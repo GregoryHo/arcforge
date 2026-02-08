@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 /**
  * Append an entry to a JSONL index file.
@@ -144,9 +145,6 @@ function main() {
  * @param {string} project - Project name
  */
 function checkBubbleUpForProject(project) {
-  const path = require('path');
-  const os = require('os');
-
   const instinctsBase = path.join(os.homedir(), '.claude', 'instincts');
   const projectInstincts = path.join(instinctsBase, project);
   const globalDir = path.join(instinctsBase, 'global');

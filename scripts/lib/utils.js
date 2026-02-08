@@ -478,6 +478,36 @@ function getCompactionLogPath(project) {
 }
 
 /**
+ * Sanitize a filename to prevent path traversal attacks.
+ * Rejects names containing path separators, parent-dir sequences,
+ * null bytes, or control characters. Throws on invalid input.
+ *
+ * @param {string} name - Filename to validate (e.g., skill name, instinct ID)
+ * @returns {string} The validated filename (unchanged if valid)
+ * @throws {Error} If the name is invalid
+ */
+function sanitizeFilename(name) {
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new Error('Filename must be a non-empty string');
+  }
+
+  if (name.includes('/') || name.includes('\\')) {
+    throw new Error(`Invalid filename: path separators not allowed: "${name}"`);
+  }
+
+  if (name.includes('..')) {
+    throw new Error(`Invalid filename: parent directory traversal not allowed: "${name}"`);
+  }
+
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(name)) {
+    throw new Error(`Invalid filename: control characters not allowed: "${name}"`);
+  }
+
+  return name;
+}
+
+/**
  * Ensure a directory exists
  */
 function ensureDir(dirPath) {
@@ -596,6 +626,7 @@ module.exports = {
   getDiaryedDir,
   getCompactionLogPath,
   ensureDir,
+  sanitizeFilename,
   createSessionCounter,
   getSessionFilePath,
   loadSession,

@@ -25,6 +25,8 @@ const {
   getLearnedGlobalIndex
 } = require('../../../scripts/lib/session-utils');
 
+const { sanitizeFilename } = require('../../../scripts/lib/utils');
+
 const {
   appendToIndex,
   findCrossProjectPatterns,
@@ -117,6 +119,8 @@ function cmdSave(flags) {
     console.error('Usage: learn.js save --name X --content "..." [--project P] [--scope global|project] [--confidence 0.5]');
     process.exit(1);
   }
+
+  sanitizeFilename(name);
 
   const dir = scope === 'global' ? getLearnedSkillsDir(null) : getLearnedSkillsDir(project);
   fs.mkdirSync(dir, { recursive: true });
@@ -211,6 +215,7 @@ function cmdList(flags) {
  * Confirm a learned skill.
  */
 function cmdConfirm(name, flags) {
+  sanitizeFilename(name);
   const project = flags.project || getDefaultProject();
 
   // Look in project first, then global
@@ -250,6 +255,7 @@ function cmdConfirm(name, flags) {
  * Contradict a learned skill.
  */
 function cmdContradict(name, flags) {
+  sanitizeFilename(name);
   const project = flags.project || getDefaultProject();
 
   let filePath = path.join(getLearnedSkillsDir(project), `${name}.md`);
@@ -304,6 +310,7 @@ function cmdContradict(name, flags) {
  * Check for duplicate skill name.
  */
 function cmdCheckDuplicate(name, flags) {
+  sanitizeFilename(name);
   const project = flags.project || getDefaultProject();
 
   const projectPath = path.join(getLearnedSkillsDir(project), `${name}.md`);

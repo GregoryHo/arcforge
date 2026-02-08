@@ -112,9 +112,6 @@ function main() {
     const phase = process.argv[2]; // 'pre' or 'post'
     const stdin = readStdinSync();
 
-    // Pass through stdin for hook chaining
-    process.stdout.write(stdin);
-
     // Parse hook input
     let input;
     try {

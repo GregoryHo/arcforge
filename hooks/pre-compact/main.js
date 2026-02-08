@@ -116,7 +116,7 @@ function main() {
 
       // Generate auto-diary draft (silent, best-effort)
       try {
-        const autoDiaryPath = path.join(__dirname, '../session-tracker/../../skills/arc-journaling/scripts/auto-diary.js');
+        const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
         execFileSync('node', [
           autoDiaryPath, 'generate',
           '--project', project,

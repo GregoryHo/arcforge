@@ -26,6 +26,8 @@ const {
   getGlobalInstinctsDir
 } = require('../../../scripts/lib/session-utils');
 
+const { sanitizeFilename } = require('../../../scripts/lib/utils');
+
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -175,6 +177,7 @@ function cmdStatus(project) {
  * Confirm an instinct (increase confidence).
  */
 function cmdConfirm(instinctId, project) {
+  sanitizeFilename(instinctId);
   const dir = getInstinctsDir(project);
   const filePath = path.join(dir, `${instinctId}.md`);
 
@@ -211,6 +214,7 @@ function cmdConfirm(instinctId, project) {
  * Contradict an instinct (decrease confidence).
  */
 function cmdContradict(instinctId, project) {
+  sanitizeFilename(instinctId);
   const dir = getInstinctsDir(project);
   const filePath = path.join(dir, `${instinctId}.md`);
 
