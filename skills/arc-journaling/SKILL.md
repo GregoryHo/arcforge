@@ -56,6 +56,23 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 
 **Storage:** `~/.claude/sessions/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
+## Pre-Diary Check (Noise Gate)
+
+Before creating a diary entry, verify at least ONE of these criteria is met:
+
+- **Non-trivial decision** was made (architecture, tool choice, approach)
+- **Challenge was solved** (debugging, workaround found)
+- **User preference was expressed** (explicit or implicit)
+- **Technique was discovered** (new pattern, integration insight)
+
+**Auto-skip these sessions** (no diary needed):
+- Pure Q&A (answering questions without making changes)
+- Retrying the same operation (build failures, test reruns)
+- Pure exploration (reading files without decisions)
+- Trivial fixes (typos, formatting, single-line changes)
+
+This is a **soft gate**: Claude judges based on conversation memory. User can always override with explicit `/diary`.
+
 ## When to Use
 
 - User runs `/diary`
@@ -70,6 +87,7 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 - Pure research without decisions
 - Already captured in previous diary entry this session
 - Pattern extraction needed (use /learn instead)
+- **Fails Pre-Diary Check** — unless user explicitly requests
 
 ## Process
 

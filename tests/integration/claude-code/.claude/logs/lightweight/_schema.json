@@ -1,0 +1,32 @@
+{
+  "_type": "schema",
+  "_description": "Lightweight log for Claude Code sessions",
+  "fields": {
+    "start_time": "Session 開始時間 (ISO 格式)",
+    "transcript_path": "完整對話記錄路徑，可用於回溯詳細內容",
+    "timeline": "所有事件按時間排列，每個包含 ts/type 及對應資料",
+    "timeline_types": {
+      "prompt": "用戶輸入的 prompt（content）",
+      "response": "Claude 回覆（content，截斷至 200 字）",
+      "tool": "工具使用（tool/input/output）",
+      "subagent": "Subagent 完成（subagent_type/duration_sec/success）",
+      "permission_request": "權限請求（tool/input）"
+    },
+    "tokens": {
+      "input": "新輸入 token (1x 價格)",
+      "output": "輸出 token (1x 價格)",
+      "cache_read": "從 cache 讀取的 token (0.1x 價格，最省)",
+      "cache_creation": "建立 cache 的 token (1.25x 價格)"
+    },
+    "context_tokens": "最後一次 API 呼叫的 context 大小 (input + cache_read)",
+    "context_limit": "模型 context window 上限 (預設 200K)",
+    "context_used": "Context 已使用百分比",
+    "context_remaining": "Context 剩餘百分比",
+    "model": "使用的模型",
+    "duration_sec": "Session 持續秒數",
+    "cost_estimate": "估算成本 (USD)",
+    "files_modified": "修改的檔案列表（從 Edit/Write 提取）",
+    "error_count": "工具執行失敗次數",
+    "end_time": "Session 結束時間 (ISO 格式)"
+  }
+}

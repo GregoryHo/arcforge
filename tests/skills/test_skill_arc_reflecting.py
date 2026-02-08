@@ -91,3 +91,11 @@ def test_distinguishes_from_learn():
     has_learn_reference = "/learn" in lower_text or "learn" in lower_text
     has_diaryed = "diaryed" in lower_text
     assert has_learn_reference and has_diaryed
+
+
+def test_has_observation_cross_reference():
+    """Skill must document observation cross-referencing."""
+    text = _read_skill()
+    lower = text.lower()
+    assert "observation" in lower
+    assert "cross-reference" in lower or "cross reference" in lower

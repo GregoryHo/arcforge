@@ -56,7 +56,24 @@ if (command === 'strategy') {
   updateProcessedLog(logPath, diaryFiles, reflection);
   console.log(`✓ Updated processed.log with ${diaryFiles.length} entries`);
 
+} else if (command === 'auto-check') {
+  // Check if reflection is ready (enough unprocessed diaries)
+  const { project } = parseArgs(args.slice(1));
+  if (!project) {
+    console.error('Error: Missing required argument --project');
+    console.log('Usage: reflect.js auto-check --project X');
+    process.exit(1);
+  }
+  const logPath = getProcessedLogPath(project);
+  const strategy = determineReflectStrategy(project, logPath);
+  const diaries = scanDiaries(project, strategy, logPath);
+
+  if (diaries.length >= 3) {
+    console.log(`ready|${strategy}|${diaries.length}`);
+  } else {
+    console.log(`not-ready|${strategy}|${diaries.length}`);
+  }
 } else {
-  console.log('Usage: reflect.js <strategy|scan|update-log> --project X [--strategy Y] [--diaries "a,b,c"] [--reflection Z]');
+  console.log('Usage: reflect.js <strategy|scan|update-log|auto-check> --project X [--strategy Y] [--diaries "a,b,c"] [--reflection Z]');
   process.exit(1);
 }

@@ -126,6 +126,92 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
   fs.appendFileSync(logPath, lines, 'utf-8');
 }
 
+// ─────────────────────────────────────────────
+// Observation & Instinct Path Helpers
+// ─────────────────────────────────────────────
+
+/**
+ * Get observations JSONL path for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/observations/{project}/observations.jsonl
+ */
+function getObservationsPath(project) {
+  return path.join(CLAUDE_DIR, 'observations', project, 'observations.jsonl');
+}
+
+/**
+ * Get observations archive directory for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/observations/{project}/archive/
+ */
+function getObservationsArchivePath(project) {
+  return path.join(CLAUDE_DIR, 'observations', project, 'archive');
+}
+
+/**
+ * Get instincts directory for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/instincts/{project}/
+ */
+function getInstinctsDir(project) {
+  return path.join(CLAUDE_DIR, 'instincts', project);
+}
+
+/**
+ * Get archived instincts directory for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/instincts/{project}/archived/
+ */
+function getInstinctsArchivedDir(project) {
+  return path.join(CLAUDE_DIR, 'instincts', project, 'archived');
+}
+
+/**
+ * Get global instincts directory.
+ * @returns {string} ~/.claude/instincts/global/
+ */
+function getGlobalInstinctsDir() {
+  return path.join(CLAUDE_DIR, 'instincts', 'global');
+}
+
+/**
+ * Get global index for instinct bubble-up tracking.
+ * @returns {string} ~/.claude/instincts/global-index.jsonl
+ */
+function getInstinctsGlobalIndex() {
+  return path.join(CLAUDE_DIR, 'instincts', 'global-index.jsonl');
+}
+
+/**
+ * Get global index for learned skills bubble-up tracking.
+ * @returns {string} ~/.claude/skills/learned/global-index.jsonl
+ */
+function getLearnedGlobalIndex() {
+  return path.join(CLAUDE_DIR, 'skills', 'learned', 'global-index.jsonl');
+}
+
+/**
+ * Get learned skills directory.
+ * @param {string|null} project - Project name for project-specific, null for global
+ * @returns {string} Path to learned skills directory
+ */
+function getLearnedSkillsDir(project = null) {
+  const base = path.join(CLAUDE_DIR, 'skills', 'learned');
+  return project ? path.join(base, project) : path.join(base, 'global');
+}
+
+/**
+ * Get archived learned skills directory.
+ * @param {string|null} project - Project name for project-specific, null for global
+ * @returns {string} Path to archived learned skills directory
+ */
+function getLearnedSkillsArchivedDir(project = null) {
+  const base = path.join(CLAUDE_DIR, 'skills', 'learned');
+  return project
+    ? path.join(base, project, 'archived')
+    : path.join(base, 'global', 'archived');
+}
+
 module.exports = {
   getDiaryPath,
   saveDiary,
@@ -134,5 +220,15 @@ module.exports = {
   scanDiaries,
   determineReflectStrategy,
   updateProcessedLog,
-  CLAUDE_DIR
+  CLAUDE_DIR,
+  // Observation & Instinct paths
+  getObservationsPath,
+  getObservationsArchivePath,
+  getInstinctsDir,
+  getInstinctsArchivedDir,
+  getGlobalInstinctsDir,
+  getInstinctsGlobalIndex,
+  getLearnedGlobalIndex,
+  getLearnedSkillsDir,
+  getLearnedSkillsArchivedDir
 };

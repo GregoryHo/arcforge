@@ -10,6 +10,7 @@
  */
 
 const path = require('path');
+const { execFileSync } = require('child_process');
 const {
   getProjectSessionsDir,
   getSessionDir,
@@ -113,11 +114,24 @@ function main() {
         writeFileSafe(markdownPath, markdown);
       }
 
-      // Prompt to run diary skill
-      log(`
-📝 Context compaction detected. (${userCount} messages, ${toolCount} tool calls)
+      // Generate auto-diary draft (silent, best-effort)
+      try {
+        const autoDiaryPath = path.join(__dirname, '../session-tracker/../../skills/arc-journaling/scripts/auto-diary.js');
+        execFileSync('node', [
+          autoDiaryPath, 'generate',
+          '--project', project,
+          '--date', date,
+          '--session', sessionId
+        ], { stdio: 'ignore', timeout: 5000 });
+      } catch {
+        // Non-blocking — draft generation is best-effort
+      }
 
-Please use /diary skill immediately to capture session reflections before context is compacted.
+      // Prompt to run diary skill via stderr (NOT outputDecision — preserves stdout pass-through)
+      log(`
+Context compaction detected. (${userCount} messages, ${toolCount} tool calls)
+
+A diary draft has been generated. Please use /diary skill to review and finalize it before context is compacted.
 `);
 
       // Reset counters after threshold is met

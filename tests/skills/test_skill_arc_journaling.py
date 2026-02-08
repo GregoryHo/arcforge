@@ -70,3 +70,26 @@ def test_has_template():
     assert "## User Preferences" in text
     assert "## What Worked Well" in text
     assert "## Challenges" in text
+
+
+def test_has_pre_diary_check():
+    """Skill must have Pre-Diary Check noise gate section."""
+    text = _read_skill()
+    assert "Pre-Diary Check" in text
+
+
+def test_pre_diary_check_has_criteria():
+    """Pre-Diary Check must list criteria for what qualifies."""
+    text = _read_skill()
+    lower = text.lower()
+    assert "non-trivial decision" in lower or "decision" in lower
+    assert "challenge" in lower
+    assert "preference" in lower or "user preference" in lower
+
+
+def test_pre_diary_check_has_skip_conditions():
+    """Pre-Diary Check must list conditions to skip."""
+    text = _read_skill()
+    lower = text.lower()
+    assert "q&a" in lower or "pure q&a" in lower
+    assert "trivial" in lower

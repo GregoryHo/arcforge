@@ -159,6 +159,8 @@ Read each diary entry. Look for:
 - Common techniques
 - **Rule violations:** Cases where user corrected Claude for breaking a CLAUDE.md rule
 
+**Observation Cross-Reference:** When observations are available (`~/.claude/observations/{project}/observations.jsonl`), cross-reference diary patterns with tool call data for stronger evidence. Tool usage sequences that match diary-reported techniques provide quantitative backing for patterns. For example, if a diary mentions "always grep before editing", check observations for Grep→Read→Edit sequences to confirm frequency.
+
 ### 5. Identify Patterns and Violations
 
 **Pattern threshold (3+ occurrences):** A pattern MUST appear in 3+ diary entries to be labeled "Pattern".

@@ -53,23 +53,22 @@ function loadConfig() {
  * @returns {string} The reason/prompt for Claude to execute
  */
 function formatStopReason(userCount, toolCount, config) {
-  const project = getProjectName();
-
   return `📚 Session evaluation available (${userCount} messages, ${toolCount} tool calls)
 
-**Pattern Extraction:**
+**Pattern Extraction (while session context is fresh):**
 Evaluate if there are extractable patterns from this session:
-- Repeated error resolution methods (error_resolution)
-- User correction habits (user_corrections)
-- Effective workarounds
-- Debugging techniques (debugging_techniques)
-- Project-specific conventions (project_specific)
+- Repeated error resolution methods
+- User correction habits
+- Effective workarounds or debugging techniques
+- Cross-project reusable patterns
 
-If patterns found, use:
-  /learn  - Extract reusable patterns → ${config.learnedSkillsGlobalPath}
+Apply the Transferability Test before saving:
+1. Would this help in a **different** project?
+2. Would another developer find this useful?
+3. Has this pattern appeared more than once?
 
-**Reflection (requires 5+ diary entries):**
-  /reflect - Analyze diary entries → ~/.claude/diaryed/${project}/`;
+If patterns found, use /learn to extract them.
+New patterns start at confidence 0.50 and need confirmations to reach auto-load threshold (0.70).`;
 }
 
 /**
