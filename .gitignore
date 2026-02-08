@@ -1,0 +1,34 @@
+.worktrees/
+worktrees/
+.claude/skills/
+.claude/settings.local.json
+.claude/logs/
+
+# Local tooling
+docs/.claude/
+.venv/
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+dist/
+build/
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Node.js
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.claude/log-lightweight.config.json
+.serena/cache/

@@ -1,0 +1,71 @@
+---
+name: agentic-debug
+description: Use when encountering bugs, test failures, or unexpected behavior
+---
+
+# agentic-debug
+
+## Overview
+Systematic 4-phase debugging approach with 3-Attempt Rule from CLAUDE.md.
+
+## Four Phases
+
+### 1. Observe
+Gather evidence: error messages, stack traces, test output, logs.
+
+### 2. Hypothesize
+Form testable hypotheses about root cause.
+
+### 3. Test
+Verify hypothesis with minimal changes or debugging tools.
+
+### 4. Fix
+Implement fix, verify with tests, commit.
+
+## 3-Attempt Rule
+Maximum 3 attempts per issue. After 3 failures:
+1. Document what failed
+2. Research alternatives (find 2-3 similar implementations)
+3. Question fundamentals (wrong abstraction? simpler approach?)
+4. Try different angle or ask for help
+
+## Workflow
+1. Run failing test/code to observe error
+2. Form hypothesis about root cause
+3. Test hypothesis (add logging, use debugger, isolate component)
+4. Implement fix
+5. Verify fix with full test suite
+6. Commit with clear message
+
+## Stage Completion Format
+```
+─────────────────────────────────────────────────
+✅ Debug complete → issue resolved
+
+Root cause: [description]
+Fix: [summary]
+
+Next: Continue with implementation
+─────────────────────────────────────────────────
+```
+
+## Blocked Format
+```
+─────────────────────────────────────────────────
+⚠️ Debug blocked (3 attempts exhausted)
+
+Issue: [description]
+Location: [file:line]
+
+Attempted:
+1. [approach 1]
+2. [approach 2]
+3. [approach 3]
+
+To resolve:
+1. Review fundamentals or consider different approach
+2. Consult documentation or similar implementations
+
+Then retry: `/agentic-debug`
+─────────────────────────────────────────────────
+```

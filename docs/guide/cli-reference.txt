@@ -1,0 +1,602 @@
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              arcforge CLI 流程 (CLI Reference)                           │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  1. COMMAND TREE STRUCTURE (命令樹結構)                                                       │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │  arcforge                     # Main CLI group                                  │    │
+│  │  │                                                                                  │    │
+│  │  ├── status                       # Show pipeline progress                          │    │
+│  │  │   ├── --project, -p PATH       # Project path (default: .)                       │    │
+│  │  │   ├── --blocked                # Show only blocked items                         │    │
+│  │  │   └── --json                   # Output as JSON                                  │    │
+│  │  │                                                                                  │    │
+│  │  ├── next                         # Get next available task                         │    │
+│  │  │   └── (no options)                                                               │    │
+│  │  │                                                                                  │    │
+│  │  ├── complete <task_id>           # Mark task as completed                          │    │
+│  │  │   └── task_id (required)       # ID of task to complete                          │    │
+│  │  │                                                                                  │    │
+│  │  ├── block <task_id> <reason>     # Mark task as blocked                            │    │
+│  │  │   ├── task_id (required)       # ID of task to block                             │    │
+│  │  │   └── reason (required)        # Reason for blocking                             │    │
+│  │  │                                                                                  │    │
+│  │  ├── parallel                     # Show parallelizable tasks                       │    │
+│  │  │   └── (no options)                                                               │    │
+│  │  │                                                                                  │    │
+│  │  ├── expand                       # Create worktrees for ready epics                │    │
+│  │  │   ├── --verify                 # Run baseline tests in new worktrees             │    │
+│  │  │   └── --verify-cmd CMD         # Test command (default: "pytest tests/ -v")      │    │
+│  │  │                                                                                  │    │
+│  │  ├── merge [epic_ids...]          # Merge completed epics to base                   │    │
+│  │  │   ├── epic_ids (optional)      # Specific epic IDs to merge                      │    │
+│  │  │   └── --base BRANCH            # Base branch (default: main)                     │    │
+│  │  │                                                                                  │    │
+│  │  ├── cleanup [epic_ids...]        # Remove merged worktrees                         │    │
+│  │  │   └── epic_ids (optional)      # Specific epic IDs to clean                      │    │
+│  │  │                                                                                  │    │
+│  │  ├── reboot                       # Generate 5-Question context                     │    │
+│  │  │   └── (no options)                                                               │    │
+│  │  │                                                                                  │    │
+│  │  └── sync                         # Synchronize state                               │    │
+│  │      └── --direction, -d          # from-base|to-base|both|scan                     │    │
+│  │                                   # (auto-detected if omitted)                      │    │
+│  │                                                                                     │    │
+│  │  Global Option:                                                                     │    │
+│  │  └── --project, -p PATH           # Project root (applies to all commands)          │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  2. COMMAND REFERENCE (命令參考)                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  status - Show Pipeline Progress (顯示管線進度)                                      │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge status [OPTIONS]                                               │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --project, -p PATH    Project root directory (default: current directory)        │    │
+│  │    --blocked             Filter to show only blocked items                          │    │
+│  │    --json                Output raw JSON instead of formatted table                 │    │
+│  │                                                                                     │    │
+│  │  Output (table):                                                                    │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │              Pipeline Status                                                  │  │    │
+│  │  ├───────────────┬─────────────┬──────────┬────────────────────────────────────┤  │    │
+│  │  │ Epic          │ Status      │ Progress │ Worktree                           │  │    │
+│  │  ├───────────────┼─────────────┼──────────┼────────────────────────────────────┤  │    │
+│  │  │ epic-auth     │ in_progress │ 50%      │ .worktrees/epic-auth               │  │    │
+│  │  │ epic-api      │ pending     │ 0%       │ -                                  │  │    │
+│  │  └───────────────┴─────────────┴──────────┴────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "dag.yaml not found at <path>" if no DAG exists                                │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  next - Get Next Available Task (取得下一個可用任務)                                  │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge next                                                           │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Next task: <task_id>"   if a task is available                                  │    │
+│  │    "No available tasks"     if all tasks are blocked/completed/in_progress          │    │
+│  │                                                                                     │    │
+│  │  Priority order:                                                                    │    │
+│  │    1. IN_PROGRESS features (resume existing work)                                   │    │
+│  │    2. PENDING features with all dependencies completed                              │    │
+│  │    3. PENDING epics with all dependencies completed                                 │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  complete - Mark Task Completed (標記任務完成)                                        │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge complete <task_id>                                             │    │
+│  │                                                                                     │    │
+│  │  Arguments:                                                                         │    │
+│  │    task_id    ID of the task (feature or epic) to mark complete                     │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Sets task status to COMPLETED                                                 │    │
+│  │    2. If task is a Feature, checks if all features in epic are complete             │    │
+│  │    3. If all features complete, auto-completes the parent Epic                      │    │
+│  │    4. Persists changes to dag.yaml                                                  │    │
+│  │                                                                                     │    │
+│  │  Output: "Marked <task_id> as completed"                                            │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Task not found: <task_id>" if task doesn't exist                              │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  block - Mark Task Blocked (標記任務阻塞)                                             │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge block <task_id> <reason>                                       │    │
+│  │                                                                                     │    │
+│  │  Arguments:                                                                         │    │
+│  │    task_id    ID of the task to block                                               │    │
+│  │    reason     Explanation of why the task is blocked                                │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Sets task status to BLOCKED                                                   │    │
+│  │    2. Creates BlockedItem record with timestamp                                     │    │
+│  │    3. Persists to dag.yaml (in "blocked" array)                                     │    │
+│  │                                                                                     │    │
+│  │  Output: "Marked <task_id> as blocked: <reason>"                                    │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  parallel - Show Parallelizable Tasks (顯示可並行任務)                                │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge parallel                                                       │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    Lists all PENDING epics with all dependencies completed                          │    │
+│  │    Format: "<epic_id>: <epic_name>"                                                 │    │
+│  │                                                                                     │    │
+│  │  Example:                                                                           │    │
+│  │    epic-auth: Authentication System                                                 │    │
+│  │    epic-api: API Layer                                                              │    │
+│  │                                                                                     │    │
+│  │  Use case: Identify epics that can be expanded into parallel worktrees              │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  expand - Create Worktrees (建立 Worktrees)                                          │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge expand [OPTIONS]                                               │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --verify           Run baseline tests in newly created worktrees                 │    │
+│  │    --verify-cmd CMD   Custom test command (default: "pytest tests/ -v")             │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Ensures .worktrees is in .gitignore (commits if needed)                       │    │
+│  │    2. Finds PENDING epics with all dependencies completed                           │    │
+│  │    3. Creates git worktree: git worktree add .worktrees/<epic_id> -b <epic_id>      │    │
+│  │    4. Writes .agentic-epic metadata file (YAML format)                              │    │
+│  │    5. Sets epic status to IN_PROGRESS                                               │    │
+│  │    6. If --verify: runs test command, fails if tests fail                           │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Worktrees created: N"                                                           │    │
+│  │    "<epic_id>: <epic_name>" (for each created worktree)                             │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Failed to create worktree for <epic_id>: <git_error>"                         │    │
+│  │    - "Baseline tests failed for <epic_id>: <test_output>" (if --verify)             │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  merge - Merge Epics to Base (合併 Epics 到主分支)                                    │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge merge [EPIC_IDS...] [OPTIONS]                                  │    │
+│  │                                                                                     │    │
+│  │  Arguments:                                                                         │    │
+│  │    epic_ids    Optional list of specific epic IDs to merge                          │    │
+│  │                (default: all COMPLETED epics)                                       │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --base BRANCH    Target branch to merge into (default: main)                     │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. If in worktree, delegates to base worktree coordinator                        │    │
+│  │    2. Checks out base branch                                                        │    │
+│  │    3. For each epic: git merge --no-ff <epic_id> -m "feat: integrate <epic_id>"     │    │
+│  │    4. Sets epic status to COMPLETED                                                 │    │
+│  │    5. Persists changes to dag.yaml                                                  │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Merged epics into <base>:"                                                      │    │
+│  │    "<epic_id>: <epic_name>" (for each merged epic)                                  │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Epic not found: <epic_id>"                                                    │    │
+│  │    - "Failed to checkout <branch>: <error>"                                         │    │
+│  │    - "Failed to merge <epic_id>: <merge_error>"                                     │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  cleanup - Remove Worktrees (移除 Worktrees)                                         │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge cleanup [EPIC_IDS...]                                          │    │
+│  │                                                                                     │    │
+│  │  Arguments:                                                                         │    │
+│  │    epic_ids    Optional list of specific epic IDs to clean                          │    │
+│  │                (default: all COMPLETED epics)                                       │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. For each epic: git worktree remove <path>                                     │    │
+│  │    2. Removes any remaining files in worktree directory                             │    │
+│  │    3. Clears epic.worktree reference                                                │    │
+│  │    4. Persists changes to dag.yaml                                                  │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Worktrees removed: N"                                                           │    │
+│  │    "<path>" (for each removed worktree)                                             │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  reboot - Generate 5-Question Context (產生 5 問題上下文)                             │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge reboot                                                         │    │
+│  │                                                                                     │    │
+│  │  Output (tree format):                                                              │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │  5-Question Reboot                                                            │  │    │
+│  │  │  ├── Where am I? <current_task or "No active task">                           │  │    │
+│  │  │  ├── Where am I going? <N> tasks remaining                                    │  │    │
+│  │  │  ├── What's the goal? <project_goal>                                          │  │    │
+│  │  │  ├── What have I learned? <N> research files                                  │  │    │
+│  │  │  └── What have I done? <N> tasks completed                                    │  │    │
+│  │  └───────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │  Use case: Session resume after context loss or new conversation                    │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  sync - Synchronize State (同步狀態)                                                 │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge sync [OPTIONS]                                                 │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --direction, -d DIRECTION    Sync direction (auto-detected if omitted):          │    │
+│  │                                 - from-base: Pull DAG state into .agentic-epic      │    │
+│  │                                 - to-base: Push local state to DAG                  │    │
+│  │                                 - both: Bidirectional (default in worktree)         │    │
+│  │                                 - scan: Scan all worktrees (default in base)        │    │
+│  │                                                                                     │    │
+│  │  Behavior (in worktree - has .agentic-epic):                                        │    │
+│  │    from-base: Reads base DAG, updates .agentic-epic with dependency status          │    │
+│  │    to-base: Reads local status, updates base DAG                                    │    │
+│  │    both: Does both operations                                                       │    │
+│  │                                                                                     │    │
+│  │  Behavior (in base project):                                                        │    │
+│  │    scan: Iterates all .worktrees/*/. agentic-epic, updates DAG from local status    │    │
+│  │                                                                                     │    │
+│  │  Output (worktree):                                                                 │    │
+│  │    "Synced epic: <epic_id>"                                                         │    │
+│  │    "  Pulled from base DAG"                                                         │    │
+│  │    "  Ready to proceed" or "  Blocked by: <deps>"                                   │    │
+│  │    "  Pushed to base DAG"                                                           │    │
+│  │                                                                                     │    │
+│  │  Output (base):                                                                     │    │
+│  │    "Synced N worktrees"                                                             │    │
+│  │    "  <epic>: <old_status> -> <new_status>"                                         │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Cannot use --direction scan in worktree"                                      │    │
+│  │    - "Cannot use --direction from-base/to-base/both in base project"                │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  3. EXECUTION FLOW DIAGRAMS (執行流程圖)                                                      │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  Command Initialization Flow (命令初始化流程):                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │   User                         CLI                          Coordinator             │    │
+│  │    │                            │                                │                  │    │
+│  │    │  arcforge <cmd>        │                                │                  │    │
+│  │    ├───────────────────────────▶│                                │                  │    │
+│  │    │                            │  parseArgs(process.argv)       │                  │    │
+│  │    │                            │  args = { command, flags }     │                  │    │
+│  │    │                            │    projectRoot = cwd           │                  │    │
+│  │    │                            │                                │                  │    │
+│  │    │                            │  switch (args.command)         │                  │    │
+│  │    │                            │  case '<cmd>': ...             │                  │    │
+│  │    │                            │                                │                  │    │
+│  │    │                            │  new Coordinator(projectRoot)  │                  │    │
+│  │    │                            ├───────────────────────────────▶│                  │    │
+│  │    │                            │                                │ get dag()       │    │
+│  │    │                            │                                │   (lazy load)   │    │
+│  │    │                            │                                │                  │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  Status/Next/Complete Flow (狀態/下一個/完成流程):                                            │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │   status:                                                                           │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  dag.yaml ──load──▶ Coordinator.status() ──▶ Rich Table output              │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  For each epic:                                                             │  │    │
+│  │   │    - id, name, status, completion_ratio(), worktree                         │  │    │
+│  │   │  + blocked items (if any)                                                   │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │   next:                                                                             │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  Coordinator.next_task()                                                    │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    ├── 1. Find IN_PROGRESS features (resume)                                │  │    │
+│  │   │    │       └── Return first found                                           │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    ├── 2. Find PENDING features with deps satisfied                         │  │    │
+│  │   │    │       └── Check feature.is_ready(completed_features)                   │  │    │
+│  │   │    │       └── Return first found                                           │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    └── 3. Find PENDING epics with deps satisfied                            │  │    │
+│  │   │            └── Check epic.is_ready(completed_epics)                         │  │    │
+│  │   │            └── Return first found                                           │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │   complete:                                                                         │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  Coordinator.complete_task(task_id)                                         │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    ├── dag.get_task(task_id)                                                │  │    │
+│  │   │    ├── task.status = COMPLETED                                              │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    ├── If Feature:                                                          │  │    │
+│  │   │    │     └── Check if all sibling features completed                        │  │    │
+│  │   │    │     └── If yes: epic.status = COMPLETED                                │  │    │
+│  │   │    │                                                                        │  │    │
+│  │   │    └── _save_dag() ──with dag_lock──▶ dag.yaml                              │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  Expand/Merge/Cleanup Worktree Lifecycle (Worktree 生命週期):                                │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │   PENDING Epic                                                                      │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  expand_worktrees()                                                         │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  1. _ensure_worktrees_ignored()                                             │  │    │
+│  │   │     └── Add .worktrees to .gitignore if not present                         │  │    │
+│  │   │     └── Commit: "chore: ignore .worktrees directory"                        │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  2. For each ready epic:                                                    │  │    │
+│  │   │     └── git worktree add .worktrees/<epic_id> -b <epic_id>                  │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  3. Write .agentic-epic:                                                     │  │    │
+│  │   │     ┌────────────────────────────────────┐                                  │  │    │
+│  │   │     │ epic: <epic_id>                    │                                  │  │    │
+│  │   │     │ base_worktree: /path/to/project    │                                  │  │    │
+│  │   │     │ base_branch: main                  │                                  │  │    │
+│  │   │     │ local:                             │                                  │  │    │
+│  │   │     │   status: in_progress              │                                  │  │    │
+│  │   │     │   started_at: <timestamp>          │                                  │  │    │
+│  │   │     │ synced: null                       │                                  │  │    │
+│  │   │     └────────────────────────────────────┘                                  │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  4. epic.status = IN_PROGRESS, epic.worktree = .worktrees/<epic_id>         │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  5. If --verify: run test command, fail if tests fail                       │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   IN_PROGRESS Epic (work happens in worktree)                                       │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  merge_epics()                                                              │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  1. If in worktree: delegate to base coordinator                            │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  2. git checkout <base_branch>                                              │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  3. For each epic:                                                          │  │    │
+│  │   │     └── git merge --no-ff <epic_id> -m "feat: integrate <epic_id> epic"     │  │    │
+│  │   │     └── epic.status = COMPLETED                                             │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  4. _save_dag()                                                             │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   COMPLETED Epic (merged to base)                                                   │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  cleanup_worktrees()                                                        │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  1. git worktree remove <path>                                              │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  2. Remove any remaining files                                              │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  3. epic.worktree = None                                                    │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  4. _save_dag()                                                             │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │       │                                                                             │    │
+│  │       ▼                                                                             │    │
+│  │   COMPLETED Epic (worktree removed)                                                 │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  Sync Bidirectional Flow (同步雙向流程):                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │   ┌───────────────────────────────────────────────────────────────────────────┐    │    │
+│  │   │                        IN WORKTREE                                        │    │    │
+│  │   └───────────────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                                     │    │
+│  │   from-base:                                                                        │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  Base dag.yaml ──read──▶ Coordinator(base)                                  │  │    │
+│  │   │       │                                                                     │  │    │
+│  │   │       └── Get epic's dependency status                                      │  │    │
+│  │   │       └── Get dependents list                                               │  │    │
+│  │   │       └── Get blocked_by list                                               │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  .agentic-epic ◀──write── synced: { dependencies, dependents, blocked_by }  │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │   to-base:                                                                          │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  .agentic-epic ──read──▶ local.status                                       │  │    │
+│  │   │       │                                                                     │  │    │
+│  │   │       └── If status changed:                                                │  │    │
+│  │   │           └── Coordinator(base).dag.get_epic().status = local.status        │  │    │
+│  │   │           └── Coordinator(base)._save_dag()                                 │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  Base dag.yaml ◀──write── updated epic status                               │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  │   ┌───────────────────────────────────────────────────────────────────────────┐    │    │
+│  │   │                        IN BASE PROJECT                                    │    │    │
+│  │   └───────────────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                                     │    │
+│  │   scan:                                                                             │    │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │   │  .worktrees/                                                                │  │    │
+│  │   │  ├── epic-A/.agentic-epic ──read──▶ local.status                            │  │    │
+│  │   │  ├── epic-B/.agentic-epic ──read──▶ local.status                            │  │    │
+│  │   │  └── epic-C/.agentic-epic ──read──▶ local.status                            │  │    │
+│  │   │       │                                                                     │  │    │
+│  │   │       └── For each: if local.status != dag_status                           │  │    │
+│  │   │           └── Update dag epic status                                        │  │    │
+│  │   │           └── Record in updates[]                                           │  │    │
+│  │   │                                                                             │  │    │
+│  │   │  dag.yaml ◀──write── all status updates                                     │  │    │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  4. CONFIGURATION FILES (設定檔)                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  dag.yaml - DAG Definition (DAG 定義):                                                       │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │  # Root structure                                                                   │    │
+│  │  epics:                           # Required: list of epics                         │    │
+│  │    - id: string                   # Unique identifier (used for branch name)        │    │
+│  │      name: string                 # Human-readable name                             │    │
+│  │      status: string               # pending | in_progress | completed | blocked     │    │
+│  │      spec_path: string            # Path to epic spec document                      │    │
+│  │      worktree: string | null      # Path to worktree (set after expand)             │    │
+│  │      depends_on: [string]         # List of epic IDs this depends on                │    │
+│  │      features:                    # List of features within this epic               │    │
+│  │        - id: string               # Unique feature identifier                       │    │
+│  │          name: string             # Human-readable feature name                     │    │
+│  │          status: string           # pending | in_progress | completed | blocked     │    │
+│  │          depends_on: [string]     # List of feature IDs this depends on             │    │
+│  │                                                                                     │    │
+│  │  blocked:                         # Optional: list of blocked items                 │    │
+│  │    - task_id: string              # ID of blocked task                              │    │
+│  │      reason: string               # Why it's blocked                                │    │
+│  │      blocked_at: string           # ISO timestamp                                   │    │
+│  │      attempts: [object]           # Optional: list of unblock attempts              │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  .agentic-epic - Worktree Metadata (Worktree 元資料):                                        │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │  epic: string                     # Epic ID                                         │    │
+│  │  base_worktree: string            # Absolute path to base project                   │    │
+│  │  base_branch: string              # Branch that was active when worktree created    │    │
+│  │                                                                                     │    │
+│  │  local:                           # Local state (managed in worktree)               │    │
+│  │    status: string                 # in_progress | completed                         │    │
+│  │    started_at: string             # ISO timestamp when worktree created             │    │
+│  │                                                                                     │    │
+│  │  synced:                          # State from base DAG (updated by sync)           │    │
+│  │    last_sync: string              # ISO timestamp of last sync                      │    │
+│  │    dependencies:                  # Status of each dependency                       │    │
+│  │      <epic_id>: string            # pending | in_progress | completed               │    │
+│  │    dependents: [string]           # Epics that depend on this one                   │    │
+│  │    blocked_by: [string]           # Dependencies not yet completed                  │    │
+│  │    dag_status: string             # Status in base DAG                              │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  5. USAGE EXAMPLES (使用範例)                                                                 │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │  # Check pipeline status                                                            │    │
+│  │  $ arcforge status                                                              │    │
+│  │                                                                                     │    │
+│  │  # Check status of blocked items only                                               │    │
+│  │  $ arcforge status --blocked                                                    │    │
+│  │                                                                                     │    │
+│  │  # Get next task to work on                                                         │    │
+│  │  $ arcforge next                                                                │    │
+│  │                                                                                     │    │
+│  │  # Mark a feature as complete                                                       │    │
+│  │  $ arcforge complete feat-login                                                 │    │
+│  │                                                                                     │    │
+│  │  # Block a task with reason                                                         │    │
+│  │  $ arcforge block feat-oauth "External API not ready"                           │    │
+│  │                                                                                     │    │
+│  │  # See which epics can run in parallel                                              │    │
+│  │  $ arcforge parallel                                                            │    │
+│  │                                                                                     │    │
+│  │  # Create worktrees for ready epics                                                 │    │
+│  │  $ arcforge expand                                                              │    │
+│  │                                                                                     │    │
+│  │  # Create worktrees with baseline test verification                                 │    │
+│  │  $ arcforge expand --verify                                                     │    │
+│  │  $ arcforge expand --verify --verify-cmd "npm test"                             │    │
+│  │                                                                                     │    │
+│  │  # Work in a worktree                                                               │    │
+│  │  $ cd .worktrees/epic-auth                                                          │    │
+│  │  $ # ... do development work ...                                                    │    │
+│  │                                                                                     │    │
+│  │  # Sync state while in worktree                                                     │    │
+│  │  $ arcforge sync                      # Auto-detect direction (both)            │    │
+│  │  $ arcforge sync -d from-base         # Pull dependency status                  │    │
+│  │  $ arcforge sync -d to-base           # Push local status                       │    │
+│  │                                                                                     │    │
+│  │  # Sync all worktrees from base project                                             │    │
+│  │  $ cd /path/to/project                                                              │    │
+│  │  $ arcforge sync                      # Auto-detect direction (scan)            │    │
+│  │                                                                                     │    │
+│  │  # Merge completed epics                                                            │    │
+│  │  $ arcforge merge                     # All completed epics                     │    │
+│  │  $ arcforge merge epic-auth           # Specific epic                           │    │
+│  │  $ arcforge merge epic-auth epic-api --base main                                │    │
+│  │                                                                                     │    │
+│  │  # Clean up merged worktrees                                                        │    │
+│  │  $ arcforge cleanup                   # All completed epics                     │    │
+│  │  $ arcforge cleanup epic-auth         # Specific epic                           │    │
+│  │                                                                                     │    │
+│  │  # Resume session context                                                           │    │
+│  │  $ arcforge reboot                                                              │    │
+│  │                                                                                     │    │
+│  │  # Use with different project path                                                  │    │
+│  │  $ arcforge -p /other/project status                                            │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,18 @@
+{
+  "name": "arcforge-dev",
+  "description": "Development marketplace for arcforge skills library",
+  "owner": {
+    "name": "Gregory Ho"
+  },
+  "plugins": [
+    {
+      "name": "arcforge",
+      "description": "Skill-based workflow engine for AI coding agents: planning, TDD, worktree orchestration, and session learning",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Gregory Ho"
+      }
+    }
+  ]
+}

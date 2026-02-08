@@ -1,0 +1,10 @@
+{
+  "sessionId": "session-{timestamp}",
+  "project": "{project-name}",
+  "date": "YYYY-MM-DD",
+  "started": "ISO-timestamp",
+  "lastUpdated": "ISO-timestamp",
+  "toolCalls": 0,
+  "filesModified": [],
+  "compactions": []
+}

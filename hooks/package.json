@@ -1,0 +1,10 @@
+{
+  "name": "arcforge-hooks",
+  "version": "1.0.0",
+  "description": "Claude Code hooks for arcforge",
+  "scripts": {
+    "test": "node --test __tests__/*.test.js",
+    "test:watch": "node --test --watch __tests__/*.test.js"
+  },
+  "private": true
+}

@@ -1,0 +1,17 @@
+{
+  "name": "arcforge",
+  "version": "1.0.0",
+  "description": "Skill-based autonomous agent pipeline for Claude Code",
+  "scripts": {
+    "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills",
+    "test:scripts": "jest",
+    "test:hooks": "cd hooks && npm test",
+    "test:node": "node tests/node/run-tests.js",
+    "test:skills": "python3 -m pytest tests/skills/ -v",
+    "test:diary": "node skills/arc-journaling/scripts/diary.js",
+    "test:reflect": "node skills/arc-reflecting/scripts/reflect.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

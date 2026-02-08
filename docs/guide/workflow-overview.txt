@@ -1,0 +1,70 @@
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                    arcforge 工作流（同圖區分 大/小型 + 檔案產出）                            │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  入口                                                                                         │
+│  ┌──────────────────┐                                                                         │
+│  │  arc-using   │  路由檢查                                                               │
+│  └────────┬─────────┘                                                                         │
+│           │                                                                                  │
+│           ▼                                                                                  │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐          │
+│  │                           決策：任務規模                                       │          │
+│  │                大型（有設計/規格/多 Epic）   小型（單一需求/無完整規格）        │          │
+│  └───────────────┬──────────────────────────────────┬───────────────────────────┘          │
+│                  │                                  │                                      │
+│                  ▼                                  ▼                                      │
+│   ┌──────────────────────────────┐       ┌──────────────────────────────┐                   │
+│   │          大型流程             │       │          小型流程             │                   │
+│   └──────────────────────────────┘       └──────────────────────────────┘                   │
+│                                                                                              │
+│   [arc-brainstorming]                     [arc-writing-tasks]                            │
+│   └─ outputs: docs/plans/*-design.md       └─ outputs: docs/tasks/<feature>-tasks.md          │
+│          │                                  (若無 feature，依任務命名)                         │
+│          ▼                                           │                                       │
+│   [arc-refining]                                  ▼                                       │
+│   └─ outputs: specs/spec.xml + specs/details/*.xml  ┌──────────────────────────────────────┐  │
+│          │                                          │           執行層（二選一）             │  │
+│          ▼                                          │  [arc-executing-tasks] OR         │  │
+│   [arc-planning]                                 │  [arc-agent-driven]               │  │
+│   └─ outputs: dag.yaml + epics/**/*.md              └──────────────────────────────────────┘  │
+│          │                                                       │                           │
+│          ▼                                                       ▼                           │
+│   [arc-coordinating]                                 TDD: RED→GREEN→REFACTOR              │
+│   └─ outputs: .worktrees/<epic>/ + .agentic-epic                  │                           │
+│          │                                                       ▼                           │
+│          ▼                              [arc-requesting-review → receiving-review]       │
+│   ┌──────────────────────────────────────────────────────────────────────┐                   │
+│   │          arc-implementing  (Per-Feature Loop)                      │                   │
+│   │                                                                      │                   │
+│   │   for each feature:                                                  │                   │
+│   │     [arc-writing-tasks]                                          │                   │
+│   │       └─ outputs: docs/tasks/<feature>-tasks.md                       │                   │
+│   │            │                                                         │                   │
+│   │            ▼                                                         │                   │
+│   │   ┌──────────────────────────────────────────────────────────────┐   │                   │
+│   │   │           執行層（二選一）                                    │   │                   │
+│   │   │  [arc-executing-tasks] OR [arc-agent-driven]          │   │                   │
+│   │   └──────────────────────────────────────────────────────────────┘   │                   │
+│   │            │                                                         │                   │
+│   │            ▼                                                         │                   │
+│   │   TDD: RED→GREEN→REFACTOR                                             │                   │
+│   │            │                                                         │                   │
+│   │            ▼                                                         │                   │
+│   │   [arc-requesting-review → receiving-review]                     │                   │
+│   │                                                                      │                   │
+│   │  loop until all features complete                                    │                   │
+│   └──────────────────────────────────────────────────────────────────────┘                   │
+│          │                                                                                   │
+│          ▼                                                                                   │
+│   outputs: src/ + tests/ + epics/<epic>/errors.md                                             │
+│          │                                                                                   │
+│          ▼                                                                                   │
+│   [arc-finishing-epic]                                                                       │
+│                                                                                              │
+│  Always Available                                                                            │
+│  [arc-debugging]   (Observe→Hypothesize→Test→Fix)                                             │
+│  [arc-verifying]  (evidence-first)                                                          │
+│  [arc-using-worktrees] (worktree expand/merge/status)                                            │
+│                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘

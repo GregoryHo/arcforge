@@ -1,0 +1,25 @@
+# Session: {date}
+**Project:** {project}
+**Session ID:** {sessionId}
+**Started:** {HH:MM}
+**Last Updated:** {HH:MM}
+
+---
+
+## Current State
+
+[Session context goes here]
+
+### Completed
+- [ ]
+
+### In Progress
+- [ ]
+
+### Notes for Next Session
+-
+
+### Context to Load
+```
+{filesModified}
+```

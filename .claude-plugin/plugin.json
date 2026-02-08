@@ -1,0 +1,12 @@
+{
+  "name": "arcforge",
+  "description": "Skill-based workflow engine for AI coding agents: planning, TDD, worktree orchestration, and session learning",
+  "version": "1.0.0",
+  "author": {
+    "name": "Gregory Ho"
+  },
+  "homepage": "https://github.com/GregoryHo/arcforge",
+  "repository": "https://github.com/GregoryHo/arcforge",
+  "license": "MIT",
+  "keywords": ["skills", "tdd", "workflows", "planning", "review", "worktrees", "arcforge"]
+}

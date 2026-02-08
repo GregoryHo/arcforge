@@ -1,0 +1,312 @@
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                         arcforge 核心設計框架 (Architecture Overview)                     │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  1. PROJECT STRUCTURE (專案結構)                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  arcforge/                                                                               │
+│  ├── scripts/                     # Node.js CLI and core engine                              │
+│  │   ├── cli.js                   # CLI entry point (10 commands)                           │
+│  │   └── lib/                     # Supporting modules                                      │
+│  │       ├── coordinator.js       # DAG orchestration engine                                │
+│  │       └── dag-schema.js        # Schema validation                                       │
+│  │                                                                                          │
+│  ├── skills/                      # Markdown skill definitions (19 skills)                  │
+│  │   ├── arc-using/           # Entry point skill                                       │
+│  │   ├── arc-brainstorming/      # Ideation                                                │
+│  │   ├── arc-refining/         # Spec generation                                         │
+│  │   ├── arc-planning/         # DAG planning                                            │
+│  │   ├── arc-coordinating/     # Worktree management                                     │
+│  │   ├── arc-implementing/     # Large project orchestration                             │
+│  │   ├── arc-writing-tasks/   # Task breakdown                                          │
+│  │   ├── arc-executing-tasks/ # Human-in-loop execution                                 │
+│  │   ├── arc-agent-driven/    # Automated subagent execution                            │
+│  │   ├── arc-dispatching-parallel/        # Multi-agent dispatch                                    │
+│  │   ├── arc-tdd/             # Test-driven development                                 │
+│  │   ├── arc-debugging/           # Systematic debugging                                    │
+│  │   ├── arc-verifying/          # Completion verification                                 │
+│  │   ├── arc-using-worktrees/        # Worktree creation                                       │
+│  │   ├── arc-finishing/          # Branch completion                                       │
+│  │   ├── arc-finishing-epic/     # Epic completion with merge                              │
+│  │   ├── arc-requesting-review/ # Review request                                        │
+│  │   ├── arc-receiving-review/  # Review response                                       │
+│  │   └── arc-writing-skills/    # Skill authoring                                       │
+│  │                                                                                          │
+│  ├── templates/                   # Subagent prompt templates                               │
+│  │   ├── implementer-prompt.md    # TDD implementer subagent                                │
+│  │   ├── spec-reviewer-prompt.md  # Spec compliance reviewer                                │
+│  │   └── code-quality-reviewer-prompt.md  # Code quality reviewer                           │
+│  │                                                                                          │
+│  ├── agents/                      # Persistent agent definitions                            │
+│  │   └── code-reviewer.md         # Code review agent                                       │
+│  │                                                                                          │
+│  ├── docs/                        # Documentation                                           │
+│  │   ├── workflow-overview.txt    # Visual workflow guide                                   │
+│  │   └── worktree-workflow.md     # Worktree operation guide                                │
+│  │                                                                                          │
+│  ├── tests/                       # Test suite (pytest + bats)                              │
+│  ├── .worktrees/                  # Git worktrees for epic isolation                        │
+│  ├── dag.yaml                     # DAG definition (when exists)                            │
+│  ├── pyproject.toml               # Package config (pytest)                                 │
+│  └── CLAUDE.md                    # Project conventions                                     │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  2. MODULE DEPENDENCY DIAGRAM (模組依賴圖)                                                    │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                  CLI Layer                                           │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │  cli.js                                                                       │  │    │
+│  │  │  ├── parseArgs(process.argv)     # Main entry point                           │  │    │
+│  │  │  ├── status, next, complete      # Task management                            │  │    │
+│  │  │  ├── expand, merge, cleanup      # Worktree lifecycle                         │  │    │
+│  │  │  └── sync, reboot, parallel      # Coordination                               │  │    │
+│  │  └───────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                         │                                            │    │
+│  │                                         ▼                                            │    │
+│  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │  coordinator.js                    # Orchestration Engine                     │  │    │
+│  │  │  ├── status()           → dict    # Pipeline state                            │  │    │
+│  │  │  ├── next_task()        → Task    # Next ready task                           │  │    │
+│  │  │  ├── complete_task()    → void    # Mark complete                             │  │    │
+│  │  │  ├── block_task()       → void    # Mark blocked                              │  │    │
+│  │  │  ├── expand_worktrees() → [Epic]  # Create worktrees                          │  │    │
+│  │  │  ├── merge_epics()      → [Epic]  # Merge to base                             │  │    │
+│  │  │  ├── cleanup_worktrees()→ [Path]  # Remove worktrees                          │  │    │
+│  │  │  ├── sync()             → Result  # Bidirectional sync                        │  │    │
+│  │  │  └── reboot_context()   → dict    # Session resume                            │  │    │
+│  │  └───────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                         │                                            │    │
+│  │                            ┌────────────┴────────────┐                               │    │
+│  │                            ▼                         ▼                               │    │
+│  │  ┌───────────────────────────────┐  ┌───────────────────────────────┐               │    │
+│  │  │  models.js                    │  │  locking.js                   │               │    │
+│  │  │  ├── TaskStatus (enum obj)    │  │  └── dagLock() async lock     │               │    │
+│  │  │  ├── Feature (class)          │  │      └── File-based mutex     │               │    │
+│  │  │  ├── Epic (class)             │  │                               │               │    │
+│  │  │  ├── BlockedItem (class)      │  └───────────────────────────────┘               │    │
+│  │  │  ├── SyncResult (class)       │                                                  │    │
+│  │  │  └── DAG (class)              │                                                  │    │
+│  │  └───────────────────────────────┘                                                  │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  3. DATA MODEL RELATIONSHIPS (資料模型關係)                                                   │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  TaskStatus (Enum)                                                                    │  │
+│  │  ┌─────────────┬─────────────┬─────────────┬─────────────┐                            │  │
+│  │  │   PENDING   │ IN_PROGRESS │  COMPLETED  │   BLOCKED   │                            │  │
+│  │  │  (pending)  │(in_progress)│ (completed) │  (blocked)  │                            │  │
+│  │  └─────────────┴─────────────┴─────────────┴─────────────┘                            │  │
+│  │                                                                                       │  │
+│  │  State Transitions:                                                                   │  │
+│  │  PENDING ──expand──▶ IN_PROGRESS ──complete──▶ COMPLETED                              │  │
+│  │     │                     │                                                           │  │
+│  │     └─────── block ───────┴────────────────▶ BLOCKED                                  │  │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  DAG (Directed Acyclic Graph)                                                         │  │
+│  │  ├── epics: list[Epic]                                                                │  │
+│  │  └── blocked: list[BlockedItem]                                                       │  │
+│  │                                                                                       │  │
+│  │  Methods:                                                                             │  │
+│  │  ├── get_task(id)            → Feature | Epic | None                                  │  │
+│  │  ├── get_completed_epics()   → set[str]                                               │  │
+│  │  ├── get_completed_features(epic_id) → set[str]                                       │  │
+│  │  └── get_epic(epic_id)       → Epic | None                                            │  │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  Epic                           1:N                Feature                            │  │
+│  │  ┌─────────────────────────┐    ──────▶    ┌─────────────────────────┐                │  │
+│  │  │ id: str                 │               │ id: str                 │                │  │
+│  │  │ name: str               │               │ name: str               │                │  │
+│  │  │ spec_path: Path         │               │ status: TaskStatus      │                │  │
+│  │  │ status: TaskStatus      │               │ depends_on: list[str]   │                │  │
+│  │  │ worktree: Path | None   │               └─────────────────────────┘                │  │
+│  │  │ depends_on: list[str]   │               Methods:                                   │  │
+│  │  │ features: list[Feature] │               ├── is_ready(completed) → bool             │  │
+│  │  └─────────────────────────┘                                                          │  │
+│  │  Methods:                                                                             │  │
+│  │  ├── is_ready(completed_epics) → bool                                                 │  │
+│  │  └── completion_ratio() → float                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  BlockedItem                          SyncResult                                      │  │
+│  │  ┌─────────────────────────┐          ┌─────────────────────────┐                     │  │
+│  │  │ task_id: str            │          │ epic_id: str | None     │                     │  │
+│  │  │ reason: str             │          │ pulled: bool            │                     │  │
+│  │  │ blocked_at: datetime    │          │ pushed: bool            │                     │  │
+│  │  │ attempts: list[dict]    │          │ scanned: int            │                     │  │
+│  │  └─────────────────────────┘          │ updates: list[dict]     │                     │  │
+│  │                                       │ blocked_by: list[str]   │                     │  │
+│  │                                       │ dependents: list[str]   │                     │  │
+│  │                                       └─────────────────────────┘                     │  │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  4. CORE DATA FLOW (核心資料流)                                                               │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                     │    │
+│  │   User/Skill                        CLI                      Coordinator            │    │
+│  │       │                              │                            │                 │    │
+│  │       │  arcforge status         │                            │                 │    │
+│  │       ├────────────────────────────▶ │                            │                 │    │
+│  │       │                              │  Coordinator(project_root) │                 │    │
+│  │       │                              ├──────────────────────────▶ │                 │    │
+│  │       │                              │                            │ _load_dag()     │    │
+│  │       │                              │                            ├──────────────┐  │    │
+│  │       │                              │                            │              │  │    │
+│  │       │                              │                            │ dag.yaml     │  │    │
+│  │       │                              │                            │◀─────────────┘  │    │
+│  │       │                              │                            │                 │    │
+│  │       │                              │           status()         │                 │    │
+│  │       │                              │◀────────────────────────── │                 │    │
+│  │       │        Rich Table output     │                            │                 │    │
+│  │       │◀──────────────────────────── │                            │                 │    │
+│  │       │                              │                            │                 │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  File-based State Flow:                                                                     │
+│                                                                                              │
+│  ┌────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌────────────────┐   │
+│  │  dag.yaml  │ ──▶ │  Coordinator     │ ──▶ │  .worktrees/     │ ──▶ │ .agentic-epic  │   │
+│  │ (source of │     │  (orchestrates)  │     │  <epic-id>/      │     │ (worktree      │   │
+│  │  truth)    │     │                  │     │  (isolated env)  │     │  metadata)     │   │
+│  └────────────┘     └──────────────────┘     └──────────────────┘     └────────────────┘   │
+│        │                    │                        │                       │             │
+│        │                    │     dag_lock()         │                       │             │
+│        │◀───────────────────┤     (mutex)            │                       │             │
+│        │     _save_dag()    │                        │                       │             │
+│        │                    │                        │   sync (to_base)      │             │
+│        │◀────────────────────────────────────────────┴───────────────────────┤             │
+│        │                    │                        │                       │             │
+│        │                    │                        │   sync (from_base)    │             │
+│        │                    ├────────────────────────┴──────────────────────▶│             │
+│        │                    │                                                │             │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  5. KEY DESIGN PATTERNS (關鍵設計模式)                                                        │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  Pattern: Node.js parseArgs CLI                                                      │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │  const { values, positionals } = parseArgs({                                         │    │
+│  │    args: process.argv.slice(2),                                                      │    │
+│  │    options: { project: { type: 'string', short: 'p', default: '.' } },               │    │
+│  │  });                                                                                 │    │
+│  │  const projectRoot = path.resolve(values.project);                                   │    │
+│  │                                                                                      │    │
+│  │  Benefits: Zero dependencies, built-in Node.js API, consistent project path          │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  Pattern: File-based Locking                                                         │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │  const release = await dagLock(projectRoot);                                         │    │
+│  │  try {                                                                               │    │
+│  │    fs.writeFileSync(dagPath, yaml.dump(data));  // Atomic write                      │    │
+│  │  } finally { release(); }                                                            │    │
+│  │                                                                                      │    │
+│  │  Benefits: Prevents concurrent DAG corruption from parallel worktrees                │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  Pattern: Lazy Loading                                                               │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │  get dag() {                                                                         │    │
+│  │    if (!this._dag) {                                                                 │    │
+│  │      this._dag = this._loadDag();       // Load on first access                      │    │
+│  │    }                                                                                 │    │
+│  │    return this._dag;                                                                 │    │
+│  │  }                                                                                   │    │
+│  │                                                                                      │    │
+│  │  Benefits: Fast CLI startup, load only when needed                                   │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  Pattern: Worktree Isolation                                                         │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │  .worktrees/                                                                         │    │
+│  │  ├── epic-auth/            # Epic 1 worktree                                         │    │
+│  │  │   ├── .agentic-epic     # Metadata (YAML with sync state)                         │    │
+│  │  │   └── ...               # Full codebase copy                                      │    │
+│  │  └── epic-api/             # Epic 2 worktree (parallel)                              │    │
+│  │      ├── .agentic-epic                                                               │    │
+│  │      └── ...                                                                         │    │
+│  │                                                                                      │    │
+│  │  Benefits: Parallel epic development without conflicts                               │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  Pattern: Zero Dependencies                                                          │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │  // Uses only Node.js built-ins:                                                     │    │
+│  │  import { parseArgs } from 'node:util';                                              │    │
+│  │  import { readFileSync, writeFileSync } from 'node:fs';                              │    │
+│  │  import { execSync } from 'node:child_process';                                      │    │
+│  │                                                                                      │    │
+│  │  Benefits: No npm install needed, works anywhere Node.js 18+ is available            │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                              │
+│  6. FILE FORMAT REFERENCE (檔案格式參考)                                                      │
+│  ═══════════════════════════════════════════════════════════════════════════════════════════ │
+│                                                                                              │
+│  dag.yaml:                                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  epics:                                                                              │    │
+│  │    - id: epic-auth                                                                   │    │
+│  │      name: "Authentication System"                                                   │    │
+│  │      status: pending | in_progress | completed | blocked                             │    │
+│  │      spec_path: epics/epic-auth/spec.md                                              │    │
+│  │      worktree: .worktrees/epic-auth    # Set when expanded                           │    │
+│  │      depends_on: []                                                                  │    │
+│  │      features:                                                                       │    │
+│  │        - id: feat-login                                                              │    │
+│  │          name: "Login endpoint"                                                      │    │
+│  │          status: pending                                                             │    │
+│  │          depends_on: []                                                              │    │
+│  │        - id: feat-logout                                                             │    │
+│  │          name: "Logout endpoint"                                                     │    │
+│  │          status: pending                                                             │    │
+│  │          depends_on: [feat-login]                                                    │    │
+│  │  blocked:                               # Optional                                   │    │
+│  │    - task_id: feat-oauth                                                             │    │
+│  │      reason: "External API not ready"                                                │    │
+│  │      blocked_at: "2024-01-15T10:30:00"                                               │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  .agentic-epic (YAML format):                                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  epic: epic-auth                                                                     │    │
+│  │  base_worktree: /path/to/project                                                     │    │
+│  │  base_branch: main                                                                   │    │
+│  │  local:                                                                              │    │
+│  │    status: in_progress                                                               │    │
+│  │    started_at: "2024-01-15T10:00:00"                                                 │    │
+│  │  synced:                                # Updated by sync command                    │    │
+│  │    last_sync: "2024-01-15T12:00:00"                                                  │    │
+│  │    dependencies:                                                                     │    │
+│  │      epic-core: completed                                                            │    │
+│  │    dependents: [epic-frontend]                                                       │    │
+│  │    blocked_by: []                                                                    │    │
+│  │    dag_status: in_progress                                                           │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
