@@ -188,6 +188,16 @@ function generateDraft(project, date, sessionId) {
   lines.push('- **Solution**: ');
   lines.push('- **Generalizable?**: Yes/No');
   lines.push('');
+  lines.push('## Completed');
+  lines.push('');
+  lines.push('<!-- TO BE ENRICHED — What was accomplished this session? -->');
+  lines.push('- ');
+  lines.push('');
+  lines.push('## In Progress');
+  lines.push('');
+  lines.push('<!-- TO BE ENRICHED — What\'s still ongoing? -->');
+  lines.push('- ');
+  lines.push('');
   lines.push('## Context for Next Session');
   lines.push('');
   lines.push('<!-- TO BE ENRICHED — What context would help next time? -->');

@@ -17,9 +17,9 @@ Manage automatically detected behavioral patterns (instincts) from tool usage ob
 
 | Task | Command |
 |------|---------|
-| **View instincts** | `node "${SKILL_ROOT}/scripts/instinct-cli.js" status --project {p}` |
-| **Confirm pattern** | `node "${SKILL_ROOT}/scripts/instinct-cli.js" confirm {id} --project {p}` |
-| **Contradict pattern** | `node "${SKILL_ROOT}/scripts/instinct-cli.js" contradict {id} --project {p}` |
+| **View instincts** | `node "${SKILL_ROOT}/scripts/instinct.js" status --project {p}` |
+| **Confirm pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" confirm {id} --project {p}` |
+| **Contradict pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" contradict {id} --project {p}` |
 | **Daemon status** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" status` |
 | **Start daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" start` |
 | **Stop daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" stop` |

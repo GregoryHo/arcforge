@@ -5,7 +5,7 @@
  * Runs on Stop to:
  * 1. Update session file with final metrics
  * 2. Save tool call count
- * 3. Output JSON with decision: "block" to prompt Claude to fill session template
+ * 3. Output JSON with decision: "block" to prompt Claude to review diary draft
  *
  * Note: Uses Stop hook (not SessionEnd) so Claude sees and executes the prompt.
  */
@@ -29,17 +29,7 @@ const {
 const { readCount: readToolCount, resetCounter: resetToolCounter } = require('../compact-suggester/main');
 const { readCount: readUserCount, resetCounter: resetUserCounter } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../lib/thresholds');
-const { generateMarkdownSummary, calculateDurationMinutes } = require('./summary');
-
-/**
- * Get markdown summary file path
- */
-function getMarkdownFilePath() {
-  const project = getProjectName();
-  const date = getDateString();
-  const sessionId = getSessionId();
-  return path.join(getSessionDir(project, date), `${sessionId}.md`);
-}
+const { calculateDurationMinutes } = require('./summary');
 
 /**
  * Create default session if none exists
@@ -69,15 +59,6 @@ function saveSessionJson(session) {
     `${session.sessionId}.json`
   );
   writeFileSafe(sessionFile, JSON.stringify(session, null, 2));
-}
-
-/**
- * Save session markdown (only when threshold is met)
- */
-function saveSessionMarkdown(session) {
-  const markdownFile = getMarkdownFilePath();
-  const markdown = generateMarkdownSummary(session);
-  writeFileSafe(markdownFile, markdown);
 }
 
 /**
@@ -121,11 +102,9 @@ function checkReflectReady(project) {
 /**
  * Format stop reason for decision: "block" output (when threshold is met)
  * Claude will see and execute this prompt.
- * Absorbs session-evaluator functionality into unified pipeline.
  * @returns {string} The reason/prompt for Claude to execute
  */
-function formatStopReason(session, draftPath, reflectStatus) {
-  const mdPath = `~/.claude/sessions/${session.project}/${session.date}/${session.sessionId}.md`;
+function formatStopReason(session, draftPath) {
   const duration = calculateDurationMinutes(session.started, session.lastUpdated);
 
   let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
@@ -136,52 +115,15 @@ function formatStopReason(session, draftPath, reflectStatus) {
     stats += `, ${session.filesModified.length} files modified`;
   }
 
-  const steps = [];
-  let stepNum = 1;
-
-  steps.push(`**Step ${stepNum++}: Fill in session template**
-File: ${mdPath}
-
-Based on this conversation, fill in:
-- Completed: What was accomplished
-- In Progress: What's still ongoing
-- Notes for Next Session: What to remember next time`);
-
+  let prompt;
   if (draftPath) {
-    steps.push(`**Step ${stepNum++}: Review and finalize diary**
-A draft diary has been generated at: ${draftPath}
-Review the draft, enrich the <!-- TO BE ENRICHED --> sections from conversation memory, then use the arc-journaling skill to finalize it.`);
+    prompt = `Review and enrich the draft diary at ${draftPath}
+Fill in the <!-- TO BE ENRICHED --> sections from conversation memory.
+Use the arc-journaling skill to finalize.`;
   } else {
-    steps.push(`**Step ${stepNum++}: Use arc-journaling skill**
-Consider whether this session warrants a diary entry (check Pre-Diary gate).`);
+    prompt = `Consider creating a diary entry if this session warrants one.`;
   }
-
-  if (reflectStatus?.ready) {
-    steps.push(`**Step ${stepNum++}: Run /reflect** (${reflectStatus.count} diaries ready, strategy: ${reflectStatus.strategy})`);
-  }
-
-  // Unified pattern extraction (merged from session-evaluator)
-  steps.push(`**Step ${stepNum++}: Pattern Extraction** (while session context is fresh)
-
-Evaluate if there are extractable patterns from this session:
-- Repeated error resolution methods
-- User correction habits
-- Effective workarounds or debugging techniques
-- Cross-project reusable patterns
-
-Apply the Transferability Test before saving:
-1. Would this help in a **different** project?
-2. Would another developer find this useful?
-3. Has this pattern appeared more than once?
-
-If patterns found, use /learn to extract them.
-New patterns start at confidence 0.50 and need confirmations to reach auto-load threshold (0.70).`);
-
-  return `Session ended. (${stats})
-
-Please complete the following steps:
-
-${steps.join('\n\n')}`;
+  return `Session ended. (${stats})\n\n${prompt}`;
 }
 
 /**
@@ -196,10 +138,7 @@ function formatShortMessage(userCount, toolCount) {
  * Main entry point
  */
 function main() {
-  // Read stdin
   const stdin = readStdinSync();
-
-  // Parse input to check for stop_hook_active flag and set session ID
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
@@ -209,42 +148,34 @@ function main() {
     return;
   }
 
-  // Load or create session
   const session = getOrCreateSession();
-
-  // Read counters
   const userCount = readUserCount();
   const toolCount = readToolCount();
 
-  // Update session with final metrics
-  // Note: filesModified left empty - git status parsing was unreliable
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
   session.toolCalls = toolCount;
   session.filesModified = [];
 
-  // Always save JSON for tracking
   saveSessionJson(session);
 
-  // Check threshold for diary trigger
   if (shouldTrigger(userCount, toolCount)) {
-    // Generate markdown summary
-    saveSessionMarkdown(session);
-
-    // Auto-diary: generate draft enriched with metrics + observations
     const draftPath = tryGenerateAutoDiary(session.project, session.date, session.sessionId);
 
-    // Auto-reflect check: is reflection ready?
     const reflectStatus = checkReflectReady(session.project);
+    if (reflectStatus?.ready) {
+      const { addPendingAction } = require('../../scripts/lib/pending-actions');
+      addPendingAction(session.project, 'reflect-ready', {
+        strategy: reflectStatus.strategy,
+        count: reflectStatus.count
+      });
+    }
 
-    // Output decision: "block" - Claude will see and execute (unified pipeline)
-    outputDecision(formatStopReason(session, draftPath, reflectStatus));
+    outputDecision(formatStopReason(session, draftPath));
 
-    // Reset counters after threshold is met
     resetUserCounter();
     resetToolCounter();
   } else {
-    // Output short message to stderr, preserve counters for next resume
     log(formatShortMessage(userCount, toolCount));
   }
 
@@ -255,10 +186,8 @@ function main() {
 module.exports = {
   getOrCreateSession,
   saveSessionJson,
-  saveSessionMarkdown,
   formatStopReason,
   formatShortMessage,
-  getMarkdownFilePath,
   tryGenerateAutoDiary,
   checkReflectReady
 };

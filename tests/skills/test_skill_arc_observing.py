@@ -49,9 +49,9 @@ class TestArcObservingSkill:
         assert "## Quick Reference" in content
 
     def test_has_instinct_cli_commands(self):
-        """References instinct-cli.js commands."""
+        """References instinct.js commands."""
         content = _read_skill()
-        assert "instinct-cli.js" in content
+        assert "instinct.js" in content
         assert "status" in content
         assert "confirm" in content
         assert "contradict" in content
@@ -98,7 +98,7 @@ class TestArcObservingSkill:
         expected_scripts = [
             "observer-daemon.sh",
             "observer-prompt.md",
-            "instinct-cli.js",
+            "instinct.js",
         ]
         for script in expected_scripts:
             assert (scripts_dir / script).exists(), f"Missing script: {script}"

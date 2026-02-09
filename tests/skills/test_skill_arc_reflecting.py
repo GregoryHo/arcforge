@@ -57,14 +57,11 @@ def test_has_quick_reference_section():
     assert "## Quick Reference" in text
 
 
-def test_documents_permission_requirement():
-    """Skill must require user permission before saving."""
+def test_documents_auto_save_behavior():
+    """Skill must document auto-save behavior for reflections and instincts."""
     text = _read_skill()
-    # Multiple acceptable phrasings
-    has_never_auto_save = "NEVER auto-save" in text
-    has_user_approval = "user approval" in text.lower()
-    has_ask = "ask:" in text.lower() or "ask " in text.lower()
-    assert has_never_auto_save or has_user_approval or has_ask
+    assert "auto-saved" in text.lower() or "auto-save" in text.lower()
+    assert "inform user" in text.lower() or "inform user of what was saved" in text.lower()
 
 
 def test_has_common_mistakes_section():
@@ -83,14 +80,14 @@ def test_documents_rule_violation_detection():
     assert has_violation and has_claude_md
 
 
-def test_distinguishes_from_learn():
-    """Skill should explain difference from /learn."""
+def test_distinguishes_from_recall():
+    """Skill should explain difference from /recall."""
     text = _read_skill()
     lower_text = text.lower()
-    # Check that it references /learn and distinguishes
-    has_learn_reference = "/learn" in lower_text or "learn" in lower_text
+    # Check that it references /recall and distinguishes
+    has_recall_reference = "/recall" in lower_text
     has_diaryed = "diaryed" in lower_text
-    assert has_learn_reference and has_diaryed
+    assert has_recall_reference and has_diaryed
 
 
 def test_has_observation_cross_reference():
@@ -99,3 +96,9 @@ def test_has_observation_cross_reference():
     lower = text.lower()
     assert "observation" in lower
     assert "cross-reference" in lower or "cross reference" in lower
+
+
+def test_documents_save_instinct_command():
+    """Skill must document the save-instinct command."""
+    text = _read_skill()
+    assert "save-instinct" in text

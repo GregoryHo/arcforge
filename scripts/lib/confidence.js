@@ -2,7 +2,7 @@
 /**
  * Confidence Library
  *
- * Shared confidence scoring for instincts AND learned skills.
+ * Shared confidence scoring for instincts.
  * Both use unified .md + YAML frontmatter format.
  *
  * Lifecycle: create → confirm/contradict → decay → archive
@@ -22,6 +22,7 @@ const DECAY_PER_WEEK = 0.02;
 const AUTO_LOAD_THRESHOLD = 0.7;
 const ARCHIVE_THRESHOLD = 0.15;
 const MAX_CONFIDENCE = 0.9;
+const REFLECT_MAX_CONFIDENCE = 0.85;
 const MIN_CONFIDENCE = 0.1;
 
 // ─────────────────────────────────────────────
@@ -177,9 +178,6 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
   for (const file of files) {
     const filePath = path.join(dirPath, file);
-    const stat = fs.statSync(filePath);
-    if (stat.isDirectory()) continue;
-
     const content = fs.readFileSync(filePath, 'utf-8');
     const { frontmatter } = parseConfidenceFrontmatter(content);
 
@@ -225,6 +223,7 @@ module.exports = {
   AUTO_LOAD_THRESHOLD,
   ARCHIVE_THRESHOLD,
   MAX_CONFIDENCE,
+  REFLECT_MAX_CONFIDENCE,
   MIN_CONFIDENCE,
   // Parsing
   parseConfidenceFrontmatter,

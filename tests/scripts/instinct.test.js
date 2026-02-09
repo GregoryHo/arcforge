@@ -1,4 +1,4 @@
-// tests/scripts/instinct-cli.test.js
+// tests/scripts/instinct.test.js
 
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +9,7 @@ const {
   confidenceBar,
   pct,
   parseArgs
-} = require('../../skills/arc-observing/scripts/instinct-cli');
+} = require('../../skills/arc-observing/scripts/instinct');
 
 const {
   parseConfidenceFrontmatter,
@@ -18,8 +18,8 @@ const {
   ARCHIVE_THRESHOLD
 } = require('../../scripts/lib/confidence');
 
-describe('instinct-cli', () => {
-  const testDir = path.join(os.tmpdir(), 'instinct-cli-test-' + Date.now());
+describe('instinct', () => {
+  const testDir = path.join(os.tmpdir(), 'instinct-test-' + Date.now());
 
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });

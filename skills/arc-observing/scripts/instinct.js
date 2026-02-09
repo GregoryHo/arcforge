@@ -3,7 +3,7 @@
  * Instinct CLI — status, confirm, contradict, evolve
  *
  * Node.js CLI for managing behavioral instincts.
- * Adapted from: continuous-learning-v2/scripts/instinct-cli.py
+ * Adapted from: continuous-learning-v2/scripts/instinct.py
  */
 
 const fs = require('fs');
@@ -50,9 +50,6 @@ function loadInstincts(dir) {
     .filter(f => f.endsWith('.md'))
     .map(file => {
       const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) return null;
-
       const content = fs.readFileSync(filePath, 'utf-8');
       const { frontmatter, body } = parseConfidenceFrontmatter(content);
 
@@ -261,7 +258,7 @@ function cmdContradict(instinctId, project) {
 }
 
 /**
- * Evolve: suggest combining related instincts into learned skills.
+ * Evolve: suggest combining related instincts into higher-level skills.
  * (Phase 5 nice-to-have — basic implementation)
  */
 function cmdEvolve(project) {
@@ -287,11 +284,11 @@ function cmdEvolve(project) {
       hasCandidates = true;
       const highConf = items.filter(i => (i.frontmatter.confidence || 0) >= 0.6);
       console.log(`\nDomain "${domain}": ${items.length} instincts (${highConf.length} high-confidence)`);
-      console.log('  Candidate for learned skill extraction:');
+      console.log('  Candidate for skill clustering:');
       for (const inst of items) {
         console.log(`    - ${inst.id} (${pct(inst.frontmatter.confidence || 0)})`);
       }
-      console.log('  Run /learn to extract a combined technique from these instincts.');
+      console.log('  Run /learn to cluster these into a higher-level skill.');
     }
   }
 
@@ -339,7 +336,7 @@ function main() {
 
     case 'confirm':
       if (!positional[0]) {
-        console.error('Usage: instinct-cli.js confirm <id> --project <project>');
+        console.error('Usage: instinct.js confirm <id> --project <project>');
         process.exit(1);
       }
       cmdConfirm(positional[0], project);
@@ -347,7 +344,7 @@ function main() {
 
     case 'contradict':
       if (!positional[0]) {
-        console.error('Usage: instinct-cli.js contradict <id> --project <project>');
+        console.error('Usage: instinct.js contradict <id> --project <project>');
         process.exit(1);
       }
       cmdContradict(positional[0], project);
@@ -359,7 +356,7 @@ function main() {
 
     default:
       console.log('Instinct CLI — Behavioral pattern management\n');
-      console.log('Usage: instinct-cli.js <command> [options]\n');
+      console.log('Usage: instinct.js <command> [options]\n');
       console.log('Commands:');
       console.log('  status                Show instincts with confidence bars');
       console.log('  confirm <id>          Confirm a pattern (+0.05 confidence)');

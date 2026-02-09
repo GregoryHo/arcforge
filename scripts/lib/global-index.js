@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * Global Index — Bubble-up tracking for instincts and learned skills
+ * Global Index — Bubble-up tracking for instincts
  *
  * Manages JSONL index files for tracking cross-project patterns.
- * Shared between instincts (global-index.jsonl) and learned skills (global-index.jsonl).
+ * Tracks instinct promotions across projects via global-index.jsonl.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { buildTriggerFingerprint, jaccardSimilarity } = require('./fingerprint');
+const { parseConfidenceFrontmatter } = require('./confidence');
 
 /**
  * Append an entry to a JSONL index file.
@@ -174,13 +176,60 @@ function checkBubbleUpForProject(project) {
       }
     }
 
-    // Bubble up if found in 2+ projects
+    // Fast path: bubble up if found in 2+ projects by filename
     if (projectCount >= 2) {
       const sourcePath = path.join(projectInstincts, file);
       const promoted = promoteToGlobal(sourcePath, globalDir, indexPath);
 
       if (promoted) {
         console.log(`Promoted ${instinctId} to global (found in ${projectCount} projects)`);
+      }
+      continue;
+    }
+
+    // Slow path: semantic matching via trigger fingerprints
+    const sourcePath = path.join(projectInstincts, file);
+    const sourceContent = fs.readFileSync(sourcePath, 'utf-8');
+    const { frontmatter: sourceFm } = parseConfidenceFrontmatter(sourceContent);
+
+    if (!sourceFm.trigger || !sourceFm.domain) continue;
+
+    const sourceFp = buildTriggerFingerprint(sourceFm.trigger);
+    if (sourceFp.size < 3) continue;
+
+    let semanticMatch = false;
+
+    for (const otherProj of projectDirs) {
+      if (otherProj === project) continue;
+
+      const otherProjDir = path.join(instinctsBase, otherProj);
+      const otherFiles = fs.readdirSync(otherProjDir).filter(f => f.endsWith('.md'));
+
+      for (const otherFile of otherFiles) {
+        const otherPath = path.join(otherProjDir, otherFile);
+        const otherContent = fs.readFileSync(otherPath, 'utf-8');
+        const { frontmatter: otherFm } = parseConfidenceFrontmatter(otherContent);
+
+        if (!otherFm.trigger || !otherFm.domain) continue;
+        if (otherFm.domain !== sourceFm.domain) continue;
+
+        const otherFp = buildTriggerFingerprint(otherFm.trigger);
+        if (otherFp.size < 3) continue;
+
+        const similarity = jaccardSimilarity(sourceFp, otherFp);
+        if (similarity >= 0.6) {
+          semanticMatch = true;
+          break;
+        }
+      }
+
+      if (semanticMatch) break;
+    }
+
+    if (semanticMatch) {
+      const promoted = promoteToGlobal(sourcePath, globalDir, indexPath);
+      if (promoted) {
+        console.log(`Promoted ${instinctId} to global (semantic match across projects)`);
       }
     }
   }

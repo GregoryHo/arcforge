@@ -439,16 +439,6 @@ function getSessionDir(project, date) {
 }
 
 /**
- * Get learned skills directory
- * @param {string|null} project - Project name for project-specific skills, null for global
- * @returns {string} Path to learned skills directory
- */
-function getLearnedSkillsDir(project = null) {
-  const base = path.join(os.homedir(), '.claude', 'skills', 'learned');
-  return project ? path.join(base, project) : path.join(base, 'global');
-}
-
-/**
  * Get diary file path for current session
  * Returns ~/.claude/sessions/{project}/{date}/diary-{sessionId}.md
  */
@@ -621,7 +611,6 @@ module.exports = {
   getSessionsDir,
   getProjectSessionsDir,
   getSessionDir,
-  getLearnedSkillsDir,
   getDiaryFilePath,
   getDiaryedDir,
   getCompactionLogPath,

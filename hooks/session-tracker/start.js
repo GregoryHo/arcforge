@@ -5,7 +5,7 @@
  * Runs ASYNCHRONOUSLY on SessionStart to:
  * 1. Initialize new session file
  * 2. Check/start observer daemon
- * 3. Run decay cycles on instincts and learned skills
+ * 3. Run decay cycles on instincts
  *
  * IMPORTANT: This file was split from the original start.js:
  * - inject-context.js (sync): Handles context injection to Claude
@@ -35,8 +35,7 @@ const {
 } = require('../lib/utils');
 
 const {
-  getInstinctsDir,
-  getLearnedSkillsDir
+  getInstinctsDir
 } = require('../../scripts/lib/session-utils');
 
 const {
@@ -104,23 +103,19 @@ function checkDaemon() {
 }
 
 /**
- * Run decay cycle on instincts and learned skills.
+ * Run decay cycle on instincts.
  */
 function runDecayCycles(project) {
   try {
     const instResult = runDecayCycle(getInstinctsDir(project));
-    const learnResult = runDecayCycle(getLearnedSkillsDir(project));
 
-    const totalDecayed = instResult.decayed.length + learnResult.decayed.length;
-    const totalArchived = instResult.archived.length + learnResult.archived.length;
-
-    if (totalDecayed > 0 || totalArchived > 0) {
-      log(`Decay cycle: ${totalDecayed} decayed, ${totalArchived} archived`);
+    if (instResult.decayed.length > 0 || instResult.archived.length > 0) {
+      log(`Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`);
     }
 
-    return { instResult, learnResult };
+    return { instResult };
   } catch {
-    return { instResult: { decayed: [], archived: [] }, learnResult: { decayed: [], archived: [] } };
+    return { instResult: { decayed: [], archived: [] } };
   }
 }
 
@@ -128,25 +123,16 @@ function runDecayCycles(project) {
  * Main entry point (async background tasks)
  */
 function main() {
-  // Read stdin
   const stdin = readStdinSync();
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
   const project = getProjectName();
 
-  // Initialize new session file
   initializeSession();
-
-  // ── Background observation system tasks ──
-
-  // 1. Check/start observer daemon (best-effort, non-blocking)
   checkDaemon();
-
-  // 2. Run decay cycle on instincts and learned skills
   runDecayCycles(project);
 
-  // Note: Context injection is handled by inject-context.js (sync hook)
   log('Session tracker initialized (background tasks)');
   process.exit(0);
 }

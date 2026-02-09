@@ -9,7 +9,8 @@ const {
   readIndex,
   findCrossProjectPatterns,
   isAlreadyGlobal,
-  promoteToGlobal
+  promoteToGlobal,
+  checkBubbleUpForProject
 } = require('../../scripts/lib/global-index');
 
 describe('global-index', () => {
@@ -143,6 +144,100 @@ describe('global-index', () => {
       const entries = readIndex(indexPath);
       expect(entries).toHaveLength(1);
       expect(entries[0].promoted).toBeDefined();
+    });
+  });
+
+  describe('checkBubbleUpForProject — semantic matching', () => {
+    let mockHomeDir;
+    let instinctsBase;
+
+    beforeEach(() => {
+      mockHomeDir = path.join(testDir, 'home');
+      instinctsBase = path.join(mockHomeDir, '.claude', 'instincts');
+      jest.spyOn(os, 'homedir').mockReturnValue(mockHomeDir);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    function writeInstinct(project, filename, { trigger, domain }) {
+      const dir = path.join(instinctsBase, project);
+      fs.mkdirSync(dir, { recursive: true });
+      const content = `---
+trigger: "${trigger}"
+domain: ${domain}
+confidence: 0.70
+---
+
+## Action
+Do the thing
+`;
+      fs.writeFileSync(path.join(dir, filename), content, 'utf-8');
+    }
+
+    it('detects semantic match: different filenames, similar triggers, same domain', () => {
+      writeInstinct('project-a', 'search-before-editing.md', {
+        trigger: 'grep search codebase before editing files',
+        domain: 'code-quality'
+      });
+      writeInstinct('project-b', 'grep-then-edit.md', {
+        trigger: 'grep search codebase before editing changes',
+        domain: 'code-quality'
+      });
+
+      checkBubbleUpForProject('project-a');
+
+      const globalDir = path.join(instinctsBase, 'global');
+      expect(fs.existsSync(path.join(globalDir, 'search-before-editing.md'))).toBe(true);
+    });
+
+    it('does NOT match when domains differ despite similar triggers', () => {
+      writeInstinct('project-a', 'search-first.md', {
+        trigger: 'grep search codebase before editing files',
+        domain: 'code-quality'
+      });
+      writeInstinct('project-b', 'search-first-ops.md', {
+        trigger: 'grep search codebase before editing files',
+        domain: 'operations'
+      });
+
+      checkBubbleUpForProject('project-a');
+
+      const globalDir = path.join(instinctsBase, 'global');
+      expect(fs.existsSync(globalDir)).toBe(false);
+    });
+
+    it('does NOT match when trigger fingerprint has fewer than 3 words', () => {
+      writeInstinct('project-a', 'short-trigger.md', {
+        trigger: 'run tests',
+        domain: 'testing'
+      });
+      writeInstinct('project-b', 'also-short.md', {
+        trigger: 'run tests',
+        domain: 'testing'
+      });
+
+      checkBubbleUpForProject('project-a');
+
+      const globalDir = path.join(instinctsBase, 'global');
+      expect(fs.existsSync(globalDir)).toBe(false);
+    });
+
+    it('does NOT match when Jaccard similarity is below 0.6', () => {
+      writeInstinct('project-a', 'pattern-alpha.md', {
+        trigger: 'always review database migrations carefully before deploying',
+        domain: 'deployment'
+      });
+      writeInstinct('project-b', 'pattern-beta.md', {
+        trigger: 'check frontend accessibility standards compliance testing',
+        domain: 'deployment'
+      });
+
+      checkBubbleUpForProject('project-a');
+
+      const globalDir = path.join(instinctsBase, 'global');
+      expect(fs.existsSync(globalDir)).toBe(false);
     });
   });
 });

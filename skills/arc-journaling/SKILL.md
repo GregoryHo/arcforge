@@ -52,7 +52,7 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 **Core distinction:**
 
 - **Diary = observations, context, decisions made** (stored in session directory)
-- **Learn = reusable patterns** (stored in learned skills)
+- **Learn = instinct clustering** (combines related instincts into skills)
 
 **Storage:** `~/.claude/sessions/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
@@ -86,7 +86,7 @@ This is a **soft gate**: Claude judges based on conversation memory. User can al
 - Quick Q&A sessions (< 5 tool calls)
 - Pure research without decisions
 - Already captured in previous diary entry this session
-- Pattern extraction needed (use /learn instead)
+- Pattern extraction needed (use /recall instead)
 - **Fails Pre-Diary Check** — unless user explicitly requests
 
 ## Process
@@ -188,7 +188,7 @@ Keep entries focused. Don't over-document routine work.
 
 ### Duplicating Learn Content
 
-**Wrong:** Same pattern in both diary and learned skill
+**Wrong:** Same pattern in both diary and instinct
 **Right:** Diary captures context; learn extracts reusable pattern
 
 ### Not Asking Permission
@@ -199,7 +199,7 @@ Keep entries focused. Don't over-document routine work.
 ### Skipping the Generalizable Marker
 
 **Wrong:** Leaving Generalizable? empty or omitting it
-**Right:** Always mark solutions as Yes/No - helps /learn prioritize patterns
+**Right:** Always mark solutions as Yes/No - helps /reflect identify patterns
 
 ## Template Variables
 

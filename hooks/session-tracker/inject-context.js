@@ -32,6 +32,11 @@ const {
   shouldAutoLoad
 } = require('../../scripts/lib/confidence');
 
+const {
+  getPendingActions,
+  consumeAction
+} = require('../../scripts/lib/pending-actions');
+
 const MAX_SESSIONS = 5;
 const MAX_MD_FILES = 3;
 
@@ -150,50 +155,53 @@ function formatSessionContext(sessions) {
 }
 
 /**
- * Find recent markdown files from latest session
+ * Find recent diary or session markdown files from latest session.
+ * Diary-first: if diary files exist, load those. Otherwise fallback to session markdown.
+ * Returns { header, contents } where header indicates diary vs session notes.
  */
 function findRecentMarkdownFiles(sessions) {
-  if (!sessions?.length) return [];
+  if (!sessions?.length) return { header: null, contents: [] };
 
   const latestDateStr = sessions[0].dateStr;
-  if (!latestDateStr) return [];
+  if (!latestDateStr) return { header: null, contents: [] };
 
   const dateDir = path.join(getProjectSessionsDir(getProjectName()), latestDateStr);
-  if (!fs.existsSync(dateDir)) return [];
+  if (!fs.existsSync(dateDir)) return { header: null, contents: [] };
 
-  return fs.readdirSync(dateDir)
-    .filter(f => f.endsWith('.md') && !f.startsWith('diary-'))
-    .sort()
-    .reverse()
-    .slice(0, MAX_MD_FILES)
+  const allFiles = fs.readdirSync(dateDir).filter(f => f.endsWith('.md'));
+
+  // Diary-first: prioritize diary files, fall back to session markdown
+  const diaryFiles = allFiles.filter(f => f.startsWith('diary-'));
+  const isDiary = diaryFiles.length > 0;
+  const files = isDiary ? diaryFiles : allFiles.filter(f => !f.startsWith('diary-'));
+
+  const contents = files
+    .sort().reverse().slice(0, MAX_MD_FILES)
     .map(file => {
       const content = readFileSafe(path.join(dateDir, file));
       return content?.trim() ? `### ${latestDateStr}/${file}\n${content.trim()}` : null;
     })
     .filter(Boolean);
+
+  const header = isDiary ? '--- Recent Diary Entries ---' : '--- Previous Session Notes ---';
+  return { header, contents };
 }
 
 /**
  * Load instincts with confidence >= AUTO_LOAD_THRESHOLD
  */
 function loadAutoInstincts(project) {
-  const lines = [];
-
-  // Load project instincts
-  const projectDir = getInstinctsDir(project);
-  const projectInstincts = loadInstinctFiles(projectDir);
-
-  // Load global instincts
-  const globalDir = getGlobalInstinctsDir();
-  const globalInstincts = loadInstinctFiles(globalDir);
-
-  const allInstincts = [...projectInstincts, ...globalInstincts];
-  const autoLoaded = allInstincts.filter(i => shouldAutoLoad(i.confidence));
+  const projectInstincts = loadInstinctFiles(getInstinctsDir(project));
+  const globalInstincts = loadInstinctFiles(getGlobalInstinctsDir());
+  const autoLoaded = [...projectInstincts, ...globalInstincts]
+    .filter(i => shouldAutoLoad(i.confidence));
 
   if (autoLoaded.length === 0) return null;
 
-  lines.push('## Active Behavioral Instincts\n');
-  lines.push('These patterns were auto-detected from your tool usage:\n');
+  const lines = [
+    '## Active Behavioral Instincts\n',
+    'These patterns were auto-detected from your tool usage:\n'
+  ];
 
   for (const inst of autoLoaded) {
     const pctStr = Math.round(inst.confidence * 100);
@@ -266,37 +274,68 @@ function checkNewGlobalPromotions() {
 }
 
 /**
+ * Load and consume pending actions for context injection.
+ * Returns formatted context string or null.
+ */
+function loadPendingActions(project) {
+  try {
+    const actions = getPendingActions(project);
+    if (actions.length === 0) return null;
+
+    const lines = [];
+
+    // Group by type
+    const reflectActions = actions.filter(a => a.type === 'reflect-ready');
+    const otherActions = actions.filter(a => a.type !== 'reflect-ready');
+
+    if (reflectActions.length > 0) {
+      const latest = reflectActions[reflectActions.length - 1];
+      const count = latest.payload?.count || reflectActions.length;
+      lines.push(`**${count} unprocessed diaries ready for reflection.** Run /reflect to analyze patterns.`);
+    }
+
+    for (const action of otherActions) {
+      lines.push(`- Pending: ${action.type} (${action.payload ? JSON.stringify(action.payload) : 'no details'})`);
+    }
+
+    // Consume all displayed actions
+    for (const action of actions) {
+      consumeAction(project, action.id);
+    }
+
+    return lines.length > 0 ? lines.join('\n') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Main entry point (sync)
  */
 function main() {
-  // Read stdin
   const stdin = readStdinSync();
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
   const project = getProjectName();
-
-  // Find recent sessions and MD files
   const sessions = findRecentSessions();
-  const mdContents = findRecentMarkdownFiles(sessions);
-
-  // Load instincts and check promotions
+  const { header: mdHeader, contents: mdContents } = findRecentMarkdownFiles(sessions);
   const instinctsContext = loadAutoInstincts(project);
+  const pendingContext = loadPendingActions(project);
   const globalPromotions = checkNewGlobalPromotions();
 
-  // Build context for Claude
   const parts = [];
 
   const sessionContext = formatSessionContext(sessions);
   if (sessionContext) {
     parts.push(sessionContext);
-    log(sessionContext); // Also show in terminal
+    log(sessionContext);
   }
 
-  if (mdContents.length > 0) {
-    parts.push('--- Previous Session Notes ---');
+  if (mdContents.length > 0 && mdHeader) {
+    parts.push(mdHeader);
     parts.push(mdContents.join('\n---\n'));
-    log('\n--- Previous Session Notes ---');
+    log(`\n${mdHeader}`);
     log(mdContents.join('\n---\n'));
   }
 
@@ -305,12 +344,16 @@ function main() {
     log(instinctsContext);
   }
 
+  if (pendingContext) {
+    parts.push(pendingContext);
+    log(pendingContext);
+  }
+
   if (globalPromotions) {
     parts.push(globalPromotions);
     log(globalPromotions);
   }
 
-  // Output context to Claude via stdout (sync delivery)
   if (parts.length > 0) {
     const fullContext = parts.join('\n\n');
     outputContext(fullContext, 'SessionStart');
@@ -330,7 +373,8 @@ module.exports = {
   pluralize,
   loadAutoInstincts,
   loadInstinctFiles,
-  checkNewGlobalPromotions
+  checkNewGlobalPromotions,
+  loadPendingActions
 };
 
 // Run if executed directly

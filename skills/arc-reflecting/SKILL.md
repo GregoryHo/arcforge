@@ -18,6 +18,7 @@ Analyze multiple diary entries to identify recurring patterns. Save insights to 
 | **Update log** | `node "${SKILL_ROOT}/scripts/reflect.js" update-log --project {p} --diaries "{f}" --reflection "{id}"` |
 | **Pattern threshold** | 3+ occurrences = Pattern, 1-2 = Observation |
 | **Rule violations** | Check CLAUDE.md first, report violations with evidence |
+| **Save instinct** | `node "${SKILL_ROOT}/scripts/reflect.js" save-instinct --project {p} --id {id} --trigger "..." --action "..." [--domain D] [--evidence "..."] [--evidence-count N]` |
 | **Strategy modes** | unprocessed (5+ new) \| project_focused (5+ total) \| recent_window (fallback) |
 
 ## Infrastructure Commands
@@ -59,9 +60,9 @@ node "${SKILL_ROOT}/scripts/reflect.js" update-log \
 
 For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) to read diaries in an isolated context without polluting the main conversation.
 
-**Key distinction from /learn:**
-- `/learn` → `~/.claude/skills/learned/` (auto-loaded by Claude)
-- `/reflect` → `~/.claude/diaryed/` (user reviews manually)
+**Integration with instincts:**
+- `/reflect` → `~/.claude/diaryed/` (reflections) + instincts saved via `save-instinct`
+- `/recall` → retrieves instincts and learned patterns
 
 **Core principle:** Patterns must appear 3+ times across diary entries to be considered "Pattern". 1-2 occurrences are labeled "Observation".
 
@@ -75,7 +76,7 @@ For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) 
 ## When NOT to Use
 
 - Fewer than 3 diary entries exist
-- User wants patterns auto-loaded (use /learn instead)
+- User wants patterns auto-loaded (use /recall instead)
 - Single-session insights (use /diary instead)
 - No meaningful patterns found
 
@@ -100,7 +101,7 @@ diary-abc123.md | 2025-01-24 | 2025-01-reflection-1.md
 diary-def456.md | 2025-01-24 | 2025-01-reflection-1.md
 ```
 
-**NOT auto-loaded by Claude.** User must manually review and optionally move to learned skills.
+**NOT auto-loaded by Claude.** User must manually review.
 
 ## Process
 
@@ -221,42 +222,57 @@ Use this structure (with strategy header from step 1):
 
 **Note:** Rule violations appear FIRST (priority) before patterns.
 
-### 7. Present for User Approval
+#### Instincts to Create
+<!-- For each pattern found, create an instinct -->
+- **ID**: [pattern-name]
+- **Trigger**: [when does this apply]
+- **Action**: [what to do]
+- **Domain**: [category]
+- **Evidence count**: [how many times seen]
 
-**NEVER auto-save.** Present the draft and ask:
+### 7. Auto-Save and Inform
 
-> "I found these patterns/violations across X diary entries. Should I save this reflection?"
-> - **Save to diaryed/** - For patterns to review later
-> - **Promote to learned/** - For patterns to auto-load (use /learn instead)
-> - **Skip** - Don't save
+Reflections and instincts are auto-saved. Inform user of what was saved.
 
-For rule violations, additionally ask:
+> "I found these patterns/violations across X diary entries. Saving reflection and instincts."
+
+For rule violations, additionally inform:
 > "These rule violations suggest strengthening CLAUDE.md. Would you like to update those rules?"
 
-### 8. Save and Update processed.log
+### 8. Save Reflections and Instincts
 
-If approved for diaryed:
 1. Ensure `~/.claude/diaryed/{project}/` or `~/.claude/diaryed/global/` exists
 2. Write the reflection markdown file (e.g., `YYYY-MM-reflection-N.md`)
 3. **Update processed.log** with each diary that was analyzed:
    ```
    diary-abc123.md | 2025-01-24 | 2025-01-reflection-1.md
    ```
-4. Confirm save location and processed.log update
+4. For each Pattern, save an instinct:
+   ```bash
+   node "${SKILL_ROOT}/scripts/reflect.js" save-instinct \
+     --project {project} \
+     --id {pattern-name} \
+     --trigger "{when this applies}" \
+     --action "{what to do}" \
+     --domain {category} \
+     --evidence "{source diary references}" \
+     --evidence-count {N}
+   ```
+5. Confirm save location, processed.log update, and instincts saved
 
 ## Key Principles
 
 ### Evidence-Based Only
 Every pattern MUST cite specific diary entries as evidence. No patterns based on general assumptions.
 
-### User Controls Output
-NEVER auto-save. User reviews and approves before saving.
+### Auto-Save with Notification
+Reflections and instincts are auto-saved. Inform user of what was saved.
 
 ### Non-Prescriptive
 Insights are observations, not rules. User decides how to act on them.
 
-### Separate from Learn
-Diaryed patterns are for reflection. If user wants auto-loading, redirect to /learn.
+### Separate from Recall
+Diaryed patterns are for reflection. If user wants auto-loading, redirect to /recall.
 
 ## Common Mistakes
 
@@ -268,11 +284,7 @@ Diaryed patterns are for reflection. If user wants auto-loading, redirect to /le
 **Wrong:** "You seem to prefer X"
 **Right:** "Based on sessions from Jan 15 and Jan 20, you consistently chose X"
 
-### Auto-Saving Without Approval
-**Wrong:** Saving patterns automatically
-**Right:** Present draft, wait for explicit approval
-
-### Confusing with /learn
+### Confusing with /recall
 **Wrong:** Putting reusable techniques here
 **Right:** Observations go to diaryed; techniques go to learned
 
@@ -377,5 +389,5 @@ Diaryed patterns are for reflection. If user wants auto-loading, redirect to /le
 - No specific diary citations
 - Prescriptive language ("always do X")
 - Already extracted in previous reflect session (check processed.log)
-- Belongs in learned skills (reusable technique)
+- Already captured as instinct (check for duplicates)
 - Auto-updating CLAUDE.md without user approval
