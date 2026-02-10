@@ -2,12 +2,23 @@
 
 ## Project Overview
 
-Skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode.
+Skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode.
 
 ## Commands
 
-- `pytest tests/ -v` - Run tests
+- `npm test` - Run all tests (4 runners, all must pass)
+- `npm run test:scripts` - Jest tests (scripts/lib/)
+- `npm run test:hooks` - Hook tests (Node --test)
+- `npm run test:node` - CLI, DAG, models, YAML tests
+- `npm run test:skills` - Skill validation (pytest)
 - `node scripts/cli.js --help` - CLI help
+
+## Setup
+
+```bash
+npm install
+cd hooks && npm install && cd ..
+```
 
 ## Skills
 
@@ -20,8 +31,11 @@ Skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode.
 ## Architecture
 
 - `scripts/` - Node.js CLI and core engine
+- `hooks/` - Claude Code event hooks (Node.js)
 - `skills/` - Markdown skill definitions
 - `templates/` - Prompt templates for subagents
+- `commands/` - Thin CLI command wrappers (delegate to skills)
+- `agents/` - Specialized subagent definitions
 - `docs/` - Design docs, platform guides, workflow docs
 - `.worktrees/` - Git worktrees for epic isolation
 
@@ -33,3 +47,14 @@ Skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode.
 - Examples: `arc-brainstorming`, `arc-writing-tasks`, `arc-using-worktrees`
 - Never summarize skill workflow in description - Claude may follow description instead of reading full skill
 - Cross-reference skills with `**REQUIRED BACKGROUND:** ...` not @-file syntax
+- Zero external runtime dependencies - Node.js only
+- Hooks must be Node.js (not bash) for cross-platform support
+- Use `execFileSync` over `exec` in hooks (prevents shell injection)
+- Conventional commits: `feat(scope):`, `fix(scope):`, `docs(scope):`
+
+## Gotchas
+
+- `npm test` runs 4 separate runners (Jest, Node --test, custom, pytest) — all must pass
+- Hooks have their own `package.json` — run `cd hooks && npm install` separately
+- Never use `@`-file syntax in skills (force-loads context into memory)
+- Skills max 500 words; use supporting files for heavy reference
