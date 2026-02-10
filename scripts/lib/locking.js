@@ -44,7 +44,7 @@ class LockError extends Error {
  * @returns {Object} Lock handle with release() method
  */
 function acquireLock(projectRoot, options = {}) {
-  const lockPath = path.join(projectRoot, '.agentic-lock');
+  const lockPath = path.join(projectRoot, '.arcforge-lock');
   const timeout = options.timeout || DEFAULT_TIMEOUT;
   const retryInterval = options.retryInterval || 50;
   const startTime = Date.now();
@@ -171,7 +171,7 @@ async function withLockAsync(projectRoot, fn, options = {}) {
  * @returns {boolean} Whether lock file exists
  */
 function isLocked(projectRoot) {
-  const lockPath = path.join(projectRoot, '.agentic-lock');
+  const lockPath = path.join(projectRoot, '.arcforge-lock');
   return fs.existsSync(lockPath);
 }
 
@@ -181,7 +181,7 @@ function isLocked(projectRoot) {
  * @param {string} projectRoot - Project root directory
  */
 function forceClearLock(projectRoot) {
-  const lockPath = path.join(projectRoot, '.agentic-lock');
+  const lockPath = path.join(projectRoot, '.arcforge-lock');
   try {
     fs.unlinkSync(lockPath);
   } catch (err) {
@@ -192,13 +192,5 @@ function forceClearLock(projectRoot) {
 }
 
 module.exports = {
-  LockError,
-  acquireLock,
-  releaseLock,
-  withLock,
-  withLockAsync,
-  isLocked,
-  forceClearLock,
-  DEFAULT_TIMEOUT,
-  STALE_THRESHOLD
+  withLock
 };

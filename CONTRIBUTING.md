@@ -1,6 +1,6 @@
 # Contributing to arcforge
 
-Welcome! arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, commands, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
+Welcome! arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, commands, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
 
 ## Table of Contents
 
@@ -177,7 +177,7 @@ Hooks extend Claude Code behavior through event-driven JavaScript modules. See [
 ```
 hooks/
   hooks.json              # Hook registration
-  run-hook.js             # Node.js dispatcher (cross-platform)
+  run-hook.cmd            # Bash dispatcher
   lib/                    # Shared utilities (utils.js, package-manager.js)
   <hook-name>/
     main.js               # Entry point
@@ -200,7 +200,7 @@ hooks/
 
 Use `hooks/lib/utils.js` for common operations:
 - `readStdinSync()` — read stdin for hook chaining
-- `logWarning(msg)` — log to stderr (visible in Claude Code)
+- `log(msg)` — log to stderr (visible in Claude Code)
 - `execCommand(cmd, args)` — safe execution (no shell injection)
 
 ### Conventions

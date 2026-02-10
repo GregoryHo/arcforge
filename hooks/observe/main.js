@@ -10,7 +10,11 @@
 
 const fs = require('fs');
 const path = require('path');
+
 const os = require('os');
+
+const { getProjectName, readStdinSync } = require('../lib/utils');
+const { getObservationsPath } = require('../../scripts/lib/session-utils');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -20,27 +24,15 @@ const MAX_INPUT_LENGTH = 5000;
 const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
-
-// ─────────────────────────────────────────────
-// Path Helpers
-// ─────────────────────────────────────────────
-
-function getProjectName() {
-  const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  return path.basename(projectDir);
-}
-
-function getObservationsPath(project) {
-  return path.join(CLAUDE_DIR, 'observations', project, 'observations.jsonl');
-}
-
+/**
+ * Get observations archive directory for a project.
+ */
 function getArchiveDir(project) {
-  return path.join(CLAUDE_DIR, 'observations', project, 'archive');
+  return path.dirname(getObservationsPath(project)) + '/archive';
 }
 
 function getPidFile() {
-  return path.join(CLAUDE_DIR, 'instincts', '.observer.pid');
+  return path.join(os.homedir(), '.claude', 'instincts', '.observer.pid');
 }
 
 // ─────────────────────────────────────────────
@@ -89,17 +81,6 @@ function signalDaemon() {
     }
   } catch {
     // Daemon not running or signal failed — silently ignore
-  }
-}
-
-/**
- * Read stdin synchronously.
- */
-function readStdinSync() {
-  try {
-    return fs.readFileSync(0, 'utf-8');
-  } catch {
-    return '';
   }
 }
 
@@ -175,4 +156,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { truncate, getObservationsPath, getArchiveDir, getPidFile, getProjectName };
+module.exports = { truncate, getArchiveDir, getPidFile };

@@ -141,12 +141,14 @@ class Coordinator {
 
     task.status = TaskStatus.COMPLETED;
 
-    // If feature, check if epic is now complete
+    // If feature, update parent epic status
     if (task instanceof Feature) {
       for (const epic of this.dag.epics) {
         if (epic.features.some(f => f.id === taskId)) {
           if (epic.features.every(f => f.status === TaskStatus.COMPLETED)) {
             epic.status = TaskStatus.COMPLETED;
+          } else if (epic.status === TaskStatus.PENDING) {
+            epic.status = TaskStatus.IN_PROGRESS;
           }
           break;
         }
@@ -174,41 +176,6 @@ class Coordinator {
       blocked_at: new Date()
     }));
     this._saveDag();
-  }
-
-  /**
-   * Get newly available tasks after completing a task
-   * @param {string} completedTaskId - The just-completed task ID
-   * @returns {(Feature|Epic)[]} List of newly available tasks
-   */
-  getNewlyAvailable(completedTaskId) {
-    const available = [];
-    const completedEpics = this.dag.getCompletedEpics();
-
-    // Check for ready epics
-    for (const epic of this.dag.epics) {
-      if (epic.status === TaskStatus.PENDING && epic.isReady(completedEpics)) {
-        available.push(epic);
-      }
-    }
-
-    // Check for ready features in in-progress epics
-    for (const epic of this.dag.epics) {
-      if (epic.status === TaskStatus.IN_PROGRESS) {
-        const completedFeatures = this.dag.getCompletedFeatures(epic.id);
-        for (const feature of epic.features) {
-          if (
-            feature.status === TaskStatus.PENDING &&
-            feature.isReady(completedFeatures) &&
-            feature.depends_on.includes(completedTaskId)
-          ) {
-            available.push(feature);
-          }
-        }
-      }
-    }
-
-    return available;
   }
 
   /**

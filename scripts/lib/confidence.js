@@ -34,17 +34,20 @@ const MIN_CONFIDENCE = 0.1;
  * Returns { frontmatter: {}, body: string }
  */
 function parseConfidenceFrontmatter(content) {
-  if (!content || !content.startsWith('---\n')) {
-    return { frontmatter: {}, body: content || '' };
+  // Normalize CRLF to LF for cross-platform compatibility
+  const normalized = content ? content.replace(/\r\n/g, '\n') : content;
+
+  if (!normalized || !normalized.startsWith('---\n')) {
+    return { frontmatter: {}, body: normalized || '' };
   }
 
-  const endIdx = content.indexOf('\n---\n', 4);
+  const endIdx = normalized.indexOf('\n---\n', 4);
   if (endIdx === -1) {
-    return { frontmatter: {}, body: content };
+    return { frontmatter: {}, body: normalized };
   }
 
-  const yamlBlock = content.substring(4, endIdx);
-  const body = content.substring(endIdx + 5);
+  const yamlBlock = normalized.substring(4, endIdx);
+  const body = normalized.substring(endIdx + 5);
   const frontmatter = {};
 
   for (const line of yamlBlock.split('\n')) {

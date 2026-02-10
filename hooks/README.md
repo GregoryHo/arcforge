@@ -7,8 +7,7 @@ Hooks for extending Claude Code behavior in arcforge.
 ```
 hooks/
 ├── hooks.json              # Hook configuration
-├── run-hook.cmd            # Bash dispatcher (legacy)
-├── run-hook.js             # Node.js dispatcher (cross-platform)
+├── run-hook.cmd            # Bash dispatcher
 ├── README.md
 ├── lib/                    # Shared utilities
 │   ├── utils.js            # File ops, JSON helpers, command detection
@@ -28,11 +27,12 @@ hooks/
 │   ├── main.js
 │   └── README.md
 ├── session-tracker/        # Session persistence
-│   ├── main.js
 │   ├── inject-context.js   # Context injection at session start
 │   ├── start.js
 │   ├── end.js
 │   ├── summary.js          # Markdown summary generator
+│   ├── session.json.template
+│   ├── session.md.template
 │   └── README.md
 ├── user-message-counter/   # Counts user prompts
 │   ├── main.js
@@ -118,7 +118,7 @@ hooks/
 
 ```javascript
 #!/usr/bin/env node
-const { readStdinSync, logWarning } = require('../lib/utils');
+const { readStdinSync, log } = require('../lib/utils');
 
 function main() {
   // Read and pass through stdin (for hook chaining)
@@ -127,7 +127,7 @@ function main() {
 
   // Your logic here
   // Warnings go to stderr (visible in Claude Code)
-  logWarning('[my-hook] Something happened');
+  log('[my-hook] Something happened');
 }
 
 main();
@@ -174,8 +174,8 @@ main();
 - `writeFileSafe(path, content)` - Write file with directory creation
 - `execCommand(cmd, args)` - Safe command execution (no shell injection)
 - `readStdinSync()` - Read all stdin content
-- `outputHookResponse(context, eventName)` - Output hook JSON response
-- `logWarning(msg)` - Log to stderr
+- `log(msg)` - Log to stderr (visible to user, not sent to Claude)
+- `outputContext(context, eventName)` - Output structured hook response for Claude
 
 ### lib/package-manager.js
 
@@ -186,7 +186,7 @@ main();
 
 ## Cross-Platform Notes
 
-- Use Node.js (`run-hook.js`) instead of bash for Windows compatibility
+- Use Node.js instead of bash for Windows compatibility
 - Use `execCommand` (which uses `execFileSync`) to prevent shell injection
 - Use `path.join()` for file paths
 - Temp files go to `os.tmpdir()` (via `getTempDir()`)

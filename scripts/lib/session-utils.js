@@ -140,15 +140,6 @@ function getObservationsPath(project) {
 }
 
 /**
- * Get observations archive directory for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/observations/{project}/archive/
- */
-function getObservationsArchivePath(project) {
-  return path.join(CLAUDE_DIR, 'observations', project, 'archive');
-}
-
-/**
  * Get instincts directory for a project.
  * @param {string} project - Project name
  * @returns {string} ~/.claude/instincts/{project}/
@@ -193,7 +184,6 @@ module.exports = {
   CLAUDE_DIR,
   // Observation & Instinct paths
   getObservationsPath,
-  getObservationsArchivePath,
   getInstinctsDir,
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,

@@ -10,7 +10,19 @@
 │  │   ├── cli.js                   # CLI entry point (10 commands)                           │
 │  │   └── lib/                     # Supporting modules                                      │
 │  │       ├── coordinator.js       # DAG orchestration engine                                │
-│  │       └── dag-schema.js        # Schema validation                                       │
+│  │       ├── dag-schema.js        # Schema validation                                       │
+│  │       ├── models.js            # DAG data models (Epic, Feature, etc.)                   │
+│  │       ├── yaml-parser.js       # YAML parser/serializer                                  │
+│  │       ├── locking.js           # File-based DAG locking                                  │
+│  │       ├── package-manager.js   # PM detection (npm/pnpm/yarn/bun)                        │
+│  │       ├── confidence.js        # Confidence scoring for instincts                        │
+│  │       ├── fingerprint.js       # Trigger fingerprinting (Jaccard)                        │
+│  │       ├── global-index.js      # Cross-project instinct bubble-up                        │
+│  │       ├── instinct-writer.js   # Instinct file creation                                  │
+│  │       ├── pending-actions.js   # Deferred action queue                                   │
+│  │       ├── session-utils.js     # Session/diary path helpers                              │
+│  │       ├── thresholds.js        # Session evaluation thresholds                           │
+│  │       └── utils.js             # Cross-platform file/JSON utilities                      │
 │  │                                                                                          │
 │  ├── skills/                      # Markdown skill definitions (24 skills)                  │
 │  │   ├── arc-using/           # Entry point skill                                       │
@@ -41,16 +53,16 @@
 │  ├── templates/                   # Subagent prompt templates                               │
 │  │   ├── implementer-prompt.md    # TDD implementer subagent                                │
 │  │   ├── spec-reviewer-prompt.md  # Spec compliance reviewer                                │
-│  │   └── code-quality-reviewer-prompt.md  # Code quality reviewer                           │
+│  │   └── quality-reviewer-prompt.md  # Code quality reviewer                                │
 │  │                                                                                          │
 │  ├── agents/                      # Persistent agent definitions                            │
 │  │   └── code-reviewer.md         # Code review agent                                       │
 │  │                                                                                          │
 │  ├── docs/                        # Documentation                                           │
-│  │   ├── workflow-overview.txt    # Visual workflow guide                                   │
-│  │   └── worktree-workflow.md     # Worktree operation guide                                │
+│  │   ├── guide/                   # Architecture and workflow guides                        │
+│  │   └── README.*.md              # Platform-specific READMEs (codex, opencode, gemini)     │
 │  │                                                                                          │
-│  ├── tests/                       # Test suite (pytest + bats)                              │
+│  ├── tests/                       # Test suite (Jest, Node --test, custom, pytest)           │
 │  ├── .worktrees/                  # Git worktrees for epic isolation                        │
 │  ├── dag.yaml                     # DAG definition (when exists)                            │
 │  ├── pyproject.toml               # Package config (pytest)                                 │

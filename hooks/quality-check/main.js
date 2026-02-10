@@ -119,7 +119,9 @@ function main() {
   process.exit(0);
 }
 
-main().catch(err => {
+try {
+  main();
+} catch (err) {
   console.error('[quality-check] Error:', err.message);
   process.exit(0);
-});
+}

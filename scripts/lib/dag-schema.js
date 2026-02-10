@@ -217,7 +217,7 @@ function exampleToYaml() {
  * Simple YAML serializer for objects (no external dependencies)
  * Only handles the types we need for dag.yaml
  */
-function objectToYaml(obj, indent = 0, isArrayItem = false) {
+function objectToYaml(obj, indent = 0) {
   const spaces = '  '.repeat(indent);
   const lines = [];
 
@@ -299,7 +299,7 @@ function formatValue(value) {
     if (value.includes(':') || value.includes('#') || value.includes("'") ||
         value.includes('"') || value.includes('\n') || value === '' ||
         value.startsWith(' ') || value.endsWith(' ')) {
-      return `"${value.replace(/"/g, '\\"')}"`;
+      return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     }
     return value;
   }
@@ -372,6 +372,39 @@ function validate(dag) {
 
           if (feat.status && !Object.values(TaskStatus).includes(feat.status)) {
             errors.push(`${featPrefix}.status must be one of: ${Object.values(TaskStatus).join(', ')}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Validate depends_on cross-references
+  if (Array.isArray(dag.epics)) {
+    const epicIds = new Set(dag.epics.filter(e => e.id).map(e => e.id));
+    for (let i = 0; i < dag.epics.length; i++) {
+      const epic = dag.epics[i];
+      const prefix = `epics[${i}]`;
+
+      // Validate epic-level depends_on
+      if (Array.isArray(epic.depends_on)) {
+        for (const depId of epic.depends_on) {
+          if (!epicIds.has(depId)) {
+            errors.push(`${prefix}.depends_on references non-existent epic "${depId}"`);
+          }
+        }
+      }
+
+      // Validate feature-level depends_on
+      if (Array.isArray(epic.features)) {
+        const featureIds = new Set(epic.features.filter(f => f.id).map(f => f.id));
+        for (let j = 0; j < epic.features.length; j++) {
+          const feat = epic.features[j];
+          if (Array.isArray(feat.depends_on)) {
+            for (const depId of feat.depends_on) {
+              if (!featureIds.has(depId)) {
+                errors.push(`${prefix}.features[${j}].depends_on references non-existent feature "${depId}"`);
+              }
+            }
           }
         }
       }

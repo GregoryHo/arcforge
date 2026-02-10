@@ -228,8 +228,8 @@ arcforge reboot
 ## Development
 
 ```bash
-# Run tests
-pytest tests/ -v
+# Run all tests (4 runners: Jest, Node --test, custom, pytest)
+npm test
 
 # Run CLI
 node scripts/cli.js --help

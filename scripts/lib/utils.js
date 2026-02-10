@@ -171,29 +171,6 @@ function execCommand(command, args = [], options = {}) {
 }
 
 /**
- * Get the plugin root directory (parent of scripts/)
- */
-function getPluginRoot() {
-  // This file is at scripts/lib/utils.js
-  // Plugin root is two levels up
-  return path.resolve(__dirname, '..', '..');
-}
-
-/**
- * Get the scripts directory
- */
-function getScriptsDir() {
-  return path.resolve(__dirname, '..');
-}
-
-/**
- * Get the hooks directory
- */
-function getHooksDir() {
-  return path.resolve(__dirname, '..', '..', 'hooks');
-}
-
-/**
  * Parse stdin JSON (for hook input)
  * Returns parsed object or null on error
  */
@@ -206,30 +183,6 @@ function parseStdinJson(stdinContent) {
 }
 
 /**
- * Read all stdin content
- * Returns promise resolving to string
- */
-function readStdin() {
-  return new Promise((resolve) => {
-    let data = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('readable', () => {
-      let chunk;
-      while ((chunk = process.stdin.read()) !== null) {
-        data += chunk;
-      }
-    });
-    process.stdin.on('end', () => {
-      resolve(data);
-    });
-    // Handle case where stdin is empty/closed
-    if (process.stdin.isTTY) {
-      resolve('');
-    }
-  });
-}
-
-/**
  * Read stdin synchronously (blocking)
  * For hooks that need sync operation
  */
@@ -239,29 +192,6 @@ function readStdinSync() {
   } catch {
     return '';
   }
-}
-
-/**
- * Output hook response JSON
- * Writes to stdout
- * @deprecated Use outputContext() for clearer semantics
- */
-function outputHookResponse(additionalContext, eventName = 'Hook') {
-  const response = {
-    hookSpecificOutput: {
-      hookEventName: eventName,
-      additionalContext: additionalContext
-    }
-  };
-  console.log(JSON.stringify(response, null, 2));
-}
-
-/**
- * Log to stderr (for warnings/info that shouldn't affect hook output)
- * @deprecated Use log() for clearer semantics
- */
-function logWarning(message) {
-  console.error(message);
 }
 
 // =============================================================================
@@ -580,11 +510,7 @@ module.exports = {
   getCommandPath,
   commandExists,
   execCommand,
-  getPluginRoot,
-  getScriptsDir,
-  getHooksDir,
   parseStdinJson,
-  readStdin,
   readStdinSync,
   // Session ID caching
   setSessionIdFromInput,
@@ -600,9 +526,6 @@ module.exports = {
   colors,
   colorize,
   supportsColor,
-  // Legacy I/O helpers (deprecated)
-  outputHookResponse,
-  logWarning,
   // Session management
   getSessionId,
   getProjectName,
