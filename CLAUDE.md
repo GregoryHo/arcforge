@@ -20,6 +20,11 @@ npm install
 cd hooks && npm install && cd ..
 ```
 
+Python 3 with pytest is required for `npm run test:skills`:
+```bash
+pip install pytest pyyaml
+```
+
 ## Skills
 
 - Skills live in `skills/<skill-name>/SKILL.md`
@@ -56,5 +61,6 @@ cd hooks && npm install && cd ..
 
 - `npm test` runs 4 separate runners (Jest, Node --test, custom, pytest) — all must pass
 - Hooks have their own `package.json` — run `cd hooks && npm install` separately
+- `test:skills` requires Python 3 + pytest (`pip install pytest pyyaml`)
 - Never use `@`-file syntax in skills (force-loads context into memory)
 - Skills max 500 words; use supporting files for heavy reference
