@@ -1,7 +1,32 @@
 {
   "name": "arcforge",
-  "version": "1.0.0",
-  "description": "Skill-based autonomous agent pipeline for Claude Code",
+  "version": "1.1.0",
+  "description": "Skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode",
+  "license": "MIT",
+  "author": {
+    "name": "Gregory Ho"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GregoryHo/arcforge.git"
+  },
+  "bin": {
+    "arcforge": "scripts/cli.js"
+  },
+  "files": [
+    "skills/",
+    "hooks/",
+    "scripts/",
+    "templates/",
+    "commands/",
+    ".claude-plugin/",
+    ".codex/",
+    ".gemini/",
+    ".opencode/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills",
     "test:scripts": "jest",

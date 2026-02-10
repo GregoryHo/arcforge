@@ -97,7 +97,7 @@
 │  │     └────────┬─────────┘                   │                 │                     │    │
 │  │              │                             ▼                 ▼                     │    │
 │  │             YES                   ┌─────────────────┐ ┌─────────────────┐          │    │
-│  │              │                    │Large (multi-epic)│ │agentic-writing- │          │    │
+│  │              │                    │Large (multi-epic)│ │arc-writing-     │          │    │
 │  │              ▼                    │                 │ │tasks (small)    │          │    │
 │  │     ┌──────────────────┐          └────────┬────────┘ └────────┬────────┘          │    │
 │  │     │ arc-refining  │                   │                   │                   │    │
@@ -134,7 +134,7 @@
 │                                                                                              │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                              │
-│  3. SKILLS CATALOG (技能目錄) - 19 Skills                                                     │
+│  3. SKILLS CATALOG (技能目錄) - 24 Skills                                                     │
 │  ═══════════════════════════════════════════════════════════════════════════════════════════ │
 │                                                                                              │
 │  ┌──────────────────────┬───────────────────────────────────────────────────────────────┐   │
@@ -158,8 +158,8 @@
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
 │  │ arc-writing-tasks│ Breaking features into tasks, preparing for implementation    │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
-│  │ agentic-executing-   │ Executing prepared task list with human checkpoints           │   │
-│  │ tasks                │                                                               │   │
+│  │ arc-executing-tasks   │ Executing prepared task list with human checkpoints           │   │
+│  │                      │                                                               │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
 │  │ arc-agent-driven │ Executing task lists with automated subagent + 2-stage review │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
@@ -173,14 +173,24 @@
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
 │  │ arc-finishing-epic  │ Epic complete in worktree, merge to base + DAG update         │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
-│  │ agentic-requesting-  │ Completing tasks/features, need code review                   │   │
+│  │ arc-requesting-      │ Completing tasks/features, need code review                   │   │
 │  │ review               │                                                               │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
-│  │ agentic-receiving-   │ Receiving code review feedback (technical rigor required)     │   │
+│  │ arc-receiving-       │ Receiving code review feedback (technical rigor required)     │   │
 │  │ review               │                                                               │   │
 │  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
-│  │ agentic-writing-     │ Creating/editing skills, verifying skills before deploy       │   │
-│  │ skills               │                                                               │   │
+│  │ arc-writing-skills   │ Creating/editing skills, verifying skills before deploy       │   │
+│  │                      │                                                               │   │
+│  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
+│  │ arc-journaling       │ End of session, capturing reflections before compaction       │   │
+│  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
+│  │ arc-reflecting       │ After 5+ diary entries, analyzing patterns and insights       │   │
+│  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
+│  │ arc-learning         │ When patterns emerge from reflection, extract reusable skills │   │
+│  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
+│  │ arc-observing        │ Tool call observation for behavioral pattern detection        │   │
+│  ├──────────────────────┼───────────────────────────────────────────────────────────────┤   │
+│  │ arc-recalling        │ Manual instinct creation from session insights                │   │
 │  └──────────────────────┴───────────────────────────────────────────────────────────────┘   │
 │                                                                                              │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -202,14 +212,14 @@
 │  │ arc-coordinating │ dag.yaml                   │ .worktrees/<epic>/                 │  │
 │  │                     │                            │ .agentic-epic (metadata)           │  │
 │  ├─────────────────────┼────────────────────────────┼────────────────────────────────────┤  │
-│  │ agentic-writing-    │ Feature spec              │ docs/tasks/<feature>-tasks.md      │  │
-│  │ tasks               │                            │                                    │  │
+│  │ arc-writing-tasks   │ Feature spec              │ docs/tasks/<feature>-tasks.md      │  │
+│  │                     │                            │                                    │  │
 │  ├─────────────────────┼────────────────────────────┼────────────────────────────────────┤  │
-│  │ agentic-executing-  │ docs/tasks/*-tasks.md      │ src/* (implementation)             │  │
-│  │ tasks               │                            │ tests/* (tests)                    │  │
+│  │ arc-executing-tasks │ docs/tasks/*-tasks.md      │ src/* (implementation)             │  │
+│  │                     │                            │ tests/* (tests)                    │  │
 │  ├─────────────────────┼────────────────────────────┼────────────────────────────────────┤  │
-│  │ agentic-agent-      │ docs/tasks/*-tasks.md      │ src/* + tests/*                    │  │
-│  │ driven              │                            │ (with automated review)            │  │
+│  │ arc-agent-driven    │ docs/tasks/*-tasks.md      │ src/* + tests/*                    │  │
+│  │                     │                            │ (with automated review)            │  │
 │  ├─────────────────────┼────────────────────────────┼────────────────────────────────────┤  │
 │  │ arc-implementing │ dag.yaml + epic specs      │ src/* + tests/*                    │  │
 │  │                     │                            │ epics/<epic>/errors.md             │  │
@@ -314,7 +324,7 @@
 │  │       │                     │                              │                     │  │    │
 │  │       │                     │                    ┌─────────┴─────────┐           │  │    │
 │  │       │                     │                    ▼                   ▼           │  │    │
-│  │       │                     │         arc-executing-tasks  agentic-agent-    │  │    │
+│  │       │                     │         arc-executing-tasks  arc-agent-        │  │    │
 │  │       │                     │                    │             driven            │  │    │
 │  │       │                     │                    └─────────┬─────────┘           │  │    │
 │  │       │                     │                              ▼                     │  │    │

@@ -38,9 +38,9 @@ Check that commands appear:
 
 ```
 # Should see:
-# /arcforge:brainstorm - Design exploration
-# /arcforge:write-tasks - Break epics or features into executable tasks
-# /arcforge:execute-tasks - Execute tasks with checkpoints
+# /arcforge:arc-brainstorming - Design exploration
+# /arcforge:arc-writing-tasks - Break epics or features into executable tasks
+# /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
 ### Codex
@@ -79,40 +79,40 @@ These are the most frequently used commands:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `/arcforge:brainstorm` | Design exploration | When starting new work or clarifying requirements |
-| `/arcforge:write-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
-| `/arcforge:execute-tasks` | Run task list | When tasks are ready and you want to implement |
-| `/arcforge:journal` | Session journaling | At end of session to capture reflections |
-| `/arcforge:reflect` | Analyze patterns | After 5+ diary entries to summarize learnings |
+| `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
+| `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
+| `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
+| `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
+| `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
 
 ### Typical Flow
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌───────────────┐    ┌─────────┐
-│ brainstorm  │───▶│ write-tasks │───▶│ execute-tasks │───▶│  diary  │
-└──────▲──────┘    └─────────────┘    └───────────────┘    └────┬────┘
-       │                                                        │
-       │           ┌────────────────────────────────────────────┘
-       │           │  (after multiple sessions)
-       │           ▼
-       │    ┌─────────────┐
-       │    │   reflect   │
-       │    └──────┬──────┘
-       │           │  (when patterns emerge)
-       │           ▼
-       │    ┌─────────────┐
-       └────│    learn    │  ─── produces new skills/patterns
-            └─────────────┘
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌────────────────┐
+│ arc-brainstorming│───▶│ arc-writing-tasks│───▶│arc-executing-tasks│───▶│ arc-journaling │
+└────────▲─────────┘    └──────────────────┘    └──────────────────┘    └───────┬────────┘
+         │                                                                      │
+         │           ┌──────────────────────────────────────────────────────────┘
+         │           │  (after multiple sessions)
+         │           ▼
+         │    ┌────────────────┐
+         │    │ arc-reflecting │
+         │    └───────┬────────┘
+         │            │  (when patterns emerge)
+         │            ▼
+         │    ┌────────────────┐
+         └────│  arc-learning  │  ─── produces new skills/patterns
+              └────────────────┘
 ```
 
 ### Starting Points
 
 | Situation | Start With |
 |-----------|------------|
-| Vague idea or new requirement | `brainstorm` |
-| Clear spec, ready to plan | `write-tasks` or `arc-planning` |
-| Tasks already defined | `execute-tasks` |
-| End of work session | `diary` |
+| Vague idea or new requirement | `arc-brainstorming` |
+| Clear spec, ready to plan | `arc-writing-tasks` or `arc-planning` |
+| Tasks already defined | `arc-executing-tasks` |
+| End of work session | `arc-journaling` |
 
 ## The Basic Workflow
 
@@ -170,6 +170,8 @@ These are the most frequently used commands:
 - **arc-journaling** - Session journaling for capturing reflections before compaction
 - **arc-reflecting** - Analyze diary entries for insights and patterns
 - **arc-learning** - Extract reusable patterns from sessions
+- **arc-observing** - Tool call observation for behavioral pattern detection
+- **arc-recalling** - Manual instinct creation from session insights
 
 ### Review Layer
 
@@ -235,8 +237,9 @@ node scripts/cli.js --help
 
 ## Documentation
 
-- [Design Document](docs/plans/2026-01-17-arcforge-skill-system-design.md)
-- [Implementation Roadmap](docs/plans/2026-01-17-arcforge-implementation-roadmap.md)
+- [Architecture Overview](docs/guide/architecture-overview.txt)
+- [Skills Workflow](docs/guide/skills-workflow.txt)
+- [Worktree Workflow](docs/guide/worktree-workflow.md)
 
 ## Contributing
 

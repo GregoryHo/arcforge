@@ -12,7 +12,7 @@
 │  │       ├── coordinator.js       # DAG orchestration engine                                │
 │  │       └── dag-schema.js        # Schema validation                                       │
 │  │                                                                                          │
-│  ├── skills/                      # Markdown skill definitions (19 skills)                  │
+│  ├── skills/                      # Markdown skill definitions (24 skills)                  │
 │  │   ├── arc-using/           # Entry point skill                                       │
 │  │   ├── arc-brainstorming/      # Ideation                                                │
 │  │   ├── arc-refining/         # Spec generation                                         │
@@ -31,7 +31,12 @@
 │  │   ├── arc-finishing-epic/     # Epic completion with merge                              │
 │  │   ├── arc-requesting-review/ # Review request                                        │
 │  │   ├── arc-receiving-review/  # Review response                                       │
-│  │   └── arc-writing-skills/    # Skill authoring                                       │
+│  │   ├── arc-writing-skills/    # Skill authoring                                       │
+│  │   ├── arc-journaling/        # Session journaling                                    │
+│  │   ├── arc-reflecting/        # Diary analysis for patterns                           │
+│  │   ├── arc-learning/          # Pattern extraction from sessions                      │
+│  │   ├── arc-observing/         # Tool call observation                                 │
+│  │   └── arc-recalling/         # Manual instinct creation                              │
 │  │                                                                                          │
 │  ├── templates/                   # Subagent prompt templates                               │
 │  │   ├── implementer-prompt.md    # TDD implementer subagent                                │

@@ -29,6 +29,7 @@ hooks/
 │   └── README.md
 ├── session-tracker/        # Session persistence
 │   ├── main.js
+│   ├── inject-context.js   # Context injection at session start
 │   ├── start.js
 │   ├── end.js
 │   ├── summary.js          # Markdown summary generator
@@ -36,10 +37,9 @@ hooks/
 ├── user-message-counter/   # Counts user prompts
 │   ├── main.js
 │   └── README.md
-└── session-evaluator/      # Suggests pattern extraction
-    ├── main.js
-    ├── config.json
-    └── README.md
+├── observe/                # Tool call observation
+│   └── main.js
+└── log-lightweight.py      # Lightweight session logging
 ```
 
 ## Active Hooks
@@ -49,27 +49,57 @@ hooks/
 | Hook | Trigger | Description |
 |------|---------|-------------|
 | inject-skills | startup, resume, clear, compact | Injects arc-using skill content |
-| session-tracker/start | startup, resume | Loads previous session context, resets counters |
+| session-tracker/inject-context | startup, resume, clear | Loads previous session context |
+| session-tracker/start | startup, resume, clear | Resets counters, initializes session |
+| log-lightweight | All | Records session start for logging |
 
 ### UserPromptSubmit
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
 | user-message-counter | All | Counts user messages for session evaluation |
+| log-lightweight | All | Records user prompts for logging |
+
+### PreToolUse
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| observe | All | Captures tool calls for behavioral pattern observation |
+| log-lightweight | All | Records tool usage for session logging |
 
 ### PostToolUse
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
 | quality-check | Edit on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
-| compact-suggester | All tools | Counts tool calls, suggests /compact at 50, then every 25 |
+| observe | All | Captures tool call results for behavioral pattern observation |
+| compact-suggester | All | Counts tool calls, suggests /compact at 50, then every 25 |
+| log-lightweight | All | Records tool results for session logging |
 
 ### Stop
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
 | session-tracker/end | All | Saves session metrics (JSON + Markdown summary) |
-| session-evaluator | All | Suggests pattern extraction for long sessions |
+| log-lightweight | All | Records session stop for logging |
+
+### SubagentStop
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| log-lightweight | All | Records subagent stop for logging |
+
+### SessionEnd
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| log-lightweight | All | Records session end for logging |
+
+### PermissionRequest
+
+| Hook | Trigger | Description |
+|------|---------|-------------|
+| log-lightweight | All | Records permission requests for logging |
 
 ### PreCompact
 
