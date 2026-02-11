@@ -1,10 +1,22 @@
 # arcforge
 
-arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-4%20runners-brightgreen)](#development)
+
+arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
+
+## Why arcforge
+
+AI coding agents are powerful but undisciplined. Left to their defaults, they skip design, ignore review, and lose context across sessions. The result is code that works in the moment but accumulates debt fast.
+
+arcforge solves this by embedding a skill-based workflow directly into the agent's session. Skills trigger automatically based on context — the agent doesn't need to remember commands or follow a manual checklist. Design, planning, TDD, and review happen because the workflow enforces them.
+
+The outcome: your agent behaves like a disciplined engineer. It designs before building, plans before coding, tests before shipping, and learns from every session.
 
 ## How it works
 
-It starts the moment you open your coding agent. Instead of jumping into code, it activates skills that guide you through design, planning, and execution.
+When your coding agent starts a session, arcforge's hooks inject available skills into context. Instead of jumping into code, it activates skills that guide you through design, planning, and execution.
 
 Once a design is approved, it builds a clear implementation plan and then executes tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
@@ -116,11 +128,11 @@ These are the most frequently used commands:
 
 ## The Basic Workflow
 
-1. **routing** - `arc-using` checks context and decides between a large or small flow.
+1. **routing** - `arc-using` checks context and decides between a large or small flow. Multi-epic work with cross-cutting concerns goes large; single features or bug fixes go small.
 
-2. **large flow** - `arc-brainstorming` → `arc-refining` → `arc-planning` → `arc-coordinating` → `arc-implementing` (per-epic loops).
+2. **large flow** - `arc-brainstorming` → `arc-refining` → `arc-planning` → `arc-coordinating` → `arc-implementing` (with worktree isolation per epic).
 
-3. **small flow** - `arc-writing-tasks` → `arc-executing-tasks` or `arc-agent-driven`.
+3. **small flow** - `arc-writing-tasks` → `arc-executing-tasks` or `arc-agent-driven` (without DAG or worktrees).
 
 4. **execution** - TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
 
@@ -186,6 +198,8 @@ These are the most frequently used commands:
 
 ## CLI Usage
 
+The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
+
 ```bash
 # Show pipeline status
 arcforge status
@@ -214,9 +228,39 @@ arcforge cleanup
 # Sync state between worktree and base DAG
 arcforge sync [--direction from-base|to-base|both|scan]
 
-# Show 5-Question Reboot context
+# Show 5-Question Reboot context:
+#   Where am I? / Where am I going? / What's the goal?
+#   What have I learned? / What have I done?
 arcforge reboot
 ```
+
+## Development
+
+### Setup
+
+```bash
+npm install
+cd hooks && npm install && cd ..
+pip install pytest pyyaml    # Required for test:skills
+```
+
+### Running Tests
+
+```bash
+# Run all tests (4 runners — all must pass)
+npm test
+
+# Individual runners
+npm run test:scripts   # Jest — CLI engine (scripts/lib/)
+npm run test:hooks     # Node --test — hook behavior (hooks/__tests__/)
+npm run test:node      # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
+npm run test:skills    # pytest — skill content validation (tests/skills/)
+
+# Run CLI
+node scripts/cli.js --help
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ## Philosophy
 
@@ -225,30 +269,22 @@ arcforge reboot
 - **Skill-first workflow** - Use the existing skills before improvising
 - **Evidence over claims** - Verify before declaring success
 
-## Development
-
-```bash
-# Run all tests (4 runners: Jest, Node --test, custom, pytest)
-npm test
-
-# Run CLI
-node scripts/cli.js --help
-```
-
 ## Documentation
 
-- [Architecture Overview](docs/guide/architecture-overview.txt)
-- [Skills Workflow](docs/guide/skills-workflow.txt)
-- [Worktree Workflow](docs/guide/worktree-workflow.md)
+- [Architecture Overview](docs/guide/architecture-overview.txt) — System design, module map, and data flow
+- [Skills Workflow](docs/guide/skills-workflow.txt) — How skills load, trigger, and chain
+- [Worktree Workflow](docs/guide/worktree-workflow.md) — Epic isolation with git worktrees
+- [CLI Reference](docs/guide/cli-reference.txt) — Full command tree, options, and examples
+- [Changelog](CHANGELOG.md) — Release history and migration notes
 
 ## Contributing
 
-Skills live in this repository. To contribute:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. It covers:
 
-1. Create a branch for your change.
-2. Follow `skills/arc-writing-skills/SKILL.md` when adding or updating skills.
-3. Run tests and keep changes minimal and readable.
-4. Submit a PR.
+- **Naming conventions** — `arc-<gerund>[-<object>]` pattern for skills
+- **The Iron Law** — no skill without a failing test first (TDD for documentation)
+- **Test runners** — all 4 runners must pass before submitting a PR
+- **PR process** — branch naming, conventional commits, Iron Law compliance
 
 ## Updating
 
