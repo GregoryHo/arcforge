@@ -135,13 +135,11 @@ Each file: {id}.md with YAML frontmatter + markdown body.
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     if command -v claude &>/dev/null; then
       # Capture stdout and stderr separately
-      claude_output=$(echo "$prompt" | claude --model haiku --max-turns 3 --print 2>&1)
-      local exit_code=$?
-
-      if [ "$exit_code" -eq 0 ]; then
+      if claude_output=$(echo "$prompt" | claude --model haiku --max-turns 3 --print 2>&1); then
         analysis_success=true
         log_msg "Claude analysis completed successfully"
       else
+        local exit_code=$?
         log_msg "ERROR: claude analysis failed (exit code: ${exit_code})"
         if [ "$retry_count" -lt "$max_retries" ]; then
           retry_count=$((retry_count + 1))
