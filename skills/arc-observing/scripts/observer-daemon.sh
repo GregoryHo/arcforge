@@ -48,11 +48,6 @@ is_running() {
   kill -0 "$pid" 2>/dev/null
 }
 
-write_pid() {
-  mkdir -p "$(dirname "$PID_FILE")"
-  echo "$$" > "$PID_FILE"
-}
-
 remove_pid() {
   rm -f "$PID_FILE"
 }
@@ -135,8 +130,8 @@ Each file: {id}.md with YAML frontmatter + markdown body.
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     if command -v claude &>/dev/null; then
       # Capture stdout and stderr separately
-      claude_output=$(echo "$prompt" | claude --model haiku --max-turns 3 --print 2>&1)
-      local exit_code=$?
+      local exit_code=0
+      claude_output=$(echo "$prompt" | claude --model haiku --max-turns 3 --print 2>&1) || exit_code=$?
 
       if [ "$exit_code" -eq 0 ]; then
         analysis_success=true
@@ -226,8 +221,7 @@ analyze_all_projects() {
 # ─────────────────────────────────────────────
 
 daemon_loop() {
-  write_pid
-  log_msg "Observer daemon started (PID $$)"
+  log_msg "Observer daemon started"
 
   local last_activity
   last_activity=$(date +%s)
@@ -288,6 +282,7 @@ cmd_start() {
   mkdir -p "$INSTINCTS_DIR"
   echo "Starting observer daemon..."
   daemon_loop &
+  echo "$!" > "$PID_FILE"
   disown
   echo "Observer daemon started (PID $!)"
 }
