@@ -29,7 +29,7 @@ git clone https://github.com/GregoryHo/arcforge.git ~/.agents/arcforge
 
 ```bash
 mkdir -p ~/.gemini/skills
-for skill in ~/.agents/arcforge/skills/agentic-*/; do
+for skill in ~/.agents/arcforge/skills/arc-*/; do
   ln -sf "$skill" ~/.gemini/skills/
 done
 ```
@@ -60,7 +60,7 @@ Agentic-core skills are written for Claude Code's tool vocabulary. Gemini CLI ma
 
 1. **Workspace skills** (`.gemini/skills/`) — project-specific overrides
 2. **User skills** (`~/.gemini/skills/`) — personal skills
-3. **Agentic skills** (`~/.gemini/skills/agentic-*`) — symlinked from the arcforge repo
+3. **Agentic skills** (`~/.gemini/skills/arc-*`) — symlinked from the arcforge repo
 
 Higher-priority skills override lower ones with the same name.
 
@@ -85,7 +85,7 @@ Skills update instantly through the symlink.
 Remove the skill symlinks and optionally delete the clone:
 
 ```bash
-for skill in ~/.gemini/skills/agentic-*; do
+for skill in ~/.gemini/skills/arc-*; do
   [ -L "$skill" ] && unlink "$skill"
 done
 rm -rf ~/.agents/arcforge   # optional: remove the repo
@@ -100,7 +100,7 @@ rm -rf ~/.agents/arcforge   # optional: remove the repo
 ```cmd
 git clone https://github.com/GregoryHo/arcforge.git "%USERPROFILE%\.agents\arcforge"
 mkdir "%USERPROFILE%\.gemini\skills"
-for /D %s in ("%USERPROFILE%\.agents\arcforge\skills\agentic-*") do mklink /J "%USERPROFILE%\.gemini\skills\%~nxs" "%s"
+for /D %s in ("%USERPROFILE%\.agents\arcforge\skills\arc-*") do mklink /J "%USERPROFILE%\.gemini\skills\%~nxs" "%s"
 ```
 
 ### PowerShell
@@ -108,7 +108,7 @@ for /D %s in ("%USERPROFILE%\.agents\arcforge\skills\agentic-*") do mklink /J "%
 ```powershell
 git clone https://github.com/GregoryHo/arcforge.git "$env:USERPROFILE\.agents\arcforge"
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\skills"
-Get-ChildItem "$env:USERPROFILE\.agents\arcforge\skills\agentic-*" -Directory | ForEach-Object {
+Get-ChildItem "$env:USERPROFILE\.agents\arcforge\skills\arc-*" -Directory | ForEach-Object {
   cmd /c mklink /J "$env:USERPROFILE\.gemini\skills\$($_.Name)" $_.FullName
 }
 ```
@@ -118,7 +118,7 @@ Get-ChildItem "$env:USERPROFILE\.agents\arcforge\skills\agentic-*" -Directory | 
 ```bash
 git clone https://github.com/GregoryHo/arcforge.git ~/.agents/arcforge
 mkdir -p ~/.gemini/skills
-for skill in ~/.agents/arcforge/skills/agentic-*/; do
+for skill in ~/.agents/arcforge/skills/arc-*/; do
   ln -sf "$skill" ~/.gemini/skills/
 done
 ```
@@ -127,6 +127,6 @@ done
 
 ### Skills not found
 
-1. Verify symlinks: `ls -la ~/.gemini/skills/agentic-*` (should show 22 symlinks)
+1. Verify symlinks: `ls -la ~/.gemini/skills/arc-*` (should show 24 symlinks)
 2. Verify a skill resolves: `ls ~/.gemini/skills/arc-using/SKILL.md`
 3. Restart Gemini CLI to trigger skill discovery

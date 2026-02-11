@@ -16,7 +16,7 @@ Enable agentic skills in Gemini CLI via native skill discovery.
 2. **Symlink each skill into the Gemini skills directory:**
    ```bash
    mkdir -p ~/.gemini/skills
-   for skill in ~/.agents/arcforge/skills/agentic-*/; do
+   for skill in ~/.agents/arcforge/skills/arc-*/; do
      ln -sf "$skill" ~/.gemini/skills/
    done
    ```
@@ -47,7 +47,7 @@ If you previously cloned to `~/.gemini/arcforge`:
 4. Create per-skill symlinks:
    ```bash
    mkdir -p ~/.gemini/skills
-   for skill in ~/.agents/arcforge/skills/agentic-*/; do
+   for skill in ~/.agents/arcforge/skills/arc-*/; do
      ln -sf "$skill" ~/.gemini/skills/
    done
    ```
@@ -59,10 +59,10 @@ If you previously cloned to `~/.gemini/arcforge`:
 ## Verify
 
 ```bash
-ls ~/.gemini/skills/agentic-*
+ls ~/.gemini/skills/arc-*
 ```
 
-You should see 22 symlinks, each pointing to a skill directory in `~/.agents/arcforge/skills/`.
+You should see 24 symlinks, each pointing to a skill directory in `~/.agents/arcforge/skills/`.
 
 ## Updating
 
@@ -73,7 +73,7 @@ cd ~/.agents/arcforge && git pull
 Skills update instantly through the symlinks. If new skills were added, re-run the symlink loop:
 
 ```bash
-for skill in ~/.agents/arcforge/skills/agentic-*/; do
+for skill in ~/.agents/arcforge/skills/arc-*/; do
   ln -sf "$skill" ~/.gemini/skills/
 done
 ```
@@ -81,7 +81,7 @@ done
 ## Uninstalling
 
 ```bash
-for skill in ~/.gemini/skills/agentic-*; do
+for skill in ~/.gemini/skills/arc-*; do
   [ -L "$skill" ] && unlink "$skill"
 done
 ```
