@@ -1,8 +1,8 @@
 // tests/scripts/instinct-writer.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 // Mock session-utils to redirect paths to temp directories
 // Variables prefixed with "mock" are allowed in jest.mock() factories
@@ -13,15 +13,19 @@ let mockGlobalIndexPath;
 jest.mock('../../scripts/lib/session-utils', () => ({
   getInstinctsDir: () => mockProjectInstinctsDir,
   getGlobalInstinctsDir: () => mockGlobalInstinctsDir,
-  getInstinctsGlobalIndex: () => mockGlobalIndexPath
+  getInstinctsGlobalIndex: () => mockGlobalIndexPath,
 }));
 
 const { saveInstinct, checkInstinctDuplicate } = require('../../scripts/lib/instinct-writer');
 const { readIndex } = require('../../scripts/lib/global-index');
-const { parseConfidenceFrontmatter, INITIAL, MAX_CONFIDENCE } = require('../../scripts/lib/confidence');
+const {
+  parseConfidenceFrontmatter,
+  INITIAL,
+  MAX_CONFIDENCE,
+} = require('../../scripts/lib/confidence');
 
 describe('instinct-writer', () => {
-  const testDir = path.join(os.tmpdir(), 'instinct-writer-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `instinct-writer-test-${Date.now()}`);
 
   beforeEach(() => {
     mockProjectInstinctsDir = path.join(testDir, 'instincts', 'test-project');
@@ -43,7 +47,7 @@ describe('instinct-writer', () => {
         project: 'test-project',
         domain: 'workflow',
         source: 'observation',
-        evidence: 'saw this 3 times in session'
+        evidence: 'saw this 3 times in session',
       });
 
       expect(result.path).toContain('grep-before-edit.md');
@@ -78,7 +82,7 @@ describe('instinct-writer', () => {
         id: 'basic-instinct',
         trigger: 'always',
         action: 'do the thing',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       const content = fs.readFileSync(result.path, 'utf-8');
@@ -96,7 +100,7 @@ describe('instinct-writer', () => {
         action: 'test first',
         project: 'test-project',
         maxConfidence: 0.85,
-        evidenceCount: 10
+        evidenceCount: 10,
       });
 
       // INITIAL(0.5) + 0.05 * 10 = 1.0, capped at 0.85
@@ -113,7 +117,7 @@ describe('instinct-writer', () => {
         trigger: 'when reviewing',
         action: 'check imports',
         project: 'test-project',
-        evidenceCount: 2
+        evidenceCount: 2,
       });
 
       // INITIAL(0.5) + 0.05 * 2 = 0.6
@@ -126,7 +130,7 @@ describe('instinct-writer', () => {
         trigger: 'always',
         action: 'do it',
         project: 'test-project',
-        evidenceCount: 20
+        evidenceCount: 20,
       });
 
       // INITIAL(0.5) + 0.05 * 20 = 1.5, capped at MAX_CONFIDENCE(0.9)
@@ -138,7 +142,7 @@ describe('instinct-writer', () => {
         id: 'new-pattern',
         trigger: 'when starting',
         action: 'read docs',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       expect(result.isNew).toBe(true);
@@ -150,7 +154,7 @@ describe('instinct-writer', () => {
         id: 'existing-pattern',
         trigger: 'when starting',
         action: 'read docs',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       // Second save (overwrite)
@@ -158,7 +162,7 @@ describe('instinct-writer', () => {
         id: 'existing-pattern',
         trigger: 'when starting',
         action: 'read docs v2',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       expect(result.isNew).toBe(false);
@@ -170,7 +174,7 @@ describe('instinct-writer', () => {
         trigger: 'when testing',
         action: 'mock first',
         project: 'test-project',
-        evidenceCount: 1
+        evidenceCount: 1,
       });
 
       const entries = readIndex(mockGlobalIndexPath);
@@ -187,14 +191,14 @@ describe('instinct-writer', () => {
         id: 'pattern-a',
         trigger: 'a',
         action: 'do a',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       saveInstinct({
         id: 'pattern-b',
         trigger: 'b',
         action: 'do b',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       const entries = readIndex(mockGlobalIndexPath);
@@ -207,7 +211,7 @@ describe('instinct-writer', () => {
           id: 'secret..hidden',
           trigger: 'malicious',
           action: 'attack',
-          project: 'test-project'
+          project: 'test-project',
         });
       }).toThrow(/parent directory traversal not allowed/);
     });
@@ -218,7 +222,7 @@ describe('instinct-writer', () => {
           id: 'foo/bar',
           trigger: 'malicious',
           action: 'attack',
-          project: 'test-project'
+          project: 'test-project',
         });
       }).toThrow(/path separators not allowed/);
     });
@@ -229,7 +233,7 @@ describe('instinct-writer', () => {
           id: '',
           trigger: 'empty',
           action: 'nothing',
-          project: 'test-project'
+          project: 'test-project',
         });
       }).toThrow(/non-empty string/);
     });
@@ -239,7 +243,7 @@ describe('instinct-writer', () => {
         id: 'my-cool-pattern',
         trigger: 'always',
         action: 'be cool',
-        project: 'test-project'
+        project: 'test-project',
       });
 
       const content = fs.readFileSync(result.path, 'utf-8');
@@ -282,11 +286,13 @@ describe('instinct-writer', () => {
 
       fs.writeFileSync(
         path.join(mockProjectInstinctsDir, 'both-places.md'),
-        '# Project copy\n', 'utf-8'
+        '# Project copy\n',
+        'utf-8',
       );
       fs.writeFileSync(
         path.join(mockGlobalInstinctsDir, 'both-places.md'),
-        '# Global copy\n', 'utf-8'
+        '# Global copy\n',
+        'utf-8',
       );
 
       const result = checkInstinctDuplicate('both-places', 'test-project');

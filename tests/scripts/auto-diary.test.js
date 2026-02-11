@@ -1,18 +1,18 @@
 // tests/scripts/auto-diary.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
   generateDraft,
   getDraftPath,
   summarizeObservations,
-  parseArgs
+  parseArgs,
 } = require('../../skills/arc-journaling/scripts/auto-diary');
 
 describe('auto-diary', () => {
-  const testDir = path.join(os.tmpdir(), 'auto-diary-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `auto-diary-test-${Date.now()}`);
   const originalHome = process.env.HOME;
 
   beforeEach(() => {
@@ -27,8 +27,15 @@ describe('auto-diary', () => {
   describe('parseArgs', () => {
     it('parses generate command with flags', () => {
       const { command, flags } = parseArgs([
-        'node', 'auto-diary.js', 'generate',
-        '--project', 'my-api', '--date', '2026-02-08', '--session', 'abc123'
+        'node',
+        'auto-diary.js',
+        'generate',
+        '--project',
+        'my-api',
+        '--date',
+        '2026-02-08',
+        '--session',
+        'abc123',
       ]);
       expect(command).toBe('generate');
       expect(flags.project).toBe('my-api');
@@ -37,7 +44,17 @@ describe('auto-diary', () => {
     });
 
     it('parses finalize command', () => {
-      const { command } = parseArgs(['node', 'auto-diary.js', 'finalize', '--project', 'x', '--date', 'y', '--session', 'z']);
+      const { command } = parseArgs([
+        'node',
+        'auto-diary.js',
+        'finalize',
+        '--project',
+        'x',
+        '--date',
+        'y',
+        '--session',
+        'z',
+      ]);
       expect(command).toBe('finalize');
     });
   });

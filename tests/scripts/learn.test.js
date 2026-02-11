@@ -1,8 +1,8 @@
 // tests/scripts/learn.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 // Mock session-utils paths
 let mockInstinctsDir;
@@ -10,13 +10,17 @@ let mockGlobalInstinctsDir;
 
 jest.mock('../../scripts/lib/session-utils', () => ({
   getInstinctsDir: jest.fn(() => mockInstinctsDir),
-  getGlobalInstinctsDir: jest.fn(() => mockGlobalInstinctsDir)
+  getGlobalInstinctsDir: jest.fn(() => mockGlobalInstinctsDir),
 }));
 
-const { loadInstincts, clusterInstincts, parseArgs } = require('../../skills/arc-learning/scripts/learn');
+const {
+  loadInstincts,
+  clusterInstincts,
+  parseArgs,
+} = require('../../skills/arc-learning/scripts/learn');
 
 describe('learn.js (instinct clustering)', () => {
-  const testDir = path.join(os.tmpdir(), 'learn-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `learn-test-${Date.now()}`);
 
   beforeEach(() => {
     mockInstinctsDir = path.join(testDir, 'instincts');
@@ -70,7 +74,7 @@ Do the thing for ${id}
     it('returns empty for fewer than 3 instincts in any domain', () => {
       const instincts = [
         { id: 'a', domain: 'testing', confidence: 0.7, trigger: 'when testing' },
-        { id: 'b', domain: 'testing', confidence: 0.7, trigger: 'when testing more' }
+        { id: 'b', domain: 'testing', confidence: 0.7, trigger: 'when testing more' },
       ];
       expect(clusterInstincts(instincts)).toEqual([]);
     });
@@ -79,7 +83,7 @@ Do the thing for ${id}
       const instincts = [
         { id: 'a', domain: 'testing', confidence: 0.7, trigger: 'when running tests' },
         { id: 'b', domain: 'testing', confidence: 0.8, trigger: 'when executing tests' },
-        { id: 'c', domain: 'testing', confidence: 0.6, trigger: 'when checking tests' }
+        { id: 'c', domain: 'testing', confidence: 0.6, trigger: 'when checking tests' },
       ];
       const clusters = clusterInstincts(instincts);
       expect(clusters.length).toBeGreaterThanOrEqual(1);
@@ -90,7 +94,7 @@ Do the thing for ${id}
       const instincts = [
         { id: 'a', domain: 'testing', confidence: 0.3, trigger: 'low conf 1' },
         { id: 'b', domain: 'testing', confidence: 0.2, trigger: 'low conf 2' },
-        { id: 'c', domain: 'testing', confidence: 0.1, trigger: 'low conf 3' }
+        { id: 'c', domain: 'testing', confidence: 0.1, trigger: 'low conf 3' },
       ];
       expect(clusterInstincts(instincts)).toEqual([]);
     });
@@ -101,11 +105,11 @@ Do the thing for ${id}
         { id: 'b', domain: 'testing', confidence: 0.7, trigger: 'test 2' },
         { id: 'c', domain: 'testing', confidence: 0.7, trigger: 'test 3' },
         { id: 'd', domain: 'debug', confidence: 0.7, trigger: 'debug 1' },
-        { id: 'e', domain: 'debug', confidence: 0.7, trigger: 'debug 2' }
+        { id: 'e', domain: 'debug', confidence: 0.7, trigger: 'debug 2' },
       ];
       const clusters = clusterInstincts(instincts);
       // Only testing should cluster (3+), debug only has 2
-      const domains = clusters.map(c => c.domain);
+      const domains = clusters.map((c) => c.domain);
       expect(domains).toContain('testing');
       expect(domains).not.toContain('debug');
     });

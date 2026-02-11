@@ -3,9 +3,17 @@
  * Tests for dag-schema.js
  */
 
-const assert = require('assert');
-const path = require('path');
-const { TaskStatus, schema, example, schemaToYaml, exampleToYaml, validate, objectToYaml } = require('../../scripts/lib/dag-schema');
+const assert = require('node:assert');
+const _path = require('node:path');
+const {
+  TaskStatus,
+  schema,
+  example,
+  schemaToYaml,
+  exampleToYaml,
+  validate,
+  objectToYaml,
+} = require('../../scripts/lib/dag-schema');
 
 console.log('Testing dag-schema.js...\n');
 
@@ -61,22 +69,24 @@ console.log('  validate (missing id)...');
 const invalidDag1 = { epics: [{ name: 'Test' }] };
 const result1 = validate(invalidDag1);
 assert.strictEqual(result1.valid, false);
-assert.ok(result1.errors.some(e => e.includes('id')));
+assert.ok(result1.errors.some((e) => e.includes('id')));
 console.log('    ✓ Missing id detected');
 
 // Test validate - invalid status
 console.log('  validate (invalid status)...');
 const invalidDag2 = {
-  epics: [{
-    id: 'test',
-    name: 'Test',
-    spec_path: 'test.md',
-    status: 'invalid_status'
-  }]
+  epics: [
+    {
+      id: 'test',
+      name: 'Test',
+      spec_path: 'test.md',
+      status: 'invalid_status',
+    },
+  ],
 };
 const result2 = validate(invalidDag2);
 assert.strictEqual(result2.valid, false);
-assert.ok(result2.errors.some(e => e.includes('status')));
+assert.ok(result2.errors.some((e) => e.includes('status')));
 console.log('    ✓ Invalid status detected');
 
 // Test validate - duplicate epic id
@@ -84,12 +94,12 @@ console.log('  validate (duplicate epic id)...');
 const invalidDag3 = {
   epics: [
     { id: 'same-id', name: 'Epic 1', spec_path: 'a.md' },
-    { id: 'same-id', name: 'Epic 2', spec_path: 'b.md' }
-  ]
+    { id: 'same-id', name: 'Epic 2', spec_path: 'b.md' },
+  ],
 };
 const result3 = validate(invalidDag3);
 assert.strictEqual(result3.valid, false);
-assert.ok(result3.errors.some(e => e.includes('duplicate')));
+assert.ok(result3.errors.some((e) => e.includes('duplicate')));
 console.log('    ✓ Duplicate epic id detected');
 
 // Test objectToYaml
@@ -97,7 +107,7 @@ console.log('  objectToYaml...');
 const testObj = {
   key: 'value',
   nested: { a: 1, b: 2 },
-  list: ['x', 'y', 'z']
+  list: ['x', 'y', 'z'],
 };
 const objYaml = objectToYaml(testObj);
 assert.ok(objYaml.includes('key: value'));

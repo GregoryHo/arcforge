@@ -8,10 +8,10 @@
  * Adapted from: continuous-learning-v2/hooks/observe.sh
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const os = require('os');
+const os = require('node:os');
 
 const { getProjectName, readStdinSync } = require('../lib/utils');
 const { getObservationsPath } = require('../../scripts/lib/session-utils');
@@ -28,7 +28,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
  * Get observations archive directory for a project.
  */
 function getArchiveDir(project) {
-  return path.dirname(getObservationsPath(project)) + '/archive';
+  return `${path.dirname(getObservationsPath(project))}/archive`;
 }
 
 function getPidFile() {
@@ -44,7 +44,7 @@ function getPidFile() {
  */
 function truncate(str, maxLen) {
   if (!str || str.length <= maxLen) return str || '';
-  return str.substring(0, maxLen) + '...[truncated]';
+  return `${str.substring(0, maxLen)}...[truncated]`;
 }
 
 /**
@@ -103,7 +103,8 @@ function main() {
     }
 
     const project = getProjectName();
-    const sessionId = input.session_id || process.env.CLAUDE_SESSION_ID || `session-${process.ppid || 'default'}`;
+    const sessionId =
+      input.session_id || process.env.CLAUDE_SESSION_ID || `session-${process.ppid || 'default'}`;
 
     // Extract tool information
     const toolName = input.tool_name || input.tool || 'unknown';
@@ -115,21 +116,21 @@ function main() {
       event,
       tool: toolName,
       session: sessionId,
-      project
+      project,
     };
 
     // Add input/output based on phase
     if (phase === 'pre' && input.tool_input) {
-      const inputStr = typeof input.tool_input === 'string'
-        ? input.tool_input
-        : JSON.stringify(input.tool_input);
+      const inputStr =
+        typeof input.tool_input === 'string' ? input.tool_input : JSON.stringify(input.tool_input);
       observation.input = truncate(inputStr, MAX_INPUT_LENGTH);
     }
 
     if (phase === 'post' && input.tool_output) {
-      const outputStr = typeof input.tool_output === 'string'
-        ? input.tool_output
-        : JSON.stringify(input.tool_output);
+      const outputStr =
+        typeof input.tool_output === 'string'
+          ? input.tool_output
+          : JSON.stringify(input.tool_output);
       observation.output = truncate(outputStr, MAX_OUTPUT_LENGTH);
     }
 
@@ -141,7 +142,7 @@ function main() {
     archiveIfNeeded(obsPath, project);
 
     // Append observation
-    fs.appendFileSync(obsPath, JSON.stringify(observation) + '\n', 'utf-8');
+    fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
     // Signal daemon
     signalDaemon();

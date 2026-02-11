@@ -5,10 +5,10 @@
  * NOTE: This is the canonical location. hooks/lib/utils.js should import from here.
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { execFileSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 // Module-level cached session ID (set from hook input)
 let _cachedSessionId = null;
@@ -20,7 +20,7 @@ let _cachedSessionId = null;
  * @returns {string|null} The cached session ID
  */
 function setSessionIdFromInput(input) {
-  if (input && input.session_id) {
+  if (input?.session_id) {
     _cachedSessionId = input.session_id;
   }
   return _cachedSessionId;
@@ -39,15 +39,18 @@ function clearCachedSessionId() {
  */
 function escapeForJson(str) {
   if (typeof str !== 'string') return '';
-  return str
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t')
-    .replace(/[\x00-\x1f\x7f]/g, (char) => {
-      return '\\u' + ('0000' + char.charCodeAt(0).toString(16)).slice(-4);
-    });
+  return (
+    str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char sanitization
+      .replace(/[\x00-\x1f\x7f]/g, (char) => {
+        return `\\u${(`0000${char.charCodeAt(0).toString(16)}`).slice(-4)}`;
+      })
+  );
 }
 
 /**
@@ -130,7 +133,7 @@ function getCommandPath(command) {
     // execFileSync is safe - no shell interpretation
     const result = execFileSync(whichCmd, [command], {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     // 'where' on Windows returns multiple lines, take first
     return result.trim().split('\n')[0].trim();
@@ -157,7 +160,7 @@ function execCommand(command, args = [], options = {}) {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: options.timeout || 30000,
       cwd: options.cwd || process.cwd(),
-      ...options
+      ...options,
     });
     return { stdout, stderr: '', exitCode: 0 };
   } catch (err) {
@@ -165,7 +168,7 @@ function execCommand(command, args = [], options = {}) {
       stdout: err.stdout || '',
       stderr: err.stderr || err.message,
       exitCode: err.status || 1,
-      error: err
+      error: err,
     };
   }
 }
@@ -216,7 +219,7 @@ const colors = {
   brightCyan: '\x1b[96m',
   // Background
   bgYellow: '\x1b[43m',
-  bgBlue: '\x1b[44m'
+  bgBlue: '\x1b[44m',
 };
 
 /**
@@ -285,8 +288,8 @@ function outputContext(context, eventName = 'Hook') {
   output({
     hookSpecificOutput: {
       hookEventName: eventName,
-      additionalContext: context
-    }
+      additionalContext: context,
+    },
   });
 }
 
@@ -419,7 +422,7 @@ function sanitizeFilename(name) {
     throw new Error(`Invalid filename: parent directory traversal not allowed: "${name}"`);
   }
 
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char validation
   if (/[\x00-\x1f\x7f]/.test(name)) {
     throw new Error(`Invalid filename: control characters not allowed: "${name}"`);
   }
@@ -453,7 +456,7 @@ function createSessionCounter(name) {
   function read() {
     const content = readFileSafe(getFilePath());
     const count = parseInt(content, 10);
-    return isNaN(count) ? 0 : count;
+    return Number.isNaN(count) ? 0 : count;
   }
 
   function write(count) {
@@ -542,5 +545,5 @@ module.exports = {
   createSessionCounter,
   getSessionFilePath,
   loadSession,
-  saveSession
+  saveSession,
 };

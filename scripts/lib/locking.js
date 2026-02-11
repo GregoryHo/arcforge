@@ -11,8 +11,8 @@
  * 4. Release by unlinking lock file
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 /**
  * Default lock timeout in milliseconds
@@ -55,13 +55,16 @@ function acquireLock(projectRoot, options = {}) {
   while (!acquired) {
     try {
       // Try to create lock file exclusively
-      const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
+      const fd = fs.openSync(
+        lockPath,
+        fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
+      );
 
       // Write PID and timestamp for debugging
       const lockData = JSON.stringify({
         pid: process.pid,
         timestamp: new Date().toISOString(),
-        hostname: require('os').hostname()
+        hostname: require('node:os').hostname(),
       });
       fs.writeSync(fd, lockData);
       fs.closeSync(fd);
@@ -79,11 +82,11 @@ function acquireLock(projectRoot, options = {}) {
             try {
               fs.unlinkSync(lockPath);
               continue; // Retry immediately
-            } catch (unlinkErr) {
+            } catch (_unlinkErr) {
               // Another process might have removed it, continue
             }
           }
-        } catch (statErr) {
+        } catch (_statErr) {
           // File might have been removed, continue
         }
 
@@ -110,7 +113,7 @@ function acquireLock(projectRoot, options = {}) {
     lockPath,
     release() {
       releaseLock(lockPath);
-    }
+    },
   };
 }
 
@@ -155,7 +158,7 @@ function withLock(projectRoot, fn, options = {}) {
  * @param {Object} options - Lock options
  * @returns {Promise<*>} Return value of fn
  */
-async function withLockAsync(projectRoot, fn, options = {}) {
+async function _withLockAsync(projectRoot, fn, options = {}) {
   const lock = acquireLock(projectRoot, options);
   try {
     return await fn();
@@ -170,7 +173,7 @@ async function withLockAsync(projectRoot, fn, options = {}) {
  * @param {string} projectRoot - Project root directory
  * @returns {boolean} Whether lock file exists
  */
-function isLocked(projectRoot) {
+function _isLocked(projectRoot) {
   const lockPath = path.join(projectRoot, '.arcforge-lock');
   return fs.existsSync(lockPath);
 }
@@ -180,7 +183,7 @@ function isLocked(projectRoot) {
  *
  * @param {string} projectRoot - Project root directory
  */
-function forceClearLock(projectRoot) {
+function _forceClearLock(projectRoot) {
   const lockPath = path.join(projectRoot, '.arcforge-lock');
   try {
     fs.unlinkSync(lockPath);
@@ -192,5 +195,5 @@ function forceClearLock(projectRoot) {
 }
 
 module.exports = {
-  withLock
+  withLock,
 };

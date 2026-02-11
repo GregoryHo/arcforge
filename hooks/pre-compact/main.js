@@ -9,8 +9,8 @@
  * Non-blocking: Always exits 0 to avoid disrupting compaction flow.
  */
 
-const path = require('path');
-const { execFileSync } = require('child_process');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
   getProjectSessionsDir,
   getSessionDir,
@@ -25,10 +25,16 @@ const {
   log,
   readStdinSync,
   loadSession,
-  saveSession
+  saveSession,
 } = require('../lib/utils');
-const { readCount: readToolCount, resetCounter: resetToolCounter } = require('../compact-suggester/main');
-const { readCount: readUserCount, resetCounter: resetUserCounter } = require('../user-message-counter/main');
+const {
+  readCount: readToolCount,
+  resetCounter: resetToolCounter,
+} = require('../compact-suggester/main');
+const {
+  readCount: readUserCount,
+  resetCounter: resetUserCounter,
+} = require('../user-message-counter/main');
 const { shouldTrigger } = require('../lib/thresholds');
 const { generateMarkdownSummary } = require('../session-tracker/summary');
 
@@ -48,10 +54,7 @@ function logCompactionEvent(project, timestamp, sessionId) {
  * Update session file with compaction marker
  */
 function updateSessionFile(project, date, timestamp, sessionId) {
-  const sessionFile = path.join(
-    getSessionDir(project, date),
-    `${sessionId}.json`
-  );
+  const sessionFile = path.join(getSessionDir(project, date), `${sessionId}.json`);
 
   const content = readFileSafe(sessionFile);
   if (!content) return false;
@@ -116,13 +119,15 @@ function main() {
 
       // Generate auto-diary draft (silent, best-effort)
       try {
-        const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
-        execFileSync('node', [
-          autoDiaryPath, 'generate',
-          '--project', project,
-          '--date', date,
-          '--session', sessionId
-        ], { stdio: 'ignore', timeout: 5000 });
+        const autoDiaryPath = path.join(
+          __dirname,
+          '../../skills/arc-journaling/scripts/auto-diary.js',
+        );
+        execFileSync(
+          'node',
+          [autoDiaryPath, 'generate', '--project', project, '--date', date, '--session', sessionId],
+          { stdio: 'ignore', timeout: 5000 },
+        );
       } catch {
         // Non-blocking — draft generation is best-effort
       }

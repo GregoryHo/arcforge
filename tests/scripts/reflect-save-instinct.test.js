@@ -1,8 +1,8 @@
 // tests/scripts/reflect-save-instinct.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 // Mock session-utils to redirect paths to temp directories
 // Variables prefixed with "mock" are allowed in jest.mock() factories
@@ -18,14 +18,17 @@ jest.mock('../../scripts/lib/session-utils', () => ({
   getProcessedLogPath: jest.fn(),
   scanDiaries: jest.fn(() => []),
   determineReflectStrategy: jest.fn(() => 'standard'),
-  updateProcessedLog: jest.fn()
+  updateProcessedLog: jest.fn(),
 }));
 
 const { saveInstinct } = require('../../scripts/lib/instinct-writer');
-const { REFLECT_MAX_CONFIDENCE, parseConfidenceFrontmatter } = require('../../scripts/lib/confidence');
+const {
+  REFLECT_MAX_CONFIDENCE,
+  parseConfidenceFrontmatter,
+} = require('../../scripts/lib/confidence');
 
 describe('reflect save-instinct', () => {
-  const testDir = path.join(os.tmpdir(), 'reflect-instinct-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `reflect-instinct-test-${Date.now()}`);
 
   beforeEach(() => {
     mockInstinctsDir = path.join(testDir, 'instincts');
@@ -53,7 +56,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: 'saw this in session',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 20  // Would push way above cap
+      evidenceCount: 20, // Would push way above cap
     });
 
     expect(result.confidence).toBeLessThanOrEqual(REFLECT_MAX_CONFIDENCE);
@@ -71,7 +74,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: 'from diary analysis',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 1
+      evidenceCount: 1,
     });
 
     const content = fs.readFileSync(result.path, 'utf-8');
@@ -90,7 +93,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: '',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 1
+      evidenceCount: 1,
     });
     expect(result1.confidence).toBeCloseTo(0.55); // 0.5 + 0.05 * 1
 
@@ -103,7 +106,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: '',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 3
+      evidenceCount: 3,
     });
     expect(result3.confidence).toBeCloseTo(0.65); // 0.5 + 0.05 * 3
   });
@@ -119,7 +122,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: '',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 1
+      evidenceCount: 1,
     });
     expect(r1.isNew).toBe(true);
 
@@ -133,7 +136,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: '',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 2
+      evidenceCount: 2,
     });
     expect(r2.isNew).toBe(false);
   });
@@ -148,7 +151,7 @@ describe('reflect save-instinct', () => {
       source: 'reflection',
       evidence: '',
       maxConfidence: REFLECT_MAX_CONFIDENCE,
-      evidenceCount: 1
+      evidenceCount: 1,
     });
 
     const content = fs.readFileSync(result.path, 'utf-8');

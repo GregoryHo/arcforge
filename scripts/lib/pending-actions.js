@@ -9,10 +9,10 @@
  * Format: { actions: [{ id, type, payload, created, consumed, consumed_at }] }
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const crypto = require('crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const crypto = require('node:crypto');
 
 const EXPIRY_DAYS = 7;
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
@@ -71,7 +71,7 @@ function addPendingAction(project, type, payload = {}) {
     payload,
     created: new Date().toISOString(),
     consumed: false,
-    consumed_at: null
+    consumed_at: null,
   };
 
   data.actions.push(action);
@@ -91,7 +91,7 @@ function getPendingActions(project, type) {
   const now = new Date();
   const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
-  return data.actions.filter(a => {
+  return data.actions.filter((a) => {
     if (a.consumed) return false;
 
     const created = new Date(a.created);
@@ -112,7 +112,7 @@ function getPendingActions(project, type) {
 function consumeAction(project, actionId) {
   const data = readActions(project);
 
-  const action = data.actions.find(a => a.id === actionId);
+  const action = data.actions.find((a) => a.id === actionId);
   if (!action) return false;
 
   action.consumed = true;
@@ -133,7 +133,7 @@ function pruneExpired(project) {
   const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
   const before = data.actions.length;
-  data.actions = data.actions.filter(a => {
+  data.actions = data.actions.filter((a) => {
     const created = new Date(a.created);
     return now.getTime() - created.getTime() <= expiryMs;
   });
@@ -152,5 +152,5 @@ module.exports = {
   addPendingAction,
   getPendingActions,
   consumeAction,
-  pruneExpired
+  pruneExpired,
 };

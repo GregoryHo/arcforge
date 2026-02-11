@@ -16,7 +16,7 @@ const TaskStatus = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
-  BLOCKED: 'blocked'
+  BLOCKED: 'blocked',
 };
 
 /**
@@ -35,20 +35,20 @@ const schema = {
         required: false,
         default: 'pending',
         enum: Object.values(TaskStatus),
-        description: 'Current status'
+        description: 'Current status',
       },
       spec_path: { type: 'string', required: true, description: 'Path to spec document' },
       worktree: {
         type: 'string|null',
         required: false,
-        description: 'Path to git worktree (relative to project root)'
+        description: 'Path to git worktree (relative to project root)',
       },
       depends_on: {
         type: 'array',
         items: 'string',
         required: false,
         default: [],
-        description: 'List of epic IDs this epic depends on'
+        description: 'List of epic IDs this epic depends on',
       },
       features: {
         type: 'array',
@@ -56,30 +56,34 @@ const schema = {
         default: [],
         description: 'List of features within this epic',
         items: {
-          id: { type: 'string', required: true, description: 'Unique identifier (e.g., feat-001-01)' },
+          id: {
+            type: 'string',
+            required: true,
+            description: 'Unique identifier (e.g., feat-001-01)',
+          },
           name: { type: 'string', required: true, description: 'Human-readable name' },
           status: {
             type: 'string',
             required: false,
             default: 'pending',
             enum: Object.values(TaskStatus),
-            description: 'Current status'
+            description: 'Current status',
           },
           depends_on: {
             type: 'array',
             items: 'string',
             required: false,
             default: [],
-            description: 'List of feature IDs this feature depends on'
+            description: 'List of feature IDs this feature depends on',
           },
           source_requirement: {
             type: 'string',
             required: false,
-            description: 'Optional reference to source requirement (e.g., FR-XXX-NNN)'
-          }
-        }
-      }
-    }
+            description: 'Optional reference to source requirement (e.g., FR-XXX-NNN)',
+          },
+        },
+      },
+    },
   },
   blocked: {
     type: 'array',
@@ -97,11 +101,11 @@ const schema = {
         items: {
           attempt_at: { type: 'string', description: 'ISO 8601 timestamp' },
           action: { type: 'string', description: 'What was tried' },
-          result: { type: 'string', description: 'Outcome of attempt' }
-        }
-      }
-    }
-  }
+          result: { type: 'string', description: 'Outcome of attempt' },
+        },
+      },
+    },
+  },
 };
 
 /**
@@ -121,22 +125,22 @@ const example = {
           id: 'feat-001-01',
           name: 'Login API endpoint',
           status: 'completed',
-          depends_on: []
+          depends_on: [],
         },
         {
           id: 'feat-001-02',
           name: 'Session management',
           status: 'in_progress',
-          depends_on: ['feat-001-01']
+          depends_on: ['feat-001-01'],
         },
         {
           id: 'feat-001-03',
           name: 'Password reset flow',
           status: 'pending',
           depends_on: ['feat-001-01'],
-          source_requirement: 'FR-AUTH-003'
-        }
-      ]
+          source_requirement: 'FR-AUTH-003',
+        },
+      ],
     },
     {
       id: 'epic-002',
@@ -150,10 +154,10 @@ const example = {
           id: 'feat-002-01',
           name: 'Dashboard layout',
           status: 'pending',
-          depends_on: []
-        }
-      ]
-    }
+          depends_on: [],
+        },
+      ],
+    },
   ],
   blocked: [
     {
@@ -164,11 +168,11 @@ const example = {
         {
           attempt_at: '2024-01-15T11:00:00Z',
           action: 'Contacted DevOps for Redis access',
-          result: 'Pending approval'
-        }
-      ]
-    }
-  ]
+          result: 'Pending approval',
+        },
+      ],
+    },
+  ],
 };
 
 /**
@@ -183,14 +187,18 @@ function schemaToYaml() {
   lines.push('epics:  # List of epics (required)');
   lines.push('  - id: string  # Unique identifier (required)');
   lines.push('    name: string  # Human-readable name (required)');
-  lines.push(`    status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`);
+  lines.push(
+    `    status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`,
+  );
   lines.push('    spec_path: string  # Path to spec document (required)');
   lines.push('    worktree: string|null  # Git worktree path (optional)');
   lines.push('    depends_on: [string]  # Epic IDs this depends on (default: [])');
   lines.push('    features:  # List of features (optional)');
   lines.push('      - id: string  # Unique identifier (required)');
   lines.push('        name: string  # Human-readable name (required)');
-  lines.push(`        status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`);
+  lines.push(
+    `        status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`,
+  );
   lines.push('        depends_on: [string]  # Feature IDs this depends on (default: [])');
   lines.push('        source_requirement: string  # Reference to source requirement (optional)');
   lines.push('');
@@ -296,9 +304,16 @@ function formatValue(value) {
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string') {
     // Quote strings that need it
-    if (value.includes(':') || value.includes('#') || value.includes("'") ||
-        value.includes('"') || value.includes('\n') || value === '' ||
-        value.startsWith(' ') || value.endsWith(' ')) {
+    if (
+      value.includes(':') ||
+      value.includes('#') ||
+      value.includes("'") ||
+      value.includes('"') ||
+      value.includes('\n') ||
+      value === '' ||
+      value.startsWith(' ') ||
+      value.endsWith(' ')
+    ) {
       return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     }
     return value;
@@ -371,7 +386,9 @@ function validate(dag) {
           }
 
           if (feat.status && !Object.values(TaskStatus).includes(feat.status)) {
-            errors.push(`${featPrefix}.status must be one of: ${Object.values(TaskStatus).join(', ')}`);
+            errors.push(
+              `${featPrefix}.status must be one of: ${Object.values(TaskStatus).join(', ')}`,
+            );
           }
         }
       }
@@ -380,7 +397,7 @@ function validate(dag) {
 
   // Validate depends_on cross-references
   if (Array.isArray(dag.epics)) {
-    const epicIds = new Set(dag.epics.filter(e => e.id).map(e => e.id));
+    const epicIds = new Set(dag.epics.filter((e) => e.id).map((e) => e.id));
     for (let i = 0; i < dag.epics.length; i++) {
       const epic = dag.epics[i];
       const prefix = `epics[${i}]`;
@@ -396,13 +413,15 @@ function validate(dag) {
 
       // Validate feature-level depends_on
       if (Array.isArray(epic.features)) {
-        const featureIds = new Set(epic.features.filter(f => f.id).map(f => f.id));
+        const featureIds = new Set(epic.features.filter((f) => f.id).map((f) => f.id));
         for (let j = 0; j < epic.features.length; j++) {
           const feat = epic.features[j];
           if (Array.isArray(feat.depends_on)) {
             for (const depId of feat.depends_on) {
               if (!featureIds.has(depId)) {
-                errors.push(`${prefix}.features[${j}].depends_on references non-existent feature "${depId}"`);
+                errors.push(
+                  `${prefix}.features[${j}].depends_on references non-existent feature "${depId}"`,
+                );
               }
             }
           }
@@ -446,5 +465,5 @@ module.exports = {
   exampleToYaml,
   objectToYaml,
   formatValue,
-  validate
+  validate,
 };

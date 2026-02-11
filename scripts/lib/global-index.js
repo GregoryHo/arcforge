@@ -6,9 +6,9 @@
  * Tracks instinct promotions across projects via global-index.jsonl.
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 const { buildTriggerFingerprint, jaccardSimilarity } = require('./fingerprint');
 const { parseConfidenceFrontmatter } = require('./confidence');
 
@@ -26,11 +26,11 @@ function appendToIndex(indexPath, patternName, project, confidence, type) {
     project,
     confidence,
     type,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
   fs.mkdirSync(path.dirname(indexPath), { recursive: true });
-  fs.appendFileSync(indexPath, JSON.stringify(entry) + '\n', 'utf-8');
+  fs.appendFileSync(indexPath, `${JSON.stringify(entry)}\n`, 'utf-8');
 }
 
 /**
@@ -42,11 +42,16 @@ function readIndex(indexPath) {
   if (!fs.existsSync(indexPath)) return [];
 
   const content = fs.readFileSync(indexPath, 'utf-8');
-  return content.trim().split('\n')
+  return content
+    .trim()
+    .split('\n')
     .filter(Boolean)
-    .map(line => {
-      try { return JSON.parse(line); }
-      catch { return null; }
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
     })
     .filter(Boolean);
 }
@@ -75,7 +80,7 @@ function findCrossProjectPatterns(indexPath, minProjects = 2) {
     .map(([id, projects]) => ({
       id,
       projects: Array.from(projects),
-      count: projects.size
+      count: projects.size,
     }));
 }
 
@@ -87,7 +92,7 @@ function findCrossProjectPatterns(indexPath, minProjects = 2) {
  */
 function isAlreadyGlobal(indexPath, patternName) {
   const entries = readIndex(indexPath);
-  return entries.some(e => e.id === patternName && e.promoted);
+  return entries.some((e) => e.id === patternName && e.promoted);
 }
 
 /**
@@ -111,11 +116,11 @@ function promoteToGlobal(sourcePath, globalDir, indexPath) {
   const entry = {
     id: path.basename(filename, '.md'),
     promoted: new Date().toISOString(),
-    source: sourcePath
+    source: sourcePath,
   };
 
   fs.mkdirSync(path.dirname(indexPath), { recursive: true });
-  fs.appendFileSync(indexPath, JSON.stringify(entry) + '\n', 'utf-8');
+  fs.appendFileSync(indexPath, `${JSON.stringify(entry)}\n`, 'utf-8');
 
   return targetPath;
 }
@@ -157,14 +162,14 @@ function checkBubbleUpForProject(project) {
   }
 
   // For each instinct in this project, check if it appears in 2+ projects
-  const instinctFiles = fs.readdirSync(projectInstincts).filter(f => f.endsWith('.md'));
+  const instinctFiles = fs.readdirSync(projectInstincts).filter((f) => f.endsWith('.md'));
 
   for (const file of instinctFiles) {
     const instinctId = path.basename(file, '.md');
 
     // Count how many projects have this instinct
     let projectCount = 0;
-    const projectDirs = fs.readdirSync(instinctsBase).filter(name => {
+    const projectDirs = fs.readdirSync(instinctsBase).filter((name) => {
       const fullPath = path.join(instinctsBase, name);
       return fs.statSync(fullPath).isDirectory() && name !== 'global' && name !== 'archived';
     });
@@ -203,7 +208,7 @@ function checkBubbleUpForProject(project) {
       if (otherProj === project) continue;
 
       const otherProjDir = path.join(instinctsBase, otherProj);
-      const otherFiles = fs.readdirSync(otherProjDir).filter(f => f.endsWith('.md'));
+      const otherFiles = fs.readdirSync(otherProjDir).filter((f) => f.endsWith('.md'));
 
       for (const otherFile of otherFiles) {
         const otherPath = path.join(otherProjDir, otherFile);
@@ -241,7 +246,7 @@ module.exports = {
   findCrossProjectPatterns,
   isAlreadyGlobal,
   promoteToGlobal,
-  checkBubbleUpForProject
+  checkBubbleUpForProject,
 };
 
 // Run CLI if executed directly

@@ -1,14 +1,13 @@
 // tests/scripts/fingerprint.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
-  STOP_WORDS,
   buildTriggerFingerprint,
   jaccardSimilarity,
-  findSimilarInstincts
+  findSimilarInstincts,
 } = require('../../scripts/lib/fingerprint');
 
 describe('fingerprint', () => {
@@ -103,7 +102,7 @@ describe('fingerprint', () => {
     let testDir;
 
     beforeEach(() => {
-      testDir = path.join(os.tmpdir(), 'fingerprint-test-' + Date.now());
+      testDir = path.join(os.tmpdir(), `fingerprint-test-${Date.now()}`);
       fs.mkdirSync(testDir, { recursive: true });
     });
 
@@ -116,7 +115,7 @@ describe('fingerprint', () => {
         '---',
         `id: ${filename.replace('.md', '')}`,
         `trigger: "${trigger}"`,
-        'confidence: 0.50'
+        'confidence: 0.50',
       ];
       for (const [k, v] of Object.entries(extras)) {
         fmLines.push(`${k}: ${v}`);
@@ -131,23 +130,16 @@ describe('fingerprint', () => {
       writeInstinct('unrelated.md', 'prefer dark theme terminal colors');
 
       // Query similar to grep-first
-      const results = findSimilarInstincts(
-        'grep the codebase before editing files',
-        testDir,
-        0.3
-      );
+      const results = findSimilarInstincts('grep the codebase before editing files', testDir, 0.3);
 
       expect(results.length).toBeGreaterThanOrEqual(1);
-      const grepMatch = results.find(r => r.file === 'grep-first.md');
+      const grepMatch = results.find((r) => r.file === 'grep-first.md');
       expect(grepMatch).toBeDefined();
       expect(grepMatch.similarity).toBeGreaterThan(0.3);
     });
 
     it('returns empty array for non-existent directory', () => {
-      const results = findSimilarInstincts(
-        'some trigger text here now',
-        '/nonexistent/path/xyz'
-      );
+      const results = findSimilarInstincts('some trigger text here now', '/nonexistent/path/xyz');
       expect(results).toEqual([]);
     });
 
@@ -158,13 +150,13 @@ describe('fingerprint', () => {
       const lowThreshold = findSimilarInstincts(
         'review all code changes before committing anything',
         testDir,
-        0.2
+        0.2,
       );
 
       const highThreshold = findSimilarInstincts(
         'review all code changes before committing anything',
         testDir,
-        0.9
+        0.9,
       );
 
       expect(highThreshold.length).toBeLessThanOrEqual(lowThreshold.length);
@@ -186,7 +178,7 @@ describe('fingerprint', () => {
       const results = findSimilarInstincts(
         'always grep codebase before editing source files',
         testDir,
-        0.1
+        0.1,
       );
 
       for (let i = 1; i < results.length; i++) {

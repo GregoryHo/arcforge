@@ -34,9 +34,14 @@
     "test:node": "node tests/node/run-tests.js",
     "test:skills": "python3 -m pytest tests/skills/ -v",
     "test:diary": "node skills/arc-journaling/scripts/diary.js",
-    "test:reflect": "node skills/arc-reflecting/scripts/reflect.js"
+    "test:reflect": "node skills/arc-reflecting/scripts/reflect.js",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
     "jest": "^29.7.0"
   }
 }

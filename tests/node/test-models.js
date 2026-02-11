@@ -3,8 +3,15 @@
  * Tests for models.js
  */
 
-const assert = require('assert');
-const { TaskStatus, Feature, Epic, BlockedItem, SyncResult, DAG } = require('../../scripts/lib/models');
+const assert = require('node:assert');
+const {
+  TaskStatus,
+  Feature,
+  Epic,
+  BlockedItem,
+  SyncResult,
+  DAG,
+} = require('../../scripts/lib/models');
 
 console.log('Testing models.js...\n');
 
@@ -14,7 +21,7 @@ const feature1 = new Feature({
   id: 'feat-001',
   name: 'Test Feature',
   status: TaskStatus.PENDING,
-  depends_on: ['feat-000']
+  depends_on: ['feat-000'],
 });
 assert.strictEqual(feature1.id, 'feat-001');
 assert.strictEqual(feature1.name, 'Test Feature');
@@ -45,8 +52,8 @@ const epic1 = new Epic({
   depends_on: [],
   features: [
     { id: 'feat-001', name: 'Feature 1', status: TaskStatus.COMPLETED },
-    { id: 'feat-002', name: 'Feature 2', status: TaskStatus.PENDING }
-  ]
+    { id: 'feat-002', name: 'Feature 2', status: TaskStatus.PENDING },
+  ],
 });
 assert.strictEqual(epic1.id, 'epic-001');
 assert.strictEqual(epic1.features.length, 2);
@@ -59,7 +66,7 @@ const epicWithDeps = new Epic({
   id: 'epic-002',
   name: 'Dependent Epic',
   spec_path: 'spec.md',
-  depends_on: ['epic-001']
+  depends_on: ['epic-001'],
 });
 assert.strictEqual(epicWithDeps.isReady(new Set()), false);
 assert.strictEqual(epicWithDeps.isReady(new Set(['epic-001'])), true);
@@ -80,7 +87,7 @@ console.log('  BlockedItem class...');
 const blocked = new BlockedItem({
   task_id: 'feat-001',
   reason: 'Test reason',
-  blocked_at: '2024-01-15T10:00:00Z'
+  blocked_at: '2024-01-15T10:00:00Z',
 });
 assert.strictEqual(blocked.task_id, 'feat-001');
 assert.ok(blocked.blocked_at instanceof Date);
@@ -95,7 +102,7 @@ console.log('  SyncResult class...');
 const syncResult = new SyncResult({
   epic_id: 'epic-001',
   pulled: true,
-  pushed: false
+  pushed: false,
 });
 assert.strictEqual(syncResult.epic_id, 'epic-001');
 assert.strictEqual(syncResult.pulled, true);
@@ -113,17 +120,17 @@ const dag = new DAG({
       status: TaskStatus.IN_PROGRESS,
       features: [
         { id: 'feat-001', name: 'Feature 1', status: TaskStatus.COMPLETED },
-        { id: 'feat-002', name: 'Feature 2', status: TaskStatus.PENDING }
-      ]
+        { id: 'feat-002', name: 'Feature 2', status: TaskStatus.PENDING },
+      ],
     },
     {
       id: 'epic-002',
       name: 'Epic 2',
       spec_path: 'spec2.md',
       status: TaskStatus.PENDING,
-      depends_on: ['epic-001']
-    }
-  ]
+      depends_on: ['epic-001'],
+    },
+  ],
 });
 assert.strictEqual(dag.epics.length, 2);
 assert.ok(dag.epics[0] instanceof Epic);

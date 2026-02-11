@@ -9,9 +9,9 @@
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 // ─────────────────────────────────────────────
 // 1. instinct-writer creates correct frontmatter
@@ -35,7 +35,7 @@ describe('instinct-writer creates correct frontmatter', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
-    Object.keys(process.env).forEach(key => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
     delete require.cache[require.resolve('../../scripts/lib/session-utils')];
     delete require.cache[require.resolve('../../scripts/lib/instinct-writer')];
@@ -52,7 +52,7 @@ describe('instinct-writer creates correct frontmatter', () => {
       project: 'test-project',
       domain: 'support',
       source: 'manual',
-      evidence: 'Observed in 3 sessions'
+      evidence: 'Observed in 3 sessions',
     });
 
     assert.ok(result.path, 'should return a file path');
@@ -83,15 +83,15 @@ describe('recall.js save delegates to instinct-writer', () => {
     // Read the source to verify it uses instinct-writer with source: manual
     const recallSource = fs.readFileSync(
       path.join(__dirname, '../../skills/arc-recalling/scripts/recall.js'),
-      'utf-8'
+      'utf-8',
     );
     assert.ok(
       recallSource.includes("source: 'manual'"),
-      'recall.js should pass source: manual to saveInstinct'
+      'recall.js should pass source: manual to saveInstinct',
     );
     assert.ok(
       recallSource.includes('instinct-writer'),
-      'recall.js should import from instinct-writer'
+      'recall.js should import from instinct-writer',
     );
   });
 });
@@ -110,7 +110,7 @@ describe('reflect.js save-instinct uses 0.85 cap', () => {
     const { REFLECT_MAX_CONFIDENCE, MAX_CONFIDENCE } = require('../../scripts/lib/confidence');
     assert.ok(
       REFLECT_MAX_CONFIDENCE < MAX_CONFIDENCE,
-      'REFLECT_MAX_CONFIDENCE should be less than MAX_CONFIDENCE'
+      'REFLECT_MAX_CONFIDENCE should be less than MAX_CONFIDENCE',
     );
   });
 });
@@ -124,7 +124,7 @@ describe('inject-context loads diary (not session markdown)', () => {
     const injectContext = require('../session-tracker/inject-context');
     assert.ok(
       typeof injectContext.findRecentMarkdownFiles === 'function',
-      'findRecentMarkdownFiles should be exported'
+      'findRecentMarkdownFiles should be exported',
     );
   });
 
@@ -146,7 +146,7 @@ describe('inject-context loads instincts', () => {
     const injectContext = require('../session-tracker/inject-context');
     assert.ok(
       typeof injectContext.loadAutoInstincts === 'function',
-      'loadAutoInstincts should be exported'
+      'loadAutoInstincts should be exported',
     );
   });
 
@@ -154,7 +154,7 @@ describe('inject-context loads instincts', () => {
     const injectContext = require('../session-tracker/inject-context');
     assert.ok(
       typeof injectContext.loadInstinctFiles === 'function',
-      'loadInstinctFiles should be exported'
+      'loadInstinctFiles should be exported',
     );
   });
 });
@@ -169,18 +169,18 @@ describe('inject-context does not load learned skills', () => {
     assert.strictEqual(
       injectContext.getLearnedSkillsDir,
       undefined,
-      'getLearnedSkillsDir should not be exported from inject-context'
+      'getLearnedSkillsDir should not be exported from inject-context',
     );
   });
 
   it('should not reference getLearnedSkillsDir in source', () => {
     const source = fs.readFileSync(
       path.join(__dirname, '../session-tracker/inject-context.js'),
-      'utf-8'
+      'utf-8',
     );
     assert.ok(
       !source.includes('getLearnedSkillsDir'),
-      'inject-context.js should not reference getLearnedSkillsDir'
+      'inject-context.js should not reference getLearnedSkillsDir',
     );
   });
 });
@@ -197,21 +197,15 @@ describe('end.js references /recall not /learn', () => {
       lastUpdated: new Date().toISOString(),
       toolCalls: 10,
       userMessages: 5,
-      filesModified: ['a.js']
+      filesModified: ['a.js'],
     };
 
     const output = formatStopReason(session, null);
-    assert.ok(
-      !output.includes('/learn'),
-      'formatStopReason should not reference /learn command'
-    );
+    assert.ok(!output.includes('/learn'), 'formatStopReason should not reference /learn command');
   });
 
   it('end.js source should not contain /learn command reference', () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../session-tracker/end.js'),
-      'utf-8'
-    );
+    const source = fs.readFileSync(path.join(__dirname, '../session-tracker/end.js'), 'utf-8');
     // /learn as a command reference (not part of other words like "learned")
     const hasLearnCommand = /\/learn\b/.test(source);
     assert.ok(!hasLearnCommand, 'end.js should not reference /learn as a command');
@@ -224,33 +218,24 @@ describe('end.js references /recall not /learn', () => {
 
 describe('start.js only decays instincts', () => {
   it('should not import getLearnedSkillsDir', () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../session-tracker/start.js'),
-      'utf-8'
-    );
+    const source = fs.readFileSync(path.join(__dirname, '../session-tracker/start.js'), 'utf-8');
     assert.ok(
       !source.includes('getLearnedSkillsDir'),
-      'start.js should not import getLearnedSkillsDir'
+      'start.js should not import getLearnedSkillsDir',
     );
   });
 
   it('should import runDecayCycle from confidence', () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../session-tracker/start.js'),
-      'utf-8'
-    );
+    const source = fs.readFileSync(path.join(__dirname, '../session-tracker/start.js'), 'utf-8');
     assert.ok(
       source.includes('runDecayCycle'),
-      'start.js should use runDecayCycle for instinct decay'
+      'start.js should use runDecayCycle for instinct decay',
     );
   });
 
   it('should export runDecayCycles function', () => {
     const start = require('../session-tracker/start');
-    assert.ok(
-      typeof start.runDecayCycles === 'function',
-      'runDecayCycles should be exported'
-    );
+    assert.ok(typeof start.runDecayCycles === 'function', 'runDecayCycles should be exported');
   });
 });
 
@@ -272,13 +257,17 @@ describe('pending-actions create + consume flow', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
-    Object.keys(process.env).forEach(key => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
     delete require.cache[require.resolve('../../scripts/lib/pending-actions')];
   });
 
   it('should complete add -> get -> consume lifecycle', () => {
-    const { addPendingAction, getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
+    const {
+      addPendingAction,
+      getPendingActions,
+      consumeAction,
+    } = require('../../scripts/lib/pending-actions');
 
     // Add an action
     const action = addPendingAction('test-project', 'reflect-ready', { count: 3 });
@@ -361,7 +350,11 @@ describe('no getLearnedSkillsDir in scripts/ or hooks/', () => {
       }
     }
 
-    assert.deepStrictEqual(violations, [], `Found getLearnedSkillsDir references in: ${violations.join(', ')}`);
+    assert.deepStrictEqual(
+      violations,
+      [],
+      `Found getLearnedSkillsDir references in: ${violations.join(', ')}`,
+    );
   });
 
   it('should not have getLearnedSkillsDir in any JS file under hooks/', () => {
@@ -378,7 +371,11 @@ describe('no getLearnedSkillsDir in scripts/ or hooks/', () => {
       }
     }
 
-    assert.deepStrictEqual(violations, [], `Found getLearnedSkillsDir references in: ${violations.join(', ')}`);
+    assert.deepStrictEqual(
+      violations,
+      [],
+      `Found getLearnedSkillsDir references in: ${violations.join(', ')}`,
+    );
   });
 });
 
@@ -389,7 +386,10 @@ describe('no getLearnedSkillsDir in scripts/ or hooks/', () => {
 describe('fingerprint Jaccard is available', () => {
   it('should export buildTriggerFingerprint', () => {
     const { buildTriggerFingerprint } = require('../../scripts/lib/fingerprint');
-    assert.ok(typeof buildTriggerFingerprint === 'function', 'buildTriggerFingerprint should be importable');
+    assert.ok(
+      typeof buildTriggerFingerprint === 'function',
+      'buildTriggerFingerprint should be importable',
+    );
   });
 
   it('should export jaccardSimilarity', () => {

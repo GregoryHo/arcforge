@@ -1,16 +1,29 @@
 // tests/scripts/diary.test.js
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const { execFileSync } = require('node:child_process');
+const _fs = require('node:fs');
+const path = require('node:path');
+const _os = require('node:os');
 
 describe('diary.js CLI', () => {
   const scriptPath = path.join(__dirname, '../../skills/arc-journaling/scripts/diary.js');
 
   describe('path command', () => {
     it('returns correct path for given arguments', () => {
-      const result = execFileSync('node', [scriptPath, 'path', '--project', 'test-project', '--date', '2026-01-15', '--session', 'abc123'], { encoding: 'utf-8' });
+      const result = execFileSync(
+        'node',
+        [
+          scriptPath,
+          'path',
+          '--project',
+          'test-project',
+          '--date',
+          '2026-01-15',
+          '--session',
+          'abc123',
+        ],
+        { encoding: 'utf-8' },
+      );
       expect(result.trim()).toContain('.claude');
       expect(result.trim()).toContain('sessions');
       expect(result.trim()).toContain('test-project');
@@ -20,7 +33,10 @@ describe('diary.js CLI', () => {
 
     it('exits with error when missing arguments', () => {
       expect(() => {
-        execFileSync('node', [scriptPath, 'path', '--project', 'test-project'], { encoding: 'utf-8', stdio: 'pipe' });
+        execFileSync('node', [scriptPath, 'path', '--project', 'test-project'], {
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
       }).toThrow();
     });
   });

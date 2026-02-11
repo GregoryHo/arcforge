@@ -1,8 +1,8 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
   escapeForJson,
@@ -18,7 +18,7 @@ const {
   getDateString,
   getTimestamp,
   createSessionCounter,
-  parseStdinJson
+  parseStdinJson,
 } = require('../lib/utils');
 
 describe('escapeForJson', () => {

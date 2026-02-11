@@ -1,25 +1,25 @@
 // tests/scripts/instinct.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
   loadInstincts,
   confidenceBar,
   pct,
-  parseArgs
+  parseArgs,
 } = require('../../skills/arc-observing/scripts/instinct');
 
 const {
   parseConfidenceFrontmatter,
   applyConfirmation,
   applyContradiction,
-  ARCHIVE_THRESHOLD
+  ARCHIVE_THRESHOLD,
 } = require('../../scripts/lib/confidence');
 
 describe('instinct', () => {
-  const testDir = path.join(os.tmpdir(), 'instinct-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `instinct-test-${Date.now()}`);
 
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -71,14 +71,19 @@ describe('instinct', () => {
 
   describe('parseArgs', () => {
     it('parses status command', () => {
-      const { command, positional, flags } = parseArgs(['node', 'cli.js', 'status']);
+      const { command, positional } = parseArgs(['node', 'cli.js', 'status']);
       expect(command).toBe('status');
       expect(positional).toHaveLength(0);
     });
 
     it('parses confirm with id and project', () => {
       const { command, positional, flags } = parseArgs([
-        'node', 'cli.js', 'confirm', 'grep-before-edit', '--project', 'my-api'
+        'node',
+        'cli.js',
+        'confirm',
+        'grep-before-edit',
+        '--project',
+        'my-api',
       ]);
       expect(command).toBe('confirm');
       expect(positional[0]).toBe('grep-before-edit');
@@ -86,9 +91,7 @@ describe('instinct', () => {
     });
 
     it('parses contradict with id', () => {
-      const { command, positional, flags } = parseArgs([
-        'node', 'cli.js', 'contradict', 'bad-pattern'
-      ]);
+      const { command, positional } = parseArgs(['node', 'cli.js', 'contradict', 'bad-pattern']);
       expect(command).toBe('contradict');
       expect(positional[0]).toBe('bad-pattern');
     });
@@ -187,11 +190,11 @@ confidence: 0.50
 # Bad`);
 
       const newConf = applyContradiction(frontmatter.confidence);
-      expect(newConf).toBeCloseTo(0.40, 5);
+      expect(newConf).toBeCloseTo(0.4, 5);
     });
 
     it('multiple contradictions can trigger archive', () => {
-      let conf = 0.50;
+      let conf = 0.5;
       // 4 contradictions: 0.50 → 0.40 → 0.30 → 0.20 → 0.10
       for (let i = 0; i < 4; i++) {
         conf = applyContradiction(conf);

@@ -13,8 +13,8 @@
  * NOTE: This is the canonical location. hooks/lib/package-manager.js should import from here.
  */
 
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const _fs = require('node:fs');
 const { fileExists, commandExists, readFileSafe } = require('./utils');
 
 /**
@@ -25,39 +25,39 @@ const PACKAGE_MANAGERS = {
   pnpm: {
     lockFile: 'pnpm-lock.yaml',
     command: 'pnpm',
-    run: ['pnpm'],              // pnpm <script>
-    exec: ['pnpm', 'exec'],     // pnpm exec <cmd>
+    run: ['pnpm'], // pnpm <script>
+    exec: ['pnpm', 'exec'], // pnpm exec <cmd>
     install: ['pnpm', 'install'],
     test: ['pnpm', 'test'],
-    build: ['pnpm', 'build']
+    build: ['pnpm', 'build'],
   },
   yarn: {
     lockFile: 'yarn.lock',
     command: 'yarn',
-    run: ['yarn'],              // yarn <script>
-    exec: ['yarn'],             // yarn <cmd>
+    run: ['yarn'], // yarn <script>
+    exec: ['yarn'], // yarn <cmd>
     install: ['yarn', 'install'],
     test: ['yarn', 'test'],
-    build: ['yarn', 'build']
+    build: ['yarn', 'build'],
   },
   bun: {
     lockFile: 'bun.lockb',
     command: 'bun',
-    run: ['bun', 'run'],        // bun run <script>
-    exec: ['bun', 'x'],         // bun x <cmd>
+    run: ['bun', 'run'], // bun run <script>
+    exec: ['bun', 'x'], // bun x <cmd>
     install: ['bun', 'install'],
     test: ['bun', 'test'],
-    build: ['bun', 'run', 'build']
+    build: ['bun', 'run', 'build'],
   },
   npm: {
     lockFile: 'package-lock.json',
     command: 'npm',
-    run: ['npm', 'run'],        // npm run <script>
-    exec: ['npx'],              // npx <cmd>
+    run: ['npm', 'run'], // npm run <script>
+    exec: ['npx'], // npx <cmd>
     install: ['npm', 'install'],
     test: ['npm', 'test'],
-    build: ['npm', 'run', 'build']
-  }
+    build: ['npm', 'run', 'build'],
+  },
 };
 
 /**
@@ -111,13 +111,17 @@ function detectPackageManager(projectDir = process.cwd()) {
   // Priority 2: Project .claude/package-manager.json
   const projectConfig = path.join(projectDir, '.claude', 'package-manager.json');
   const projectPm = readPackageManagerConfig(projectConfig);
-  if (projectPm && PACKAGE_MANAGERS[projectPm] && commandExists(PACKAGE_MANAGERS[projectPm].command)) {
+  if (
+    projectPm &&
+    PACKAGE_MANAGERS[projectPm] &&
+    commandExists(PACKAGE_MANAGERS[projectPm].command)
+  ) {
     return projectPm;
   }
 
   // Priority 3: package.json packageManager field
   const packageJson = readPackageJson(projectDir);
-  if (packageJson && packageJson.packageManager) {
+  if (packageJson?.packageManager) {
     // Format is "pnpm@8.0.0" or just "pnpm"
     const pmName = packageJson.packageManager.split('@')[0];
     if (PACKAGE_MANAGERS[pmName] && commandExists(PACKAGE_MANAGERS[pmName].command)) {
@@ -137,7 +141,7 @@ function detectPackageManager(projectDir = process.cwd()) {
   }
 
   // Priority 5: Global ~/.claude/package-manager.json
-  const os = require('os');
+  const os = require('node:os');
   const globalConfig = path.join(os.homedir(), '.claude', 'package-manager.json');
   const globalPm = readPackageManagerConfig(globalConfig);
   if (globalPm && PACKAGE_MANAGERS[globalPm] && commandExists(PACKAGE_MANAGERS[globalPm].command)) {
@@ -208,8 +212,10 @@ function getRunCommand(action, options = {}) {
 function hasDependency(packageName, projectDir = process.cwd()) {
   const packageJson = readPackageJson(projectDir);
   if (!packageJson) return false;
-  return packageName in (packageJson.devDependencies || {}) ||
-         packageName in (packageJson.dependencies || {});
+  return (
+    packageName in (packageJson.devDependencies || {}) ||
+    packageName in (packageJson.dependencies || {})
+  );
 }
 
 /**
@@ -279,5 +285,5 @@ module.exports = {
   hasPackageJson,
   hasPyprojectToml,
   getDefaultTestCommand,
-  readPackageJson
+  readPackageJson,
 };

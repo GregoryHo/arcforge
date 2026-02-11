@@ -4,10 +4,14 @@
  * Centralizes instinct file creation for: reflect.js, recall.js, instinct.js
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { sanitizeFilename } = require('./utils');
-const { getInstinctsDir, getGlobalInstinctsDir, getInstinctsGlobalIndex } = require('./session-utils');
+const {
+  getInstinctsDir,
+  getGlobalInstinctsDir,
+  getInstinctsGlobalIndex,
+} = require('./session-utils');
 const { appendToIndex } = require('./global-index');
 const { INITIAL, MAX_CONFIDENCE } = require('./confidence');
 
@@ -25,7 +29,17 @@ const { INITIAL, MAX_CONFIDENCE } = require('./confidence');
  * @param {number} [opts.evidenceCount=0] - Number of evidence instances
  * @returns {{ path: string, confidence: number, isNew: boolean }}
  */
-function saveInstinct({ id, trigger, action, project, domain = 'general', source = 'manual', evidence = '', maxConfidence, evidenceCount = 0 }) {
+function saveInstinct({
+  id,
+  trigger,
+  action,
+  project,
+  domain = 'general',
+  source = 'manual',
+  evidence = '',
+  maxConfidence,
+  evidenceCount = 0,
+}) {
   sanitizeFilename(id);
 
   const cap = maxConfidence ?? MAX_CONFIDENCE;
@@ -51,7 +65,7 @@ contradictions: 0
 evidence: "${evidence}"
 ---
 
-# ${id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+# ${id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
 
 ## Trigger
 ${trigger}
@@ -92,5 +106,5 @@ function checkInstinctDuplicate(id, project) {
 
 module.exports = {
   saveInstinct,
-  checkInstinctDuplicate
+  checkInstinctDuplicate,
 };

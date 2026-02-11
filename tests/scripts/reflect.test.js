@@ -1,16 +1,20 @@
 // tests/scripts/reflect.test.js
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const { execFileSync } = require('node:child_process');
+const _fs = require('node:fs');
+const path = require('node:path');
+const _os = require('node:os');
 
 describe('reflect.js CLI', () => {
   const scriptPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
 
   describe('strategy command', () => {
     it('returns a valid strategy', () => {
-      const result = execFileSync('node', [scriptPath, 'strategy', '--project', 'nonexistent-project'], { encoding: 'utf-8' });
+      const result = execFileSync(
+        'node',
+        [scriptPath, 'strategy', '--project', 'nonexistent-project'],
+        { encoding: 'utf-8' },
+      );
       expect(['unprocessed', 'project_focused', 'recent_window']).toContain(result.trim());
     });
 
@@ -24,7 +28,10 @@ describe('reflect.js CLI', () => {
   describe('scan command', () => {
     it('exits with error when missing arguments', () => {
       expect(() => {
-        execFileSync('node', [scriptPath, 'scan', '--project', 'test'], { encoding: 'utf-8', stdio: 'pipe' });
+        execFileSync('node', [scriptPath, 'scan', '--project', 'test'], {
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
       }).toThrow();
     });
   });
@@ -32,7 +39,10 @@ describe('reflect.js CLI', () => {
   describe('update-log command', () => {
     it('exits with error when missing arguments', () => {
       expect(() => {
-        execFileSync('node', [scriptPath, 'update-log', '--project', 'test'], { encoding: 'utf-8', stdio: 'pipe' });
+        execFileSync('node', [scriptPath, 'update-log', '--project', 'test'], {
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
       }).toThrow();
     });
   });

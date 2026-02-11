@@ -10,8 +10,8 @@
  * Note: Uses Stop hook (not SessionEnd) so Claude sees and executes the prompt.
  */
 
-const path = require('path');
-const { execFileSync } = require('child_process');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -24,10 +24,16 @@ const {
   getSessionId,
   getTimestamp,
   log,
-  outputDecision
+  outputDecision,
 } = require('../lib/utils');
-const { readCount: readToolCount, resetCounter: resetToolCounter } = require('../compact-suggester/main');
-const { readCount: readUserCount, resetCounter: resetUserCounter } = require('../user-message-counter/main');
+const {
+  readCount: readToolCount,
+  resetCounter: resetToolCounter,
+} = require('../compact-suggester/main');
+const {
+  readCount: readUserCount,
+  resetCounter: resetUserCounter,
+} = require('../user-message-counter/main');
 const { shouldTrigger } = require('../lib/thresholds');
 const { calculateDurationMinutes } = require('./summary');
 
@@ -46,7 +52,7 @@ function getOrCreateSession() {
     lastUpdated: getTimestamp(),
     toolCalls: 0,
     filesModified: [],
-    compactions: []
+    compactions: [],
   };
 }
 
@@ -56,7 +62,7 @@ function getOrCreateSession() {
 function saveSessionJson(session) {
   const sessionFile = path.join(
     getSessionDir(session.project, session.date),
-    `${session.sessionId}.json`
+    `${session.sessionId}.json`,
   );
   writeFileSafe(sessionFile, JSON.stringify(session, null, 2));
 }
@@ -68,12 +74,11 @@ function saveSessionJson(session) {
 function tryGenerateAutoDiary(project, date, sessionId) {
   try {
     const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
-    const result = execFileSync('node', [
-      autoDiaryPath, 'generate',
-      '--project', project,
-      '--date', date,
-      '--session', sessionId
-    ], { encoding: 'utf-8', timeout: 5000 }).trim();
+    const result = execFileSync(
+      'node',
+      [autoDiaryPath, 'generate', '--project', project, '--date', date, '--session', sessionId],
+      { encoding: 'utf-8', timeout: 5000 },
+    ).trim();
     return result || null;
   } catch {
     return null;
@@ -87,10 +92,10 @@ function tryGenerateAutoDiary(project, date, sessionId) {
 function checkReflectReady(project) {
   try {
     const reflectPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
-    const result = execFileSync('node', [
-      reflectPath, 'auto-check',
-      '--project', project
-    ], { encoding: 'utf-8', timeout: 5000 }).trim();
+    const result = execFileSync('node', [reflectPath, 'auto-check', '--project', project], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
 
     const [status, strategy, count] = result.split('|');
     return { ready: status === 'ready', strategy, count: parseInt(count, 10) || 0 };
@@ -142,7 +147,7 @@ function main() {
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
-  if (input && input.stop_hook_active) {
+  if (input?.stop_hook_active) {
     // Already processing stop hook - allow stop to prevent infinite loop
     process.exit(0);
     return;
@@ -167,7 +172,7 @@ function main() {
       const { addPendingAction } = require('../../scripts/lib/pending-actions');
       addPendingAction(session.project, 'reflect-ready', {
         strategy: reflectStatus.strategy,
-        count: reflectStatus.count
+        count: reflectStatus.count,
       });
     }
 
@@ -189,7 +194,7 @@ module.exports = {
   formatStopReason,
   formatShortMessage,
   tryGenerateAutoDiary,
-  checkReflectReady
+  checkReflectReady,
 };
 
 // Run if executed directly

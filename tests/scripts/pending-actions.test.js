@@ -1,8 +1,8 @@
 // tests/scripts/pending-actions.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 describe('pending-actions', () => {
   let testDir;
@@ -25,7 +25,7 @@ describe('pending-actions', () => {
     it('returns path under ~/.claude/sessions/{project}', () => {
       const result = pendingActions.getActionsPath('my-project');
       expect(result).toBe(
-        path.join(testDir, '.claude', 'sessions', 'my-project', 'pending-actions.json')
+        path.join(testDir, '.claude', 'sessions', 'my-project', 'pending-actions.json'),
       );
     });
   });
@@ -54,14 +54,16 @@ describe('pending-actions', () => {
     it('has correct fields: id, type, payload, created, consumed, consumed_at', () => {
       const action = pendingActions.addPendingAction('proj', 'diary-saved', {});
 
-      expect(action).toEqual(expect.objectContaining({
-        id: expect.any(String),
-        type: 'diary-saved',
-        payload: {},
-        created: expect.any(String),
-        consumed: false,
-        consumed_at: null
-      }));
+      expect(action).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          type: 'diary-saved',
+          payload: {},
+          created: expect.any(String),
+          consumed: false,
+          consumed_at: null,
+        }),
+      );
 
       // Verify created is a valid ISO date
       expect(() => new Date(action.created)).not.toThrow();
@@ -91,7 +93,7 @@ describe('pending-actions', () => {
 
       const reflectOnly = pendingActions.getPendingActions('proj', 'reflect-ready');
       expect(reflectOnly).toHaveLength(2);
-      reflectOnly.forEach(a => expect(a.type).toBe('reflect-ready'));
+      for (const a of reflectOnly) expect(a.type).toBe('reflect-ready');
 
       const diaryOnly = pendingActions.getPendingActions('proj', 'diary-saved');
       expect(diaryOnly).toHaveLength(1);
@@ -123,7 +125,7 @@ describe('pending-actions', () => {
         payload: {},
         created: eightDaysAgo,
         consumed: false,
-        consumed_at: null
+        consumed_at: null,
       });
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
@@ -149,7 +151,7 @@ describe('pending-actions', () => {
         payload: {},
         created: eightDaysAgo,
         consumed: false,
-        consumed_at: null
+        consumed_at: null,
       });
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
@@ -225,7 +227,7 @@ describe('pending-actions', () => {
 
       const filePath = pendingActions.getActionsPath('proj');
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      const found = data.actions.find(a => a.id === action.id);
+      const found = data.actions.find((a) => a.id === action.id);
 
       expect(found.consumed).toBe(true);
       expect(found.consumed_at).toBeDefined();

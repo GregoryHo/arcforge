@@ -1,8 +1,8 @@
 // tests/scripts/confidence.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
   INITIAL,
@@ -20,8 +20,7 @@ const {
   applyContradiction,
   shouldAutoLoad,
   shouldArchive,
-  clampConfidence,
-  runDecayCycle
+  runDecayCycle,
 } = require('../../scripts/lib/confidence');
 
 describe('confidence', () => {
@@ -29,7 +28,7 @@ describe('confidence', () => {
     it('has expected default values', () => {
       expect(INITIAL).toBe(0.5);
       expect(CONFIRM_DELTA).toBe(0.05);
-      expect(CONTRADICT_DELTA).toBe(-0.10);
+      expect(CONTRADICT_DELTA).toBe(-0.1);
       expect(DECAY_PER_WEEK).toBe(0.02);
       expect(AUTO_LOAD_THRESHOLD).toBe(0.7);
       expect(ARCHIVE_THRESHOLD).toBe(0.15);
@@ -114,7 +113,7 @@ confidence: 0.50
 
       const updated = updateConfidenceFrontmatter(content, {
         last_confirmed: '2026-02-08',
-        archived_at: '2026-02-08'
+        archived_at: '2026-02-08',
       });
       const { frontmatter } = parseConfidenceFrontmatter(updated);
 
@@ -210,7 +209,7 @@ confidence: 0.50
   });
 
   describe('runDecayCycle', () => {
-    const testDir = path.join(os.tmpdir(), 'confidence-decay-test-' + Date.now());
+    const testDir = path.join(os.tmpdir(), `confidence-decay-test-${Date.now()}`);
 
     beforeEach(() => {
       fs.mkdirSync(testDir, { recursive: true });
@@ -246,7 +245,7 @@ last_confirmed: 2025-12-14
       if (result.decayed.includes('old-pattern.md')) {
         const updated = fs.readFileSync(path.join(testDir, 'old-pattern.md'), 'utf-8');
         const { frontmatter } = parseConfidenceFrontmatter(updated);
-        expect(frontmatter.confidence).toBeLessThan(0.50);
+        expect(frontmatter.confidence).toBeLessThan(0.5);
       }
     });
 

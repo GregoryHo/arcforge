@@ -5,11 +5,11 @@
  * Note: These are integration tests that require a temporary git repo.
  */
 
-const assert = require('assert');
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const assert = require('node:assert');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 // Get the script directory
 const SCRIPT_DIR = path.resolve(__dirname, '../../scripts');
@@ -25,22 +25,22 @@ const dagPath = path.join(testDir, 'dag.yaml');
 function runCli(args, options = {}) {
   const env = {
     ...process.env,
-    CLAUDE_PROJECT_DIR: testDir
+    CLAUDE_PROJECT_DIR: testDir,
   };
-  const argArray = args.split(' ').filter(a => a);
+  const argArray = args.split(' ').filter((a) => a);
   try {
     const result = execFileSync('node', [CLI_PATH, ...argArray], {
       encoding: 'utf8',
       env,
       cwd: testDir,
-      ...options
+      ...options,
     });
     return { stdout: result, exitCode: 0 };
   } catch (err) {
     return {
       stdout: err.stdout || '',
       stderr: err.stderr || err.message,
-      exitCode: err.status || 1
+      exitCode: err.status || 1,
     };
   }
 }
@@ -148,7 +148,7 @@ assert.strictEqual(completeResult.exitCode, 0);
 
 // Verify status after completion
 const statusAfter = JSON.parse(runCli('status --json').stdout);
-const epic1 = statusAfter.epics.find(e => e.id === 'epic-001');
+const epic1 = statusAfter.epics.find((e) => e.id === 'epic-001');
 assert.strictEqual(epic1.status, 'completed'); // All features complete
 assert.strictEqual(epic1.progress, 1);
 console.log('    ✓ complete');
@@ -164,15 +164,15 @@ console.log('  CLI block command...');
 // For block command, we need to handle the space in reason differently
 const blockEnv = {
   ...process.env,
-  CLAUDE_PROJECT_DIR: testDir
+  CLAUDE_PROJECT_DIR: testDir,
 };
 try {
   execFileSync('node', [CLI_PATH, 'block', 'feat-002-01', 'Waiting for API'], {
     encoding: 'utf8',
     env: blockEnv,
-    cwd: testDir
+    cwd: testDir,
   });
-} catch (err) {
+} catch (_err) {
   // Ignore if it fails for other reasons
 }
 

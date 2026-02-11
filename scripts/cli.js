@@ -16,7 +16,7 @@
  *   schema [--json] [--example]     Show dag.yaml schema
  */
 
-const path = require('path');
+const _path = require('node:path');
 const { Coordinator } = require('./lib/coordinator');
 const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
 
@@ -26,7 +26,7 @@ function parseArgs(args) {
     command: null,
     positional: [],
     flags: {},
-    options: {}
+    options: {},
   };
 
   let i = 0;
@@ -163,11 +163,14 @@ async function main() {
         const coord = new Coordinator(projectRoot);
         const task = coord.nextTask();
         if (task) {
-          output({
-            id: task.id,
-            name: task.name,
-            type: task.features ? 'epic' : 'feature'
-          }, asJson);
+          output(
+            {
+              id: task.id,
+              name: task.name,
+              type: task.features ? 'epic' : 'feature',
+            },
+            asJson,
+          );
         } else {
           output({ message: 'No tasks available' }, asJson);
         }
@@ -199,10 +202,13 @@ async function main() {
       case 'parallel': {
         const coord = new Coordinator(projectRoot);
         const tasks = coord.parallelTasks();
-        output({
-          count: tasks.length,
-          epics: tasks.map(e => ({ id: e.id, name: e.name }))
-        }, asJson);
+        output(
+          {
+            count: tasks.length,
+            epics: tasks.map((e) => ({ id: e.id, name: e.name })),
+          },
+          asJson,
+        );
         break;
       }
 
@@ -211,15 +217,18 @@ async function main() {
         const verifyCmd = args.options['verify-cmd'];
         const created = coord.expandWorktrees({
           verify: args.flags.verify,
-          verifyCommand: verifyCmd ? verifyCmd.split(' ') : undefined
+          verifyCommand: verifyCmd ? verifyCmd.split(' ') : undefined,
         });
-        output({
-          created: created.length,
-          epics: created.map(e => ({
-            id: e.id,
-            worktree: e.worktree
-          }))
-        }, asJson);
+        output(
+          {
+            created: created.length,
+            epics: created.map((e) => ({
+              id: e.id,
+              worktree: e.worktree,
+            })),
+          },
+          asJson,
+        );
         break;
       }
 
@@ -227,24 +236,30 @@ async function main() {
         const coord = new Coordinator(projectRoot);
         const merged = coord.mergeEpics({
           baseBranch: args.options.base,
-          epicIds: args.positional.length > 0 ? args.positional : undefined
+          epicIds: args.positional.length > 0 ? args.positional : undefined,
         });
-        output({
-          merged: merged.length,
-          epics: merged.map(e => e.id)
-        }, asJson);
+        output(
+          {
+            merged: merged.length,
+            epics: merged.map((e) => e.id),
+          },
+          asJson,
+        );
         break;
       }
 
       case 'cleanup': {
         const coord = new Coordinator(projectRoot);
         const removed = coord.cleanupWorktrees({
-          epicIds: args.positional.length > 0 ? args.positional : undefined
+          epicIds: args.positional.length > 0 ? args.positional : undefined,
         });
-        output({
-          removed: removed.length,
-          paths: removed
-        }, asJson);
+        output(
+          {
+            removed: removed.length,
+            paths: removed,
+          },
+          asJson,
+        );
         break;
       }
 
@@ -299,7 +314,7 @@ async function main() {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

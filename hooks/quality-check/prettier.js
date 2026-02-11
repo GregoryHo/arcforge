@@ -33,7 +33,7 @@ function runPrettier(filePath, pmName) {
   // but with --write it auto-fixes, so exitCode 0 is expected on success
   return {
     formatted: false,
-    error: result.stderr || 'Prettier failed'
+    error: result.stderr || 'Prettier failed',
   };
 }
 
@@ -59,11 +59,11 @@ function checkPrettier(filePath, pmName) {
   // Exit code 0 = already formatted, 1 = needs formatting
   return {
     needsFormatting: result.exitCode !== 0,
-    error: result.exitCode > 1 ? result.stderr : undefined
+    error: result.exitCode > 1 ? result.stderr : undefined,
   };
 }
 
 module.exports = {
   runPrettier,
-  checkPrettier
+  checkPrettier,
 };

@@ -11,7 +11,7 @@ const {
   readStdinSync,
   parseStdinJson,
   setSessionIdFromInput,
-  createSessionCounter
+  createSessionCounter,
 } = require('../lib/utils');
 
 // Counter is created lazily on first access
@@ -48,7 +48,7 @@ module.exports = {
   readCount: () => getCounter().read(),
   writeCount: (count) => getCounter().write(count),
   resetCounter: () => getCounter().reset(),
-  getCounterFilePath: () => getCounter().getFilePath()
+  getCounterFilePath: () => getCounter().getFilePath(),
 };
 
 // Run if executed directly

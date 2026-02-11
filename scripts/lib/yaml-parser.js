@@ -63,7 +63,13 @@ function parse(yamlString) {
           frame.pendingKey = null;
           // Pop any frames above this one
           while (stack.length > j + 1) stack.pop();
-          stack.push({ obj: arr, indent: indent - 2, pendingKey: null, pendingIndent: -2, isArray: true });
+          stack.push({
+            obj: arr,
+            indent: indent - 2,
+            pendingKey: null,
+            pendingIndent: -2,
+            isArray: true,
+          });
           // Reprocess this line
           i--;
           handled = true;
@@ -147,9 +153,7 @@ function parse(yamlString) {
       const key = content.slice(0, colonPos).trim();
       const valueStr = content.slice(colonPos + 1).trim();
 
-      const targetObj = Array.isArray(parent.obj)
-        ? parent.obj[parent.obj.length - 1]
-        : parent.obj;
+      const targetObj = Array.isArray(parent.obj) ? parent.obj[parent.obj.length - 1] : parent.obj;
 
       if (valueStr === '' || valueStr === '[]') {
         if (valueStr === '[]') {
@@ -203,8 +207,7 @@ function parseValue(str) {
   if (str === 'false') return false;
 
   // Quoted string
-  if ((str.startsWith('"') && str.endsWith('"')) ||
-      (str.startsWith("'") && str.endsWith("'"))) {
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
     const inner = str.slice(1, -1);
     // Handle escape sequences for double-quoted strings
     if (str.startsWith('"')) {
@@ -276,34 +279,34 @@ function parseDagYaml(content) {
 function stringifyDagYaml(dag) {
   // Clean up undefined values
   const clean = {
-    epics: dag.epics.map(epic => ({
+    epics: dag.epics.map((epic) => ({
       id: epic.id,
       name: epic.name,
       status: epic.status,
       spec_path: epic.spec_path,
       worktree: epic.worktree || null,
       depends_on: epic.depends_on || [],
-      features: (epic.features || []).map(feat => {
+      features: (epic.features || []).map((feat) => {
         const f = {
           id: feat.id,
           name: feat.name,
           status: feat.status,
-          depends_on: feat.depends_on || []
+          depends_on: feat.depends_on || [],
         };
         if (feat.source_requirement) {
           f.source_requirement = feat.source_requirement;
         }
         return f;
-      })
-    }))
+      }),
+    })),
   };
 
   if (dag.blocked && dag.blocked.length > 0) {
-    clean.blocked = dag.blocked.map(b => ({
+    clean.blocked = dag.blocked.map((b) => ({
       task_id: b.task_id,
       reason: b.reason,
       blocked_at: b.blocked_at,
-      attempts: b.attempts || []
+      attempts: b.attempts || [],
     }));
   }
 
@@ -315,5 +318,5 @@ module.exports = {
   parseValue,
   stringify,
   parseDagYaml,
-  stringifyDagYaml
+  stringifyDagYaml,
 };

@@ -33,7 +33,7 @@ class Feature {
    * @returns {boolean} True if all dependencies are completed
    */
   isReady(completedFeatures) {
-    return this.depends_on.every(dep => completedFeatures.has(dep));
+    return this.depends_on.every((dep) => completedFeatures.has(dep));
   }
 
   /**
@@ -45,7 +45,7 @@ class Feature {
       id: this.id,
       name: this.name,
       status: this.status,
-      depends_on: this.depends_on
+      depends_on: this.depends_on,
     };
     if (this.source_requirement) {
       obj.source_requirement = this.source_requirement;
@@ -75,9 +75,7 @@ class Epic {
     this.status = data.status || TaskStatus.PENDING;
     this.worktree = data.worktree || null;
     this.depends_on = data.depends_on || [];
-    this.features = (data.features || []).map(f =>
-      f instanceof Feature ? f : new Feature(f)
-    );
+    this.features = (data.features || []).map((f) => (f instanceof Feature ? f : new Feature(f)));
   }
 
   /**
@@ -86,7 +84,7 @@ class Epic {
    * @returns {boolean} True if all dependencies are completed
    */
   isReady(completedEpics) {
-    return this.depends_on.every(dep => completedEpics.has(dep));
+    return this.depends_on.every((dep) => completedEpics.has(dep));
   }
 
   /**
@@ -97,7 +95,7 @@ class Epic {
     if (this.features.length === 0) {
       return 0.0;
     }
-    const completed = this.features.filter(f => f.status === TaskStatus.COMPLETED).length;
+    const completed = this.features.filter((f) => f.status === TaskStatus.COMPLETED).length;
     return completed / this.features.length;
   }
 
@@ -106,11 +104,7 @@ class Epic {
    * @returns {Set<string>} Set of completed feature IDs
    */
   getCompletedFeatures() {
-    return new Set(
-      this.features
-        .filter(f => f.status === TaskStatus.COMPLETED)
-        .map(f => f.id)
-    );
+    return new Set(this.features.filter((f) => f.status === TaskStatus.COMPLETED).map((f) => f.id));
   }
 
   /**
@@ -125,7 +119,7 @@ class Epic {
       spec_path: this.spec_path,
       worktree: this.worktree,
       depends_on: this.depends_on,
-      features: this.features.map(f => f.toObject())
+      features: this.features.map((f) => f.toObject()),
     };
   }
 }
@@ -144,9 +138,7 @@ class BlockedItem {
   constructor(data) {
     this.task_id = data.task_id;
     this.reason = data.reason;
-    this.blocked_at = data.blocked_at instanceof Date
-      ? data.blocked_at
-      : new Date(data.blocked_at);
+    this.blocked_at = data.blocked_at instanceof Date ? data.blocked_at : new Date(data.blocked_at);
     this.attempts = data.attempts || [];
   }
 
@@ -159,7 +151,7 @@ class BlockedItem {
       task_id: this.task_id,
       reason: this.reason,
       blocked_at: this.blocked_at.toISOString(),
-      attempts: this.attempts
+      attempts: this.attempts,
     };
   }
 }
@@ -200,7 +192,7 @@ class SyncResult {
       scanned: this.scanned,
       updates: this.updates,
       blocked_by: this.blocked_by,
-      dependents: this.dependents
+      dependents: this.dependents,
     };
   }
 }
@@ -215,11 +207,9 @@ class DAG {
    * @param {BlockedItem[]|Object[]} [data.blocked=[]] - List of blocked items
    */
   constructor(data = {}) {
-    this.epics = (data.epics || []).map(e =>
-      e instanceof Epic ? e : new Epic(e)
-    );
-    this.blocked = (data.blocked || []).map(b =>
-      b instanceof BlockedItem ? b : new BlockedItem(b)
+    this.epics = (data.epics || []).map((e) => (e instanceof Epic ? e : new Epic(e)));
+    this.blocked = (data.blocked || []).map((b) =>
+      b instanceof BlockedItem ? b : new BlockedItem(b),
     );
   }
 
@@ -248,7 +238,7 @@ class DAG {
    * @returns {Epic|null} The epic or null if not found
    */
   getEpic(epicId) {
-    return this.epics.find(e => e.id === epicId) || null;
+    return this.epics.find((e) => e.id === epicId) || null;
   }
 
   /**
@@ -256,11 +246,7 @@ class DAG {
    * @returns {Set<string>} Set of completed epic IDs
    */
   getCompletedEpics() {
-    return new Set(
-      this.epics
-        .filter(e => e.status === TaskStatus.COMPLETED)
-        .map(e => e.id)
-    );
+    return new Set(this.epics.filter((e) => e.status === TaskStatus.COMPLETED).map((e) => e.id));
   }
 
   /**
@@ -281,7 +267,7 @@ class DAG {
    */
   findEpicByFeature(featureId) {
     for (const epic of this.epics) {
-      if (epic.features.some(f => f.id === featureId)) {
+      if (epic.features.some((f) => f.id === featureId)) {
         return epic;
       }
     }
@@ -294,10 +280,10 @@ class DAG {
    */
   toObject() {
     const obj = {
-      epics: this.epics.map(e => e.toObject())
+      epics: this.epics.map((e) => e.toObject()),
     };
     if (this.blocked.length > 0) {
-      obj.blocked = this.blocked.map(b => b.toObject());
+      obj.blocked = this.blocked.map((b) => b.toObject());
     }
     return obj;
   }
@@ -318,5 +304,5 @@ module.exports = {
   Epic,
   BlockedItem,
   SyncResult,
-  DAG
+  DAG,
 };

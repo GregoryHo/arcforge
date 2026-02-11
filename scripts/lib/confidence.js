@@ -8,8 +8,8 @@
  * Lifecycle: create → confirm/contradict → decay → archive
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // ─────────────────────────────────────────────
 // Constants
@@ -17,7 +17,7 @@ const path = require('path');
 
 const INITIAL = 0.5;
 const CONFIRM_DELTA = 0.05;
-const CONTRADICT_DELTA = -0.10;
+const CONTRADICT_DELTA = -0.1;
 const DECAY_PER_WEEK = 0.02;
 const AUTO_LOAD_THRESHOLD = 0.7;
 const ARCHIVE_THRESHOLD = 0.15;
@@ -58,8 +58,10 @@ function parseConfidenceFrontmatter(content) {
     let value = line.substring(colonIdx + 1).trim();
 
     // Strip surrounding quotes
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
 
@@ -100,7 +102,7 @@ function updateConfidenceFrontmatter(content, updates) {
   }
   lines.push('---');
 
-  return lines.join('\n') + '\n' + body;
+  return `${lines.join('\n')}\n${body}`;
 }
 
 // ─────────────────────────────────────────────
@@ -176,7 +178,7 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
   if (!fs.existsSync(dirPath)) return result;
 
-  const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+  const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
   const now = new Date();
 
   for (const file of files) {
@@ -198,7 +200,7 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
       const updatedContent = updateConfidenceFrontmatter(content, {
         confidence: newConfidence,
-        archived_at: now.toISOString().split('T')[0]
+        archived_at: now.toISOString().split('T')[0],
       });
 
       fs.writeFileSync(path.join(archiveDir, file), updatedContent, 'utf-8');
@@ -207,7 +209,7 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
     } else if (newConfidence < frontmatter.confidence) {
       // Update confidence in place
       const updatedContent = updateConfidenceFrontmatter(content, {
-        confidence: newConfidence
+        confidence: newConfidence,
       });
       fs.writeFileSync(filePath, updatedContent, 'utf-8');
       result.decayed.push(file);
@@ -239,5 +241,5 @@ module.exports = {
   shouldArchive,
   clampConfidence,
   // Lifecycle
-  runDecayCycle
+  runDecayCycle,
 };

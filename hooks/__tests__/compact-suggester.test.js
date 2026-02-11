@@ -1,8 +1,8 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 describe('compact-suggester counter', () => {
   // Save original env
@@ -20,7 +20,7 @@ describe('compact-suggester counter', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
-    Object.keys(process.env).forEach(key => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
   });
 

@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-4%20runners-brightgreen)](#development)
+[![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
 arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
 

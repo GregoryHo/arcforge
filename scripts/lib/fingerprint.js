@@ -5,18 +5,68 @@
  * and detecting semantic duplicates across projects.
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { parseConfidenceFrontmatter } = require('./confidence');
 
 // Common English stop words to filter out
 const STOP_WORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
-  'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-  'could', 'should', 'may', 'might', 'shall', 'can', 'this', 'that',
-  'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
-  'when', 'if', 'then', 'not', 'no', 'so', 'as', 'just', 'also'
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'but',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'of',
+  'with',
+  'by',
+  'from',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'been',
+  'being',
+  'have',
+  'has',
+  'had',
+  'do',
+  'does',
+  'did',
+  'will',
+  'would',
+  'could',
+  'should',
+  'may',
+  'might',
+  'shall',
+  'can',
+  'this',
+  'that',
+  'these',
+  'those',
+  'i',
+  'you',
+  'he',
+  'she',
+  'it',
+  'we',
+  'they',
+  'when',
+  'if',
+  'then',
+  'not',
+  'no',
+  'so',
+  'as',
+  'just',
+  'also',
 ]);
 
 /**
@@ -31,8 +81,8 @@ function buildTriggerFingerprint(trigger) {
 
   const tokens = trigger
     .toLowerCase()
-    .split(/[\s\-_.,;:!?'"()\[\]{}\/\\]+/)
-    .filter(t => t.length > 0 && !STOP_WORDS.has(t));
+    .split(/[\s\-_.,;:!?'"()[\]{}/\\]+/)
+    .filter((t) => t.length > 0 && !STOP_WORDS.has(t));
 
   return new Set(tokens.sort());
 }
@@ -73,7 +123,7 @@ function findSimilarInstincts(trigger, dir, threshold = 0.6) {
   if (queryFp.size < 3) return []; // Too short for meaningful comparison
 
   const results = [];
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
 
   for (const file of files) {
     const filePath = path.join(dir, file);
@@ -89,7 +139,7 @@ function findSimilarInstincts(trigger, dir, threshold = 0.6) {
       results.push({
         file,
         trigger: frontmatter.trigger,
-        similarity
+        similarity,
       });
     }
   }
@@ -101,5 +151,5 @@ module.exports = {
   STOP_WORDS,
   buildTriggerFingerprint,
   jaccardSimilarity,
-  findSimilarInstincts
+  findSimilarInstincts,
 };

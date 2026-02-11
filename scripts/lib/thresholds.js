@@ -24,5 +24,5 @@ function shouldTrigger(userCount, toolCount) {
 module.exports = {
   MIN_USER_MESSAGES,
   MIN_TOOL_CALLS,
-  shouldTrigger
+  shouldTrigger,
 };

@@ -17,9 +17,9 @@
  * Note: Counters accumulate until threshold is met in end.js or pre-compact/main.js.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execFileSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -31,16 +31,12 @@ const {
   getSessionId,
   getTimestamp,
   ensureDir,
-  log
+  log,
 } = require('../lib/utils');
 
-const {
-  getInstinctsDir
-} = require('../../scripts/lib/session-utils');
+const { getInstinctsDir } = require('../../scripts/lib/session-utils');
 
-const {
-  runDecayCycle
-} = require('../../scripts/lib/confidence');
+const { runDecayCycle } = require('../../scripts/lib/confidence');
 
 /**
  * Initialize new session file
@@ -61,7 +57,7 @@ function initializeSession() {
     lastUpdated: getTimestamp(),
     toolCalls: 0,
     filesModified: [],
-    compactions: []
+    compactions: [],
   };
 
   writeFileSafe(sessionFile, JSON.stringify(session, null, 2));
@@ -72,7 +68,7 @@ function initializeSession() {
 // Observer Daemon & Instinct Loading
 // ─────────────────────────────────────────────
 
-const PID_FILE = path.join(require('os').homedir(), '.claude', 'instincts', '.observer.pid');
+const PID_FILE = path.join(require('node:os').homedir(), '.claude', 'instincts', '.observer.pid');
 
 /**
  * Check if observer daemon is running, start if not.
@@ -92,7 +88,10 @@ function checkDaemon() {
     }
 
     // Try to start daemon
-    const daemonPath = path.join(__dirname, '../../skills/arc-observing/scripts/observer-daemon.sh');
+    const daemonPath = path.join(
+      __dirname,
+      '../../skills/arc-observing/scripts/observer-daemon.sh',
+    );
     if (fs.existsSync(daemonPath)) {
       execFileSync('bash', [daemonPath, 'start'], { stdio: 'ignore', timeout: 5000 });
       log('Observer daemon started');
@@ -110,7 +109,9 @@ function runDecayCycles(project) {
     const instResult = runDecayCycle(getInstinctsDir(project));
 
     if (instResult.decayed.length > 0 || instResult.archived.length > 0) {
-      log(`Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`);
+      log(
+        `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`,
+      );
     }
 
     return { instResult };
@@ -141,7 +142,7 @@ function main() {
 module.exports = {
   initializeSession,
   checkDaemon,
-  runDecayCycles
+  runDecayCycles,
 };
 
 // Run if executed directly

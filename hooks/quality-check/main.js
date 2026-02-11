@@ -11,7 +11,7 @@
  * Warnings go to stderr only
  */
 
-const path = require('path');
+const path = require('node:path');
 const { readStdinSync, parseStdinJson, log, readFileSafe } = require('../lib/utils');
 const { detectPackageManager, hasDevDependency } = require('../lib/package-manager');
 const { runPrettier } = require('./prettier');
@@ -71,9 +71,7 @@ function main() {
   }
 
   // Get absolute path
-  const absolutePath = path.isAbsolute(filePath)
-    ? filePath
-    : path.resolve(process.cwd(), filePath);
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
 
   const projectDir = process.cwd();
   const pm = detectPackageManager(projectDir);
@@ -96,7 +94,7 @@ function main() {
       const tsResult = runTypeCheck(absolutePath, pm);
       if (tsResult.errors && tsResult.errors.length > 0) {
         log(`[quality-check] TypeScript errors in ${path.basename(filePath)}:`);
-        tsResult.errors.forEach(err => {
+        tsResult.errors.forEach((err) => {
           log(`  ${err}`);
         });
       }
@@ -108,7 +106,7 @@ function main() {
   if (consoleLogs.length > 0) {
     log(`[quality-check] console.* found in ${path.basename(filePath)}:`);
     // Show max 15 occurrences
-    consoleLogs.slice(0, 15).forEach(match => {
+    consoleLogs.slice(0, 15).forEach((match) => {
       log(`  Line ${match.line}: ${match.content}...`);
     });
     if (consoleLogs.length > 15) {

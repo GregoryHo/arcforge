@@ -1,8 +1,8 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 describe('user-message-counter', () => {
   // Save original env
@@ -20,7 +20,7 @@ describe('user-message-counter', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
-    Object.keys(process.env).forEach(key => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
   });
 
@@ -69,12 +69,15 @@ describe('counter independence', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
-    Object.keys(process.env).forEach(key => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
   });
 
   it('should not conflict with compact-suggester counter', () => {
-    const { readCount: readUserCount, writeCount: writeUserCount } = require('../user-message-counter/main');
+    const {
+      readCount: readUserCount,
+      writeCount: writeUserCount,
+    } = require('../user-message-counter/main');
     const { readCount: readToolCount } = require('../compact-suggester/main');
     const { createSessionCounter } = require('../lib/utils');
     const toolCounter = createSessionCounter('tool-count');
