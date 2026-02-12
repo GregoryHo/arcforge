@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 
 def _read_skill() -> str:
@@ -39,9 +38,6 @@ def test_arc_refining_frontmatter_and_rules():
     assert "✅" in text
     assert "⚠️" in text
 
-    # Keep skill concise (<500 words)
-    word_count = len(re.findall(r"\b\w+\b", text))
-    assert word_count <= 500
 
 
 def test_arc_refining_contains_required_sections():

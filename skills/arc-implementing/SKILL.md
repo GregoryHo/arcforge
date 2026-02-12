@@ -44,7 +44,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
      - Call `arc-writing-tasks`
      - Input: `feature.md`
      - Output: `docs/tasks/<feature>-tasks.md`
-     - Quality gate: If tasks are vague or missing tests/commands, STOP and re-run `arc-writing-tasks` to refine.
+     - Quality gate: If tasks are vague or missing tests/commands, STOP and re-run `arc-writing-tasks` to refine. **Max 2 refinement cycles** — if still vague, escalate to human.
    - 2b: Execute Tasks.
      - Call `arc-agent-driven`
      - Input: tasks file
@@ -60,7 +60,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 | 1 | arc-writing-tasks | epic.md | features breakdown |
 | 2a | arc-writing-tasks | feature.md | tasks file |
 | 2b | arc-agent-driven | tasks file | completed code |
-| 2b | arc-dispatching-parallel | (if review finds multiple issues) | parallel fixes |
+| 2b | arc-dispatching-parallel | (via arc-agent-driven, if review finds multiple issues) | parallel fixes |
 | End | arc-finishing-epic | completed epic | merge decision |
 
 ## What Implementer Does NOT Do

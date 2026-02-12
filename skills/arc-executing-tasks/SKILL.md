@@ -43,7 +43,7 @@ For each task:
 3. Run verifications
 4. Mark as completed
 
-### Step 3: Checkpoint Report (Required)
+### Step 4: Checkpoint Report (Required)
 
 ```
 ─────────────────────────────────────────────────
@@ -62,14 +62,14 @@ Ready for feedback. Continue to next batch? (y/n)
 ─────────────────────────────────────────────────
 ```
 
-### Step 4: Continue or Adjust
+### Step 5: Continue or Adjust
 
 Based on feedback:
 - Apply changes if needed
 - Execute next batch
 - Repeat until complete
 
-### Step 5: Finish
+### Step 6: Finish
 
 After all tasks: use arc-finishing (or arc-finishing-epic for epic worktrees)
 

@@ -1,6 +1,6 @@
 ---
 name: arc-finishing
-description: Use when implementation is complete on a regular branch (no .arcforge-epic file), all tests pass, and you need to decide how to integrate - guides completion with structured options for merge, PR, keep, or discard
+description: Use when implementation is complete on a regular branch (no .arcforge-epic file), all tests pass, and you need to decide how to integrate
 ---
 
 # arc-finishing
@@ -113,7 +113,7 @@ EOF
 )"
 ```
 
-Then: Cleanup worktree (Step 5)
+Keep worktree until PR merged.
 
 #### Option 3: Keep As-Is
 
@@ -145,7 +145,7 @@ Then: Cleanup worktree (Step 5)
 
 ### Step 5: Cleanup Worktree
 
-**For Options 1, 2, 4:**
+**For Options 1 and 4:**
 
 Check if in worktree:
 ```bash

@@ -63,4 +63,5 @@ pip install pytest pyyaml
 - Hooks have their own `package.json` — run `cd hooks && npm install` separately
 - `test:skills` requires Python 3 + pytest (`pip install pytest pyyaml`)
 - Never use `@`-file syntax in skills (force-loads context into memory)
-- Skills max 500 words; use supporting files for heavy reference
+- Skill word count tiers (soft guidance): Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w
+- Over-limit skills should extract details to `references/` for progressive loading

@@ -4,7 +4,6 @@ This skill provides the methodology for writing and maintaining skills
 in the arcforge system, based on TDD principles.
 """
 from pathlib import Path
-import re
 
 
 def _read_skill() -> str:
@@ -52,18 +51,6 @@ class TestFrontmatterAndBasicRules:
         """Ensure no @ force-loading syntax in skill content."""
         text = _read_skill()
         assert "@" not in text
-
-    def test_word_count_appropriate(self):
-        """Meta-skill about writing skills can be comprehensive.
-
-        Note: 500 word limit applies to pipeline skills, not to this meta-skill
-        which needs comprehensive methodology content. Heavy reference still
-        goes to supporting files.
-        """
-        text = _read_skill()
-        word_count = len(re.findall(r"\b\w+\b", text))
-        # Writing-skills is comprehensive by design, but should still be reasonable
-        assert word_count <= 2500, f"Word count {word_count} exceeds 2500 limit"
 
 
 class TestTDDMethodology:

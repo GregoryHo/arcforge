@@ -1,6 +1,6 @@
 ---
 name: arc-agent-driven
-description: Use when executing task lists where each task requires an independent subagent
+description: Use when executing task lists where each task requires isolated execution
 ---
 
 # arc-agent-driven
@@ -86,6 +86,8 @@ digraph process {
     "Dispatch final code reviewer" -> "Use arc-finishing or arc-finishing-epic";
 }
 ```
+
+**Max review cycles: 3 per reviewer.** If not converging, escalate to human with summary of unresolved issues.
 
 ## Prompt Templates
 

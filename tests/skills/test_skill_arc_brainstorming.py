@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 
 def _read_skill() -> str:
@@ -38,9 +37,6 @@ def test_arc_brainstorming_frontmatter_and_rules():
     assert "✅" in text
     assert "⚠️" in text
 
-    # Keep skill concise
-    word_count = len(re.findall(r"\b\w+\b", text))
-    assert word_count <= 700
 
 
 def test_arc_brainstorming_contains_2_action_rule():

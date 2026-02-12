@@ -366,7 +366,7 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 - Follow existing patterns and conventions
 - Run `npm test` before submitting (all 4 runners must pass)
 - Include tests for new functionality
-- Keep skills under 500 words (use supporting files for heavy reference)
+- Skill word count tiers (soft guidance): Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w — use `references/` for overflow
 - Use `execFileSync` over `exec` in hooks (prevents shell injection)
 - Cross-reference skills with `**REQUIRED BACKGROUND:** ...` syntax
 

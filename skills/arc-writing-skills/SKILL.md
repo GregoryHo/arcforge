@@ -182,10 +182,12 @@ Use words Claude would search for:
 
 ### 4. Token Efficiency
 
-**Target word counts:**
-- Pipeline skills: <500 words
-- Meta-skills (like this one): comprehensive but reasonable
-- Heavy reference: Supporting files
+**Target word counts (soft guidance, not test-enforced):**
+- Lean (< 500w): Simple triggers, thin wrappers
+- Standard (< 1000w): Most workflow skills
+- Comprehensive (< 1800w): Complex multi-path skills
+- Meta (< 2500w): Self-referential teaching skills (like this one)
+- Over limit? Move details to `references/` directory for progressive loading
 
 ### 5. Cross-Referencing Other Skills
 
