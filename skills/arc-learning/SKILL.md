@@ -19,6 +19,17 @@ Cluster related instincts into higher-level abstractions: skills, commands, or a
 | **Preview clusters** | `node "${SKILL_ROOT}/scripts/learn.js" preview --project {p}` |
 | **List evolved** | `node "${SKILL_ROOT}/scripts/learn.js" list --project {p}` |
 
+## Infrastructure Commands
+
+**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
+```bash
+: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-learning}"
+if [ ! -d "$SKILL_ROOT" ]; then
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  exit 1
+fi
+```
+
 ## Workflow
 
 1. **Scan**: Load all instincts from `~/.claude/instincts/{project}/` and `global/`
