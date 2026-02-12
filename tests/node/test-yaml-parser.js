@@ -3,8 +3,13 @@
  * Tests for yaml-parser.js
  */
 
-const assert = require('assert');
-const { parse, parseValue, parseDagYaml, stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
+const assert = require('node:assert');
+const {
+  parse,
+  parseValue,
+  parseDagYaml,
+  stringifyDagYaml,
+} = require('../../scripts/lib/yaml-parser');
 
 console.log('Testing yaml-parser.js...\n');
 
@@ -121,21 +126,25 @@ console.log('    ✓ DAG YAML parsing');
 // Test stringifyDagYaml
 console.log('  stringifyDagYaml...');
 const dagObj = {
-  epics: [{
-    id: 'test-epic',
-    name: 'Test',
-    status: 'pending',
-    spec_path: 'test.md',
-    worktree: null,
-    depends_on: [],
-    features: [{
-      id: 'test-feat',
-      name: 'Test Feature',
+  epics: [
+    {
+      id: 'test-epic',
+      name: 'Test',
       status: 'pending',
-      depends_on: []
-    }]
-  }],
-  blocked: []
+      spec_path: 'test.md',
+      worktree: null,
+      depends_on: [],
+      features: [
+        {
+          id: 'test-feat',
+          name: 'Test Feature',
+          status: 'pending',
+          depends_on: [],
+        },
+      ],
+    },
+  ],
+  blocked: [],
 };
 const yamlString = stringifyDagYaml(dagObj);
 assert.ok(yamlString.includes('test-epic'));

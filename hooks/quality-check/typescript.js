@@ -3,7 +3,7 @@
  * Uses execCommand from utils.js (which uses execFileSync, not exec)
  */
 
-const path = require('path');
+const path = require('node:path');
 const { execCommand, fileExists, findUpwards } = require('../lib/utils');
 const { getPmExecCommand } = require('../lib/package-manager');
 
@@ -52,8 +52,9 @@ function runTypeCheck(filePath, pmName) {
   const basename = path.basename(filePath);
 
   let match;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
   while ((match = errorRegex.exec(output)) !== null) {
-    const [, errorFile, line, col, severity, code, message] = match;
+    const [, errorFile, line, _col, severity, code, message] = match;
 
     // Check if error is from our edited file
     const errorFilePath = path.resolve(errorFile);
@@ -70,10 +71,10 @@ function runTypeCheck(filePath, pmName) {
   // Limit output to first 15 errors
   return {
     errors: errors.slice(0, 15),
-    warnings: warnings.slice(0, 15)
+    warnings: warnings.slice(0, 15),
   };
 }
 
 module.exports = {
-  runTypeCheck
+  runTypeCheck,
 };

@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify tag matches package.json version
+        env:
+          TAG_REF: ${{ github.ref_name }}
+        run: |
+          TAG_VERSION="${TAG_REF#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION ≠ package.json $PKG_VERSION"
+            exit 1
+          fi
+      - name: Generate changelog
+        id: changelog
+        env:
+          TAG_REF: ${{ github.ref_name }}
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+          [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$TAG_REF" ] && \
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          LOG=$(git log "${PREV_TAG}..${TAG_REF}" --pretty=format:"- %s (%h)" --reverse)
+          FEATS=$(echo "$LOG" | grep -E "^- feat" || true)
+          FIXES=$(echo "$LOG" | grep -E "^- fix" || true)
+          OTHER=$(echo "$LOG" | grep -vE "^- (feat|fix)" || true)
+          {
+            echo "body<<EOF"
+            [ -n "$FEATS" ] && echo "### Features" && echo "$FEATS" && echo ""
+            [ -n "$FIXES" ] && echo "### Fixes" && echo "$FIXES" && echo ""
+            [ -n "$OTHER" ] && echo "### Other" && echo "$OTHER" && echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
+          prerelease: ${{ contains(github.ref_name, '-') }}

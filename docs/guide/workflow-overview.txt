@@ -62,6 +62,10 @@
 │          ▼                                                                                   │
 │   [arc-finishing-epic]                                                                       │
 │                                                                                              │
+│  Learning Layer                                                                              │
+│  [arc-journaling]  → [arc-reflecting]  → [arc-learning]                                      │
+│  └─ session capture   └─ pattern analysis    └─ skill extraction                              │
+│                                                                                              │
 │  Always Available                                                                            │
 │  [arc-debugging]   (Observe→Hypothesize→Test→Fix)                                             │
 │  [arc-verifying]  (evidence-first)                                                          │

@@ -7,22 +7,22 @@
  *   node tests/node/run-tests.js schema    # Run specific test
  */
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const testDir = __dirname;
 const args = process.argv.slice(2);
 
 // Find all test files
-const testFiles = fs.readdirSync(testDir)
-  .filter(f => f.startsWith('test-') && f.endsWith('.js'))
+const testFiles = fs
+  .readdirSync(testDir)
+  .filter((f) => f.startsWith('test-') && f.endsWith('.js'))
   .sort();
 
 // Filter by argument if provided
-const filesToRun = args.length > 0
-  ? testFiles.filter(f => args.some(arg => f.includes(arg)))
-  : testFiles;
+const filesToRun =
+  args.length > 0 ? testFiles.filter((f) => args.some((arg) => f.includes(arg))) : testFiles;
 
 if (filesToRun.length === 0) {
   console.error('No test files found matching:', args);
@@ -45,10 +45,10 @@ for (const file of filesToRun) {
   try {
     execFileSync('node', [filePath], {
       stdio: 'inherit',
-      cwd: path.resolve(testDir, '../..')
+      cwd: path.resolve(testDir, '../..'),
     });
     passed++;
-  } catch (err) {
+  } catch (_err) {
     console.error(`\n❌ FAILED: ${file}\n`);
     failed++;
   }

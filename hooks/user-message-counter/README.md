@@ -10,7 +10,7 @@ Tracks the number of user messages in a session to determine if the session is "
 
 1. **UserPromptSubmit hook** increments a counter on each user message
 2. Counter stored in temp file: `$TMPDIR/arcforge-user-count-<project>-<date>`
-3. Counter read by `session-evaluator` on Stop to evaluate session
+3. Counter read by `session-tracker` on Stop to evaluate session
 4. Counter resets **only when threshold is met** (in `pre-compact/main.js` or `session-tracker/end.js`)
 
 **Note:** Counters accumulate across resume/exit cycles until the threshold is reached (`userCount >= 10 OR toolCount >= 50`). This allows meaningful sessions to be captured even if split across multiple short sessions.

@@ -5,12 +5,13 @@
  * Runs on Stop to:
  * 1. Update session file with final metrics
  * 2. Save tool call count
- * 3. Output JSON with decision: "block" to prompt Claude to fill session template
+ * 3. Output JSON with decision: "block" to prompt Claude to review diary draft
  *
  * Note: Uses Stop hook (not SessionEnd) so Claude sees and executes the prompt.
  */
 
-const path = require('path');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -23,22 +24,18 @@ const {
   getSessionId,
   getTimestamp,
   log,
-  outputDecision
+  outputDecision,
 } = require('../lib/utils');
-const { readCount: readToolCount, resetCounter: resetToolCounter } = require('../compact-suggester/main');
-const { readCount: readUserCount, resetCounter: resetUserCounter } = require('../user-message-counter/main');
+const {
+  readCount: readToolCount,
+  resetCounter: resetToolCounter,
+} = require('../compact-suggester/main');
+const {
+  readCount: readUserCount,
+  resetCounter: resetUserCounter,
+} = require('../user-message-counter/main');
 const { shouldTrigger } = require('../lib/thresholds');
-const { generateMarkdownSummary, calculateDurationMinutes } = require('./summary');
-
-/**
- * Get markdown summary file path
- */
-function getMarkdownFilePath() {
-  const project = getProjectName();
-  const date = getDateString();
-  const sessionId = getSessionId();
-  return path.join(getSessionDir(project, date), `${sessionId}.md`);
-}
+const { calculateDurationMinutes } = require('./summary');
 
 /**
  * Create default session if none exists
@@ -55,7 +52,7 @@ function getOrCreateSession() {
     lastUpdated: getTimestamp(),
     toolCalls: 0,
     filesModified: [],
-    compactions: []
+    compactions: [],
   };
 }
 
@@ -65,27 +62,54 @@ function getOrCreateSession() {
 function saveSessionJson(session) {
   const sessionFile = path.join(
     getSessionDir(session.project, session.date),
-    `${session.sessionId}.json`
+    `${session.sessionId}.json`,
   );
   writeFileSafe(sessionFile, JSON.stringify(session, null, 2));
 }
 
 /**
- * Save session markdown (only when threshold is met)
+ * Try to generate auto-diary draft.
+ * Returns draft path on success, null on failure.
  */
-function saveSessionMarkdown(session) {
-  const markdownFile = getMarkdownFilePath();
-  const markdown = generateMarkdownSummary(session);
-  writeFileSafe(markdownFile, markdown);
+function tryGenerateAutoDiary(project, date, sessionId) {
+  try {
+    const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
+    const result = execFileSync(
+      'node',
+      [autoDiaryPath, 'generate', '--project', project, '--date', date, '--session', sessionId],
+      { encoding: 'utf-8', timeout: 5000 },
+    ).trim();
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if reflection is ready.
+ * Returns { ready, strategy, count } or null on failure.
+ */
+function checkReflectReady(project) {
+  try {
+    const reflectPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
+    const result = execFileSync('node', [reflectPath, 'auto-check', '--project', project], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
+
+    const [status, strategy, count] = result.split('|');
+    return { ready: status === 'ready', strategy, count: parseInt(count, 10) || 0 };
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Format stop reason for decision: "block" output (when threshold is met)
- * Claude will see and execute this prompt
+ * Claude will see and execute this prompt.
  * @returns {string} The reason/prompt for Claude to execute
  */
-function formatStopReason(session) {
-  const mdPath = `~/.claude/sessions/${session.project}/${session.date}/${session.sessionId}.md`;
+function formatStopReason(session, draftPath) {
   const duration = calculateDurationMinutes(session.started, session.lastUpdated);
 
   let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
@@ -96,21 +120,15 @@ function formatStopReason(session) {
     stats += `, ${session.filesModified.length} files modified`;
   }
 
-  return `📝 Session ended. (${stats})
-
-Please complete the following steps:
-
-**Step 1: Fill in session template**
-File: ${mdPath}
-
-Based on this conversation, fill in:
-- Completed: What was accomplished
-- In Progress: What's still ongoing
-- Notes for Next Session: What to remember next time
-
-**Step 2: Use arc-journaling skill**
-
-**Step 3: Use arc-learning skill**`;
+  let prompt;
+  if (draftPath) {
+    prompt = `Review and enrich the draft diary at ${draftPath}
+Fill in the <!-- TO BE ENRICHED --> sections from conversation memory.
+Use the arc-journaling skill to finalize.`;
+  } else {
+    prompt = `Consider creating a diary entry if this session warrants one.`;
+  }
+  return `Session ended. (${stats})\n\n${prompt}`;
 }
 
 /**
@@ -125,49 +143,44 @@ function formatShortMessage(userCount, toolCount) {
  * Main entry point
  */
 function main() {
-  // Read stdin
   const stdin = readStdinSync();
-
-  // Parse input to check for stop_hook_active flag and set session ID
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
-  if (input && input.stop_hook_active) {
+  if (input?.stop_hook_active) {
     // Already processing stop hook - allow stop to prevent infinite loop
     process.exit(0);
     return;
   }
 
-  // Load or create session
   const session = getOrCreateSession();
-
-  // Read counters
   const userCount = readUserCount();
   const toolCount = readToolCount();
 
-  // Update session with final metrics
-  // Note: filesModified left empty - git status parsing was unreliable
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
   session.toolCalls = toolCount;
   session.filesModified = [];
 
-  // Always save JSON for tracking
   saveSessionJson(session);
 
-  // Check threshold for diary trigger
   if (shouldTrigger(userCount, toolCount)) {
-    // Generate markdown summary
-    saveSessionMarkdown(session);
+    const draftPath = tryGenerateAutoDiary(session.project, session.date, session.sessionId);
 
-    // Output decision: "block" - Claude will see and execute
-    outputDecision(formatStopReason(session));
+    const reflectStatus = checkReflectReady(session.project);
+    if (reflectStatus?.ready) {
+      const { addPendingAction } = require('../../scripts/lib/pending-actions');
+      addPendingAction(session.project, 'reflect-ready', {
+        strategy: reflectStatus.strategy,
+        count: reflectStatus.count,
+      });
+    }
 
-    // Reset counters after threshold is met
+    outputDecision(formatStopReason(session, draftPath));
+
     resetUserCounter();
     resetToolCounter();
   } else {
-    // Output short message to stderr, preserve counters for next resume
     log(formatShortMessage(userCount, toolCount));
   }
 
@@ -178,10 +191,10 @@ function main() {
 module.exports = {
   getOrCreateSession,
   saveSessionJson,
-  saveSessionMarkdown,
   formatStopReason,
   formatShortMessage,
-  getMarkdownFilePath
+  tryGenerateAutoDiary,
+  checkReflectReady,
 };
 
 // Run if executed directly

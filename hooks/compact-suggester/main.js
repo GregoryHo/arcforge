@@ -14,11 +14,11 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   logHighlight,
-  createSessionCounter
+  createSessionCounter,
 } = require('../lib/utils');
 
-const THRESHOLD = 50;     // First suggestion
-const INTERVAL = 25;      // Subsequent reminders
+const THRESHOLD = 50; // First suggestion
+const INTERVAL = 25; // Subsequent reminders
 
 // Counter is created lazily on first access
 let toolCounter = null;
@@ -57,9 +57,10 @@ function main() {
 
   // Check if suggestion is needed
   if (shouldSuggest(newCount)) {
-    const message = newCount === THRESHOLD
-      ? `\n📊 You've made ${newCount} tool calls this session. Consider using /compact at your next phase boundary to preserve context quality.\n`
-      : `\n📊 Now at ${newCount} tool calls. Reminder: /compact helps maintain context quality for longer sessions.\n`;
+    const message =
+      newCount === THRESHOLD
+        ? `\n📊 You've made ${newCount} tool calls this session. Consider using /compact at your next phase boundary to preserve context quality.\n`
+        : `\n📊 Now at ${newCount} tool calls. Reminder: /compact helps maintain context quality for longer sessions.\n`;
     logHighlight(message);
   }
 }
@@ -68,7 +69,7 @@ function main() {
 module.exports = {
   resetCounter: () => getCounter().reset(),
   readCount: () => getCounter().read(),
-  getCounterFilePath: () => getCounter().getFilePath()
+  getCounterFilePath: () => getCounter().getFilePath(),
 };
 
 // Run if executed directly

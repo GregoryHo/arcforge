@@ -1,10 +1,22 @@
 # arcforge
 
-arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
+
+arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
+
+## Why arcforge
+
+AI coding agents are powerful but undisciplined. Left to their defaults, they skip design, ignore review, and lose context across sessions. The result is code that works in the moment but accumulates debt fast.
+
+arcforge solves this by embedding a skill-based workflow directly into the agent's session. Skills trigger automatically based on context — the agent doesn't need to remember commands or follow a manual checklist. Design, planning, TDD, and review happen because the workflow enforces them.
+
+The outcome: your agent behaves like a disciplined engineer. It designs before building, plans before coding, tests before shipping, and learns from every session.
 
 ## How it works
 
-It starts the moment you open your coding agent. Instead of jumping into code, it activates skills that guide you through design, planning, and execution.
+When your coding agent starts a session, arcforge's hooks inject available skills into context. Instead of jumping into code, it activates skills that guide you through design, planning, and execution.
 
 Once a design is approved, it builds a clear implementation plan and then executes tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
@@ -38,9 +50,9 @@ Check that commands appear:
 
 ```
 # Should see:
-# /arcforge:brainstorm - Design exploration
-# /arcforge:write-tasks - Break epics or features into executable tasks
-# /arcforge:execute-tasks - Execute tasks with checkpoints
+# /arcforge:arc-brainstorming - Design exploration
+# /arcforge:arc-writing-tasks - Break epics or features into executable tasks
+# /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
 ### Codex
@@ -79,48 +91,48 @@ These are the most frequently used commands:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `/arcforge:brainstorm` | Design exploration | When starting new work or clarifying requirements |
-| `/arcforge:write-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
-| `/arcforge:execute-tasks` | Run task list | When tasks are ready and you want to implement |
-| `/arcforge:journal` | Session journaling | At end of session to capture reflections |
-| `/arcforge:reflect` | Analyze patterns | After 5+ diary entries to summarize learnings |
+| `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
+| `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
+| `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
+| `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
+| `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
 
 ### Typical Flow
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌───────────────┐    ┌─────────┐
-│ brainstorm  │───▶│ write-tasks │───▶│ execute-tasks │───▶│  diary  │
-└──────▲──────┘    └─────────────┘    └───────────────┘    └────┬────┘
-       │                                                        │
-       │           ┌────────────────────────────────────────────┘
-       │           │  (after multiple sessions)
-       │           ▼
-       │    ┌─────────────┐
-       │    │   reflect   │
-       │    └──────┬──────┘
-       │           │  (when patterns emerge)
-       │           ▼
-       │    ┌─────────────┐
-       └────│    learn    │  ─── produces new skills/patterns
-            └─────────────┘
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌────────────────┐
+│ arc-brainstorming│───▶│ arc-writing-tasks│───▶│arc-executing-tasks│───▶│ arc-journaling │
+└────────▲─────────┘    └──────────────────┘    └──────────────────┘    └───────┬────────┘
+         │                                                                      │
+         │           ┌──────────────────────────────────────────────────────────┘
+         │           │  (after multiple sessions)
+         │           ▼
+         │    ┌────────────────┐
+         │    │ arc-reflecting │
+         │    └───────┬────────┘
+         │            │  (when patterns emerge)
+         │            ▼
+         │    ┌────────────────┐
+         └────│  arc-learning  │  ─── produces new skills/patterns
+              └────────────────┘
 ```
 
 ### Starting Points
 
 | Situation | Start With |
 |-----------|------------|
-| Vague idea or new requirement | `brainstorm` |
-| Clear spec, ready to plan | `write-tasks` or `arc-planning` |
-| Tasks already defined | `execute-tasks` |
-| End of work session | `diary` |
+| Vague idea or new requirement | `arc-brainstorming` |
+| Clear spec, ready to plan | `arc-writing-tasks` or `arc-planning` |
+| Tasks already defined | `arc-executing-tasks` |
+| End of work session | `arc-journaling` |
 
 ## The Basic Workflow
 
-1. **routing** - `arc-using` checks context and decides between a large or small flow.
+1. **routing** - `arc-using` checks context and decides between a large or small flow. Multi-epic work with cross-cutting concerns goes large; single features or bug fixes go small.
 
-2. **large flow** - `arc-brainstorming` → `arc-refining` → `arc-planning` → `arc-coordinating` → `arc-implementing` (per-epic loops).
+2. **large flow** - `arc-brainstorming` → `arc-refining` → `arc-planning` → `arc-coordinating` → `arc-implementing` (with worktree isolation per epic).
 
-3. **small flow** - `arc-writing-tasks` → `arc-executing-tasks` or `arc-agent-driven`.
+3. **small flow** - `arc-writing-tasks` → `arc-executing-tasks` or `arc-agent-driven` (without DAG or worktrees).
 
 4. **execution** - TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
 
@@ -170,6 +182,8 @@ These are the most frequently used commands:
 - **arc-journaling** - Session journaling for capturing reflections before compaction
 - **arc-reflecting** - Analyze diary entries for insights and patterns
 - **arc-learning** - Extract reusable patterns from sessions
+- **arc-observing** - Tool call observation for behavioral pattern detection
+- **arc-recalling** - Manual instinct creation from session insights
 
 ### Review Layer
 
@@ -183,6 +197,8 @@ These are the most frequently used commands:
 - `templates/quality-reviewer-prompt.md` - Code quality reviewer prompt
 
 ## CLI Usage
+
+The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
 
 ```bash
 # Show pipeline status
@@ -212,9 +228,39 @@ arcforge cleanup
 # Sync state between worktree and base DAG
 arcforge sync [--direction from-base|to-base|both|scan]
 
-# Show 5-Question Reboot context
+# Show 5-Question Reboot context:
+#   Where am I? / Where am I going? / What's the goal?
+#   What have I learned? / What have I done?
 arcforge reboot
 ```
+
+## Development
+
+### Setup
+
+```bash
+npm install
+cd hooks && npm install && cd ..
+pip install pytest pyyaml    # Required for test:skills
+```
+
+### Running Tests
+
+```bash
+# Run all tests (4 runners — all must pass)
+npm test
+
+# Individual runners
+npm run test:scripts   # Jest — CLI engine (scripts/lib/)
+npm run test:hooks     # Node --test — hook behavior (hooks/__tests__/)
+npm run test:node      # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
+npm run test:skills    # pytest — skill content validation (tests/skills/)
+
+# Run CLI
+node scripts/cli.js --help
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ## Philosophy
 
@@ -223,29 +269,22 @@ arcforge reboot
 - **Skill-first workflow** - Use the existing skills before improvising
 - **Evidence over claims** - Verify before declaring success
 
-## Development
-
-```bash
-# Run tests
-pytest tests/ -v
-
-# Run CLI
-node scripts/cli.js --help
-```
-
 ## Documentation
 
-- [Design Document](docs/plans/2026-01-17-arcforge-skill-system-design.md)
-- [Implementation Roadmap](docs/plans/2026-01-17-arcforge-implementation-roadmap.md)
+- [Architecture Overview](docs/guide/architecture-overview.txt) — System design, module map, and data flow
+- [Skills Workflow](docs/guide/skills-workflow.txt) — How skills load, trigger, and chain
+- [Worktree Workflow](docs/guide/worktree-workflow.md) — Epic isolation with git worktrees
+- [CLI Reference](docs/guide/cli-reference.txt) — Full command tree, options, and examples
+- [Changelog](CHANGELOG.md) — Release history and migration notes
 
 ## Contributing
 
-Skills live in this repository. To contribute:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. It covers:
 
-1. Create a branch for your change.
-2. Follow `skills/arc-writing-skills/SKILL.md` when adding or updating skills.
-3. Run tests and keep changes minimal and readable.
-4. Submit a PR.
+- **Naming conventions** — `arc-<gerund>[-<object>]` pattern for skills
+- **The Iron Law** — no skill without a failing test first (TDD for documentation)
+- **Test runners** — all 4 runners must pass before submitting a PR
+- **PR process** — branch naming, conventional commits, Iron Law compliance
 
 ## Updating
 

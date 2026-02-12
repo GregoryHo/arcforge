@@ -117,5 +117,5 @@ module.exports = {
   generateMarkdownSummary,
   calculateDurationMinutes,
   formatTime,
-  formatDate
+  formatDate,
 };

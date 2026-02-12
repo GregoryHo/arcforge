@@ -3,7 +3,7 @@
  * User Message Counter
  *
  * Tracks user prompt submissions via UserPromptSubmit hook.
- * Count is stored in temp file and used by session-evaluator
+ * Count is stored in temp file and used by session-tracker
  * to determine if session is long enough for pattern extraction.
  */
 
@@ -11,7 +11,7 @@ const {
   readStdinSync,
   parseStdinJson,
   setSessionIdFromInput,
-  createSessionCounter
+  createSessionCounter,
 } = require('../lib/utils');
 
 // Counter is created lazily on first access
@@ -43,12 +43,12 @@ function main() {
   process.exit(0);
 }
 
-// Export for use by session-tracker and session-evaluator
+// Export for use by session-tracker
 module.exports = {
   readCount: () => getCounter().read(),
   writeCount: (count) => getCounter().write(count),
   resetCounter: () => getCounter().reset(),
-  getCounterFilePath: () => getCounter().getFilePath()
+  getCounterFilePath: () => getCounter().getFilePath(),
 };
 
 // Run if executed directly

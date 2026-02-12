@@ -52,9 +52,26 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 **Core distinction:**
 
 - **Diary = observations, context, decisions made** (stored in session directory)
-- **Learn = reusable patterns** (stored in learned skills)
+- **Learn = instinct clustering** (combines related instincts into skills)
 
 **Storage:** `~/.claude/sessions/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
+
+## Pre-Diary Check (Noise Gate)
+
+Before creating a diary entry, verify at least ONE of these criteria is met:
+
+- **Non-trivial decision** was made (architecture, tool choice, approach)
+- **Challenge was solved** (debugging, workaround found)
+- **User preference was expressed** (explicit or implicit)
+- **Technique was discovered** (new pattern, integration insight)
+
+**Auto-skip these sessions** (no diary needed):
+- Pure Q&A (answering questions without making changes)
+- Retrying the same operation (build failures, test reruns)
+- Pure exploration (reading files without decisions)
+- Trivial fixes (typos, formatting, single-line changes)
+
+This is a **soft gate**: Claude judges based on conversation memory. User can always override with explicit `/diary`.
 
 ## When to Use
 
@@ -69,7 +86,8 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 - Quick Q&A sessions (< 5 tool calls)
 - Pure research without decisions
 - Already captured in previous diary entry this session
-- Pattern extraction needed (use /learn instead)
+- Pattern extraction needed (use /recall instead)
+- **Fails Pre-Diary Check** — unless user explicitly requests
 
 ## Process
 
@@ -170,7 +188,7 @@ Keep entries focused. Don't over-document routine work.
 
 ### Duplicating Learn Content
 
-**Wrong:** Same pattern in both diary and learned skill
+**Wrong:** Same pattern in both diary and instinct
 **Right:** Diary captures context; learn extracts reusable pattern
 
 ### Not Asking Permission
@@ -181,7 +199,7 @@ Keep entries focused. Don't over-document routine work.
 ### Skipping the Generalizable Marker
 
 **Wrong:** Leaving Generalizable? empty or omitting it
-**Right:** Always mark solutions as Yes/No - helps /learn prioritize patterns
+**Right:** Always mark solutions as Yes/No - helps /reflect identify patterns
 
 ## Template Variables
 

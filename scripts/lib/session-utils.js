@@ -1,7 +1,7 @@
 // scripts/lib/session-utils.js
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
@@ -41,7 +41,7 @@ function parseProcessedLog(logPath) {
     const content = fs.readFileSync(logPath, 'utf-8');
     for (const line of content.split('\n')) {
       if (line.trim() && !line.startsWith('#')) {
-        const [filename] = line.split('|').map(s => s.trim());
+        const [filename] = line.split('|').map((s) => s.trim());
         if (filename) processed.add(filename);
       }
     }
@@ -60,22 +60,24 @@ function scanDiaries(project, strategy, processedLogPath) {
   const allDiaries = [];
 
   // Find all diary files sorted by date
-  const dateDirs = fs.readdirSync(sessionsDir).filter(d =>
-    fs.statSync(path.join(sessionsDir, d)).isDirectory()
-  ).sort();
+  const dateDirs = fs
+    .readdirSync(sessionsDir)
+    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory())
+    .sort();
 
   for (const dateDir of dateDirs) {
     const dirPath = path.join(sessionsDir, dateDir);
-    const diaries = fs.readdirSync(dirPath)
-      .filter(f => f.startsWith('diary-') && f.endsWith('.md'))
-      .map(f => path.join(dirPath, f))
+    const diaries = fs
+      .readdirSync(dirPath)
+      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'))
+      .map((f) => path.join(dirPath, f))
       .sort();
     allDiaries.push(...diaries);
   }
 
   // Filter based on strategy
   if (strategy === 'unprocessed') {
-    return allDiaries.filter(d => !processed.has(path.basename(d)));
+    return allDiaries.filter((d) => !processed.has(path.basename(d)));
   } else if (strategy === 'project_focused') {
     return allDiaries.slice(0, 10);
   } else {
@@ -91,20 +93,21 @@ function determineReflectStrategy(project, processedLogPath) {
   if (!fs.existsSync(sessionsDir)) return 'recent_window';
 
   // Count all diaries
-  let allDiaries = [];
-  const dateDirs = fs.readdirSync(sessionsDir).filter(d =>
-    fs.statSync(path.join(sessionsDir, d)).isDirectory()
-  );
+  const allDiaries = [];
+  const dateDirs = fs
+    .readdirSync(sessionsDir)
+    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory());
   for (const dateDir of dateDirs) {
     const dirPath = path.join(sessionsDir, dateDir);
-    const diaries = fs.readdirSync(dirPath)
-      .filter(f => f.startsWith('diary-') && f.endsWith('.md'));
+    const diaries = fs
+      .readdirSync(dirPath)
+      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'));
     allDiaries.push(...diaries);
   }
 
   // Count unprocessed
   const processed = parseProcessedLog(processedLogPath);
-  const unprocessed = allDiaries.filter(d => !processed.has(d));
+  const unprocessed = allDiaries.filter((d) => !processed.has(d));
 
   if (unprocessed.length >= 5) return 'unprocessed';
   if (allDiaries.length >= 5) return 'project_focused';
@@ -119,11 +122,56 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
   fs.mkdirSync(dir, { recursive: true });
 
   const date = new Date().toISOString().split('T')[0];
-  const lines = diaryFiles.map(d =>
-    `${path.basename(d)} | ${date} | ${reflectionId}\n`
-  ).join('');
+  const lines = diaryFiles.map((d) => `${path.basename(d)} | ${date} | ${reflectionId}\n`).join('');
 
   fs.appendFileSync(logPath, lines, 'utf-8');
+}
+
+// ─────────────────────────────────────────────
+// Observation & Instinct Path Helpers
+// ─────────────────────────────────────────────
+
+/**
+ * Get observations JSONL path for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/observations/{project}/observations.jsonl
+ */
+function getObservationsPath(project) {
+  return path.join(CLAUDE_DIR, 'observations', project, 'observations.jsonl');
+}
+
+/**
+ * Get instincts directory for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/instincts/{project}/
+ */
+function getInstinctsDir(project) {
+  return path.join(CLAUDE_DIR, 'instincts', project);
+}
+
+/**
+ * Get archived instincts directory for a project.
+ * @param {string} project - Project name
+ * @returns {string} ~/.claude/instincts/{project}/archived/
+ */
+function getInstinctsArchivedDir(project) {
+  return path.join(CLAUDE_DIR, 'instincts', project, 'archived');
+}
+
+/**
+ * Get global instincts directory.
+ * @returns {string} ~/.claude/instincts/global/
+ */
+function getGlobalInstinctsDir() {
+  return path.join(CLAUDE_DIR, 'instincts', 'global');
+}
+
+/**
+ * Get global index for instinct bubble-up tracking.
+ * @returns {string} ~/.claude/instincts/global-index.jsonl
+ */
+function getInstinctsGlobalIndex() {
+  return path.join(CLAUDE_DIR, 'instincts', 'global-index.jsonl');
 }
 
 module.exports = {
@@ -134,5 +182,11 @@ module.exports = {
   scanDiaries,
   determineReflectStrategy,
   updateProcessedLog,
-  CLAUDE_DIR
+  CLAUDE_DIR,
+  // Observation & Instinct paths
+  getObservationsPath,
+  getInstinctsDir,
+  getInstinctsArchivedDir,
+  getGlobalInstinctsDir,
+  getInstinctsGlobalIndex,
 };

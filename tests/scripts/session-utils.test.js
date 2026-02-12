@@ -1,22 +1,19 @@
 // tests/scripts/session-utils.test.js
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const {
   getDiaryPath,
   saveDiary,
   getProcessedLogPath,
   parseProcessedLog,
-  scanDiaries,
-  determineReflectStrategy,
   updateProcessedLog,
-  CLAUDE_DIR
 } = require('../../scripts/lib/session-utils');
 
 describe('session-utils', () => {
-  const testDir = path.join(os.tmpdir(), 'session-utils-test-' + Date.now());
+  const testDir = path.join(os.tmpdir(), `session-utils-test-${Date.now()}`);
   const originalHome = process.env.HOME;
 
   beforeAll(() => {
@@ -62,7 +59,14 @@ describe('session-utils', () => {
 
   describe('saveDiary', () => {
     it('creates directories and saves content', () => {
-      const diaryPath = path.join(testDir, '.claude', 'sessions', 'test-project', '2026-01-15', 'diary-test.md');
+      const diaryPath = path.join(
+        testDir,
+        '.claude',
+        'sessions',
+        'test-project',
+        '2026-01-15',
+        'diary-test.md',
+      );
       const content = '# Test Diary\n\nContent here';
 
       const result = saveDiary(diaryPath, content);
@@ -83,7 +87,10 @@ describe('session-utils', () => {
       const logDir = path.join(testDir, 'test-log');
       fs.mkdirSync(logDir, { recursive: true });
       const logPath = path.join(logDir, 'processed.log');
-      fs.writeFileSync(logPath, '# Comment\ndiary-abc.md | 2026-01-15 | reflection-1.md\ndiary-def.md | 2026-01-16 | reflection-2.md\n');
+      fs.writeFileSync(
+        logPath,
+        '# Comment\ndiary-abc.md | 2026-01-15 | reflection-1.md\ndiary-def.md | 2026-01-16 | reflection-2.md\n',
+      );
 
       const result = parseProcessedLog(logPath);
 

@@ -7,10 +7,10 @@
  * Mirrors Python coordinator.py functionality.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execFileSync } = require('child_process');
-const { DAG, Epic, Feature, BlockedItem, SyncResult, TaskStatus } = require('./models');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { DAG, Feature, BlockedItem, SyncResult, TaskStatus } = require('./models');
 const { parseDagYaml, stringifyDagYaml } = require('./yaml-parser');
 const { withLock } = require('./locking');
 const { getDefaultTestCommand } = require('./package-manager');
@@ -60,20 +60,20 @@ class Coordinator {
         status: epic.status,
         progress: epic.completionRatio(),
         worktree: epic.worktree,
-        features: epic.features.map(f => ({
+        features: epic.features.map((f) => ({
           id: f.id,
           name: f.name,
-          status: f.status
-        }))
+          status: f.status,
+        })),
       });
     }
 
     return {
       epics,
-      blocked: this.dag.blocked.map(b => ({
+      blocked: this.dag.blocked.map((b) => ({
         task_id: b.task_id,
-        reason: b.reason
-      }))
+        reason: b.reason,
+      })),
     };
   }
 
@@ -125,7 +125,7 @@ class Coordinator {
   parallelTasks() {
     const completedEpics = this.dag.getCompletedEpics();
     return this.dag.epics.filter(
-      epic => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics)
+      (epic) => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics),
     );
   }
 
@@ -141,12 +141,14 @@ class Coordinator {
 
     task.status = TaskStatus.COMPLETED;
 
-    // If feature, check if epic is now complete
+    // If feature, update parent epic status
     if (task instanceof Feature) {
       for (const epic of this.dag.epics) {
-        if (epic.features.some(f => f.id === taskId)) {
-          if (epic.features.every(f => f.status === TaskStatus.COMPLETED)) {
+        if (epic.features.some((f) => f.id === taskId)) {
+          if (epic.features.every((f) => f.status === TaskStatus.COMPLETED)) {
             epic.status = TaskStatus.COMPLETED;
+          } else if (epic.status === TaskStatus.PENDING) {
+            epic.status = TaskStatus.IN_PROGRESS;
           }
           break;
         }
@@ -168,47 +170,14 @@ class Coordinator {
     }
 
     task.status = TaskStatus.BLOCKED;
-    this.dag.blocked.push(new BlockedItem({
-      task_id: taskId,
-      reason: reason,
-      blocked_at: new Date()
-    }));
+    this.dag.blocked.push(
+      new BlockedItem({
+        task_id: taskId,
+        reason: reason,
+        blocked_at: new Date(),
+      }),
+    );
     this._saveDag();
-  }
-
-  /**
-   * Get newly available tasks after completing a task
-   * @param {string} completedTaskId - The just-completed task ID
-   * @returns {(Feature|Epic)[]} List of newly available tasks
-   */
-  getNewlyAvailable(completedTaskId) {
-    const available = [];
-    const completedEpics = this.dag.getCompletedEpics();
-
-    // Check for ready epics
-    for (const epic of this.dag.epics) {
-      if (epic.status === TaskStatus.PENDING && epic.isReady(completedEpics)) {
-        available.push(epic);
-      }
-    }
-
-    // Check for ready features in in-progress epics
-    for (const epic of this.dag.epics) {
-      if (epic.status === TaskStatus.IN_PROGRESS) {
-        const completedFeatures = this.dag.getCompletedFeatures(epic.id);
-        for (const feature of epic.features) {
-          if (
-            feature.status === TaskStatus.PENDING &&
-            feature.isReady(completedFeatures) &&
-            feature.depends_on.includes(completedTaskId)
-          ) {
-            available.push(feature);
-          }
-        }
-      }
-    }
-
-    return available;
   }
 
   /**
@@ -223,7 +192,7 @@ class Coordinator {
 
     const completedEpics = this.dag.getCompletedEpics();
     const readyEpics = this.dag.epics.filter(
-      epic => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics)
+      (epic) => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics),
     );
 
     const created = [];
@@ -257,14 +226,11 @@ class Coordinator {
         base_branch: this._currentBranch(),
         local: {
           status: TaskStatus.IN_PROGRESS,
-          started_at: new Date().toISOString()
+          started_at: new Date().toISOString(),
         },
-        synced: null
+        synced: null,
       };
-      fs.writeFileSync(
-        path.join(worktreePath, '.arcforge-epic'),
-        objectToYaml(epicData)
-      );
+      fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(epicData));
 
       epic.worktree = path.join('.worktrees', epic.id);
       epic.status = TaskStatus.IN_PROGRESS;
@@ -326,13 +292,13 @@ class Coordinator {
   _mergeEpicsInBase(baseBranch, epicIds) {
     let epics;
     if (epicIds) {
-      epics = this.dag.epics.filter(e => epicIds.includes(e.id));
-      const missing = epicIds.filter(id => !epics.some(e => e.id === id));
+      epics = this.dag.epics.filter((e) => epicIds.includes(e.id));
+      const missing = epicIds.filter((id) => !epics.some((e) => e.id === id));
       if (missing.length > 0) {
         throw new Error(`Epic not found: ${missing.join(', ')}`);
       }
     } else {
-      epics = this.dag.epics.filter(e => e.status === TaskStatus.COMPLETED);
+      epics = this.dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
     }
 
     if (epics.length === 0) {
@@ -348,8 +314,11 @@ class Coordinator {
     const merged = [];
     for (const epic of epics) {
       const result = this._runGit([
-        'merge', '--no-ff', epic.id,
-        '-m', `feat: integrate ${epic.id} epic`
+        'merge',
+        '--no-ff',
+        epic.id,
+        '-m',
+        `feat: integrate ${epic.id} epic`,
       ]);
       if (result.exitCode !== 0) {
         throw new Error(`Failed to merge ${epic.id}: ${result.stderr.trim()}`);
@@ -376,13 +345,13 @@ class Coordinator {
 
     let epics;
     if (epicIds) {
-      epics = this.dag.epics.filter(e => epicIds.includes(e.id));
-      const missing = epicIds.filter(id => !epics.some(e => e.id === id));
+      epics = this.dag.epics.filter((e) => epicIds.includes(e.id));
+      const missing = epicIds.filter((id) => !epics.some((e) => e.id === id));
       if (missing.length > 0) {
         throw new Error(`Epic not found: ${missing.join(', ')}`);
       }
     } else {
-      epics = this.dag.epics.filter(e => e.status === TaskStatus.COMPLETED);
+      epics = this.dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
     }
 
     const removed = [];
@@ -437,7 +406,7 @@ class Coordinator {
       completed_count: completed,
       blocked_count: this.dag.blocked.length,
       project_goal: 'Build a skill-based autonomous agent pipeline system',
-      research_files: []
+      research_files: [],
     };
   }
 
@@ -459,7 +428,7 @@ class Coordinator {
       if (direction === 'scan') {
         throw new Error(
           'Cannot use --direction scan in worktree. ' +
-          'Use --direction from-base, to-base, or both (or omit for auto-detect).'
+            'Use --direction from-base, to-base, or both (or omit for auto-detect).',
         );
       }
       return this._syncWorktree(direction);
@@ -467,7 +436,7 @@ class Coordinator {
       if (['from_base', 'to_base', 'both'].includes(direction)) {
         throw new Error(
           'Cannot use --direction from-base/to-base/both in base project. ' +
-          "Run 'arcforge sync' without --direction to scan all worktrees."
+            "Run 'arcforge sync' without --direction to scan all worktrees.",
         );
       }
       return this._syncBase();
@@ -492,7 +461,7 @@ class Coordinator {
           dependencies: this._getDependencyStatuses(baseCoord.dag, dagEpic),
           dependents: this._getDependents(baseCoord.dag, dagEpic),
           blocked_by: this._getBlockedBy(baseCoord.dag, dagEpic),
-          dag_status: dagEpic.status
+          dag_status: dagEpic.status,
         };
         result.blocked_by = epicFile.synced.blocked_by;
         result.dependents = epicFile.synced.dependents;
@@ -544,7 +513,7 @@ class Coordinator {
           result.updates.push({
             epic: epicData.epic,
             old_status: oldStatus,
-            new_status: local.status
+            new_status: local.status,
           });
         }
       }
@@ -571,16 +540,14 @@ class Coordinator {
   }
 
   _getBlockedBy(dag, epic) {
-    return epic.depends_on.filter(depId => {
+    return epic.depends_on.filter((depId) => {
       const depEpic = dag.getEpic(depId);
       return depEpic && depEpic.status !== TaskStatus.COMPLETED;
     });
   }
 
   _getDependents(dag, epic) {
-    return dag.epics
-      .filter(e => e.depends_on.includes(epic.id))
-      .map(e => e.id);
+    return dag.epics.filter((e) => e.depends_on.includes(epic.id)).map((e) => e.id);
   }
 
   // ==================== Private Methods ====================
@@ -591,14 +558,14 @@ class Coordinator {
       const stdout = execFileSync('git', args, {
         cwd: workdir,
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
       return { stdout, stderr: '', exitCode: 0 };
     } catch (err) {
       return {
         stdout: err.stdout || '',
         stderr: err.stderr || err.message,
-        exitCode: err.status || 1
+        exitCode: err.status || 1,
       };
     }
   }
@@ -609,14 +576,14 @@ class Coordinator {
       const stdout = execFileSync(cmd, args, {
         cwd: workdir,
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
       return { stdout, stderr: '', exitCode: 0 };
     } catch (err) {
       return {
         stdout: err.stdout || '',
         stderr: err.stderr || err.message,
-        exitCode: err.status || 1
+        exitCode: err.status || 1,
       };
     }
   }
@@ -701,7 +668,7 @@ class Coordinator {
 
     if (!lines.includes('.worktrees')) {
       lines.push('.worktrees');
-      fs.writeFileSync(ignorePath, lines.join('\n') + '\n');
+      fs.writeFileSync(ignorePath, `${lines.join('\n')}\n`);
 
       const addResult = this._runGit(['add', '.gitignore']);
       if (addResult.exitCode !== 0) {

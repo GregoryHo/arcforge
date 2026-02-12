@@ -5,10 +5,10 @@
  * NOTE: This is the canonical location. hooks/lib/utils.js should import from here.
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { execFileSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 // Module-level cached session ID (set from hook input)
 let _cachedSessionId = null;
@@ -20,7 +20,7 @@ let _cachedSessionId = null;
  * @returns {string|null} The cached session ID
  */
 function setSessionIdFromInput(input) {
-  if (input && input.session_id) {
+  if (input?.session_id) {
     _cachedSessionId = input.session_id;
   }
   return _cachedSessionId;
@@ -39,15 +39,18 @@ function clearCachedSessionId() {
  */
 function escapeForJson(str) {
   if (typeof str !== 'string') return '';
-  return str
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t')
-    .replace(/[\x00-\x1f\x7f]/g, (char) => {
-      return '\\u' + ('0000' + char.charCodeAt(0).toString(16)).slice(-4);
-    });
+  return (
+    str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char sanitization
+      .replace(/[\x00-\x1f\x7f]/g, (char) => {
+        return `\\u${(`0000${char.charCodeAt(0).toString(16)}`).slice(-4)}`;
+      })
+  );
 }
 
 /**
@@ -130,7 +133,7 @@ function getCommandPath(command) {
     // execFileSync is safe - no shell interpretation
     const result = execFileSync(whichCmd, [command], {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     // 'where' on Windows returns multiple lines, take first
     return result.trim().split('\n')[0].trim();
@@ -157,7 +160,7 @@ function execCommand(command, args = [], options = {}) {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: options.timeout || 30000,
       cwd: options.cwd || process.cwd(),
-      ...options
+      ...options,
     });
     return { stdout, stderr: '', exitCode: 0 };
   } catch (err) {
@@ -165,32 +168,9 @@ function execCommand(command, args = [], options = {}) {
       stdout: err.stdout || '',
       stderr: err.stderr || err.message,
       exitCode: err.status || 1,
-      error: err
+      error: err,
     };
   }
-}
-
-/**
- * Get the plugin root directory (parent of scripts/)
- */
-function getPluginRoot() {
-  // This file is at scripts/lib/utils.js
-  // Plugin root is two levels up
-  return path.resolve(__dirname, '..', '..');
-}
-
-/**
- * Get the scripts directory
- */
-function getScriptsDir() {
-  return path.resolve(__dirname, '..');
-}
-
-/**
- * Get the hooks directory
- */
-function getHooksDir() {
-  return path.resolve(__dirname, '..', '..', 'hooks');
 }
 
 /**
@@ -206,30 +186,6 @@ function parseStdinJson(stdinContent) {
 }
 
 /**
- * Read all stdin content
- * Returns promise resolving to string
- */
-function readStdin() {
-  return new Promise((resolve) => {
-    let data = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('readable', () => {
-      let chunk;
-      while ((chunk = process.stdin.read()) !== null) {
-        data += chunk;
-      }
-    });
-    process.stdin.on('end', () => {
-      resolve(data);
-    });
-    // Handle case where stdin is empty/closed
-    if (process.stdin.isTTY) {
-      resolve('');
-    }
-  });
-}
-
-/**
  * Read stdin synchronously (blocking)
  * For hooks that need sync operation
  */
@@ -239,29 +195,6 @@ function readStdinSync() {
   } catch {
     return '';
   }
-}
-
-/**
- * Output hook response JSON
- * Writes to stdout
- * @deprecated Use outputContext() for clearer semantics
- */
-function outputHookResponse(additionalContext, eventName = 'Hook') {
-  const response = {
-    hookSpecificOutput: {
-      hookEventName: eventName,
-      additionalContext: additionalContext
-    }
-  };
-  console.log(JSON.stringify(response, null, 2));
-}
-
-/**
- * Log to stderr (for warnings/info that shouldn't affect hook output)
- * @deprecated Use log() for clearer semantics
- */
-function logWarning(message) {
-  console.error(message);
 }
 
 // =============================================================================
@@ -286,7 +219,7 @@ const colors = {
   brightCyan: '\x1b[96m',
   // Background
   bgYellow: '\x1b[43m',
-  bgBlue: '\x1b[44m'
+  bgBlue: '\x1b[44m',
 };
 
 /**
@@ -355,8 +288,8 @@ function outputContext(context, eventName = 'Hook') {
   output({
     hookSpecificOutput: {
       hookEventName: eventName,
-      additionalContext: context
-    }
+      additionalContext: context,
+    },
   });
 }
 
@@ -439,16 +372,6 @@ function getSessionDir(project, date) {
 }
 
 /**
- * Get learned skills directory
- * @param {string|null} project - Project name for project-specific skills, null for global
- * @returns {string} Path to learned skills directory
- */
-function getLearnedSkillsDir(project = null) {
-  const base = path.join(os.homedir(), '.claude', 'skills', 'learned');
-  return project ? path.join(base, project) : path.join(base, 'global');
-}
-
-/**
  * Get diary file path for current session
  * Returns ~/.claude/sessions/{project}/{date}/diary-{sessionId}.md
  */
@@ -478,6 +401,36 @@ function getCompactionLogPath(project) {
 }
 
 /**
+ * Sanitize a filename to prevent path traversal attacks.
+ * Rejects names containing path separators, parent-dir sequences,
+ * null bytes, or control characters. Throws on invalid input.
+ *
+ * @param {string} name - Filename to validate (e.g., skill name, instinct ID)
+ * @returns {string} The validated filename (unchanged if valid)
+ * @throws {Error} If the name is invalid
+ */
+function sanitizeFilename(name) {
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new Error('Filename must be a non-empty string');
+  }
+
+  if (name.includes('/') || name.includes('\\')) {
+    throw new Error(`Invalid filename: path separators not allowed: "${name}"`);
+  }
+
+  if (name.includes('..')) {
+    throw new Error(`Invalid filename: parent directory traversal not allowed: "${name}"`);
+  }
+
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char validation
+  if (/[\x00-\x1f\x7f]/.test(name)) {
+    throw new Error(`Invalid filename: control characters not allowed: "${name}"`);
+  }
+
+  return name;
+}
+
+/**
  * Ensure a directory exists
  */
 function ensureDir(dirPath) {
@@ -503,7 +456,7 @@ function createSessionCounter(name) {
   function read() {
     const content = readFileSafe(getFilePath());
     const count = parseInt(content, 10);
-    return isNaN(count) ? 0 : count;
+    return Number.isNaN(count) ? 0 : count;
   }
 
   function write(count) {
@@ -560,11 +513,7 @@ module.exports = {
   getCommandPath,
   commandExists,
   execCommand,
-  getPluginRoot,
-  getScriptsDir,
-  getHooksDir,
   parseStdinJson,
-  readStdin,
   readStdinSync,
   // Session ID caching
   setSessionIdFromInput,
@@ -580,9 +529,6 @@ module.exports = {
   colors,
   colorize,
   supportsColor,
-  // Legacy I/O helpers (deprecated)
-  outputHookResponse,
-  logWarning,
   // Session management
   getSessionId,
   getProjectName,
@@ -591,13 +537,13 @@ module.exports = {
   getSessionsDir,
   getProjectSessionsDir,
   getSessionDir,
-  getLearnedSkillsDir,
   getDiaryFilePath,
   getDiaryedDir,
   getCompactionLogPath,
   ensureDir,
+  sanitizeFilename,
   createSessionCounter,
   getSessionFilePath,
   loadSession,
-  saveSession
+  saveSession,
 };

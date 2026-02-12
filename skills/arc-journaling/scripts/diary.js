@@ -40,7 +40,29 @@ if (command === 'save') {
     process.exit(1);
   }
   console.log(getDiaryPath(project, date, session));
+} else if (command === 'finalize') {
+  // Promote a draft diary to final
+  const { project, date, session } = parseArgs(args.slice(1));
+  if (!project || !date || !session) {
+    console.error('Error: Missing required arguments');
+    console.log('Usage: diary.js finalize --project X --date Y --session Z');
+    process.exit(1);
+  }
+  const fs = require('fs');
+  const path = require('path');
+  const { CLAUDE_DIR } = require('../../../scripts/lib/session-utils');
+  const draftPath = path.join(CLAUDE_DIR, 'sessions', project, date, `diary-${session}-draft.md`);
+  const finalPath = getDiaryPath(project, date, session);
+
+  if (!fs.existsSync(draftPath)) {
+    console.error(`No draft found at: ${draftPath}`);
+    process.exit(1);
+  }
+  const dir = path.dirname(finalPath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.renameSync(draftPath, finalPath);
+  console.log(`Finalized: ${finalPath}`);
 } else {
-  console.log('Usage: diary.js <save|path> --project X --date Y --session Z [--content "..."]');
+  console.log('Usage: diary.js <save|path|finalize> --project X --date Y --session Z [--content "..."]');
   process.exit(1);
 }

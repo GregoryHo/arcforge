@@ -5,7 +5,7 @@ const {
   generateMarkdownSummary,
   calculateDurationMinutes,
   formatTime,
-  formatDate
+  formatDate,
 } = require('../session-tracker/summary');
 
 describe('calculateDurationMinutes', () => {
@@ -62,7 +62,7 @@ describe('generateMarkdownSummary', () => {
       lastUpdated: '2025-01-15T11:30:00Z',
       toolCalls: 75,
       filesModified: ['src/app.js', 'lib/utils.js'],
-      compactions: ['2025-01-15T10:30:00Z', '2025-01-15T11:00:00Z']
+      compactions: ['2025-01-15T10:30:00Z', '2025-01-15T11:00:00Z'],
     };
 
     const md = generateMarkdownSummary(session);
@@ -101,7 +101,7 @@ describe('generateMarkdownSummary', () => {
       project: 'test',
       filesModified: [],
       compactions: [],
-      toolCalls: 10
+      toolCalls: 10,
     };
 
     const md = generateMarkdownSummary(session);
@@ -113,7 +113,7 @@ describe('generateMarkdownSummary', () => {
     const session = {
       project: 'test',
       filesModified: [],
-      toolCalls: 10
+      toolCalls: 10,
     };
 
     const md = generateMarkdownSummary(session);
@@ -123,7 +123,7 @@ describe('generateMarkdownSummary', () => {
 
   it('should handle minimal session data', () => {
     const session = {
-      project: 'minimal'
+      project: 'minimal',
     };
 
     const md = generateMarkdownSummary(session);
@@ -139,7 +139,7 @@ describe('generateMarkdownSummary', () => {
     const session = {
       project: 'test',
       started: '2025-01-15T10:00:00Z',
-      lastUpdated: '2025-01-15T10:00:00Z'
+      lastUpdated: '2025-01-15T10:00:00Z',
     };
 
     const md = generateMarkdownSummary(session);
@@ -150,7 +150,7 @@ describe('generateMarkdownSummary', () => {
     const session = {
       project: 'test',
       date: '2025-01-20',
-      started: '2025-01-15T10:00:00Z'
+      started: '2025-01-15T10:00:00Z',
     };
 
     const md = generateMarkdownSummary(session);
@@ -160,7 +160,7 @@ describe('generateMarkdownSummary', () => {
   it('should fallback to started date when session.date is missing', () => {
     const session = {
       project: 'test',
-      started: '2025-01-15T10:00:00Z'
+      started: '2025-01-15T10:00:00Z',
     };
 
     const md = generateMarkdownSummary(session);
