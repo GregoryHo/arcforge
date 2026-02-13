@@ -153,25 +153,27 @@ Wait for exact confirmation.
 
 If confirmed:
 ```bash
-git worktree remove .worktrees/<epic-name>
-git branch -D <epic-name>
-
-# Update DAG if exists
+# Update DAG and sync BEFORE destroying the worktree
+# (worktree removal deletes local dag.yaml, making later sync impossible)
 if [ -f dag.yaml ]; then
   node "${SKILL_ROOT}/scripts/finish-epic.js" block <epic-name> "Cancelled by user"
+  node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 fi
+
+git worktree remove .worktrees/<epic-name>
+git branch -D <epic-name>
 ```
 
 ### Step 4.5: Sync After Choice
 
-**After Option 2 (PR) or Option 4 (Discard) — merge delegates to base internally, keep has no DAG change:**
+**After Option 2 (PR) — merge delegates to base internally, keep has no DAG change, discard syncs inline above:**
 
 ```bash
 # Sync to base to ensure DAG reflects new status
 node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 ```
 
-**Purpose:** Ensure the base DAG reflects the epic's final status (completed, merged, or discarded).
+**Purpose:** Ensure the base DAG reflects the epic's final status (completed or merged).
 
 ## Completion Format
 

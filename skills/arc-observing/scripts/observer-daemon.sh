@@ -50,12 +50,16 @@ acquire_lock() {
   if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
     return 1  # genuinely running
   fi
-  # Stale lock — reclaim
+  # Stale lock — reclaim atomically (mv is atomic; prevents TOCTOU race
+  # where two processes both rm + mkdir and both think they won)
+  local tmp_stale="${LOCK_DIR}.stale.$$"
   log_msg "Reclaiming stale lock (old PID: ${old_pid:-unknown})"
-  rm -rf "$LOCK_DIR"
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo $$ > "$LOCK_DIR/pid"
-    return 0
+  if mv "$LOCK_DIR" "$tmp_stale" 2>/dev/null; then
+    rm -rf "$tmp_stale"
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      echo $$ > "$LOCK_DIR/pid"
+      return 0
+    fi
   fi
   return 1  # lost the race to another instance
 }
