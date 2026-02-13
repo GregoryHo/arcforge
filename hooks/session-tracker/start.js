@@ -68,33 +68,19 @@ function initializeSession() {
 // Observer Daemon & Instinct Loading
 // ─────────────────────────────────────────────
 
-const PID_FILE = path.join(require('node:os').homedir(), '.claude', 'instincts', '.observer.pid');
-
 /**
  * Check if observer daemon is running, start if not.
+ * The daemon uses mkdir-based locking for singleton enforcement,
+ * so we can call 'start' unconditionally — it's a no-op if already running.
  */
 function checkDaemon() {
   try {
-    if (fs.existsSync(PID_FILE)) {
-      const pid = parseInt(fs.readFileSync(PID_FILE, 'utf-8').trim(), 10);
-      if (pid > 0) {
-        try {
-          process.kill(pid, 0); // Check if alive
-          return; // Already running
-        } catch {
-          // Stale PID file
-        }
-      }
-    }
-
-    // Try to start daemon
     const daemonPath = path.join(
       __dirname,
       '../../skills/arc-observing/scripts/observer-daemon.sh',
     );
     if (fs.existsSync(daemonPath)) {
       execFileSync('bash', [daemonPath, 'start'], { stdio: 'ignore', timeout: 5000 });
-      log('Observer daemon started');
     }
   } catch {
     // Non-blocking — daemon start is best-effort

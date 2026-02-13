@@ -23,6 +23,10 @@ const { getObservationsPath } = require('../../scripts/lib/session-utils');
 const MAX_INPUT_LENGTH = 5000;
 const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const SIGNAL_COOLDOWN_MS = 30000; // 30 seconds between SIGUSR1 signals
+const SIGNAL_TIMESTAMP_FILE = path.join(
+  os.homedir(), '.claude', 'instincts', '.last_signal'
+);
 
 /**
  * Get observations archive directory for a project.
@@ -32,7 +36,7 @@ function getArchiveDir(project) {
 }
 
 function getPidFile() {
-  return path.join(os.homedir(), '.claude', 'instincts', '.observer.pid');
+  return path.join(os.homedir(), '.claude', 'instincts', '.observer.lock', 'pid');
 }
 
 // ─────────────────────────────────────────────
@@ -69,15 +73,24 @@ function archiveIfNeeded(obsPath, project) {
 }
 
 /**
- * Signal the observer daemon via SIGUSR1.
+ * Signal the observer daemon via SIGUSR1 with file-based cooldown.
+ * Each hook invocation is a separate process — timestamp file coordinates cooldown.
  */
 function signalDaemon() {
   try {
+    // Check cooldown via timestamp file
+    if (fs.existsSync(SIGNAL_TIMESTAMP_FILE)) {
+      const lastSignal = fs.statSync(SIGNAL_TIMESTAMP_FILE).mtimeMs;
+      if (Date.now() - lastSignal < SIGNAL_COOLDOWN_MS) return;
+    }
+
     const pidFile = getPidFile();
     if (!fs.existsSync(pidFile)) return;
     const pid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
     if (pid > 0) {
       process.kill(pid, 'SIGUSR1');
+      // Touch timestamp file (write updates mtime)
+      fs.writeFileSync(SIGNAL_TIMESTAMP_FILE, String(Date.now()), 'utf-8');
     }
   } catch {
     // Daemon not running or signal failed — silently ignore
