@@ -199,7 +199,7 @@
 │  File-based State Flow:                                                                     │
 │                                                                                              │
 │  ┌────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌────────────────┐   │
-│  │  dag.yaml  │ ──▶ │  Coordinator     │ ──▶ │  .worktrees/     │ ──▶ │ .agentic-epic  │   │
+│  │  dag.yaml  │ ──▶ │  Coordinator     │ ──▶ │  .worktrees/     │ ──▶ │ .arcforge-epic │   │
 │  │ (source of │     │  (orchestrates)  │     │  <epic-id>/      │     │ (worktree      │   │
 │  │  truth)    │     │                  │     │  (isolated env)  │     │  metadata)     │   │
 │  └────────────┘     └──────────────────┘     └──────────────────┘     └────────────────┘   │
@@ -260,10 +260,10 @@
 │  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
 │  │  .worktrees/                                                                         │    │
 │  │  ├── epic-auth/            # Epic 1 worktree                                         │    │
-│  │  │   ├── .agentic-epic     # Metadata (YAML with sync state)                         │    │
+│  │  │   ├── .arcforge-epic     # Metadata (YAML with sync state)                         │    │
 │  │  │   └── ...               # Full codebase copy                                      │    │
 │  │  └── epic-api/             # Epic 2 worktree (parallel)                              │    │
-│  │      ├── .agentic-epic                                                               │    │
+│  │      ├── .arcforge-epic                                                               │    │
 │  │      └── ...                                                                         │    │
 │  │                                                                                      │    │
 │  │  Benefits: Parallel epic development without conflicts                               │    │
@@ -309,7 +309,7 @@
 │  │      blocked_at: "2024-01-15T10:30:00"                                               │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                              │
-│  .agentic-epic (YAML format):                                                                │
+│  .arcforge-epic (YAML format):                                                                │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │  epic: epic-auth                                                                     │    │
 │  │  base_worktree: /path/to/project                                                     │    │

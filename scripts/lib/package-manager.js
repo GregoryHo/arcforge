@@ -14,7 +14,6 @@
  */
 
 const path = require('node:path');
-const _fs = require('node:fs');
 const { fileExists, commandExists, readFileSafe } = require('./utils');
 
 /**

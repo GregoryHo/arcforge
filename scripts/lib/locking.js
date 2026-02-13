@@ -150,50 +150,6 @@ function withLock(projectRoot, fn, options = {}) {
   }
 }
 
-/**
- * Execute an async function with DAG lock
- *
- * @param {string} projectRoot - Project root directory
- * @param {Function} fn - Async function to execute while holding lock
- * @param {Object} options - Lock options
- * @returns {Promise<*>} Return value of fn
- */
-async function _withLockAsync(projectRoot, fn, options = {}) {
-  const lock = acquireLock(projectRoot, options);
-  try {
-    return await fn();
-  } finally {
-    lock.release();
-  }
-}
-
-/**
- * Check if a lock exists (for testing/debugging)
- *
- * @param {string} projectRoot - Project root directory
- * @returns {boolean} Whether lock file exists
- */
-function _isLocked(projectRoot) {
-  const lockPath = path.join(projectRoot, '.arcforge-lock');
-  return fs.existsSync(lockPath);
-}
-
-/**
- * Force remove a lock (for testing/emergency recovery)
- *
- * @param {string} projectRoot - Project root directory
- */
-function _forceClearLock(projectRoot) {
-  const lockPath = path.join(projectRoot, '.arcforge-lock');
-  try {
-    fs.unlinkSync(lockPath);
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      throw err;
-    }
-  }
-}
-
 module.exports = {
   withLock,
 };

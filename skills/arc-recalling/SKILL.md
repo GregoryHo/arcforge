@@ -16,6 +16,17 @@ Save patterns and insights from the current session as instincts. This skill bri
 | **Save instinct** | `node "${SKILL_ROOT}/scripts/recall.js" save --id {id} --trigger "..." --action "..." --domain {d} --project {p}` |
 | **Check duplicate** | `node "${SKILL_ROOT}/scripts/recall.js" check-duplicate --id {id} --project {p}` |
 
+## Infrastructure Commands
+
+**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
+```bash
+: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-recalling}"
+if [ ! -d "$SKILL_ROOT" ]; then
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  exit 1
+fi
+```
+
 ## Workflow
 
 1. **Receive** user's natural language description of the pattern

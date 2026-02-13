@@ -185,7 +185,7 @@ arc-coordinating sync --direction from-base
           Base DAG                    Worktree
         ┌──────────┐                ┌──────────┐
         │          │   from-base    │          │
-        │ epic-a:  │ ──────────────▶│ .agentic │
+        │ epic-a:  │ ──────────────▶│ .arcforge│
         │ completed│                │ -epic    │
         │          │                │          │
         │ epic-b:  │   to-base      │ synced:  │

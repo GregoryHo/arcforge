@@ -1,5 +1,5 @@
 /**
- * Agentic-Core plugin for OpenCode.ai
+ * arcforge plugin for OpenCode.ai
  *
  * Uses experimental.chat.system.transform for reliable context injection.
  * Skills are discovered natively via symlink — no custom tools needed.
@@ -79,7 +79,7 @@ ${content}
 
 export default {
   name: 'arcforge',
-  version: '0.2.0',
+  version: '1.1.0',
 
   'experimental.chat.system.transform': async (_input, output) => {
     const bootstrap = getBootstrapContent();

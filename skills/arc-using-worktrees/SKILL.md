@@ -74,7 +74,18 @@ if [ -f package.json ]; then npm install; fi
 Verify clean baseline:
 
 ```bash
-pytest tests/ -v
+# Auto-detect test command from project files
+if [ -f package.json ]; then
+  npm test
+elif [ -f Cargo.toml ]; then
+  cargo test
+elif [ -f pyproject.toml ] || [ -f setup.py ]; then
+  pytest
+elif [ -f go.mod ]; then
+  go test ./...
+else
+  echo "No test command detected. Specify manually."
+fi
 ```
 
 If tests fail: Report failures, ask whether to proceed.

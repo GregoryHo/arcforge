@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def _read_skill() -> str:
-    skill_path = Path("skills/arc-implementing/SKILL.md")
+    skill_path = Path("skills/arc-using-worktrees/SKILL.md")
     return skill_path.read_text(encoding="utf-8")
 
 
@@ -22,11 +22,11 @@ def _parse_frontmatter(text: str) -> dict:
     return data
 
 
-def test_arc_implementing_frontmatter_and_rules():
+def test_arc_using_worktrees_frontmatter_and_rules():
     text = _read_skill()
     front = _parse_frontmatter(text)
 
-    assert front.get("name") == "arc-implementing"
+    assert front.get("name") == "arc-using-worktrees"
     assert front.get("description", "").startswith("Use when")
     assert len((front.get("name", "") + front.get("description", ""))) < 1024
 
@@ -36,21 +36,22 @@ def test_arc_implementing_frontmatter_and_rules():
     assert "⚠️" in text
 
 
-
-def test_arc_implementing_contains_required_sections():
+def test_arc_using_worktrees_contains_required_sections():
     text = _read_skill()
 
-    # Must be an orchestrator that delegates
-    assert "orchestrator" in text.lower() or "呼叫" in text.lower()
-    
-    # Must delegate to agent-driven (which handles TDD + two-stage review)
-    assert "arc-agent-driven" in text.lower() or "agent-driven" in text.lower()
-    
-    # Must delegate to writing-tasks (for task breakdown)
-    assert "arc-writing-tasks" in text.lower() or "writing-tasks" in text.lower()
+    # Must have .arcforge-epic creation
+    assert ".arcforge-epic" in text
+    assert 'echo "<epic-name>" > .arcforge-epic' in text
 
-    # Must have feature-by-feature flow
-    assert "feature" in text.lower()
+    # Must have auto-detect test command
+    assert "Auto-detect" in text
+    assert "npm test" in text
+    assert "cargo test" in text
+    assert "pytest" in text
 
-    # Must reference skills it delegates to
-    assert "skills" in text.lower() or "delegate" in text.lower()
+    # Must have worktree context check
+    assert "Worktree Context Check" in text
+    assert "Already in a worktree" in text
+
+    # Must have safety verification (.gitignore)
+    assert ".gitignore" in text

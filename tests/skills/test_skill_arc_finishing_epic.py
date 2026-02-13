@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def _read_skill() -> str:
-    skill_path = Path("skills/arc-planning/SKILL.md")
+    skill_path = Path("skills/arc-finishing-epic/SKILL.md")
     return skill_path.read_text(encoding="utf-8")
 
 
@@ -22,36 +22,33 @@ def _parse_frontmatter(text: str) -> dict:
     return data
 
 
-def test_arc_planning_frontmatter_and_rules():
+def test_arc_finishing_epic_frontmatter_and_rules():
     text = _read_skill()
     front = _parse_frontmatter(text)
 
-    assert front.get("name") == "arc-planning"
+    assert front.get("name") == "arc-finishing-epic"
     assert front.get("description", "").startswith("Use when")
     assert len((front.get("name", "") + front.get("description", ""))) < 1024
 
     assert "@" not in text
 
-    assert "✅" in text
-    assert "⚠️" in text
 
-
-
-def test_arc_planning_contains_required_sections():
+def test_arc_finishing_epic_contains_required_sections():
     text = _read_skill()
 
-    # Must have DAG output
-    assert "dag.yaml" in text.lower()
+    # Must check for .arcforge-epic file
+    assert ".arcforge-epic" in text
+    assert "cat .arcforge-epic" in text
 
-    # Must have epic/feature mapping
-    assert "epic" in text.lower()
-    assert "feature" in text.lower()
+    # Must present exactly 4 options
+    assert "1. Merge" in text
+    assert "2. Push and create a Pull Request" in text or "2. Create PR" in text
+    assert "3. Keep" in text
+    assert "4. Discard" in text
 
-    # Must reference spec.xml as input
-    assert "spec.xml" in text.lower()
+    # Must use coordinator merge (not git merge directly)
+    assert "coordinator merge" in text.lower()
+    assert "finish-epic.js" in text
 
-    # Must have traceability
-    assert "source_requirement" in text.lower() or "traceability" in text.lower()
-
-    # Must have self-validation (cycle detection)
-    assert "circular" in text.lower() or "cycle" in text.lower()
+    # Sync scoped to Option 2 only
+    assert "After Option 2" in text

@@ -1,6 +1,6 @@
-# Agentic-Core for Gemini CLI
+# arcforge for Gemini CLI
 
-Guide for using Agentic-Core with Gemini CLI.
+Guide for using arcforge with Gemini CLI.
 
 ## Quick Install
 
@@ -46,7 +46,7 @@ The installation creates individual symlinks for each skill (e.g. `~/.gemini/ski
 
 ## Tool Mapping
 
-Agentic-core skills are written for Claude Code's tool vocabulary. Gemini CLI maps these automatically:
+arcforge skills are written for Claude Code's tool vocabulary. Gemini CLI maps these automatically:
 
 | Claude Code | Gemini CLI | Purpose |
 |---|---|---|

@@ -164,7 +164,7 @@ fi
 
 ### Step 4.5: Sync After Choice
 
-**After executing any option except "Keep" (Option 3):**
+**After Option 2 (PR) or Option 4 (Discard) — merge delegates to base internally, keep has no DAG change:**
 
 ```bash
 # Sync to base to ensure DAG reflects new status

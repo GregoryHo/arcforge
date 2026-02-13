@@ -1,6 +1,6 @@
-# Agentic-Core for OpenCode
+# arcforge for OpenCode
 
-Guide for using Agentic-Core with [OpenCode.ai](https://opencode.ai).
+Guide for using arcforge with [OpenCode.ai](https://opencode.ai).
 
 ## Quick Install
 
@@ -55,7 +55,7 @@ OpenCode uses two mechanisms to integrate arcforge:
 
 ## Tool Mapping
 
-Agentic-core skills are written for Claude Code's tool vocabulary. OpenCode maps these automatically:
+arcforge skills are written for Claude Code's tool vocabulary. OpenCode maps these automatically:
 
 | Claude Code | OpenCode | Purpose |
 |---|---|---|

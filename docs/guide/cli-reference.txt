@@ -171,7 +171,7 @@
 │  │    1. Ensures .worktrees is in .gitignore (commits if needed)                       │    │
 │  │    2. Finds PENDING epics with all dependencies completed                           │    │
 │  │    3. Creates git worktree: git worktree add .worktrees/<epic_id> -b <epic_id>      │    │
-│  │    4. Writes .agentic-epic metadata file (YAML format)                              │    │
+│  │    4. Writes .arcforge-epic metadata file (YAML format)                              │    │
 │  │    5. Sets epic status to IN_PROGRESS                                               │    │
 │  │    6. If --verify: runs test command, fails if tests fail                           │    │
 │  │                                                                                     │    │
@@ -266,18 +266,18 @@
 │  │                                                                                     │    │
 │  │  Options:                                                                           │    │
 │  │    --direction, -d DIRECTION    Sync direction (auto-detected if omitted):          │    │
-│  │                                 - from-base: Pull DAG state into .agentic-epic      │    │
+│  │                                 - from-base: Pull DAG state into .arcforge-epic      │    │
 │  │                                 - to-base: Push local state to DAG                  │    │
 │  │                                 - both: Bidirectional (default in worktree)         │    │
 │  │                                 - scan: Scan all worktrees (default in base)        │    │
 │  │                                                                                     │    │
-│  │  Behavior (in worktree - has .agentic-epic):                                        │    │
-│  │    from-base: Reads base DAG, updates .agentic-epic with dependency status          │    │
+│  │  Behavior (in worktree - has .arcforge-epic):                                        │    │
+│  │    from-base: Reads base DAG, updates .arcforge-epic with dependency status          │    │
 │  │    to-base: Reads local status, updates base DAG                                    │    │
 │  │    both: Does both operations                                                       │    │
 │  │                                                                                     │    │
 │  │  Behavior (in base project):                                                        │    │
-│  │    scan: Iterates all .worktrees/*/. agentic-epic, updates DAG from local status    │    │
+│  │    scan: Iterates all .worktrees/*/.arcforge-epic, updates DAG from local status    │    │
 │  │                                                                                     │    │
 │  │  Output (worktree):                                                                 │    │
 │  │    "Synced epic: <epic_id>"                                                         │    │
@@ -382,7 +382,7 @@
 │  │   │  2. For each ready epic:                                                    │  │    │
 │  │   │     └── git worktree add .worktrees/<epic_id> -b <epic_id>                  │  │    │
 │  │   │                                                                             │  │    │
-│  │   │  3. Write .agentic-epic:                                                     │  │    │
+│  │   │  3. Write .arcforge-epic:                                                     │  │    │
 │  │   │     ┌────────────────────────────────────┐                                  │  │    │
 │  │   │     │ epic: <epic_id>                    │                                  │  │    │
 │  │   │     │ base_worktree: /path/to/project    │                                  │  │    │
@@ -452,12 +452,12 @@
 │  │   │       └── Get dependents list                                               │  │    │
 │  │   │       └── Get blocked_by list                                               │  │    │
 │  │   │                                                                             │  │    │
-│  │   │  .agentic-epic ◀──write── synced: { dependencies, dependents, blocked_by }  │  │    │
+│  │   │  .arcforge-epic ◀──write── synced: { dependencies, dependents, blocked_by }  │  │    │
 │  │   └─────────────────────────────────────────────────────────────────────────────┘  │    │
 │  │                                                                                     │    │
 │  │   to-base:                                                                          │    │
 │  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
-│  │   │  .agentic-epic ──read──▶ local.status                                       │  │    │
+│  │   │  .arcforge-epic ──read──▶ local.status                                       │  │    │
 │  │   │       │                                                                     │  │    │
 │  │   │       └── If status changed:                                                │  │    │
 │  │   │           └── Coordinator(base).dag.get_epic().status = local.status        │  │    │
@@ -473,9 +473,9 @@
 │  │   scan:                                                                             │    │
 │  │   ┌─────────────────────────────────────────────────────────────────────────────┐  │    │
 │  │   │  .worktrees/                                                                │  │    │
-│  │   │  ├── epic-A/.agentic-epic ──read──▶ local.status                            │  │    │
-│  │   │  ├── epic-B/.agentic-epic ──read──▶ local.status                            │  │    │
-│  │   │  └── epic-C/.agentic-epic ──read──▶ local.status                            │  │    │
+│  │   │  ├── epic-A/.arcforge-epic ──read──▶ local.status                            │  │    │
+│  │   │  ├── epic-B/.arcforge-epic ──read──▶ local.status                            │  │    │
+│  │   │  └── epic-C/.arcforge-epic ──read──▶ local.status                            │  │    │
 │  │   │       │                                                                     │  │    │
 │  │   │       └── For each: if local.status != dag_status                           │  │    │
 │  │   │           └── Update dag epic status                                        │  │    │
@@ -516,7 +516,7 @@
 │  │                                                                                     │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                              │
-│  .agentic-epic - Worktree Metadata (Worktree 元資料):                                        │
+│  .arcforge-epic - Worktree Metadata (Worktree 元資料):                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                     │    │
 │  │  epic: string                     # Epic ID                                         │    │

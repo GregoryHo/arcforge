@@ -100,10 +100,14 @@ Task tool (general-purpose): "Fix issue C in file Z"
 
 - Read each summary
 - Verify no conflicts
+- If conflicts found: tasks were not truly independent — resolve manually and re-check grouping
 - Run full test suite
 - Integrate all changes
 
-## Core Workflow
+## DAG-Based Workflow
+
+When `dag.yaml` exists (from `/arc-planning`), use this structured workflow.
+If you don't have a DAG, skip to **Without DAG: Independent Failures** below.
 
 ### Step 1: Read dag.yaml
 
@@ -149,15 +153,6 @@ Features A, B, C have no dependencies → Group 1 (parallel)
 Feature D depends on A → Must wait for Group 1
 Feature E depends on B and C → Must wait for Group 1
 ```
-
-## Alternate Entry: Independent Failures
-
-If there is no DAG context and you have multiple independent failures:
-
-1. Group failures by subsystem or file.
-2. Apply the independence checks above.
-3. Dispatch parallel agents using the prompt template.
-4. Integrate fixes and run the full test suite.
 
 ### Step 4: Present Parallelization Plan
 
@@ -219,6 +214,16 @@ arc-coordinating parallel
 # Or get next single task
 arc-coordinating next
 ```
+
+## Without DAG: Independent Failures
+
+When you have multiple independent failures but no `dag.yaml`:
+
+1. **Group failures** by subsystem or file
+2. **Apply independence checks** from The Pattern above
+3. **Dispatch parallel agents** using the prompt template from The Pattern
+4. **Integrate fixes** and run the full test suite
+   - If conflicts found: tasks were not truly independent — resolve manually and re-check grouping
 
 ## Example: Post-Review Parallel Fixes
 

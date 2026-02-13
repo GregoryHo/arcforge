@@ -128,7 +128,7 @@ Use this diary template:
 
 - **Challenge**: [What went wrong]
 - **Solution**: [How resolved]
-- **Generalizable?**: [Yes/No - pre-flags for /learn]
+- **Generalizable?**: [Yes/No - pre-flags for /reflect]
 
 ## PR/Review Feedback (if any)
 
@@ -153,13 +153,13 @@ _Captured at {timestamp}_
 
 After saving, briefly mention:
 
-> "Diary saved. If you noticed reusable patterns, run `/learn` to extract them."
+> "Diary saved. If you noticed reusable patterns, run `/reflect` to extract them."
 
 ## Key Principles
 
 ### Observation Over Prescription
 
-Record what happened, not rules. Patterns that should become rules belong in `/learn`.
+Record what happened, not rules. Patterns that should become rules belong in `/reflect`.
 
 ### User Intent Over Implementation
 

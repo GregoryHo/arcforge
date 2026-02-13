@@ -73,6 +73,17 @@ epics/
 
 **dag.yaml structure:**
 
+## Infrastructure Commands
+
+**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
+```bash
+: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-planning}"
+if [ ! -d "$SKILL_ROOT" ]; then
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  exit 1
+fi
+```
+
 To view the full schema and example, run:
 ```bash
 # View schema with field descriptions
