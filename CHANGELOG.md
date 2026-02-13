@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] - 2026-02-13
+
+### Added
+
+- `docs/guide/skills-reference.md`: Complete skill catalog (701 lines) with decision trees, workflow comparisons, and iron laws
+- `skills/arc-observing/scripts/observer-system-prompt.md`: Separated system prompt from task prompt for observer daemon
+- 9 new pytest test files: all 24 skills now have dedicated test coverage (111 tests total)
+- `tests/skills/test_skill_cross_references.py`: Cross-reference validation for REQUIRED SUB-SKILL and REQUIRED BACKGROUND
+- SKILL_ROOT initialization added to `arc-learning`, `arc-planning`, `arc-recalling`
+
+### Changed
+
+- **Learning subsystem refactored** (PR #3): sync context injection, merged stop hooks, unified bubble-up logic
+- Word count policy: replaced hard 500-word assertion with 4-tier soft guidance (Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w)
+- `arc-dispatching-parallel`: restructured dual numbering, added conflict detection fallback
+- `arc-agent-driven`: added max review cycle guard (3 cycles per reviewer)
+- `arc-implementing`: added explicit retry limits (2 refinement cycles)
+- `arc-using-worktrees`: auto-detect test command instead of hardcoded pytest
+- `observer-daemon.sh`: atomic mkdir-based locks, circuit breaker (3 failures), max age TTL (2h)
+- `hooks/observe/main.js`: file-based signal cooldown (30s) to prevent duplicate processing
+- `hooks/session-tracker/start.js`: split into sync + async for reliable context delivery
+- Branding: all remaining "Agentic-Core" references renamed to "arcforge" in INSTALL files and platform READMEs
+
+### Removed
+
+- Unused functions from `scripts/lib/locking.js` (`_withLockAsync`, `_isLocked`, `_forceClearLock`)
+- Unused `require('node:path')` in `scripts/cli.js`
+- Placeholder test assertions replaced by substantive content checks
+
+### Fixed
+
+- `arc-finishing-epic`: removed redundant sync step
+- `arc-journaling`: corrected `/learn` command references to `/reflect` (3 occurrences)
+- `arc-finishing`: resolved contradictory cleanup instructions (Step 5 now applies to Options 1 and 4 only)
+- `arc-executing-tasks`: fixed duplicate step numbering
+- `arc-debugging`: corrected heading capitalization
+- `arc-finishing` and `arc-agent-driven`: cleaned up description text (removed workflow summaries)
+- Workflow docs: `.agentic-epic` references corrected to `.arcforge-epic`
+
 ## [1.1.0] - 2026-02-10
 
 ### Added
