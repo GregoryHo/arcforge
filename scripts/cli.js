@@ -16,7 +16,6 @@
  *   schema [--json] [--example]     Show dag.yaml schema
  */
 
-const _path = require('node:path');
 const { Coordinator } = require('./lib/coordinator');
 const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
 

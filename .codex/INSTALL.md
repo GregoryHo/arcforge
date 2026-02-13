@@ -1,4 +1,4 @@
-# Installing Agentic-Core for Codex
+# Installing arcforge for Codex
 
 Enable agentic skills in Codex via native skill discovery. One clone, one symlink.
 

@@ -1,4 +1,4 @@
-# Installing Agentic-Core for Gemini CLI
+# Installing arcforge for Gemini CLI
 
 Enable agentic skills in Gemini CLI via native skill discovery.
 

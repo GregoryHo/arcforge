@@ -1,6 +1,6 @@
-# Agentic-Core for Codex
+# arcforge for Codex
 
-Guide for using Agentic-Core with OpenAI Codex.
+Guide for using arcforge with OpenAI Codex.
 
 ## Quick Install
 

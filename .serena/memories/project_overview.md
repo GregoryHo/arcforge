@@ -1,8 +1,8 @@
-# Agentic-Core - Project Overview
+# arcforge - Project Overview
 
 ## Purpose
 
-Agentic-Core is a **skill-based autonomous agent pipeline system** for Claude Code, with planned support for OpenAI and Codex. It transforms the agentic workflow from a background orchestrator to an in-session skill-based system.
+arcforge is a **skill-based autonomous agent pipeline system** for Claude Code, with planned support for OpenAI and Codex. It transforms the agentic workflow from a background orchestrator to an in-session skill-based system.
 
 ## Architecture
 

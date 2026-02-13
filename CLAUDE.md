@@ -53,7 +53,7 @@ pip install pytest pyyaml
 - Never summarize skill workflow in description - Claude may follow description instead of reading full skill
 - Cross-reference skills with `**REQUIRED BACKGROUND:** ...` not @-file syntax
 - Zero external runtime dependencies - Node.js only
-- Hooks must be Node.js (not bash) for cross-platform support
+- Hooks should be Node.js for cross-platform support (exceptions: inject-skills/main.sh for environment injection)
 - Use `execFileSync` over `exec` in hooks (prevents shell injection)
 - Conventional commits: `feat(scope):`, `fix(scope):`, `docs(scope):`
 

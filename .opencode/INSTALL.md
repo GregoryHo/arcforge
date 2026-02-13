@@ -1,4 +1,4 @@
-# Installing Agentic-Core for OpenCode
+# Installing arcforge for OpenCode
 
 Enable agentic skills in OpenCode via native skill discovery and system transform plugin.
 

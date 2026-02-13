@@ -31,7 +31,7 @@
 │          │                                                       │                           │
 │          ▼                                                       ▼                           │
 │   [arc-coordinating]                                 TDD: RED→GREEN→REFACTOR              │
-│   └─ outputs: .worktrees/<epic>/ + .agentic-epic                  │                           │
+│   └─ outputs: .worktrees/<epic>/ + .arcforge-epic                  │                           │
 │          │                                                       ▼                           │
 │          ▼                              [arc-requesting-review → receiving-review]       │
 │   ┌──────────────────────────────────────────────────────────────────────┐                   │
