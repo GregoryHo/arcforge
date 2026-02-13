@@ -150,7 +150,6 @@ function withLock(projectRoot, fn, options = {}) {
   }
 }
 
-
 module.exports = {
   withLock,
 };

@@ -107,8 +107,15 @@ analyze_project() {
     return
   fi
 
-  # Circuit breaker — skip after 3 consecutive failures
+  # Circuit breaker — skip after 3 consecutive failures (TTL: 30 min)
   local fail_count_file="${OBS_DIR}/${project}/.fail_count"
+  if [ -f "$fail_count_file" ]; then
+    # Reset circuit breaker if .fail_count is older than 30 minutes
+    if [ -z "$(find "$fail_count_file" -mmin -30 2>/dev/null)" ]; then
+      log_msg "Circuit breaker TTL expired for ${project} — resetting"
+      rm -f "$fail_count_file"
+    fi
+  fi
   local fail_count
   fail_count=$(cat "$fail_count_file" 2>/dev/null || echo 0)
   if [ "$fail_count" -ge 3 ]; then
@@ -293,6 +300,7 @@ daemon_loop() {
     log_msg "SIGUSR1 received — immediate analysis"
     LAST_ANALYSIS=$now
     analyze_all_projects
+    echo 0 > "$obs_state_file"
   }
   trap 'handle_sigusr1' USR1
 
@@ -342,6 +350,9 @@ daemon_loop() {
     if [ "$has_new" = true ]; then
       LAST_ANALYSIS=$now
       analyze_all_projects
+      # Reset baseline — archives moved observations, so counts dropped.
+      # Without reset, new observations stay below stale high-water mark.
+      echo 0 > "$obs_state_file"
     fi
   done
 }
