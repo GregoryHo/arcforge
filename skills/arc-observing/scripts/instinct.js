@@ -224,7 +224,7 @@ function cmdContradict(instinctId, project) {
   const { frontmatter } = parseConfidenceFrontmatter(content);
 
   const oldConfidence = frontmatter.confidence || 0.5;
-  const newConfidence = applyContradiction(oldConfidence);
+  const newConfidence = applyContradiction(oldConfidence, frontmatter.source);
   const contradictions = (frontmatter.contradictions || 0) + 1;
 
   const updated = updateConfidenceFrontmatter(content, {

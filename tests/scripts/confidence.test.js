@@ -13,6 +13,9 @@ const {
   ARCHIVE_THRESHOLD,
   MAX_CONFIDENCE,
   MIN_CONFIDENCE,
+  MANUAL_CONTRADICT_DELTA,
+  MANUAL_DECAY_PER_WEEK,
+  RESISTANT_SOURCES,
   parseConfidenceFrontmatter,
   updateConfidenceFrontmatter,
   calculateDecay,
@@ -275,6 +278,121 @@ last_confirmed: 2025-01-01
 
       expect(result.decayed).toHaveLength(0);
       expect(result.archived).toHaveLength(0);
+    });
+
+    it('halves weekly decay for source: manual', () => {
+      // Create manual instinct with old last_confirmed (4 weeks ago)
+      const content = `---
+id: manual-pattern
+confidence: 0.50
+source: manual
+last_confirmed: 2026-01-17
+---
+
+# Manual Pattern`;
+
+      fs.writeFileSync(path.join(testDir, 'manual-pattern.md'), content, 'utf-8');
+
+      // Also create a session-observation instinct with same date and confidence
+      const autoContent = `---
+id: auto-pattern
+confidence: 0.50
+source: session-observation
+last_confirmed: 2026-01-17
+---
+
+# Auto Pattern`;
+
+      fs.writeFileSync(path.join(testDir, 'auto-pattern.md'), autoContent, 'utf-8');
+
+      runDecayCycle(testDir);
+
+      // Manual should decay less than auto
+      if (fs.existsSync(path.join(testDir, 'manual-pattern.md'))) {
+        const manualUpdated = fs.readFileSync(path.join(testDir, 'manual-pattern.md'), 'utf-8');
+        const { frontmatter: manualFm } = parseConfidenceFrontmatter(manualUpdated);
+
+        if (fs.existsSync(path.join(testDir, 'auto-pattern.md'))) {
+          const autoUpdated = fs.readFileSync(path.join(testDir, 'auto-pattern.md'), 'utf-8');
+          const { frontmatter: autoFm } = parseConfidenceFrontmatter(autoUpdated);
+          expect(manualFm.confidence).toBeGreaterThan(autoFm.confidence);
+        }
+      }
+    });
+
+    it('halves weekly decay for source: reflection', () => {
+      const content = `---
+id: reflection-pattern
+confidence: 0.50
+source: reflection
+last_confirmed: 2026-01-17
+---
+
+# Reflection Pattern`;
+
+      fs.writeFileSync(path.join(testDir, 'reflection-pattern.md'), content, 'utf-8');
+
+      const autoContent = `---
+id: auto-pattern-2
+confidence: 0.50
+source: session-observation
+last_confirmed: 2026-01-17
+---
+
+# Auto Pattern 2`;
+
+      fs.writeFileSync(path.join(testDir, 'auto-pattern-2.md'), autoContent, 'utf-8');
+
+      runDecayCycle(testDir);
+
+      if (fs.existsSync(path.join(testDir, 'reflection-pattern.md'))) {
+        const reflUpdated = fs.readFileSync(path.join(testDir, 'reflection-pattern.md'), 'utf-8');
+        const { frontmatter: reflFm } = parseConfidenceFrontmatter(reflUpdated);
+
+        if (fs.existsSync(path.join(testDir, 'auto-pattern-2.md'))) {
+          const autoUpdated = fs.readFileSync(path.join(testDir, 'auto-pattern-2.md'), 'utf-8');
+          const { frontmatter: autoFm } = parseConfidenceFrontmatter(autoUpdated);
+          expect(reflFm.confidence).toBeGreaterThan(autoFm.confidence);
+        }
+      }
+    });
+  });
+
+  describe('source-aware constants', () => {
+    it('has resistance constants', () => {
+      expect(MANUAL_CONTRADICT_DELTA).toBe(-0.05);
+      expect(MANUAL_DECAY_PER_WEEK).toBe(0.01);
+      expect(RESISTANT_SOURCES).toBeInstanceOf(Set);
+      expect(RESISTANT_SOURCES.has('manual')).toBe(true);
+      expect(RESISTANT_SOURCES.has('reflection')).toBe(true);
+      expect(RESISTANT_SOURCES.has('session-observation')).toBe(false);
+    });
+  });
+
+  describe('applyContradiction (source-aware)', () => {
+    it('halves delta for source: manual (-0.05 instead of -0.10)', () => {
+      const result = applyContradiction(0.5, 'manual');
+      expect(result).toBeCloseTo(0.45, 5);
+    });
+
+    it('halves delta for source: reflection (-0.05 instead of -0.10)', () => {
+      const result = applyContradiction(0.5, 'reflection');
+      expect(result).toBeCloseTo(0.45, 5);
+    });
+
+    it('full delta for source: session-observation (-0.10)', () => {
+      const result = applyContradiction(0.5, 'session-observation');
+      expect(result).toBeCloseTo(0.4, 5);
+    });
+
+    it('full delta when source is undefined (backward compat)', () => {
+      const result = applyContradiction(0.5);
+      expect(result).toBeCloseTo(0.4, 5);
+    });
+
+    it('still respects MIN_CONFIDENCE floor for resistant sources', () => {
+      const result = applyContradiction(0.12, 'manual');
+      expect(result).toBe(MIN_CONFIDENCE);
     });
   });
 });

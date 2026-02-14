@@ -15,13 +15,25 @@ const {
 
 const {
   getInstinctsDir,
-  getGlobalInstinctsDir
+  getGlobalInstinctsDir,
+  getEvolvedLogPath
 } = require('../../../scripts/lib/session-utils');
 
 const {
   buildTriggerFingerprint,
   jaccardSimilarity
 } = require('../../../scripts/lib/fingerprint');
+
+const {
+  classifyCluster,
+  generateName,
+  generateSkill,
+  generateCommand,
+  generateAgent,
+  recordEvolution,
+  readEvolutionLog,
+  isAlreadyEvolved
+} = require('../../../scripts/lib/evolve');
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -181,25 +193,139 @@ function cmdPreview(project) {
     return;
   }
 
-  for (const cluster of clusters) {
-    console.log(`\n## Cluster: ${cluster.domain} (${cluster.items.length} instincts)\n`);
+  for (let idx = 0; idx < clusters.length; idx++) {
+    const cluster = clusters[idx];
+    const classification = classifyCluster(cluster);
+    const suggestedName = generateName(cluster, classification.type);
+
+    console.log(`\n## Cluster ${idx}: ${cluster.domain} (${cluster.items.length} instincts)\n`);
     console.log('Instincts in this cluster:');
     for (const inst of cluster.items) {
       console.log(`  - **${inst.id}** (${Math.round((inst.confidence || 0) * 100)}%)`);
       if (inst.trigger) console.log(`    Trigger: ${inst.trigger}`);
     }
-    console.log('\nPossible outputs:');
-    console.log('  1. Skill: A reusable SKILL.md with combined workflow');
-    console.log('  2. Command: A CLI command that automates the pattern');
-    console.log('  3. Agent: A specialized subagent for the domain');
+    console.log(`\nRecommended type: ${classification.type}`);
+    console.log(`Suggested name: ${suggestedName}`);
+    console.log(`Reasons: ${classification.reasons.join('; ')}`);
+    console.log(`\nGenerate: /learn generate --cluster ${idx} --project ${project}`);
     console.log('');
   }
 }
 
 function cmdList(project) {
-  // List previously evolved clusters (placeholder — would need storage)
-  console.log('No evolved clusters yet.');
-  console.log('Use /learn scan to find candidates, then /learn preview to analyze them.');
+  const logPath = getEvolvedLogPath();
+  const entries = readEvolutionLog(logPath);
+
+  if (entries.length === 0) {
+    console.log('No evolved clusters yet.');
+    console.log('Use /learn scan to find candidates, then /learn generate to evolve them.');
+    return;
+  }
+
+  // Filter by project if specified
+  const filtered = project ? entries.filter(e => e.project === project) : entries;
+
+  if (filtered.length === 0) {
+    console.log(`No evolved clusters for project "${project}".`);
+    console.log(`Total across all projects: ${entries.length}`);
+    return;
+  }
+
+  console.log(`\n## Evolved Clusters${project ? ` (${project})` : ''}\n`);
+  for (const entry of filtered) {
+    const date = entry.timestamp ? entry.timestamp.split('T')[0] : 'unknown';
+    console.log(`  ${entry.type.padEnd(7)} ${entry.id}`);
+    console.log(`          instincts: ${(entry.instincts || []).join(', ')}`);
+    console.log(`          files: ${(entry.files || []).join(', ')}`);
+    console.log(`          date: ${date}`);
+    console.log('');
+  }
+}
+
+/**
+ * Generate a skill/command/agent from a cluster.
+ */
+function cmdGenerate(project, flags) {
+  const clusterIdx = parseInt(flags.cluster, 10);
+  const typeOverride = flags.type;
+  const nameOverride = flags.name;
+  const dryRun = flags['dry-run'] === true;
+
+  const projectInstincts = loadInstincts(getInstinctsDir(project));
+  const globalInstincts = loadInstincts(getGlobalInstinctsDir());
+  const allInstincts = [...projectInstincts, ...globalInstincts];
+  const clusters = clusterInstincts(allInstincts);
+
+  if (isNaN(clusterIdx) || clusterIdx < 0 || clusterIdx >= clusters.length) {
+    console.error(`Invalid cluster index: ${flags.cluster}. Available: 0-${clusters.length - 1}`);
+    return;
+  }
+
+  const cluster = clusters[clusterIdx];
+  const instinctIds = cluster.items.map(i => i.id);
+
+  // Check if already evolved
+  const logPath = getEvolvedLogPath();
+  if (isAlreadyEvolved(instinctIds, logPath)) {
+    console.error('These instincts have already been evolved. Use --name to create a different artifact.');
+    return;
+  }
+
+  // Classify
+  const classification = typeOverride
+    ? { type: typeOverride, confidence: 0, reasons: [`Type override: ${typeOverride}`] }
+    : classifyCluster(cluster);
+
+  const type = classification.type;
+
+  // Generate name
+  const baseName = nameOverride || generateName(cluster, type);
+  const skillName = type === 'skill' ? baseName : (baseName.startsWith('arc-') ? baseName : `arc-${baseName}`);
+  const cmdName = baseName.replace(/^arc-/, '');
+
+  // Generate files
+  const files = [];
+
+  if (type === 'skill') {
+    files.push(generateSkill(cluster, skillName));
+  } else if (type === 'command') {
+    // Commands always produce a backing skill too
+    files.push(generateSkill(cluster, skillName));
+    files.push(generateCommand(cluster, cmdName, skillName));
+  } else if (type === 'agent') {
+    files.push(generateAgent(cluster, baseName));
+  }
+
+  if (dryRun) {
+    console.log(`DRY RUN — would generate ${type}:\n`);
+    for (const file of files) {
+      console.log(`--- ${file.path} (${file.type}) ---`);
+      console.log(file.content);
+      console.log('');
+    }
+    console.log('Run without --dry-run to write files.');
+    return;
+  }
+
+  // Write files
+  for (const file of files) {
+    const fullPath = path.resolve(file.path);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, file.content, 'utf-8');
+    console.log(`Created: ${file.path}`);
+  }
+
+  // Record evolution
+  recordEvolution({
+    id: baseName,
+    type,
+    instincts: instinctIds,
+    project,
+    files: files.map(f => f.path),
+  }, logPath);
+
+  console.log(`\nEvolved ${instinctIds.length} instincts into ${type}: ${baseName}`);
+  console.log('Generated files are scaffolds — refine before deployment.');
 }
 
 // ─────────────────────────────────────────────
@@ -217,18 +343,26 @@ function main() {
     case 'preview':
       cmdPreview(project);
       break;
+    case 'generate':
+      cmdGenerate(project, flags);
+      break;
     case 'list':
       cmdList(project);
       break;
     default:
-      console.log('Learn CLI — Instinct clustering\n');
+      console.log('Learn CLI — Instinct clustering & evolution\n');
       console.log('Usage: learn.js <command> [options]\n');
       console.log('Commands:');
       console.log('  scan                  Scan for clustering candidates');
-      console.log('  preview               Preview detailed cluster analysis');
+      console.log('  preview               Preview clusters with type recommendations');
+      console.log('  generate              Generate skill/command/agent from a cluster');
       console.log('  list                  List previously evolved clusters\n');
       console.log('Options:');
       console.log('  --project <name>      Project name (default: current directory)');
+      console.log('  --cluster <N>         Cluster index (for generate)');
+      console.log('  --type <type>         Override type: skill|command|agent');
+      console.log('  --name <name>         Override generated name');
+      console.log('  --dry-run             Preview without writing files');
       break;
   }
 }
@@ -239,6 +373,7 @@ module.exports = {
   clusterInstincts,
   cmdScan,
   cmdPreview,
+  cmdGenerate,
   cmdList,
   parseArgs,
   getDefaultProject
