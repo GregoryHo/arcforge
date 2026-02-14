@@ -272,7 +272,7 @@ function cmdGenerate(project, flags) {
 
   // Check if already evolved
   const logPath = getEvolvedLogPath();
-  if (isAlreadyEvolved(instinctIds, logPath)) {
+  if (isAlreadyEvolved(instinctIds, logPath, project)) {
     console.error('These instincts have already been evolved. Use --name to create a different artifact.');
     return;
   }
@@ -290,6 +290,12 @@ function cmdGenerate(project, flags) {
     : classifyCluster(cluster);
 
   const type = classification.type;
+
+  // Sanitize --name to prevent path traversal
+  if (nameOverride && (/[\/\\]/.test(nameOverride) || nameOverride.includes('..'))) {
+    console.error(`Invalid --name "${nameOverride}". Name must not contain path separators or "..".`);
+    return;
+  }
 
   // Generate name — skills already have arc- prefix from generateName
   const baseName = nameOverride || generateName(cluster, type);

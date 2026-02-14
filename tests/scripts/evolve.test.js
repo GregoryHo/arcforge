@@ -59,8 +59,8 @@ describe('classifyCluster', () => {
       domain: 'workflow',
       items: [
         makeInstinct('wf-a', { domain: 'workflow', confidence: 0.75 }),
-        makeInstinct('wf-b', { domain: 'workflow', confidence: 0.70 }),
-        makeInstinct('wf-c', { domain: 'workflow', confidence: 0.80 }),
+        makeInstinct('wf-b', { domain: 'workflow', confidence: 0.7 }),
+        makeInstinct('wf-c', { domain: 'workflow', confidence: 0.8 }),
       ],
     });
     const result = classifyCluster(cluster);
@@ -86,7 +86,7 @@ describe('classifyCluster', () => {
     const cluster = makeCluster({
       domain: 'debugging',
       items: [
-        makeInstinct('dbg-a', { domain: 'debugging', confidence: 0.80 }),
+        makeInstinct('dbg-a', { domain: 'debugging', confidence: 0.8 }),
         makeInstinct('dbg-b', { domain: 'debugging', confidence: 0.75 }),
         makeInstinct('dbg-c', { domain: 'debugging', confidence: 0.85 }),
       ],
@@ -97,10 +97,7 @@ describe('classifyCluster', () => {
 
   it('classifies small cluster (< 3) as skill (default)', () => {
     const cluster = makeCluster({
-      items: [
-        makeInstinct('s-a', { confidence: 0.8 }),
-        makeInstinct('s-b', { confidence: 0.8 }),
-      ],
+      items: [makeInstinct('s-a', { confidence: 0.8 }), makeInstinct('s-b', { confidence: 0.8 })],
     });
     const result = classifyCluster(cluster);
     expect(result.type).toBe('skill');
@@ -131,7 +128,7 @@ describe('classifyCluster', () => {
         }),
         makeInstinct('act-b', {
           domain: 'general',
-          confidence: 0.70,
+          confidence: 0.7,
           trigger: 'when running a deployment script',
         }),
         makeInstinct('act-c', {
@@ -151,7 +148,9 @@ describe('classifyCluster', () => {
     const result = classifyCluster(cluster);
     expect(result.reasons).toBeInstanceOf(Array);
     expect(result.reasons.length).toBeGreaterThan(0);
-    result.reasons.forEach((r) => expect(typeof r).toBe('string'));
+    for (const r of result.reasons) {
+      expect(typeof r).toBe('string');
+    }
   });
 });
 

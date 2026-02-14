@@ -334,11 +334,12 @@ function readEvolutionLog(logPath) {
 /**
  * Check if a set of instinct IDs has already been evolved.
  */
-function isAlreadyEvolved(instinctIds, logPath) {
+function isAlreadyEvolved(instinctIds, logPath, project) {
   const entries = readEvolutionLog(logPath);
   const idSet = new Set(instinctIds);
 
   return entries.some((entry) => {
+    if (project && entry.project && entry.project !== project) return false;
     const entrySet = new Set(entry.instincts || []);
     if (entrySet.size !== idSet.size) return false;
     for (const id of idSet) {
