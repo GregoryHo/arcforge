@@ -6,8 +6,8 @@
  * Replaces the old "learned skills" system with instinct-based clustering.
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   parseConfidenceFrontmatter
@@ -41,6 +41,20 @@ const {
 
 function getDefaultProject() {
   return path.basename(process.env.CLAUDE_PROJECT_DIR || process.cwd());
+}
+
+/**
+ * Load project + global instincts and merge them.
+ */
+function loadAllInstincts(project) {
+  const projectInstincts = loadInstincts(getInstinctsDir(project));
+  const globalInstincts = loadInstincts(getGlobalInstinctsDir());
+  return [...projectInstincts, ...globalInstincts];
+}
+
+/** Ensure a name has the arc- prefix (for backing skills). */
+function ensureArcPrefix(name) {
+  return name.startsWith('arc-') ? name : `arc-${name}`;
 }
 
 function parseArgs(argv) {
@@ -152,9 +166,7 @@ function clusterInstincts(instincts, threshold = 0.6) {
 // ─────────────────────────────────────────────
 
 function cmdScan(project) {
-  const projectInstincts = loadInstincts(getInstinctsDir(project));
-  const globalInstincts = loadInstincts(getGlobalInstinctsDir());
-  const allInstincts = [...projectInstincts, ...globalInstincts];
+  const allInstincts = loadAllInstincts(project);
 
   if (allInstincts.length < 3) {
     console.log(`Only ${allInstincts.length} instincts found. Need at least 3 for clustering.`);
@@ -183,10 +195,7 @@ function cmdScan(project) {
 }
 
 function cmdPreview(project) {
-  const projectInstincts = loadInstincts(getInstinctsDir(project));
-  const globalInstincts = loadInstincts(getGlobalInstinctsDir());
-  const allInstincts = [...projectInstincts, ...globalInstincts];
-  const clusters = clusterInstincts(allInstincts);
+  const clusters = clusterInstincts(loadAllInstincts(project));
 
   if (clusters.length === 0) {
     console.log('No clustering candidates found.');
@@ -251,10 +260,7 @@ function cmdGenerate(project, flags) {
   const nameOverride = flags.name;
   const dryRun = flags['dry-run'] === true;
 
-  const projectInstincts = loadInstincts(getInstinctsDir(project));
-  const globalInstincts = loadInstincts(getGlobalInstinctsDir());
-  const allInstincts = [...projectInstincts, ...globalInstincts];
-  const clusters = clusterInstincts(allInstincts);
+  const clusters = clusterInstincts(loadAllInstincts(project));
 
   if (isNaN(clusterIdx) || clusterIdx < 0 || clusterIdx >= clusters.length) {
     console.error(`Invalid cluster index: ${flags.cluster}. Available: 0-${clusters.length - 1}`);
@@ -278,9 +284,9 @@ function cmdGenerate(project, flags) {
 
   const type = classification.type;
 
-  // Generate name
+  // Generate name — skills already have arc- prefix from generateName
   const baseName = nameOverride || generateName(cluster, type);
-  const skillName = type === 'skill' ? baseName : (baseName.startsWith('arc-') ? baseName : `arc-${baseName}`);
+  const skillName = ensureArcPrefix(baseName);
   const cmdName = baseName.replace(/^arc-/, '');
 
   // Generate files
@@ -370,6 +376,7 @@ function main() {
 // Export for testing
 module.exports = {
   loadInstincts,
+  loadAllInstincts,
   clusterInstincts,
   cmdScan,
   cmdPreview,

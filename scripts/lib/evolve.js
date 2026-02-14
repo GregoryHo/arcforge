@@ -8,7 +8,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildTriggerFingerprint, STOP_WORDS } = require('./fingerprint');
+const { buildTriggerFingerprint } = require('./fingerprint');
+
+// ─────────────────────────────────────────────
+// Instinct Accessors
+// ─────────────────────────────────────────────
+
+/** Resolve trigger text from instinct (top-level or nested in frontmatter). */
+function getTrigger(inst) {
+  return inst.trigger || inst.frontmatter?.trigger || '';
+}
+
+/** Resolve confidence from instinct (top-level or nested in frontmatter). */
+function getConfidence(inst) {
+  return inst.confidence || inst.frontmatter?.confidence || 0;
+}
 
 // ─────────────────────────────────────────────
 // Type Classification
@@ -35,7 +49,7 @@ function classifyCluster(cluster) {
   const reasons = [];
 
   const avgConfidence =
-    items.length > 0 ? items.reduce((sum, i) => sum + (i.confidence || i.frontmatter?.confidence || 0), 0) / items.length : 0;
+    items.length > 0 ? items.reduce((sum, i) => sum + getConfidence(i), 0) / items.length : 0;
 
   // Primary rule 1: workflow/automation domain + high confidence → command
   if (COMMAND_DOMAINS.has(domain) && avgConfidence >= 0.7) {
@@ -50,7 +64,7 @@ function classifyCluster(cluster) {
   }
 
   // Tiebreaker: keyword ratio
-  const allTriggers = items.map((i) => i.trigger || i.frontmatter?.trigger || '').join(' ').toLowerCase();
+  const allTriggers = items.map((i) => getTrigger(i)).join(' ').toLowerCase();
   const tokens = allTriggers.split(/\s+/);
 
   let behavioralCount = 0;
@@ -97,13 +111,12 @@ function generateName(cluster, type) {
   let raw = '';
 
   if (items.length === 1) {
-    raw = items[0].trigger || items[0].frontmatter?.trigger || items[0].id || '';
+    raw = getTrigger(items[0]) || items[0].id || '';
   } else {
     // Collect all trigger tokens, find most frequent
     const tokenCounts = {};
     for (const item of items) {
-      const trigger = item.trigger || item.frontmatter?.trigger || '';
-      const fp = buildTriggerFingerprint(trigger);
+      const fp = buildTriggerFingerprint(getTrigger(item));
       for (const token of fp) {
         tokenCounts[token] = (tokenCounts[token] || 0) + 1;
       }
@@ -144,7 +157,7 @@ function generateName(cluster, type) {
 function generateSkill(cluster, name) {
   const items = cluster.items || [];
   const domain = cluster.domain || 'uncategorized';
-  const triggers = items.map((i) => i.trigger || i.frontmatter?.trigger || '').filter(Boolean);
+  const triggers = items.map(getTrigger).filter(Boolean);
 
   // Build description: "Use when <common prefix>. Covers: <unique suffixes>"
   const commonPrefix = triggers.length > 0 ? triggers[0].replace(/^when\s+/i, '') : domain;
@@ -164,10 +177,7 @@ function generateSkill(cluster, name) {
   const triggerBullets = triggers.map((t) => `- ${t}`).join('\n');
   const instinctBodies = items.map((i) => i.body || '').filter(Boolean).join('\n\n---\n\n');
   const sourceList = items
-    .map((i) => {
-      const conf = i.confidence || i.frontmatter?.confidence || 0;
-      return `- ${i.id} (${Math.round(conf * 100)}%)`;
-    })
+    .map((i) => `- ${i.id} (${Math.round(getConfidence(i) * 100)}%)`)
     .join('\n');
 
   const content = `---
@@ -202,7 +212,7 @@ ${sourceList}
  */
 function generateCommand(cluster, cmdName, skillName) {
   const domain = cluster.domain || 'uncategorized';
-  const triggers = (cluster.items || []).map((i) => i.trigger || i.frontmatter?.trigger || '').filter(Boolean);
+  const triggers = (cluster.items || []).map(getTrigger).filter(Boolean);
 
   const description = triggers.length > 0
     ? triggers[0].replace(/^when\s+/i, '')
@@ -228,7 +238,7 @@ Invoke the ${skillName} skill and follow it exactly as presented to you
 function generateAgent(cluster, name) {
   const items = cluster.items || [];
   const domain = cluster.domain || 'uncategorized';
-  const triggers = items.map((i) => i.trigger || i.frontmatter?.trigger || '').filter(Boolean);
+  const triggers = items.map(getTrigger).filter(Boolean);
 
   const description = triggers.length > 0
     ? triggers.map((t) => t.replace(/^when\s+/i, '')).join(', ')

@@ -26,8 +26,9 @@ const REFLECT_MAX_CONFIDENCE = 0.85;
 const MIN_CONFIDENCE = 0.1;
 
 // Resistance-based confidence: manual/reflection instincts decay slower
-const MANUAL_CONTRADICT_DELTA = -0.05; // Half of -0.10
-const MANUAL_DECAY_PER_WEEK = 0.01; // Half of 0.02
+const RESISTANT_DECAY_RATIO = 0.5;
+const MANUAL_CONTRADICT_DELTA = CONTRADICT_DELTA * RESISTANT_DECAY_RATIO;
+const MANUAL_DECAY_PER_WEEK = DECAY_PER_WEEK * RESISTANT_DECAY_RATIO;
 const RESISTANT_SOURCES = new Set(['manual', 'reflection']);
 
 // ─────────────────────────────────────────────
@@ -201,7 +202,7 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
     // Source-aware decay: resistant sources decay at half rate
     const decay = RESISTANT_SOURCES.has(frontmatter.source)
-      ? baseDecay * (MANUAL_DECAY_PER_WEEK / DECAY_PER_WEEK)
+      ? baseDecay * RESISTANT_DECAY_RATIO
       : baseDecay;
     const newConfidence = clampConfidence(frontmatter.confidence - decay);
 
