@@ -277,6 +277,13 @@ function cmdGenerate(project, flags) {
     return;
   }
 
+  // Validate type override
+  const VALID_TYPES = new Set(['skill', 'command', 'agent']);
+  if (typeOverride && !VALID_TYPES.has(typeOverride)) {
+    console.error(`Invalid --type "${typeOverride}". Must be one of: ${[...VALID_TYPES].join(', ')}`);
+    return;
+  }
+
   // Classify
   const classification = typeOverride
     ? { type: typeOverride, confidence: 0, reasons: [`Type override: ${typeOverride}`] }

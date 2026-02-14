@@ -59,12 +59,17 @@ function classifyCluster(cluster) {
 
   // Primary rule 2: 3+ instincts + very high confidence → agent
   if (items.length >= 3 && avgConfidence >= 0.75) {
-    reasons.push(`Cluster size ${items.length} >= 3 with avg confidence ${avgConfidence.toFixed(2)} >= 0.75`);
+    reasons.push(
+      `Cluster size ${items.length} >= 3 with avg confidence ${avgConfidence.toFixed(2)} >= 0.75`,
+    );
     return { type: 'agent', confidence: avgConfidence, reasons };
   }
 
   // Tiebreaker: keyword ratio
-  const allTriggers = items.map((i) => getTrigger(i)).join(' ').toLowerCase();
+  const allTriggers = items
+    .map((i) => getTrigger(i))
+    .join(' ')
+    .toLowerCase();
   const tokens = allTriggers.split(/\s+/);
 
   let behavioralCount = 0;
@@ -82,11 +87,15 @@ function classifyCluster(cluster) {
 
   if (actionCount > 0 && behavioralCount > 0) {
     if (behavioralCount > actionCount * 2) {
-      reasons.push(`Keyword tiebreaker: ${behavioralCount} behavioral vs ${actionCount} action → skill`);
+      reasons.push(
+        `Keyword tiebreaker: ${behavioralCount} behavioral vs ${actionCount} action → skill`,
+      );
       return { type: 'skill', confidence: avgConfidence, reasons };
     }
     if (actionCount > behavioralCount * 2) {
-      reasons.push(`Keyword tiebreaker: ${actionCount} action vs ${behavioralCount} behavioral → command`);
+      reasons.push(
+        `Keyword tiebreaker: ${actionCount} action vs ${behavioralCount} behavioral → command`,
+      );
       return { type: 'command', confidence: avgConfidence, reasons };
     }
   }
@@ -144,6 +153,10 @@ function generateName(cluster, type) {
     cleaned = cleaned.substring(0, maxLen).replace(/-+$/, '');
   }
 
+  if (!cleaned) {
+    cleaned = (cluster.domain || 'evolved').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
   return type === 'skill' ? `arc-${cleaned}` : cleaned;
 }
 
@@ -171,11 +184,14 @@ function generateSkill(cluster, name) {
     description += `. Covers: ${uniqueSuffixes}`;
   }
   if (description.length > 1024) {
-    description = description.substring(0, 1021) + '...';
+    description = `${description.substring(0, 1021)}...`;
   }
 
   const triggerBullets = triggers.map((t) => `- ${t}`).join('\n');
-  const instinctBodies = items.map((i) => i.body || '').filter(Boolean).join('\n\n---\n\n');
+  const instinctBodies = items
+    .map((i) => i.body || '')
+    .filter(Boolean)
+    .join('\n\n---\n\n');
   const sourceList = items
     .map((i) => `- ${i.id} (${Math.round(getConfidence(i) * 100)}%)`)
     .join('\n');
@@ -214,9 +230,8 @@ function generateCommand(cluster, cmdName, skillName) {
   const domain = cluster.domain || 'uncategorized';
   const triggers = (cluster.items || []).map(getTrigger).filter(Boolean);
 
-  const description = triggers.length > 0
-    ? triggers[0].replace(/^when\s+/i, '')
-    : `${domain} automation`;
+  const description =
+    triggers.length > 0 ? triggers[0].replace(/^when\s+/i, '') : `${domain} automation`;
 
   const content = `---
 description: "${description}"
@@ -240,9 +255,10 @@ function generateAgent(cluster, name) {
   const domain = cluster.domain || 'uncategorized';
   const triggers = items.map(getTrigger).filter(Boolean);
 
-  const description = triggers.length > 0
-    ? triggers.map((t) => t.replace(/^when\s+/i, '')).join(', ')
-    : `${domain} specialist`;
+  const description =
+    triggers.length > 0
+      ? triggers.map((t) => t.replace(/^when\s+/i, '')).join(', ')
+      : `${domain} specialist`;
 
   // Derive workflow steps from instinct action sections
   const actions = items
@@ -252,9 +268,10 @@ function generateAgent(cluster, name) {
     })
     .filter(Boolean);
 
-  const workflowSteps = actions.length > 0
-    ? actions.map((a, idx) => `${idx + 1}. ${a}`).join('\n')
-    : '1. Analyze the task\n2. Execute the appropriate pattern\n3. Verify results';
+  const workflowSteps =
+    actions.length > 0
+      ? actions.map((a, idx) => `${idx + 1}. ${a}`).join('\n')
+      : '1. Analyze the task\n2. Execute the appropriate pattern\n3. Verify results';
 
   const content = `---
 name: ${name}
@@ -296,7 +313,7 @@ function recordEvolution(entry, logPath) {
     timestamp: new Date().toISOString(),
   };
 
-  fs.appendFileSync(logPath, JSON.stringify(record) + '\n', 'utf-8');
+  fs.appendFileSync(logPath, `${JSON.stringify(record)}\n`, 'utf-8');
 }
 
 /**
