@@ -326,6 +326,17 @@ function cmdGenerate(project, flags) {
     return;
   }
 
+  // Check for existing files before writing (prevent accidental overwrites)
+  const existing = files.filter((f) => fs.existsSync(path.resolve(f.path)));
+  if (existing.length > 0) {
+    console.error('Refusing to overwrite existing files:');
+    for (const f of existing) {
+      console.error(`  ${f.path}`);
+    }
+    console.error('Use a different --name or remove the existing files first.');
+    return;
+  }
+
   // Write files
   for (const file of files) {
     const fullPath = path.resolve(file.path);
