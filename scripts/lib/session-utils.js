@@ -174,6 +174,14 @@ function getInstinctsGlobalIndex() {
   return path.join(CLAUDE_DIR, 'instincts', 'global-index.jsonl');
 }
 
+/**
+ * Get evolved log path for tracking instinct-to-artifact evolution.
+ * @returns {string} ~/.claude/evolved/evolved.jsonl
+ */
+function getEvolvedLogPath() {
+  return path.join(CLAUDE_DIR, 'evolved', 'evolved.jsonl');
+}
+
 module.exports = {
   getDiaryPath,
   saveDiary,
@@ -189,4 +197,5 @@ module.exports = {
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
+  getEvolvedLogPath,
 };

@@ -8,14 +8,18 @@ const os = require('node:os');
 let mockInstinctsDir;
 let mockGlobalInstinctsDir;
 
+let mockEvolvedLogPath;
+
 jest.mock('../../scripts/lib/session-utils', () => ({
   getInstinctsDir: jest.fn(() => mockInstinctsDir),
   getGlobalInstinctsDir: jest.fn(() => mockGlobalInstinctsDir),
+  getEvolvedLogPath: jest.fn(() => mockEvolvedLogPath),
 }));
 
 const {
   loadInstincts,
   clusterInstincts,
+  cmdGenerate,
   parseArgs,
 } = require('../../skills/arc-learning/scripts/learn');
 
@@ -25,6 +29,7 @@ describe('learn.js (instinct clustering)', () => {
   beforeEach(() => {
     mockInstinctsDir = path.join(testDir, 'instincts');
     mockGlobalInstinctsDir = path.join(testDir, 'global');
+    mockEvolvedLogPath = path.join(testDir, 'evolved', 'evolved.jsonl');
     fs.mkdirSync(mockInstinctsDir, { recursive: true });
     fs.mkdirSync(mockGlobalInstinctsDir, { recursive: true });
   });
@@ -130,6 +135,136 @@ Do the thing for ${id}
     it('handles no arguments', () => {
       const result = parseArgs(['node', 'learn.js']);
       expect(result.command).toBeUndefined();
+    });
+  });
+
+  describe('cmdGenerate', () => {
+    function writeClusterInstincts(dir) {
+      // Write 3+ instincts in same domain with quality threshold met
+      for (const id of ['gen-a', 'gen-b', 'gen-c']) {
+        writeInstinct(dir, id, {
+          confidence: 0.7,
+          domain: 'testing',
+          trigger: `when running ${id} tests`,
+        });
+      }
+    }
+
+    it('generates skill for valid cluster (dry-run)', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      const output = [];
+      const origLog = console.log;
+      console.log = (...args) => output.push(args.join(' '));
+
+      cmdGenerate('test-project', { cluster: '0', 'dry-run': true });
+
+      console.log = origLog;
+
+      const fullOutput = output.join('\n');
+      expect(fullOutput).toContain('DRY RUN');
+      expect(fullOutput).toContain('skill');
+    });
+
+    it('generates command + skill pair for command type', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      const output = [];
+      const origLog = console.log;
+      console.log = (...args) => output.push(args.join(' '));
+
+      cmdGenerate('test-project', { cluster: '0', type: 'command', 'dry-run': true });
+
+      console.log = origLog;
+
+      const fullOutput = output.join('\n');
+      expect(fullOutput).toContain('command');
+      expect(fullOutput).toContain('skill'); // backing skill
+    });
+
+    it('generates agent for agent type', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      const output = [];
+      const origLog = console.log;
+      console.log = (...args) => output.push(args.join(' '));
+
+      cmdGenerate('test-project', { cluster: '0', type: 'agent', 'dry-run': true });
+
+      console.log = origLog;
+
+      const fullOutput = output.join('\n');
+      expect(fullOutput).toContain('agent');
+    });
+
+    it('respects --name override', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      const output = [];
+      const origLog = console.log;
+      console.log = (...args) => output.push(args.join(' '));
+
+      cmdGenerate('test-project', {
+        cluster: '0',
+        name: 'custom-name',
+        'dry-run': true,
+      });
+
+      console.log = origLog;
+
+      const fullOutput = output.join('\n');
+      expect(fullOutput).toContain('custom-name');
+    });
+
+    it('handles invalid cluster index', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      const output = [];
+      const origErr = console.error;
+      console.error = (...args) => output.push(args.join(' '));
+
+      cmdGenerate('test-project', { cluster: '99' });
+
+      console.error = origErr;
+
+      const fullOutput = output.join('\n');
+      expect(fullOutput).toContain('Invalid cluster index');
+    });
+
+    it('rejects already-evolved instincts', () => {
+      writeClusterInstincts(mockInstinctsDir);
+
+      // First generation (non-dry-run) to record evolution
+      const origLog = console.log;
+      console.log = () => {};
+      cmdGenerate('test-project', { cluster: '0', 'dry-run': true });
+      console.log = origLog;
+
+      // Record evolution manually
+      const { recordEvolution } = require('../../scripts/lib/evolve');
+      fs.mkdirSync(path.dirname(mockEvolvedLogPath), { recursive: true });
+      recordEvolution(
+        {
+          id: 'arc-running-tests',
+          type: 'skill',
+          instincts: ['gen-a', 'gen-b', 'gen-c'],
+          project: 'test-project',
+          files: [],
+        },
+        mockEvolvedLogPath,
+      );
+
+      // Second attempt should reject
+      const errOutput = [];
+      const origErr = console.error;
+      console.error = (...args) => errOutput.push(args.join(' '));
+
+      cmdGenerate('test-project', { cluster: '0' });
+
+      console.error = origErr;
+
+      const fullOutput = errOutput.join('\n');
+      expect(fullOutput).toContain('already been evolved');
     });
   });
 });

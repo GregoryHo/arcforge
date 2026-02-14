@@ -41,7 +41,7 @@ fi
 2. **Analysis**: Background daemon reads observations (10+ required), calls Haiku to detect patterns
 3. **Creation**: Instincts saved as `.md` files with YAML frontmatter in `~/.claude/instincts/{project}/`
 4. **Loading**: Session start loads instincts with confidence >= 0.7 into Claude context
-5. **Lifecycle**: Confirm (+0.05) / Contradict (-0.10) / Decay (-0.02/week) / Archive (< 0.15)
+5. **Lifecycle**: Confirm (+0.05) / Contradict (-0.10, -0.05 for manual/reflection) / Decay (-0.02/week, -0.01 for manual/reflection) / Archive (< 0.15)
 
 ## Instinct Format
 
@@ -91,8 +91,8 @@ Always use Grep to find the exact location before using Edit.
 ```
 Auto-detected by daemon: confidence 0.5
 Confirmed → +0.05 (cap 0.9)
-Contradicted → -0.10 (floor 0.1)
-No activity → -0.02/week
+Contradicted → -0.10 (floor 0.1), -0.05 for manual/reflection sources
+No activity → -0.02/week, -0.01/week for manual/reflection sources
 
 >= 0.7 → Auto-loaded into Claude context
 0.3-0.7 → Listed as summary

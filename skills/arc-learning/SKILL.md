@@ -17,6 +17,7 @@ Cluster related instincts into higher-level abstractions: skills, commands, or a
 |------|---------|
 | **Scan instincts** | `node "${SKILL_ROOT}/scripts/learn.js" scan --project {p}` |
 | **Preview clusters** | `node "${SKILL_ROOT}/scripts/learn.js" preview --project {p}` |
+| **Generate artifact** | `node "${SKILL_ROOT}/scripts/learn.js" generate --cluster N --project {p} [--type skill\|command\|agent] [--name custom-name] [--dry-run]` |
 | **List evolved** | `node "${SKILL_ROOT}/scripts/learn.js" list --project {p}` |
 
 ## Infrastructure Commands
@@ -35,9 +36,11 @@ fi
 1. **Scan**: Load all instincts from `~/.claude/instincts/{project}/` and `global/`
 2. **Cluster**: Group by domain, then within each domain use trigger fingerprint similarity (Jaccard >= 0.6) to find sub-clusters
 3. **Filter**: Only process clusters with 3+ instincts, at least 1 with confidence >= 0.6
-4. **Preview**: Display candidate clusters for user review
-5. **Generate**: User decides what to create (skill, command, or agent)
-6. **Track**: Record which instincts were consolidated
+4. **Preview**: Display candidate clusters with type recommendations and suggested names
+5. **Generate**: Create skill, command, or agent from a cluster (auto-classified or user-overridden)
+6. **Track**: Record evolution to `~/.claude/evolved/evolved.jsonl` for deduplication
+
+**Note:** Generated files are scaffolds — refine before deployment.
 
 ## When to Use
 
@@ -53,9 +56,24 @@ fi
 - User wants to reflect on diaries (use /reflect instead)
 - User wants to confirm/contradict individual instincts (use arc-observing)
 
+## Generation Types
+
+Classification is hybrid: domain+threshold primary, keywords as tiebreaker.
+
+| Rule | Condition | Type |
+|------|-----------|------|
+| 1 | Domain is `workflow` or `automation` + avg confidence >= 0.7 | **command** |
+| 2 | Cluster size >= 3 + avg confidence >= 0.75 | **agent** |
+| 3 | Default (no primary rule matches) | **skill** |
+
+Tiebreaker: if behavioral tokens ("always", "prefer", "avoid") outnumber action tokens ("when starting", "when running") 2:1 → skill. Reverse → command.
+
+Commands always produce a backing skill (arcforge convention). Source instincts are left in place after evolution.
+
 ## Key Principles
 
 - **User-driven**: Preview clusters and let user decide what to create
 - **Minimum cluster size**: 3+ instincts required per cluster
 - **Quality threshold**: At least 1 instinct must have confidence >= 0.6
-- **Source tracking**: Record which instincts were consumed by each cluster
+- **Source tracking**: Record which instincts were evolved via JSONL log
+- **No re-evolution**: `isAlreadyEvolved()` prevents duplicate generation

@@ -16,6 +16,7 @@
 │  │       ├── locking.js           # File-based DAG locking                                  │
 │  │       ├── package-manager.js   # PM detection (npm/pnpm/yarn/bun)                        │
 │  │       ├── confidence.js        # Confidence scoring for instincts                        │
+│  │       ├── evolve.js            # Instinct-to-artifact evolution (skill/cmd/agent)         │
 │  │       ├── fingerprint.js       # Trigger fingerprinting (Jaccard)                        │
 │  │       ├── global-index.js      # Cross-project instinct bubble-up                        │
 │  │       ├── instinct-writer.js   # Instinct file creation                                  │

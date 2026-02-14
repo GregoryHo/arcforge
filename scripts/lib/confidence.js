@@ -25,6 +25,12 @@ const MAX_CONFIDENCE = 0.9;
 const REFLECT_MAX_CONFIDENCE = 0.85;
 const MIN_CONFIDENCE = 0.1;
 
+// Resistance-based confidence: manual/reflection instincts decay slower
+const RESISTANT_DECAY_RATIO = 0.5;
+const MANUAL_CONTRADICT_DELTA = CONTRADICT_DELTA * RESISTANT_DECAY_RATIO;
+const MANUAL_DECAY_PER_WEEK = DECAY_PER_WEEK * RESISTANT_DECAY_RATIO;
+const RESISTANT_SOURCES = new Set(['manual', 'reflection']);
+
 // ─────────────────────────────────────────────
 // Frontmatter Parsing
 // ─────────────────────────────────────────────
@@ -134,9 +140,12 @@ function applyConfirmation(confidence) {
 
 /**
  * Apply contradiction to confidence score.
+ * @param {number} confidence - Current confidence
+ * @param {string} [source] - Instinct source (manual, reflection, session-observation)
  */
-function applyContradiction(confidence) {
-  return Math.max(MIN_CONFIDENCE, (confidence || INITIAL) + CONTRADICT_DELTA);
+function applyContradiction(confidence, source) {
+  const delta = RESISTANT_SOURCES.has(source) ? MANUAL_CONTRADICT_DELTA : CONTRADICT_DELTA;
+  return Math.max(MIN_CONFIDENCE, (confidence || INITIAL) + delta);
 }
 
 /**
@@ -188,9 +197,13 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
     if (frontmatter.confidence === undefined) continue;
 
-    const decay = calculateDecay(frontmatter.last_confirmed, now);
-    if (decay <= 0) continue;
+    const baseDecay = calculateDecay(frontmatter.last_confirmed, now);
+    if (baseDecay <= 0) continue;
 
+    // Source-aware decay: resistant sources decay at half rate
+    const decay = RESISTANT_SOURCES.has(frontmatter.source)
+      ? baseDecay * RESISTANT_DECAY_RATIO
+      : baseDecay;
     const newConfidence = clampConfidence(frontmatter.confidence - decay);
 
     if (shouldArchive(newConfidence)) {
@@ -230,6 +243,9 @@ module.exports = {
   MAX_CONFIDENCE,
   REFLECT_MAX_CONFIDENCE,
   MIN_CONFIDENCE,
+  MANUAL_CONTRADICT_DELTA,
+  MANUAL_DECAY_PER_WEEK,
+  RESISTANT_SOURCES,
   // Parsing
   parseConfidenceFrontmatter,
   updateConfidenceFrontmatter,

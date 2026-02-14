@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.2] - 2026-02-14
+
+### Added
+
+- `scripts/lib/evolve.js`: Three-type evolution engine — classifies instinct clusters into skills, commands, or agents via domain+confidence rules with keyword tiebreaker
+- `learn.js generate` command: Creates skill, command, or agent scaffolds from clustered instincts (`--type`, `--name`, `--dry-run`)
+- `learn.js list` command: Shows previously evolved artifacts from JSONL tracking log
+- `session-utils.js`: `getEvolvedLogPath()` helper for `~/.claude/evolved/evolved.jsonl`
+- Resistance-based confidence: `MANUAL_CONTRADICT_DELTA`, `MANUAL_DECAY_PER_WEEK`, `RESISTANT_SOURCES` for source-aware scoring
+- Tests: `evolve.test.js` (358 lines), `confidence.test.js` additions (118 lines), `learn.test.js` (135 lines)
+
+### Changed
+
+- `confidence.js`: `applyContradiction()` accepts optional `source` — manual/reflection instincts receive half-strength contradiction (-0.05 vs -0.10)
+- `confidence.js`: `runDecayCycle()` applies source-aware decay — resistant sources decay at 50% rate
+- `instinct.js`: passes `frontmatter.source` to `applyContradiction()` for resistance-based scoring
+- `learn.js`: Extracted helpers, removed duplication, derived constants from centralized modules
+
+### Fixed
+
+- `learn.js generate`: Refuses to overwrite existing artifacts — exits with error instead of silently clobbering
+- `learn.js generate`: `--name` sanitized to prevent path traversal (`/`, `\`, `..`)
+- `learn.js generate`: `--type` validated against allowed values (skill, command, agent)
+- `learn.js generate`: Empty slug fallback uses domain name instead of broken paths
+- `learn.js`: Evolution deduplication scoped to project to prevent cross-project false positives
+
 ## [1.1.1] - 2026-02-13
 
 ### Added

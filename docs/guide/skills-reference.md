@@ -542,7 +542,7 @@ arcforge's 24 skills are organized into 6 categories:
 1. Capture: hooks record every tool call to observations.jsonl
 2. Analysis: background daemon detects patterns (10+ observations required)
 3. Creation: instincts saved as `.md` files with YAML frontmatter
-4. Lifecycle: confirm (+0.05) / contradict (-0.10) / decay (-0.02/week)
+4. Lifecycle: confirm (+0.05) / contradict (-0.10, -0.05 for manual/reflection) / decay (-0.02/week, -0.01 for manual/reflection)
 5. Loading: instincts with confidence >= 0.7 auto-loaded into context
 
 **Artifacts:**
