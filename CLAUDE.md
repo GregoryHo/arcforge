@@ -11,6 +11,8 @@ Skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and Op
 - `npm run test:hooks` - Hook tests (Node --test)
 - `npm run test:node` - CLI, DAG, models, YAML tests
 - `npm run test:skills` - Skill validation (pytest)
+- `npm run lint` - Biome lint + format check (CI blocks merge on failure)
+- `npm run lint:fix` - Auto-fix lint and format issues
 - `node scripts/cli.js --help` - CLI help
 
 ## Setup
@@ -54,7 +56,6 @@ pip install pytest pyyaml
 - Cross-reference skills with `**REQUIRED BACKGROUND:** ...` not @-file syntax
 - Zero external runtime dependencies - Node.js only
 - Hooks should be Node.js for cross-platform support (exceptions: inject-skills/main.sh for environment injection)
-- Use `execFileSync` over `exec` in hooks (prevents shell injection)
 - Conventional commits: `feat(scope):`, `fix(scope):`, `docs(scope):`
 
 ## Gotchas
