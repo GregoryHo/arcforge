@@ -19,7 +19,7 @@ const {
   getProjectName,
   outputContext,
   log,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 
 const {
   getInstinctsDir,

@@ -16,7 +16,6 @@ paths:
 hooks/
   hooks.json              # Hook registration
   run-hook.cmd            # Dispatcher
-  lib/                    # Shared utilities (utils.js, package-manager.js)
   <hook-name>/
     main.js               # Entry point
     README.md             # Hook documentation
@@ -31,7 +30,7 @@ try { /* hook logic */ } catch { /* silently continue */ }
 
 ## Stdin/Stdout
 
-- Use `readStdinSync()` from `hooks/lib/utils.js` to read stdin
+- Use `readStdinSync()` from `scripts/lib/utils.js` to read stdin
 - Write back to stdout for hook chaining
 
 ## Logging
@@ -41,7 +40,7 @@ try { /* hook logic */ } catch { /* silently continue */ }
 
 ## Shared Utilities
 
-Import from `hooks/lib/utils.js`:
+Import from `scripts/lib/utils.js` (canonical source):
 - `readStdinSync()` — read stdin for hook chaining
 - `log(msg)` — log to stderr
 - `execCommand(cmd, args)` — safe execution (no shell injection)

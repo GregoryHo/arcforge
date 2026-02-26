@@ -15,7 +15,7 @@ describe('compact-suggester counter', () => {
     process.env.CLAUDE_SESSION_ID = 'test-compact-session';
     // Clear module cache before each test
     delete require.cache[require.resolve('../compact-suggester/main')];
-    delete require.cache[require.resolve('../lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
   });
 
   afterEach(() => {
@@ -39,7 +39,7 @@ describe('compact-suggester counter', () => {
   it('should reset counter', () => {
     const { readCount, resetCounter } = require('../compact-suggester/main');
     // Manually write a count
-    const { createSessionCounter } = require('../lib/utils');
+    const { createSessionCounter } = require('../../scripts/lib/utils');
     const counter = createSessionCounter('tool-count');
     counter.write(50);
 

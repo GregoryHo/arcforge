@@ -13,7 +13,7 @@ const path = require('node:path');
 
 const os = require('node:os');
 
-const { getProjectName, readStdinSync } = require('../lib/utils');
+const { getProjectName, readStdinSync } = require('../../scripts/lib/utils');
 const { getObservationsPath } = require('../../scripts/lib/session-utils');
 
 // ─────────────────────────────────────────────

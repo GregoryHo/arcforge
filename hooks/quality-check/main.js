@@ -12,8 +12,8 @@
  */
 
 const path = require('node:path');
-const { readStdinSync, parseStdinJson, log, readFileSafe } = require('../lib/utils');
-const { detectPackageManager, hasDevDependency } = require('../lib/package-manager');
+const { readStdinSync, parseStdinJson, log, readFileSafe } = require('../../scripts/lib/utils');
+const { detectPackageManager, hasDevDependency } = require('../../scripts/lib/package-manager');
 const { runPrettier } = require('./prettier');
 const { runTypeCheck } = require('./typescript');
 

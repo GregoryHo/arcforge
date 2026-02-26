@@ -15,7 +15,7 @@ const {
   setSessionIdFromInput,
   logHighlight,
   createSessionCounter,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 
 const THRESHOLD = 50; // First suggestion
 const INTERVAL = 25; // Subsequent reminders

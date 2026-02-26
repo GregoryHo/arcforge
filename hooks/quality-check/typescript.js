@@ -4,8 +4,8 @@
  */
 
 const path = require('node:path');
-const { execCommand, fileExists, findUpwards } = require('../lib/utils');
-const { getPmExecCommand } = require('../lib/package-manager');
+const { execCommand, fileExists, findUpwards } = require('../../scripts/lib/utils');
+const { getPmExecCommand } = require('../../scripts/lib/package-manager');
 
 /**
  * Run TypeScript compiler on project (noEmit mode)

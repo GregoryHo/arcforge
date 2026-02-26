@@ -32,7 +32,7 @@ const {
   getTimestamp,
   ensureDir,
   log,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 
 const { getInstinctsDir } = require('../../scripts/lib/session-utils');
 
