@@ -12,7 +12,7 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   createSessionCounter,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 
 // Counter is created lazily on first access
 let userCounter = null;

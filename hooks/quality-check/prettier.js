@@ -2,8 +2,8 @@
  * Prettier formatting module for quality-check hook
  */
 
-const { execCommand, fileExists } = require('../lib/utils');
-const { getPmExecCommand } = require('../lib/package-manager');
+const { execCommand, fileExists } = require('../../scripts/lib/utils');
+const { getPmExecCommand } = require('../../scripts/lib/package-manager');
 
 /**
  * Run Prettier on a file with --write flag

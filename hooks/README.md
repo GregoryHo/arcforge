@@ -118,7 +118,7 @@ hooks/
 
 ```javascript
 #!/usr/bin/env node
-const { readStdinSync, log } = require('../lib/utils');
+const { readStdinSync, log } = require('../../scripts/lib/utils');
 
 function main() {
   // Read and pass through stdin (for hook chaining)

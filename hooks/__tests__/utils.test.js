@@ -19,7 +19,7 @@ const {
   getTimestamp,
   createSessionCounter,
   parseStdinJson,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 
 describe('escapeForJson', () => {
   it('should handle empty string', () => {

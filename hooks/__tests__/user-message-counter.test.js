@@ -15,7 +15,7 @@ describe('user-message-counter', () => {
     process.env.CLAUDE_SESSION_ID = 'test-user-session';
     // Clear module cache before each test
     delete require.cache[require.resolve('../user-message-counter/main')];
-    delete require.cache[require.resolve('../lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
   });
 
   afterEach(() => {
@@ -64,7 +64,7 @@ describe('counter independence', () => {
     // Clear all related module caches
     delete require.cache[require.resolve('../user-message-counter/main')];
     delete require.cache[require.resolve('../compact-suggester/main')];
-    delete require.cache[require.resolve('../lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
   });
 
   afterEach(() => {
@@ -79,7 +79,7 @@ describe('counter independence', () => {
       writeCount: writeUserCount,
     } = require('../user-message-counter/main');
     const { readCount: readToolCount } = require('../compact-suggester/main');
-    const { createSessionCounter } = require('../lib/utils');
+    const { createSessionCounter } = require('../../scripts/lib/utils');
     const toolCounter = createSessionCounter('tool-count');
 
     // Set different values

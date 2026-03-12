@@ -25,7 +25,7 @@ const {
   getTimestamp,
   log,
   outputDecision,
-} = require('../lib/utils');
+} = require('../../scripts/lib/utils');
 const {
   readCount: readToolCount,
   resetCounter: resetToolCounter,
@@ -34,7 +34,7 @@ const {
   readCount: readUserCount,
   resetCounter: resetUserCounter,
 } = require('../user-message-counter/main');
-const { shouldTrigger } = require('../lib/thresholds');
+const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { calculateDurationMinutes } = require('./summary');
 
 /**

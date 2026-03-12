@@ -510,7 +510,6 @@ module.exports = {
   writeFileSafe,
   getTempDir,
   findUpwards,
-  getCommandPath,
   commandExists,
   execCommand,
   parseStdinJson,
@@ -525,10 +524,7 @@ module.exports = {
   outputContext,
   outputDecision,
   outputDecisionHighlight,
-  // Color utilities
-  colors,
-  colorize,
-  supportsColor,
+  // Color utilities (internal: colors, colorize, supportsColor)
   // Session management
   getSessionId,
   getProjectName,
