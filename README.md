@@ -244,6 +244,10 @@ cd hooks && npm install && cd ..
 pip install pytest pyyaml    # Required for test:skills
 ```
 
+### Plugin Development
+
+To develop arcforge itself with live plugin loading, see the [Plugin Development](CONTRIBUTING.md#plugin-development) section in CONTRIBUTING.md. Quick version: `npm run dev` starts a Claude session that loads the plugin directly from your local checkout.
+
 ### Running Tests
 
 ```bash

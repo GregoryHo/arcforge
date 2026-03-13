@@ -6,6 +6,7 @@ Welcome! arcforge is a skill-based autonomous agent pipeline for Claude Code, Co
 
 - [Philosophy & Principles](#philosophy--principles)
 - [Quick Start](#quick-start)
+- [Plugin Development](#plugin-development)
 - [Contributing Skills](#contributing-skills)
 - [Contributing to the CLI Engine](#contributing-to-the-cli-engine)
 - [Contributing Hooks](#contributing-hooks)
@@ -66,6 +67,45 @@ npm test
 # 7. Submit PR
 git push -u origin feat/my-contribution
 ```
+
+---
+
+## Plugin Development
+
+When developing inside the arcforge repo, you need the plugin to load from your local checkout instead of the cached marketplace version. The project handles this automatically:
+
+- **`.claude/settings.json`** disables the marketplace install (`arcforge@arcforge-dev`) at project scope, so it never conflicts with local changes.
+- **`--plugin-dir .`** tells Claude Code to load the plugin directly from the filesystem. This bypasses the version cache entirely — no version bump needed, changes are picked up immediately.
+
+### Starting a Dev Session
+
+```bash
+npm run dev
+```
+
+This runs `claude --plugin-dir .`, which starts Claude Code with the local plugin loaded. You can also run the command directly if you prefer.
+
+### Hot Reload Workflow
+
+1. Edit skill files, hooks, or other plugin components
+2. In the Claude session, run `/reload-plugins`
+3. Changes are reflected immediately — no restart needed
+
+### Verifying Local Plugin
+
+Inside a dev session, ask Claude:
+
+```
+What is ARCFORGE_ROOT?
+```
+
+The value should be your local repo path (e.g., `/Users/you/arcforge`), **not** a cache path like `~/.claude/plugins/cache/...`.
+
+### Notes
+
+- `--plugin-dir` requires Claude Code v2.1.74+
+- The marketplace version continues to work in all other projects — this override is session-scoped
+- You do NOT need to bump `version` in `plugin.json` during development
 
 ---
 
