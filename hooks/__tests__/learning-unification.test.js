@@ -116,24 +116,29 @@ describe('reflect.js save-instinct uses 0.85 cap', () => {
 });
 
 // ─────────────────────────────────────────────
-// 4. inject-context loads diary (not session markdown)
+// 4. inject-context uses one-liner session summary (not diary markdown)
 // ─────────────────────────────────────────────
 
-describe('inject-context loads diary (not session markdown)', () => {
-  it('should export findRecentMarkdownFiles', () => {
+describe('inject-context uses one-liner session summary', () => {
+  it('should export findLatestSession and formatSessionSummary', () => {
     const injectContext = require('../session-tracker/inject-context');
     assert.ok(
-      typeof injectContext.findRecentMarkdownFiles === 'function',
-      'findRecentMarkdownFiles should be exported',
+      typeof injectContext.findLatestSession === 'function',
+      'findLatestSession should be exported',
+    );
+    assert.ok(
+      typeof injectContext.formatSessionSummary === 'function',
+      'formatSessionSummary should be exported',
     );
   });
 
-  it('findRecentMarkdownFiles should return diary header for diary files', () => {
-    // Verify the function signature handles empty input gracefully
-    const { findRecentMarkdownFiles } = require('../session-tracker/inject-context');
-    const result = findRecentMarkdownFiles([]);
-    assert.strictEqual(result.header, null, 'should return null header for empty sessions');
-    assert.deepStrictEqual(result.contents, [], 'should return empty contents for empty sessions');
+  it('should NOT export findRecentMarkdownFiles (removed in redesign)', () => {
+    const injectContext = require('../session-tracker/inject-context');
+    assert.strictEqual(
+      injectContext.findRecentMarkdownFiles,
+      undefined,
+      'findRecentMarkdownFiles should no longer be exported',
+    );
   });
 });
 

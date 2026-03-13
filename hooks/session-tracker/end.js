@@ -36,6 +36,7 @@ const {
 } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { calculateDurationMinutes } = require('./summary');
+const { parseTranscript } = require('../../scripts/lib/transcript');
 
 /**
  * Create default session if none exists
@@ -160,7 +161,18 @@ function main() {
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
   session.toolCalls = toolCount;
-  session.filesModified = [];
+
+  // Enrich with transcript data if available
+  const transcriptPath = input?.transcript_path;
+  const transcriptData = transcriptPath ? parseTranscript(transcriptPath) : null;
+
+  if (transcriptData) {
+    session.userMessageContent = transcriptData.userMessages;
+    session.toolsUsed = transcriptData.toolsUsed;
+    session.filesModified = transcriptData.filesModified;
+  } else {
+    session.filesModified = [];
+  }
 
   saveSessionJson(session);
 

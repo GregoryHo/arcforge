@@ -2,10 +2,20 @@
 /**
  * Session Tracker - Context Injection (Sync Hook)
  *
- * Runs SYNCHRONOUSLY on SessionStart to inject context into Claude.
- * Outputs JSON with additionalContext for immediate delivery.
+ * Runs SYNCHRONOUSLY on SessionStart to inject minimal context into Claude.
  *
- * This is the sync companion to start.js (which runs async for background tasks).
+ * Injected (to Claude via stdout):
+ * - One-liner session summary (awareness, not history)
+ * - Active behavioral instincts (confidence >= 0.70)
+ * - Pending action notifications
+ *
+ * Logged (to user via stderr):
+ * - Available session aliases (discoverability)
+ * - Global instinct promotions
+ *
+ * Removed in redesign (was noise):
+ * - Diary content injection → use /sessions resume instead
+ * - Verbose 5-session history → replaced with one-liner
  */
 
 const fs = require('node:fs');
@@ -22,6 +32,7 @@ const {
 } = require('../../scripts/lib/utils');
 
 const {
+  getDateDirs,
   getInstinctsDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
@@ -31,53 +42,7 @@ const { parseConfidenceFrontmatter, shouldAutoLoad } = require('../../scripts/li
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
-const MAX_SESSIONS = 5;
-const MAX_MD_FILES = 3;
-
-/**
- * Get all date directories sorted by date descending
- */
-function getDateDirs(projectDir) {
-  return fs
-    .readdirSync(projectDir)
-    .filter((entry) => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry)) return false;
-      return fs.statSync(path.join(projectDir, entry)).isDirectory();
-    })
-    .sort((a, b) => new Date(b) - new Date(a));
-}
-
-/**
- * Find recent session files for current project
- */
-function findRecentSessions() {
-  const projectDir = getProjectSessionsDir(getProjectName());
-  if (!fs.existsSync(projectDir)) return [];
-
-  const sessions = [];
-  const dateDirs = getDateDirs(projectDir);
-
-  for (const dateStr of dateDirs) {
-    const dateDir = path.join(projectDir, dateStr);
-    const files = fs.readdirSync(dateDir).filter((f) => f.endsWith('.json'));
-
-    for (const file of files) {
-      const content = readFileSafe(path.join(dateDir, file));
-      if (!content) continue;
-
-      try {
-        sessions.push({ ...JSON.parse(content), dateStr });
-      } catch {
-        // Skip invalid JSON
-      }
-    }
-  }
-
-  return sessions
-    .filter((s) => (s.userMessages || 0) >= 1 || (s.toolCalls || 0) >= 1)
-    .sort((a, b) => new Date(b.lastUpdated || b.dateStr) - new Date(a.lastUpdated || a.dateStr))
-    .slice(0, MAX_SESSIONS);
-}
+const { calculateDurationMinutes } = require('./summary');
 
 /**
  * Pluralize a word based on count
@@ -104,88 +69,53 @@ function formatRelativeTime(timestamp) {
 }
 
 /**
- * Calculate session duration in minutes
+ * Find the most recent session for a one-liner summary.
+ * Returns the latest session object or null.
  */
-function calcDuration(session) {
-  if (!session.started || !session.lastUpdated) return 0;
-  return Math.round((new Date(session.lastUpdated) - new Date(session.started)) / 60000);
-}
+function findLatestSession() {
+  const projectDir = getProjectSessionsDir(getProjectName());
+  if (!fs.existsSync(projectDir)) return null;
 
-/**
- * Format session context for output
- */
-function formatSessionContext(sessions) {
-  if (sessions.length === 0) return null;
+  const dateDirs = getDateDirs(projectDir);
 
-  const [latest, ...older] = sessions;
-  const lines = ['## Previous Session Context\n'];
+  for (const dateStr of dateDirs) {
+    const dateDir = path.join(projectDir, dateStr);
+    const files = fs
+      .readdirSync(dateDir)
+      .filter((f) => f.endsWith('.json') && f.startsWith('session-'));
 
-  // Latest session details
-  lines.push('### Last Session');
-  lines.push(`- **Time**: ${formatRelativeTime(latest.lastUpdated)}`);
-
-  const duration = calcDuration(latest);
-  if (duration > 0) {
-    lines.push(`- **Duration**: ~${duration} minutes`);
-  }
-
-  lines.push(`- **Tool calls**: ${latest.toolCalls || 0}`);
-  lines.push(`- **User messages**: ${latest.userMessages || 0}`);
-
-  const files = latest.filesModified || [];
-  if (files.length > 0) {
-    const displayed = files.slice(0, 5);
-    const remaining = files.length - displayed.length;
-    lines.push(
-      `- **Files modified**: ${displayed.join(', ')}${remaining > 0 ? ` ... and ${remaining} more` : ''}`,
-    );
-  }
-
-  // Older sessions summary
-  if (older.length > 0) {
-    const totalToolCalls = older.reduce((sum, s) => sum + (s.toolCalls || 0), 0);
-    const totalUserMsgs = older.reduce((sum, s) => sum + (s.userMessages || 0), 0);
-    lines.push(
-      `\n**Recent activity**: ${pluralize(older.length, 'other session')}, ${totalToolCalls} tool calls, ${totalUserMsgs} user messages`,
-    );
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Find recent diary or session markdown files from latest session.
- * Diary-first: if diary files exist, load those. Otherwise fallback to session markdown.
- * Returns { header, contents } where header indicates diary vs session notes.
- */
-function findRecentMarkdownFiles(sessions) {
-  if (!sessions?.length) return { header: null, contents: [] };
-
-  const latestDateStr = sessions[0].dateStr;
-  if (!latestDateStr) return { header: null, contents: [] };
-
-  const dateDir = path.join(getProjectSessionsDir(getProjectName()), latestDateStr);
-  if (!fs.existsSync(dateDir)) return { header: null, contents: [] };
-
-  const allFiles = fs.readdirSync(dateDir).filter((f) => f.endsWith('.md'));
-
-  // Diary-first: prioritize diary files, fall back to session markdown
-  const diaryFiles = allFiles.filter((f) => f.startsWith('diary-'));
-  const isDiary = diaryFiles.length > 0;
-  const files = isDiary ? diaryFiles : allFiles.filter((f) => !f.startsWith('diary-'));
-
-  const contents = files
-    .sort()
-    .reverse()
-    .slice(0, MAX_MD_FILES)
-    .map((file) => {
+    const sessions = [];
+    for (const file of files) {
       const content = readFileSafe(path.join(dateDir, file));
-      return content?.trim() ? `### ${latestDateStr}/${file}\n${content.trim()}` : null;
-    })
-    .filter(Boolean);
+      if (!content) continue;
+      try {
+        sessions.push(JSON.parse(content));
+      } catch {
+        // skip
+      }
+    }
 
-  const header = isDiary ? '--- Recent Diary Entries ---' : '--- Previous Session Notes ---';
-  return { header, contents };
+    if (sessions.length > 0) {
+      // Return the most recently updated session
+      sessions.sort((a, b) => new Date(b.lastUpdated || 0) - new Date(a.lastUpdated || 0));
+      return sessions[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Format a session summary with key metrics.
+ */
+function formatSessionSummary(session) {
+  if (!session) return null;
+
+  const time = formatRelativeTime(session.lastUpdated);
+  const duration = calculateDurationMinutes(session.started, session.lastUpdated) || 0;
+  const tools = session.toolCalls || 0;
+  const msgs = session.userMessages || 0;
+  return `- **Time**: ${time}\n- **Duration**: ~${duration} minutes\n- **Tool calls**: ${tools}\n- **User messages**: ${msgs}`;
 }
 
 /**
@@ -232,7 +162,6 @@ function loadInstinctFiles(dir) {
         const { frontmatter, body } = parseConfidenceFrontmatter(content);
         if (frontmatter.confidence === undefined) return null;
 
-        // Extract action from body
         const actionMatch = body.match(/## Action\n+(.+)/);
 
         return {
@@ -250,43 +179,7 @@ function loadInstinctFiles(dir) {
 }
 
 /**
- * Check global index for newly promoted patterns
- */
-function checkNewGlobalPromotions() {
-  try {
-    const indexPath = getInstinctsGlobalIndex();
-    if (!fs.existsSync(indexPath)) return null;
-
-    const content = fs.readFileSync(indexPath, 'utf-8');
-    const lines = content.trim().split('\n').filter(Boolean);
-
-    // Check for promotions in the last 7 days
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    const recent = lines
-      .map((line) => {
-        try {
-          return JSON.parse(line);
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean)
-      .filter((entry) => new Date(entry.promoted) > weekAgo);
-
-    if (recent.length === 0) return null;
-
-    const ids = recent.map((e) => e.id).join(', ');
-    return `New global instincts (found in multiple projects): ${ids}`;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Load and consume pending actions for context injection.
- * Returns formatted context string or null.
  */
 function loadPendingActions(project) {
   try {
@@ -295,7 +188,6 @@ function loadPendingActions(project) {
 
     const lines = [];
 
-    // Group by type
     const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
     const otherActions = actions.filter((a) => a.type !== 'reflect-ready');
 
@@ -313,7 +205,6 @@ function loadPendingActions(project) {
       );
     }
 
-    // Consume all displayed actions
     for (const action of actions) {
       consumeAction(project, action.id);
     }
@@ -321,6 +212,56 @@ function loadPendingActions(project) {
     return lines.length > 0 ? lines.join('\n') : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Load session aliases and log to stderr for discoverability.
+ */
+function logAvailableAliases(project) {
+  try {
+    const { listAliases } = require('../../scripts/lib/session-aliases');
+    const aliases = listAliases(project);
+    if (aliases.length > 0) {
+      const names = aliases.map((a) => a.name).join(', ');
+      log(`${aliases.length} session aliases available: ${names}`);
+    }
+  } catch {
+    // session-aliases not available yet — skip
+  }
+}
+
+/**
+ * Check global index for newly promoted patterns (stderr only)
+ */
+function checkNewGlobalPromotions() {
+  try {
+    const indexPath = getInstinctsGlobalIndex();
+    if (!fs.existsSync(indexPath)) return;
+
+    const content = fs.readFileSync(indexPath, 'utf-8');
+    const lines = content.trim().split('\n').filter(Boolean);
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const recent = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .filter((entry) => new Date(entry.promoted) > weekAgo);
+
+    if (recent.length > 0) {
+      const ids = recent.map((e) => e.id).join(', ');
+      log(`New global instincts (found in multiple projects): ${ids}`);
+    }
+  } catch {
+    // silent
   }
 }
 
@@ -333,41 +274,35 @@ function main() {
   setSessionIdFromInput(input);
 
   const project = getProjectName();
-  const sessions = findRecentSessions();
-  const { header: mdHeader, contents: mdContents } = findRecentMarkdownFiles(sessions);
-  const instinctsContext = loadAutoInstincts(project);
-  const pendingContext = loadPendingActions(project);
-  const globalPromotions = checkNewGlobalPromotions();
 
+  // Build context for Claude (stdout → additionalContext)
   const parts = [];
 
-  const sessionContext = formatSessionContext(sessions);
-  if (sessionContext) {
-    parts.push(sessionContext);
-    log(sessionContext);
+  // 1. One-liner session summary (minimal awareness)
+  const latest = findLatestSession();
+  const oneLiner = formatSessionSummary(latest);
+  if (oneLiner) {
+    parts.push('### Last Session');
+    parts.push(oneLiner);
   }
 
-  if (mdContents.length > 0 && mdHeader) {
-    parts.push(mdHeader);
-    parts.push(mdContents.join('\n---\n'));
-    log(`\n${mdHeader}`);
-    log(mdContents.join('\n---\n'));
-  }
-
+  // 2. Active instincts (behavioral patterns, always relevant)
+  const instinctsContext = loadAutoInstincts(project);
   if (instinctsContext) {
     parts.push(instinctsContext);
     log(instinctsContext);
   }
 
+  // 3. Pending action notifications
+  const pendingContext = loadPendingActions(project);
   if (pendingContext) {
     parts.push(pendingContext);
     log(pendingContext);
   }
 
-  if (globalPromotions) {
-    parts.push(globalPromotions);
-    log(globalPromotions);
-  }
+  // Stderr-only (user visibility, not injected into Claude)
+  logAvailableAliases(project);
+  checkNewGlobalPromotions();
 
   if (parts.length > 0) {
     const fullContext = parts.join('\n\n');
@@ -379,17 +314,15 @@ function main() {
 
 // Export for testing
 module.exports = {
-  getDateDirs,
-  findRecentSessions,
-  formatSessionContext,
-  findRecentMarkdownFiles,
+  findLatestSession,
+  formatSessionSummary,
   formatRelativeTime,
-  calcDuration,
   pluralize,
   loadAutoInstincts,
   loadInstinctFiles,
-  checkNewGlobalPromotions,
   loadPendingActions,
+  logAvailableAliases,
+  checkNewGlobalPromotions,
 };
 
 // Run if executed directly
