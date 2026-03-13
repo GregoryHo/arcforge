@@ -28,6 +28,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
+    "dev": "claude --plugin-dir .",
     "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills",
     "test:scripts": "jest",
     "test:hooks": "cd hooks && npm test",
