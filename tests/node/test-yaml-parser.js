@@ -158,4 +158,39 @@ assert.strictEqual(roundtripResult.epics[0].id, dagResult.epics[0].id);
 assert.strictEqual(roundtripResult.epics[0].features[0].id, dagResult.epics[0].features[0].id);
 console.log('    ✓ Roundtrip preserves data');
 
+// Test parseDagYaml defaults for depends_on
+console.log('  parseDagYaml (depends_on defaults)...');
+const nullDepsYaml = `
+epics:
+  - id: epic-001
+    name: Test
+    spec_path: spec.md
+    depends_on: null
+    features:
+      - id: feat-001
+        name: Feature 1
+`;
+const nullDepsResult = parseDagYaml(nullDepsYaml);
+assert.deepStrictEqual(nullDepsResult.epics[0].depends_on, []);
+assert.deepStrictEqual(nullDepsResult.epics[0].features[0].depends_on, []);
+console.log('    ✓ null/missing depends_on defaults to []');
+
+// Test that flow syntax passes through as string (parser limitation)
+const flowDepsYaml = `
+epics:
+  - id: epic-002
+    name: Test
+    spec_path: spec.md
+    depends_on: [epic-001]
+    features:
+      - id: feat-002
+        name: Feature 2
+        depends_on: [feat-001]
+`;
+const flowDepsResult = parseDagYaml(flowDepsYaml);
+// Parser doesn't support flow syntax — returns raw string, not array
+assert.strictEqual(typeof flowDepsResult.epics[0].depends_on, 'string');
+assert.strictEqual(typeof flowDepsResult.epics[0].features[0].depends_on, 'string');
+console.log('    ✓ Flow syntax passes through as string (normalized by model constructors)');
+
 console.log('\n✅ All yaml-parser tests passed!\n');

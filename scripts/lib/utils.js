@@ -431,6 +431,35 @@ function sanitizeFilename(name) {
 }
 
 /**
+ * Normalize a value into an array.
+ * Handles the various forms that depends_on can take from YAML parsing:
+ * - falsy (null, undefined, '') → []
+ * - already an array → pass-through
+ * - string "[a, b]" (YAML flow syntax) → ['a', 'b']
+ * - string "item" (plain string) → ['item']
+ *
+ * @param {*} value - Value to normalize
+ * @returns {Array} Normalized array
+ */
+function normalizeArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const inner = trimmed.slice(1, -1).trim();
+      if (inner === '') return [];
+      return inner
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
+/**
  * Ensure a directory exists
  */
 function ensureDir(dirPath) {
@@ -537,6 +566,7 @@ module.exports = {
   getDiaryedDir,
   getCompactionLogPath,
   ensureDir,
+  normalizeArray,
   sanitizeFilename,
   createSessionCounter,
   getSessionFilePath,

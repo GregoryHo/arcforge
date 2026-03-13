@@ -403,6 +403,9 @@ function validate(dag) {
       const prefix = `epics[${i}]`;
 
       // Validate epic-level depends_on
+      if (epic.depends_on !== undefined && !Array.isArray(epic.depends_on)) {
+        errors.push(`${prefix}.depends_on must be an array, got ${typeof epic.depends_on}`);
+      }
       if (Array.isArray(epic.depends_on)) {
         for (const depId of epic.depends_on) {
           if (!epicIds.has(depId)) {
@@ -416,6 +419,11 @@ function validate(dag) {
         const featureIds = new Set(epic.features.filter((f) => f.id).map((f) => f.id));
         for (let j = 0; j < epic.features.length; j++) {
           const feat = epic.features[j];
+          if (feat.depends_on !== undefined && !Array.isArray(feat.depends_on)) {
+            errors.push(
+              `${prefix}.features[${j}].depends_on must be an array, got ${typeof feat.depends_on}`,
+            );
+          }
           if (Array.isArray(feat.depends_on)) {
             for (const depId of feat.depends_on) {
               if (!featureIds.has(depId)) {
