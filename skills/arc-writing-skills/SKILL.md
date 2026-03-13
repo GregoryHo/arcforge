@@ -382,6 +382,8 @@ Agent found new rationalization? Add explicit counter. Re-test until bulletproof
 
 **Testing methodology:** See `testing-skills-with-subagents.md` for complete testing methodology.
 
+**Structured evaluation:** Use `agents/` templates for structured grading (`skill-grader.md`), blind comparison (`skill-comparator.md`), pattern analysis (`skill-analyzer.md`), and description testing (`description-tester.md`). See `references/eval-schemas.md` for data formats.
+
 ## Anti-Patterns
 
 ### Narrative Example
@@ -466,6 +468,15 @@ This skill includes supporting files for comprehensive skill development:
 **Flowcharts:**
 - `graphviz-conventions.dot` - Style guide for graphviz flowcharts (node shapes, edge labels, naming patterns)
 - `render-graphs.js` - Utility to render SKILL.md flowcharts to SVG
+
+**Evaluation Agents (subagent templates):**
+- `agents/skill-grader.md` - Grades behavioral compliance under pressure, extracts rationalizations
+- `agents/skill-comparator.md` - Blind A/B comparison of skill versions for REFACTOR phase
+- `agents/skill-analyzer.md` - Assertion discrimination, benchmark pattern analysis, pressure scenario quality
+- `agents/description-tester.md` - Automated description trigger testing with train/test split
+
+**Evaluation Reference:**
+- `references/eval-schemas.md` - JSON schemas for evals, grading, benchmarks, and comparisons
 
 **Examples:**
 - `examples/CLAUDE_MD_TESTING.md` - Example of testing documentation variants with pressure scenarios

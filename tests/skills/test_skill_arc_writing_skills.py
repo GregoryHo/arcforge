@@ -5,9 +5,11 @@ in the arcforge system, based on TDD principles.
 """
 from pathlib import Path
 
+SKILL_DIR = Path("skills/arc-writing-skills")
+
 
 def _read_skill() -> str:
-    skill_path = Path("skills/arc-writing-skills/SKILL.md")
+    skill_path = SKILL_DIR / "SKILL.md"
     return skill_path.read_text(encoding="utf-8")
 
 
@@ -114,3 +116,66 @@ class TestSkillCreationChecklist:
         text = _read_skill()
         lowered = text.lower()
         assert "checklist" in lowered or ("[ ]" in text)
+
+
+class TestEvaluationAgents:
+    """Test that evaluation agent templates exist and are properly structured."""
+
+    AGENT_FILES = [
+        "agents/skill-grader.md",
+        "agents/skill-comparator.md",
+        "agents/skill-analyzer.md",
+        "agents/description-tester.md",
+    ]
+
+    def test_agent_files_exist(self):
+        """All 4 agent templates must exist."""
+        for agent_file in self.AGENT_FILES:
+            path = SKILL_DIR / agent_file
+            assert path.exists(), f"Missing agent template: {agent_file}"
+
+    def test_agent_files_have_role_section(self):
+        """Each agent template must define its Role."""
+        for agent_file in self.AGENT_FILES:
+            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
+            assert "## Role" in content, f"{agent_file} missing ## Role section"
+
+    def test_agent_files_have_process_section(self):
+        """Each agent template must define its Process."""
+        for agent_file in self.AGENT_FILES:
+            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
+            assert "## Process" in content, f"{agent_file} missing ## Process section"
+
+    def test_agent_files_have_output_or_guidelines(self):
+        """Each agent template must define output format or guidelines."""
+        for agent_file in self.AGENT_FILES:
+            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
+            has_output = "## Output" in content or "## Guidelines" in content
+            assert has_output, f"{agent_file} missing ## Output or ## Guidelines section"
+
+    def test_eval_schemas_exist(self):
+        """Evaluation schemas reference file must exist."""
+        path = SKILL_DIR / "references/eval-schemas.md"
+        assert path.exists(), "Missing references/eval-schemas.md"
+
+    def test_eval_schemas_has_required_schemas(self):
+        """Schemas file must define evals, grading, benchmark, and comparison."""
+        content = (SKILL_DIR / "references/eval-schemas.md").read_text(encoding="utf-8")
+        for schema in ["evals.json", "grading.json", "benchmark.json", "comparison.json"]:
+            assert schema in content, f"Missing schema definition: {schema}"
+
+
+class TestSupportingFilesReferenced:
+    """Test that all supporting files are referenced in SKILL.md."""
+
+    def test_agent_templates_referenced(self):
+        """All agent templates must be listed in Supporting Files."""
+        text = _read_skill()
+        for agent in ["skill-grader.md", "skill-comparator.md",
+                       "skill-analyzer.md", "description-tester.md"]:
+            assert agent in text, f"Agent {agent} not referenced in SKILL.md"
+
+    def test_eval_schemas_referenced(self):
+        """Eval schemas must be referenced in Supporting Files."""
+        text = _read_skill()
+        assert "eval-schemas.md" in text

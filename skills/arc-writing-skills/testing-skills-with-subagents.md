@@ -358,6 +358,50 @@ Fix: Continue REFACTOR cycle until no new rationalizations.
 | **REFACTOR** | Close loopholes | Add counters for new rationalizations |
 | **Stay GREEN** | Re-verify | Agent still complies after refactoring |
 
+## Structured Evaluation Agents
+
+For repeatable, structured evaluation beyond manual testing, use the agent templates in `agents/`:
+
+| Agent | When to Use | Output |
+|-------|-------------|--------|
+| `skill-grader.md` | After RED or GREEN runs — grade compliance assertions, extract rationalizations | `grading.json` |
+| `skill-comparator.md` | During REFACTOR — blind A/B comparison of two skill versions | `comparison.json` |
+| `skill-analyzer.md` | After comparison or benchmark — surface patterns, find weak scenarios | `analysis.json` or notes array |
+| `description-tester.md` | Before deployment — test whether description triggers correctly | Results summary |
+
+See `references/eval-schemas.md` for JSON data formats used by these agents.
+
+### Workspace Directory Structure
+
+Organize evaluation results by iteration to track skill improvement:
+
+```
+workspace/
+  iteration-1/
+    eval-scenario-1/
+      without_skill/    # RED baseline
+        transcript.md
+        grading.json
+      with_skill/       # GREEN verification
+        transcript.md
+        grading.json
+    eval-scenario-2/
+      ...
+  iteration-2/
+    ...
+    comparison.json     # Comparator output (vs iteration-1)
+    analysis.json       # Analyzer output
+  benchmark/
+    benchmark.json      # Aggregated results across iterations
+```
+
+### Agent Workflow
+
+1. **RED phase**: Run scenarios without skill, grade with `skill-grader.md` to capture baseline rationalizations
+2. **GREEN phase**: Run same scenarios with skill, grade again to verify compliance
+3. **REFACTOR phase**: Use `skill-comparator.md` for blind comparison between skill versions, then `skill-analyzer.md` to understand why one version works better
+4. **Before deployment**: Use `description-tester.md` to verify the description triggers correctly
+
 ## The Bottom Line
 
 **Skill creation IS TDD. Same principles, same cycle, same benefits.**
