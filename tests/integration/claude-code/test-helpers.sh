@@ -3,9 +3,13 @@
 
 # Run Claude Code with a prompt and capture output
 # Usage: run_claude "prompt text" [timeout_seconds] [allowed_tools]
+#
+# Returns 0 on success, 1 on timeout or failure.
+# Callers should use: output=$(run_claude ...) || true
+# to avoid set -e from killing the script on timeout.
 run_claude() {
     local prompt="$1"
-    local timeout="${2:-60}"
+    local timeout_val="${2:-120}"
     local allowed_tools="${3:-}"
     local output_file=$(mktemp)
 
@@ -13,23 +17,28 @@ run_claude() {
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local plugin_dir="$(cd "$script_dir/../../.." && pwd)"
 
-    # Build command with --plugin-dir to use local plugin without installation
-    local cmd="claude -p \"$prompt\" --plugin-dir \"$plugin_dir\""
+    # Build command args as array — avoids bash -c wrapper so timeout
+    # sends SIGTERM directly to claude, not to an intermediary shell
+    local -a cmd_args=(-p "$prompt" --plugin-dir "$plugin_dir")
     if [ -n "$allowed_tools" ]; then
-        cmd="$cmd --allowed-tools=$allowed_tools"
+        cmd_args+=(--allowed-tools="$allowed_tools")
     fi
 
     # Run Claude in headless mode with timeout
-    # Note: </dev/null is critical to prevent Claude CLI from hanging on stdin
-    if timeout "$timeout" bash -c "$cmd" </dev/null > "$output_file" 2>&1; then
+    # --kill-after=10: send SIGKILL if SIGTERM doesn't work after 10s
+    # </dev/null: prevent Claude CLI from hanging on stdin
+    if timeout --kill-after=10 "$timeout_val" claude "${cmd_args[@]}" </dev/null > "$output_file" 2>&1; then
         cat "$output_file"
         rm -f "$output_file"
         return 0
     else
         local exit_code=$?
-        cat "$output_file" >&2
+        # Output partial results to stdout (not stderr) so callers can still check content
+        cat "$output_file"
         rm -f "$output_file"
-        return $exit_code
+        # Return 1 (not 124) so set -e callers see a normal failure,
+        # not an exit code that the runner confuses with its own timeout
+        return 1
     fi
 }
 
@@ -127,6 +136,19 @@ assert_order() {
     fi
 }
 
+# Check that run_claude produced output (not empty from timeout/error)
+# Usage: require_output "$output" "Test N description" || { FAILED=$((FAILED+1)); continue; }
+require_output() {
+    local output="$1"
+    local test_name="${2:-test}"
+
+    if [ -z "$output" ]; then
+        echo "  [FAIL] $test_name: No output from Claude (timeout or error)"
+        return 1
+    fi
+    return 0
+}
+
 # Create a temporary test project directory
 # Usage: test_project=$(create_test_project)
 create_test_project() {
@@ -202,6 +224,7 @@ export -f assert_contains
 export -f assert_not_contains
 export -f assert_count
 export -f assert_order
+export -f require_output
 export -f create_test_project
 export -f cleanup_test_project
 export -f create_test_plan

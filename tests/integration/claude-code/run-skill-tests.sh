@@ -129,10 +129,10 @@ for test in "${tests[@]}"; do
             end_time=$(date +%s)
             duration=$((end_time - start_time))
             echo ""
-            if [ $exit_code -eq 124 ]; then
-                echo "  [FAIL] $test (timeout after ${TIMEOUT}s)"
+            if [ $exit_code -eq 124 ] && [ $duration -ge $((TIMEOUT - 5)) ]; then
+                echo "  [FAIL] $test (timeout after ${duration}s)"
             else
-                echo "  [FAIL] $test (${duration}s)"
+                echo "  [FAIL] $test (${duration}s, exit $exit_code)"
             fi
             failed=$((failed + 1))
         fi
@@ -147,10 +147,10 @@ for test in "${tests[@]}"; do
             exit_code=$?
             end_time=$(date +%s)
             duration=$((end_time - start_time))
-            if [ $exit_code -eq 124 ]; then
-                echo "  [FAIL] (timeout after ${TIMEOUT}s)"
+            if [ $exit_code -eq 124 ] && [ $duration -ge $((TIMEOUT - 5)) ]; then
+                echo "  [FAIL] (timeout after ${duration}s)"
             else
-                echo "  [FAIL] (${duration}s)"
+                echo "  [FAIL] (${duration}s, exit $exit_code)"
             fi
             echo ""
             echo "  Output:"
