@@ -9,7 +9,7 @@ description: Use when you have accumulated instincts and want to cluster related
 
 Cluster related instincts into higher-level abstractions: skills, commands, or agents. This skill analyzes accumulated behavioral patterns (instincts) and identifies groups that can be consolidated into reusable components.
 
-**Pipeline position:** `observe → instincts → cluster (this skill) → skills/commands/agents`
+**Position:** `observe → instincts → cluster (this skill) → skills/commands/agents`
 
 ## Quick Reference
 

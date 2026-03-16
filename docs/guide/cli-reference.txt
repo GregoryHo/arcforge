@@ -9,7 +9,7 @@
 │  │                                                                                     │    │
 │  │  arcforge                     # Main CLI group                                  │    │
 │  │  │                                                                                  │    │
-│  │  ├── status                       # Show pipeline progress                          │    │
+│  │  ├── status                       # Show workflow progress                          │    │
 │  │  │   ├── --project, -p PATH       # Project path (default: .)                       │    │
 │  │  │   ├── --blocked                # Show only blocked items                         │    │
 │  │  │   └── --json                   # Output as JSON                                  │    │
@@ -56,7 +56,7 @@
 │  ═══════════════════════════════════════════════════════════════════════════════════════════ │
 │                                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
-│  │  status - Show Pipeline Progress (顯示管線進度)                                      │    │
+│  │  status - Show Workflow Progress (顯示工作流程進度)                                      │    │
 │  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
 │  │                                                                                     │    │
 │  │  Usage: arcforge status [OPTIONS]                                               │    │
@@ -68,7 +68,7 @@
 │  │                                                                                     │    │
 │  │  Output (table):                                                                    │    │
 │  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
-│  │  │              Pipeline Status                                                  │  │    │
+│  │  │              Workflow Status                                                  │  │    │
 │  │  ├───────────────┬─────────────┬──────────┬────────────────────────────────────┤  │    │
 │  │  │ Epic          │ Status      │ Progress │ Worktree                           │  │    │
 │  │  ├───────────────┼─────────────┼──────────┼────────────────────────────────────┤  │    │
@@ -544,7 +544,7 @@
 │                                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                     │    │
-│  │  # Check pipeline status                                                            │    │
+│  │  # Check workflow status                                                            │    │
 │  │  $ arcforge status                                                              │    │
 │  │                                                                                     │    │
 │  │  # Check status of blocked items only                                               │    │

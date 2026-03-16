@@ -405,7 +405,7 @@ class Coordinator {
       remaining_count: remaining,
       completed_count: completed,
       blocked_count: this.dag.blocked.length,
-      project_goal: 'Build a skill-based autonomous agent pipeline system',
+      project_goal: 'Build a skill-based autonomous agent toolkit',
       research_files: [],
     };
   }

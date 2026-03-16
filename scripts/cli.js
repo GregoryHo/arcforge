@@ -74,7 +74,7 @@ function output(data, asJson = false) {
 // Print usage help
 function printHelp() {
   console.log(`
-arcforge CLI - DAG management for skill-based agent pipelines
+arcforge CLI - DAG management for skill-based agent workflows
 
 USAGE:
   node scripts/cli.js <command> [options]

@@ -11,7 +11,7 @@ argument-hint: "save [alias] | resume [alias] | list | alias <id> <name> | alias
 
 User-controlled session checkpoints for continuity across conversations. Save what matters, resume when needed.
 
-**Three arcforge pipelines — this skill handles Continuity:**
+**Three arcforge layers — this skill handles Continuity:**
 - **Continuity (this skill)** — save/resume checkpoints for session handoff
 - **Learning (diary→reflect→learn)** — deliberate reflection for pattern extraction
 - **Behavioral (instincts)** — auto-detected tool-usage patterns

@@ -87,7 +87,7 @@
 │  │                                         ▼                                            │    │
 │  │  ┌───────────────────────────────────────────────────────────────────────────────┐  │    │
 │  │  │  coordinator.js                    # Orchestration Engine                     │  │    │
-│  │  │  ├── status()           → dict    # Pipeline state                            │  │    │
+│  │  │  ├── status()           → dict    # Workflow state                            │  │    │
 │  │  │  ├── next_task()        → Task    # Next ready task                           │  │    │
 │  │  │  ├── complete_task()    → void    # Mark complete                             │  │    │
 │  │  │  ├── block_task()       → void    # Mark blocked                              │  │    │

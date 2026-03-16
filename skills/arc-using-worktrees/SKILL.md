@@ -172,7 +172,7 @@ Then retry: `/arc-using-worktrees`
 ─────────────────────────────────────────────────
 ```
 
-## Integration with Pipeline
+## Related Skills
 
 - **Called by:** `arc-agent-driven`, `arc-executing-tasks`, `arc-coordinating`
 - **Before:** `arc-coordinating expand` (creates multiple worktrees)

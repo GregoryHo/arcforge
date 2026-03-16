@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode.
+Skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode.
 
 ## Commands
 

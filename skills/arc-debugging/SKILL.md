@@ -45,7 +45,7 @@ Use for ANY technical issue:
 
 ## The Four Phases
 
-You MUST complete each phase before proceeding to the next.
+Complete each phase before proceeding — skipping phases leads to symptom fixes that miss root causes.
 
 ### Phase 1: Root Cause Investigation
 

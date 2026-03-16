@@ -1,6 +1,6 @@
 # Contributing to arcforge
 
-Welcome! arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, commands, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
+Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, commands, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
 
 ## Table of Contents
 
@@ -254,7 +254,7 @@ Use `hooks/lib/utils.js` for common operations:
 
 ## Contributing Templates
 
-Templates are subagent prompt definitions used by the pipeline.
+Templates are subagent prompt definitions used by the workflow.
 
 ### Location
 

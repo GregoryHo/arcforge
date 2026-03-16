@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "version": "1.1.2",
-  "description": "Skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode",
+  "description": "Skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode",
   "license": "MIT",
   "author": {
     "name": "Gregory Ho"

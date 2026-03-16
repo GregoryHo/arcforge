@@ -2,7 +2,7 @@
 
 ## Quick Start
 
-arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
+arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
 
 **Start here — the 5 skills every user should learn first:**
 
@@ -629,7 +629,7 @@ arc-brainstorming --> arc-refining --> arc-planning --> arc-using-worktrees
                                                   arc-finishing-epic
 ```
 
-Full pipeline for complex projects. Explore design, refine to spec, plan DAG, isolate in worktrees, coordinate parallel epics, implement with subagents.
+Full workflow for complex projects. Explore design, refine to spec, plan DAG, isolate in worktrees, coordinate parallel epics, implement with subagents.
 
 ### 3. Bug Fix
 

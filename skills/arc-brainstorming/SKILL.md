@@ -11,6 +11,12 @@ description: Use when exploring ideas before implementation or when user says "l
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
+## When NOT to Use
+
+- Requirements are already clear and documented
+- Scope is a single function or small fix
+- User says "just do it" or equivalent
+
 ## The Process
 
 ### Phase 1: Understanding
@@ -87,6 +93,8 @@ Route to **refiner** (specs required) if ANY of these are true:
 - Missing acceptance criteria for any requirement
 - Ambiguous terms like "should", "usually", "maybe" without quantification
 - Scope boundaries unclear (no explicit out-of-scope)
+
+Recommended next:
 
 **Large/unclear flow:**
 `/arc-refining` → `/arc-planning` → `/arc-coordinating`
