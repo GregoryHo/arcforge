@@ -116,19 +116,25 @@ describe('reflect.js save-instinct uses 0.85 cap', () => {
 });
 
 // ─────────────────────────────────────────────
-// 4. inject-context uses one-liner session summary (not diary markdown)
+// 4. inject-context injects only actionable context (no session summary)
 // ─────────────────────────────────────────────
 
-describe('inject-context uses one-liner session summary', () => {
-  it('should export findLatestSession and formatSessionSummary', () => {
+describe('inject-context injects only actionable context', () => {
+  it('should NOT export findLatestSession (removed — was informational noise)', () => {
     const injectContext = require('../session-tracker/inject-context');
-    assert.ok(
-      typeof injectContext.findLatestSession === 'function',
-      'findLatestSession should be exported',
+    assert.strictEqual(
+      injectContext.findLatestSession,
+      undefined,
+      'findLatestSession should no longer be exported',
     );
-    assert.ok(
-      typeof injectContext.formatSessionSummary === 'function',
-      'formatSessionSummary should be exported',
+  });
+
+  it('should NOT export formatSessionSummary (removed — was informational noise)', () => {
+    const injectContext = require('../session-tracker/inject-context');
+    assert.strictEqual(
+      injectContext.formatSessionSummary,
+      undefined,
+      'formatSessionSummary should no longer be exported',
     );
   });
 
@@ -191,29 +197,32 @@ describe('inject-context does not load learned skills', () => {
 });
 
 // ─────────────────────────────────────────────
-// 7. end.js references /recall not /learn
+// 7. end.js does not reference /learn and no longer blocks with outputDecision
 // ─────────────────────────────────────────────
 
-describe('end.js references /recall not /learn', () => {
-  it('formatStopReason output should not contain /learn', () => {
-    const { formatStopReason } = require('../session-tracker/end');
-    const session = {
-      started: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-      toolCalls: 10,
-      userMessages: 5,
-      filesModified: ['a.js'],
-    };
-
-    const output = formatStopReason(session, null);
-    assert.ok(!output.includes('/learn'), 'formatStopReason should not reference /learn command');
-  });
-
+describe('end.js does not reference /learn', () => {
   it('end.js source should not contain /learn command reference', () => {
     const source = fs.readFileSync(path.join(__dirname, '../session-tracker/end.js'), 'utf-8');
-    // /learn as a command reference (not part of other words like "learned")
     const hasLearnCommand = /\/learn\b/.test(source);
     assert.ok(!hasLearnCommand, 'end.js should not reference /learn as a command');
+  });
+
+  it('end.js should not use outputDecision (diary offloaded to background enricher)', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../session-tracker/end.js'), 'utf-8');
+    assert.ok(
+      !source.includes('outputDecision'),
+      'end.js should not import or call outputDecision',
+    );
+  });
+
+  it('should export formatStats instead of formatStopReason', () => {
+    const endModule = require('../session-tracker/end');
+    assert.ok(typeof endModule.formatStats === 'function', 'formatStats should be exported');
+    assert.strictEqual(
+      endModule.formatStopReason,
+      undefined,
+      'formatStopReason should no longer be exported',
+    );
   });
 });
 
