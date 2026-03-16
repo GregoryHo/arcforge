@@ -164,7 +164,7 @@ function spawnDiaryEnricher(draftPath, session) {
         '--disable-slash-commands',
         '--strict-mcp-config',
         '--mcp-config',
-        '{}',
+        '{"mcpServers":{}}',
       ],
       { detached: true, stdio: ['pipe', 'ignore', 'ignore'] },
     );

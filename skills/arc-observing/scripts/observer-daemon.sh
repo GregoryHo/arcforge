@@ -181,7 +181,7 @@ Each file: {id}.md with YAML frontmatter + markdown body.
         --system-prompt "$(cat "$OBSERVER_SYSTEM_PROMPT")" \
         --tools "Write,Read,Bash,Grep,Glob" \
         --disable-slash-commands \
-        --strict-mcp-config --mcp-config '{}' \
+        --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
         2>&1) || exit_code=$?
 
       if [ "$exit_code" -eq 0 ]; then
