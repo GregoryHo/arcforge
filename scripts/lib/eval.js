@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
+const stats = require('./eval-stats');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -251,7 +252,7 @@ function runSkillEval(scenario, k, options = {}) {
   return {
     baseline,
     treatment,
-    delta: computeDelta(baseline, treatment),
+    delta: stats.computeDelta(baseline, treatment),
   };
 }
 
@@ -434,57 +435,6 @@ function loadResults(evalName, projectRoot) {
 }
 
 /**
- * Compute pass@k metric: at least 1 success in k trials
- * @param {TrialResult[]} results - Trial results
- * @returns {boolean} Whether pass@k is satisfied
- */
-function passAtK(results) {
-  return results.some((r) => r.passed);
-}
-
-/**
- * Compute pass^k metric: all k trials succeed
- * @param {TrialResult[]} results - Trial results
- * @returns {boolean} Whether pass^k is satisfied
- */
-function passAllK(results) {
-  return results.length > 0 && results.every((r) => r.passed);
-}
-
-/**
- * Compute average score from trial results
- * @param {TrialResult[]} results - Trial results
- * @returns {number} Average score (0.0 to 1.0), or 0 if empty
- */
-function avgScore(results) {
-  if (results.length === 0) return 0;
-  return results.reduce((sum, r) => sum + r.score, 0) / results.length;
-}
-
-/**
- * Compute pass rate from trial results
- * @param {TrialResult[]} results - Trial results
- * @returns {number} Pass rate (0.0 to 1.0), or 0 if empty
- */
-function passRate(results) {
-  if (results.length === 0) return 0;
-  return results.filter((r) => r.passed).length / results.length;
-}
-
-/**
- * Compute delta between baseline and treatment results
- * @param {TrialResult[]} baseline - Baseline results
- * @param {TrialResult[]} treatment - Treatment results
- * @returns {number} Delta (treatment avg score - baseline avg score)
- */
-function computeDelta(baseline, treatment) {
-  if (baseline.length === 0 || treatment.length === 0) {
-    return 0;
-  }
-  return avgScore(treatment) - avgScore(baseline);
-}
-
-/**
  * Generate a benchmark summary from results
  * @param {string} projectRoot - Project root directory
  * @returns {Object} Benchmark data
@@ -499,14 +449,18 @@ function generateBenchmark(projectRoot) {
 
     if (results.length === 0) continue;
 
+    const warning = stats.confidenceWarning(results);
     benchmarks[scenario.name] = {
       scope: scenario.scope,
       trials: results.length,
-      pass_rate: Math.round(passRate(results) * 100) / 100,
-      avg_score: Math.round(avgScore(results) * 100) / 100,
-      pass_at_k: passAtK(results),
-      pass_all_k: passAllK(results),
+      pass_rate: Math.round(stats.passRate(results) * 100) / 100,
+      avg_score: Math.round(stats.avgScore(results) * 100) / 100,
+      stddev: Math.round(stats.stddev(results) * 100) / 100,
+      ci95: stats.ci95(results),
+      pass_at_k: stats.passAtK(results),
+      pass_all_k: stats.passAllK(results),
       last_run: results[results.length - 1].timestamp,
+      ...(warning ? { warning } : {}),
     };
   }
 
@@ -523,38 +477,6 @@ function generateBenchmark(projectRoot) {
   );
 
   return benchmark;
-}
-
-/**
- * Get verdict from a numeric pass rate
- * @param {number} rate - Pass rate (0.0 to 1.0)
- * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
- */
-function verdictFromRate(rate) {
-  if (rate >= 1.0) return 'SHIP';
-  if (rate >= 0.6) return 'NEEDS WORK';
-  return 'BLOCKED';
-}
-
-/**
- * Get verdict for an eval based on pass rate
- * @param {TrialResult[]} results - Trial results
- * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
- */
-function getVerdict(results) {
-  if (results.length === 0) return 'BLOCKED';
-  return verdictFromRate(passRate(results));
-}
-
-/**
- * Get A/B comparison verdict from a delta value
- * @param {number} delta - Treatment avg score minus baseline avg score
- * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED'} Verdict
- */
-function verdictFromDelta(delta) {
-  if (delta > 0.15) return 'IMPROVED';
-  if (delta >= -0.05) return 'INCONCLUSIVE';
-  return 'REGRESSED';
 }
 
 /**
@@ -604,6 +526,7 @@ function ensureEvalsDir(projectRoot) {
 }
 
 module.exports = {
+  // Orchestration
   parseScenario,
   listScenarios,
   createTrialDir,
@@ -619,16 +542,11 @@ module.exports = {
   saveTranscript,
   appendResult,
   loadResults,
-  passAtK,
-  passAllK,
-  avgScore,
-  passRate,
-  computeDelta,
   generateBenchmark,
-  verdictFromRate,
-  verdictFromDelta,
-  getVerdict,
   ensureEvalsDir,
+  // Re-export stats for backward compatibility
+  ...stats,
+  // Constants
   EVALS_DIR,
   SCENARIOS_DIR,
   RESULTS_DIR,

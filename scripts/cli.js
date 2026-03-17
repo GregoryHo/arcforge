@@ -340,14 +340,20 @@ async function main() {
         };
 
         const printAbSummary = (label, baseline, treatment, delta) => {
+          const bStats = eval_.statsFromResults(baseline);
+          const tStats = eval_.statsFromResults(treatment);
+          const bCi = bStats.ci95;
+          const tCi = tStats.ci95;
           console.log(
-            `${label}Baseline:  ${baseline.length} trials, avg ${eval_.avgScore(baseline).toFixed(2)}, pass ${(eval_.passRate(baseline) * 100).toFixed(0)}%`,
+            `${label}Baseline:  ${baseline.length} trials, avg ${bStats.avg.toFixed(2)} [${bCi.lower}, ${bCi.upper}], pass ${(bStats.passRate * 100).toFixed(0)}%`,
           );
           console.log(
-            `${label}Treatment: ${treatment.length} trials, avg ${eval_.avgScore(treatment).toFixed(2)}, pass ${(eval_.passRate(treatment) * 100).toFixed(0)}%`,
+            `${label}Treatment: ${treatment.length} trials, avg ${tStats.avg.toFixed(2)} [${tCi.lower}, ${tCi.upper}], pass ${(tStats.passRate * 100).toFixed(0)}%`,
           );
           console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}`);
           console.log(`${label}Verdict:   ${eval_.verdictFromDelta(delta)}`);
+          const warning = eval_.confidenceWarning(baseline) || eval_.confidenceWarning(treatment);
+          if (warning) console.log(`${label}${warning}`);
         };
 
         if (subcommand === 'list') {
