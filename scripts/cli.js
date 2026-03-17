@@ -18,8 +18,12 @@
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N]          Run eval scenario with k trials
  *   eval report [name]               Show eval benchmark report
+ *   eval ab <name> --skill-file <path> [--k N]  A/B skill eval
+ *   eval compare <name>              Compare A/B results
  */
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { Coordinator } = require('./lib/coordinator');
 const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
 
@@ -311,6 +315,40 @@ async function main() {
       case 'eval': {
         const eval_ = require('./lib/eval');
         const subcommand = args.positional[0];
+        const parseK = () => (args.options.k ? parseInt(args.options.k, 10) : 3);
+        const formatStatus = (g) => (g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`);
+
+        const findScenario = (name) => {
+          for (const f of eval_.listScenarios(projectRoot)) {
+            const s = eval_.parseScenario(f);
+            if (s.name === name) return s;
+          }
+          return undefined;
+        };
+
+        const requireScenario = (name, cmd) => {
+          if (!name) {
+            console.error(`Error: eval ${cmd} requires a scenario name`);
+            process.exit(1);
+          }
+          const scenario = findScenario(name);
+          if (!scenario) {
+            console.error(`Error: scenario "${name}" not found`);
+            process.exit(1);
+          }
+          return scenario;
+        };
+
+        const printAbSummary = (label, baseline, treatment, delta) => {
+          console.log(
+            `${label}Baseline:  ${baseline.length} trials, avg ${eval_.avgScore(baseline).toFixed(2)}, pass ${(eval_.passRate(baseline) * 100).toFixed(0)}%`,
+          );
+          console.log(
+            `${label}Treatment: ${treatment.length} trials, avg ${eval_.avgScore(treatment).toFixed(2)}, pass ${(eval_.passRate(treatment) * 100).toFixed(0)}%`,
+          );
+          console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}`);
+          console.log(`${label}Verdict:   ${eval_.verdictFromDelta(delta)}`);
+        };
 
         if (subcommand === 'list') {
           const scenarios = eval_.listScenarios(projectRoot);
@@ -325,38 +363,81 @@ async function main() {
             }
           }
         } else if (subcommand === 'run') {
-          const name = args.positional[1];
-          if (!name) {
-            console.error('Error: eval run requires a scenario name');
-            process.exit(1);
-          }
-          const k = args.options.k ? parseInt(args.options.k, 10) : 3;
-          let scenario;
-          const scenarios = eval_.listScenarios(projectRoot);
-          scenarios.find((f) => {
-            const s = eval_.parseScenario(f);
-            if (s.name === name) {
-              scenario = s;
-              return true;
-            }
-            return false;
-          });
-          if (!scenario) {
-            console.error(`Error: scenario "${name}" not found`);
-            process.exit(1);
-          }
+          const k = parseK();
+          const scenario = requireScenario(args.positional[1], 'run');
           console.log(`Running ${scenario.name} (k=${k})...`);
 
-          for (let t = 1; t <= k; t++) {
-            process.stdout.write(`  Trial ${t}/${k}: `);
-            const result = eval_.runTrial(scenario, t, k, { projectRoot });
-            const graded = eval_.gradeTrialResult(result, scenario, projectRoot);
-            eval_.appendResult(graded, projectRoot);
-            console.log(graded.passed ? `PASS (${graded.score})` : `FAIL (${graded.score})`);
+          let rl;
+          try {
+            if (scenario.grader === 'human') {
+              const readline = require('node:readline');
+              rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+            }
+
+            for (let t = 1; t <= k; t++) {
+              process.stdout.write(`  Trial ${t}/${k}: `);
+              const result = eval_.runTrial(scenario, t, k, { projectRoot });
+              let graded = eval_.gradeTrialResult(result, scenario, projectRoot);
+
+              if (graded.grader === 'human-pending') {
+                console.log('HUMAN REVIEW');
+                console.log('\n--- Trial Output ---');
+                const outputText = result.output || result.error || '(no output)';
+                console.log(outputText.split('\n').slice(0, 200).join('\n'));
+                console.log('--- End Output ---\n');
+                graded = await eval_.gradeWithHuman(graded, rl);
+              }
+
+              eval_.appendResult(graded, projectRoot);
+              console.log(formatStatus(graded));
+            }
+          } finally {
+            if (rl) rl.close();
           }
 
           const results = eval_.loadResults(scenario.name, projectRoot).slice(-k);
           console.log(`Verdict: ${eval_.getVerdict(results)}`);
+        } else if (subcommand === 'ab') {
+          const skillFile = args.options['skill-file'];
+          if (!skillFile) {
+            console.error('Error: eval ab requires --skill-file <path>');
+            process.exit(1);
+          }
+          const k = parseK();
+          const scenario = requireScenario(args.positional[1], 'ab');
+
+          const skillInstruction = fs.readFileSync(path.resolve(skillFile), 'utf8');
+          console.log(`A/B eval: ${scenario.name} (k=${k})`);
+          console.log(`Skill: ${skillFile}\n`);
+
+          const { baseline, treatment, delta } = eval_.runSkillEval(scenario, k, {
+            projectRoot,
+            skillInstruction,
+            onTrialComplete: (label, t, graded) => {
+              console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
+            },
+          });
+
+          printAbSummary('\n', baseline, treatment, delta);
+        } else if (subcommand === 'compare') {
+          const name = args.positional[1];
+          if (!name) {
+            console.error('Error: eval compare requires a scenario name');
+            process.exit(1);
+          }
+
+          const baseline = eval_.loadResults(`${name}-baseline`, projectRoot);
+          const treatment = eval_.loadResults(`${name}-treatment`, projectRoot);
+
+          if (baseline.length === 0 || treatment.length === 0) {
+            console.error(
+              'Error: need both baseline and treatment results. Run: arc eval ab <name>',
+            );
+            process.exit(1);
+          }
+
+          console.log(`A/B Comparison: ${name}`);
+          printAbSummary('  ', baseline, treatment, eval_.computeDelta(baseline, treatment));
         } else if (subcommand === 'report') {
           const benchmark = eval_.generateBenchmark(projectRoot);
           const name = args.positional[1];
@@ -377,7 +458,7 @@ async function main() {
             }
           }
         } else {
-          console.error('Usage: arc eval [list|run|report]');
+          console.error('Usage: arc eval [list|run|ab|compare|report]');
           process.exit(1);
         }
         break;

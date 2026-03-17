@@ -165,7 +165,7 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
 function runSkillEval(scenario, k, options = {}) {
-  const { projectRoot = process.cwd(), skillInstruction } = options;
+  const { projectRoot = process.cwd(), skillInstruction, onTrialComplete } = options;
 
   // Build treatment scenario with skill instruction prepended to context
   const treatmentScenario = {
@@ -182,6 +182,7 @@ function runSkillEval(scenario, k, options = {}) {
     const graded = gradeTrialResult(result, scenario, projectRoot);
     appendResult(graded, projectRoot);
     baseline.push(graded);
+    if (onTrialComplete) onTrialComplete('baseline', t, graded);
   }
 
   // Run treatment trials (with skill instruction)
@@ -190,6 +191,7 @@ function runSkillEval(scenario, k, options = {}) {
     const graded = gradeTrialResult(result, scenario, projectRoot);
     appendResult(graded, projectRoot);
     treatment.push(graded);
+    if (onTrialComplete) onTrialComplete('treatment', t, graded);
   }
 
   return {
@@ -388,6 +390,26 @@ function passAllK(results) {
 }
 
 /**
+ * Compute average score from trial results
+ * @param {TrialResult[]} results - Trial results
+ * @returns {number} Average score (0.0 to 1.0), or 0 if empty
+ */
+function avgScore(results) {
+  if (results.length === 0) return 0;
+  return results.reduce((sum, r) => sum + r.score, 0) / results.length;
+}
+
+/**
+ * Compute pass rate from trial results
+ * @param {TrialResult[]} results - Trial results
+ * @returns {number} Pass rate (0.0 to 1.0), or 0 if empty
+ */
+function passRate(results) {
+  if (results.length === 0) return 0;
+  return results.filter((r) => r.passed).length / results.length;
+}
+
+/**
  * Compute delta between baseline and treatment results
  * @param {TrialResult[]} baseline - Baseline results
  * @param {TrialResult[]} treatment - Treatment results
@@ -397,9 +419,7 @@ function computeDelta(baseline, treatment) {
   if (baseline.length === 0 || treatment.length === 0) {
     return 0;
   }
-  const baseAvg = baseline.reduce((sum, r) => sum + r.score, 0) / baseline.length;
-  const treatAvg = treatment.reduce((sum, r) => sum + r.score, 0) / treatment.length;
-  return treatAvg - baseAvg;
+  return avgScore(treatment) - avgScore(baseline);
 }
 
 /**
@@ -417,14 +437,11 @@ function generateBenchmark(projectRoot) {
 
     if (results.length === 0) continue;
 
-    const passRate = results.filter((r) => r.passed).length / results.length;
-    const avgScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
-
     benchmarks[scenario.name] = {
       scope: scenario.scope,
       trials: results.length,
-      pass_rate: Math.round(passRate * 100) / 100,
-      avg_score: Math.round(avgScore * 100) / 100,
+      pass_rate: Math.round(passRate(results) * 100) / 100,
+      avg_score: Math.round(avgScore(results) * 100) / 100,
       pass_at_k: passAtK(results),
       pass_all_k: passAllK(results),
       last_run: results[results.length - 1].timestamp,
@@ -448,12 +465,12 @@ function generateBenchmark(projectRoot) {
 
 /**
  * Get verdict from a numeric pass rate
- * @param {number} passRate - Pass rate (0.0 to 1.0)
+ * @param {number} rate - Pass rate (0.0 to 1.0)
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
  */
-function verdictFromRate(passRate) {
-  if (passRate >= 1.0) return 'SHIP';
-  if (passRate >= 0.6) return 'NEEDS WORK';
+function verdictFromRate(rate) {
+  if (rate >= 1.0) return 'SHIP';
+  if (rate >= 0.6) return 'NEEDS WORK';
   return 'BLOCKED';
 }
 
@@ -464,8 +481,54 @@ function verdictFromRate(passRate) {
  */
 function getVerdict(results) {
   if (results.length === 0) return 'BLOCKED';
-  const passRate = results.filter((r) => r.passed).length / results.length;
-  return verdictFromRate(passRate);
+  return verdictFromRate(passRate(results));
+}
+
+/**
+ * Get A/B comparison verdict from a delta value
+ * @param {number} delta - Treatment avg score minus baseline avg score
+ * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED'} Verdict
+ */
+function verdictFromDelta(delta) {
+  if (delta > 0.15) return 'IMPROVED';
+  if (delta >= -0.05) return 'INCONCLUSIVE';
+  return 'REGRESSED';
+}
+
+/**
+ * Prompt a human to grade a trial result via readline.
+ * Returns a new result object (does not mutate input).
+ * @param {TrialResult} result - Trial result to grade
+ * @param {readline.Interface} rl - Readline interface for prompting
+ * @returns {Promise<TrialResult>} Graded result
+ */
+async function gradeWithHuman(result, rl) {
+  const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
+
+  let score;
+  while (score === undefined) {
+    const raw = await ask('Score (0.0-1.0): ');
+    const num = Number.parseFloat(raw);
+    if (!Number.isNaN(num) && num >= 0 && num <= 1) {
+      score = Math.round(num * 100) / 100;
+    } else {
+      console.log('Invalid score. Enter a number between 0.0 and 1.0.');
+    }
+  }
+
+  const passedRaw = await ask(`Passed? (y/n, default ${score >= 0.7 ? 'y' : 'n'}): `);
+  const passed =
+    passedRaw.trim() === '' ? score >= 0.7 : passedRaw.trim().toLowerCase().startsWith('y');
+
+  const notes = (await ask('Notes (optional): ')).trim();
+
+  return {
+    ...result,
+    passed,
+    score,
+    grader: 'human',
+    ...(notes ? { notes } : {}),
+  };
 }
 
 /**
@@ -485,6 +548,7 @@ module.exports = {
   buildTrialPrompt,
   gradeWithCode,
   gradeWithModel,
+  gradeWithHuman,
   gradeTrialResult,
   runSkillEval,
   saveTranscript,
@@ -492,9 +556,12 @@ module.exports = {
   loadResults,
   passAtK,
   passAllK,
+  avgScore,
+  passRate,
   computeDelta,
   generateBenchmark,
   verdictFromRate,
+  verdictFromDelta,
   getVerdict,
   ensureEvalsDir,
   EVALS_DIR,
