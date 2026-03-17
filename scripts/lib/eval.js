@@ -220,11 +220,14 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
 function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
   const { projectRoot, label, onTrialComplete } = opts;
   const result = runTrial(trialScenario, trialNumber, k, { projectRoot, label });
-  const graded = gradeTrialResult(result, gradeScenario, projectRoot);
-  appendResult(graded, projectRoot);
-  if (onTrialComplete) onTrialComplete(label, trialNumber, graded);
-  cleanupTrialDir(result.trialDir);
-  return graded;
+  try {
+    const graded = gradeTrialResult(result, gradeScenario, projectRoot);
+    appendResult(graded, projectRoot);
+    if (onTrialComplete) onTrialComplete(label, trialNumber, graded);
+    return graded;
+  } finally {
+    cleanupTrialDir(result.trialDir);
+  }
 }
 
 /**
@@ -470,14 +473,15 @@ function generateBenchmark(projectRoot) {
 
     if (results.length === 0) continue;
 
+    const s = stats.statsFromResults(results);
     const warning = stats.confidenceWarning(results);
     benchmarks[scenario.name] = {
       scope: scenario.scope,
-      trials: results.length,
-      pass_rate: Math.round(stats.passRate(results) * 100) / 100,
-      avg_score: Math.round(stats.avgScore(results) * 100) / 100,
-      stddev: Math.round(stats.stddev(results) * 100) / 100,
-      ci95: stats.ci95(results),
+      trials: s.count,
+      pass_rate: s.passRate,
+      avg_score: s.avg,
+      stddev: s.stddev,
+      ci95: s.ci95,
       pass_at_k: stats.passAtK(results),
       pass_all_k: stats.passAllK(results),
       last_run: results[results.length - 1].timestamp,

@@ -7,6 +7,9 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
+const DELTA_IMPROVED_THRESHOLD = 0.15;
+const DELTA_REGRESSED_THRESHOLD = -0.05;
+
 /**
  * Compute pass@k metric: at least 1 success in k trials
  * @param {import('./eval').TrialResult[]} results - Trial results
@@ -46,26 +49,31 @@ function passRate(results) {
 }
 
 /**
- * Compute sample standard deviation of scores (Bessel's correction)
+ * Compute sample standard deviation of scores (Bessel's correction).
+ * Accepts optional precomputed mean to avoid redundant traversals.
  * @param {import('./eval').TrialResult[]} results - Trial results
+ * @param {number} [mean] - Precomputed mean score
  * @returns {number} Standard deviation, or 0 if fewer than 2 results
  */
-function stddev(results) {
+function stddev(results, mean) {
   if (results.length < 2) return 0;
-  const avg = avgScore(results);
+  const avg = mean ?? avgScore(results);
   const variance = results.reduce((sum, r) => sum + (r.score - avg) ** 2, 0) / (results.length - 1);
   return Math.sqrt(variance);
 }
 
 /**
- * Compute 95% confidence interval for mean score (normal approximation)
+ * Compute 95% confidence interval for mean score (normal approximation).
+ * Accepts optional precomputed mean and sd to avoid redundant traversals.
  * @param {import('./eval').TrialResult[]} results - Trial results
+ * @param {number} [mean] - Precomputed mean score
+ * @param {number} [sd] - Precomputed standard deviation
  * @returns {{ lower: number, upper: number, width: number }} CI bounds
  */
-function ci95(results) {
+function ci95(results, mean, sd) {
   if (results.length < 2) return { lower: 0, upper: 0, width: 0 };
-  const avg = avgScore(results);
-  const se = stddev(results) / Math.sqrt(results.length);
+  const avg = mean ?? avgScore(results);
+  const se = (sd ?? stddev(results, avg)) / Math.sqrt(results.length);
   const margin = 1.96 * se;
   return {
     lower: Math.round(Math.max(0, avg - margin) * 100) / 100,
@@ -74,21 +82,29 @@ function ci95(results) {
   };
 }
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
 /**
- * Compute comprehensive statistics from trial results
+ * Compute comprehensive statistics from trial results.
+ * Computes avg once and threads it through stddev/ci95 to avoid redundant traversals.
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @returns {{ count: number, avg: number, stddev: number, min: number, max: number, ci95: Object, passRate: number }}
  */
 function statsFromResults(results) {
+  if (results.length === 0) {
+    return { count: 0, avg: 0, stddev: 0, min: 0, max: 0, ci95: ci95([]), passRate: 0 };
+  }
   const scores = results.map((r) => r.score);
+  const avg = avgScore(results);
+  const sd = stddev(results, avg);
   return {
     count: results.length,
-    avg: Math.round(avgScore(results) * 100) / 100,
-    stddev: Math.round(stddev(results) * 100) / 100,
-    min: scores.length > 0 ? Math.min(...scores) : 0,
-    max: scores.length > 0 ? Math.max(...scores) : 0,
-    ci95: ci95(results),
-    passRate: Math.round(passRate(results) * 100) / 100,
+    avg: round2(avg),
+    stddev: round2(sd),
+    min: Math.min(...scores),
+    max: Math.max(...scores),
+    ci95: ci95(results, avg, sd),
+    passRate: round2(passRate(results)),
   };
 }
 
@@ -146,8 +162,8 @@ function getVerdict(results) {
  * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED'} Verdict
  */
 function verdictFromDelta(delta, thresholds = {}) {
-  const improved = thresholds.improved ?? 0.15;
-  const regressed = thresholds.regressed ?? -0.05;
+  const improved = thresholds.improved ?? DELTA_IMPROVED_THRESHOLD;
+  const regressed = thresholds.regressed ?? DELTA_REGRESSED_THRESHOLD;
   if (delta > improved) return 'IMPROVED';
   if (delta >= regressed) return 'INCONCLUSIVE';
   return 'REGRESSED';
@@ -166,4 +182,6 @@ module.exports = {
   verdictFromRate,
   verdictFromDelta,
   getVerdict,
+  DELTA_IMPROVED_THRESHOLD,
+  DELTA_REGRESSED_THRESHOLD,
 };
