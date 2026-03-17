@@ -455,6 +455,21 @@ Plain text at end.
       const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       expect(data.generated).toBeDefined();
     });
+
+    it('should write timestamped snapshot alongside latest.json', () => {
+      writeScenario(tempDir, 'snap.md', '# Eval: snap\n\n## Scenario\nTest.\n');
+      const benchmark = generateBenchmark(tempDir);
+
+      const dateStr = benchmark.generated.split('T')[0];
+      const snapshotPath = path.join(tempDir, BENCHMARKS_DIR, `${dateStr}.json`);
+      expect(fs.existsSync(snapshotPath)).toBe(true);
+
+      const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
+      const latest = JSON.parse(
+        fs.readFileSync(path.join(tempDir, BENCHMARKS_DIR, 'latest.json'), 'utf8'),
+      );
+      expect(snapshot).toEqual(latest);
+    });
   });
 
   // ── ensureEvalsDir ────────────────────────────────────────────

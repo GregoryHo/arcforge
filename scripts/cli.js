@@ -18,8 +18,9 @@
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N]          Run eval scenario with k trials
  *   eval report [name]               Show eval benchmark report
- *   eval ab <name> --skill-file <path> [--k N]  A/B skill eval
+ *   eval ab <name> --skill-file <path> [--k N] [--interleave]  A/B skill eval
  *   eval compare <name>              Compare A/B results
+ *   eval history                     List benchmark snapshots
  */
 
 const fs = require('node:fs');
@@ -465,8 +466,27 @@ async function main() {
               }
             }
           }
+        } else if (subcommand === 'history') {
+          const benchmarkPath = path.join(projectRoot, eval_.BENCHMARKS_DIR);
+          if (!fs.existsSync(benchmarkPath)) {
+            console.log('No benchmarks yet. Run: arc eval report');
+          } else {
+            const snapshots = fs
+              .readdirSync(benchmarkPath)
+              .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+              .sort();
+            if (snapshots.length === 0) {
+              console.log('No history snapshots yet. Run: arc eval report');
+            } else {
+              for (const file of snapshots) {
+                const data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, file), 'utf8'));
+                const evalCount = Object.keys(data.evals).length;
+                console.log(`  ${file.replace('.json', '')} — ${evalCount} evals`);
+              }
+            }
+          }
         } else {
-          console.error('Usage: arc eval [list|run|ab|compare|report]');
+          console.error('Usage: arc eval [list|run|ab|compare|report|history]');
           process.exit(1);
         }
         break;

@@ -492,10 +492,12 @@ function generateBenchmark(projectRoot) {
 
   const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
   ensureDir(benchmarkPath);
-  fs.writeFileSync(
-    path.join(benchmarkPath, 'latest.json'),
-    `${JSON.stringify(benchmark, null, 2)}\n`,
-  );
+  const json = `${JSON.stringify(benchmark, null, 2)}\n`;
+  fs.writeFileSync(path.join(benchmarkPath, 'latest.json'), json);
+
+  // Write timestamped snapshot for history (same-day runs overwrite)
+  const dateStr = benchmark.generated.split('T')[0];
+  fs.writeFileSync(path.join(benchmarkPath, `${dateStr}.json`), json);
 
   return benchmark;
 }
