@@ -14,6 +14,7 @@
  *   sync [--direction from-base|to-base|both|scan]  Sync state
  *   reboot                          Get context for new session
  *   schema [--json] [--example]     Show dag.yaml schema
+ *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
  */
 
 const { Coordinator } = require('./lib/coordinator');
@@ -120,6 +121,12 @@ COMMANDS:
       Show dag.yaml schema.
       --json       Output schema as JSON
       --example    Show complete example
+
+  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N]
+      Run autonomous cross-session execution loop.
+      --pattern    Execution pattern: sequential (default) or dag
+      --max-runs   Maximum iterations (default: 50)
+      --max-cost   Maximum cost in dollars (default: unlimited)
 
 ENVIRONMENT:
   CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
@@ -294,6 +301,26 @@ async function main() {
           } else {
             console.log(schemaToYaml());
           }
+        }
+        break;
+      }
+
+      case 'loop': {
+        const { runSequential, runDag } = require('./loop');
+        const pattern = args.options.pattern || 'sequential';
+        const maxRuns = args.options['max-runs'] ? parseInt(args.options['max-runs'], 10) : 50;
+        const maxCost = args.options['max-cost'] ? parseFloat(args.options['max-cost']) : null;
+
+        if (!['sequential', 'dag'].includes(pattern)) {
+          console.error(`Error: Invalid pattern "${pattern}". Use "sequential" or "dag".`);
+          process.exit(1);
+        }
+
+        const loopOptions = { pattern, maxRuns, maxCost, projectRoot };
+        if (pattern === 'dag') {
+          runDag(loopOptions);
+        } else {
+          runSequential(loopOptions);
         }
         break;
       }

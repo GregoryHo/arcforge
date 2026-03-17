@@ -383,6 +383,53 @@ class Coordinator {
   }
 
   /**
+   * Build a self-contained task context for spawned sessions (e.g., autonomous loops).
+   * @param {string} taskId - Task ID to build context for
+   * @returns {Object} Task context
+   */
+  taskContext(taskId) {
+    const task = this.dag.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
+    const context = {
+      task_id: task.id,
+      task_name: task.name,
+      task_type: task instanceof Feature ? 'feature' : 'epic',
+      status: task.status,
+      project_root: this.projectRoot,
+    };
+
+    if (task.depends_on && task.depends_on.length > 0) {
+      context.dependencies = task.depends_on.map((depId) => {
+        const dep = this.dag.getTask(depId);
+        return {
+          id: depId,
+          name: dep ? dep.name : depId,
+          status: dep ? dep.status : TaskStatus.BLOCKED,
+        };
+      });
+    }
+
+    const parentEpic = this.dag.findEpicByFeature(taskId);
+    if (parentEpic) {
+      context.parent_epic = {
+        id: parentEpic.id,
+        name: parentEpic.name,
+        progress: parentEpic.completionRatio(),
+      };
+      context.sibling_tasks = parentEpic.features.map((f) => ({
+        id: f.id,
+        name: f.name,
+        status: f.status,
+      }));
+    }
+
+    return context;
+  }
+
+  /**
    * Reboot context - get summary for new session
    * @returns {Object} Context summary
    */
