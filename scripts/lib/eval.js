@@ -208,7 +208,12 @@ function loadResults(evalName, projectRoot) {
   }
 
   const results = [];
-  const files = fs.readdirSync(resultsPath).filter((f) => f.endsWith(`-${evalName}.jsonl`));
+  const suffix = `-${evalName}.jsonl`;
+  const files = fs.readdirSync(resultsPath).filter((f) => {
+    if (!f.endsWith(suffix)) return false;
+    const prefix = f.slice(0, f.length - suffix.length);
+    return /^\d{4}-\d{2}-\d{2}$/.test(prefix);
+  });
 
   for (const file of files) {
     const content = fs.readFileSync(path.join(resultsPath, file), 'utf8');
