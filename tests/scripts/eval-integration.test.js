@@ -14,7 +14,12 @@ const {
   verdictFromDelta,
   runSkillEval,
   gradeTrialResult,
+  parseScenario,
+  createTrialDir,
+  cleanupTrialDir,
+  runSetup,
   loadResults,
+  appendResult,
   SCENARIOS_DIR,
   RESULTS_DIR,
 } = require('../../scripts/lib/eval');
@@ -308,6 +313,153 @@ describe('runSkillEval A/B flow', () => {
     const treatmentPrompt = calls[1];
     expect(baselinePrompt).not.toContain('SKILL_MARKER_TEXT');
     expect(treatmentPrompt).toContain('SKILL_MARKER_TEXT');
+  });
+});
+
+// ── Trial isolation ─────────────────────────────────────────
+
+describe('trial isolation', () => {
+  describe('parseScenario setup field', () => {
+    let tmpDir;
+
+    beforeEach(() => {
+      tmpDir = makeTempDir();
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    test('extracts setup section from scenario', () => {
+      const content = [
+        '# Eval: iso-test',
+        '',
+        '## Scenario',
+        'Do something.',
+        '',
+        '## Setup',
+        'mkdir -p src && echo "hello" > src/main.js',
+        '',
+        '## Grader',
+        'code',
+      ].join('\n');
+      const filePath = writeScenario(tmpDir, 'iso-test.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toBe('mkdir -p src && echo "hello" > src/main.js');
+    });
+
+    test('defaults setup to empty string when missing', () => {
+      const content = '# Eval: no-setup\n\n## Scenario\nTask.\n';
+      const filePath = writeScenario(tmpDir, 'no-setup.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toBe('');
+    });
+  });
+
+  describe('createTrialDir', () => {
+    test('returns path inside os.tmpdir', () => {
+      const dir = createTrialDir('test-eval', 1);
+      try {
+        expect(dir.startsWith(os.tmpdir())).toBe(true);
+        expect(fs.existsSync(dir)).toBe(true);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('includes eval name and trial number in prefix', () => {
+      const dir = createTrialDir('my-eval', 3);
+      try {
+        expect(path.basename(dir)).toMatch(/^arcforge-eval-my-eval-t3-/);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('cleanupTrialDir', () => {
+    test('removes temp directory', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleanup-test-'));
+      fs.writeFileSync(path.join(dir, 'file.txt'), 'data');
+      cleanupTrialDir(dir);
+
+      expect(fs.existsSync(dir)).toBe(false);
+    });
+
+    test('ignores null/undefined', () => {
+      expect(() => cleanupTrialDir(null)).not.toThrow();
+      expect(() => cleanupTrialDir(undefined)).not.toThrow();
+    });
+
+    test('ignores paths outside tmpdir', () => {
+      // Should not attempt to remove non-temp paths
+      expect(() => cleanupTrialDir('/some/other/path')).not.toThrow();
+    });
+  });
+
+  describe('runSetup', () => {
+    afterEach(() => {
+      mockUtils.execCommand.mockReset();
+      mockUtils.execCommand.mockImplementation((...args) => {
+        const actual = jest.requireActual('../../scripts/lib/utils');
+        return actual.execCommand(...args);
+      });
+    });
+
+    test('executes command in trial directory via sh -c', () => {
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+
+      const dir = '/tmp/fake-trial-dir';
+      runSetup('mkdir -p src', dir);
+
+      expect(mockUtils.execCommand).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'mkdir -p src'],
+        expect.objectContaining({ cwd: dir }),
+      );
+    });
+
+    test('throws on setup failure', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '',
+        stderr: 'command not found',
+        exitCode: 1,
+      });
+
+      expect(() => runSetup('bad-command', '/tmp/dir')).toThrow('Setup failed');
+    });
+  });
+
+  describe('appendResult storage truncation', () => {
+    let tmpDir;
+
+    beforeEach(() => {
+      tmpDir = makeTempDir();
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    test('truncates large output for storage', () => {
+      const bigOutput = 'x'.repeat(60000);
+      const result = makeResult({ output: bigOutput });
+      appendResult(result, tmpDir);
+
+      const loaded = loadResults('test-eval', tmpDir);
+      expect(loaded[0].output.length).toBeLessThan(bigOutput.length);
+      expect(loaded[0].output).toContain('[truncated for storage]');
+    });
+
+    test('does not truncate normal-sized output', () => {
+      const result = makeResult({ output: 'normal output' });
+      appendResult(result, tmpDir);
+
+      const loaded = loadResults('test-eval', tmpDir);
+      expect(loaded[0].output).toBe('normal output');
+    });
   });
 });
 

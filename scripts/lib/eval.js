@@ -8,6 +8,7 @@
  */
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
 
@@ -21,6 +22,7 @@ const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./ut
  * @property {string[]} assertions - List of assertions to verify
  * @property {string} grader - 'code' | 'model' | 'human'
  * @property {string} graderConfig - Grader-specific configuration
+ * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
  */
 
 /**
@@ -34,6 +36,7 @@ const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./ut
  * @property {number} score - Score from 0.0 to 1.0
  * @property {string} timestamp - ISO timestamp
  * @property {string} [transcript] - Path to transcript file
+ * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed
  */
 
@@ -78,6 +81,7 @@ function parseScenario(filePath) {
     assertions,
     grader: (sections.grader || []).join('\n').trim() || 'code',
     graderConfig: (sections['grader config'] || []).join('\n').trim(),
+    setup: (sections.setup || []).join('\n').trim(),
   };
 }
 
@@ -98,6 +102,45 @@ function listScenarios(projectRoot) {
 }
 
 /**
+ * Create an isolated temp directory for a trial run
+ * @param {string} evalName - Eval name for prefix
+ * @param {number} trialNumber - Trial number
+ * @returns {string} Absolute path to temp directory
+ */
+function createTrialDir(evalName, trialNumber) {
+  const prefix = `arcforge-eval-${sanitizeFilename(evalName)}-t${trialNumber}-`;
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+/**
+ * Clean up a trial temp directory. Only removes paths inside os.tmpdir().
+ * @param {string} [trialDir] - Path to trial directory
+ */
+function cleanupTrialDir(trialDir) {
+  if (!trialDir || !trialDir.startsWith(os.tmpdir())) return;
+  try {
+    fs.rmSync(trialDir, { recursive: true, force: true });
+  } catch {
+    /* silent — temp dir cleanup is best-effort */
+  }
+}
+
+/**
+ * Run a setup command in the trial directory
+ * @param {string} setupCommand - Shell command to execute
+ * @param {string} trialDir - Working directory for setup
+ */
+function runSetup(setupCommand, trialDir) {
+  const { exitCode, stderr } = execCommand('sh', ['-c', setupCommand], {
+    cwd: trialDir,
+    timeout: 30000,
+  });
+  if (exitCode !== 0) {
+    throw new Error(`Setup failed: ${stderr}`);
+  }
+}
+
+/**
  * Run a single eval trial by spawning a Claude session
  * @param {EvalScenario} scenario - The eval scenario
  * @param {number} trialNumber - Trial number (1-indexed)
@@ -110,11 +153,19 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const { projectRoot = process.cwd(), label } = options;
   const timestamp = getTimestamp();
 
+  // Isolate trial in temp dir when scenario defines a setup command
+  let trialDir;
+  if (scenario.setup) {
+    trialDir = createTrialDir(scenario.name, trialNumber);
+    runSetup(scenario.setup, trialDir);
+  }
+  const trialCwd = trialDir || projectRoot;
+
   const prompt = buildTrialPrompt(scenario);
 
   const result = execCommand('claude', ['-p', '--output-format', 'text'], {
     input: prompt,
-    cwd: projectRoot,
+    cwd: trialCwd,
     timeout: 300000, // 5 minute timeout per trial
   });
 
@@ -131,9 +182,10 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     score: 0,
     timestamp,
     transcript,
+    ...(trialDir ? { trialDir } : {}),
   };
   return result.exitCode === 0
-    ? { ...base, output: result.stdout.slice(0, 10000) }
+    ? { ...base, output: result.stdout }
     : { ...base, error: result.stderr };
 }
 
@@ -183,6 +235,7 @@ function runSkillEval(scenario, k, options = {}) {
     appendResult(graded, projectRoot);
     baseline.push(graded);
     if (onTrialComplete) onTrialComplete('baseline', t, graded);
+    cleanupTrialDir(result.trialDir);
   }
 
   // Run treatment trials (with skill instruction)
@@ -192,6 +245,7 @@ function runSkillEval(scenario, k, options = {}) {
     appendResult(graded, projectRoot);
     treatment.push(graded);
     if (onTrialComplete) onTrialComplete('treatment', t, graded);
+    cleanupTrialDir(result.trialDir);
   }
 
   return {
@@ -210,7 +264,8 @@ function runSkillEval(scenario, k, options = {}) {
  */
 function gradeTrialResult(result, scenario, projectRoot) {
   if (scenario.grader === 'code') {
-    return gradeWithCode(result, scenario.graderConfig, projectRoot);
+    const gradeCwd = result.trialDir || projectRoot;
+    return gradeWithCode(result, scenario.graderConfig, gradeCwd);
   }
   if (scenario.grader === 'model') {
     return gradeWithModel(result, scenario, projectRoot);
@@ -332,11 +387,18 @@ function appendResult(result, projectRoot) {
   const resultsPath = path.join(projectRoot, RESULTS_DIR);
   ensureDir(resultsPath);
 
-  const dateStr = result.timestamp.split('T')[0];
-  const fileName = `${dateStr}-${sanitizeFilename(result.eval)}.jsonl`;
+  // Truncate output for storage only (grading already used full output)
+  const maxStorageLen = 50000;
+  const storable =
+    result.output && result.output.length > maxStorageLen
+      ? { ...result, output: `${result.output.slice(0, maxStorageLen)}\n[truncated for storage]` }
+      : result;
+
+  const dateStr = storable.timestamp.split('T')[0];
+  const fileName = `${dateStr}-${sanitizeFilename(storable.eval)}.jsonl`;
   const filePath = path.join(resultsPath, fileName);
 
-  fs.appendFileSync(filePath, `${JSON.stringify(result)}\n`);
+  fs.appendFileSync(filePath, `${JSON.stringify(storable)}\n`);
 }
 
 /**
@@ -544,6 +606,9 @@ function ensureEvalsDir(projectRoot) {
 module.exports = {
   parseScenario,
   listScenarios,
+  createTrialDir,
+  cleanupTrialDir,
+  runSetup,
   runTrial,
   buildTrialPrompt,
   gradeWithCode,

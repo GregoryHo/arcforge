@@ -17,6 +17,9 @@ Working directory contains no existing files. Create both implementation and tes
 - [ ] Implementation handles edge cases (n=0, n=1)
 - [ ] All tests pass when run with node --test
 
+## Setup
+true
+
 ## Grader
 model
 
