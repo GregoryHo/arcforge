@@ -2,6 +2,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
+// Mock utils.execCommand so gradeWithModel tests can intercept Claude calls.
+// Default implementation delegates to the real function — only gradeWithModel
+// tests override via mockReturnValueOnce.
+jest.mock('../../scripts/lib/utils', () => {
+  const actual = jest.requireActual('../../scripts/lib/utils');
+  return { ...actual, execCommand: jest.fn((...args) => actual.execCommand(...args)) };
+});
+const mockUtils = require('../../scripts/lib/utils');
+
 const {
   parseScenario,
   buildTrialPrompt,
@@ -15,6 +24,10 @@ const {
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
+  gradeWithModel,
+  gradeTrialResult,
+  saveTranscript,
+  runSkillEval,
   SCENARIOS_DIR,
   RESULTS_DIR,
   BENCHMARKS_DIR,
@@ -490,11 +503,154 @@ Plain text at end.
       expect(result).toEqual(original);
     });
 
-    it('should handle string command', () => {
+    it('should handle string command via shell', () => {
       const result = makeResult();
-      const graded = gradeWithCode(result, 'node -e process.exit(0)', tempDir);
+      const graded = gradeWithCode(result, 'node -e "process.exit(0)"', tempDir);
 
       expect(graded.passed).toBe(true);
+    });
+
+    it('should handle shell features like && chaining', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'true && node -e "process.exit(0)"', tempDir);
+
+      expect(graded.passed).toBe(true);
+    });
+  });
+
+  // ── gradeWithModel ────────────────────────────────────────────
+
+  describe('gradeWithModel', () => {
+    const mockScenario = {
+      name: 'test-eval',
+      scope: 'agent',
+      scenario: 'Do something.',
+      context: '',
+      assertions: ['Criterion A', 'Criterion B'],
+      grader: 'model',
+      graderConfig: 'Score based on completeness.',
+    };
+
+    it('should be exported as a function', () => {
+      expect(typeof gradeWithModel).toBe('function');
+    });
+
+    it('should parse valid JSON grade and not mutate input', () => {
+      const result = makeResult({ output: 'test output' });
+      const original = { ...result };
+
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [0.9, 0.8], "overall": 0.85, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(result).toEqual(original);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(0.85);
+    });
+
+    it('should handle Claude failure gracefully', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '',
+        stderr: 'error',
+        exitCode: 1,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0);
+      expect(graded.error).toContain('failed to respond');
+    });
+
+    it('should handle unparseable response', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: 'I cannot grade this output because...',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(false);
+      expect(graded.error).toContain('unparseable');
+    });
+
+    it('should extract JSON from mixed markdown response', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout:
+          'Here is my grade:\n```json\n{"scores": [1.0, 0.6], "overall": 0.80, "passed": false}\n```',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0.8);
+    });
+  });
+
+  // ── saveTranscript ────────────────────────────────────────────
+
+  describe('saveTranscript', () => {
+    it('should save output to transcript file and return path', () => {
+      const filePath = saveTranscript('my-eval', 1, 'full output text', tempDir);
+
+      expect(fs.existsSync(filePath)).toBe(true);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('full output text');
+      expect(filePath).toContain('my-eval-trial-1.txt');
+    });
+
+    it('should create transcripts subdirectory', () => {
+      saveTranscript('test', 2, 'output', tempDir);
+      const transcriptsDir = path.join(tempDir, RESULTS_DIR, 'transcripts');
+      expect(fs.existsSync(transcriptsDir)).toBe(true);
+    });
+  });
+
+  // ── gradeTrialResult ──────────────────────────────────────────
+
+  describe('gradeTrialResult', () => {
+    it('should dispatch to gradeWithCode for code grader', () => {
+      const result = makeResult();
+      const scenario = { grader: 'code', graderConfig: 'true' };
+      const graded = gradeTrialResult(result, scenario, tempDir);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(1.0);
+    });
+
+    it('should dispatch to gradeWithModel for model grader', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [0.9], "overall": 0.9, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+      const result = makeResult({ output: 'some output' });
+      const scenario = {
+        grader: 'model',
+        graderConfig: 'Check quality.',
+        assertions: ['Is good'],
+      };
+      const graded = gradeTrialResult(result, scenario, tempDir);
+      expect(graded.passed).toBe(true);
+    });
+
+    it('should return human-pending for human grader', () => {
+      const result = makeResult();
+      const scenario = { grader: 'human', graderConfig: '' };
+      const graded = gradeTrialResult(result, scenario, tempDir);
+      expect(graded.grader).toBe('human-pending');
+    });
+  });
+
+  // ── runSkillEval ──────────────────────────────────────────────
+
+  describe('runSkillEval', () => {
+    it('should be exported as a function', () => {
+      expect(typeof runSkillEval).toBe('function');
     });
   });
 });

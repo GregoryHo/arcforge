@@ -59,6 +59,16 @@ function getReadWriteRatio() {
 }
 
 /**
+ * Check if a write-heavy phase should suppress non-critical reminders.
+ * Suppresses at non-threshold counts below 100 during active implementation.
+ */
+function shouldSuppressReminder(count) {
+  const { writes, total } = getReadWriteRatio();
+  const writeHeavy = total >= MIN_PHASE_SAMPLES && writes / total > 0.6;
+  return writeHeavy && count !== THRESHOLD && count < 100;
+}
+
+/**
  * Build phase-aware suggestion message
  */
 function buildMessage(count) {
@@ -119,22 +129,23 @@ function main() {
 
   // Check if suggestion is needed (suppress during write-heavy phases at non-threshold counts)
   if (shouldSuggest(newCount)) {
-    const { writes, total } = getReadWriteRatio();
-    const writeHeavy = total >= MIN_PHASE_SAMPLES && writes / total > 0.6;
-
-    if (writeHeavy && newCount !== THRESHOLD && newCount < 100) {
-      // Suppress non-critical reminders during active implementation
+    if (shouldSuppressReminder(newCount)) {
       return;
     }
     logHighlight(buildMessage(newCount));
   }
 }
 
-// Export for use by session-tracker
+// Export for use by session-tracker and testing
 module.exports = {
   resetCounter: () => getCounter().reset(),
   readCount: () => getCounter().read(),
   getCounterFilePath: () => getCounter().getFilePath(),
+  shouldSuggest,
+  shouldSuppressReminder,
+  buildMessage,
+  trackToolType,
+  getReadWriteRatio,
 };
 
 // Run if executed directly

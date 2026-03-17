@@ -9,7 +9,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand, ensureDir, getTimestamp } = require('./utils');
+const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -107,7 +107,7 @@ function listScenarios(projectRoot) {
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
-  const { projectRoot = process.cwd() } = options;
+  const { projectRoot = process.cwd(), label } = options;
   const timestamp = getTimestamp();
 
   const prompt = buildTrialPrompt(scenario);
@@ -118,28 +118,103 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     timeout: 300000, // 5 minute timeout per trial
   });
 
-  if (result.exitCode === 0) {
-    return {
-      eval: scenario.name,
-      trial: trialNumber,
-      k: totalTrials,
-      passed: false, // Will be set by grader
-      grader: scenario.grader,
-      score: 0,
-      timestamp,
-      output: result.stdout.slice(0, 10000), // Truncate for storage
-    };
-  }
-  return {
-    eval: scenario.name,
+  const evalName = label ? `${scenario.name}-${label}` : scenario.name;
+  const fullOutput = result.exitCode === 0 ? result.stdout : result.stderr || '';
+  const transcript = saveTranscript(evalName, trialNumber, fullOutput, projectRoot);
+
+  const base = {
+    eval: evalName,
     trial: trialNumber,
     k: totalTrials,
-    passed: false,
+    passed: false, // Will be set by grader
     grader: scenario.grader,
     score: 0,
     timestamp,
-    error: result.stderr,
+    transcript,
   };
+  return result.exitCode === 0
+    ? { ...base, output: result.stdout.slice(0, 10000) }
+    : { ...base, error: result.stderr };
+}
+
+/**
+ * Save full trial output to a transcript file
+ * @param {string} evalName - Eval name (may include label suffix)
+ * @param {number} trialNumber - Trial number
+ * @param {string} output - Full output text
+ * @param {string} projectRoot - Project root directory
+ * @returns {string} Path to transcript file
+ */
+function saveTranscript(evalName, trialNumber, output, projectRoot) {
+  const transcriptsPath = path.join(projectRoot, RESULTS_DIR, 'transcripts');
+  ensureDir(transcriptsPath);
+  const fileName = `${sanitizeFilename(evalName)}-trial-${trialNumber}.txt`;
+  const filePath = path.join(transcriptsPath, fileName);
+  fs.writeFileSync(filePath, output);
+  return filePath;
+}
+
+/**
+ * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
+ * Runs k trials for each condition, grades both, computes delta.
+ * @param {EvalScenario} scenario - Scenario with scope='skill'
+ * @param {number} k - Number of trials per condition
+ * @param {Object} options - Run options
+ * @param {string} [options.projectRoot] - Project root
+ * @param {string} [options.skillInstruction] - Instruction to prepend for treatment trials
+ * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
+ */
+function runSkillEval(scenario, k, options = {}) {
+  const { projectRoot = process.cwd(), skillInstruction } = options;
+
+  // Build treatment scenario with skill instruction prepended to context
+  const treatmentScenario = {
+    ...scenario,
+    context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
+  };
+
+  const baseline = [];
+  const treatment = [];
+
+  // Run baseline trials (plain scenario, no skill)
+  for (let t = 1; t <= k; t++) {
+    const result = runTrial(scenario, t, k, { projectRoot, label: 'baseline' });
+    const graded = gradeTrialResult(result, scenario, projectRoot);
+    appendResult(graded, projectRoot);
+    baseline.push(graded);
+  }
+
+  // Run treatment trials (with skill instruction)
+  for (let t = 1; t <= k; t++) {
+    const result = runTrial(treatmentScenario, t, k, { projectRoot, label: 'treatment' });
+    const graded = gradeTrialResult(result, scenario, projectRoot);
+    appendResult(graded, projectRoot);
+    treatment.push(graded);
+  }
+
+  return {
+    baseline,
+    treatment,
+    delta: computeDelta(baseline, treatment),
+  };
+}
+
+/**
+ * Grade a trial result using the appropriate grader for the scenario.
+ * @param {TrialResult} result - Trial result to grade
+ * @param {EvalScenario} scenario - Scenario with grader config
+ * @param {string} projectRoot - Project root directory
+ * @returns {TrialResult} Graded result
+ */
+function gradeTrialResult(result, scenario, projectRoot) {
+  if (scenario.grader === 'code') {
+    return gradeWithCode(result, scenario.graderConfig, projectRoot);
+  }
+  if (scenario.grader === 'model') {
+    return gradeWithModel(result, scenario, projectRoot);
+  }
+  // human grader — return ungraded
+  return { ...result, grader: 'human-pending' };
 }
 
 /**
@@ -165,7 +240,7 @@ function buildTrialPrompt(scenario) {
 
 /**
  * Grade a trial result using a code grader (test command).
- * Accepts test command as array (preferred) or space-separated string.
+ * Accepts test command as array (exec directly) or string (run via shell).
  * Returns a new result object (does not mutate input).
  * @param {TrialResult} result - Trial result to grade
  * @param {string|string[]} testCommand - Test command to run
@@ -173,9 +248,77 @@ function buildTrialPrompt(scenario) {
  * @returns {TrialResult} New result with grade
  */
 function gradeWithCode(result, testCommand, projectRoot) {
-  const [cmd, ...args] = Array.isArray(testCommand) ? testCommand : testCommand.split(' ');
+  const [cmd, args] = Array.isArray(testCommand)
+    ? [testCommand[0], testCommand.slice(1)]
+    : ['sh', ['-c', testCommand]];
   const { exitCode } = execCommand(cmd, args, { cwd: projectRoot });
   return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0 };
+}
+
+/**
+ * Grade a trial result using the eval-grader agent (LLM-as-judge).
+ * Spawns a Claude session with the rubric and trial output, then
+ * parses the structured grade report for per-assertion scores.
+ * Returns a new result object (does not mutate input).
+ * @param {TrialResult} result - Trial result to grade
+ * @param {EvalScenario} scenario - Scenario with assertions and graderConfig
+ * @param {string} projectRoot - Project root directory
+ * @returns {TrialResult} New result with grade
+ */
+function gradeWithModel(result, scenario, projectRoot) {
+  const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
+  const prompt = [
+    '## Grading Task',
+    '',
+    'Grade the following output against these assertions. For each assertion, score 0.0 to 1.0.',
+    '',
+    '### Assertions',
+    rubric,
+    '',
+    '### Grader Guidelines',
+    scenario.graderConfig || 'Score each assertion based on evidence in the output.',
+    '',
+    '### Output to Grade',
+    '```',
+    result.output || result.error || '(no output)',
+    '```',
+    '',
+    '### Response Format',
+    'Respond with ONLY a JSON object:',
+    '```json',
+    '{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}',
+    '```',
+    'Set passed=true if ALL scores >= 0.7.',
+  ].join('\n');
+
+  const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text'], {
+    input: prompt,
+    cwd: projectRoot,
+    timeout: 120000,
+  });
+
+  if (exitCode !== 0) {
+    return { ...result, passed: false, score: 0, error: 'Model grader failed to respond' };
+  }
+
+  const jsonMatch = stdout.match(/\{[\s\S]*?"scores"\s*:[\s\S]*?\}/);
+  if (!jsonMatch) {
+    return {
+      ...result,
+      passed: false,
+      score: 0,
+      error: 'Model grader returned unparseable response',
+    };
+  }
+
+  try {
+    const grade = JSON.parse(jsonMatch[0]);
+    const score = typeof grade.overall === 'number' ? grade.overall : 0;
+    const passed = typeof grade.passed === 'boolean' ? grade.passed : score >= 0.7;
+    return { ...result, passed, score: Math.round(score * 100) / 100 };
+  } catch {
+    return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
+  }
 }
 
 /**
@@ -188,7 +331,7 @@ function appendResult(result, projectRoot) {
   ensureDir(resultsPath);
 
   const dateStr = result.timestamp.split('T')[0];
-  const fileName = `${dateStr}-${result.eval}.jsonl`;
+  const fileName = `${dateStr}-${sanitizeFilename(result.eval)}.jsonl`;
   const filePath = path.join(resultsPath, fileName);
 
   fs.appendFileSync(filePath, `${JSON.stringify(result)}\n`);
@@ -304,6 +447,17 @@ function generateBenchmark(projectRoot) {
 }
 
 /**
+ * Get verdict from a numeric pass rate
+ * @param {number} passRate - Pass rate (0.0 to 1.0)
+ * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
+ */
+function verdictFromRate(passRate) {
+  if (passRate >= 1.0) return 'SHIP';
+  if (passRate >= 0.6) return 'NEEDS WORK';
+  return 'BLOCKED';
+}
+
+/**
  * Get verdict for an eval based on pass rate
  * @param {TrialResult[]} results - Trial results
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
@@ -311,9 +465,7 @@ function generateBenchmark(projectRoot) {
 function getVerdict(results) {
   if (results.length === 0) return 'BLOCKED';
   const passRate = results.filter((r) => r.passed).length / results.length;
-  if (passRate >= 1.0) return 'SHIP';
-  if (passRate >= 0.6) return 'NEEDS WORK';
-  return 'BLOCKED';
+  return verdictFromRate(passRate);
 }
 
 /**
@@ -332,12 +484,17 @@ module.exports = {
   runTrial,
   buildTrialPrompt,
   gradeWithCode,
+  gradeWithModel,
+  gradeTrialResult,
+  runSkillEval,
+  saveTranscript,
   appendResult,
   loadResults,
   passAtK,
   passAllK,
   computeDelta,
   generateBenchmark,
+  verdictFromRate,
   getVerdict,
   ensureEvalsDir,
   EVALS_DIR,

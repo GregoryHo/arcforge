@@ -1,0 +1,50 @@
+{
+  "generated": "2026-03-17T06:57:13.206Z",
+  "evals": {
+    "agent-roster-dispatch": {
+      "scope": "agent",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-17T03:14:43.123Z"
+    },
+    "compact-suggester-phases": {
+      "scope": "skill",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-17T03:17:51.781Z"
+    },
+    "eval-harness-basic": {
+      "scope": "workflow",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-17T03:20:21.022Z"
+    },
+    "eval-self-evaluation": {
+      "scope": "workflow",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-17T06:55:09.653Z"
+    },
+    "loop-stall-detection": {
+      "scope": "workflow",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-17T03:28:11.603Z"
+    }
+  }
+}

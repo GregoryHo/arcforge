@@ -509,6 +509,7 @@ module.exports = {
   runTask,
   isStalled,
   isRetryStorm,
+  checkStopConditions,
   runSequential,
   runDag,
 };

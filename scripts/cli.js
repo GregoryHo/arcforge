@@ -15,6 +15,9 @@
  *   reboot                          Get context for new session
  *   schema [--json] [--example]     Show dag.yaml schema
  *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
+ *   eval list                        List eval scenarios
+ *   eval run <name> [--k N]          Run eval scenario with k trials
+ *   eval report [name]               Show eval benchmark report
  */
 
 const { Coordinator } = require('./lib/coordinator');
@@ -301,6 +304,81 @@ async function main() {
           } else {
             console.log(schemaToYaml());
           }
+        }
+        break;
+      }
+
+      case 'eval': {
+        const eval_ = require('./lib/eval');
+        const subcommand = args.positional[0];
+
+        if (subcommand === 'list') {
+          const scenarios = eval_.listScenarios(projectRoot);
+          if (scenarios.length === 0) {
+            console.log('No scenarios found in evals/scenarios/');
+          } else {
+            for (const file of scenarios) {
+              const s = eval_.parseScenario(file);
+              const results = eval_.loadResults(s.name, projectRoot);
+              const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
+              console.log(`  ${s.name} (${s.scope}, ${s.grader}) — ${verdict}`);
+            }
+          }
+        } else if (subcommand === 'run') {
+          const name = args.positional[1];
+          if (!name) {
+            console.error('Error: eval run requires a scenario name');
+            process.exit(1);
+          }
+          const k = args.options.k ? parseInt(args.options.k, 10) : 3;
+          let scenario;
+          const scenarios = eval_.listScenarios(projectRoot);
+          scenarios.find((f) => {
+            const s = eval_.parseScenario(f);
+            if (s.name === name) {
+              scenario = s;
+              return true;
+            }
+            return false;
+          });
+          if (!scenario) {
+            console.error(`Error: scenario "${name}" not found`);
+            process.exit(1);
+          }
+          console.log(`Running ${scenario.name} (k=${k})...`);
+
+          for (let t = 1; t <= k; t++) {
+            process.stdout.write(`  Trial ${t}/${k}: `);
+            const result = eval_.runTrial(scenario, t, k, { projectRoot });
+            const graded = eval_.gradeTrialResult(result, scenario, projectRoot);
+            eval_.appendResult(graded, projectRoot);
+            console.log(graded.passed ? `PASS (${graded.score})` : `FAIL (${graded.score})`);
+          }
+
+          const results = eval_.loadResults(scenario.name, projectRoot).slice(-k);
+          console.log(`Verdict: ${eval_.getVerdict(results)}`);
+        } else if (subcommand === 'report') {
+          const benchmark = eval_.generateBenchmark(projectRoot);
+          const name = args.positional[1];
+
+          if (name && benchmark.evals[name]) {
+            const data = benchmark.evals[name];
+            output(data, asJson);
+          } else {
+            if (Object.keys(benchmark.evals).length === 0) {
+              console.log('No eval results yet. Run: arc eval run <scenario>');
+            } else {
+              for (const [evalName, data] of Object.entries(benchmark.evals)) {
+                const verdict = eval_.verdictFromRate(data.pass_rate);
+                console.log(
+                  `  ${evalName}: ${(data.pass_rate * 100).toFixed(0)}% (${data.trials} trials) — ${verdict}`,
+                );
+              }
+            }
+          }
+        } else {
+          console.error('Usage: arc eval [list|run|report]');
+          process.exit(1);
         }
         break;
       }

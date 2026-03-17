@@ -21,4 +21,4 @@ The loop orchestrator in scripts/loop.js implements two safety mechanisms: stall
 code
 
 ## Grader Config
-node -e "const l = require('./scripts/loop.js'); console.log('exports:', Object.keys(l));"
+node -e "require('./scripts/loop.js')"
