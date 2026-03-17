@@ -208,6 +208,26 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
 }
 
 /**
+ * Execute a single trial: run → grade → append → callback → cleanup.
+ * Shared helper for both sequential and interleaved A/B modes.
+ * @param {EvalScenario} trialScenario - Scenario to run (may have skill instruction in context)
+ * @param {EvalScenario} gradeScenario - Original scenario for grading (without skill instruction)
+ * @param {number} trialNumber - Trial number (1-indexed)
+ * @param {number} k - Total trials per condition
+ * @param {Object} opts - { projectRoot, label, onTrialComplete }
+ * @returns {TrialResult} Graded result
+ */
+function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
+  const { projectRoot, label, onTrialComplete } = opts;
+  const result = runTrial(trialScenario, trialNumber, k, { projectRoot, label });
+  const graded = gradeTrialResult(result, gradeScenario, projectRoot);
+  appendResult(graded, projectRoot);
+  if (onTrialComplete) onTrialComplete(label, trialNumber, graded);
+  cleanupTrialDir(result.trialDir);
+  return graded;
+}
+
+/**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
  * Runs k trials for each condition, grades both, computes delta.
  * @param {EvalScenario} scenario - Scenario with scope='skill'
@@ -215,12 +235,17 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
  * @param {Object} options - Run options
  * @param {string} [options.projectRoot] - Project root
  * @param {string} [options.skillInstruction] - Instruction to prepend for treatment trials
+ * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
 function runSkillEval(scenario, k, options = {}) {
-  const { projectRoot = process.cwd(), skillInstruction, onTrialComplete } = options;
+  const {
+    projectRoot = process.cwd(),
+    skillInstruction,
+    onTrialComplete,
+    interleave = false,
+  } = options;
 
-  // Build treatment scenario with skill instruction prepended to context
   const treatmentScenario = {
     ...scenario,
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
@@ -228,25 +253,21 @@ function runSkillEval(scenario, k, options = {}) {
 
   const baseline = [];
   const treatment = [];
+  const bOpts = { projectRoot, label: 'baseline', onTrialComplete };
+  const tOpts = { projectRoot, label: 'treatment', onTrialComplete };
 
-  // Run baseline trials (plain scenario, no skill)
-  for (let t = 1; t <= k; t++) {
-    const result = runTrial(scenario, t, k, { projectRoot, label: 'baseline' });
-    const graded = gradeTrialResult(result, scenario, projectRoot);
-    appendResult(graded, projectRoot);
-    baseline.push(graded);
-    if (onTrialComplete) onTrialComplete('baseline', t, graded);
-    cleanupTrialDir(result.trialDir);
-  }
-
-  // Run treatment trials (with skill instruction)
-  for (let t = 1; t <= k; t++) {
-    const result = runTrial(treatmentScenario, t, k, { projectRoot, label: 'treatment' });
-    const graded = gradeTrialResult(result, scenario, projectRoot);
-    appendResult(graded, projectRoot);
-    treatment.push(graded);
-    if (onTrialComplete) onTrialComplete('treatment', t, graded);
-    cleanupTrialDir(result.trialDir);
+  if (interleave) {
+    for (let t = 1; t <= k; t++) {
+      baseline.push(executeAndGradeTrial(scenario, scenario, t, k, bOpts));
+      treatment.push(executeAndGradeTrial(treatmentScenario, scenario, t, k, tOpts));
+    }
+  } else {
+    for (let t = 1; t <= k; t++) {
+      baseline.push(executeAndGradeTrial(scenario, scenario, t, k, bOpts));
+    }
+    for (let t = 1; t <= k; t++) {
+      treatment.push(executeAndGradeTrial(treatmentScenario, scenario, t, k, tOpts));
+    }
   }
 
   return {
@@ -538,6 +559,7 @@ module.exports = {
   gradeWithModel,
   gradeWithHuman,
   gradeTrialResult,
+  executeAndGradeTrial,
   runSkillEval,
   saveTranscript,
   appendResult,

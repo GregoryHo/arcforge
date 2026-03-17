@@ -314,6 +314,86 @@ describe('runSkillEval A/B flow', () => {
     expect(baselinePrompt).not.toContain('SKILL_MARKER_TEXT');
     expect(treatmentPrompt).toContain('SKILL_MARKER_TEXT');
   });
+
+  test('should interleave baseline and treatment when interleave=true', () => {
+    writeScenario(tmpDir, 'test-ab.md', scenarioContent);
+    const { parseScenario } = require('../../scripts/lib/eval');
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
+
+    const callOrder = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
+      if (cmd === 'claude') {
+        const hasSkill = (opts.input || '').includes('SKILL_MARKER');
+        callOrder.push(hasSkill ? 'treatment' : 'baseline');
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runSkillEval(scenario, 2, {
+      projectRoot: tmpDir,
+      skillInstruction: 'SKILL_MARKER',
+      interleave: true,
+    });
+
+    // Interleaved: B1, T1, B2, T2
+    expect(callOrder).toEqual(['baseline', 'treatment', 'baseline', 'treatment']);
+  });
+
+  test('should call onTrialComplete in interleaved order', () => {
+    writeScenario(tmpDir, 'test-ab.md', scenarioContent);
+    const { parseScenario } = require('../../scripts/lib/eval');
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
+
+    const trialOutput = { stdout: 'output', stderr: '', exitCode: 0 };
+    const gradePass = { stdout: '', stderr: '', exitCode: 0 };
+    for (let i = 0; i < 4; i++) {
+      mockUtils.execCommand.mockReturnValueOnce(trialOutput);
+      mockUtils.execCommand.mockReturnValueOnce(gradePass);
+    }
+
+    const callback = jest.fn();
+    runSkillEval(scenario, 2, {
+      projectRoot: tmpDir,
+      skillInstruction: 'TDD.',
+      interleave: true,
+      onTrialComplete: callback,
+    });
+
+    expect(callback).toHaveBeenCalledTimes(4);
+    // Interleaved order: baseline-1, treatment-1, baseline-2, treatment-2
+    expect(callback.mock.calls[0][0]).toBe('baseline');
+    expect(callback.mock.calls[0][1]).toBe(1);
+    expect(callback.mock.calls[1][0]).toBe('treatment');
+    expect(callback.mock.calls[1][1]).toBe(1);
+    expect(callback.mock.calls[2][0]).toBe('baseline');
+    expect(callback.mock.calls[2][1]).toBe(2);
+    expect(callback.mock.calls[3][0]).toBe('treatment');
+    expect(callback.mock.calls[3][1]).toBe(2);
+  });
+
+  test('should preserve sequential order when interleave=false', () => {
+    writeScenario(tmpDir, 'test-ab.md', scenarioContent);
+    const { parseScenario } = require('../../scripts/lib/eval');
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
+
+    const callOrder = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
+      if (cmd === 'claude') {
+        const hasSkill = (opts.input || '').includes('SKILL_MARKER');
+        callOrder.push(hasSkill ? 'treatment' : 'baseline');
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runSkillEval(scenario, 2, {
+      projectRoot: tmpDir,
+      skillInstruction: 'SKILL_MARKER',
+      interleave: false,
+    });
+
+    // Sequential: B1, B2, T1, T2
+    expect(callOrder).toEqual(['baseline', 'baseline', 'treatment', 'treatment']);
+  });
 });
 
 // ── Trial isolation ─────────────────────────────────────────

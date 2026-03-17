@@ -413,12 +413,14 @@ async function main() {
           const scenario = requireScenario(args.positional[1], 'ab');
 
           const skillInstruction = fs.readFileSync(path.resolve(skillFile), 'utf8');
-          console.log(`A/B eval: ${scenario.name} (k=${k})`);
+          const interleave = !!args.options.interleave;
+          console.log(`A/B eval: ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`);
           console.log(`Skill: ${skillFile}\n`);
 
           const { baseline, treatment, delta } = eval_.runSkillEval(scenario, k, {
             projectRoot,
             skillInstruction,
+            interleave,
             onTrialComplete: (label, t, graded) => {
               console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
             },
