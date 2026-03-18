@@ -128,7 +128,7 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
 }
 
 // ─────────────────────────────────────────────
-// Session Listing, Checkpoints & Briefings
+// Session Listing & Briefings
 // ─────────────────────────────────────────────
 
 /**
@@ -152,16 +152,17 @@ function getDateDirs(parentDir) {
  * @param {string} project - Project name
  * @param {Object} [options]
  * @param {string} [options.date] - Filter by date (YYYY-MM-DD)
+ * @param {string} [options.query] - Filter by session ID substring
  * @param {number} [options.limit=20] - Max results
  * @param {number} [options.offset=0] - Skip first N results
  * @returns {{ sessions: Object[], total: number }}
  */
 function listSessions(project, options = {}) {
-  const { date = null, limit = 20, offset = 0 } = options;
+  const { date = null, query = null, limit = 20, offset = 0 } = options;
   const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
   if (!fs.existsSync(sessionsDir)) return { sessions: [], total: 0 };
 
-  const allSessions = [];
+  let allSessions = [];
   let dateDirs = getDateDirs(sessionsDir);
 
   if (date) {
@@ -170,15 +171,29 @@ function listSessions(project, options = {}) {
 
   for (const dateStr of dateDirs) {
     const dateDir = path.join(sessionsDir, dateStr);
-    const jsonFiles = fs
+    const sessionFiles = fs
       .readdirSync(dateDir)
-      .filter((f) => f.endsWith('.json') && f.startsWith('session-'));
+      .filter((f) => f.startsWith('session-') && (f.endsWith('.json') || f.endsWith('.md')));
 
-    for (const file of jsonFiles) {
+    for (const file of sessionFiles) {
       try {
-        const content = fs.readFileSync(path.join(dateDir, file), 'utf-8');
-        const session = JSON.parse(content);
-        allSessions.push({ ...session, dateStr, filename: file });
+        if (file.endsWith('.json')) {
+          const content = fs.readFileSync(path.join(dateDir, file), 'utf-8');
+          const session = JSON.parse(content);
+          allSessions.push({ ...session, dateStr, filename: file, type: 'auto' });
+        } else {
+          // session-{alias}.md — user-saved session
+          const alias = file.replace(/^session-/, '').replace(/\.md$/, '');
+          allSessions.push({
+            sessionId: alias,
+            project,
+            date: dateStr,
+            dateStr,
+            filename: file,
+            type: 'saved',
+            lastUpdated: fs.statSync(path.join(dateDir, file)).mtime.toISOString(),
+          });
+        }
       } catch {
         // skip invalid
       }
@@ -191,6 +206,12 @@ function listSessions(project, options = {}) {
       new Date(b.lastUpdated || b.dateStr).getTime() -
       new Date(a.lastUpdated || a.dateStr).getTime(),
   );
+
+  // Filter by session ID substring
+  if (query) {
+    const q = query.toLowerCase();
+    allSessions = allSessions.filter((s) => (s.sessionId || '').toLowerCase().includes(q));
+  }
 
   return {
     sessions: allSessions.slice(offset, offset + limit),
@@ -214,7 +235,7 @@ function getSessionById(project, idPrefix) {
 }
 
 /**
- * Generate a checkpoint markdown from session data and optional transcript data.
+ * Generate a saved session markdown from session data and optional transcript data.
  * @param {Object} session - Session JSON data
  * @param {Object|null} transcriptData - Parsed transcript data
  * @param {Object} [enrichment] - Claude-provided enrichment
@@ -223,13 +244,13 @@ function getSessionById(project, idPrefix) {
  * @param {string} [enrichment.whatFailed] - Approaches that failed
  * @param {string} [enrichment.blockers] - Current blockers
  * @param {string} [enrichment.nextStep] - Exact next step
- * @returns {string} Checkpoint markdown content
+ * @returns {string} Session markdown content
  */
-function generateCheckpoint(session, transcriptData = null, enrichment = {}) {
+function generateSession(session, transcriptData = null, enrichment = {}) {
   const lines = [];
   const date = session.date || session.dateStr || new Date().toISOString().split('T')[0];
 
-  lines.push(`# Session Checkpoint: ${date}`);
+  lines.push(`# Session: ${date}`);
   lines.push(`**Project:** ${session.project || 'unknown'}`);
   lines.push(`**Session:** ${session.sessionId || 'unknown'}`);
   lines.push(`**Created:** ${new Date().toISOString()}`);
@@ -303,19 +324,18 @@ function generateCheckpoint(session, transcriptData = null, enrichment = {}) {
 }
 
 /**
- * Format a structured briefing from checkpoint content for resume.
- * @param {string} checkpointContent - Raw checkpoint markdown
- * @param {string} checkpointPath - Path to the checkpoint file
+ * Format a structured briefing from saved session content for resume.
+ * @param {string} sessionContent - Raw session markdown
+ * @param {string} sessionPath - Path to the session file
  * @returns {string} Formatted briefing
  */
-function formatSessionBriefing(checkpointContent, checkpointPath) {
+function formatSessionBriefing(sessionContent, sessionPath) {
   const lines = [];
-  lines.push(`SESSION LOADED: ${checkpointPath}`);
+  lines.push(`SESSION LOADED: ${sessionPath}`);
   lines.push('════════════════════════════════════════════════');
   lines.push('');
 
-  // Extract sections from checkpoint markdown
-  const sections = parseCheckpointSections(checkpointContent);
+  const sections = parseSessionSections(sessionContent);
 
   if (sections.project) {
     lines.push(`PROJECT: ${sections.project}`);
@@ -371,11 +391,11 @@ function formatSessionBriefing(checkpointContent, checkpointPath) {
 }
 
 /**
- * Parse checkpoint markdown into named sections.
- * @param {string} content - Checkpoint markdown
+ * Parse saved session markdown into named sections.
+ * @param {string} content - Session markdown
  * @returns {Object} Parsed sections
  */
-function parseCheckpointSections(content) {
+function parseSessionSections(content) {
   const sections = {};
   const lines = content.split('\n');
 
@@ -492,13 +512,13 @@ module.exports = {
   determineReflectStrategy,
   updateProcessedLog,
   CLAUDE_DIR,
-  // Session listing, checkpoints & briefings
+  // Session listing & briefings
   getDateDirs,
   listSessions,
   getSessionById,
-  generateCheckpoint,
+  generateSession,
   formatSessionBriefing,
-  parseCheckpointSections,
+  parseSessionSections,
   // Observation & Instinct paths
   getObservationsPath,
   getInstinctsDir,

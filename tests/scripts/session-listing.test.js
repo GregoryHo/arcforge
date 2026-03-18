@@ -96,6 +96,55 @@ describe('session listing', () => {
       const { sessions } = listSessions(project, { date: '2026-03-14' });
       expect(sessions.length).toBe(0);
     });
+
+    it('includes saved session .md files with type=saved', () => {
+      const { listSessions } = getSessionUtils();
+      const sessionDir = path.join(testDir, '.claude', 'sessions', project, dateStr);
+      fs.writeFileSync(
+        path.join(sessionDir, 'session-my-feature.md'),
+        '# Session: 2026-03-13\n**Project:** test-project\n\n## Summary\nBuilt feature X',
+      );
+
+      const { sessions, total } = listSessions(project);
+      expect(total).toBe(3); // 2 json + 1 md
+      const saved = sessions.find((s) => s.type === 'saved');
+      expect(saved).toBeDefined();
+      expect(saved.sessionId).toBe('my-feature');
+    });
+
+    it('marks auto-tracked sessions with type=auto', () => {
+      const { listSessions } = getSessionUtils();
+      const { sessions } = listSessions(project);
+      const auto = sessions.filter((s) => s.type === 'auto');
+      expect(auto.length).toBe(2);
+    });
+
+    it('filters sessions by query on sessionId', () => {
+      const { listSessions } = getSessionUtils();
+      const { sessions } = listSessions(project, { query: 'abc' });
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].sessionId).toBe('session-abc123');
+    });
+
+    it('query filter is case-insensitive', () => {
+      const { listSessions } = getSessionUtils();
+      const { sessions } = listSessions(project, { query: 'DEF' });
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].sessionId).toBe('session-def456');
+    });
+
+    it('query matches saved sessions by alias', () => {
+      const { listSessions } = getSessionUtils();
+      const { sessions } = listSessions(project, { query: 'feature' });
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].type).toBe('saved');
+    });
+
+    it('returns empty for non-matching query', () => {
+      const { listSessions } = getSessionUtils();
+      const { sessions } = listSessions(project, { query: 'zzz-nonexistent' });
+      expect(sessions.length).toBe(0);
+    });
   });
 
   describe('getSessionById', () => {
@@ -120,7 +169,7 @@ describe('session listing', () => {
   });
 });
 
-describe('checkpoint generation', () => {
+describe('session generation', () => {
   const session = {
     sessionId: 'session-test123',
     project: 'my-project',
@@ -132,59 +181,59 @@ describe('checkpoint generation', () => {
     filesModified: ['src/app.js'],
   };
 
-  describe('generateCheckpoint', () => {
-    it('generates checkpoint with session data', () => {
-      const { generateCheckpoint } = getSessionUtils();
-      const checkpoint = generateCheckpoint(session);
-      expect(checkpoint).toContain('# Session Checkpoint');
-      expect(checkpoint).toContain('my-project');
-      expect(checkpoint).toContain('session-test123');
-      expect(checkpoint).toContain('45');
+  describe('generateSession', () => {
+    it('generates session markdown with session data', () => {
+      const { generateSession } = getSessionUtils();
+      const md = generateSession(session);
+      expect(md).toContain('# Session:');
+      expect(md).toContain('my-project');
+      expect(md).toContain('session-test123');
+      expect(md).toContain('45');
     });
 
     it('includes transcript data when provided', () => {
-      const { generateCheckpoint } = getSessionUtils();
+      const { generateSession } = getSessionUtils();
       const transcriptData = {
         userMessages: ['fix the login bug', 'looks good'],
         toolsUsed: ['Read', 'Edit', 'Bash'],
         filesModified: ['/src/auth.js', '/src/login.js'],
       };
 
-      const checkpoint = generateCheckpoint(session, transcriptData);
-      expect(checkpoint).toContain('Read, Edit, Bash');
-      expect(checkpoint).toContain('/src/auth.js');
-      expect(checkpoint).toContain('fix the login bug');
+      const md = generateSession(session, transcriptData);
+      expect(md).toContain('Read, Edit, Bash');
+      expect(md).toContain('/src/auth.js');
+      expect(md).toContain('fix the login bug');
     });
 
     it('includes enrichment when provided', () => {
-      const { generateCheckpoint } = getSessionUtils();
-      const checkpoint = generateCheckpoint(session, null, {
+      const { generateSession } = getSessionUtils();
+      const md = generateSession(session, null, {
         summary: 'Fixed authentication flow',
         nextStep: 'Add unit tests for login',
       });
-      expect(checkpoint).toContain('Fixed authentication flow');
-      expect(checkpoint).toContain('Add unit tests for login');
+      expect(md).toContain('Fixed authentication flow');
+      expect(md).toContain('Add unit tests for login');
     });
 
     it('adds TO BE ENRICHED placeholders when no enrichment', () => {
-      const { generateCheckpoint } = getSessionUtils();
-      const checkpoint = generateCheckpoint(session);
-      expect(checkpoint).toContain('TO BE ENRICHED');
+      const { generateSession } = getSessionUtils();
+      const md = generateSession(session);
+      expect(md).toContain('TO BE ENRICHED');
     });
   });
 
-  describe('parseCheckpointSections', () => {
+  describe('parseSessionSections', () => {
     it('parses project from frontmatter line', () => {
-      const { parseCheckpointSections } = getSessionUtils();
+      const { parseSessionSections } = getSessionUtils();
       const content = '# Header\n**Project:** my-project\n\n## Summary\nDone stuff';
-      const sections = parseCheckpointSections(content);
+      const sections = parseSessionSections(content);
       expect(sections.project).toBe('my-project');
     });
 
     it('parses named sections', () => {
-      const { parseCheckpointSections } = getSessionUtils();
+      const { parseSessionSections } = getSessionUtils();
       const content = '## Summary\nDid things\n\n## Next Step\nDo more things';
-      const sections = parseCheckpointSections(content);
+      const sections = parseSessionSections(content);
       expect(sections.summary).toBe('Did things');
       expect(sections.nextStep).toBe('Do more things');
     });
@@ -194,7 +243,7 @@ describe('checkpoint generation', () => {
     it('formats structured briefing', () => {
       const { formatSessionBriefing } = getSessionUtils();
       const content = [
-        '# Session Checkpoint: 2026-03-13',
+        '# Session: 2026-03-13',
         '**Project:** my-project',
         '',
         '## Summary',
@@ -204,8 +253,8 @@ describe('checkpoint generation', () => {
         'Add tests',
       ].join('\n');
 
-      const briefing = formatSessionBriefing(content, '/path/to/checkpoint.md');
-      expect(briefing).toContain('SESSION LOADED: /path/to/checkpoint.md');
+      const briefing = formatSessionBriefing(content, '/path/to/session.md');
+      expect(briefing).toContain('SESSION LOADED: /path/to/session.md');
       expect(briefing).toContain('PROJECT: my-project');
       expect(briefing).toContain('Built the auth system');
       expect(briefing).toContain('Add tests');

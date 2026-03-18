@@ -110,19 +110,19 @@ function validateAlias(alias) {
 }
 
 /**
- * Set or update an alias pointing to a checkpoint file.
+ * Set or update an alias pointing to a saved session file.
  * @param {string} project - Project name
  * @param {string} alias - Alias name
- * @param {string} checkpointPath - Path to checkpoint file
+ * @param {string} sessionPath - Path to saved session file
  * @param {string} [title] - Optional description
  * @returns {{ success: boolean, isNew?: boolean, error?: string }}
  */
-function setAlias(project, alias, checkpointPath, title = null) {
+function setAlias(project, alias, sessionPath, title = null) {
   const validation = validateAlias(alias);
   if (!validation.valid) return { success: false, error: validation.error };
 
-  if (!checkpointPath || typeof checkpointPath !== 'string' || checkpointPath.trim() === '') {
-    return { success: false, error: 'Checkpoint path cannot be empty' };
+  if (!sessionPath || typeof sessionPath !== 'string' || sessionPath.trim() === '') {
+    return { success: false, error: 'Session path cannot be empty' };
   }
 
   const data = loadAliases(project);
@@ -130,23 +130,23 @@ function setAlias(project, alias, checkpointPath, title = null) {
   const isNew = !existing;
 
   data.aliases[alias] = {
-    checkpointPath,
+    sessionPath,
     createdAt: existing ? existing.createdAt : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     title: title || null,
   };
 
   if (saveAliases(project, data)) {
-    return { success: true, isNew, alias, checkpointPath };
+    return { success: true, isNew, alias, sessionPath };
   }
   return { success: false, error: 'Failed to save alias' };
 }
 
 /**
- * Resolve an alias to its checkpoint path.
+ * Resolve an alias to its saved session path.
  * @param {string} project - Project name
  * @param {string} alias - Alias name
- * @returns {{ alias: string, checkpointPath: string, title: string|null } | null}
+ * @returns {{ alias: string, sessionPath: string, title: string|null } | null}
  */
 function resolveAlias(project, alias) {
   if (!alias) return null;
@@ -159,7 +159,7 @@ function resolveAlias(project, alias) {
 
   return {
     alias,
-    checkpointPath: entry.checkpointPath,
+    sessionPath: entry.sessionPath,
     title: entry.title || null,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
@@ -172,7 +172,7 @@ function resolveAlias(project, alias) {
  * @param {Object} [options]
  * @param {string} [options.search] - Filter by partial name/title match
  * @param {number} [options.limit] - Max results
- * @returns {Array<{ name: string, checkpointPath: string, title: string|null, createdAt: string, updatedAt: string }>}
+ * @returns {Array<{ name: string, sessionPath: string, title: string|null, createdAt: string, updatedAt: string }>}
  */
 function listAliases(project, options = {}) {
   const { search = null, limit = null } = options;
@@ -180,7 +180,7 @@ function listAliases(project, options = {}) {
 
   let aliases = Object.entries(data.aliases).map(([name, info]) => ({
     name,
-    checkpointPath: info.checkpointPath,
+    sessionPath: info.sessionPath,
     createdAt: info.createdAt,
     updatedAt: info.updatedAt,
     title: info.title,

@@ -11,7 +11,7 @@ Manage automatically detected behavioral patterns (instincts) from tool usage ob
 
 **Three layers in arcforge — this skill handles Behavioral:**
 - **Behavioral (instincts)** — auto-detected from tool usage patterns (this skill). Focuses on tool-usage workflow patterns only. User preferences and project context are handled by Claude Code's native auto-memory.
-- **Continuity (sessions)** — user-controlled save/resume checkpoints for session handoff
+- **Continuity (sessions)** — user-controlled save/resume for session handoff
 - **Learning (diary→reflect→learn)** — deliberate reflection for pattern extraction
 
 ## Quick Reference

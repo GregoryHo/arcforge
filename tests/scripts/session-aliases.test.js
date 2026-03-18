@@ -75,7 +75,7 @@ describe('session-aliases', () => {
   describe('setAlias', () => {
     it('creates a new alias', () => {
       const { setAlias } = getAliasesModule();
-      const result = setAlias(project, 'new-alias-1', '/path/to/checkpoint.md');
+      const result = setAlias(project, 'new-alias-1', '/path/to/session.md');
       expect(result.success).toBe(true);
       expect(result.isNew).toBe(true);
       expect(result.alias).toBe('new-alias-1');
@@ -96,7 +96,7 @@ describe('session-aliases', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('rejects empty checkpoint path', () => {
+    it('rejects empty session path', () => {
       const { setAlias } = getAliasesModule();
       const result = setAlias(project, 'valid-name', '');
       expect(result.success).toBe(false);
@@ -106,10 +106,10 @@ describe('session-aliases', () => {
   describe('resolveAlias', () => {
     it('resolves an existing alias', () => {
       const { setAlias, resolveAlias } = getAliasesModule();
-      setAlias(project, 'resolve-test', '/path/checkpoint.md');
+      setAlias(project, 'resolve-test', '/path/session.md');
       const result = resolveAlias(project, 'resolve-test');
       expect(result).not.toBeNull();
-      expect(result.checkpointPath).toBe('/path/checkpoint.md');
+      expect(result.sessionPath).toBe('/path/session.md');
       expect(result.alias).toBe('resolve-test');
     });
 
@@ -176,7 +176,7 @@ describe('session-aliases', () => {
       const fresh = getAliasesModule();
       const data = fresh.loadAliases(project);
       expect(data.aliases['persist-test']).toBeDefined();
-      expect(data.aliases['persist-test'].checkpointPath).toBe('/persistent.md');
+      expect(data.aliases['persist-test'].sessionPath).toBe('/persistent.md');
     });
   });
 });
