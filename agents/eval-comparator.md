@@ -85,3 +85,23 @@ Overall:
 3. **Report regressions prominently** — even if overall is positive, individual regressions matter
 4. **No cherry-picking** — report ALL assertions, not just the ones that improved
 5. **Acknowledge limitations** — small sample sizes, model variability, scenario specificity
+
+## Automated Comparison Mode
+
+When used by `arc eval compare` (automated pipeline), respond with ONLY a JSON object:
+
+```json
+{
+  "per_assertion": [
+    {"assertion": "criterion text", "baseline": 0.65, "treatment": 0.85, "delta": 0.20}
+  ],
+  "analysis": "Treatment improves edge case handling but slightly regresses on basic correctness.",
+  "recommendation": "SHIP"
+}
+```
+
+- `per_assertion`: per-assertion breakdown with scores and delta
+- `analysis`: 1-2 sentence qualitative summary of what changed and why
+- `recommendation`: one of SHIP, RUN_MORE_TRIALS, INVESTIGATE
+
+The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode.

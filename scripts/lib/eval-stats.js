@@ -11,6 +11,43 @@ const DELTA_IMPROVED_THRESHOLD = 0.15;
 const DELTA_REGRESSED_THRESHOLD = -0.05;
 
 /**
+ * Two-tailed t-critical values at 95% confidence, keyed by degrees of freedom.
+ * For df > 30, the t-distribution converges to z=1.96 (normal approximation).
+ */
+const T_CRITICAL_95 = {
+  1: 12.706,
+  2: 4.303,
+  3: 3.182,
+  4: 2.776,
+  5: 2.571,
+  6: 2.447,
+  7: 2.365,
+  8: 2.306,
+  9: 2.262,
+  10: 2.228,
+  11: 2.201,
+  12: 2.179,
+  13: 2.16,
+  14: 2.145,
+  15: 2.131,
+  16: 2.12,
+  17: 2.11,
+  18: 2.101,
+  19: 2.093,
+  20: 2.086,
+  21: 2.08,
+  22: 2.074,
+  23: 2.069,
+  24: 2.064,
+  25: 2.06,
+  26: 2.056,
+  27: 2.052,
+  28: 2.048,
+  29: 2.045,
+  30: 2.042,
+};
+
+/**
  * Compute pass@k metric: at least 1 success in k trials
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @returns {boolean} Whether pass@k is satisfied
@@ -63,7 +100,8 @@ function stddev(results, mean) {
 }
 
 /**
- * Compute 95% confidence interval for mean score (normal approximation).
+ * Compute 95% confidence interval for mean score using Student's t-distribution.
+ * Uses t-critical values for df=1-30; falls back to z=1.96 for larger samples.
  * Accepts optional precomputed mean and sd to avoid redundant traversals.
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @param {number} [mean] - Precomputed mean score
@@ -74,12 +112,41 @@ function ci95(results, mean, sd) {
   if (results.length < 2) return { lower: 0, upper: 0, width: 0 };
   const avg = mean ?? avgScore(results);
   const se = (sd ?? stddev(results, avg)) / Math.sqrt(results.length);
-  const margin = 1.96 * se;
+  const df = results.length - 1;
+  const tCritical = T_CRITICAL_95[df] || 1.96;
+  const margin = tCritical * se;
   return {
     lower: Math.round(Math.max(0, avg - margin) * 100) / 100,
     upper: Math.round(Math.min(1, avg + margin) * 100) / 100,
     width: Math.round(margin * 2 * 100) / 100,
   };
+}
+
+/**
+ * Whether sample size is large enough for CI to be meaningfully displayed.
+ * At k < 5, t-distribution CIs are too wide to provide useful guidance.
+ * @param {import('./eval').TrialResult[]} results - Trial results
+ * @returns {boolean} True if CI should be shown in output
+ */
+function shouldShowCI(results) {
+  return results.length >= 5;
+}
+
+/**
+ * Compute default trial count based on eval characteristics.
+ * A/B comparisons need more data than single-condition evals.
+ * Model grading adds noise, requiring additional trials.
+ * @param {Object} scenario - Parsed eval scenario
+ * @param {string} scenario.grader - Grader type ('code' | 'model' | 'human')
+ * @param {number} [scenario.trials] - Explicit trial count from scenario
+ * @param {boolean} [isAb=false] - Whether this is an A/B comparison
+ * @returns {number} Recommended trial count per condition
+ */
+function defaultK(scenario, isAb = false) {
+  if (scenario.trials) return scenario.trials;
+  const isModel = scenario.grader === 'model' || scenario.grader === 'human';
+  if (isAb) return isModel ? 10 : 5;
+  return isModel ? 5 : 3;
 }
 
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -176,6 +243,8 @@ module.exports = {
   passRate,
   stddev,
   ci95,
+  shouldShowCI,
+  defaultK,
   statsFromResults,
   confidenceWarning,
   computeDelta,

@@ -5,6 +5,8 @@ const {
   passRate,
   stddev,
   ci95,
+  shouldShowCI,
+  defaultK,
   statsFromResults,
   confidenceWarning,
   computeDelta,
@@ -126,6 +128,80 @@ describe('ci95', () => {
     const large = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8].map((s) => makeResult({ score: s }));
 
     expect(ci95(small).width).toBeGreaterThan(ci95(large).width);
+  });
+
+  test('uses t-distribution for k=3 (df=2, t=4.303)', () => {
+    // scores [0.5, 0.6, 0.7]: mean=0.6, sd=0.1, SE=0.0577
+    // t=4.303: margin=0.2483, width=0.4967 ≈ 0.50
+    const results = [0.5, 0.6, 0.7].map((s) => makeResult({ score: s }));
+    const interval = ci95(results);
+    expect(interval.width).toBeCloseTo(0.5, 1);
+  });
+
+  test('uses t-distribution for k=5 (df=4, t=2.776)', () => {
+    // scores [0.7, 0.8, 0.9, 0.85, 0.75]: mean=0.8, sd≈0.0791, SE≈0.0354
+    // t=2.776: margin=0.0983, width=0.1965 ≈ 0.20
+    const results = [0.7, 0.8, 0.9, 0.85, 0.75].map((s) => makeResult({ score: s }));
+    const interval = ci95(results);
+    expect(interval.width).toBeCloseTo(0.2, 1);
+  });
+
+  test('falls back to z=1.96 for k>30', () => {
+    // 31 identical scores: sd=0, SE=0, margin=0 regardless of critical value
+    // Use varied scores to test the critical value path
+    const results = Array.from({ length: 31 }, (_, i) =>
+      makeResult({ score: 0.5 + (i % 3) * 0.1 }),
+    );
+    const interval31 = ci95(results);
+    // For k=31 (z=1.96) vs k=30 (t=2.042), the 31-sample should use z=1.96
+    // With 31 results, margin should be smaller than with 30 (both from more data and lower critical value)
+    const results30 = results.slice(0, 30);
+    const interval30 = ci95(results30);
+    expect(interval31.width).toBeLessThanOrEqual(interval30.width);
+  });
+});
+
+// ── shouldShowCI ────────────────────────────────────────────
+
+describe('shouldShowCI', () => {
+  test('returns false for k < 5', () => {
+    expect(shouldShowCI([makeResult()])).toBe(false);
+    expect(shouldShowCI([makeResult(), makeResult(), makeResult()])).toBe(false);
+    expect(shouldShowCI([makeResult(), makeResult(), makeResult(), makeResult()])).toBe(false);
+  });
+
+  test('returns true for k >= 5', () => {
+    expect(shouldShowCI(Array.from({ length: 5 }, () => makeResult()))).toBe(true);
+    expect(shouldShowCI(Array.from({ length: 10 }, () => makeResult()))).toBe(true);
+  });
+});
+
+// ── defaultK ────────────────────────────────────────────────
+
+describe('defaultK', () => {
+  test('returns 3 for code grader eval run', () => {
+    expect(defaultK({ grader: 'code' }, false)).toBe(3);
+  });
+
+  test('returns 5 for model grader eval run', () => {
+    expect(defaultK({ grader: 'model' }, false)).toBe(5);
+  });
+
+  test('returns 5 for human grader eval run', () => {
+    expect(defaultK({ grader: 'human' }, false)).toBe(5);
+  });
+
+  test('returns 5 for code grader A/B', () => {
+    expect(defaultK({ grader: 'code' }, true)).toBe(5);
+  });
+
+  test('returns 10 for model grader A/B', () => {
+    expect(defaultK({ grader: 'model' }, true)).toBe(10);
+  });
+
+  test('uses scenario.trials when set', () => {
+    expect(defaultK({ grader: 'code', trials: 15 }, false)).toBe(15);
+    expect(defaultK({ grader: 'model', trials: 7 }, true)).toBe(7);
   });
 });
 

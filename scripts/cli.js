@@ -316,7 +316,8 @@ async function main() {
       case 'eval': {
         const eval_ = require('./lib/eval');
         const subcommand = args.positional[0];
-        const parseK = () => (args.options.k ? parseInt(args.options.k, 10) : 3);
+        const parseK = (scenario, isAb = false) =>
+          args.options.k ? parseInt(args.options.k, 10) : eval_.defaultK(scenario || {}, isAb);
         const formatStatus = (g) => (g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`);
 
         const findScenario = (name) => {
@@ -343,14 +344,14 @@ async function main() {
         const printAbSummary = (label, baseline, treatment, delta) => {
           const bStats = eval_.statsFromResults(baseline);
           const tStats = eval_.statsFromResults(treatment);
-          const bCi = bStats.ci95;
-          const tCi = tStats.ci95;
-          console.log(
-            `${label}Baseline:  ${baseline.length} trials, avg ${bStats.avg.toFixed(2)} [${bCi.lower}, ${bCi.upper}], pass ${(bStats.passRate * 100).toFixed(0)}%`,
-          );
-          console.log(
-            `${label}Treatment: ${treatment.length} trials, avg ${tStats.avg.toFixed(2)} [${tCi.lower}, ${tCi.upper}], pass ${(tStats.passRate * 100).toFixed(0)}%`,
-          );
+          const showCI = eval_.shouldShowCI(baseline) && eval_.shouldShowCI(treatment);
+          const fmtStats = (results, s) => {
+            const base = `${results.length} trials, avg ${s.avg.toFixed(2)}`;
+            const ci = showCI ? ` [${s.ci95.lower}, ${s.ci95.upper}]` : '';
+            return `${base}${ci}, pass ${(s.passRate * 100).toFixed(0)}%`;
+          };
+          console.log(`${label}Baseline:  ${fmtStats(baseline, bStats)}`);
+          console.log(`${label}Treatment: ${fmtStats(treatment, tStats)}`);
           console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}`);
           console.log(`${label}Verdict:   ${eval_.verdictFromDelta(delta)}`);
           const warning = eval_.confidenceWarning(baseline) || eval_.confidenceWarning(treatment);
@@ -364,14 +365,14 @@ async function main() {
           } else {
             for (const file of scenarios) {
               const s = eval_.parseScenario(file);
-              const results = eval_.loadResults(s.name, projectRoot);
+              const results = eval_.loadResults(s.name, projectRoot, { version: s.version });
               const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
               console.log(`  ${s.name} (${s.scope}, ${s.grader}) — ${verdict}`);
             }
           }
         } else if (subcommand === 'run') {
-          const k = parseK();
           const scenario = requireScenario(args.positional[1], 'run');
+          const k = parseK(scenario, false);
           console.log(`Running ${scenario.name} (k=${k})...`);
 
           let rl;
@@ -402,11 +403,16 @@ async function main() {
             if (rl) rl.close();
           }
 
-          const results = eval_.loadResults(scenario.name, projectRoot).slice(-k);
+          const results = eval_
+            .loadResults(scenario.name, projectRoot, {
+              version: scenario.version,
+              since: args.options.since,
+            })
+            .slice(-k);
           console.log(`Verdict: ${eval_.getVerdict(results)}`);
         } else if (subcommand === 'ab') {
-          const k = parseK();
           const scenario = requireScenario(args.positional[1], 'ab');
+          const k = parseK(scenario, true);
           const interleave = !!args.options.interleave;
           const onTrialComplete = (label, t, graded) => {
             console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
@@ -450,8 +456,13 @@ async function main() {
             process.exit(1);
           }
 
-          const baseline = eval_.loadResults(`${name}-baseline`, projectRoot);
-          const treatment = eval_.loadResults(`${name}-treatment`, projectRoot);
+          const scenario = findScenario(name);
+          const filterOpts = {
+            version: scenario?.version,
+            since: args.options.since,
+          };
+          const baseline = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
+          const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
 
           if (baseline.length === 0 || treatment.length === 0) {
             console.error(
@@ -461,7 +472,20 @@ async function main() {
           }
 
           console.log(`A/B Comparison: ${name}`);
-          printAbSummary('  ', baseline, treatment, eval_.computeDelta(baseline, treatment));
+          if (scenario && scenario.grader !== 'code') {
+            console.log('(Using eval-comparator agent for qualitative analysis...)\n');
+          }
+          const comparison = eval_.compareResults(
+            scenario || { grader: 'code' },
+            baseline,
+            treatment,
+            projectRoot,
+          );
+          printAbSummary('  ', baseline, treatment, comparison.delta);
+          if (comparison.modelAnalysis) {
+            console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
+            console.log(`  Recommendation: ${comparison.modelAnalysis.recommendation || ''}`);
+          }
         } else if (subcommand === 'report') {
           const benchmark = eval_.generateBenchmark(projectRoot);
           const name = args.positional[1];

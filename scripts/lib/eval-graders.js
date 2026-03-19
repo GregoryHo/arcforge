@@ -11,6 +11,37 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execCommand } = require('./utils');
 
+// Cache agent definitions to avoid repeated disk reads during batch grading.
+// Key: absolute path, Value: file content with frontmatter stripped (empty string if missing).
+const agentDefCache = new Map();
+
+/**
+ * Load an agent definition file, caching the result to avoid repeated disk reads.
+ * Strips YAML frontmatter if present. Returns empty string if file does not exist.
+ * @param {string} agentPath - Absolute path to the agent markdown file
+ * @returns {string} Agent definition content (cached)
+ */
+function loadAgentDef(agentPath) {
+  if (agentDefCache.has(agentPath)) return agentDefCache.get(agentPath);
+  let content = '';
+  try {
+    content = fs.readFileSync(agentPath, 'utf8').replace(/^---[\s\S]*?---\n*/m, '');
+  } catch {
+    /* file missing — return empty string */
+  }
+  agentDefCache.set(agentPath, content);
+  return content;
+}
+
+/**
+ * Strip markdown code fences from text before JSON extraction.
+ * @param {string} text - Text potentially containing ```json ... ``` fences
+ * @returns {string} Text with fences removed
+ */
+function stripCodeFences(text) {
+  return text.replace(/```(?:json)?\s*\n?/g, '');
+}
+
 /**
  * Grade a trial result using the appropriate grader for the scenario.
  * @param {import('./eval').TrialResult} result - Trial result to grade
@@ -117,12 +148,13 @@ function captureTrialArtifacts(trialDir, opts = {}) {
  * @returns {import('./eval').TrialResult} New result with grade
  */
 function gradeWithModel(result, scenario, projectRoot) {
+  const agentDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-grader.md'));
+
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const artifacts = captureTrialArtifacts(result.trialDir);
   const prompt = [
-    '## Grading Task',
-    '',
-    'Grade the following output against these assertions. For each assertion, score 0.0 to 1.0.',
+    ...(agentDef ? [agentDef, ''] : []),
+    '## This Trial',
     '',
     '### Assertions',
     rubric,
@@ -136,12 +168,90 @@ function gradeWithModel(result, scenario, projectRoot) {
     '```',
     ...(artifacts ? [artifacts] : []),
     '',
-    '### Response Format',
+    '### Required Response Format (automated grading)',
     'Respond with ONLY a JSON object:',
     '```json',
     '{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}',
     '```',
     'Set passed=true if ALL scores >= 0.7.',
+  ].join('\n');
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text'], {
+      input: prompt,
+      cwd: projectRoot,
+      timeout: 120000,
+    });
+
+    if (exitCode !== 0) {
+      if (attempt === 2) {
+        return { ...result, passed: false, score: 0, error: 'Model grader failed to respond' };
+      }
+      continue;
+    }
+
+    // Strip markdown code fences before JSON extraction
+    const cleaned = stripCodeFences(stdout);
+    const jsonMatch = cleaned.match(/\{[\s\S]*?"scores"\s*:[\s\S]*?\}/);
+    if (!jsonMatch) {
+      if (attempt === 2) {
+        return {
+          ...result,
+          passed: false,
+          score: 0,
+          error: 'Model grader returned unparseable response',
+        };
+      }
+      continue;
+    }
+
+    try {
+      const grade = JSON.parse(jsonMatch[0]);
+      const score = typeof grade.overall === 'number' ? grade.overall : 0;
+      const passed = typeof grade.passed === 'boolean' ? grade.passed : score >= 0.7;
+      return { ...result, passed, score: Math.round(score * 100) / 100 };
+    } catch {
+      if (attempt === 2) {
+        return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
+      }
+    }
+  }
+}
+
+/**
+ * Compare baseline vs treatment results using the eval-comparator agent.
+ * Reads agents/eval-comparator.md as the comparison methodology.
+ * Returns qualitative analysis with per-assertion breakdown.
+ * @param {import('./eval').EvalScenario} scenario - Eval scenario
+ * @param {import('./eval').TrialResult[]} baseline - Baseline results
+ * @param {import('./eval').TrialResult[]} treatment - Treatment results
+ * @param {string} projectRoot - Project root directory
+ * @returns {{ per_assertion: Object[], analysis: string, recommendation: string }|null}
+ */
+function compareWithModel(scenario, baseline, treatment, projectRoot) {
+  const agentDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
+  if (!agentDef) return null;
+  const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
+  const fmtResults = (results) =>
+    results.map((r) => `Trial ${r.trial}: score=${r.score}, passed=${r.passed}`).join('\n');
+
+  const prompt = [
+    agentDef,
+    '',
+    '## This Comparison',
+    '',
+    `### Assertions\n${assertions}`,
+    '',
+    `### Baseline Results (${baseline.length} trials)\n${fmtResults(baseline)}`,
+    '',
+    `### Treatment Results (${treatment.length} trials)\n${fmtResults(treatment)}`,
+    '',
+    '### Required Response Format (automated comparison)',
+    'Respond with ONLY a JSON object:',
+    '```json',
+    '{"per_assertion": [{"assertion": "...", "baseline": 0.65, "treatment": 0.85, "delta": 0.20}],',
+    '"analysis": "...", "recommendation": "SHIP"}',
+    '```',
   ].join('\n');
 
   const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text'], {
@@ -150,27 +260,24 @@ function gradeWithModel(result, scenario, projectRoot) {
     timeout: 120000,
   });
 
-  if (exitCode !== 0) {
-    return { ...result, passed: false, score: 0, error: 'Model grader failed to respond' };
-  }
+  if (exitCode !== 0) return null;
 
-  const jsonMatch = stdout.match(/\{[\s\S]*?"scores"\s*:[\s\S]*?\}/);
-  if (!jsonMatch) {
-    return {
-      ...result,
-      passed: false,
-      score: 0,
-      error: 'Model grader returned unparseable response',
-    };
-  }
-
+  const cleaned = stripCodeFences(stdout).trim();
+  // Try parsing the entire cleaned output first (the prompt asks for "ONLY a JSON object").
+  // Fall back to extracting the outermost { ... } by brace balancing.
   try {
-    const grade = JSON.parse(jsonMatch[0]);
-    const score = typeof grade.overall === 'number' ? grade.overall : 0;
-    const passed = typeof grade.passed === 'boolean' ? grade.passed : score >= 0.7;
-    return { ...result, passed, score: Math.round(score * 100) / 100 };
+    return JSON.parse(cleaned);
   } catch {
-    return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
+    const start = cleaned.indexOf('{');
+    if (start === -1) return null;
+    for (let end = cleaned.lastIndexOf('}'); end > start; end = cleaned.lastIndexOf('}', end - 1)) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        /* try shorter substring */
+      }
+    }
+    return null;
   }
 }
 
@@ -215,5 +322,6 @@ module.exports = {
   gradeWithCode,
   captureTrialArtifacts,
   gradeWithModel,
+  compareWithModel,
   gradeWithHuman,
 };

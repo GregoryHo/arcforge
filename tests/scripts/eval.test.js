@@ -163,6 +163,48 @@ Plain text at end.
 
       expect(scenario.assertions).toEqual(['Real assertion', 'Another assertion']);
     });
+
+    it('should extract trials section as integer', () => {
+      const content = `# Eval: with-trials
+## Scenario
+Do something.
+## Trials
+15
+`;
+      const filePath = writeScenario(tempDir, 'with-trials.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.trials).toBe(15);
+    });
+
+    it('should default trials to undefined when missing', () => {
+      const content = '# Eval: no-trials\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'no-trials.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.trials).toBeUndefined();
+    });
+
+    it('should extract version section', () => {
+      const content = `# Eval: versioned
+## Scenario
+Do something.
+## Version
+2
+`;
+      const filePath = writeScenario(tempDir, 'versioned.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.version).toBe('2');
+    });
+
+    it('should default version to undefined when missing', () => {
+      const content = '# Eval: no-version\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'no-version.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.version).toBeUndefined();
+    });
   });
 
   // ── buildTrialPrompt ─────────────────────────────────────────
@@ -301,6 +343,42 @@ Plain text at end.
       const files = fs.readdirSync(resultsDir);
       expect(files).toHaveLength(1);
       expect(files[0]).toBe('2026-03-17-test-eval.jsonl');
+    });
+
+    it('should filter by version', () => {
+      appendResult(makeResult({ trial: 1, score: 0.5, version: '1' }), tempDir);
+      appendResult(makeResult({ trial: 2, score: 0.8, version: '2' }), tempDir);
+      appendResult(makeResult({ trial: 3, score: 0.9, version: '2' }), tempDir);
+
+      const v2 = loadResults('test-eval', tempDir, { version: '2' });
+      expect(v2).toHaveLength(2);
+      expect(v2.every((r) => r.version === '2')).toBe(true);
+    });
+
+    it('should default unversioned results to version 1', () => {
+      appendResult(makeResult({ trial: 1, score: 0.5 }), tempDir);
+      appendResult(makeResult({ trial: 2, score: 0.8, version: '2' }), tempDir);
+
+      const v1 = loadResults('test-eval', tempDir, { version: '1' });
+      expect(v1).toHaveLength(1);
+      expect(v1[0].trial).toBe(1);
+    });
+
+    it('should filter by since date', () => {
+      appendResult(makeResult({ trial: 1, timestamp: '2026-03-15T10:00:00Z' }), tempDir);
+      appendResult(makeResult({ trial: 2, timestamp: '2026-03-18T10:00:00Z' }), tempDir);
+
+      const recent = loadResults('test-eval', tempDir, { since: '2026-03-17' });
+      expect(recent).toHaveLength(1);
+      expect(recent[0].trial).toBe(2);
+    });
+
+    it('should return all results when no filter options', () => {
+      appendResult(makeResult({ trial: 1, version: '1' }), tempDir);
+      appendResult(makeResult({ trial: 2, version: '2' }), tempDir);
+
+      const all = loadResults('test-eval', tempDir);
+      expect(all).toHaveLength(2);
     });
   });
 
@@ -659,12 +737,11 @@ Plain text at end.
       expect(graded.score).toBe(0.85);
     });
 
-    it('should handle Claude failure gracefully', () => {
-      mockUtils.execCommand.mockReturnValueOnce({
-        stdout: '',
-        stderr: 'error',
-        exitCode: 1,
-      });
+    it('should handle Claude failure after retry', () => {
+      // Both attempts fail
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: '', stderr: 'error', exitCode: 1 })
+        .mockReturnValueOnce({ stdout: '', stderr: 'error', exitCode: 1 });
 
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
@@ -673,12 +750,11 @@ Plain text at end.
       expect(graded.error).toContain('failed to respond');
     });
 
-    it('should handle unparseable response', () => {
-      mockUtils.execCommand.mockReturnValueOnce({
-        stdout: 'I cannot grade this output because...',
-        stderr: '',
-        exitCode: 0,
-      });
+    it('should handle unparseable response after retry', () => {
+      // Both attempts return unparseable text
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: 'cannot grade...', stderr: '', exitCode: 0 })
+        .mockReturnValueOnce({ stdout: 'still cannot grade...', stderr: '', exitCode: 0 });
 
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
@@ -698,6 +774,49 @@ Plain text at end.
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(false);
       expect(graded.score).toBe(0.8);
+    });
+
+    it('should retry on first parse failure then succeed', () => {
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: 'unparseable garbage', stderr: '', exitCode: 0 })
+        .mockReturnValueOnce({
+          stdout: '{"scores": [0.9], "overall": 0.90, "passed": true}',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(0.9);
+    });
+
+    it('should retry on first Claude failure then succeed', () => {
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: '', stderr: 'timeout', exitCode: 1 })
+        .mockReturnValueOnce({
+          stdout: '{"scores": [0.8], "overall": 0.80, "passed": true}',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(0.8);
+    });
+
+    it('should strip code fences with json language tag', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '```json\n{"scores": [0.75], "overall": 0.75, "passed": true}\n```',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(0.75);
     });
   });
 

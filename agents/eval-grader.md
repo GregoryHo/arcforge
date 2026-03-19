@@ -67,3 +67,17 @@ For each assertion in the scenario:
 3. **Consistent thresholds** — 0.7 is pass, always
 4. **No regrading** — if in doubt, score conservatively and note why
 5. **Flag ambiguity** — if an assertion is unclear, note it rather than guessing
+
+## Automated Grading Mode
+
+When used by `arc eval run` (automated batch grading), respond with ONLY a JSON object instead of the markdown report:
+
+```json
+{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}
+```
+
+- `scores`: array of 0.0-1.0 scores, one per assertion in order
+- `overall`: average of all scores
+- `passed`: true if ALL scores >= 0.7
+
+The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode.

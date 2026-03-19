@@ -100,6 +100,12 @@ Create a scenario file in `evals/scenarios/`:
 
 ## Grader Config
 [For code: test command. For model: grading rubric. For human: review checklist]
+
+## Trials
+[Optional: explicit trial count. Omit to use scenario-driven defaults.]
+
+## Version
+[Optional: bump when assertions change materially. Filters out stale historical results.]
 ```
 
 ### Step 2: Prepare Environment
@@ -144,7 +150,7 @@ Three grader types:
 | Grader | Use When | How |
 |--------|----------|-----|
 | **code** | Output is testable (files, tests, structured artifacts) | Run test command, check exit code. `$TRIAL_DIR` env var available for checking trial artifacts. |
-| **model** | Output needs judgment | Spawn eval-grader agent with rubric. Trial directory artifacts are automatically included in grader context. |
+| **model** | Output needs judgment | Reads `agents/eval-grader.md` as grading methodology, scores each assertion 0.0-1.0. Trial directory artifacts automatically included. |
 | **human** | Subjective quality | Present output + checklist for review |
 
 **Prefer code grader** when assertions are verifiable: test exit codes, file existence, grep patterns. Code grading is free, deterministic, and more reliable than model grading. Use model grader only when assertions require subjective judgment (e.g., "review is well-structured").
@@ -172,6 +178,20 @@ Results stored in `evals/results/` as JSONL (gitignored):
 | `pass@k` | At least 1 success in k trials | Reliability — "does it ever work?" |
 | `pass^k` | All k trials succeed | Critical paths — "does it always work?" |
 | `delta` | Treatment score - Baseline score | Improvement — "is it better?" |
+| `CI95` | 95% confidence interval (t-distribution) | Only shown when k >= 5 — "how precise is the average?" |
+
+### Default Trial Counts (scenario-driven)
+
+k is determined by eval type and grader, not a fixed default:
+
+| Eval type | Code grader | Model grader |
+|-----------|-------------|--------------|
+| `eval run` (single condition) | k=3 | k=5 |
+| `eval ab` (A/B, per group) | k=5 | k=10 |
+
+A/B needs more data for meaningful delta. Model grading adds noise, requiring more trials.
+
+Override with `## Trials` in the scenario file, or `--k` on the CLI.
 
 ## Storage Layout
 
@@ -186,10 +206,10 @@ evals/
 
 ## Available Agents
 
-| Agent | Role |
-|-------|------|
-| **eval-grader** | Grade individual eval outputs against rubrics |
-| **eval-comparator** | Compare A/B results for skill/workflow evals |
+| Agent | Role | Used By |
+|-------|------|---------|
+| **eval-grader** | Grade individual eval outputs against rubrics | `arc eval run` (automated, model-graded scenarios) + manual dispatch |
+| **eval-comparator** | Compare A/B results for skill/workflow evals | `arc eval compare` (automated, model/human-graded scenarios) + manual dispatch |
 
 ## Common Mistakes
 
@@ -199,7 +219,7 @@ evals/
 | Model grader for deterministic output | Noisy scores, false positives from LLM hallucination | Use code grader with `$TRIAL_DIR` — verify files, run tests, grep patterns |
 | Empty trial dir without Setup or Context | Agent spends 5+ minutes searching nothing, then times out | Add Setup to copy needed files, or provide sufficient Context for text-only responses |
 | Assertions that can't be verified by chosen grader | Code grader can't check "well-structured"; model grader is overkill for "file exists" | Match grader to assertion type — code for existence/correctness, model for judgment |
-| Running k=1 and trusting the result | No variance information, single lucky/unlucky trial dominates | Always k >= 3; system warns at k < 5 |
+| Running k=1 and trusting the result | No variance information, single lucky/unlucky trial dominates | Use scenario-driven defaults (k=3-10 depending on eval type and grader); CI shown at k >= 5 |
 | Grading stdout claims without checking artifacts | Agent says "I created the file" but didn't; grader scores the claim | Use code grader against `$TRIAL_DIR`, or model grader (artifacts auto-included) |
 | Using `--skill-file` for workflow eval | Varies the prompt instead of the environment — measures the wrong thing | Workflow A/B varies the environment. Use `eval ab <name>` without `--skill-file` for workflow scope |
 | Workflow eval with no plugins installed | Baseline and treatment are identical, delta is always 0 | Ensure toolkit plugin is installed: `claude plugin list` should show active plugins |
@@ -224,15 +244,20 @@ evals/
 
 ```
 arc eval list                                          # List all scenarios
-arc eval run <name> --k 5                              # Run k trials, grade, show verdict
-arc eval ab <skill-scenario> --skill-file path --k 5   # Skill A/B (varies prompt)
-arc eval ab <workflow-scenario> --k 5 --interleave     # Workflow A/B (varies environment)
-arc eval compare <name>                                # Compare saved A/B results
+arc eval run <name>                                    # Run trials (k auto-determined by scope+grader)
+arc eval run <name> --k 5                              # Override default k
+arc eval ab <skill-scenario> --skill-file path         # Skill A/B (varies prompt)
+arc eval ab <workflow-scenario> --interleave            # Workflow A/B (varies environment)
+arc eval compare <name>                                # Compare saved A/B results (routes by grader type)
+arc eval compare <name> --since 2026-03-18             # Compare only results after a date
 arc eval report [name]                                 # Generate benchmark report
 arc eval history                                       # List benchmark snapshots
 ```
 
-For skill scope, `--skill-file` is required (the treatment prepends the skill instruction). For workflow scope, `--skill-file` is not needed — the treatment is the environment itself (plugins, MCP, skills active vs isolated bare agent). The scope is auto-detected from the scenario file.
+- k is auto-determined from scope + grader type (see default trial counts above). Use `--k` to override.
+- `--since` filters results by date — useful after scenario changes to exclude old data.
+- For skill scope, `--skill-file` is required. For workflow scope, it is not needed.
+- `eval compare` auto-routes: code-graded → programmatic delta, model-graded → eval-comparator agent analysis.
 
 ## Integration
 

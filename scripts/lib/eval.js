@@ -75,6 +75,10 @@ function parseScenario(filePath) {
     .filter((line) => line.match(/^-\s*\[[ x]?\]/))
     .map((line) => line.replace(/^-\s*\[[ x]?\]\s*/, '').trim());
 
+  const trialsRaw = (sections.trials || []).join('\n').trim();
+  const trials = trialsRaw ? parseInt(trialsRaw, 10) : undefined;
+  const version = (sections.version || []).join('\n').trim();
+
   return {
     name,
     scope: (sections.scope || []).join('\n').trim() || 'skill',
@@ -84,6 +88,8 @@ function parseScenario(filePath) {
     grader: (sections.grader || []).join('\n').trim() || 'code',
     graderConfig: (sections['grader config'] || []).join('\n').trim(),
     setup: (sections.setup || []).join('\n').trim(),
+    ...(trials && !Number.isNaN(trials) ? { trials } : {}),
+    ...(version ? { version } : {}),
   };
 }
 
@@ -289,9 +295,12 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
   });
   try {
     const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
-    appendResult(graded, projectRoot);
-    if (onTrialComplete) onTrialComplete(label, trialNumber, graded);
-    return graded;
+    const versioned = gradeScenario.version
+      ? { ...graded, version: gradeScenario.version }
+      : graded;
+    appendResult(versioned, projectRoot);
+    if (onTrialComplete) onTrialComplete(label, trialNumber, versioned);
+    return versioned;
   } finally {
     cleanupTrialDir(result.trialDir);
   }
@@ -432,13 +441,16 @@ function appendResult(result, projectRoot) {
 }
 
 /**
- * Load results for a specific eval.
+ * Load results for a specific eval with optional filtering.
  * Uses exact segment match to avoid cross-eval contamination.
  * @param {string} evalName - Eval scenario name
  * @param {string} projectRoot - Project root directory
- * @returns {TrialResult[]} All results for this eval
+ * @param {Object} [options] - Filter options
+ * @param {string} [options.version] - Only include results matching this version
+ * @param {string} [options.since] - Only include results with timestamp >= this ISO date string
+ * @returns {TrialResult[]} Filtered results for this eval
  */
-function loadResults(evalName, projectRoot) {
+function loadResults(evalName, projectRoot, options = {}) {
   const resultsPath = path.join(projectRoot, RESULTS_DIR);
   if (!fs.existsSync(resultsPath)) {
     return [];
@@ -446,10 +458,14 @@ function loadResults(evalName, projectRoot) {
 
   const results = [];
   const suffix = `-${evalName}.jsonl`;
+  const sinceDate = options.since ? options.since.slice(0, 10) : undefined;
   const files = fs.readdirSync(resultsPath).filter((f) => {
     if (!f.endsWith(suffix)) return false;
     const prefix = f.slice(0, f.length - suffix.length);
-    return /^\d{4}-\d{2}-\d{2}$/.test(prefix);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(prefix)) return false;
+    // Skip files whose date is entirely before the since filter
+    if (sinceDate && prefix < sinceDate) return false;
+    return true;
   });
 
   for (const file of files) {
@@ -460,7 +476,12 @@ function loadResults(evalName, projectRoot) {
     }
   }
 
-  return results;
+  if (!options.version && !options.since) return results;
+  return results.filter((r) => {
+    if (options.version && (r.version || '1') !== options.version) return false;
+    if (options.since && r.timestamp < options.since) return false;
+    return true;
+  });
 }
 
 /**
@@ -474,7 +495,9 @@ function generateBenchmark(projectRoot) {
 
   for (const file of scenarioFiles) {
     const scenario = parseScenario(file);
-    const results = loadResults(scenario.name, projectRoot);
+    const results = loadResults(scenario.name, projectRoot, {
+      version: scenario.version,
+    });
 
     if (results.length === 0) continue;
 
@@ -521,6 +544,33 @@ function ensureEvalsDir(projectRoot) {
   ensureDir(path.join(projectRoot, BENCHMARKS_DIR));
 }
 
+/**
+ * Compare baseline vs treatment results, routing by grader type.
+ * Code-graded scenarios get fast programmatic delta.
+ * Model/human-graded scenarios also get eval-comparator agent analysis.
+ * @param {EvalScenario} scenario - Eval scenario
+ * @param {TrialResult[]} baseline - Baseline results
+ * @param {TrialResult[]} treatment - Treatment results
+ * @param {string} projectRoot - Project root directory
+ * @returns {{ delta: number, verdict: string, baseline: Object, treatment: Object, modelAnalysis?: Object }}
+ */
+function compareResults(scenario, baseline, treatment, projectRoot) {
+  const delta = stats.computeDelta(baseline, treatment);
+  const result = {
+    delta,
+    verdict: stats.verdictFromDelta(delta),
+    baseline: stats.statsFromResults(baseline),
+    treatment: stats.statsFromResults(treatment),
+  };
+
+  if (scenario.grader !== 'code') {
+    const modelAnalysis = graders.compareWithModel(scenario, baseline, treatment, projectRoot);
+    if (modelAnalysis) result.modelAnalysis = modelAnalysis;
+  }
+
+  return result;
+}
+
 module.exports = {
   // Orchestration
   parseScenario,
@@ -539,6 +589,7 @@ module.exports = {
   appendResult,
   loadResults,
   generateBenchmark,
+  compareResults,
   ensureEvalsDir,
   // Re-export graders for backward compatibility
   ...graders,
