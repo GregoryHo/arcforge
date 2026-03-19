@@ -13,6 +13,7 @@ const {
   gradeWithHuman,
   verdictFromDelta,
   runSkillEval,
+  runWorkflowEval,
   gradeTrialResult,
   parseScenario,
   createTrialDir,
@@ -159,6 +160,9 @@ describe('gradeWithHuman', () => {
 
 // ── runSkillEval A/B flow ───────────────────────────────────
 
+// Mock response for `claude plugin list --json` (used by buildIsolationSettings)
+const pluginListResponse = { stdout: '[]', stderr: '', exitCode: 0 };
+
 describe('runSkillEval A/B flow', () => {
   let tmpDir;
 
@@ -166,6 +170,8 @@ describe('runSkillEval A/B flow', () => {
     tmpDir = makeTempDir();
     fs.mkdirSync(path.join(tmpDir, RESULTS_DIR), { recursive: true });
     mockUtils.execCommand.mockReset();
+    // First call in runSkillEval is buildIsolationSettings → claude plugin list --json
+    mockUtils.execCommand.mockReturnValueOnce(pluginListResponse);
   });
 
   afterEach(() => {
@@ -200,8 +206,7 @@ describe('runSkillEval A/B flow', () => {
     const { parseScenario } = require('../../scripts/lib/eval');
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
 
-    // Mock: 2 baseline trials (runTrial) + 2 code grades + 2 treatment trials + 2 code grades
-    // runTrial calls execCommand('claude', ...) and gradeWithCode calls execCommand('sh', ...)
+    // 2 baseline trials (runTrial) + 2 code grades + 2 treatment trials + 2 code grades
     const trialOutput = { stdout: 'output', stderr: '', exitCode: 0 };
     const gradePass = { stdout: '', stderr: '', exitCode: 0 };
     for (let i = 0; i < 4; i++) {
@@ -439,22 +444,26 @@ describe('trial isolation', () => {
   });
 
   describe('createTrialDir', () => {
-    test('returns path inside os.tmpdir', () => {
-      const dir = createTrialDir('test-eval', 1);
+    test('creates directory under .eval-trials/ when projectRoot given', () => {
+      const projectRoot = makeTempDir();
+      const dir = createTrialDir('test-eval', 1, projectRoot);
       try {
-        expect(dir.startsWith(os.tmpdir())).toBe(true);
+        expect(dir).toContain('.eval-trials');
         expect(fs.existsSync(dir)).toBe(true);
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(projectRoot, { recursive: true, force: true });
       }
     });
 
     test('includes eval name and trial number in prefix', () => {
-      const dir = createTrialDir('my-eval', 3);
+      const projectRoot = makeTempDir();
+      const dir = createTrialDir('my-eval', 3, projectRoot);
       try {
-        expect(path.basename(dir)).toMatch(/^arcforge-eval-my-eval-t3-/);
+        expect(path.basename(dir)).toMatch(/^my-eval-t3-/);
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(projectRoot, { recursive: true, force: true });
       }
     });
   });
@@ -625,5 +634,225 @@ describe('model grader integration', () => {
     const prompt = mockUtils.execCommand.mock.calls[0][2].input;
     expect(prompt).toContain('CUSTOM_GUIDELINE_TEXT');
     expect(prompt).toContain('TRIAL_OUTPUT_CONTENT');
+  });
+
+  test('model grader prompt includes trial directory artifacts when available', () => {
+    const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-model-'));
+    fs.writeFileSync(path.join(trialDir, 'output.js'), 'ARTIFACT_CONTENT_MARKER');
+    try {
+      const scenario = {
+        name: 'artifact-test',
+        scope: 'agent',
+        grader: 'model',
+        graderConfig: 'Check artifacts.',
+        assertions: ['File exists'],
+      };
+      const result = makeResult({ output: 'some output', grader: 'model', trialDir });
+
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      gradeTrialResult(result, scenario, tmpDir);
+
+      const prompt = mockUtils.execCommand.mock.calls[0][2].input;
+      expect(prompt).toContain('Trial Directory Artifacts');
+      expect(prompt).toContain('output.js');
+      expect(prompt).toContain('ARTIFACT_CONTENT_MARKER');
+    } finally {
+      fs.rmSync(trialDir, { recursive: true, force: true });
+    }
+  });
+
+  test('model grader works without trial directory', () => {
+    const scenario = {
+      name: 'no-trial-dir',
+      scope: 'agent',
+      grader: 'model',
+      graderConfig: 'Check.',
+      assertions: ['Works'],
+    };
+    const result = makeResult({ output: 'output', grader: 'model' });
+
+    mockUtils.execCommand.mockReturnValueOnce({
+      stdout: '{"scores": [0.8], "overall": 0.8, "passed": true}',
+      stderr: '',
+      exitCode: 0,
+    });
+
+    const graded = gradeTrialResult(result, scenario, tmpDir);
+    expect(graded.passed).toBe(true);
+
+    const prompt = mockUtils.execCommand.mock.calls[0][2].input;
+    expect(prompt).not.toContain('Trial Directory Artifacts');
+  });
+});
+
+// ── runWorkflowEval A/B flow ──────────────────────────────
+
+describe('runWorkflowEval A/B flow', () => {
+  let tmpDir;
+
+  const scenarioContent = [
+    '# Eval: workflow-ab-test',
+    '',
+    '## Scope',
+    'workflow',
+    '',
+    '## Scenario',
+    'Debug a failing test.',
+    '',
+    '## Context',
+    'The test file has a typo.',
+    '',
+    '## Assertions',
+    '- [ ] Fixes the bug',
+    '',
+    '## Grader',
+    'code',
+    '',
+    '## Grader Config',
+    'echo pass',
+  ].join('\n');
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    tmpDir = makeTempDir();
+    // Default: all execCommand calls succeed
+    mockUtils.execCommand.mockReturnValue({ stdout: 'ok', stderr: '', exitCode: 0 });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('should run k baseline and k treatment trials', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const { baseline, treatment } = runWorkflowEval(scenario, 2, {
+      projectRoot: tmpDir,
+    });
+
+    expect(baseline).toHaveLength(2);
+    expect(treatment).toHaveLength(2);
+  });
+
+  test('should compute delta between baseline and treatment', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const { delta } = runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+
+    expect(typeof delta).toBe('number');
+  });
+
+  test('baseline uses --strict-mcp-config, treatment does not', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const trialCalls = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
+      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+        trialCalls.push({ args: [...cmdArgs] });
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+
+    // First trial = baseline (should have --strict-mcp-config)
+    expect(trialCalls[0].args).toContain('--strict-mcp-config');
+    // Second trial = treatment (should NOT have --strict-mcp-config)
+    expect(trialCalls[1].args).not.toContain('--strict-mcp-config');
+  });
+
+  test('both conditions use identical prompts', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const prompts = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
+      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+        prompts.push(opts.input);
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+
+    // Both baseline and treatment should get the same prompt
+    expect(prompts[0]).toBe(prompts[1]);
+  });
+
+  test('should store results with label suffixes in JSONL', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+
+    const baselineResults = loadResults('workflow-ab-test-baseline', tmpDir);
+    const treatmentResults = loadResults('workflow-ab-test-treatment', tmpDir);
+    expect(baselineResults.length).toBeGreaterThan(0);
+    expect(treatmentResults.length).toBeGreaterThan(0);
+  });
+
+  test('should call onTrialComplete callback for each trial', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const callback = jest.fn();
+    runWorkflowEval(scenario, 2, {
+      projectRoot: tmpDir,
+      onTrialComplete: callback,
+    });
+
+    expect(callback).toHaveBeenCalledTimes(4);
+    expect(callback.mock.calls[0][0]).toBe('baseline');
+    expect(callback.mock.calls[2][0]).toBe('treatment');
+  });
+
+  test('should interleave baseline and treatment when interleave=true', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const trialOrder = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
+      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+        trialOrder.push(cmdArgs.includes('--strict-mcp-config') ? 'baseline' : 'treatment');
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runWorkflowEval(scenario, 2, {
+      projectRoot: tmpDir,
+      interleave: true,
+    });
+
+    // Interleaved: B1, T1, B2, T2
+    expect(trialOrder).toEqual(['baseline', 'treatment', 'baseline', 'treatment']);
+  });
+
+  test('should preserve sequential order when interleave=false', () => {
+    writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
+    const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
+
+    const trialOrder = [];
+    mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
+      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+        trialOrder.push(cmdArgs.includes('--strict-mcp-config') ? 'baseline' : 'treatment');
+      }
+      return { stdout: 'ok', stderr: '', exitCode: 0 };
+    });
+
+    runWorkflowEval(scenario, 2, {
+      projectRoot: tmpDir,
+      interleave: false,
+    });
+
+    // Sequential: B1, B2, T1, T2
+    expect(trialOrder).toEqual(['baseline', 'baseline', 'treatment', 'treatment']);
   });
 });

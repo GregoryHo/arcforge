@@ -27,6 +27,7 @@ const {
   gradeWithModel,
   gradeTrialResult,
   saveTranscript,
+  captureTrialArtifacts,
   runSkillEval,
   SCENARIOS_DIR,
   RESULTS_DIR,
@@ -530,6 +531,98 @@ Plain text at end.
       const graded = gradeWithCode(result, 'true && node -e "process.exit(0)"', tempDir);
 
       expect(graded.passed).toBe(true);
+    });
+
+    it('should inject TRIAL_DIR env var when result has trialDir', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-env-'));
+      fs.writeFileSync(path.join(trialDir, 'marker.txt'), 'found');
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(result, 'test -f "$TRIAL_DIR/marker.txt"', tempDir);
+        expect(graded.passed).toBe(true);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should work without trialDir (no TRIAL_DIR env var)', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'true', tempDir);
+      expect(graded.passed).toBe(true);
+    });
+  });
+
+  // ── captureTrialArtifacts ─────────────────────────────────────
+
+  describe('captureTrialArtifacts', () => {
+    it('should capture files from trial directory', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-art-'));
+      fs.writeFileSync(path.join(trialDir, 'main.js'), 'console.log("hello");');
+      fs.writeFileSync(path.join(trialDir, 'test.js'), 'assert(true);');
+      try {
+        const result = captureTrialArtifacts(trialDir);
+        expect(result).toContain('main.js');
+        expect(result).toContain('console.log("hello");');
+        expect(result).toContain('test.js');
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should skip hidden directories like .claude', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-art-'));
+      fs.mkdirSync(path.join(trialDir, '.claude'));
+      fs.writeFileSync(path.join(trialDir, '.claude', 'settings.json'), '{}');
+      fs.writeFileSync(path.join(trialDir, 'app.js'), 'code');
+      try {
+        const result = captureTrialArtifacts(trialDir);
+        expect(result).toContain('app.js');
+        expect(result).not.toContain('settings.json');
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should return empty string for missing directory', () => {
+      expect(captureTrialArtifacts('/nonexistent/path')).toBe('');
+      expect(captureTrialArtifacts(null)).toBe('');
+      expect(captureTrialArtifacts(undefined)).toBe('');
+    });
+
+    it('should respect maxFiles limit', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-art-'));
+      for (let i = 0; i < 5; i++) {
+        fs.writeFileSync(path.join(trialDir, `file${i}.js`), `content ${i}`);
+      }
+      try {
+        const result = captureTrialArtifacts(trialDir, { maxFiles: 2 });
+        expect(result).toContain('more files not shown');
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should handle large files gracefully', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-art-'));
+      fs.writeFileSync(path.join(trialDir, 'big.js'), 'x'.repeat(20000));
+      try {
+        const result = captureTrialArtifacts(trialDir, { maxFileSize: 10000 });
+        expect(result).toContain('too large to include');
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should walk subdirectories', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-art-'));
+      fs.mkdirSync(path.join(trialDir, 'src'));
+      fs.writeFileSync(path.join(trialDir, 'src', 'index.js'), 'exports');
+      try {
+        const result = captureTrialArtifacts(trialDir);
+        expect(result).toContain('src/index.js');
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
     });
   });
 

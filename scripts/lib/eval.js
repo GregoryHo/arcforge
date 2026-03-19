@@ -12,6 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
 const stats = require('./eval-stats');
+const graders = require('./eval-graders');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -103,38 +104,53 @@ function listScenarios(projectRoot) {
 }
 
 /**
- * Create an isolated temp directory for a trial run
+ * Create an isolated trial directory under the project root.
+ * Uses .eval-trials/ (gitignored) to avoid macOS permission dialogs
+ * that occur when running from /var/folders/ temp directories.
  * @param {string} evalName - Eval name for prefix
  * @param {number} trialNumber - Trial number
- * @returns {string} Absolute path to temp directory
+ * @param {string} [projectRoot] - Project root directory
+ * @returns {string} Absolute path to trial directory
  */
-function createTrialDir(evalName, trialNumber) {
-  const prefix = `arcforge-eval-${sanitizeFilename(evalName)}-t${trialNumber}-`;
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+function createTrialDir(evalName, trialNumber, projectRoot) {
+  const base = projectRoot
+    ? path.join(projectRoot, '.eval-trials')
+    : path.join(process.cwd(), '.eval-trials');
+  ensureDir(base);
+  const prefix = `${sanitizeFilename(evalName)}-t${trialNumber}-`;
+  return fs.mkdtempSync(path.join(base, prefix));
 }
 
 /**
- * Clean up a trial temp directory. Only removes paths inside os.tmpdir().
+ * Clean up a trial directory. Only removes paths inside .eval-trials/ or os.tmpdir().
  * @param {string} [trialDir] - Path to trial directory
  */
 function cleanupTrialDir(trialDir) {
-  if (!trialDir || !trialDir.startsWith(os.tmpdir())) return;
+  if (!trialDir) return;
+  const isEvalTrial = trialDir.includes('.eval-trials');
+  const isTmp = trialDir.startsWith(os.tmpdir());
+  if (!isEvalTrial && !isTmp) return;
   try {
     fs.rmSync(trialDir, { recursive: true, force: true });
   } catch {
-    /* silent — temp dir cleanup is best-effort */
+    /* silent — trial dir cleanup is best-effort */
   }
 }
 
 /**
- * Run a setup command in the trial directory
+ * Run a setup command in the trial directory.
+ * Injects PROJECT_ROOT env var so setup can reference project files.
  * @param {string} setupCommand - Shell command to execute
  * @param {string} trialDir - Working directory for setup
+ * @param {string} [projectRoot] - Project root for $PROJECT_ROOT env var
  */
-function runSetup(setupCommand, trialDir) {
+function runSetup(setupCommand, trialDir, projectRoot) {
+  const env = { ...process.env };
+  if (projectRoot) env.PROJECT_ROOT = projectRoot;
   const { exitCode, stderr } = execCommand('sh', ['-c', setupCommand], {
     cwd: trialDir,
     timeout: 30000,
+    env,
   });
   if (exitCode !== 0) {
     throw new Error(`Setup failed: ${stderr}`);
@@ -142,32 +158,78 @@ function runSetup(setupCommand, trialDir) {
 }
 
 /**
- * Run a single eval trial by spawning a Claude session
+ * Write isolation settings to a trial directory.
+ * Disables all user plugins so trials run in a clean context.
+ * @param {string} trialDir - Path to trial temp directory
+ * @param {string} [cachedSettings] - Pre-built settings JSON (avoids repeated plugin list calls)
+ */
+function writeIsolationSettings(trialDir, cachedSettings) {
+  const claudeDir = path.join(trialDir, '.claude');
+  fs.mkdirSync(claudeDir, { recursive: true });
+  const settings = cachedSettings || buildIsolationSettings();
+  fs.writeFileSync(path.join(claudeDir, 'settings.json'), settings);
+}
+
+/**
+ * Build isolation settings JSON string (cached for reuse across trials).
+ * Queries installed plugins and generates settings to disable all of them.
+ * Returns empty settings if claude CLI is unavailable (e.g., in tests).
+ * @returns {string} JSON string for .claude/settings.json
+ */
+function buildIsolationSettings() {
+  try {
+    const { stdout, exitCode } = execCommand('claude', ['plugin', 'list', '--json'], {
+      timeout: 10000,
+    });
+    if (exitCode !== 0 || !stdout) return '{}';
+    const plugins = JSON.parse(stdout);
+    if (!Array.isArray(plugins)) return '{}';
+    const disabled = {};
+    for (const p of plugins) disabled[p.id] = false;
+    return JSON.stringify({ enabledPlugins: disabled });
+  } catch {
+    return '{}';
+  }
+}
+
+/**
+ * Run a single eval trial by spawning a Claude session.
+ * Runs in a temp directory for workspace safety. When isolated (default),
+ * plugins are disabled and MCP servers stripped. When not isolated,
+ * the agent has access to the full toolkit (plugins, MCP, skills, hooks).
  * @param {EvalScenario} scenario - The eval scenario
  * @param {number} trialNumber - Trial number (1-indexed)
  * @param {number} totalTrials - Total number of trials (k)
  * @param {Object} options - Run options
- * @param {string} [options.projectRoot] - Project root
+ * @param {string} [options.projectRoot] - Project root (for transcript storage + code grading)
+ * @param {string} [options.isolationSettings] - Cached isolation settings JSON
+ * @param {boolean} [options.isolated=true] - Whether to disable plugins and MCP
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
-  const { projectRoot = process.cwd(), label } = options;
+  const { projectRoot = process.cwd(), label, isolationSettings, isolated = true } = options;
   const timestamp = getTimestamp();
 
-  // Isolate trial in temp dir when scenario defines a setup command
-  let trialDir;
-  if (scenario.setup) {
-    trialDir = createTrialDir(scenario.name, trialNumber);
-    runSetup(scenario.setup, trialDir);
-  }
-  const trialCwd = trialDir || projectRoot;
+  // Always run in trial dir for workspace safety
+  const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
+  if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
+  if (isolated) writeIsolationSettings(trialDir, isolationSettings);
 
   const prompt = buildTrialPrompt(scenario);
 
-  const result = execCommand('claude', ['-p', '--output-format', 'text'], {
+  const claudeArgs = [
+    '-p',
+    '--output-format',
+    'text',
+    '--no-session-persistence',
+    '--disable-slash-commands',
+  ];
+  if (isolated) claudeArgs.push('--strict-mcp-config');
+
+  const result = execCommand('claude', claudeArgs, {
     input: prompt,
-    cwd: trialCwd,
-    timeout: 300000, // 5 minute timeout per trial
+    cwd: trialDir,
+    timeout: 300000,
   });
 
   const evalName = label ? `${scenario.name}-${label}` : scenario.name;
@@ -183,7 +245,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     score: 0,
     timestamp,
     transcript,
-    ...(trialDir ? { trialDir } : {}),
+    trialDir,
   };
   return result.exitCode === 0
     ? { ...base, output: result.stdout }
@@ -218,10 +280,15 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
  * @returns {TrialResult} Graded result
  */
 function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
-  const { projectRoot, label, onTrialComplete } = opts;
-  const result = runTrial(trialScenario, trialNumber, k, { projectRoot, label });
+  const { projectRoot, label, onTrialComplete, isolationSettings, isolated } = opts;
+  const result = runTrial(trialScenario, trialNumber, k, {
+    projectRoot,
+    label,
+    isolationSettings,
+    isolated,
+  });
   try {
-    const graded = gradeTrialResult(result, gradeScenario, projectRoot);
+    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
     appendResult(graded, projectRoot);
     if (onTrialComplete) onTrialComplete(label, trialNumber, graded);
     return graded;
@@ -231,8 +298,41 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
 }
 
 /**
+ * Run an A/B eval: execute k trials for each condition, grade, compute delta.
+ * Shared by both skill and workflow evals — only the options differ.
+ * @param {EvalScenario} baseScenario - Scenario for baseline trials
+ * @param {EvalScenario} treatScenario - Scenario for treatment trials (may differ from base)
+ * @param {EvalScenario} gradeScenario - Original scenario for grading
+ * @param {number} k - Trials per condition
+ * @param {Object} bOpts - Baseline trial options
+ * @param {Object} tOpts - Treatment trial options
+ * @param {boolean} interleave - Alternate baseline/treatment trials
+ * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
+ */
+function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts, interleave) {
+  const baseline = [];
+  const treatment = [];
+
+  if (interleave) {
+    for (let t = 1; t <= k; t++) {
+      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
+      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
+    }
+  } else {
+    for (let t = 1; t <= k; t++) {
+      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
+    }
+    for (let t = 1; t <= k; t++) {
+      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
+    }
+  }
+
+  return { baseline, treatment, delta: stats.computeDelta(baseline, treatment) };
+}
+
+/**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
- * Runs k trials for each condition, grades both, computes delta.
+ * Both conditions run in isolated environments; the treatment prepends skill instruction.
  * @param {EvalScenario} scenario - Scenario with scope='skill'
  * @param {number} k - Number of trials per condition
  * @param {Object} options - Run options
@@ -248,55 +348,43 @@ function runSkillEval(scenario, k, options = {}) {
     onTrialComplete,
     interleave = false,
   } = options;
+  const isolationSettings = buildIsolationSettings();
 
   const treatmentScenario = {
     ...scenario,
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
   };
 
-  const baseline = [];
-  const treatment = [];
-  const bOpts = { projectRoot, label: 'baseline', onTrialComplete };
-  const tOpts = { projectRoot, label: 'treatment', onTrialComplete };
-
-  if (interleave) {
-    for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(scenario, scenario, t, k, bOpts));
-      treatment.push(executeAndGradeTrial(treatmentScenario, scenario, t, k, tOpts));
-    }
-  } else {
-    for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(scenario, scenario, t, k, bOpts));
-    }
-    for (let t = 1; t <= k; t++) {
-      treatment.push(executeAndGradeTrial(treatmentScenario, scenario, t, k, tOpts));
-    }
-  }
-
-  return {
-    baseline,
-    treatment,
-    delta: stats.computeDelta(baseline, treatment),
-  };
+  const bOpts = { projectRoot, label: 'baseline', onTrialComplete, isolationSettings };
+  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolationSettings };
+  return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);
 }
 
 /**
- * Grade a trial result using the appropriate grader for the scenario.
- * @param {TrialResult} result - Trial result to grade
- * @param {EvalScenario} scenario - Scenario with grader config
- * @param {string} projectRoot - Project root directory
- * @returns {TrialResult} Graded result
+ * Run a workflow eval as A/B comparison: isolated baseline vs non-isolated treatment.
+ * Both conditions use identical prompts; the treatment differs by having the full
+ * arcforge toolkit available (plugins, MCP, skills, hooks).
+ * @param {EvalScenario} scenario - Scenario with scope='workflow'
+ * @param {number} k - Number of trials per condition
+ * @param {Object} options - Run options
+ * @param {string} [options.projectRoot] - Project root
+ * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
+ * @param {Function} [options.onTrialComplete] - Callback per trial
+ * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
-function gradeTrialResult(result, scenario, projectRoot) {
-  if (scenario.grader === 'code') {
-    const gradeCwd = result.trialDir || projectRoot;
-    return gradeWithCode(result, scenario.graderConfig, gradeCwd);
-  }
-  if (scenario.grader === 'model') {
-    return gradeWithModel(result, scenario, projectRoot);
-  }
-  // human grader — return ungraded
-  return { ...result, grader: 'human-pending' };
+function runWorkflowEval(scenario, k, options = {}) {
+  const { projectRoot = process.cwd(), onTrialComplete, interleave = false } = options;
+  const isolationSettings = buildIsolationSettings();
+
+  const bOpts = {
+    projectRoot,
+    label: 'baseline',
+    onTrialComplete,
+    isolationSettings,
+    isolated: true,
+  };
+  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolated: false };
+  return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }
 
 /**
@@ -318,89 +406,6 @@ function buildTrialPrompt(scenario) {
   }
 
   return parts.join('\n\n');
-}
-
-/**
- * Grade a trial result using a code grader (test command).
- * Accepts test command as array (exec directly) or string (run via shell).
- * Returns a new result object (does not mutate input).
- * @param {TrialResult} result - Trial result to grade
- * @param {string|string[]} testCommand - Test command to run
- * @param {string} projectRoot - Project root directory
- * @returns {TrialResult} New result with grade
- */
-function gradeWithCode(result, testCommand, projectRoot) {
-  const [cmd, args] = Array.isArray(testCommand)
-    ? [testCommand[0], testCommand.slice(1)]
-    : ['sh', ['-c', testCommand]];
-  const { exitCode } = execCommand(cmd, args, { cwd: projectRoot });
-  return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0 };
-}
-
-/**
- * Grade a trial result using the eval-grader agent (LLM-as-judge).
- * Spawns a Claude session with the rubric and trial output, then
- * parses the structured grade report for per-assertion scores.
- * Returns a new result object (does not mutate input).
- * @param {TrialResult} result - Trial result to grade
- * @param {EvalScenario} scenario - Scenario with assertions and graderConfig
- * @param {string} projectRoot - Project root directory
- * @returns {TrialResult} New result with grade
- */
-function gradeWithModel(result, scenario, projectRoot) {
-  const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
-  const prompt = [
-    '## Grading Task',
-    '',
-    'Grade the following output against these assertions. For each assertion, score 0.0 to 1.0.',
-    '',
-    '### Assertions',
-    rubric,
-    '',
-    '### Grader Guidelines',
-    scenario.graderConfig || 'Score each assertion based on evidence in the output.',
-    '',
-    '### Output to Grade',
-    '```',
-    result.output || result.error || '(no output)',
-    '```',
-    '',
-    '### Response Format',
-    'Respond with ONLY a JSON object:',
-    '```json',
-    '{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}',
-    '```',
-    'Set passed=true if ALL scores >= 0.7.',
-  ].join('\n');
-
-  const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text'], {
-    input: prompt,
-    cwd: projectRoot,
-    timeout: 120000,
-  });
-
-  if (exitCode !== 0) {
-    return { ...result, passed: false, score: 0, error: 'Model grader failed to respond' };
-  }
-
-  const jsonMatch = stdout.match(/\{[\s\S]*?"scores"\s*:[\s\S]*?\}/);
-  if (!jsonMatch) {
-    return {
-      ...result,
-      passed: false,
-      score: 0,
-      error: 'Model grader returned unparseable response',
-    };
-  }
-
-  try {
-    const grade = JSON.parse(jsonMatch[0]);
-    const score = typeof grade.overall === 'number' ? grade.overall : 0;
-    const passed = typeof grade.passed === 'boolean' ? grade.passed : score >= 0.7;
-    return { ...result, passed, score: Math.round(score * 100) / 100 };
-  } catch {
-    return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
-  }
 }
 
 /**
@@ -507,42 +512,6 @@ function generateBenchmark(projectRoot) {
 }
 
 /**
- * Prompt a human to grade a trial result via readline.
- * Returns a new result object (does not mutate input).
- * @param {TrialResult} result - Trial result to grade
- * @param {readline.Interface} rl - Readline interface for prompting
- * @returns {Promise<TrialResult>} Graded result
- */
-async function gradeWithHuman(result, rl) {
-  const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
-
-  let score;
-  while (score === undefined) {
-    const raw = await ask('Score (0.0-1.0): ');
-    const num = Number.parseFloat(raw);
-    if (!Number.isNaN(num) && num >= 0 && num <= 1) {
-      score = Math.round(num * 100) / 100;
-    } else {
-      console.log('Invalid score. Enter a number between 0.0 and 1.0.');
-    }
-  }
-
-  const passedRaw = await ask(`Passed? (y/n, default ${score >= 0.7 ? 'y' : 'n'}): `);
-  const passed =
-    passedRaw.trim() === '' ? score >= 0.7 : passedRaw.trim().toLowerCase().startsWith('y');
-
-  const notes = (await ask('Notes (optional): ')).trim();
-
-  return {
-    ...result,
-    passed,
-    score,
-    grader: 'human',
-    ...(notes ? { notes } : {}),
-  };
-}
-
-/**
  * Ensure evals directory structure exists
  * @param {string} projectRoot - Project root directory
  */
@@ -559,19 +528,20 @@ module.exports = {
   createTrialDir,
   cleanupTrialDir,
   runSetup,
+  writeIsolationSettings,
+  buildIsolationSettings,
   runTrial,
   buildTrialPrompt,
-  gradeWithCode,
-  gradeWithModel,
-  gradeWithHuman,
-  gradeTrialResult,
   executeAndGradeTrial,
   runSkillEval,
+  runWorkflowEval,
   saveTranscript,
   appendResult,
   loadResults,
   generateBenchmark,
   ensureEvalsDir,
+  // Re-export graders for backward compatibility
+  ...graders,
   // Re-export stats for backward compatibility
   ...stats,
   // Constants

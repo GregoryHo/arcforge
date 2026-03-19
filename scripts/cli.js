@@ -18,7 +18,7 @@
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N]          Run eval scenario with k trials
  *   eval report [name]               Show eval benchmark report
- *   eval ab <name> --skill-file <path> [--k N] [--interleave]  A/B skill eval
+ *   eval ab <name> [--skill-file <path>] [--k N] [--interleave]  A/B eval (skill or workflow)
  *   eval compare <name>              Compare A/B results
  *   eval history                     List benchmark snapshots
  */
@@ -405,29 +405,44 @@ async function main() {
           const results = eval_.loadResults(scenario.name, projectRoot).slice(-k);
           console.log(`Verdict: ${eval_.getVerdict(results)}`);
         } else if (subcommand === 'ab') {
-          const skillFile = args.options['skill-file'];
-          if (!skillFile) {
-            console.error('Error: eval ab requires --skill-file <path>');
-            process.exit(1);
-          }
           const k = parseK();
           const scenario = requireScenario(args.positional[1], 'ab');
-
-          const skillInstruction = fs.readFileSync(path.resolve(skillFile), 'utf8');
           const interleave = !!args.options.interleave;
-          console.log(`A/B eval: ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`);
-          console.log(`Skill: ${skillFile}\n`);
+          const onTrialComplete = (label, t, graded) => {
+            console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
+          };
 
-          const { baseline, treatment, delta } = eval_.runSkillEval(scenario, k, {
-            projectRoot,
-            skillInstruction,
-            interleave,
-            onTrialComplete: (label, t, graded) => {
-              console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
-            },
-          });
+          let result;
+          if (scenario.scope === 'workflow') {
+            console.log(
+              `A/B eval (workflow): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
+            );
+            console.log('Baseline: isolated (no plugins/MCP) | Treatment: full toolkit\n');
+            result = eval_.runWorkflowEval(scenario, k, {
+              projectRoot,
+              interleave,
+              onTrialComplete,
+            });
+          } else {
+            const skillFile = args.options['skill-file'];
+            if (!skillFile) {
+              console.error('Error: eval ab for skill scope requires --skill-file <path>');
+              process.exit(1);
+            }
+            const skillInstruction = fs.readFileSync(path.resolve(skillFile), 'utf8');
+            console.log(
+              `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
+            );
+            console.log(`Skill: ${skillFile}\n`);
+            result = eval_.runSkillEval(scenario, k, {
+              projectRoot,
+              skillInstruction,
+              interleave,
+              onTrialComplete,
+            });
+          }
 
-          printAbSummary('\n', baseline, treatment, delta);
+          printAbSummary('\n', result.baseline, result.treatment, result.delta);
         } else if (subcommand === 'compare') {
           const name = args.positional[1];
           if (!name) {
