@@ -145,15 +145,17 @@ Both conditions run in `.eval-trials/` for workspace safety. The treatment trial
 
 ### Step 4: Grade Eval
 
-Three grader types:
+Three grader types — choose based on the assertion's nature, not convenience:
 
-| Grader | Use When | How |
-|--------|----------|-----|
-| **code** | Output is testable (files, tests, structured artifacts) | Run test command, check exit code. `$TRIAL_DIR` env var available for checking trial artifacts. |
-| **model** | Output needs judgment | Reads `agents/eval-grader.md` as grading methodology, scores each assertion 0.0-1.0. Trial directory artifacts automatically included. |
-| **human** | Subjective quality | Present output + checklist for review |
+| Grader | Use When | Not For | How |
+|--------|----------|---------|-----|
+| **code** | Assertions have deterministic correct answers (file exists, test passes, value matches expected) | Quality or intent judgment — don't rewrite assertions into grep proxies to force code grading | Run test command, check exit code. `$TRIAL_DIR` env var available for checking trial artifacts. |
+| **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion 0.0-1.0. Trial directory artifacts automatically included. |
+| **human** | Assertions involve audience-dependent experience, taste, or domain expertise that even LLMs assess unreliably (e.g., "feels intuitive", "tone matches brand") | Assessments an LLM can judge — save human bandwidth for what only humans can evaluate | Present output + checklist for review |
 
-**Prefer code grader** when assertions are verifiable: test exit codes, file existence, grep patterns. Code grading is free, deterministic, and more reliable than model grading. Use model grader only when assertions require subjective judgment (e.g., "review is well-structured").
+Some behavioral qualities cannot be captured by deterministic tests alone. When evaluating methodology, reasoning quality, or communication clarity, model or human grading captures signal that code grading structurally cannot. Match the grader to the assertion — not the other way around.
+
+**When a goal has both deterministic and judgment aspects** (e.g., "agent writes good error handling"): split into complementary scenarios — one code-graded for verifiable aspects (tests pass, no empty catch blocks), one model-graded for judgment aspects (error messages are contextual, errors handled at appropriate layer).
 
 ### Step 5: Track Results
 
@@ -219,6 +221,7 @@ evals/
 | Model grader for deterministic output | Noisy scores, false positives from LLM hallucination | Use code grader with `$TRIAL_DIR` — verify files, run tests, grep patterns |
 | Empty trial dir without Setup or Context | Agent spends 5+ minutes searching nothing, then times out | Add Setup to copy needed files, or provide sufficient Context for text-only responses |
 | Assertions that can't be verified by chosen grader | Code grader can't check "well-structured"; model grader is overkill for "file exists" | Match grader to assertion type — code for existence/correctness, model for judgment |
+| Rewriting assertions to fit preferred grader | "Well-structured code" becomes "name > 10 chars" — measures surface proxy, not actual quality (validity sacrificed for reliability) | Choose grader to match assertion's nature. If the assertion requires judgment, use model/human grader — don't reshape it into a grep pattern |
 | Running k=1 and trusting the result | No variance information, single lucky/unlucky trial dominates | Use scenario-driven defaults (k=3-10 depending on eval type and grader); CI shown at k >= 5 |
 | Grading stdout claims without checking artifacts | Agent says "I created the file" but didn't; grader scores the claim | Use code grader against `$TRIAL_DIR`, or model grader (artifacts auto-included) |
 | Using `--skill-file` for workflow eval | Varies the prompt instead of the environment — measures the wrong thing | Workflow A/B varies the environment. Use `eval ab <name>` without `--skill-file` for workflow scope |
