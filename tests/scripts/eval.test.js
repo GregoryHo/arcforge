@@ -29,6 +29,8 @@ const {
   saveTranscript,
   captureTrialArtifacts,
   runSkillEval,
+  snapScore,
+  validateGraderResponse,
   SCENARIOS_DIR,
   RESULTS_DIR,
   BENCHMARKS_DIR,
@@ -726,7 +728,7 @@ Do something.
       const original = { ...result };
 
       mockUtils.execCommand.mockReturnValueOnce({
-        stdout: '{"scores": [0.9, 0.8], "overall": 0.85, "passed": true}',
+        stdout: '{"scores": [1.0, 1.0], "overall": 1.0, "passed": true}',
         stderr: '',
         exitCode: 0,
       });
@@ -734,7 +736,7 @@ Do something.
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(result).toEqual(original);
       expect(graded.passed).toBe(true);
-      expect(graded.score).toBe(0.85);
+      expect(graded.score).toBe(1.0);
     });
 
     it('should handle Claude failure after retry', () => {
@@ -765,7 +767,7 @@ Do something.
     it('should extract JSON from mixed markdown response', () => {
       mockUtils.execCommand.mockReturnValueOnce({
         stdout:
-          'Here is my grade:\n```json\n{"scores": [1.0, 0.6], "overall": 0.80, "passed": false}\n```',
+          'Here is my grade:\n```json\n{"scores": [1.0, 0.5], "overall": 0.75, "passed": false}\n```',
         stderr: '',
         exitCode: 0,
       });
@@ -773,14 +775,14 @@ Do something.
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(false);
-      expect(graded.score).toBe(0.8);
+      expect(graded.score).toBe(0.75);
     });
 
     it('should retry on first parse failure then succeed', () => {
       mockUtils.execCommand
         .mockReturnValueOnce({ stdout: 'unparseable garbage', stderr: '', exitCode: 0 })
         .mockReturnValueOnce({
-          stdout: '{"scores": [0.9], "overall": 0.90, "passed": true}',
+          stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
           stderr: '',
           exitCode: 0,
         });
@@ -788,14 +790,14 @@ Do something.
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(true);
-      expect(graded.score).toBe(0.9);
+      expect(graded.score).toBe(1.0);
     });
 
     it('should retry on first Claude failure then succeed', () => {
       mockUtils.execCommand
         .mockReturnValueOnce({ stdout: '', stderr: 'timeout', exitCode: 1 })
         .mockReturnValueOnce({
-          stdout: '{"scores": [0.8], "overall": 0.80, "passed": true}',
+          stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
           stderr: '',
           exitCode: 0,
         });
@@ -803,12 +805,12 @@ Do something.
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(true);
-      expect(graded.score).toBe(0.8);
+      expect(graded.score).toBe(1.0);
     });
 
     it('should strip code fences with json language tag', () => {
       mockUtils.execCommand.mockReturnValueOnce({
-        stdout: '```json\n{"scores": [0.75], "overall": 0.75, "passed": true}\n```',
+        stdout: '```json\n{"scores": [1.0], "overall": 1.0, "passed": true}\n```',
         stderr: '',
         exitCode: 0,
       });
@@ -816,7 +818,157 @@ Do something.
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(1.0);
+    });
+
+    it('should snap continuous scores to 3-tier scale', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [0.85, 0.6], "overall": 0.72, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      // 0.85 → 1.0, 0.6 → 0.5, overall recomputed = 0.75, not all 1.0 so passed=false
+      expect(graded.passed).toBe(false);
       expect(graded.score).toBe(0.75);
+    });
+
+    it('should accept exact 3-tier scores unchanged', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [0, 0.5, 1.0], "overall": 0.5, "passed": false}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const threeAssertionScenario = { ...mockScenario, assertions: ['A', 'B', 'C'] };
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, threeAssertionScenario, tempDir);
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0.5);
+    });
+
+    it('should clamp out-of-range scores', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [1.5, -0.1], "overall": 0.7, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      // 1.5 → clamp to 1.0 → snap to 1.0, -0.1 → clamp to 0 → snap to 0
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0.5);
+    });
+
+    it('should treat empty scores array as parse failure and retry', () => {
+      mockUtils.execCommand
+        .mockReturnValueOnce({
+          stdout: '{"scores": [], "overall": 0, "passed": false}',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockReturnValueOnce({
+          stdout: '{"scores": [1.0, 1.0], "overall": 1.0, "passed": true}',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(1.0);
+    });
+
+    it('should recompute overall from snapped scores ignoring LLM overall', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '{"scores": [1.0, 0.5], "overall": 0.99, "passed": true}',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      // LLM says overall=0.99, but recomputed from [1.0, 0.5] = 0.75
+      expect(graded.score).toBe(0.75);
+      expect(graded.passed).toBe(false);
+    });
+  });
+
+  // ── snapScore ───────────────────────────────────────────────
+
+  describe('snapScore', () => {
+    it('should snap low scores to 0', () => {
+      expect(snapScore(0)).toBe(0);
+      expect(snapScore(0.1)).toBe(0);
+      expect(snapScore(0.25)).toBe(0);
+    });
+
+    it('should snap mid scores to 0.5', () => {
+      expect(snapScore(0.26)).toBe(0.5);
+      expect(snapScore(0.5)).toBe(0.5);
+      expect(snapScore(0.6)).toBe(0.5);
+      expect(snapScore(0.75)).toBe(0.5);
+    });
+
+    it('should snap high scores to 1.0', () => {
+      expect(snapScore(0.76)).toBe(1.0);
+      expect(snapScore(0.85)).toBe(1.0);
+      expect(snapScore(1.0)).toBe(1.0);
+    });
+
+    it('should clamp out-of-range values', () => {
+      expect(snapScore(-0.5)).toBe(0);
+      expect(snapScore(1.5)).toBe(1.0);
+    });
+  });
+
+  // ── validateGraderResponse ────────────────────────────────────
+
+  describe('validateGraderResponse', () => {
+    it('should return null for missing scores', () => {
+      expect(validateGraderResponse({}, 2)).toBeNull();
+      expect(validateGraderResponse({ scores: [] }, 2)).toBeNull();
+    });
+
+    it('should snap scores and recompute overall', () => {
+      const result = validateGraderResponse(
+        { scores: [0.85, 0.6], overall: 0.72, passed: true },
+        2,
+      );
+      expect(result.scores).toEqual([1.0, 0.5]);
+      expect(result.overall).toBe(0.75);
+      expect(result.passed).toBe(false);
+    });
+
+    it('should pass only when all scores are 1.0', () => {
+      const allGood = validateGraderResponse({ scores: [1.0, 1.0], overall: 1.0, passed: true }, 2);
+      expect(allGood.passed).toBe(true);
+
+      const partial = validateGraderResponse(
+        { scores: [1.0, 0.5], overall: 0.75, passed: false },
+        2,
+      );
+      expect(partial.passed).toBe(false);
+    });
+
+    it('should handle non-numeric score values', () => {
+      const result = validateGraderResponse(
+        { scores: ['bad', null, 0.9], overall: 0, passed: false },
+        3,
+      );
+      expect(result.scores).toEqual([0, 0, 1.0]);
+    });
+
+    it('should warn but not reject on assertion count mismatch', () => {
+      const stderrWrite = jest.spyOn(process.stderr, 'write').mockImplementation();
+      const result = validateGraderResponse({ scores: [1.0], overall: 1.0, passed: true }, 3);
+      expect(result).not.toBeNull();
+      expect(result.scores).toEqual([1.0]);
+      expect(stderrWrite).toHaveBeenCalled();
+      stderrWrite.mockRestore();
     });
   });
 

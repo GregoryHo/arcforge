@@ -577,13 +577,13 @@ describe('model grader integration', () => {
     const result = makeResult({ output: 'some output', grader: 'model' });
 
     mockUtils.execCommand.mockReturnValueOnce({
-      stdout: '{"scores": [0.9, 0.8], "overall": 0.85, "passed": true}',
+      stdout: '{"scores": [1.0, 1.0], "overall": 1.0, "passed": true}',
       stderr: '',
       exitCode: 0,
     });
 
     const graded = gradeTrialResult(result, scenario, tmpDir);
-    expect(graded.score).toBe(0.85);
+    expect(graded.score).toBe(1.0);
     expect(graded.passed).toBe(true);
   });
 
@@ -624,7 +624,7 @@ describe('model grader integration', () => {
     const result = makeResult({ output: 'TRIAL_OUTPUT_CONTENT', grader: 'model' });
 
     mockUtils.execCommand.mockReturnValueOnce({
-      stdout: '{"scores": [0.7], "overall": 0.7, "passed": true}',
+      stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
       stderr: '',
       exitCode: 0,
     });
@@ -677,7 +677,7 @@ describe('model grader integration', () => {
     const result = makeResult({ output: 'output', grader: 'model' });
 
     mockUtils.execCommand.mockReturnValueOnce({
-      stdout: '{"scores": [0.8], "overall": 0.8, "passed": true}',
+      stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
       stderr: '',
       exitCode: 0,
     });

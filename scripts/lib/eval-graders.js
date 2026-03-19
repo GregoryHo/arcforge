@@ -10,6 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execCommand } = require('./utils');
+const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD, round2 } = require('./eval-stats');
 
 // Cache agent definitions to avoid repeated disk reads during batch grading.
 // Key: absolute path, Value: file content with frontmatter stripped (empty string if missing).
@@ -40,6 +41,43 @@ function loadAgentDef(agentPath) {
  */
 function stripCodeFences(text) {
   return text.replace(/```(?:json)?\s*\n?/g, '');
+}
+
+/**
+ * Snap a score to the nearest 3-tier value: 0, 0.5, or 1.0.
+ * Thresholds are midpoints between tiers: <= 0.25 → 0, 0.25-0.75 → 0.5, > 0.75 → 1.0.
+ * @param {number} score - Raw score from grader
+ * @returns {number} Snapped score
+ */
+function snapScore(score) {
+  const clamped = Math.max(0, Math.min(1, score));
+  if (clamped <= 0.25) return 0;
+  if (clamped <= 0.75) return 0.5;
+  return 1.0;
+}
+
+/**
+ * Validate and normalize a grader JSON response.
+ * Snaps scores to 3-tier scale, recomputes overall and passed from snapped scores.
+ * Returns null if scores array is missing or empty (triggers retry).
+ * @param {Object} grade - Parsed JSON from grader: { scores, overall, passed }
+ * @param {number} assertionCount - Expected number of assertions
+ * @returns {{ scores: number[], overall: number, passed: boolean }|null}
+ */
+function validateGraderResponse(grade, assertionCount) {
+  if (!Array.isArray(grade.scores) || grade.scores.length === 0) return null;
+
+  if (grade.scores.length !== assertionCount && assertionCount > 0) {
+    process.stderr.write(
+      `Warning: grader returned ${grade.scores.length} scores for ${assertionCount} assertions\n`,
+    );
+  }
+
+  const scores = grade.scores.map((s) => snapScore(typeof s === 'number' ? s : 0));
+  const overall = round2(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const passed = scores.every((s) => s === 1.0);
+
+  return { scores, overall, passed };
 }
 
 /**
@@ -171,9 +209,10 @@ function gradeWithModel(result, scenario, projectRoot) {
     '### Required Response Format (automated grading)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}',
+    '{"scores": [1.0, 0.5, ...], "overall": 0.75, "passed": false}',
     '```',
-    'Set passed=true if ALL scores >= 0.7.',
+    'Score each assertion as: 0 (not met), 0.5 (partially met), or 1.0 (fully met).',
+    'Set passed=true only if ALL scores are 1.0.',
   ].join('\n');
 
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -207,9 +246,19 @@ function gradeWithModel(result, scenario, projectRoot) {
 
     try {
       const grade = JSON.parse(jsonMatch[0]);
-      const score = typeof grade.overall === 'number' ? grade.overall : 0;
-      const passed = typeof grade.passed === 'boolean' ? grade.passed : score >= 0.7;
-      return { ...result, passed, score: Math.round(score * 100) / 100 };
+      const validated = validateGraderResponse(grade, scenario.assertions.length);
+      if (!validated) {
+        if (attempt === 2) {
+          return {
+            ...result,
+            passed: false,
+            score: 0,
+            error: 'Model grader returned empty scores',
+          };
+        }
+        continue;
+      }
+      return { ...result, passed: validated.passed, score: validated.overall };
     } catch {
       if (attempt === 2) {
         return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
@@ -229,8 +278,11 @@ function gradeWithModel(result, scenario, projectRoot) {
  * @returns {{ per_assertion: Object[], analysis: string, recommendation: string }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot) {
-  const agentDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
-  if (!agentDef) return null;
+  const rawDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
+  if (!rawDef) return null;
+  const agentDef = rawDef
+    .replace(/\{IMPROVED_THRESHOLD\}/g, String(DELTA_IMPROVED_THRESHOLD))
+    .replace(/\{REGRESSED_THRESHOLD\}/g, String(DELTA_REGRESSED_THRESHOLD));
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
     results.map((r) => `Trial ${r.trial}: score=${r.score}, passed=${r.passed}`).join('\n');
@@ -296,7 +348,7 @@ async function gradeWithHuman(result, rl) {
     const raw = await ask('Score (0.0-1.0): ');
     const num = Number.parseFloat(raw);
     if (!Number.isNaN(num) && num >= 0 && num <= 1) {
-      score = Math.round(num * 100) / 100;
+      score = round2(num);
     } else {
       console.log('Invalid score. Enter a number between 0.0 and 1.0.');
     }
@@ -324,4 +376,6 @@ module.exports = {
   gradeWithModel,
   compareWithModel,
   gradeWithHuman,
+  snapScore,
+  validateGraderResponse,
 };

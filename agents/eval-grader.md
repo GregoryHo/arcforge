@@ -30,13 +30,16 @@ For each assertion in the scenario:
 
 1. **Find evidence** — does the output contain evidence of this criterion?
 2. **Assess quality** — not just present/absent, but how well?
-3. **Score** — 0.0 (completely absent) to 1.0 (perfectly met)
+3. **Score** using 3-tier scale:
+   - **1.0** — fully met (clear evidence the criterion is satisfied)
+   - **0.5** — partially met (some evidence, but incomplete or flawed)
+   - **0** — not met (no evidence, or criterion clearly unsatisfied)
 
 ### Step 4: Compute Overall Grade
 
-- **Pass threshold**: all assertions scored >= 0.7
+- **Pass threshold**: all assertions scored 1.0 (fully met)
 - **Overall score**: average of all assertion scores
-- **Verdict**: PASS (all >= 0.7), PARTIAL (some < 0.7), FAIL (majority < 0.7)
+- **Verdict**: PASS (all = 1.0), PARTIAL (some < 1.0), FAIL (majority = 0)
 
 ## Report Format
 
@@ -73,11 +76,11 @@ For each assertion in the scenario:
 When used by `arc eval run` (automated batch grading), respond with ONLY a JSON object instead of the markdown report:
 
 ```json
-{"scores": [0.85, 0.70, ...], "overall": 0.78, "passed": true}
+{"scores": [1.0, 0.5, ...], "overall": 0.75, "passed": false}
 ```
 
-- `scores`: array of 0.0-1.0 scores, one per assertion in order
+- `scores`: array using 3-tier scale (0, 0.5, or 1.0), one per assertion in order
 - `overall`: average of all scores
-- `passed`: true if ALL scores >= 0.7
+- `passed`: true only if ALL scores are 1.0
 
 The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode.

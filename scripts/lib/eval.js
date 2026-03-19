@@ -555,12 +555,21 @@ function ensureEvalsDir(projectRoot) {
  * @returns {{ delta: number, verdict: string, baseline: Object, treatment: Object, modelAnalysis?: Object }}
  */
 function compareResults(scenario, baseline, treatment, projectRoot) {
+  const bStats = stats.statsFromResults(baseline);
+  const tStats = stats.statsFromResults(treatment);
   const delta = stats.computeDelta(baseline, treatment);
+  const deltaCi = stats.ciForDelta(baseline, treatment);
+  const baselineWarning = stats.baselineVarianceWarning(baseline, {
+    avg: bStats.avg,
+    stddev: bStats.stddev,
+  });
   const result = {
     delta,
-    verdict: stats.verdictFromDelta(delta),
-    baseline: stats.statsFromResults(baseline),
-    treatment: stats.statsFromResults(treatment),
+    deltaCi,
+    verdict: stats.verdictFromDeltaCI(baseline, treatment),
+    baseline: bStats,
+    treatment: tStats,
+    ...(baselineWarning ? { baselineWarning } : {}),
   };
 
   if (scenario.grader !== 'code') {

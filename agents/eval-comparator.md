@@ -34,17 +34,17 @@ Overall:
 ### Step 3: Assess Significance
 
 - **k < 3**: insufficient data, note this limitation
-- **k >= 3, delta > 0.15**: likely meaningful improvement
-- **k >= 3, delta between -0.05 and 0.15**: inconclusive
-- **k >= 3, delta < -0.05**: regression detected
+- **k >= 3, delta > {IMPROVED_THRESHOLD}**: likely meaningful improvement
+- **k >= 3, delta between {REGRESSED_THRESHOLD} and {IMPROVED_THRESHOLD}**: inconclusive
+- **k >= 3, delta < {REGRESSED_THRESHOLD}**: regression detected
 
 ### Step 4: Verdict
 
 | Delta | Verdict | Action |
 |-------|---------|--------|
-| > 0.15 | **IMPROVED** | Ship the change |
-| -0.05 to 0.15 | **INCONCLUSIVE** | Run more trials (increase k) |
-| < -0.05 | **REGRESSED** | Investigate and fix |
+| > {IMPROVED_THRESHOLD} | **IMPROVED** | Ship the change |
+| {REGRESSED_THRESHOLD} to {IMPROVED_THRESHOLD} | **INCONCLUSIVE** | Run more trials (increase k) |
+| < {REGRESSED_THRESHOLD} | **REGRESSED** | Investigate and fix |
 
 ## Report Format
 

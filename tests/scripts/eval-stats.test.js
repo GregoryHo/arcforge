@@ -12,7 +12,11 @@ const {
   computeDelta,
   verdictFromRate,
   verdictFromDelta,
+  verdictFromDeltaCI,
+  ciForDelta,
+  verdictFromCI,
   getVerdict,
+  baselineVarianceWarning,
 } = require('../../scripts/lib/eval-stats');
 
 function makeResult(overrides = {}) {
@@ -315,6 +319,157 @@ describe('verdictFromDelta', () => {
   });
 });
 
+// ── ciForDelta ────────────────────────────────────────────────
+
+describe('ciForDelta', () => {
+  test('returns zeros for insufficient data', () => {
+    expect(ciForDelta([makeResult({ score: 0.5 })], [makeResult({ score: 0.8 })])).toEqual({
+      lower: 0,
+      upper: 0,
+      width: 0,
+    });
+    expect(ciForDelta([], [makeResult(), makeResult()])).toEqual({ lower: 0, upper: 0, width: 0 });
+  });
+
+  test('CI contains the point estimate', () => {
+    const baseline = [0.3, 0.4, 0.5, 0.6, 0.7].map((s) => makeResult({ score: s }));
+    const treatment = [0.7, 0.8, 0.9, 0.85, 0.75].map((s) => makeResult({ score: s }));
+    const ci = ciForDelta(baseline, treatment);
+    const delta = avgScore(treatment) - avgScore(baseline);
+
+    expect(ci.lower).toBeLessThanOrEqual(delta);
+    expect(ci.upper).toBeGreaterThanOrEqual(delta);
+  });
+
+  test('clearly different groups produce CI not spanning zero', () => {
+    const baseline = [0.1, 0.2, 0.15, 0.1, 0.2].map((s) => makeResult({ score: s }));
+    const treatment = [0.9, 0.95, 0.85, 0.9, 0.95].map((s) => makeResult({ score: s }));
+    const ci = ciForDelta(baseline, treatment);
+
+    expect(ci.lower).toBeGreaterThan(0);
+  });
+
+  test('identical groups produce CI spanning zero', () => {
+    const data = [0.5, 0.6, 0.7, 0.5, 0.6].map((s) => makeResult({ score: s }));
+    const ci = ciForDelta(data, data);
+
+    expect(ci.lower).toBeLessThanOrEqual(0);
+    expect(ci.upper).toBeGreaterThanOrEqual(0);
+  });
+
+  test('handles unequal group sizes', () => {
+    const baseline = [0.3, 0.4, 0.5].map((s) => makeResult({ score: s }));
+    const treatment = [0.7, 0.8, 0.9, 0.85, 0.75].map((s) => makeResult({ score: s }));
+    const ci = ciForDelta(baseline, treatment);
+
+    expect(ci.lower).toBeDefined();
+    expect(ci.upper).toBeDefined();
+    expect(ci.width).toBeGreaterThan(0);
+  });
+});
+
+// ── verdictFromDeltaCI ──────────────────────────────────────
+
+describe('verdictFromDeltaCI', () => {
+  test('IMPROVED when CI clearly above zero (k=5)', () => {
+    const baseline = [0.1, 0.2, 0.15, 0.1, 0.2].map((s) => makeResult({ score: s }));
+    const treatment = [0.9, 0.95, 0.85, 0.9, 0.95].map((s) => makeResult({ score: s }));
+
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe('IMPROVED');
+  });
+
+  test('INCONCLUSIVE when CI spans zero (k=5)', () => {
+    const baseline = [0.4, 0.5, 0.6, 0.5, 0.55].map((s) => makeResult({ score: s }));
+    const treatment = [0.5, 0.6, 0.55, 0.45, 0.6].map((s) => makeResult({ score: s }));
+
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe('INCONCLUSIVE');
+  });
+
+  test('REGRESSED when CI clearly below zero (k=5)', () => {
+    const baseline = [0.9, 0.95, 0.85, 0.9, 0.95].map((s) => makeResult({ score: s }));
+    const treatment = [0.1, 0.2, 0.15, 0.1, 0.2].map((s) => makeResult({ score: s }));
+
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe('REGRESSED');
+  });
+
+  test('falls back to magic thresholds for k < 5', () => {
+    const baseline = [makeResult({ score: 0.5 }), makeResult({ score: 0.5 })];
+    const treatment = [makeResult({ score: 0.7 }), makeResult({ score: 0.7 })];
+    // delta = 0.2, which is > 0.15 threshold
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe('IMPROVED');
+  });
+
+  test('falls back when only one group has < 5', () => {
+    const baseline = [0.5, 0.5, 0.5].map((s) => makeResult({ score: s }));
+    const treatment = [0.5, 0.5, 0.5, 0.5, 0.5].map((s) => makeResult({ score: s }));
+    // delta = 0, within fallback INCONCLUSIVE range
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe('INCONCLUSIVE');
+  });
+});
+
+// ── baselineVarianceWarning ──────────────────────────────────
+
+describe('baselineVarianceWarning', () => {
+  test('returns null for low variance baseline', () => {
+    const results = [0.8, 0.8, 0.8].map((s) => makeResult({ score: s }));
+    expect(baselineVarianceWarning(results)).toBeNull();
+  });
+
+  test('returns warning for high variance baseline', () => {
+    const results = [0.1, 0.9, 0.2, 0.8].map((s) => makeResult({ score: s }));
+    const warning = baselineVarianceWarning(results);
+    expect(warning).toContain('WARNING');
+    expect(warning).toContain('CV=');
+  });
+
+  test('returns null for single result', () => {
+    expect(baselineVarianceWarning([makeResult({ score: 0.5 })])).toBeNull();
+  });
+
+  test('returns null for near-zero mean', () => {
+    const results = [0, 0, 0].map((s) => makeResult({ score: s }));
+    expect(baselineVarianceWarning(results)).toBeNull();
+  });
+
+  test('respects custom threshold', () => {
+    const results = [0.5, 0.6, 0.7].map((s) => makeResult({ score: s }));
+    // Default CV_THRESHOLD=0.5: low CV → null
+    expect(baselineVarianceWarning(results)).toBeNull();
+    // Custom strict threshold: 0.1 → warning
+    expect(baselineVarianceWarning(results, 0.1)).toContain('WARNING');
+  });
+});
+
+// ── verdictFromCI ─────────────────────────────────────────────
+
+describe('verdictFromCI', () => {
+  test('SHIP when all trials score high', () => {
+    const results = [1.0, 1.0, 1.0, 1.0, 1.0].map((s) => makeResult({ score: s }));
+    expect(verdictFromCI(results)).toBe('SHIP');
+  });
+
+  test('BLOCKED for single trial', () => {
+    expect(verdictFromCI([makeResult({ score: 1.0 })])).toBe('BLOCKED');
+  });
+
+  test('BLOCKED for all-zero scores', () => {
+    const results = [0, 0, 0, 0, 0].map((s) => makeResult({ score: s, passed: false }));
+    expect(verdictFromCI(results)).toBe('BLOCKED');
+  });
+
+  test('NEEDS WORK for mixed results above 60% pass rate', () => {
+    const results = [1.0, 1.0, 1.0, 0.5, 0].map((s) => makeResult({ score: s, passed: s === 1.0 }));
+    // CI lower likely below 0.8 but pass rate is 60%
+    expect(verdictFromCI(results)).toBe('NEEDS WORK');
+  });
+
+  test('uses custom target', () => {
+    // With target=0.5, moderate scores should SHIP
+    const results = [0.6, 0.7, 0.65, 0.7, 0.6].map((s) => makeResult({ score: s }));
+    expect(verdictFromCI(results, 0.5)).toBe('SHIP');
+  });
+});
+
 // ── getVerdict ────────────────────────────────────────────────
 
 describe('getVerdict', () => {
@@ -335,5 +490,27 @@ describe('getVerdict', () => {
 
   test('BLOCKED for empty results', () => {
     expect(getVerdict([])).toBe('BLOCKED');
+  });
+
+  test('uses CI-based verdict when useCi is true and k >= 5', () => {
+    const results = [1.0, 1.0, 1.0, 1.0, 1.0].map((s) => makeResult({ score: s, passed: true }));
+    expect(getVerdict(results, { useCi: true })).toBe('SHIP');
+  });
+
+  test('falls back to rate-based when useCi true but k < 5', () => {
+    const results = [{ passed: true }, { passed: true }, { passed: true }];
+    expect(getVerdict(results, { useCi: true })).toBe('SHIP');
+  });
+
+  test('ignores useCi when not set (backward compatible)', () => {
+    const results = [
+      { passed: true },
+      { passed: true },
+      { passed: true },
+      { passed: true },
+      { passed: false },
+    ];
+    // Without useCi, uses rate-based: 80% = NEEDS WORK
+    expect(getVerdict(results)).toBe('NEEDS WORK');
   });
 });

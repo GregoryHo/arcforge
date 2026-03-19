@@ -150,7 +150,7 @@ Three grader types — choose based on the assertion's nature, not convenience:
 | Grader | Use When | Not For | How |
 |--------|----------|---------|-----|
 | **code** | Assertions have deterministic correct answers (file exists, test passes, value matches expected) | Quality or intent judgment — don't rewrite assertions into grep proxies to force code grading | Run test command, check exit code. `$TRIAL_DIR` env var available for checking trial artifacts. |
-| **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion 0.0-1.0. Trial directory artifacts automatically included. |
+| **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion using 3-tier scale: 0 (not met), 0.5 (partially met), 1.0 (fully met). Trial directory artifacts automatically included. |
 | **human** | Assertions involve audience-dependent experience, taste, or domain expertise that even LLMs assess unreliably (e.g., "feels intuitive", "tone matches brand") | Assessments an LLM can judge — save human bandwidth for what only humans can evaluate | Present output + checklist for review |
 
 Some behavioral qualities cannot be captured by deterministic tests alone. When evaluating methodology, reasoning quality, or communication clarity, model or human grading captures signal that code grading structurally cannot. Match the grader to the assertion — not the other way around.
@@ -162,15 +162,15 @@ Some behavioral qualities cannot be captured by deterministic tests alone. When 
 Results stored in `evals/results/` as JSONL (gitignored):
 
 ```json
-{"eval": "skill-tdd-compliance", "trial": 1, "k": 5, "passed": true, "grader": "model", "score": 0.85, "timestamp": "2026-03-17T10:00:00Z"}
+{"eval": "skill-tdd-compliance", "trial": 1, "k": 5, "passed": true, "grader": "model", "score": 1.0, "timestamp": "2026-03-17T10:00:00Z"}
 ```
 
 ### Step 6: Report
 
 | Verdict | Meaning | Threshold |
 |---------|---------|-----------|
-| **SHIP** | Consistently passes | pass rate = 100% |
-| **NEEDS WORK** | Flaky or partial | 60% ≤ pass rate < 100% |
+| **SHIP** | Consistently passes | Code-graded: pass rate = 100%. Model-graded: CI95 lower bound ≥ 0.8 (noise-tolerant) |
+| **NEEDS WORK** | Flaky or partial | 60% ≤ pass rate < SHIP threshold |
 | **BLOCKED** | Fundamental issues | pass rate < 60% |
 
 ## Metrics
@@ -180,6 +180,7 @@ Results stored in `evals/results/` as JSONL (gitignored):
 | `pass@k` | At least 1 success in k trials | Reliability — "does it ever work?" |
 | `pass^k` | All k trials succeed | Critical paths — "does it always work?" |
 | `delta` | Treatment score - Baseline score | Improvement — "is it better?" |
+| `delta CI` | 95% CI for delta (Welch's t-test) | When k ≥ 5: IMPROVED if lower > 0, REGRESSED if upper < 0 |
 | `CI95` | 95% confidence interval (t-distribution) | Only shown when k >= 5 — "how precise is the average?" |
 
 ### Default Trial Counts (scenario-driven)

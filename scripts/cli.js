@@ -341,19 +341,21 @@ async function main() {
           return scenario;
         };
 
-        const printAbSummary = (label, baseline, treatment, delta) => {
-          const bStats = eval_.statsFromResults(baseline);
-          const tStats = eval_.statsFromResults(treatment);
-          const showCI = eval_.shouldShowCI(baseline) && eval_.shouldShowCI(treatment);
-          const fmtStats = (results, s) => {
-            const base = `${results.length} trials, avg ${s.avg.toFixed(2)}`;
+        const printAbSummary = (label, opts) => {
+          const { baseline, treatment, delta, deltaCi, verdict } = opts;
+          const bStats = opts.bStats ?? eval_.statsFromResults(baseline);
+          const tStats = opts.tStats ?? eval_.statsFromResults(treatment);
+          const showCI = bStats.count >= 5 && tStats.count >= 5;
+          const fmtStats = (s) => {
+            const base = `${s.count} trials, avg ${s.avg.toFixed(2)}`;
             const ci = showCI ? ` [${s.ci95.lower}, ${s.ci95.upper}]` : '';
             return `${base}${ci}, pass ${(s.passRate * 100).toFixed(0)}%`;
           };
-          console.log(`${label}Baseline:  ${fmtStats(baseline, bStats)}`);
-          console.log(`${label}Treatment: ${fmtStats(treatment, tStats)}`);
-          console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}`);
-          console.log(`${label}Verdict:   ${eval_.verdictFromDelta(delta)}`);
+          console.log(`${label}Baseline:  ${fmtStats(bStats)}`);
+          console.log(`${label}Treatment: ${fmtStats(tStats)}`);
+          const ciStr = deltaCi && showCI ? ` CI[${deltaCi.lower}, ${deltaCi.upper}]` : '';
+          console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}${ciStr}`);
+          console.log(`${label}Verdict:   ${verdict}`);
           const warning = eval_.confidenceWarning(baseline) || eval_.confidenceWarning(treatment);
           if (warning) console.log(`${label}${warning}`);
         };
@@ -409,7 +411,8 @@ async function main() {
               since: args.options.since,
             })
             .slice(-k);
-          console.log(`Verdict: ${eval_.getVerdict(results)}`);
+          const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
+          console.log(`Verdict: ${eval_.getVerdict(results, verdictOpts)}`);
         } else if (subcommand === 'ab') {
           const scenario = requireScenario(args.positional[1], 'ab');
           const k = parseK(scenario, true);
@@ -448,7 +451,13 @@ async function main() {
             });
           }
 
-          printAbSummary('\n', result.baseline, result.treatment, result.delta);
+          printAbSummary('\n', {
+            baseline: result.baseline,
+            treatment: result.treatment,
+            delta: result.delta,
+            deltaCi: eval_.ciForDelta(result.baseline, result.treatment),
+            verdict: eval_.verdictFromDeltaCI(result.baseline, result.treatment),
+          });
         } else if (subcommand === 'compare') {
           const name = args.positional[1];
           if (!name) {
@@ -481,7 +490,16 @@ async function main() {
             treatment,
             projectRoot,
           );
-          printAbSummary('  ', baseline, treatment, comparison.delta);
+          printAbSummary('  ', {
+            baseline,
+            treatment,
+            delta: comparison.delta,
+            deltaCi: comparison.deltaCi,
+            verdict: comparison.verdict,
+            bStats: comparison.baseline,
+            tStats: comparison.treatment,
+          });
+          if (comparison.baselineWarning) console.log(`  ${comparison.baselineWarning}`);
           if (comparison.modelAnalysis) {
             console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
             console.log(`  Recommendation: ${comparison.modelAnalysis.recommendation || ''}`);
