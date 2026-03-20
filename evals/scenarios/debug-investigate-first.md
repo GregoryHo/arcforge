@@ -3,6 +3,9 @@
 ## Scope
 skill
 
+## Target
+skills/arc-debugging/SKILL.md
+
 ## Scenario
 A user reports this bug:
 

@@ -4,6 +4,9 @@
 
 skill
 
+## Target
+skills/arc-tdd/SKILL.md
+
 ## Scenario
 
 Implement a `calculateDiscount` function in `src/discount.js` that takes a price (number) and a customer type (string) and returns the discounted price:

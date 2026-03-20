@@ -110,19 +110,22 @@ function parseScenario(filePath) {
     .filter((line) => line.match(/^-\s*\[[ x]?\]/))
     .map((line) => line.replace(/^-\s*\[[ x]?\]\s*/, '').trim());
 
-  const trialsRaw = (sections.trials || []).join('\n').trim();
+  const section = (key) => (sections[key] || []).join('\n').trim();
+  const trialsRaw = section('trials');
   const trials = trialsRaw ? parseInt(trialsRaw, 10) : undefined;
-  const version = (sections.version || []).join('\n').trim();
+  const version = section('version');
+  const target = section('target');
 
   return {
     name,
-    scope: (sections.scope || []).join('\n').trim() || 'skill',
-    scenario: (sections.scenario || []).join('\n').trim(),
-    context: (sections.context || []).join('\n').trim(),
+    scope: section('scope') || 'skill',
+    scenario: section('scenario'),
+    context: section('context'),
     assertions,
-    grader: (sections.grader || []).join('\n').trim() || 'code',
-    graderConfig: (sections['grader config'] || []).join('\n').trim(),
-    setup: (sections.setup || []).join('\n').trim(),
+    grader: section('grader') || 'code',
+    graderConfig: section('grader config'),
+    setup: section('setup'),
+    ...(target ? { target } : {}),
     ...(trials && !Number.isNaN(trials) ? { trials } : {}),
     ...(version ? { version } : {}),
   };
@@ -699,12 +702,14 @@ function generateBenchmark(projectRoot) {
 
   for (const file of scenarioFiles) {
     const scenario = parseScenario(file);
-    // For A/B scopes (skill/workflow), results are stored with -treatment suffix
+    // For A/B scopes (skill/workflow), prefer treatment results from A/B runs.
+    // Fall back to plain name for single-condition runs (eval run, not eval ab).
     const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
-    const resultsName = isAb ? `${scenario.name}-treatment` : scenario.name;
-    const results = loadResults(resultsName, projectRoot, {
-      version: scenario.version,
-    });
+    const filterOpts = { version: scenario.version };
+    let results = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
+    if (results.length === 0) {
+      results = loadResults(scenario.name, projectRoot, filterOpts);
+    }
 
     if (results.length === 0) continue;
 

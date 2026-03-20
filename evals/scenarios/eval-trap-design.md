@@ -3,6 +3,9 @@
 ## Scope
 skill
 
+## Target
+skills/arc-evaluating/SKILL.md
+
 ## Scenario
 Here is a skill that teaches AI agents to follow a specific code review methodology:
 

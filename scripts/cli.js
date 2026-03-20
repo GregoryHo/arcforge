@@ -447,12 +447,19 @@ async function main() {
               runId,
             });
           } else {
-            const skillFile = args.options['skill-file'];
+            const skillFile = args.options['skill-file'] || scenario.target;
             if (!skillFile) {
-              console.error('Error: eval ab for skill scope requires --skill-file <path>');
+              console.error(
+                'Error: eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
+              );
               process.exit(1);
             }
-            const skillInstruction = fs.readFileSync(path.resolve(skillFile), 'utf8');
+            const resolvedSkillFile = path.resolve(skillFile);
+            if (!fs.existsSync(resolvedSkillFile)) {
+              console.error(`Error: skill file not found: ${skillFile}`);
+              process.exit(1);
+            }
+            const skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
             console.log(
               `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
             );

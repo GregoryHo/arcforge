@@ -238,6 +238,29 @@ Do something.
 
       expect(scenario.version).toBeUndefined();
     });
+
+    it('should extract target section', () => {
+      const content = `# Eval: with-target
+## Scope
+skill
+## Target
+skills/arc-tdd/SKILL.md
+## Scenario
+Do something.
+`;
+      const filePath = writeScenario(tempDir, 'with-target.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.target).toBe('skills/arc-tdd/SKILL.md');
+    });
+
+    it('should default target to undefined when missing', () => {
+      const content = '# Eval: no-target\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'no-target.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.target).toBeUndefined();
+    });
   });
 
   // ── parseStreamJsonOutput ────────────────────────────────────

@@ -3,6 +3,9 @@
 ## Scope
 skill
 
+## Target
+skills/arc-debugging/SKILL.md
+
 ## Scenario
 You are debugging a flaky integration test. Here is what has happened so far:
 

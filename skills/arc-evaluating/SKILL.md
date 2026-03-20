@@ -100,6 +100,12 @@ Create a scenario file in `evals/scenarios/`:
 ## Scope
 [skill | agent | workflow]
 
+## Target
+[What this eval tests. Meaning varies by scope:]
+[  skill: path to skill file (e.g., skills/arc-tdd/SKILL.md) — used as default --skill-file]
+[  agent: path to agent definition (e.g., agents/eval-grader.md) — documentation]
+[  workflow: description of the toolkit/pipeline being tested — documentation]
+
 ## Scenario
 [The task or prompt to give the agent]
 
