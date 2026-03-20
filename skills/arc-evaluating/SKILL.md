@@ -264,10 +264,15 @@ Override with `## Trials` in the scenario file, or `--k` on the CLI.
 
 ```
 evals/
-├── scenarios/           # Eval definitions (version controlled)
-├── results/             # Run results (JSONL, gitignored)
-│   └── transcripts/     # Full trial outputs
-└── benchmarks/          # Aggregated benchmarks (JSON, version controlled)
+├── scenarios/                    # Eval definitions (version controlled)
+├── results/                      # Run results (gitignored)
+│   └── <scenarioName>/           # Grouped by scenario
+│       └── <runId>/              # Grouped by run (YYYYMMDD-HHmmss)
+│           ├── results.jsonl     # Single-run trials
+│           ├── baseline.jsonl    # A/B baseline trials
+│           ├── treatment.jsonl   # A/B treatment trials
+│           └── transcripts/      # Full trial outputs
+└── benchmarks/                   # Aggregated benchmarks (JSON, version controlled)
     └── latest.json
 ```
 
@@ -324,16 +329,21 @@ evals/
 arc eval list                                          # List all scenarios
 arc eval run <name>                                    # Run trials (k auto-determined by scope+grader)
 arc eval run <name> --k 5                              # Override default k
+arc eval run <name> --model sonnet                     # Run with specific model
 arc eval ab <skill-scenario> --skill-file path         # Skill A/B (varies prompt)
 arc eval ab <workflow-scenario> --interleave            # Workflow A/B (varies environment)
+arc eval ab <name> --skill-file path --model opus      # A/B with specific model
 arc eval compare <name>                                # Compare saved A/B results (routes by grader type)
 arc eval compare <name> --since 2026-03-18             # Compare only results after a date
+arc eval compare <name> --model sonnet                 # Compare filtered by model
 arc eval report [name]                                 # Generate benchmark report
+arc eval report [name] --model opus                    # Report filtered by model
 arc eval history                                       # List benchmark snapshots
 ```
 
 - k is auto-determined from scope + grader type (see default trial counts above). Use `--k` to override.
 - `--since` filters results by date — useful after scenario changes to exclude old data.
+- `--model` specifies which LLM to use for trial execution (not grading). Results are tagged with the model for later filtering and cross-model comparison.
 - For skill scope, `--skill-file` is required. For workflow scope, it is not needed.
 - `eval compare` auto-routes: code-graded → programmatic delta, model-graded → eval-comparator agent analysis.
 

@@ -351,6 +351,17 @@ function getTimestamp() {
 }
 
 /**
+ * Generate a compact, filesystem-safe run identifier.
+ * Format: YYYYMMDD-HHmmss (sortable, unique per second).
+ * Used to group eval trials from the same CLI invocation.
+ * @returns {string} Run ID (e.g., '20260320-143022')
+ */
+function generateRunId() {
+  const iso = getTimestamp();
+  return `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 19).replace(/:/g, '')}`;
+}
+
+/**
  * Get Claude sessions directory (~/.claude/sessions/)
  */
 function getSessionsDir() {
@@ -559,6 +570,7 @@ module.exports = {
   getProjectName,
   getDateString,
   getTimestamp,
+  generateRunId,
   getSessionsDir,
   getProjectSessionsDir,
   getSessionDir,

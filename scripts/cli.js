@@ -16,10 +16,10 @@
  *   schema [--json] [--example]     Show dag.yaml schema
  *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
  *   eval list                        List eval scenarios
- *   eval run <name> [--k N]          Run eval scenario with k trials
- *   eval report [name]               Show eval benchmark report
- *   eval ab <name> [--skill-file <path>] [--k N] [--interleave]  A/B eval (skill or workflow)
- *   eval compare <name>              Compare A/B results
+ *   eval run <name> [--k N] [--model <name>]  Run eval scenario with k trials
+ *   eval report [name] [--model <name>]       Show eval benchmark report
+ *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave]  A/B eval
+ *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
  */
 
@@ -315,7 +315,10 @@ async function main() {
 
       case 'eval': {
         const eval_ = require('./lib/eval');
+        const { generateRunId } = require('./lib/utils');
         const subcommand = args.positional[0];
+        const model = args.options.model;
+        const runId = generateRunId();
         const parseK = (scenario, isAb = false) =>
           args.options.k ? parseInt(args.options.k, 10) : eval_.defaultK(scenario || {}, isAb);
         const formatStatus = (g) => {
@@ -383,7 +386,8 @@ async function main() {
         } else if (subcommand === 'run') {
           const scenario = requireScenario(args.positional[1], 'run');
           const k = parseK(scenario, false);
-          console.log(`Running ${scenario.name} (k=${k})...`);
+          const modelLabel = model ? ` [model: ${model}]` : '';
+          console.log(`Running ${scenario.name} (k=${k})${modelLabel}...`);
 
           let rl;
           try {
@@ -394,7 +398,7 @@ async function main() {
 
             for (let t = 1; t <= k; t++) {
               process.stdout.write(`  Trial ${t}/${k}: `);
-              const result = eval_.runTrial(scenario, t, k, { projectRoot });
+              const result = eval_.runTrial(scenario, t, k, { projectRoot, model, runId });
               let graded = eval_.gradeTrialResult(result, scenario, projectRoot);
 
               if (graded.grader === 'human-pending') {
@@ -439,6 +443,8 @@ async function main() {
               projectRoot,
               interleave,
               onTrialComplete,
+              model,
+              runId,
             });
           } else {
             const skillFile = args.options['skill-file'];
@@ -456,6 +462,8 @@ async function main() {
               skillInstruction,
               interleave,
               onTrialComplete,
+              model,
+              runId,
             });
           }
 
@@ -477,6 +485,7 @@ async function main() {
           const filterOpts = {
             version: scenario?.version,
             since: args.options.since,
+            ...(model ? { model } : {}),
           };
           const baseline = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
           const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
@@ -528,6 +537,12 @@ async function main() {
                 console.log(
                   `  ${evalName}: ${(data.pass_rate * 100).toFixed(0)}% (${data.trials} trials) — ${verdict}`,
                 );
+                if (data.by_model) {
+                  const parts = Object.entries(data.by_model).map(
+                    ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,
+                  );
+                  console.log(`    ${parts.join(' | ')}`);
+                }
               }
             }
           }

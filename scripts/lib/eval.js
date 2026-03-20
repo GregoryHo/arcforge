@@ -10,7 +10,13 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
+const {
+  execCommand,
+  ensureDir,
+  getTimestamp,
+  sanitizeFilename,
+  generateRunId,
+} = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
 
@@ -49,6 +55,30 @@ const EVALS_DIR = 'evals';
 const SCENARIOS_DIR = path.join(EVALS_DIR, 'scenarios');
 const RESULTS_DIR = path.join(EVALS_DIR, 'results');
 const BENCHMARKS_DIR = path.join(EVALS_DIR, 'benchmarks');
+
+/**
+ * Extract compact YYYYMMDD date from an ISO timestamp.
+ * Used as fallback directory name when runId is not provided.
+ * @param {string} [isoTimestamp] - ISO timestamp (defaults to now)
+ * @returns {string} Compact date (e.g., '20260320')
+ */
+function compactDate(isoTimestamp) {
+  return (isoTimestamp || getTimestamp()).slice(0, 10).replace(/-/g, '');
+}
+
+/**
+ * Parse an eval name into scenario name and condition.
+ * Used by appendResult, saveTranscript, and loadResults to derive storage paths.
+ * @param {string} evalName - Eval name (may include -baseline or -treatment suffix)
+ * @returns {{ scenarioName: string, condition: string }}
+ */
+function parseEvalName(evalName) {
+  const isBaseline = evalName.endsWith('-baseline');
+  const isTreatment = evalName.endsWith('-treatment');
+  const condition = isBaseline ? 'baseline' : isTreatment ? 'treatment' : 'results';
+  const scenarioName = sanitizeFilename(evalName.replace(/-(baseline|treatment)$/, ''));
+  return { scenarioName, condition };
+}
 
 /**
  * Parse an eval scenario from a markdown file
@@ -297,7 +327,14 @@ function summarizeToolInput(toolName, input) {
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
-  const { projectRoot = process.cwd(), label, isolationSettings, isolated = true } = options;
+  const {
+    projectRoot = process.cwd(),
+    label,
+    isolationSettings,
+    isolated = true,
+    model,
+    runId,
+  } = options;
   const timestamp = getTimestamp();
 
   // Always run in trial dir for workspace safety
@@ -316,6 +353,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     '--disable-slash-commands',
   ];
   if (isolated) claudeArgs.push('--strict-mcp-config');
+  if (model) claudeArgs.push('--model', model);
 
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
@@ -328,7 +366,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const { textResult, richTranscript } = parseStreamJsonOutput(rawOutput);
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
-  const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot);
+  const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
 
   const base = {
     eval: evalName,
@@ -340,6 +378,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     timestamp,
     transcript,
     trialDir,
+    ...(model ? { model } : {}),
+    ...(runId ? { runId } : {}),
   };
   if (result.exitCode !== 0) {
     return { ...base, error: result.stderr };
@@ -366,10 +406,13 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
  * @param {string} projectRoot - Project root directory
  * @returns {string} Path to transcript file
  */
-function saveTranscript(evalName, trialNumber, output, projectRoot) {
-  const transcriptsPath = path.join(projectRoot, RESULTS_DIR, 'transcripts');
+function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
+  const { scenarioName, condition } = parseEvalName(evalName);
+  const prefix = runId || compactDate();
+  const transcriptsPath = path.join(projectRoot, RESULTS_DIR, scenarioName, prefix, 'transcripts');
   ensureDir(transcriptsPath);
-  const fileName = `${sanitizeFilename(evalName)}-trial-${trialNumber}.txt`;
+  const fileName =
+    condition === 'results' ? `trial-${trialNumber}.txt` : `${condition}-trial-${trialNumber}.txt`;
   const filePath = path.join(transcriptsPath, fileName);
   fs.writeFileSync(filePath, output);
   return filePath;
@@ -386,12 +429,14 @@ function saveTranscript(evalName, trialNumber, output, projectRoot) {
  * @returns {TrialResult} Graded result
  */
 function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
-  const { projectRoot, label, onTrialComplete, isolationSettings, isolated } = opts;
+  const { projectRoot, label, onTrialComplete, isolationSettings, isolated, model, runId } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
     projectRoot,
     label,
     isolationSettings,
     isolated,
+    model,
+    runId,
   });
   try {
     const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
@@ -456,6 +501,8 @@ function runSkillEval(scenario, k, options = {}) {
     skillInstruction,
     onTrialComplete,
     interleave = false,
+    model,
+    runId,
   } = options;
   const isolationSettings = buildIsolationSettings();
 
@@ -464,8 +511,22 @@ function runSkillEval(scenario, k, options = {}) {
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
   };
 
-  const bOpts = { projectRoot, label: 'baseline', onTrialComplete, isolationSettings };
-  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolationSettings };
+  const bOpts = {
+    projectRoot,
+    label: 'baseline',
+    onTrialComplete,
+    isolationSettings,
+    model,
+    runId,
+  };
+  const tOpts = {
+    projectRoot,
+    label: 'treatment',
+    onTrialComplete,
+    isolationSettings,
+    model,
+    runId,
+  };
   return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);
 }
 
@@ -482,7 +543,13 @@ function runSkillEval(scenario, k, options = {}) {
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
 function runWorkflowEval(scenario, k, options = {}) {
-  const { projectRoot = process.cwd(), onTrialComplete, interleave = false } = options;
+  const {
+    projectRoot = process.cwd(),
+    onTrialComplete,
+    interleave = false,
+    model,
+    runId,
+  } = options;
   const isolationSettings = buildIsolationSettings();
 
   const bOpts = {
@@ -491,8 +558,10 @@ function runWorkflowEval(scenario, k, options = {}) {
     onTrialComplete,
     isolationSettings,
     isolated: true,
+    model,
+    runId,
   };
-  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolated: false };
+  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolated: false, model, runId };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }
 
@@ -523,7 +592,6 @@ function buildTrialPrompt(scenario) {
  */
 function appendResult(result, projectRoot) {
   const resultsPath = path.join(projectRoot, RESULTS_DIR);
-  ensureDir(resultsPath);
 
   // Truncate output for storage only (grading already used full output)
   const maxStorageLen = 50000;
@@ -532,9 +600,11 @@ function appendResult(result, projectRoot) {
       ? { ...result, output: `${result.output.slice(0, maxStorageLen)}\n[truncated for storage]` }
       : result;
 
-  const dateStr = storable.timestamp.split('T')[0];
-  const fileName = `${dateStr}-${sanitizeFilename(storable.eval)}.jsonl`;
-  const filePath = path.join(resultsPath, fileName);
+  const { scenarioName, condition } = parseEvalName(storable.eval);
+  const runId = storable.runId || compactDate(storable.timestamp);
+  const runDir = path.join(resultsPath, scenarioName, runId);
+  ensureDir(runDir);
+  const filePath = path.join(runDir, `${condition}.jsonl`);
 
   fs.appendFileSync(filePath, `${JSON.stringify(storable)}\n`);
 }
@@ -556,29 +626,64 @@ function loadResults(evalName, projectRoot, options = {}) {
   }
 
   const results = [];
-  const suffix = `-${evalName}.jsonl`;
-  const sinceDate = options.since ? options.since.slice(0, 10) : undefined;
-  const files = fs.readdirSync(resultsPath).filter((f) => {
-    if (!f.endsWith(suffix)) return false;
-    const prefix = f.slice(0, f.length - suffix.length);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(prefix)) return false;
-    // Skip files whose date is entirely before the since filter
-    if (sinceDate && prefix < sinceDate) return false;
-    return true;
-  });
+  const { scenarioName, condition } = parseEvalName(evalName);
+  const sinceCompact = options.since ? options.since.slice(0, 10).replace(/-/g, '') : undefined;
 
-  for (const file of files) {
-    const content = fs.readFileSync(path.join(resultsPath, file), 'utf8');
-    const lines = content.split('\n').filter((l) => l.trim());
-    for (const line of lines) {
-      results.push(JSON.parse(line));
+  // ── 1. Hierarchical: results/{scenarioName}/*/{condition}.jsonl ──
+  const scenarioDir = path.join(resultsPath, scenarioName);
+  let foundHierarchical = false;
+  if (fs.existsSync(scenarioDir) && fs.statSync(scenarioDir).isDirectory()) {
+    foundHierarchical = true;
+    const entries = fs.readdirSync(scenarioDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === 'transcripts') continue;
+      // Date filter on runId prefix (first 8 chars = YYYYMMDD)
+      if (sinceCompact && entry.name.slice(0, 8) < sinceCompact) continue;
+
+      const jsonlPath = path.join(scenarioDir, entry.name, `${condition}.jsonl`);
+      if (!fs.existsSync(jsonlPath)) continue;
+
+      const content = fs.readFileSync(jsonlPath, 'utf8');
+      for (const line of content.split('\n').filter((l) => l.trim())) {
+        try {
+          results.push(JSON.parse(line));
+        } catch {
+          /* skip malformed lines */
+        }
+      }
     }
   }
 
-  if (!options.version && !options.since) return results;
+  // ── 2. Legacy flat: results/{date}-{evalName}.jsonl ──
+  if (!foundHierarchical) {
+    const suffix = `-${evalName}.jsonl`;
+    const sinceDate = options.since ? options.since.slice(0, 10) : undefined;
+    const files = fs.readdirSync(resultsPath).filter((f) => {
+      if (!f.endsWith(suffix)) return false;
+      const prefix = f.slice(0, f.length - suffix.length);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(prefix)) return false;
+      if (sinceDate && prefix < sinceDate) return false;
+      return true;
+    });
+
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(resultsPath, file), 'utf8');
+      for (const line of content.split('\n').filter((l) => l.trim())) {
+        try {
+          results.push(JSON.parse(line));
+        } catch {
+          /* skip malformed lines */
+        }
+      }
+    }
+  }
+
+  // ── 3. Apply filters ──
+  if (!options.version && !options.since && !options.model) return results;
   return results.filter((r) => {
     if (options.version && (r.version || '1') !== options.version) return false;
     if (options.since && r.timestamp < options.since) return false;
+    if (options.model && r.model !== options.model) return false;
     return true;
   });
 }
@@ -605,6 +710,25 @@ function generateBenchmark(projectRoot) {
 
     const s = stats.statsFromResults(results);
     const warning = stats.confidenceWarning(results);
+
+    // Group by model for per-model breakdown
+    const modelGroups = {};
+    for (const r of results) {
+      if (!r.model) continue;
+      if (!modelGroups[r.model]) modelGroups[r.model] = [];
+      modelGroups[r.model].push(r);
+    }
+    const byModel = {};
+    for (const [m, modelResults] of Object.entries(modelGroups)) {
+      const ms = stats.statsFromResults(modelResults);
+      byModel[m] = {
+        trials: ms.count,
+        pass_rate: ms.passRate,
+        avg_score: ms.avg,
+        last_run: modelResults[modelResults.length - 1].timestamp,
+      };
+    }
+
     benchmarks[scenario.name] = {
       scope: scenario.scope,
       trials: s.count,
@@ -616,6 +740,7 @@ function generateBenchmark(projectRoot) {
       pass_all_k: stats.passAllK(results),
       last_run: results[results.length - 1].timestamp,
       ...(warning ? { warning } : {}),
+      ...(Object.keys(byModel).length > 0 ? { by_model: byModel } : {}),
     };
   }
 
@@ -698,6 +823,7 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
 
 module.exports = {
   // Orchestration
+  parseEvalName,
   parseScenario,
   listScenarios,
   createTrialDir,

@@ -12,6 +12,7 @@ jest.mock('../../scripts/lib/utils', () => {
 const mockUtils = require('../../scripts/lib/utils');
 
 const {
+  parseEvalName,
   parseScenario,
   buildTrialPrompt,
   listScenarios,
@@ -95,6 +96,34 @@ describe('eval.js', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // ── parseEvalName ───────────────────────────────────────────
+
+  describe('parseEvalName', () => {
+    it('should parse baseline condition', () => {
+      const { scenarioName, condition } = parseEvalName('my-eval-baseline');
+      expect(scenarioName).toBe('my-eval');
+      expect(condition).toBe('baseline');
+    });
+
+    it('should parse treatment condition', () => {
+      const { scenarioName, condition } = parseEvalName('my-eval-treatment');
+      expect(scenarioName).toBe('my-eval');
+      expect(condition).toBe('treatment');
+    });
+
+    it('should default to results for single runs', () => {
+      const { scenarioName, condition } = parseEvalName('my-eval');
+      expect(scenarioName).toBe('my-eval');
+      expect(condition).toBe('results');
+    });
+
+    it('should not strip -baseline from middle of name', () => {
+      const { scenarioName, condition } = parseEvalName('baseline-eval');
+      expect(scenarioName).toBe('baseline-eval');
+      expect(condition).toBe('results');
+    });
   });
 
   // ── parseScenario ────────────────────────────────────────────
@@ -457,13 +486,39 @@ Do something.
       expect(fs.existsSync(resultsDir)).toBe(true);
     });
 
-    it('should name file using date and eval name', () => {
+    it('should create hierarchical directory structure', () => {
       appendResult(makeResult({ timestamp: '2026-03-17T10:00:00Z' }), tempDir);
 
-      const resultsDir = path.join(tempDir, RESULTS_DIR);
-      const files = fs.readdirSync(resultsDir);
+      const scenarioDir = path.join(tempDir, RESULTS_DIR, 'test-eval');
+      expect(fs.existsSync(scenarioDir)).toBe(true);
+      // Without runId, falls back to compact date (YYYYMMDD) as dir name
+      const runDir = path.join(scenarioDir, '20260317');
+      expect(fs.existsSync(runDir)).toBe(true);
+      const files = fs.readdirSync(runDir);
       expect(files).toHaveLength(1);
-      expect(files[0]).toBe('2026-03-17-test-eval.jsonl');
+      expect(files[0]).toBe('results.jsonl');
+    });
+
+    it('should use runId as directory when provided', () => {
+      appendResult(makeResult({ runId: '20260317-100000' }), tempDir);
+
+      const jsonlPath = path.join(
+        tempDir,
+        RESULTS_DIR,
+        'test-eval',
+        '20260317-100000',
+        'results.jsonl',
+      );
+      expect(fs.existsSync(jsonlPath)).toBe(true);
+    });
+
+    it('should store A/B results as baseline.jsonl and treatment.jsonl', () => {
+      appendResult(makeResult({ eval: 'my-ab-baseline', runId: '20260317-100000' }), tempDir);
+      appendResult(makeResult({ eval: 'my-ab-treatment', runId: '20260317-100000' }), tempDir);
+
+      const runDir = path.join(tempDir, RESULTS_DIR, 'my-ab', '20260317-100000');
+      expect(fs.existsSync(path.join(runDir, 'baseline.jsonl'))).toBe(true);
+      expect(fs.existsSync(path.join(runDir, 'treatment.jsonl'))).toBe(true);
     });
 
     it('should filter by version', () => {
@@ -500,6 +555,50 @@ Do something.
 
       const all = loadResults('test-eval', tempDir);
       expect(all).toHaveLength(2);
+    });
+
+    it('should filter by model', () => {
+      appendResult(makeResult({ trial: 1, model: 'sonnet' }), tempDir);
+      appendResult(makeResult({ trial: 2, model: 'opus' }), tempDir);
+      appendResult(makeResult({ trial: 3, model: 'sonnet' }), tempDir);
+
+      const sonnet = loadResults('test-eval', tempDir, { model: 'sonnet' });
+      expect(sonnet).toHaveLength(2);
+      expect(sonnet.every((r) => r.model === 'sonnet')).toBe(true);
+    });
+
+    it('should read from legacy flat files when no scenario dir exists', () => {
+      // Manually write a legacy flat file
+      const resultsDir = path.join(tempDir, RESULTS_DIR);
+      fs.mkdirSync(resultsDir, { recursive: true });
+      const legacy = makeResult({ passed: true, score: 1.0 });
+      fs.writeFileSync(
+        path.join(resultsDir, '2026-03-17-test-eval.jsonl'),
+        `${JSON.stringify(legacy)}\n`,
+      );
+
+      const loaded = loadResults('test-eval', tempDir);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].passed).toBe(true);
+    });
+
+    it('should load A/B results from hierarchical condition files', () => {
+      appendResult(
+        makeResult({ eval: 'ab-test-baseline', runId: '20260317-100000', score: 0.3 }),
+        tempDir,
+      );
+      appendResult(
+        makeResult({ eval: 'ab-test-treatment', runId: '20260317-100000', score: 0.9 }),
+        tempDir,
+      );
+
+      const baseline = loadResults('ab-test-baseline', tempDir);
+      expect(baseline).toHaveLength(1);
+      expect(baseline[0].score).toBe(0.3);
+
+      const treatment = loadResults('ab-test-treatment', tempDir);
+      expect(treatment).toHaveLength(1);
+      expect(treatment[0].score).toBe(0.9);
     });
   });
 
@@ -673,6 +772,70 @@ Do something.
         fs.readFileSync(path.join(tempDir, BENCHMARKS_DIR, 'latest.json'), 'utf8'),
       );
       expect(snapshot).toEqual(latest);
+    });
+
+    it('should include by_model breakdown when results have model field', () => {
+      writeScenario(
+        tempDir,
+        'model-eval.md',
+        '# Eval: model-eval\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+
+      // Use appendResult to write in new hierarchical format
+      appendResult(
+        makeResult({
+          eval: 'model-eval',
+          trial: 1,
+          passed: true,
+          score: 1.0,
+          model: 'sonnet',
+          runId: '20260317-100000',
+        }),
+        tempDir,
+      );
+      appendResult(
+        makeResult({
+          eval: 'model-eval',
+          trial: 2,
+          passed: false,
+          score: 0.5,
+          model: 'opus',
+          runId: '20260317-100000',
+        }),
+        tempDir,
+      );
+
+      const benchmark = generateBenchmark(tempDir);
+      const data = benchmark.evals['model-eval'];
+      expect(data).toBeDefined();
+      expect(data.trials).toBe(2);
+      expect(data.by_model).toBeDefined();
+      expect(data.by_model.sonnet.trials).toBe(1);
+      expect(data.by_model.sonnet.pass_rate).toBe(1.0);
+      expect(data.by_model.opus.trials).toBe(1);
+      expect(data.by_model.opus.pass_rate).toBe(0);
+    });
+
+    it('should not include by_model when no model field in results', () => {
+      writeScenario(
+        tempDir,
+        'no-model.md',
+        '# Eval: no-model\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+
+      appendResult(
+        makeResult({
+          eval: 'no-model',
+          trial: 1,
+          passed: true,
+          score: 1.0,
+          runId: '20260317-100000',
+        }),
+        tempDir,
+      );
+
+      const benchmark = generateBenchmark(tempDir);
+      expect(benchmark.evals['no-model'].by_model).toBeUndefined();
     });
   });
 
@@ -1127,18 +1290,45 @@ Do something.
   // ── saveTranscript ────────────────────────────────────────────
 
   describe('saveTranscript', () => {
-    it('should save output to transcript file and return path', () => {
-      const filePath = saveTranscript('my-eval', 1, 'full output text', tempDir);
+    it('should save output to transcript file in hierarchical path', () => {
+      const filePath = saveTranscript('my-eval', 1, 'full output text', tempDir, '20260317-100000');
 
       expect(fs.existsSync(filePath)).toBe(true);
       expect(fs.readFileSync(filePath, 'utf8')).toBe('full output text');
-      expect(filePath).toContain('my-eval-trial-1.txt');
+      expect(filePath).toContain('trial-1.txt');
+      expect(filePath).toContain(path.join('my-eval', '20260317-100000', 'transcripts'));
     });
 
-    it('should create transcripts subdirectory', () => {
-      saveTranscript('test', 2, 'output', tempDir);
-      const transcriptsDir = path.join(tempDir, RESULTS_DIR, 'transcripts');
+    it('should create transcripts subdirectory under scenario/runId', () => {
+      saveTranscript('test', 2, 'output', tempDir, '20260317-100000');
+      const transcriptsDir = path.join(
+        tempDir,
+        RESULTS_DIR,
+        'test',
+        '20260317-100000',
+        'transcripts',
+      );
       expect(fs.existsSync(transcriptsDir)).toBe(true);
+    });
+
+    it('should use condition prefix for A/B transcripts', () => {
+      const filePath = saveTranscript(
+        'my-ab-baseline',
+        1,
+        'baseline output',
+        tempDir,
+        '20260317-100000',
+      );
+      expect(filePath).toContain('baseline-trial-1.txt');
+      expect(filePath).toContain(path.join('my-ab', '20260317-100000', 'transcripts'));
+    });
+
+    it('should fall back to compact date when no runId', () => {
+      const filePath = saveTranscript('test', 1, 'output', tempDir);
+      expect(fs.existsSync(filePath)).toBe(true);
+      // Falls back to YYYYMMDD format
+      expect(filePath).toContain(path.join('test'));
+      expect(filePath).toContain('transcripts');
     });
   });
 
