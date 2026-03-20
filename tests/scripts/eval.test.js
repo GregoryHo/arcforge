@@ -28,6 +28,7 @@ const {
   gradeTrialResult,
   saveTranscript,
   captureTrialArtifacts,
+  parseStreamJsonOutput,
   runSkillEval,
   snapScore,
   validateGraderResponse,
@@ -209,10 +210,111 @@ Do something.
     });
   });
 
+  // ── parseStreamJsonOutput ────────────────────────────────────
+
+  describe('parseStreamJsonOutput', () => {
+    it('should return empty strings for empty input', () => {
+      const result = parseStreamJsonOutput('');
+      expect(result).toEqual({ textResult: '', richTranscript: '' });
+    });
+
+    it('should return empty strings for null/undefined', () => {
+      expect(parseStreamJsonOutput(null)).toEqual({ textResult: '', richTranscript: '' });
+      expect(parseStreamJsonOutput(undefined)).toEqual({ textResult: '', richTranscript: '' });
+    });
+
+    it('should extract text from assistant messages', () => {
+      const input = JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Hello world' }] },
+      });
+      const { richTranscript } = parseStreamJsonOutput(input);
+      expect(richTranscript).toContain('[Assistant] Hello world');
+    });
+
+    it('should extract tool use from assistant messages', () => {
+      const input = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls -la' } }],
+        },
+      });
+      const { richTranscript } = parseStreamJsonOutput(input);
+      expect(richTranscript).toContain('[Tool: Bash] $ ls -la');
+    });
+
+    it('should extract textResult from result event', () => {
+      const input = JSON.stringify({ type: 'result', result: 'Final answer' });
+      const { textResult } = parseStreamJsonOutput(input);
+      expect(textResult).toBe('Final answer');
+    });
+
+    it('should skip malformed JSON lines', () => {
+      const lines = [
+        'not json at all',
+        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'OK' }] } }),
+        '{ broken',
+      ].join('\n');
+      const { richTranscript } = parseStreamJsonOutput(lines);
+      expect(richTranscript).toContain('[Assistant] OK');
+    });
+
+    it('should skip system and other non-assistant events', () => {
+      const lines = [
+        JSON.stringify({ type: 'system', subtype: 'init' }),
+        JSON.stringify({ type: 'rate_limit_event' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Real content' }] },
+        }),
+      ].join('\n');
+      const { richTranscript } = parseStreamJsonOutput(lines);
+      expect(richTranscript).toBe('[Assistant] Real content');
+    });
+
+    it('should handle Write tool with truncation', () => {
+      const longContent = 'x'.repeat(600);
+      const input = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Write',
+              input: { file_path: '/tmp/f.js', content: longContent },
+            },
+          ],
+        },
+      });
+      const { richTranscript } = parseStreamJsonOutput(input);
+      expect(richTranscript).toContain('/tmp/f.js');
+      expect(richTranscript).toContain('...(truncated)');
+    });
+
+    it('should handle Edit tool summary', () => {
+      const input = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Edit',
+              input: { file_path: '/tmp/f.js', old_string: 'old', new_string: 'new' },
+            },
+          ],
+        },
+      });
+      const { richTranscript } = parseStreamJsonOutput(input);
+      expect(richTranscript).toContain('[Tool: Edit]');
+      expect(richTranscript).toContain('replace "old"');
+      expect(richTranscript).toContain('"new"');
+    });
+  });
+
   // ── buildTrialPrompt ─────────────────────────────────────────
 
   describe('buildTrialPrompt', () => {
-    it('should include all sections when present', () => {
+    it('should include context and task but not assertions', () => {
       const scenario = {
         context: 'Project uses Jest.',
         scenario: 'Write a function.',
@@ -224,9 +326,9 @@ Do something.
       expect(prompt).toContain('Project uses Jest.');
       expect(prompt).toContain('## Task');
       expect(prompt).toContain('Write a function.');
-      expect(prompt).toContain('## Requirements');
-      expect(prompt).toContain('- Tests pass');
-      expect(prompt).toContain('- Code compiles');
+      // Assertions are grading criteria, not agent requirements
+      expect(prompt).not.toContain('## Requirements');
+      expect(prompt).not.toContain('Tests pass');
     });
 
     it('should omit context when empty', () => {
@@ -235,26 +337,6 @@ Do something.
 
       expect(prompt).not.toContain('## Context');
       expect(prompt).toContain('## Task');
-    });
-
-    it('should omit requirements when no assertions', () => {
-      const scenario = { context: 'Some context.', scenario: 'Do something.', assertions: [] };
-      const prompt = buildTrialPrompt(scenario);
-
-      expect(prompt).not.toContain('## Requirements');
-    });
-
-    it('should list all assertions as requirements', () => {
-      const scenario = {
-        context: '',
-        scenario: 'Task.',
-        assertions: ['A', 'B', 'C'],
-      };
-      const prompt = buildTrialPrompt(scenario);
-      const lines = prompt.split('\n');
-      const reqLines = lines.filter((l) => l.startsWith('- '));
-
-      expect(reqLines).toHaveLength(3);
     });
   });
 
@@ -498,7 +580,11 @@ Do something.
 
   describe('generateBenchmark', () => {
     it('should generate benchmark from scenarios and results', () => {
-      writeScenario(tempDir, 'my-eval.md', '# Eval: my-eval\n\n## Scenario\nTest.\n');
+      writeScenario(
+        tempDir,
+        'my-eval.md',
+        '# Eval: my-eval\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
 
       const resultsDir = path.join(tempDir, RESULTS_DIR);
       fs.mkdirSync(resultsDir, { recursive: true });
@@ -821,7 +907,7 @@ Do something.
       expect(graded.score).toBe(1.0);
     });
 
-    it('should snap continuous scores to 3-tier scale', () => {
+    it('should snap continuous scores to 5-tier scale', () => {
       mockUtils.execCommand.mockReturnValueOnce({
         stdout: '{"scores": [0.85, 0.6], "overall": 0.72, "passed": true}',
         stderr: '',
@@ -830,9 +916,9 @@ Do something.
 
       const result = makeResult({ output: 'test output' });
       const graded = gradeWithModel(result, mockScenario, tempDir);
-      // 0.85 → 1.0, 0.6 → 0.5, overall recomputed = 0.75, not all 1.0 so passed=false
+      // 0.85 → 0.75, 0.6 → 0.5, overall recomputed = 0.63, not all 1.0 so passed=false
       expect(graded.passed).toBe(false);
-      expect(graded.score).toBe(0.75);
+      expect(graded.score).toBe(0.63);
     });
 
     it('should accept exact 3-tier scores unchanged', () => {
@@ -900,22 +986,32 @@ Do something.
   // ── snapScore ───────────────────────────────────────────────
 
   describe('snapScore', () => {
-    it('should snap low scores to 0', () => {
+    it('should snap to 0 for very low scores', () => {
       expect(snapScore(0)).toBe(0);
       expect(snapScore(0.1)).toBe(0);
-      expect(snapScore(0.25)).toBe(0);
+      expect(snapScore(0.125)).toBe(0);
     });
 
-    it('should snap mid scores to 0.5', () => {
-      expect(snapScore(0.26)).toBe(0.5);
+    it('should snap to 0.25 for low scores', () => {
+      expect(snapScore(0.13)).toBe(0.25);
+      expect(snapScore(0.25)).toBe(0.25);
+      expect(snapScore(0.375)).toBe(0.25);
+    });
+
+    it('should snap to 0.5 for mid scores', () => {
+      expect(snapScore(0.38)).toBe(0.5);
       expect(snapScore(0.5)).toBe(0.5);
-      expect(snapScore(0.6)).toBe(0.5);
-      expect(snapScore(0.75)).toBe(0.5);
+      expect(snapScore(0.625)).toBe(0.5);
     });
 
-    it('should snap high scores to 1.0', () => {
-      expect(snapScore(0.76)).toBe(1.0);
-      expect(snapScore(0.85)).toBe(1.0);
+    it('should snap to 0.75 for high scores', () => {
+      expect(snapScore(0.63)).toBe(0.75);
+      expect(snapScore(0.75)).toBe(0.75);
+      expect(snapScore(0.875)).toBe(0.75);
+    });
+
+    it('should snap to 1.0 for very high scores', () => {
+      expect(snapScore(0.88)).toBe(1.0);
       expect(snapScore(1.0)).toBe(1.0);
     });
 
@@ -938,8 +1034,8 @@ Do something.
         { scores: [0.85, 0.6], overall: 0.72, passed: true },
         2,
       );
-      expect(result.scores).toEqual([1.0, 0.5]);
-      expect(result.overall).toBe(0.75);
+      expect(result.scores).toEqual([0.75, 0.5]);
+      expect(result.overall).toBe(0.63);
       expect(result.passed).toBe(false);
     });
 

@@ -165,7 +165,9 @@ function runSetup(setupCommand, trialDir, projectRoot) {
 
 /**
  * Write isolation settings to a trial directory.
- * Disables all user plugins so trials run in a clean context.
+ * Disables all user plugins, excludes user/project CLAUDE.md files,
+ * and initializes a git repo to create a project boundary (prevents
+ * Claude Code from walking up to the parent project's CLAUDE.md and rules).
  * @param {string} trialDir - Path to trial temp directory
  * @param {string} [cachedSettings] - Pre-built settings JSON (avoids repeated plugin list calls)
  */
@@ -179,22 +181,99 @@ function writeIsolationSettings(trialDir, cachedSettings) {
 /**
  * Build isolation settings JSON string (cached for reuse across trials).
  * Queries installed plugins and generates settings to disable all of them.
- * Returns empty settings if claude CLI is unavailable (e.g., in tests).
+ * Also excludes user-level CLAUDE.md and disables auto-memory to prevent
+ * user-specific instructions from contaminating eval baselines.
+ * Returns base isolation settings if claude CLI is unavailable (e.g., in tests).
  * @returns {string} JSON string for .claude/settings.json
  */
 function buildIsolationSettings() {
+  const baseSettings = {
+    claudeMdExcludes: ['**/CLAUDE.md', '**/CLAUDE.local.md', '**/rules/**'],
+    autoMemoryEnabled: false,
+  };
   try {
     const { stdout, exitCode } = execCommand('claude', ['plugin', 'list', '--json'], {
       timeout: 10000,
     });
-    if (exitCode !== 0 || !stdout) return '{}';
+    if (exitCode !== 0 || !stdout) return JSON.stringify(baseSettings);
     const plugins = JSON.parse(stdout);
-    if (!Array.isArray(plugins)) return '{}';
+    if (!Array.isArray(plugins)) return JSON.stringify(baseSettings);
     const disabled = {};
     for (const p of plugins) disabled[p.id] = false;
-    return JSON.stringify({ enabledPlugins: disabled });
+    return JSON.stringify({ ...baseSettings, enabledPlugins: disabled });
   } catch {
-    return '{}';
+    return JSON.stringify(baseSettings);
+  }
+}
+
+/**
+ * Parse stream-json output from `claude -p --output-format stream-json --verbose`.
+ * Extracts assistant messages with tool calls to build a rich transcript
+ * showing the full conversation flow (text + tool use in order).
+ * @param {string} rawOutput - Raw JSONL output from stream-json
+ * @returns {{ textResult: string, richTranscript: string }}
+ */
+function parseStreamJsonOutput(rawOutput) {
+  if (!rawOutput) return { textResult: '', richTranscript: '' };
+
+  const lines = rawOutput.split('\n').filter((l) => l.trim());
+  const parts = [];
+  let textResult = '';
+
+  for (const line of lines) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    if (event.type === 'assistant' && event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === 'text' && block.text) {
+          parts.push(`[Assistant] ${block.text}`);
+        } else if (block.type === 'tool_use') {
+          const inputSummary = summarizeToolInput(block.name, block.input);
+          parts.push(`[Tool: ${block.name}] ${inputSummary}`);
+        }
+      }
+    } else if (event.type === 'result') {
+      textResult = event.result || '';
+    }
+  }
+
+  return { textResult, richTranscript: parts.join('\n\n') };
+}
+
+/**
+ * Summarize tool input for transcript readability.
+ * Shows key details without overwhelming the transcript.
+ * @param {string} toolName - Tool name (Write, Edit, Bash, etc.)
+ * @param {Object} input - Tool input parameters
+ * @returns {string} Human-readable summary
+ */
+function summarizeToolInput(toolName, input) {
+  if (!input) return '';
+  switch (toolName) {
+    case 'Write': {
+      const content = input.content || '';
+      return `${input.file_path || ''}\n\`\`\`\n${content.slice(0, 500)}${content.length > 500 ? '\n...(truncated)' : ''}\n\`\`\``;
+    }
+    case 'Edit': {
+      const old = input.old_string || '';
+      const rep = input.new_string || '';
+      return `${input.file_path || ''} (replace "${old.slice(0, 80)}${old.length > 80 ? '...' : ''}" → "${rep.slice(0, 80)}${rep.length > 80 ? '...' : ''}")`;
+    }
+    case 'Read':
+      return input.file_path || '';
+    case 'Bash':
+      return `$ ${input.command || ''}`;
+    case 'Glob':
+      return `pattern: ${input.pattern || ''}`;
+    case 'Grep':
+      return `pattern: ${input.pattern || ''} ${input.path ? `in ${input.path}` : ''}`;
+    default:
+      return JSON.stringify(input).slice(0, 200);
   }
 }
 
@@ -226,7 +305,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const claudeArgs = [
     '-p',
     '--output-format',
-    'text',
+    'stream-json',
+    '--verbose',
     '--no-session-persistence',
     '--disable-slash-commands',
   ];
@@ -239,8 +319,10 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   });
 
   const evalName = label ? `${scenario.name}-${label}` : scenario.name;
-  const fullOutput = result.exitCode === 0 ? result.stdout : result.stderr || '';
-  const transcript = saveTranscript(evalName, trialNumber, fullOutput, projectRoot);
+  const rawOutput = result.exitCode === 0 ? result.stdout : result.stderr || '';
+  const { textResult, richTranscript } = parseStreamJsonOutput(rawOutput);
+  const parsedOutput = richTranscript || textResult || rawOutput;
+  const transcript = saveTranscript(evalName, trialNumber, parsedOutput, projectRoot);
 
   const base = {
     eval: evalName,
@@ -254,7 +336,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     trialDir,
   };
   return result.exitCode === 0
-    ? { ...base, output: result.stdout }
+    ? { ...base, output: parsedOutput }
     : { ...base, error: result.stderr };
 }
 
@@ -410,9 +492,8 @@ function buildTrialPrompt(scenario) {
 
   parts.push(`## Task\n${scenario.scenario}`);
 
-  if (scenario.assertions.length > 0) {
-    parts.push(`## Requirements\n${scenario.assertions.map((a) => `- ${a}`).join('\n')}`);
-  }
+  // Assertions are NOT included in the prompt — they are grading criteria
+  // for the grader (Step 4), not requirements for the agent (Step 3).
 
   return parts.join('\n\n');
 }
@@ -495,7 +576,10 @@ function generateBenchmark(projectRoot) {
 
   for (const file of scenarioFiles) {
     const scenario = parseScenario(file);
-    const results = loadResults(scenario.name, projectRoot, {
+    // For A/B scopes (skill/workflow), results are stored with -treatment suffix
+    const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
+    const resultsName = isAb ? `${scenario.name}-treatment` : scenario.name;
+    const results = loadResults(resultsName, projectRoot, {
       version: scenario.version,
     });
 
@@ -573,7 +657,21 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
   };
 
   if (scenario.grader !== 'code') {
-    const modelAnalysis = graders.compareWithModel(scenario, baseline, treatment, projectRoot);
+    const metrics = {
+      baseline: bStats,
+      treatment: tStats,
+      delta,
+      deltaCi,
+      verdict: result.verdict,
+      ...(baselineWarning ? { baselineWarning } : {}),
+    };
+    const modelAnalysis = graders.compareWithModel(
+      scenario,
+      baseline,
+      treatment,
+      projectRoot,
+      metrics,
+    );
     if (modelAnalysis) result.modelAnalysis = modelAnalysis;
   }
 
@@ -589,6 +687,7 @@ module.exports = {
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
+  parseStreamJsonOutput,
   runTrial,
   buildTrialPrompt,
   executeAndGradeTrial,

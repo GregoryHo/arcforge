@@ -636,6 +636,33 @@ describe('model grader integration', () => {
     expect(prompt).toContain('TRIAL_OUTPUT_CONTENT');
   });
 
+  test('model grader prompt documents normalized 5-tier scoring', () => {
+    const scenario = {
+      name: 'scale-test',
+      scope: 'agent',
+      grader: 'model',
+      graderConfig: 'Use the rubric.',
+      assertions: ['Check output'],
+    };
+    const result = makeResult({ output: 'TRIAL_OUTPUT_CONTENT', grader: 'model' });
+
+    mockUtils.execCommand.mockReturnValueOnce({
+      stdout: '{"scores": [1.0], "overall": 1.0, "passed": true}',
+      stderr: '',
+      exitCode: 0,
+    });
+
+    gradeTrialResult(result, scenario, tmpDir);
+
+    const prompt = mockUtils.execCommand.mock.calls[0][2].input;
+    expect(prompt).toContain('0.25');
+    expect(prompt).toContain('0.75');
+    expect(prompt).toContain('normalized 0.0-1.0');
+    expect(prompt).not.toContain(
+      'Score each assertion as: 0 (not met), 0.5 (partially met), or 1.0 (fully met).',
+    );
+  });
+
   test('model grader prompt includes trial directory artifacts when available', () => {
     const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-model-'));
     fs.writeFileSync(path.join(trialDir, 'output.js'), 'ARTIFACT_CONTENT_MARKER');

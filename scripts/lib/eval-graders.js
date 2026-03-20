@@ -44,21 +44,23 @@ function stripCodeFences(text) {
 }
 
 /**
- * Snap a score to the nearest 3-tier value: 0, 0.5, or 1.0.
- * Thresholds are midpoints between tiers: <= 0.25 → 0, 0.25-0.75 → 0.5, > 0.75 → 1.0.
+ * Snap a score to the nearest 5-tier value: 0, 0.25, 0.5, 0.75, or 1.0.
+ * Thresholds are midpoints between tiers.
  * @param {number} score - Raw score from grader
  * @returns {number} Snapped score
  */
 function snapScore(score) {
   const clamped = Math.max(0, Math.min(1, score));
-  if (clamped <= 0.25) return 0;
-  if (clamped <= 0.75) return 0.5;
+  if (clamped <= 0.125) return 0;
+  if (clamped <= 0.375) return 0.25;
+  if (clamped <= 0.625) return 0.5;
+  if (clamped <= 0.875) return 0.75;
   return 1.0;
 }
 
 /**
  * Validate and normalize a grader JSON response.
- * Snaps scores to 3-tier scale, recomputes overall and passed from snapped scores.
+ * Snaps scores to 5-tier scale, recomputes overall and passed from snapped scores.
  * Returns null if scores array is missing or empty (triggers retry).
  * @param {Object} grade - Parsed JSON from grader: { scores, overall, passed }
  * @param {number} assertionCount - Expected number of assertions
@@ -209,10 +211,12 @@ function gradeWithModel(result, scenario, projectRoot) {
     '### Required Response Format (automated grading)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"scores": [1.0, 0.5, ...], "overall": 0.75, "passed": false}',
+    '{"scores": [1.0, 0.75, 0.25], "evidence": ["...", "...", "..."], "overall": 0.67, "passed": false}',
     '```',
-    'Score each assertion as: 0 (not met), 0.5 (partially met), or 1.0 (fully met).',
-    'Set passed=true only if ALL scores are 1.0.',
+    'Score each assertion on a normalized 0.0-1.0 scale.',
+    'Use these preferred anchors when possible: 0.0 (not met), 0.25 (weak evidence), 0.5 (partially met), 0.75 (mostly met), 1.0 (fully met).',
+    'Include one short evidence note per assertion when possible.',
+    'Set passed=true only if ALL scores are 1.0. The harness will recompute overall and passed from scores.',
   ].join('\n');
 
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -270,14 +274,15 @@ function gradeWithModel(result, scenario, projectRoot) {
 /**
  * Compare baseline vs treatment results using the eval-comparator agent.
  * Reads agents/eval-comparator.md as the comparison methodology.
- * Returns qualitative analysis with per-assertion breakdown.
+ * Returns qualitative analysis based on harness-computed metrics.
  * @param {import('./eval').EvalScenario} scenario - Eval scenario
  * @param {import('./eval').TrialResult[]} baseline - Baseline results
  * @param {import('./eval').TrialResult[]} treatment - Treatment results
  * @param {string} projectRoot - Project root directory
- * @returns {{ per_assertion: Object[], analysis: string, recommendation: string }|null}
+ * @param {Object} metrics - Pre-computed metrics from compareResults
+ * @returns {{ analysis: string, recommendation: string, improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
-function compareWithModel(scenario, baseline, treatment, projectRoot) {
+function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
   const rawDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
   if (!rawDef) return null;
   const agentDef = rawDef
@@ -294,6 +299,11 @@ function compareWithModel(scenario, baseline, treatment, projectRoot) {
     '',
     `### Assertions\n${assertions}`,
     '',
+    '### Programmatic Metrics (authoritative)',
+    '```json',
+    JSON.stringify(metrics, null, 2),
+    '```',
+    '',
     `### Baseline Results (${baseline.length} trials)\n${fmtResults(baseline)}`,
     '',
     `### Treatment Results (${treatment.length} trials)\n${fmtResults(treatment)}`,
@@ -301,9 +311,9 @@ function compareWithModel(scenario, baseline, treatment, projectRoot) {
     '### Required Response Format (automated comparison)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"per_assertion": [{"assertion": "...", "baseline": 0.65, "treatment": 0.85, "delta": 0.20}],',
-    '"analysis": "...", "recommendation": "SHIP"}',
+    '{"analysis": "...", "improvements": ["..."], "regressions": ["..."], "limitations": ["..."], "recommendation": "SHIP"}',
     '```',
+    'Use the provided programmatic metrics as numeric truth. Do not invent missing per-assertion numbers.',
   ].join('\n');
 
   const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text'], {

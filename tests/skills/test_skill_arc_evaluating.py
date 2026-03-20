@@ -96,3 +96,49 @@ def test_arc_evaluating_has_scenario_design_guidance():
     has_when = "when to use" in lower
     has_scope_guidance = "scope" in lower and ("skill" in lower and "workflow" in lower)
     assert has_when or has_scope_guidance
+
+
+def test_arc_evaluating_requires_question_first_framing():
+    """The skill should teach what question the harness is answering before scenario design."""
+    text = _read_skill()
+    lower = text.lower()
+
+    has_question_first = (
+        "what are you trying to learn" in lower
+        or "question first" in lower
+        or "before choosing a metric" in lower
+    )
+    has_behavior_change = "change agent behavior" in lower or "behavior change" in lower
+    has_task_outcome = "correct output" in lower or "task outcome" in lower
+    has_toolkit_effect = "toolkit effect" in lower or "environment effect" in lower
+
+    assert has_question_first
+    assert has_behavior_change and has_task_outcome and has_toolkit_effect
+
+
+def test_arc_evaluating_documents_discriminative_scenario_design():
+    """The skill should explain how to design scenarios that isolate signal."""
+    text = _read_skill()
+    lower = text.lower()
+
+    has_isolation_guidance = "one behavior per scenario" in lower or "isolate one behavior" in lower
+    has_trap_guidance = "trap" in lower or "bait" in lower or "discriminative" in lower
+    has_ground_truth_guidance = "ground truth" in lower or "defensible" in lower
+
+    assert has_isolation_guidance
+    assert has_trap_guidance
+    assert has_ground_truth_guidance
+
+
+def test_arc_evaluating_clarifies_harness_and_comparator_roles():
+    """The skill should distinguish scenario structure, numeric stats, and qualitative analysis."""
+    text = _read_skill()
+    lower = text.lower()
+
+    has_single_condition_guidance = "single-condition" in lower or "single condition" in lower
+    has_ab_harness_guidance = "baseline and treatment" in lower and "eval ab" in lower
+    has_numeric_vs_qualitative = "programmatic" in lower and "qualitative" in lower
+
+    assert has_single_condition_guidance
+    assert has_ab_harness_guidance
+    assert has_numeric_vs_qualitative

@@ -60,6 +60,25 @@ Does the full toolkit system improve agent outcomes?
 
 This is the system-level evaluation: "does having the toolkit installed make the agent better at this task?" Unlike skill evals (which vary the prompt), workflow evals vary the environment while keeping the identical prompt for both conditions.
 
+## Question First
+
+Before you choose a metric, ask: **what are you trying to learn?**
+
+If you cannot answer that in one sentence, you are not ready to design the scenario.
+
+| Question | Scope | What Varies | What Stays Fixed | Primary Signal |
+|----------|-------|-------------|------------------|----------------|
+| Does this instruction change agent behavior? | **skill** | Skill present vs absent | Same scenario, model, setup | `delta` |
+| Can this agent complete the task correctly? | **agent** | Trial-to-trial execution | Task, environment, assertions | `pass@k`, `pass^k` |
+| Does the toolkit/environment improve outcomes? | **workflow** | Bare agent vs full toolkit | Same prompt, model, scenario | `delta`, `pass^k` |
+
+Three common questions:
+- **Behavior change**: "Did the skill cause different choices?"
+- **Task outcome**: "Did the agent produce the correct output?"
+- **Toolkit effect**: "Did the environment make the same agent better?"
+
+Do not collapse these into one fuzzy "quality" question. A skill-adherence eval and an outcome-quality eval are different harnesses, even if both involve the same task domain.
+
 ## The Process
 
 ```
@@ -108,6 +127,30 @@ Create a scenario file in `evals/scenarios/`:
 [Optional: bump when assertions change materially. Filters out stale historical results.]
 ```
 
+### Scenario Design Rules
+
+**Scenario files are single-condition.**
+
+Do **not** put separate baseline and treatment sections into one scenario file. `arc eval ab` owns the A/B loop. It runs the same single-condition scenario twice and varies only the skill or environment.
+
+For skill evals, start with narrow discriminative scenarios:
+- **One behavior per scenario** when testing adherence. Isolate one behavior so lift can be attributed to one instruction.
+- **Include a trap or bait** that a non-skill agent is likely to mishandle. Without a discriminative trap, you are measuring generic competence, not skill adherence.
+- **Make ground truth defensible.** Assertions must be supportable from the provided context, not from hidden repo conventions or debatable reviewer taste.
+- **Prefer 3-5 narrow scenarios over one overloaded scenario.** Add a capstone scenario only after the isolated behaviors are stable.
+
+Good skill-eval scenario:
+- Same task format in baseline and treatment
+- One planted challenge tied to one rule
+- Assertions that describe the expected behavior difference
+
+Bad skill-eval scenario:
+- One giant prompt testing everything at once
+- No clear reason baseline and treatment would diverge
+- Assertions that depend on arguable judgment calls
+
+If the task is deterministic but your assertion is vague, fix the assertion. If the judgment is inherently subjective, switch to model or human grading instead of pretending code grading can capture it.
+
 ### Step 2: Prepare Environment
 
 **Critical for AI agent evaluation.** Each trial runs in an isolated directory. The agent has tools (Read, Bash, Glob, Grep, etc.) and will use them. Design the environment accordingly:
@@ -150,7 +193,7 @@ Three grader types — choose based on the assertion's nature, not convenience:
 | Grader | Use When | Not For | How |
 |--------|----------|---------|-----|
 | **code** | Assertions have deterministic correct answers (file exists, test passes, value matches expected) | Quality or intent judgment — don't rewrite assertions into grep proxies to force code grading | Run test command, check exit code. `$TRIAL_DIR` env var available for checking trial artifacts. |
-| **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion using 3-tier scale: 0 (not met), 0.5 (partially met), 1.0 (fully met). Trial directory artifacts automatically included. |
+| **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion on a normalized 0.0-1.0 scale, and uses trial artifacts as evidence when available. Harness logic computes overall score and pass/fail from the returned per-assertion scores. |
 | **human** | Assertions involve audience-dependent experience, taste, or domain expertise that even LLMs assess unreliably (e.g., "feels intuitive", "tone matches brand") | Assessments an LLM can judge — save human bandwidth for what only humans can evaluate | Present output + checklist for review |
 
 Some behavioral qualities cannot be captured by deterministic tests alone. When evaluating methodology, reasoning quality, or communication clarity, model or human grading captures signal that code grading structurally cannot. Match the grader to the assertion — not the other way around.
@@ -214,10 +257,16 @@ evals/
 | **eval-grader** | Grade individual eval outputs against rubrics | `arc eval run` (automated, model-graded scenarios) + manual dispatch |
 | **eval-comparator** | Compare A/B results for skill/workflow evals | `arc eval compare` (automated, model/human-graded scenarios) + manual dispatch |
 
+**Important:** numeric comparison is programmatic. The harness computes averages, `delta`, confidence intervals, and verdicts directly from saved results. `eval-comparator` adds **qualitative** analysis for model/human-graded A/B results; it does not replace the programmatic numeric verdict.
+
 ## Common Mistakes
 
 | Mistake | What Happens | Fix |
 |---------|-------------|-----|
+| Writing the scenario before naming the eval question | You end up mixing adherence, correctness, and toolkit effects in one noisy test | State the question first: behavior change, task outcome, or environment/toolkit effect |
+| Putting baseline/treatment structure inside the scenario file | The scenario no longer matches the harness contract; A/B logic is duplicated and confusing | Keep the scenario single-condition and let `arc eval ab` vary skill or environment |
+| One overloaded skill-eval scenario with no trap | Baseline and treatment both look similar; delta is uninformative | Isolate one behavior per scenario and add a discriminative trap or bait |
+| Assertions with weak or arguable ground truth | Grading becomes subjective noise, and disagreements look like regressions | Make assertions defensible from the given context or split the scenario |
 | Comprehension scenario labeled as agent eval | Measures text quality, not tool-using behavior; misleading pass rates | Add `**Eval type: comprehension**` to Context, or redesign with Setup + file artifacts |
 | Model grader for deterministic output | Noisy scores, false positives from LLM hallucination | Use code grader with `$TRIAL_DIR` — verify files, run tests, grep patterns |
 | Empty trial dir without Setup or Context | Agent spends 5+ minutes searching nothing, then times out | Add Setup to copy needed files, or provide sufficient Context for text-only responses |
