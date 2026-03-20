@@ -1,0 +1,111 @@
+{
+  "generated": "2026-03-20T07:55:19.790Z",
+  "evals": {
+    "debug-investigate-first": {
+      "scope": "skill",
+      "trials": 7,
+      "pass_rate": 0.57,
+      "avg_score": 0.86,
+      "stddev": 0.2,
+      "ci95": {
+        "lower": 0.68,
+        "upper": 1,
+        "width": 0.36
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-03-20T07:29:19.679Z"
+    },
+    "debug-stop-at-three": {
+      "scope": "skill",
+      "trials": 7,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-20T07:45:22.857Z"
+    },
+    "eval-grader-selection": {
+      "scope": "skill",
+      "trials": 3,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-20T06:27:14.883Z",
+      "warning": "NOTE: k=3, confidence intervals are wide"
+    },
+    "eval-scenario-format": {
+      "scope": "skill",
+      "trials": 7,
+      "pass_rate": 0.71,
+      "avg_score": 0.94,
+      "stddev": 0.1,
+      "ci95": {
+        "lower": 0.85,
+        "upper": 1,
+        "width": 0.19
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-03-19T10:44:45.079Z"
+    },
+    "eval-scenario-splitting": {
+      "scope": "skill",
+      "trials": 5,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-20T03:00:59.614Z"
+    },
+    "eval-trap-design": {
+      "scope": "skill",
+      "trials": 7,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-20T02:38:36.180Z"
+    },
+    "tdd-compliance": {
+      "scope": "skill",
+      "trials": 7,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-19T09:04:08.337Z"
+    }
+  }
+}
