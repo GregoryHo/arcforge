@@ -40,6 +40,9 @@ const graders = require('./eval-graders');
  * @property {string} [transcript] - Path to transcript file
  * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed
+ * @property {string} [errorType] - Machine-readable error category (e.g., 'model_grader_failed')
+ * @property {boolean} [gradeError] - True if the grader failed to produce a score
+ * @property {boolean} [infraError] - True if the trial runner failed to capture output
  */
 
 const EVALS_DIR = 'evals';
@@ -58,8 +61,10 @@ function parseScenario(filePath) {
   let currentSection = null;
   const lines = content.split('\n');
 
+  let insideFence = false;
   for (const line of lines) {
-    const headerMatch = line.match(/^##\s+(.+)/);
+    if (/^`{3,}/.test(line)) insideFence = !insideFence;
+    const headerMatch = !insideFence && line.match(/^##\s+(.+)/);
     if (headerMatch) {
       currentSection = headerMatch[1].trim().toLowerCase();
       sections[currentSection] = [];
@@ -321,8 +326,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const evalName = label ? `${scenario.name}-${label}` : scenario.name;
   const rawOutput = result.exitCode === 0 ? result.stdout : result.stderr || '';
   const { textResult, richTranscript } = parseStreamJsonOutput(rawOutput);
-  const parsedOutput = richTranscript || textResult || rawOutput;
-  const transcript = saveTranscript(evalName, trialNumber, parsedOutput, projectRoot);
+  const parsedOutput = richTranscript || textResult;
+  const transcriptOutput = parsedOutput || rawOutput;
+  const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot);
 
   const base = {
     eval: evalName,
@@ -335,9 +341,21 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     transcript,
     trialDir,
   };
-  return result.exitCode === 0
-    ? { ...base, output: parsedOutput }
-    : { ...base, error: result.stderr };
+  if (result.exitCode !== 0) {
+    return { ...base, error: result.stderr };
+  }
+
+  if (parsedOutput) {
+    return { ...base, output: parsedOutput };
+  }
+
+  return {
+    ...base,
+    output: '',
+    error: 'No assistant output captured from stream-json output',
+    errorType: 'trial_output_missing',
+    infraError: true,
+  };
 }
 
 /**

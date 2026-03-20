@@ -44,6 +44,89 @@ function stripCodeFences(text) {
 }
 
 /**
+ * Extract the first parseable JSON object from text, honoring braces inside strings.
+ * Optionally requires specific top-level keys to be present.
+ * @param {string} text - Raw model output
+ * @param {string[]} [requiredKeys=[]] - Required top-level keys
+ * @returns {Object|null} Parsed JSON object, or null if none found
+ */
+function extractJsonObject(text, requiredKeys = []) {
+  const cleaned = stripCodeFences(text || '').trim();
+  if (!cleaned) return null;
+
+  const hasRequiredKeys = (value) =>
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    requiredKeys.every((key) => Object.hasOwn(value, key));
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (hasRequiredKeys(parsed)) return parsed;
+  } catch {
+    /* fall through to balanced-brace extraction */
+  }
+
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+      continue;
+    }
+
+    if (ch === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const candidate = cleaned.slice(start, i + 1);
+        try {
+          const parsed = JSON.parse(candidate);
+          if (hasRequiredKeys(parsed)) return parsed;
+        } catch {
+          /* keep scanning for another object */
+        }
+        start = -1;
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildModelGraderError(result, error, errorType) {
+  return {
+    ...result,
+    passed: false,
+    score: 0,
+    error,
+    gradeError: true,
+    errorType,
+  };
+}
+
+/**
  * Snap a score to the nearest 5-tier value: 0, 0.25, 0.5, 0.75, or 1.0.
  * Thresholds are midpoints between tiers.
  * @param {number} score - Raw score from grader
@@ -228,46 +311,40 @@ function gradeWithModel(result, scenario, projectRoot) {
 
     if (exitCode !== 0) {
       if (attempt === 2) {
-        return { ...result, passed: false, score: 0, error: 'Model grader failed to respond' };
+        return buildModelGraderError(
+          result,
+          'Model grader failed to respond',
+          'model_grader_failed',
+        );
       }
       continue;
     }
 
-    // Strip markdown code fences before JSON extraction
-    const cleaned = stripCodeFences(stdout);
-    const jsonMatch = cleaned.match(/\{[\s\S]*?"scores"\s*:[\s\S]*?\}/);
-    if (!jsonMatch) {
+    const grade = extractJsonObject(stdout, ['scores']);
+    if (!grade) {
       if (attempt === 2) {
-        return {
-          ...result,
-          passed: false,
-          score: 0,
-          error: 'Model grader returned unparseable response',
-        };
+        return buildModelGraderError(
+          result,
+          'Model grader returned unparseable response',
+          'model_grader_unparseable',
+        );
       }
       continue;
     }
 
-    try {
-      const grade = JSON.parse(jsonMatch[0]);
-      const validated = validateGraderResponse(grade, scenario.assertions.length);
-      if (!validated) {
-        if (attempt === 2) {
-          return {
-            ...result,
-            passed: false,
-            score: 0,
-            error: 'Model grader returned empty scores',
-          };
-        }
-        continue;
-      }
-      return { ...result, passed: validated.passed, score: validated.overall };
-    } catch {
+    const validated = validateGraderResponse(grade, scenario.assertions.length);
+    if (!validated) {
       if (attempt === 2) {
-        return { ...result, passed: false, score: 0, error: 'Model grader returned invalid JSON' };
+        return buildModelGraderError(
+          result,
+          'Model grader returned empty scores',
+          'model_grader_empty_scores',
+        );
       }
+      continue;
     }
+
+    return { ...result, passed: validated.passed, score: validated.overall };
   }
 }
 
@@ -324,23 +401,7 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
 
   if (exitCode !== 0) return null;
 
-  const cleaned = stripCodeFences(stdout).trim();
-  // Try parsing the entire cleaned output first (the prompt asks for "ONLY a JSON object").
-  // Fall back to extracting the outermost { ... } by brace balancing.
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf('{');
-    if (start === -1) return null;
-    for (let end = cleaned.lastIndexOf('}'); end > start; end = cleaned.lastIndexOf('}', end - 1)) {
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1));
-      } catch {
-        /* try shorter substring */
-      }
-    }
-    return null;
-  }
+  return extractJsonObject(stdout, ['analysis']);
 }
 
 /**

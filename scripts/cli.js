@@ -318,7 +318,15 @@ async function main() {
         const subcommand = args.positional[0];
         const parseK = (scenario, isAb = false) =>
           args.options.k ? parseInt(args.options.k, 10) : eval_.defaultK(scenario || {}, isAb);
-        const formatStatus = (g) => (g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`);
+        const formatStatus = (g) => {
+          if (g.gradeError) {
+            return `GRADE ERROR (${g.errorType || 'unknown'}${g.error ? `: ${g.error}` : ''})`;
+          }
+          if (g.infraError) {
+            return `INFRA ERROR (${g.errorType || 'unknown'}${g.error ? `: ${g.error}` : ''})`;
+          }
+          return g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`;
+        };
 
         const findScenario = (name) => {
           for (const f of eval_.listScenarios(projectRoot)) {

@@ -29,6 +29,7 @@ const {
   saveTranscript,
   captureTrialArtifacts,
   parseStreamJsonOutput,
+  runTrial,
   runSkillEval,
   snapScore,
   validateGraderResponse,
@@ -308,6 +309,42 @@ Do something.
       expect(richTranscript).toContain('[Tool: Edit]');
       expect(richTranscript).toContain('replace "old"');
       expect(richTranscript).toContain('"new"');
+    });
+  });
+
+  // ── runTrial ────────────────────────────────────────────────
+
+  describe('runTrial', () => {
+    it('should not use raw stream-json as graded output when no assistant text is captured', () => {
+      const scenario = {
+        name: 'thinking-only',
+        scenario: 'Repair the draft.',
+        context: 'Context-only task.',
+        assertions: ['A'],
+        grader: 'model',
+        graderConfig: 'Score it.',
+      };
+
+      const rawStream = [
+        JSON.stringify({ type: 'system', subtype: 'init' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'thinking', thinking: 'Internal reasoning only' }] },
+        }),
+        JSON.stringify({ type: 'result', subtype: 'success', result: '', stop_reason: 'end_turn' }),
+      ].join('\n');
+
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: rawStream,
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.output).toBe('');
+      expect(result.error).toContain('No assistant output captured');
+      expect(fs.readFileSync(result.transcript, 'utf8')).toContain('"type":"assistant"');
     });
   });
 
@@ -848,6 +885,8 @@ Do something.
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(false);
       expect(graded.error).toContain('unparseable');
+      expect(graded.gradeError).toBe(true);
+      expect(graded.errorType).toBe('model_grader_unparseable');
     });
 
     it('should extract JSON from mixed markdown response', () => {
@@ -862,6 +901,23 @@ Do something.
       const graded = gradeWithModel(result, mockScenario, tempDir);
       expect(graded.passed).toBe(false);
       expect(graded.score).toBe(0.75);
+    });
+
+    it('should parse grader JSON when evidence strings contain braces', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: `Here is the grade:
+\`\`\`json
+{"scores":[1.0,0.5],"evidence":["Uses db.query({ text: \\"...\\", values: [normalizedEmail] })","Skips formatting"],"overall":0.75,"passed":false}
+\`\`\``,
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = makeResult({ output: 'test output' });
+      const graded = gradeWithModel(result, mockScenario, tempDir);
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0.75);
+      expect(graded.error).toBeUndefined();
     });
 
     it('should retry on first parse failure then succeed', () => {
