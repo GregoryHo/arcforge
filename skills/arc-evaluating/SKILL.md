@@ -151,6 +151,27 @@ Bad skill-eval scenario:
 
 If the task is deterministic but your assertion is vague, fix the assertion. If the judgment is inherently subjective, switch to model or human grading instead of pretending code grading can capture it.
 
+### Scenario Validity Preflight
+
+Before spending a full A/B run on a new skill-eval scenario, do a quick validity check:
+
+1. **Expected baseline failure**
+   - Complete this sentence: "A non-skill agent is likely to fail because ___".
+   - If you cannot name the likely failure mode, the scenario is probably not discriminative.
+2. **Ceiling / floor risk**
+   - Run 2-3 pilot trials before the full run.
+   - If baseline already looks likely to score above ~0.8, or both sides look near 0, redesign before spending more trials.
+3. **Answer leakage**
+   - Do not tell the agent the repair pattern you want it to discover.
+   - If the prompt explicitly names the correct grader split, decomposition, or target repair structure, you are testing prompt compliance, not skill adherence.
+4. **Escape hatches**
+   - Preserve the tension you want to test, but do not prescribe the exact fix.
+   - It is valid to forbid changing the task, diff, or contract if those are the point of the eval.
+   - It is not valid to also tell the agent the exact structure of the correct repair, because that removes the discriminative step.
+5. **Output-complexity budget**
+   - Prefer short structured outputs over rewriting full scenario files, especially for comprehension or model-graded evals.
+   - Long outputs increase grading noise and often test formatting endurance rather than the target behavior.
+
 ### Step 2: Prepare Environment
 
 **Critical for AI agent evaluation.** Each trial runs in an isolated directory. The agent has tools (Read, Bash, Glob, Grep, etc.) and will use them. Design the environment accordingly:
@@ -266,12 +287,16 @@ evals/
 | Writing the scenario before naming the eval question | You end up mixing adherence, correctness, and toolkit effects in one noisy test | State the question first: behavior change, task outcome, or environment/toolkit effect |
 | Putting baseline/treatment structure inside the scenario file | The scenario no longer matches the harness contract; A/B logic is duplicated and confusing | Keep the scenario single-condition and let `arc eval ab` vary skill or environment |
 | One overloaded skill-eval scenario with no trap | Baseline and treatment both look similar; delta is uninformative | Isolate one behavior per scenario and add a discriminative trap or bait |
+| Baseline already near ceiling | Both conditions pass, delta stays tiny, and repeated runs remain inconclusive | Run 2-3 pilot trials first; if baseline already looks likely to exceed ~0.8, redesign before full A/B |
 | Assertions with weak or arguable ground truth | Grading becomes subjective noise, and disagreements look like regressions | Make assertions defensible from the given context or split the scenario |
 | Comprehension scenario labeled as agent eval | Measures text quality, not tool-using behavior; misleading pass rates | Add `**Eval type: comprehension**` to Context, or redesign with Setup + file artifacts |
+| Prompt leaks the repair pattern | Baseline follows the template and scores high without the skill | Remove explicit grader split, required decomposition, or named repair structure from the prompt |
 | Model grader for deterministic output | Noisy scores, false positives from LLM hallucination | Use code grader with `$TRIAL_DIR` — verify files, run tests, grep patterns |
 | Empty trial dir without Setup or Context | Agent spends 5+ minutes searching nothing, then times out | Add Setup to copy needed files, or provide sufficient Context for text-only responses |
 | Assertions that can't be verified by chosen grader | Code grader can't check "well-structured"; model grader is overkill for "file exists" | Match grader to assertion type — code for existence/correctness, model for judgment |
+| Scenario allows an escape hatch | Agent changes the task so the target tension disappears instead of solving it | Preserve the contract or artifact under test, but do not prescribe the exact repair |
 | Rewriting assertions to fit preferred grader | "Well-structured code" becomes "name > 10 chars" — measures surface proxy, not actual quality (validity sacrificed for reliability) | Choose grader to match assertion's nature. If the assertion requires judgment, use model/human grader — don't reshape it into a grep pattern |
+| Scenario response shape is too large | Model grading gets noisier, and failures reflect output length more than target behavior | Require a short structured artifact instead of full markdown rewrites |
 | Running k=1 and trusting the result | No variance information, single lucky/unlucky trial dominates | Use scenario-driven defaults (k=3-10 depending on eval type and grader); CI shown at k >= 5 |
 | Grading stdout claims without checking artifacts | Agent says "I created the file" but didn't; grader scores the claim | Use code grader against `$TRIAL_DIR`, or model grader (artifacts auto-included) |
 | Using `--skill-file` for workflow eval | Varies the prompt instead of the environment — measures the wrong thing | Workflow A/B varies the environment. Use `eval ab <name>` without `--skill-file` for workflow scope |
