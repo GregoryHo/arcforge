@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arcforge eval dashboard</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+  --border: #30363d; --text: #e6edf3; --text2: #8b949e;
+  --accent: #58a6ff; --ship: #3fb950; --needs-work: #d29922;
+  --blocked: #f85149; --no-runs: #484f58;
+  --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+a { color: var(--accent); text-decoration: none; cursor: pointer; }
+a:hover { text-decoration: underline; }
+
+/* Layout */
+.header { padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 14px; font-weight: 600; color: var(--text); }
+.header .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ship); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 20px; }
+.tab { padding: 8px 16px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.content { padding: 20px; max-width: 1200px; }
+.breadcrumb { margin-bottom: 16px; color: var(--text2); font-size: 12px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 8px 12px; color: var(--text2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+tr:hover td { background: var(--surface); }
+.clickable { cursor: pointer; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-ship { background: rgba(63,185,80,0.15); color: var(--ship); }
+.badge-needs-work { background: rgba(210,153,34,0.15); color: var(--needs-work); }
+.badge-blocked { background: rgba(248,81,73,0.15); color: var(--blocked); }
+.badge-no-runs { background: rgba(72,79,88,0.15); color: var(--no-runs); }
+.badge-improved { background: rgba(63,185,80,0.15); color: var(--ship); }
+.badge-inconclusive { background: rgba(210,153,34,0.15); color: var(--needs-work); }
+.badge-regressed { background: rgba(248,81,73,0.15); color: var(--blocked); }
+
+/* Score bar */
+.score-bar { display: flex; align-items: center; gap: 8px; }
+.score-bar-track { width: 100px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 11px; color: var(--text2); }
+
+/* Compare layout */
+.compare-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; margin-bottom: 20px; }
+.compare-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; }
+.delta-value { font-size: 28px; font-weight: 700; }
+.delta-positive { color: var(--ship); }
+.delta-negative { color: var(--blocked); }
+.delta-neutral { color: var(--needs-work); }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column; }
+.modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+.modal-close { cursor: pointer; color: var(--text2); font-size: 18px; }
+.modal-close:hover { color: var(--text); }
+
+/* Transcript */
+.transcript { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.6; }
+.transcript .tool { color: var(--accent); font-weight: 600; }
+.transcript .assistant { color: var(--ship); font-weight: 600; }
+
+/* Live log */
+.live-log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 400px; overflow-y: auto; font-size: 12px; }
+.live-entry { padding: 4px 0; border-bottom: 1px solid var(--border); }
+.live-entry:last-child { border-bottom: none; }
+.live-pass { color: var(--ship); }
+.live-fail { color: var(--blocked); }
+
+/* Loading */
+.loading { text-align: center; padding: 40px; color: var(--text2); }
+.empty { text-align: center; padding: 40px; color: var(--text2); }
+
+/* Stats row */
+.stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.stats-row .card { flex: 1; min-width: 140px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>arcforge eval dashboard</h1>
+  <div class="live-dot" id="live-dot" title="SSE connected"></div>
+  <span style="color:var(--text2);font-size:11px" id="status-text">connecting...</span>
+</div>
+<div class="tabs" id="tabs">
+  <div class="tab active" data-view="scenarios">Scenarios</div>
+  <div class="tab" data-view="live">Live</div>
+</div>
+<div class="content" id="content"></div>
+<div id="modal-root"></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+const h = (tag, attrs, ...children) => {
+  const el = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el[k] = v;
+    else if (k === 'className') el.className = v;
+    else el.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+    else if (c) el.appendChild(c);
+  }
+  return el;
+};
+
+// ── State ──
+const state = { view: 'scenarios', param: null, liveLog: [] };
+
+// ── API ──
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(res.status + ': ' + (await res.text()));
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('json') ? res.json() : res.text();
+}
+
+// ── Escape HTML for safe rendering ──
+function esc(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
+// ── SSE ──
+let sse = null;
+let sseRefreshTimer = null;
+function connectSSE() {
+  sse = new EventSource('/api/events');
+  sse.onopen = () => {
+    $('#live-dot').style.background = 'var(--ship)';
+    $('#status-text').textContent = 'live';
+  };
+  sse.onerror = () => {
+    $('#live-dot').style.background = 'var(--blocked)';
+    $('#status-text').textContent = 'disconnected';
+  };
+  sse.addEventListener('trial-complete', (e) => {
+    const d = JSON.parse(e.data);
+    state.liveLog.unshift({ ...d, receivedAt: new Date().toISOString() });
+    if (state.liveLog.length > 100) state.liveLog.length = 100;
+    if (state.view === 'live') renderLive();
+    // Debounce scenario refresh to avoid excessive API calls during active runs
+    if (state.view === 'scenarios') {
+      clearTimeout(sseRefreshTimer);
+      sseRefreshTimer = setTimeout(() => navigate('scenarios'), 2000);
+    }
+  });
+}
+
+// ── Badge helpers (return DOM elements, not raw HTML) ──
+function statusBadge(status) {
+  const cls = { SHIP: 'badge-ship', 'NEEDS WORK': 'badge-needs-work', BLOCKED: 'badge-blocked', 'NO RUNS': 'badge-no-runs' };
+  return h('span', { className: 'badge ' + (cls[status] || 'badge-no-runs') }, status);
+}
+function verdictBadge(v) {
+  const cls = { IMPROVED: 'badge-improved', INCONCLUSIVE: 'badge-inconclusive', REGRESSED: 'badge-regressed' };
+  return h('span', { className: 'badge ' + (cls[v] || '') }, v);
+}
+function scoreBar(score) {
+  const pct = Math.round(score * 100);
+  const color = score >= 0.8 ? 'var(--ship)' : score >= 0.6 ? 'var(--needs-work)' : 'var(--blocked)';
+  const bar = h('div', { className: 'score-bar' },
+    h('div', { className: 'score-bar-track' },
+      h('div', { className: 'score-bar-fill', style: 'width:' + pct + '%;background:' + color })
+    ),
+    h('span', null, pct + '%')
+  );
+  return bar;
+}
+function passFailLabel(passed) {
+  return h('span', { style: 'color:var(--' + (passed ? 'ship' : 'blocked') + ')' }, passed ? 'PASS' : 'FAIL');
+}
+function fmtTime(ts) { return ts ? new Date(ts).toLocaleString() : '-'; }
+
+function buildTrialsTable(trials) {
+  const tbody = h('tbody');
+  for (const r of trials) {
+    tbody.appendChild(h('tr', null,
+      h('td', null, r.condition),
+      h('td', null, '#' + r.trial),
+      h('td', null, scoreBar(r.score)),
+      h('td', null, passFailLabel(r.passed)),
+      h('td', { style: 'font-size:11px;color:var(--text2)' }, r.model || '-'),
+      h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript) }, 'View') : h('span', null, '-'))
+    ));
+  }
+  return h('table', null,
+    h('thead', null, h('tr', null,
+      h('th', null, 'Condition'), h('th', null, 'Trial'), h('th', null, 'Score'),
+      h('th', null, 'Passed'), h('th', null, 'Model'), h('th', null, 'Transcript')
+    )), tbody
+  );
+}
+function fmtScore(n) { return n == null ? '-' : n.toFixed(2); }
+
+// ── Navigation ──
+async function navigate(view, param) {
+  state.view = view; state.param = param;
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  const content = $('#content');
+  content.textContent = '';
+  content.appendChild(h('div', { className: 'loading' }, 'Loading...'));
+  try {
+    if (view === 'scenarios') await renderScenarios();
+    else if (view === 'runs') await renderRuns(param);
+    else if (view === 'compare') await renderCompare(param);
+    else if (view === 'results') await renderResults(param);
+    else if (view === 'live') renderLive();
+  } catch (err) {
+    content.textContent = '';
+    content.appendChild(h('div', { className: 'empty' }, 'Error: ' + err.message));
+  }
+}
+
+// ── Views ──
+async function renderScenarios() {
+  const { scenarios } = await api('/api/scenarios');
+  const content = $('#content');
+  content.textContent = '';
+  if (scenarios.length === 0) {
+    content.appendChild(h('div', { className: 'empty' }, 'No scenarios found in evals/scenarios/'));
+    return;
+  }
+  const tbody = h('tbody');
+  for (const s of scenarios) {
+    const row = h('tr', { className: 'clickable', onclick: () => navigate('runs', s.name) },
+      h('td', null, h('a', null, s.name)),
+      h('td', null, s.scope),
+      h('td', null, s.grader),
+      h('td', null, String(s.resultCount)),
+      h('td', null, s.resultCount > 0 ? scoreBar(s.passRate) : h('span', null, '-')),
+      h('td', null, fmtScore(s.resultCount > 0 ? s.avgScore : null)),
+      h('td', null, statusBadge(s.status)),
+      h('td', { style: 'font-size:11px;color:var(--text2)' }, fmtTime(s.lastRun))
+    );
+    tbody.appendChild(row);
+  }
+  content.appendChild(h('table', null,
+    h('thead', null, h('tr', null,
+      h('th', null, 'Name'), h('th', null, 'Scope'), h('th', null, 'Grader'),
+      h('th', null, 'Trials'), h('th', null, 'Pass Rate'), h('th', null, 'Avg Score'),
+      h('th', null, 'Status'), h('th', null, 'Last Run')
+    )), tbody
+  ));
+}
+
+async function renderRuns(scenario) {
+  const data = await api('/api/runs/' + encodeURIComponent(scenario));
+  const content = $('#content');
+  content.textContent = '';
+  content.appendChild(h('div', { className: 'breadcrumb' },
+    h('a', { onclick: () => navigate('scenarios') }, 'Scenarios'),
+    h('span', null, ' / ' + scenario)
+  ));
+  const actions = h('div', { style: 'margin-bottom:16px;display:flex;gap:8px' },
+    h('a', { onclick: () => navigate('compare', scenario), style: 'padding:4px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px' }, 'A/B Compare')
+  );
+  content.appendChild(actions);
+  if (data.runs.length === 0) {
+    content.appendChild(h('div', { className: 'empty' }, 'No runs yet'));
+    return;
+  }
+  const tbody = h('tbody');
+  for (const run of data.runs) {
+    const statsText = Object.entries(run.stats)
+      .map(([c, s]) => c + ': ' + (s.passRate * 100).toFixed(0) + '% (avg ' + s.avg.toFixed(2) + ')')
+      .join(' | ');
+    tbody.appendChild(h('tr', { className: 'clickable', onclick: () => navigate('results', scenario + '/' + run.runId) },
+      h('td', { style: 'font-size:12px' }, run.runId),
+      h('td', { style: 'font-size:11px;color:var(--text2)' }, fmtTime(run.timestamp)),
+      h('td', null, run.conditions.join(', ')),
+      h('td', null, String(run.trialCount)),
+      h('td', { style: 'font-size:11px' }, statsText)
+    ));
+  }
+  content.appendChild(h('table', null,
+    h('thead', null, h('tr', null,
+      h('th', null, 'Run ID'), h('th', null, 'Time'), h('th', null, 'Conditions'),
+      h('th', null, 'Trials'), h('th', null, 'Stats')
+    )), tbody
+  ));
+}
+
+async function renderResults(param) {
+  const parts = param.split('/');
+  const scenario = parts[0], runId = parts[1];
+  const content = $('#content');
+  content.textContent = '';
+  content.appendChild(h('div', { className: 'breadcrumb' },
+    h('a', { onclick: () => navigate('scenarios') }, 'Scenarios'),
+    h('span', null, ' / '),
+    h('a', { onclick: () => navigate('runs', scenario) }, scenario),
+    h('span', null, ' / ' + runId)
+  ));
+  const conditions = ['results', 'baseline', 'treatment'];
+  const fetches = conditions.map(cond => {
+    const evalName = cond === 'results' ? scenario : scenario + '-' + cond;
+    return api('/api/results/' + encodeURIComponent(evalName))
+      .then(data => ({ cond, results: data.results.filter(r => r.runId === runId || !r.runId) }))
+      .catch(() => null);
+  });
+  const settled = (await Promise.all(fetches)).filter(Boolean);
+  const allResults = [];
+  for (const { cond, results } of settled) {
+    for (const r of results) allResults.push({ ...r, condition: cond });
+  }
+  if (allResults.length === 0) {
+    content.appendChild(h('div', { className: 'empty' }, 'No results for this run'));
+    return;
+  }
+  // Stats cards
+  const grouped = {};
+  for (const r of allResults) { (grouped[r.condition] = grouped[r.condition] || []).push(r); }
+  const statsRow = h('div', { className: 'stats-row' });
+  for (const [cond, results] of Object.entries(grouped)) {
+    const avg = results.reduce((s, r) => s + r.score, 0) / results.length;
+    const passed = results.filter(r => r.passed).length;
+    statsRow.appendChild(h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, cond),
+      h('div', { className: 'stat-value' }, (avg * 100).toFixed(0) + '%'),
+      h('div', { className: 'stat-label' }, passed + '/' + results.length + ' passed')
+    ));
+  }
+  content.appendChild(statsRow);
+  content.appendChild(buildTrialsTable(allResults));
+}
+
+async function renderCompare(scenario) {
+  const data = await api('/api/compare/' + encodeURIComponent(scenario));
+  const content = $('#content');
+  content.textContent = '';
+  content.appendChild(h('div', { className: 'breadcrumb' },
+    h('a', { onclick: () => navigate('scenarios') }, 'Scenarios'),
+    h('span', null, ' / ' + scenario + ' / A/B Comparison')
+  ));
+  if (!data.baseline?.stats && !data.treatment?.stats) {
+    content.appendChild(h('div', { className: 'empty' }, 'No A/B results. Run: arc eval ab ' + scenario));
+    return;
+  }
+  // Compare grid
+  const grid = h('div', { className: 'compare-grid' });
+  // Baseline
+  const bStats = data.baseline?.stats;
+  grid.appendChild(h('div', { className: 'card' },
+    h('div', { className: 'card-title' }, 'Baseline'),
+    h('div', { className: 'stat-value' }, bStats ? (bStats.avg * 100).toFixed(0) + '%' : '-'),
+    h('div', { className: 'stat-label' }, bStats ? bStats.count + ' trials, ' + (bStats.passRate * 100).toFixed(0) + '% pass' : 'No data'),
+    bStats?.ci95 ? h('div', { className: 'stat-label', style: 'margin-top:4px' }, 'CI95: [' + bStats.ci95.lower + ', ' + bStats.ci95.upper + ']') : null
+  ));
+  // Delta center
+  const dCls = data.delta > 0 ? 'delta-positive' : data.delta < 0 ? 'delta-negative' : 'delta-neutral';
+  grid.appendChild(h('div', { className: 'compare-center' },
+    h('div', { className: 'delta-value ' + dCls }, (data.delta > 0 ? '+' : '') + data.delta.toFixed(2)),
+    verdictBadge(data.verdict),
+    data.deltaCi ? h('div', { className: 'stat-label' }, 'CI: [' + data.deltaCi.lower + ', ' + data.deltaCi.upper + ']') : null
+  ));
+  // Treatment
+  const tStats = data.treatment?.stats;
+  grid.appendChild(h('div', { className: 'card' },
+    h('div', { className: 'card-title' }, 'Treatment'),
+    h('div', { className: 'stat-value' }, tStats ? (tStats.avg * 100).toFixed(0) + '%' : '-'),
+    h('div', { className: 'stat-label' }, tStats ? tStats.count + ' trials, ' + (tStats.passRate * 100).toFixed(0) + '% pass' : 'No data'),
+    tStats?.ci95 ? h('div', { className: 'stat-label', style: 'margin-top:4px' }, 'CI95: [' + tStats.ci95.lower + ', ' + tStats.ci95.upper + ']') : null
+  ));
+  content.appendChild(grid);
+  // Trial details
+  const allTrials = [
+    ...(data.baseline?.results || []).map(r => ({ ...r, condition: 'baseline' })),
+    ...(data.treatment?.results || []).map(r => ({ ...r, condition: 'treatment' })),
+  ];
+  if (allTrials.length > 0) {
+    content.appendChild(buildTrialsTable(allTrials));
+  }
+}
+
+function renderLive() {
+  const content = $('#content');
+  content.textContent = '';
+  content.appendChild(h('h3', { style: 'margin-bottom:12px;font-size:14px' }, 'Live Trial Progress'));
+  if (state.liveLog.length === 0) {
+    content.appendChild(h('div', { className: 'empty' }, 'Waiting for trial completions... Start an eval in another terminal.'));
+    return;
+  }
+  const log = h('div', { className: 'live-log' });
+  for (const entry of state.liveLog) {
+    const cls = entry.passed ? 'live-pass' : 'live-fail';
+    const status = entry.passed ? 'PASS' : 'FAIL';
+    log.appendChild(h('div', { className: 'live-entry' },
+      h('span', { style: 'color:var(--text2);font-size:11px' }, fmtTime(entry.receivedAt) + '  '),
+      h('span', { className: cls }, '[' + status + '] '),
+      h('span', null, entry.eval + ' trial ' + entry.trial + '/' + entry.k + ' — score ' + entry.score)
+    ));
+  }
+  content.appendChild(log);
+}
+
+// ── Transcript Modal ──
+async function showTranscript(transcriptPath) {
+  const resultsIdx = transcriptPath.indexOf('evals/results/');
+  const relPath = resultsIdx >= 0 ? transcriptPath.slice(resultsIdx + 'evals/results/'.length) : transcriptPath;
+  let text;
+  try { text = await api('/api/transcript?path=' + encodeURIComponent(relPath)); }
+  catch (err) { text = 'Error loading transcript: ' + err.message; }
+
+  const pre = document.createElement('pre');
+  pre.className = 'transcript';
+  // Escape HTML entities first, then apply safe highlighting
+  const escaped = esc(text);
+  const highlighted = escaped
+    .replace(/^\[Tool: (.+?)\]/gm, '<span class="tool">[Tool: $1]</span>')
+    .replace(/^\[Assistant\]/gm, '<span class="assistant">[Assistant]</span>');
+  pre.innerHTML = highlighted;
+
+  const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { className: 'modal' },
+      h('div', { className: 'modal-header' },
+        h('span', null, 'Transcript'),
+        h('span', { className: 'modal-close', onclick: () => overlay.remove() }, '\u00d7')
+      ),
+      h('div', { className: 'modal-body' }, pre)
+    )
+  );
+  $('#modal-root').appendChild(overlay);
+}
+
+// ── Init ──
+$('#tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (tab) navigate(tab.dataset.view);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { const m = $('.modal-overlay'); if (m) m.remove(); }
+});
+connectSSE();
+navigate('scenarios');
+</script>
+</body>
+</html>

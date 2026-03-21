@@ -21,6 +21,7 @@
  *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave]  A/B eval
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
+ *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
  */
 
 const fs = require('node:fs');
@@ -572,8 +573,12 @@ async function main() {
               }
             }
           }
+        } else if (subcommand === 'dashboard') {
+          const { startServer } = require('./dashboard');
+          const port = args.options.port ? parseInt(args.options.port, 10) : 3333;
+          startServer(projectRoot, { port });
         } else {
-          console.error('Usage: arc eval [list|run|ab|compare|report|history]');
+          console.error('Usage: arc eval [list|run|ab|compare|report|history|dashboard]');
           process.exit(1);
         }
         break;

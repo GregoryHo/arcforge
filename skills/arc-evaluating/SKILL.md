@@ -345,6 +345,7 @@ arc eval compare <name> --model sonnet                 # Compare filtered by mod
 arc eval report [name]                                 # Generate benchmark report
 arc eval report [name] --model opus                    # Report filtered by model
 arc eval history                                       # List benchmark snapshots
+arc eval dashboard [--port N]                          # Start live dashboard (default: 3333)
 ```
 
 - k is auto-determined from scope + grader type (see default trial counts above). Use `--k` to override.
@@ -352,6 +353,7 @@ arc eval history                                       # List benchmark snapshot
 - `--model` specifies which LLM to use for trial execution (not grading). Results are tagged with the model for later filtering and cross-model comparison.
 - For skill scope, `--skill-file` is required. For workflow scope, it is not needed.
 - `eval compare` auto-routes: code-graded → programmatic delta, model-graded → eval-comparator agent analysis.
+- `eval dashboard` starts a live web dashboard at http://localhost:3333 for visual eval monitoring.
 
 ## Integration
 
