@@ -246,6 +246,8 @@ function handleApiResults(res, projectRoot, evalName, query) {
       gradeError: r.gradeError,
       infraError: r.infraError,
       transcript: r.transcript,
+      assertionScores: r.assertionScores,
+      evidence: r.evidence,
     })),
     stats: st,
   });
@@ -285,6 +287,8 @@ function trialSummary(r) {
     model: r.model,
     runId: r.runId,
     transcript: r.transcript,
+    assertionScores: r.assertionScores,
+    evidence: r.evidence,
   };
 }
 
@@ -309,6 +313,18 @@ function handleApiBenchmark(res, projectRoot) {
   sendJson(res, JSON.parse(fs.readFileSync(benchPath, 'utf8')));
 }
 
+function handleApiScenario(res, projectRoot, name) {
+  const s = eval_.findScenario(name, projectRoot);
+  if (!s) return sendError(res, 404, `Scenario "${name}" not found`);
+  sendJson(res, {
+    name: s.name,
+    scope: s.scope,
+    target: s.target,
+    grader: s.grader,
+    assertions: s.assertions,
+  });
+}
+
 // ── Router ────────────────────────────────────────────────────
 
 function createRouter(projectRoot, cachedHtml) {
@@ -324,6 +340,11 @@ function createRouter(projectRoot, cachedHtml) {
     if (pathname === '/api/events') return addSseClient(res);
     if (pathname === '/api/scenarios') return handleApiScenarios(res, projectRoot);
     if (pathname === '/api/benchmark') return handleApiBenchmark(res, projectRoot);
+
+    const scenarioMatch = pathname.match(/^\/api\/scenario\/(.+)$/);
+    if (scenarioMatch) {
+      return handleApiScenario(res, projectRoot, decodeURIComponent(scenarioMatch[1]));
+    }
 
     const runsMatch = pathname.match(/^\/api\/runs\/(.+)$/);
     if (runsMatch) return handleApiRuns(res, projectRoot, decodeURIComponent(runsMatch[1]));
@@ -349,7 +370,7 @@ function createRouter(projectRoot, cachedHtml) {
 function startServer(projectRoot, options = {}) {
   const { port = 3333 } = options;
 
-  const htmlPath = path.join(__dirname, 'dashboard-ui.html');
+  const htmlPath = path.join(__dirname, 'eval-dashboard-ui.html');
   if (!fs.existsSync(htmlPath)) {
     console.error(`Error: dashboard UI not found at ${htmlPath}`);
     process.exit(1);

@@ -137,6 +137,14 @@ COMMANDS:
       --max-runs   Maximum iterations (default: 50)
       --max-cost   Maximum cost in dollars (default: unlimited)
 
+  eval list                          List eval scenarios
+  eval run <name> [--k N] [--model]  Run eval trials
+  eval ab <name> [--skill-file path] A/B skill/workflow eval
+  eval compare <name>                Compare A/B results
+  eval report [name]                 Benchmark report
+  eval history                       List benchmark snapshots
+  eval dashboard [--port N]          Live web dashboard (default: 3333)
+
 ENVIRONMENT:
   CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
 
@@ -332,20 +340,12 @@ async function main() {
           return g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`;
         };
 
-        const findScenario = (name) => {
-          for (const f of eval_.listScenarios(projectRoot)) {
-            const s = eval_.parseScenario(f);
-            if (s.name === name) return s;
-          }
-          return undefined;
-        };
-
         const requireScenario = (name, cmd) => {
           if (!name) {
             console.error(`Error: eval ${cmd} requires a scenario name`);
             process.exit(1);
           }
-          const scenario = findScenario(name);
+          const scenario = eval_.findScenario(name, projectRoot);
           if (!scenario) {
             console.error(`Error: scenario "${name}" not found`);
             process.exit(1);
@@ -489,7 +489,7 @@ async function main() {
             process.exit(1);
           }
 
-          const scenario = findScenario(name);
+          const scenario = eval_.findScenario(name, projectRoot);
           const filterOpts = {
             version: scenario?.version,
             since: args.options.since,
@@ -574,7 +574,7 @@ async function main() {
             }
           }
         } else if (subcommand === 'dashboard') {
-          const { startServer } = require('./dashboard');
+          const { startServer } = require('./eval-dashboard');
           const port = args.options.port ? parseInt(args.options.port, 10) : 3333;
           startServer(projectRoot, { port });
         } else {

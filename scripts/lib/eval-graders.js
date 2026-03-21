@@ -344,7 +344,13 @@ function gradeWithModel(result, scenario, projectRoot) {
       continue;
     }
 
-    return { ...result, passed: validated.passed, score: validated.overall };
+    return {
+      ...result,
+      passed: validated.passed,
+      score: validated.overall,
+      assertionScores: validated.scores,
+      evidence: grade.evidence || [],
+    };
   }
 }
 

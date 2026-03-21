@@ -49,6 +49,8 @@ const graders = require('./eval-graders');
  * @property {string} [errorType] - Machine-readable error category (e.g., 'model_grader_failed')
  * @property {boolean} [gradeError] - True if the grader failed to produce a score
  * @property {boolean} [infraError] - True if the trial runner failed to capture output
+ * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
+ * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  */
 
 const EVALS_DIR = 'evals';
@@ -145,6 +147,20 @@ function listScenarios(projectRoot) {
     .readdirSync(scenariosPath)
     .filter((f) => f.endsWith('.md'))
     .map((f) => path.join(scenariosPath, f));
+}
+
+/**
+ * Find a scenario by name
+ * @param {string} name - Scenario name to find
+ * @param {string} projectRoot - Project root directory
+ * @returns {EvalScenario|undefined} Parsed scenario, or undefined if not found
+ */
+function findScenario(name, projectRoot) {
+  for (const f of listScenarios(projectRoot)) {
+    const s = parseScenario(f);
+    if (s.name === name) return s;
+  }
+  return undefined;
 }
 
 /**
@@ -831,6 +847,7 @@ module.exports = {
   parseEvalName,
   parseScenario,
   listScenarios,
+  findScenario,
   createTrialDir,
   cleanupTrialDir,
   runSetup,

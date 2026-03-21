@@ -92,6 +92,20 @@ tr:hover td { background: var(--surface); }
 /* Stats row */
 .stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .stats-row .card { flex: 1; min-width: 140px; }
+
+/* Assertion breakdown */
+.assertion-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.assertion-row:last-child { border-bottom: none; }
+.assertion-score { min-width: 36px; font-weight: 700; text-align: center; padding: 2px 4px; border-radius: 4px; }
+.assertion-score-1 { background: rgba(63,185,80,0.2); color: var(--ship); }
+.assertion-score-075 { background: rgba(63,185,80,0.1); color: var(--ship); }
+.assertion-score-05 { background: rgba(210,153,34,0.15); color: var(--needs-work); }
+.assertion-score-025 { background: rgba(248,81,73,0.1); color: var(--blocked); }
+.assertion-score-0 { background: rgba(248,81,73,0.2); color: var(--blocked); }
+.assertion-name { flex: 1; color: var(--text); }
+.assertion-evidence { color: var(--text2); font-size: 11px; font-style: italic; margin-top: 2px; }
+.assertion-detail { padding: 8px 12px; background: var(--surface); border-left: 2px solid var(--border); margin: 4px 0 4px 48px; }
+.expand-btn { cursor: pointer; color: var(--accent); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -126,6 +140,13 @@ const h = (tag, attrs, ...children) => {
 
 // ── State ──
 const state = { view: 'scenarios', param: null, liveLog: [] };
+
+async function loadAssertions(scenario) {
+  try {
+    const sc = await api('/api/scenario/' + encodeURIComponent(scenario));
+    return sc.assertions || [];
+  } catch { return []; }
+}
 
 // ── API ──
 async function api(path) {
@@ -191,17 +212,60 @@ function passFailLabel(passed) {
 }
 function fmtTime(ts) { return ts ? new Date(ts).toLocaleString() : '-'; }
 
-function buildTrialsTable(trials) {
+function assertionScoreCls(score) {
+  if (score >= 1.0) return 'assertion-score-1';
+  if (score >= 0.75) return 'assertion-score-075';
+  if (score >= 0.5) return 'assertion-score-05';
+  if (score >= 0.25) return 'assertion-score-025';
+  return 'assertion-score-0';
+}
+
+function buildAssertionBreakdown(r, assertions) {
+  if (!r.assertionScores || r.assertionScores.length === 0) return null;
+  const container = h('div', { style: 'padding:8px 0' });
+  for (let i = 0; i < r.assertionScores.length; i++) {
+    const score = r.assertionScores[i];
+    const name = assertions && assertions[i] ? assertions[i] : 'Assertion ' + (i + 1);
+    const ev = r.evidence && r.evidence[i] ? r.evidence[i] : '';
+    const row = h('div', { className: 'assertion-row' },
+      h('span', { className: 'assertion-score ' + assertionScoreCls(score) }, score.toFixed(2)),
+      h('div', { className: 'assertion-name' },
+        h('span', null, name),
+        ev ? h('div', { className: 'assertion-evidence' }, ev) : null
+      )
+    );
+    container.appendChild(row);
+  }
+  return container;
+}
+
+function buildTrialsTable(trials, assertions) {
   const tbody = h('tbody');
   for (const r of trials) {
-    tbody.appendChild(h('tr', null,
+    const row = h('tr', null,
       h('td', null, r.condition),
       h('td', null, '#' + r.trial),
       h('td', null, scoreBar(r.score)),
       h('td', null, passFailLabel(r.passed)),
       h('td', { style: 'font-size:11px;color:var(--text2)' }, r.model || '-'),
       h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript) }, 'View') : h('span', null, '-'))
-    ));
+    );
+    tbody.appendChild(row);
+
+    // Expandable assertion detail row
+    if (r.assertionScores && r.assertionScores.length > 0) {
+      const detailCell = h('td', { colspan: '6', style: 'padding:0' });
+      const detail = buildAssertionBreakdown(r, assertions);
+      const detailRow = h('tr', { style: 'display:none' }, detailCell);
+      detailCell.appendChild(h('div', { className: 'assertion-detail' }, detail));
+      tbody.appendChild(detailRow);
+
+      // Toggle on row click
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        detailRow.style.display = detailRow.style.display === 'none' ? '' : 'none';
+      });
+    }
   }
   return h('table', null,
     h('thead', null, h('tr', null,
@@ -341,7 +405,8 @@ async function renderResults(param) {
     ));
   }
   content.appendChild(statsRow);
-  content.appendChild(buildTrialsTable(allResults));
+  const assertions = await loadAssertions(scenario);
+  content.appendChild(buildTrialsTable(allResults, assertions));
 }
 
 async function renderCompare(scenario) {
@@ -388,7 +453,8 @@ async function renderCompare(scenario) {
     ...(data.treatment?.results || []).map(r => ({ ...r, condition: 'treatment' })),
   ];
   if (allTrials.length > 0) {
-    content.appendChild(buildTrialsTable(allTrials));
+    const assertions = await loadAssertions(scenario);
+    content.appendChild(buildTrialsTable(allTrials, assertions));
   }
 }
 
