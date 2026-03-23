@@ -22,6 +22,7 @@
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
+ *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
 const fs = require('node:fs');
@@ -144,6 +145,9 @@ COMMANDS:
   eval report [name]                 Benchmark report
   eval history                       List benchmark snapshots
   eval dashboard [--port N]          Live web dashboard (default: 3333)
+
+  research dashboard [--results path] [--config path] [--port N]
+                                     Live research experiment dashboard (default port: 3000)
 
 ENVIRONMENT:
   CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
@@ -579,6 +583,26 @@ async function main() {
           startServer(projectRoot, { port });
         } else {
           console.error('Usage: arc eval [list|run|ab|compare|report|history|dashboard]');
+          process.exit(1);
+        }
+        break;
+      }
+
+      case 'research': {
+        const subcommand = args.positional[0];
+
+        if (subcommand === 'dashboard') {
+          const { startServer } = require('./lib/research-dashboard');
+          const port = args.options.port ? parseInt(args.options.port, 10) : 3000;
+          const resultsPath = path.resolve(args.options.results || 'results.tsv');
+          const configPath = args.options.config
+            ? path.resolve(args.options.config)
+            : path.resolve('research-config.md');
+          startServer({ resultsPath, configPath, port });
+        } else {
+          console.error(
+            'Usage: arc research dashboard [--results path] [--config path] [--port N]',
+          );
           process.exit(1);
         }
         break;
