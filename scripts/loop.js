@@ -207,7 +207,7 @@ function buildTaskPrompt(task, coord, projectRoot) {
  * @returns {{ exitCode: number, stdout: string, stderr: string }}
  */
 function spawnSession(prompt, projectRoot) {
-  return execCommand('claude', ['-p', '--output-format', 'text'], {
+  return execCommand('claude', ['-p', '--output-format', 'text', '--no-session-persistence'], {
     input: prompt,
     cwd: projectRoot,
     timeout: 600000, // 10 minute timeout per task
