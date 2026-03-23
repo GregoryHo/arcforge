@@ -39,7 +39,7 @@ digraph when_to_use {
 1. **NEVER modify files outside the declared scope** — the research contract defines what you CAN and CANNOT touch
 2. **NEVER modify the evaluation method** — it is the fixed judge. If the eval is wrong, stop and tell the human.
 3. **NEVER stop mid-loop to ask the human** — you are autonomous. Make decisions, log them, keep going.
-4. **ALWAYS revert on failure or regression** — no half-committed experiments. `git revert` immediately.
+4. **ALWAYS reset on failure or regression** — no half-committed experiments. `git reset --hard HEAD~1` immediately.
 5. **ALWAYS log every experiment to results.tsv** — even crashes, even reverts. The record must be complete.
 6. **ALWAYS establish baseline before experimenting** — you need a reference point to measure improvement.
 
@@ -95,18 +95,19 @@ Soft constraints: {secondary considerations, e.g., "keep memory usage under 4GB"
 Mode: {run-until-interrupted | run-N-times | run-until-target}
 
 ## Simplicity Criterion
-{When two experiments achieve similar metric values, prefer the simpler implementation. Default: fewer lines changed from baseline.}
+{When two experiments achieve similar results, prefer simpler code. A small improvement that adds ugly complexity is not worth it. Removing code and getting equal or better results is a great outcome — that's a simplification win. Default examples: "0.1% improvement + 20 lines of hacky code? Probably not." "0.1% improvement from deleting code? Definitely keep." "No improvement but much simpler code? Keep."}
 ```
 
 ### Phase 2: Establish Baseline
 
 1. Create a research branch: `git checkout -b research/{tag}`
 2. Run the evaluation command from the contract
-3. Extract the baseline metric value
-4. Log baseline to `results.tsv` with status `baseline`
-5. Start the dashboard: `node scripts/cli.js research dashboard --results results.tsv --config research-config.md`
-6. Tell the human: "Dashboard running at http://localhost:3000 — monitor progress there."
-7. Commit the baseline state
+3. If the baseline crashes or produces no metric, STOP. Tell the human to fix the evaluation environment. Do not debug infrastructure — it is outside scope.
+4. Extract the baseline metric value
+5. Log baseline to `results.tsv` with status `baseline` — do NOT commit results.tsv (keep it untracked so experiment history survives resets)
+6. Start the dashboard: `node scripts/cli.js research dashboard --results results.tsv --config research-config.md`
+7. Tell the human: "Dashboard running at http://localhost:3000 — monitor progress there."
+8. Commit the baseline state (but NOT results.tsv)
 
 ### Phase 3: Experiment Loop (Autonomous)
 
@@ -118,8 +119,8 @@ LOOP (until stop condition):
   2. HYPOTHESIZE   — pick a direction based on results so far
   3. IMPLEMENT     — modify files within declared scope only
   4. COMMIT        — git commit with descriptive message
-  5. RUN           — execute evaluation command, capture output
-  6. EXTRACT       — parse metric value from output
+  5. RUN           — execute command, redirect ALL output to run.log (never tee or raw stdout)
+  6. EXTRACT       — grep for metric in run.log (never read the full log)
   7. DECIDE        — improved? keep. Same/worse? revert. Crash? log + revert.
   8. LOG           — append row to results.tsv (every experiment, no exceptions)
   9. ANALYZE       — 3+ failures in same direction? change direction entirely
@@ -130,8 +131,8 @@ LOOP (until stop condition):
 | Outcome | Action | Git | results.tsv Status |
 |---------|--------|-----|--------------------|
 | Metric improved | Keep the change | Keep commit | `keep` |
-| Metric same or worse | Discard the change | `git revert HEAD --no-edit` | `discard` |
-| Command crashed/timed out | Log and discard | `git revert HEAD --no-edit` | `crash` |
+| Metric same or worse | Discard the change | `git reset --hard HEAD~1` | `discard` |
+| Command crashed/timed out | Log and discard | `git reset --hard HEAD~1` | `crash` |
 
 #### Stuck Protocol
 
@@ -141,12 +142,37 @@ If **3 or more consecutive experiments** fail in the same direction (e.g., all t
 3. Choose a fundamentally different direction
 4. If all major directions exhausted, try combinations of previously successful changes
 
+**Idea generation when stuck:**
+- Re-read the target files for angles you missed on first read
+- Try combining two previously successful changes
+- Try the opposite of your last 3 failed approaches
+- Try removing code instead of adding it — simplification often unlocks performance
+
 #### Crash/Timeout Handling
 
-- If the run command exits non-zero: log as `crash` with the error in description
-- If the run exceeds the timeout: kill the process, log as `crash` with "timeout" in description
-- Always revert the commit after a crash
-- Never count crashes toward the "3 failures → change direction" rule (crashes indicate broken code, not a bad hypothesis)
+Two types of crashes — handle differently:
+
+**Dumb bug** (typo, missing import, syntax error, off-by-one):
+- Fix the bug in-place without reverting
+- Re-run the same experiment
+- The hypothesis is fine; the implementation had a bug
+
+**Fundamentally broken idea** (OOM, algorithm doesn't converge, approach is wrong):
+- Log as `crash` with the error in description
+- Reset the commit: `git reset --hard HEAD~1`
+- Move on to the next hypothesis
+
+**Timeout:** If the run exceeds the timeout, kill it and treat as a fundamentally broken idea.
+
+Never count crashes toward the "3 failures → change direction" rule — crashes indicate broken code, not a bad hypothesis.
+
+#### Context Discipline
+
+Long-running research burns context. Protect it:
+- **Redirect output:** `command > run.log 2>&1` — never `tee`, never raw stdout
+- **Extract, don't read:** `grep "metric_pattern" run.log` — never `cat run.log`
+- **Tail on crash only:** `tail -n 50 run.log` — read stack traces, not full logs
+- **Keep results.tsv and research-config.md as your memory** — re-read them each iteration instead of relying on conversation context
 
 ### Phase 4: Report
 
@@ -173,6 +199,8 @@ d4e5f6g	NaN	crash	Segfault in custom allocator — timeout after 300s
 - **metric_value**: Numeric value, or `NaN` for crashes
 - **status**: One of `baseline`, `keep`, `discard`, `crash`
 - **description**: What was tried and why it was kept/discarded
+
+**Git status:** Keep results.tsv untracked. If committed, `git reset` after failed experiments will erase the log. The TSV is your persistent memory — it must survive resets.
 
 ## Resume Protocol
 
