@@ -383,7 +383,12 @@ async function main() {
           } else {
             for (const file of scenarios) {
               const s = eval_.parseScenario(file);
-              const results = eval_.loadResults(s.name, projectRoot, { version: s.version });
+              const isAb = s.scope === 'skill' || s.scope === 'workflow';
+              const resultsName = isAb ? `${s.name}-treatment` : s.name;
+              let results = eval_.loadResults(resultsName, projectRoot, { version: s.version });
+              if (results.length === 0 && isAb) {
+                results = eval_.loadResults(s.name, projectRoot, { version: s.version });
+              }
               const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
               console.log(`  ${s.name} (${s.scope}, ${s.grader}) — ${verdict}`);
             }
@@ -415,7 +420,10 @@ async function main() {
                 graded = await eval_.gradeWithHuman(graded, rl);
               }
 
-              eval_.appendResult(graded, projectRoot);
+              const versioned = scenario.version
+                ? { ...graded, version: scenario.version }
+                : graded;
+              eval_.appendResult(versioned, projectRoot);
               console.log(formatStatus(graded));
             }
           } finally {
@@ -459,7 +467,7 @@ async function main() {
               );
               process.exit(1);
             }
-            const resolvedSkillFile = path.resolve(skillFile);
+            const resolvedSkillFile = path.resolve(projectRoot, skillFile);
             if (!fs.existsSync(resolvedSkillFile)) {
               console.error(`Error: skill file not found: ${skillFile}`);
               process.exit(1);
