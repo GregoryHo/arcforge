@@ -228,9 +228,7 @@ Three grader types — choose based on the assertion's nature, not convenience.
 | **model** | Assertions require understanding intent, quality, or reasoning (e.g., "identifies root cause", "explanation is clear", "follows systematic methodology") | Checks that can be verified by running commands — adds noise without value | Reads `agents/eval-grader.md` as grading methodology, scores each assertion on a normalized 0.0-1.0 scale, and uses trial artifacts as evidence when available. Harness logic computes overall score and pass/fail from the returned per-assertion scores. |
 | **human** | Assertions involve audience-dependent experience, taste, or domain expertise that even LLMs assess unreliably (e.g., "feels intuitive", "tone matches brand") | Assessments an LLM can judge — save human bandwidth for what only humans can evaluate | Present output + checklist for review |
 
-Some behavioral qualities cannot be captured by deterministic tests alone. When evaluating methodology, reasoning quality, or communication clarity, model or human grading captures signal that code grading structurally cannot. Match the grader to the assertion — not the other way around.
-
-**When a goal has both deterministic and judgment aspects** (e.g., "agent writes good error handling"): split into complementary scenarios — one code-graded for verifiable aspects (tests pass, no empty catch blocks), one model-graded for judgment aspects (error messages are contextual, errors handled at appropriate layer).
+**When a goal has both deterministic and judgment aspects**, split into complementary scenarios or use both graders on the same scenario:
 
 Example: an eval where the agent returns a JSON code review. Split the assertions:
 - Code grader: "output is valid JSON", "every finding has required fields" (structure — deterministic)
