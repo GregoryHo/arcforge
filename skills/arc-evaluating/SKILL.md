@@ -79,6 +79,8 @@ Three common questions:
 
 Do not collapse these into one fuzzy "quality" question. A skill-adherence eval and an outcome-quality eval are different harnesses, even if both involve the same task domain.
 
+**Validity vs Reliability trade-off:** A valid measurement captures the real signal (does the agent actually review code well?). A reliable measurement produces consistent scores across trials (does the grader always agree with itself?). When forced to choose, prefer validity — a noisy-but-real signal is more useful than a precise-but-fake one. Code grading is reliable but only valid for deterministic checks. Model grading is noisier but valid for judgment. Never sacrifice validity for reliability by converting judgment assertions into string-matching proxies.
+
 ## The Process
 
 ```
