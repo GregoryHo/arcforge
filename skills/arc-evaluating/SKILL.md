@@ -346,6 +346,11 @@ evals/
 3. Check if the agent has what it needs (files, context) to complete the task
 4. Consider if the skill/agent needs fundamental redesign, not just tuning
 
+**If delta stays near zero (baseline ≈ treatment):**
+1. Baseline is at ceiling — the scenario isn't discriminative. Add a harder trap that requires the skill's specific insight.
+2. Treatment is at floor — the skill isn't helping. Re-read the skill and verify its instructions actually address the scenario's challenge.
+3. Both are mediocre — the scenario may be testing generic competence rather than skill-specific behavior. Narrow the scope to one rule.
+
 ## CLI Reference
 
 ```
