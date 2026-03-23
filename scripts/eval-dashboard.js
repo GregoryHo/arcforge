@@ -175,6 +175,9 @@ function handleApiRuns(res, projectRoot, scenarioName) {
   const resultsPath = path.join(projectRoot, eval_.RESULTS_DIR, scenarioName);
   if (!fs.existsSync(resultsPath)) return sendJson(res, { scenario: scenarioName, runs: [] });
 
+  const scenario = eval_.findScenario(scenarioName, projectRoot);
+  const version = scenario?.version;
+
   const entries = fs.readdirSync(resultsPath, { withFileTypes: true });
   const runs = [];
 
@@ -200,7 +203,8 @@ function handleApiRuns(res, projectRoot, scenarioName) {
             return null;
           }
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter((r) => !version || (r.version || '1') === version);
 
       if (results.length > 0) {
         const s = stats.statsFromResults(results);
@@ -214,13 +218,15 @@ function handleApiRuns(res, projectRoot, scenarioName) {
       }
     }
 
-    runs.push({
-      runId: entry.name,
-      conditions,
-      trialCount: totalTrials,
-      timestamp,
-      stats: runStats,
-    });
+    if (totalTrials > 0) {
+      runs.push({
+        runId: entry.name,
+        conditions,
+        trialCount: totalTrials,
+        timestamp,
+        stats: runStats,
+      });
+    }
   }
 
   runs.sort((a, b) => (b.runId > a.runId ? 1 : -1));

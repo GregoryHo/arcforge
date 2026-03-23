@@ -96,8 +96,10 @@ function computeSummary(experiments, config) {
 
   let improvement = null;
   if (baseline && baseline.metric_value != null && best != null && baseline.metric_value !== 0) {
-    const delta = best - baseline.metric_value;
-    improvement = (Math.abs(delta) / Math.abs(baseline.metric_value)) * 100;
+    const delta = lowerIsBetter
+      ? baseline.metric_value - best // positive = improved (lower is better)
+      : best - baseline.metric_value; // positive = improved (higher is better)
+    improvement = (delta / Math.abs(baseline.metric_value)) * 100;
   }
 
   return {

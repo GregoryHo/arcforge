@@ -201,17 +201,35 @@ function buildTaskPrompt(task, coord, projectRoot) {
 }
 
 /**
- * Spawn a Claude session for a task
+ * Spawn a Claude session for a task.
+ * Uses JSON output to capture cost data for --max-cost budget tracking.
  * @param {string} prompt - Task prompt
  * @param {string} projectRoot - Project root directory
- * @returns {{ exitCode: number, stdout: string, stderr: string }}
+ * @returns {{ exitCode: number, stdout: string, stderr: string, costUsd: number }}
  */
 function spawnSession(prompt, projectRoot) {
-  return execCommand('claude', ['-p', '--output-format', 'text', '--no-session-persistence'], {
-    input: prompt,
-    cwd: projectRoot,
-    timeout: 600000, // 10 minute timeout per task
-  });
+  const result = execCommand(
+    'claude',
+    ['-p', '--output-format', 'json', '--no-session-persistence'],
+    {
+      input: prompt,
+      cwd: projectRoot,
+      timeout: 600000, // 10 minute timeout per task
+    },
+  );
+  let costUsd = 0;
+  if (result.exitCode === 0 && result.stdout) {
+    try {
+      const parsed = JSON.parse(result.stdout);
+      costUsd = parsed.total_cost_usd || 0;
+      // Replace stdout with the text result for downstream consumers
+      result.stdout = parsed.result || '';
+    } catch {
+      /* non-JSON output — keep stdout as-is, cost stays 0 */
+    }
+  }
+  result.costUsd = costUsd;
+  return result;
 }
 
 /**
@@ -245,6 +263,7 @@ function runTask(task, coord, state, projectRoot) {
 
   const prompt = buildTaskPrompt(task, coord, projectRoot);
   let result = spawnSession(prompt, projectRoot);
+  state.total_cost += result.costUsd;
 
   if (result.exitCode !== 0) {
     console.log(`[loop] Task ${task.id} failed, retrying once...`);
@@ -252,6 +271,7 @@ function runTask(task, coord, state, projectRoot) {
 
     // Retry once
     result = spawnSession(prompt, projectRoot);
+    state.total_cost += result.costUsd;
     if (result.exitCode !== 0) {
       console.log(`[loop] Task ${task.id} failed after retry — blocking`);
       recordError(state, task.id, result.stderr, 2);
