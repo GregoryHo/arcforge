@@ -159,6 +159,12 @@ Bad skill-eval scenario:
 
 If the task is deterministic but your assertion is vague, fix the assertion. If the judgment is inherently subjective, switch to model or human grading instead of pretending code grading can capture it.
 
+**Quick design checklist** (verify before writing assertions):
+1. Can I name the specific behavior this scenario tests? → If no, scope is too broad
+2. Can I describe why baseline will fail? → If no, scenario isn't discriminative
+3. Does each assertion use the right grader for its nature? → Code for facts, model for judgment
+4. Is the output format small enough for consistent grading? → Prefer short structured artifacts
+
 ### Scenario Validity Preflight
 
 Before spending a full A/B run on a new skill-eval scenario, do a quick validity check:
