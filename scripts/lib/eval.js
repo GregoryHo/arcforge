@@ -655,6 +655,7 @@ function loadResults(evalName, projectRoot, options = {}) {
   if (fs.existsSync(scenarioDir) && fs.statSync(scenarioDir).isDirectory()) {
     foundHierarchical = true;
     const entries = fs.readdirSync(scenarioDir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name === 'transcripts') continue;
       // Date filter on runId prefix (first 8 chars = YYYYMMDD)

@@ -547,27 +547,35 @@ async function main() {
 
           if (name && benchmark.evals[name]) {
             const data = benchmark.evals[name];
-            output(data, asJson);
+            if (model && data.by_model && data.by_model[model]) {
+              output(data.by_model[model], asJson);
+            } else {
+              output(data, asJson);
+            }
           } else {
             if (Object.keys(benchmark.evals).length === 0) {
               console.log('No eval results yet. Run: arc eval run <scenario>');
             } else {
               for (const [evalName, data] of Object.entries(benchmark.evals)) {
+                const displayData = model && data.by_model?.[model] ? data.by_model[model] : data;
                 let verdict;
-                if (data.grader === 'model' && data.trials >= 5 && data.ci95) {
+                if (data.grader === 'model' && displayData.trials >= 5) {
+                  const scenarioFile = eval_.findScenario(evalName, projectRoot);
+                  const results = eval_.loadResults(evalName, projectRoot, {
+                    version: scenarioFile?.version,
+                    ...(model ? { model } : {}),
+                  });
                   verdict =
-                    data.ci95.lower >= eval_.SHIP_CI_TARGET
-                      ? 'SHIP'
-                      : data.pass_rate >= eval_.NEEDS_WORK_THRESHOLD
-                        ? 'NEEDS WORK'
-                        : 'BLOCKED';
+                    results.length >= 5
+                      ? eval_.verdictFromCI(results)
+                      : eval_.verdictFromRate(displayData.pass_rate);
                 } else {
-                  verdict = eval_.verdictFromRate(data.pass_rate);
+                  verdict = eval_.verdictFromRate(displayData.pass_rate);
                 }
                 console.log(
-                  `  ${evalName}: ${(data.pass_rate * 100).toFixed(0)}% (${data.trials} trials) — ${verdict}`,
+                  `  ${evalName}: ${(displayData.pass_rate * 100).toFixed(0)}% (${displayData.trials} trials) — ${verdict}`,
                 );
-                if (data.by_model) {
+                if (!model && data.by_model) {
                   const parts = Object.entries(data.by_model).map(
                     ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,
                   );
@@ -612,10 +620,10 @@ async function main() {
         if (subcommand === 'dashboard') {
           const { startServer } = require('./lib/research-dashboard');
           const port = args.options.port ? parseInt(args.options.port, 10) : 3000;
-          const resultsPath = path.resolve(args.options.results || 'results.tsv');
+          const resultsPath = path.resolve(projectRoot, args.options.results || 'results.tsv');
           const configPath = args.options.config
-            ? path.resolve(args.options.config)
-            : path.resolve('research-config.md');
+            ? path.resolve(projectRoot, args.options.config)
+            : path.resolve(projectRoot, 'research-config.md');
           startServer({ resultsPath, configPath, port });
         } else {
           console.error(

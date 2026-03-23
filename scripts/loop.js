@@ -18,6 +18,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
 const { Coordinator } = require('./lib/coordinator');
 const { Feature } = require('./lib/models');
 const { execCommand, getTimestamp, readFileSafe } = require('./lib/utils');
@@ -207,6 +208,27 @@ function buildTaskPrompt(task, coord, projectRoot) {
  * @param {string} projectRoot - Project root directory
  * @returns {{ exitCode: number, stdout: string, stderr: string, costUsd: number }}
  */
+/**
+ * Extract cost data from a Claude JSON response, replacing stdout with the text result.
+ * Mutates the result object in place.
+ * @param {{ exitCode: number, stdout: string }} result
+ * @returns {{ exitCode: number, stdout: string, costUsd: number }}
+ */
+function extractCost(result) {
+  let costUsd = 0;
+  if (result.exitCode === 0 && result.stdout) {
+    try {
+      const parsed = JSON.parse(result.stdout);
+      costUsd = parsed.total_cost_usd || 0;
+      result.stdout = parsed.result || '';
+    } catch {
+      /* non-JSON output — keep stdout as-is */
+    }
+  }
+  result.costUsd = costUsd;
+  return result;
+}
+
 function spawnSession(prompt, projectRoot) {
   const result = execCommand(
     'claude',
@@ -217,19 +239,32 @@ function spawnSession(prompt, projectRoot) {
       timeout: 600000, // 10 minute timeout per task
     },
   );
-  let costUsd = 0;
-  if (result.exitCode === 0 && result.stdout) {
-    try {
-      const parsed = JSON.parse(result.stdout);
-      costUsd = parsed.total_cost_usd || 0;
-      // Replace stdout with the text result for downstream consumers
-      result.stdout = parsed.result || '';
-    } catch {
-      /* non-JSON output — keep stdout as-is, cost stays 0 */
+  return extractCost(result);
+}
+
+/**
+ * Spawn a Claude session asynchronously (for parallel DAG execution).
+ * Returns a Promise with the same shape as spawnSession.
+ * @param {string} prompt - Task prompt
+ * @param {string} projectRoot - Project root directory
+ * @returns {Promise<{ exitCode: number, stdout: string, stderr: string, costUsd: number }>}
+ */
+function spawnSessionAsync(prompt, projectRoot) {
+  return new Promise((resolve) => {
+    const child = execFile(
+      'claude',
+      ['-p', '--output-format', 'json', '--no-session-persistence'],
+      { cwd: projectRoot, timeout: 600000, maxBuffer: 50 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        const exitCode = error ? (error.status ?? 1) : 0;
+        resolve(extractCost({ stdout: stdout || '', stderr: stderr || '', exitCode }));
+      },
+    );
+    if (child.stdin) {
+      child.stdin.write(prompt);
+      child.stdin.end();
     }
-  }
-  result.costUsd = costUsd;
-  return result;
+  });
 }
 
 /**
@@ -419,10 +454,11 @@ function runSequential(options) {
 }
 
 /**
- * Run DAG-parallel loop pattern
+ * Run DAG-parallel loop pattern.
+ * Independent tasks are spawned concurrently via spawnSessionAsync.
  * @param {Object} options - Loop options
  */
-function runDag(options) {
+async function runDag(options) {
   const { projectRoot, maxRuns, maxCost } = options;
   const state = loadLoopState(projectRoot);
   state.pattern = 'dag';
@@ -444,14 +480,46 @@ function runDag(options) {
     // Try parallel tasks first
     const parallelEpics = coord.parallelTasks();
     if (parallelEpics.length > 1) {
-      console.log(`[loop] Found ${parallelEpics.length} parallel epics`);
+      console.log(`[loop] Found ${parallelEpics.length} parallel epics — running concurrently`);
 
+      // Spawn all sessions concurrently
+      const taskEntries = parallelEpics.map((epic) => ({
+        epic,
+        prompt: buildTaskPrompt(epic, coord, projectRoot),
+      }));
+      const spawnResults = await Promise.all(
+        taskEntries.map((entry) => spawnSessionAsync(entry.prompt, projectRoot)),
+      );
+
+      // Process results sequentially (state + DAG updates are not concurrent-safe)
       let anySuccess = false;
-      for (const epic of parallelEpics) {
-        const success = runTask(epic, coord, state, projectRoot);
-        saveLoopState(state, projectRoot);
-        if (success) anySuccess = true;
+      for (let i = 0; i < parallelEpics.length; i++) {
+        const epic = parallelEpics[i];
+        const result = spawnResults[i];
+        state.total_cost += result.costUsd;
+
+        if (result.exitCode !== 0) {
+          console.log(`[loop] Task ${epic.id} failed`);
+          recordError(state, epic.id, result.stderr, 1);
+          state.failed_tasks.push(epic.id);
+          try {
+            coord.blockTask(epic.id, 'Loop: failed in parallel batch');
+          } catch (err) {
+            console.error(`[loop] Warning: could not block task ${epic.id}: ${err.message}`);
+          }
+        } else {
+          try {
+            coord.completeTask(epic.id);
+            state.completed_tasks.push(epic.id);
+            state.last_progress_at = getTimestamp();
+            console.log(`[loop] Task ${epic.id} completed successfully`);
+            anySuccess = true;
+          } catch (err) {
+            console.error(`[loop] Warning: DAG update failed for ${epic.id}: ${err.message}`);
+          }
+        }
       }
+      saveLoopState(state, projectRoot);
 
       if (!anySuccess) {
         console.log('[loop] No parallel tasks succeeded');
@@ -506,11 +574,11 @@ function printSummary(state) {
 /**
  * Main entry point
  */
-function main() {
+async function main() {
   const options = parseLoopArgs(process.argv.slice(2));
 
   if (options.pattern === 'dag') {
-    runDag(options);
+    await runDag(options);
   } else {
     runSequential(options);
   }
@@ -526,6 +594,7 @@ module.exports = {
   saveLoopState,
   buildTaskPrompt,
   spawnSession,
+  spawnSessionAsync,
   runTask,
   isStalled,
   isRetryStorm,
