@@ -433,7 +433,7 @@ async function main() {
         } else if (subcommand === 'ab') {
           const scenario = requireScenario(args.positional[1], 'ab');
           const k = parseK(scenario, true);
-          const interleave = !!args.options.interleave;
+          const interleave = !!args.flags.interleave;
           const onTrialComplete = (label, t, graded) => {
             console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
           };

@@ -228,7 +228,10 @@ function handleApiRuns(res, projectRoot, scenarioName) {
 }
 
 function handleApiResults(res, projectRoot, evalName, query) {
-  const results = eval_.loadResults(evalName, projectRoot, filterOpts(query));
+  const opts = filterOpts(query);
+  const scenario = eval_.findScenario(evalName, projectRoot);
+  if (scenario?.version) opts.version = scenario.version;
+  const results = eval_.loadResults(evalName, projectRoot, opts);
   const st = results.length > 0 ? stats.statsFromResults(results) : null;
   sendJson(res, {
     eval: evalName,
@@ -247,6 +250,8 @@ function handleApiResults(res, projectRoot, evalName, query) {
 
 function handleApiCompare(res, projectRoot, scenarioName, query) {
   const opts = filterOpts(query);
+  const scenario = eval_.findScenario(scenarioName, projectRoot);
+  if (scenario?.version) opts.version = scenario.version;
   const baseline = eval_.loadResults(`${scenarioName}-baseline`, projectRoot, opts);
   const treatment = eval_.loadResults(`${scenarioName}-treatment`, projectRoot, opts);
 

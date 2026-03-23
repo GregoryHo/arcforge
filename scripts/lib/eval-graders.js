@@ -320,11 +320,15 @@ function gradeWithModel(result, scenario, projectRoot) {
   ].join('\n');
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text', '--no-session-persistence'], {
-      input: prompt,
-      cwd: projectRoot,
-      timeout: 120000,
-    });
+    const { stdout, exitCode } = execCommand(
+      'claude',
+      ['-p', '--output-format', 'text', '--no-session-persistence'],
+      {
+        input: prompt,
+        cwd: projectRoot,
+        timeout: 120000,
+      },
+    );
 
     if (exitCode !== 0) {
       if (attempt === 2) {
@@ -417,11 +421,15 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
     'Use the provided programmatic metrics as numeric truth. Do not invent missing per-assertion numbers.',
   ].join('\n');
 
-  const { stdout, exitCode } = execCommand('claude', ['-p', '--output-format', 'text', '--no-session-persistence'], {
-    input: prompt,
-    cwd: projectRoot,
-    timeout: 120000,
-  });
+  const { stdout, exitCode } = execCommand(
+    'claude',
+    ['-p', '--output-format', 'text', '--no-session-persistence'],
+    {
+      input: prompt,
+      cwd: projectRoot,
+      timeout: 120000,
+    },
+  );
 
   if (exitCode !== 0) return null;
 

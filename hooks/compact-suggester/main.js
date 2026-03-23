@@ -10,8 +10,8 @@
  *
  * Triggered on PostToolUse for ALL tools.
  *
- * Performance: read/write tracking uses in-memory counters to avoid extra file I/O
- * on the hot path. Counters only persist to disk at suggestion boundaries.
+ * Performance: read/write tracking uses session-scoped file counters (same as tool-count)
+ * since hooks run as fresh processes per event — in-memory state doesn't persist.
  */
 
 const {
@@ -29,18 +29,30 @@ const MIN_PHASE_SAMPLES = 10;
 const WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit'];
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 
-// Tool counter persists to disk (used by session-tracker exports)
+// All counters persist to disk — hooks run as fresh processes per event
 let toolCounter = null;
-
-// Read/write tracked in-memory only — no per-call file I/O
-let memReadCount = 0;
-let memWriteCount = 0;
+let readCounter = null;
+let writeCounter = null;
 
 function getCounter() {
   if (!toolCounter) {
     toolCounter = createSessionCounter('tool-count');
   }
   return toolCounter;
+}
+
+function getReadCounter() {
+  if (!readCounter) {
+    readCounter = createSessionCounter('read-count');
+  }
+  return readCounter;
+}
+
+function getWriteCounter() {
+  if (!writeCounter) {
+    writeCounter = createSessionCounter('write-count');
+  }
+  return writeCounter;
 }
 
 /**
@@ -51,11 +63,13 @@ function shouldSuggest(count) {
 }
 
 /**
- * Get read/write ratio from in-memory counters
+ * Get read/write ratio from persisted counters
  * @returns {{ reads: number, writes: number, total: number }}
  */
 function getReadWriteRatio() {
-  return { reads: memReadCount, writes: memWriteCount, total: memReadCount + memWriteCount };
+  const reads = getReadCounter().read();
+  const writes = getWriteCounter().read();
+  return { reads, writes, total: reads + writes };
 }
 
 /**
@@ -95,14 +109,16 @@ function buildMessage(count) {
 }
 
 /**
- * Track read/write tool usage in memory (no file I/O)
+ * Track read/write tool usage via persisted counters
  */
 function trackToolType(input) {
   const toolName = input?.tool_name || '';
   if (READ_TOOLS.some((t) => toolName.includes(t))) {
-    memReadCount++;
+    const c = getReadCounter();
+    c.write(c.read() + 1);
   } else if (WRITE_TOOLS.some((t) => toolName.includes(t))) {
-    memWriteCount++;
+    const c = getWriteCounter();
+    c.write(c.read() + 1);
   }
 }
 
