@@ -178,6 +178,7 @@ Before spending a full A/B run on a new skill-eval scenario, do a quick validity
 3. **Answer leakage**
    - Do not tell the agent the repair pattern you want it to discover.
    - If the prompt explicitly names the correct grader split, decomposition, or target repair structure, you are testing prompt compliance, not skill adherence.
+   - **Self-test:** Read the scenario prompt without the skill. If a competent agent could infer the expected answer from the prompt alone, the answer is leaked. The skill should provide the insight, not the prompt.
 4. **Escape hatches**
    - Preserve the tension you want to test, but do not prescribe the exact fix.
    - It is valid to forbid changing the task, diff, or contract if those are the point of the eval.
