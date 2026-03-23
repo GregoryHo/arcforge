@@ -174,6 +174,7 @@ Before spending a full A/B run on a new skill-eval scenario, do a quick validity
    - Preserve the tension you want to test, but do not prescribe the exact fix.
    - It is valid to forbid changing the task, diff, or contract if those are the point of the eval.
    - It is not valid to also tell the agent the exact structure of the correct repair, because that removes the discriminative step.
+   - Watch for scenarios where the agent can dissolve the tension entirely — e.g., rewriting the task prompt, switching to a different evaluation domain, or simplifying the code under test so the hard part disappears. The scenario must constrain what can change while leaving the "how to solve it" open.
 5. **Output-complexity budget**
    - Prefer short structured outputs over rewriting full scenario files, especially for comprehension or model-graded evals.
    - Long outputs increase grading noise and often test formatting endurance rather than the target behavior.
