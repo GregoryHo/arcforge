@@ -553,7 +553,17 @@ async function main() {
               console.log('No eval results yet. Run: arc eval run <scenario>');
             } else {
               for (const [evalName, data] of Object.entries(benchmark.evals)) {
-                const verdict = eval_.verdictFromRate(data.pass_rate);
+                let verdict;
+                if (data.grader === 'model' && data.trials >= 5 && data.ci95) {
+                  verdict =
+                    data.ci95.lower >= eval_.SHIP_CI_TARGET
+                      ? 'SHIP'
+                      : data.pass_rate >= eval_.NEEDS_WORK_THRESHOLD
+                        ? 'NEEDS WORK'
+                        : 'BLOCKED';
+                } else {
+                  verdict = eval_.verdictFromRate(data.pass_rate);
+                }
                 console.log(
                   `  ${evalName}: ${(data.pass_rate * 100).toFixed(0)}% (${data.trials} trials) — ${verdict}`,
                 );

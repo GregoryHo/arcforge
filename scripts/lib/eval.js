@@ -753,6 +753,7 @@ function generateBenchmark(projectRoot) {
 
     benchmarks[scenario.name] = {
       scope: scenario.scope,
+      grader: scenario.grader,
       trials: s.count,
       pass_rate: s.passRate,
       avg_score: s.avg,

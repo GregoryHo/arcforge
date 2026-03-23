@@ -84,7 +84,9 @@ function setupWatchers(projectRoot) {
   }
 
   const watchers = [];
-  if (fs.existsSync(resultsDir)) {
+
+  function watchResultsDir() {
+    if (!fs.existsSync(resultsDir)) return false;
     try {
       const w = fs.watch(resultsDir, { recursive: true }, (_event, filename) => {
         if (!filename) return;
@@ -93,9 +95,19 @@ function setupWatchers(projectRoot) {
         debounceTimer = setTimeout(processChanges, 500);
       });
       watchers.push(w);
+      return true;
     } catch {
       /* fs.watch may not support recursive on some platforms */
+      return false;
     }
+  }
+
+  if (!watchResultsDir()) {
+    // Results dir doesn't exist yet — poll until it appears
+    const pollInterval = setInterval(() => {
+      if (watchResultsDir()) clearInterval(pollInterval);
+    }, 5000);
+    watchers.push({ close: () => clearInterval(pollInterval) });
   }
 
   // Heartbeat every 30s
@@ -235,7 +247,8 @@ function handleApiRuns(res, projectRoot, scenarioName) {
 
 function handleApiResults(res, projectRoot, evalName, query) {
   const opts = filterOpts(query);
-  const scenario = eval_.findScenario(evalName, projectRoot);
+  const baseName = evalName.replace(/-(baseline|treatment)$/, '');
+  const scenario = eval_.findScenario(baseName, projectRoot);
   if (scenario?.version) opts.version = scenario.version;
   const results = eval_.loadResults(evalName, projectRoot, opts);
   const st = results.length > 0 ? stats.statsFromResults(results) : null;
