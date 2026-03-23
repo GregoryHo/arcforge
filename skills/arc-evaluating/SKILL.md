@@ -229,6 +229,10 @@ Some behavioral qualities cannot be captured by deterministic tests alone. When 
 
 **When a goal has both deterministic and judgment aspects** (e.g., "agent writes good error handling"): split into complementary scenarios — one code-graded for verifiable aspects (tests pass, no empty catch blocks), one model-graded for judgment aspects (error messages are contextual, errors handled at appropriate layer).
 
+Example: an eval where the agent returns a JSON code review. Split the assertions:
+- Code grader: "output is valid JSON", "every finding has required fields" (structure — deterministic)
+- Model grader: "SQL injection finding is correctly categorized and fix is sound" (quality — requires judgment)
+
 ### Step 5: Track Results
 
 Results stored in `evals/results/` as JSONL (gitignored):
