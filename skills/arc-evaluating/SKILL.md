@@ -215,7 +215,9 @@ Both conditions run in `.eval-trials/` for workspace safety. The treatment trial
 
 ### Step 4: Grade Eval
 
-Three grader types — choose based on the assertion's nature, not convenience:
+Three grader types — choose based on the assertion's nature, not convenience.
+
+**Key principle:** Structured output (JSON, typed fields) does not make semantic quality deterministic. An agent can return valid JSON with correctly typed fields while still producing a poor security analysis or vague fix suggestion. Structure is code-verifiable; quality is not. When an assertion checks *what* the output contains, use code grading. When it checks *how good* the content is, use model grading.
 
 | Grader | Use When | Not For | How |
 |--------|----------|---------|-----|
