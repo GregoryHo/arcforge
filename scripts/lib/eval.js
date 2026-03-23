@@ -51,6 +51,7 @@ const graders = require('./eval-graders');
  * @property {boolean} [infraError] - True if the trial runner failed to capture output
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
+ * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
  */
 
 const EVALS_DIR = 'evals';

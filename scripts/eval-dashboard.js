@@ -233,21 +233,13 @@ function handleApiResults(res, projectRoot, evalName, query) {
   sendJson(res, {
     eval: evalName,
     results: results.map((r) => ({
-      trial: r.trial,
+      ...trialSummary(r),
       k: r.k,
-      passed: r.passed,
-      score: r.score,
       grader: r.grader,
-      timestamp: r.timestamp,
-      model: r.model,
-      runId: r.runId,
       error: r.error,
       errorType: r.errorType,
       gradeError: r.gradeError,
       infraError: r.infraError,
-      transcript: r.transcript,
-      assertionScores: r.assertionScores,
-      evidence: r.evidence,
     })),
     stats: st,
   });
@@ -289,6 +281,7 @@ function trialSummary(r) {
     transcript: r.transcript,
     assertionScores: r.assertionScores,
     evidence: r.evidence,
+    blockRefs: r.blockRefs,
   };
 }
 

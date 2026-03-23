@@ -85,6 +85,7 @@ When used by `arc eval run` (automated batch grading), respond with ONLY a JSON 
     "Shows most of the required method but leaves one key step implicit.",
     "Mentions the topic but gives only weak support for the claim."
   ],
+  "blockRefs": [[2, 3], [4], []],
   "overall": 0.67,
   "passed": false
 }
@@ -92,6 +93,7 @@ When used by `arc eval run` (automated batch grading), respond with ONLY a JSON 
 
 - `scores`: normalized 0.0-1.0 scores, preferably using anchors `0`, `0.25`, `0.5`, `0.75`, `1.0`
 - `evidence`: short evidence note for each assertion in the same order
+- `blockRefs`: for each assertion, list the `[Block N]` numbers from the output that contain the evidence (empty array if no specific block)
 - `overall`: optional convenience field
 - `passed`: optional convenience field
 

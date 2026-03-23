@@ -259,6 +259,20 @@ function captureTrialArtifacts(trialDir, opts = {}) {
 }
 
 /**
+ * Split transcript output into numbered blocks for grader reference.
+ * Blocks are delimited by [Tool: X] and [Assistant] markers.
+ * @param {string} output - Raw transcript text
+ * @returns {{ numbered: string, blockCount: number }}
+ */
+function numberTranscriptBlocks(output) {
+  if (!output) return { numbered: '(no output)', blockCount: 0 };
+  const blocks = output.split(/(?=^\[(?:Tool:|Assistant))/m).filter((b) => b.trim());
+  if (blocks.length === 0) return { numbered: output, blockCount: 0 };
+  const numbered = blocks.map((b, i) => `[Block ${i + 1}]\n${b.trim()}`).join('\n\n');
+  return { numbered, blockCount: blocks.length };
+}
+
+/**
  * Grade a trial result using the eval-grader agent (LLM-as-judge).
  * Spawns a Claude session with the rubric and trial output, then
  * parses the structured grade report for per-assertion scores.
@@ -275,6 +289,8 @@ function gradeWithModel(result, scenario, projectRoot) {
 
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const artifacts = captureTrialArtifacts(result.trialDir);
+  const rawOutput = result.output || result.error || '(no output)';
+  const { numbered } = numberTranscriptBlocks(rawOutput);
   const prompt = [
     ...(agentDef ? [agentDef, ''] : []),
     '## This Trial',
@@ -285,20 +301,21 @@ function gradeWithModel(result, scenario, projectRoot) {
     '### Grader Guidelines',
     scenario.graderConfig || 'Score each assertion based on evidence in the output.',
     '',
-    '### Output to Grade',
+    '### Output to Grade (blocks numbered for reference)',
     '```',
-    result.output || result.error || '(no output)',
+    numbered,
     '```',
     ...(artifacts ? [artifacts] : []),
     '',
     '### Required Response Format (automated grading)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"scores": [1.0, 0.75, 0.25], "evidence": ["...", "...", "..."], "overall": 0.67, "passed": false}',
+    '{"scores": [1.0, 0.75, 0.25], "evidence": ["...", "...", "..."], "blockRefs": [[2], [1, 3], []], "overall": 0.67, "passed": false}',
     '```',
     'Score each assertion on a normalized 0.0-1.0 scale.',
     'Use these preferred anchors when possible: 0.0 (not met), 0.25 (weak evidence), 0.5 (partially met), 0.75 (mostly met), 1.0 (fully met).',
     'Include one short evidence note per assertion when possible.',
+    'For blockRefs: list the [Block N] numbers that contain evidence for each assertion. Empty array if no specific block.',
     'Set passed=true only if ALL scores are 1.0. The harness will recompute overall and passed from scores.',
   ].join('\n');
 
@@ -350,6 +367,7 @@ function gradeWithModel(result, scenario, projectRoot) {
       score: validated.overall,
       assertionScores: validated.scores,
       evidence: grade.evidence || [],
+      blockRefs: grade.blockRefs || [],
     };
   }
 }
@@ -455,4 +473,5 @@ module.exports = {
   gradeWithHuman,
   snapScore,
   validateGraderResponse,
+  numberTranscriptBlocks,
 };

@@ -106,6 +106,17 @@ tr:hover td { background: var(--surface); }
 .assertion-evidence { color: var(--text2); font-size: 11px; font-style: italic; margin-top: 2px; }
 .assertion-detail { padding: 8px 12px; background: var(--surface); border-left: 2px solid var(--border); margin: 4px 0 4px 48px; }
 .expand-btn { cursor: pointer; color: var(--accent); font-size: 11px; }
+
+/* Transcript blocks */
+.transcript-block { margin: 4px 0; padding: 8px 12px; border-radius: 4px; background: var(--surface2); border-left: 2px solid var(--border); }
+.transcript-block pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; }
+
+/* Assertion-matched blocks — purple for pass, red for fail */
+.transcript-block.ref-block { position: relative; background: rgba(163,113,247,0.08); border-left: 2px solid #a371f7; padding-left: 10px; }
+.transcript-block.ref-block-fail { border-left-color: var(--blocked); background: rgba(248,81,73,0.06); }
+.ref-labels { position: absolute; top: 4px; right: 8px; display: flex; gap: 4px; }
+.ref-label { font-size: 10px; padding: 0 5px; border-radius: 3px; background: rgba(163,113,247,0.2); color: #a371f7; }
+.ref-label-fail { background: rgba(248,81,73,0.15); color: var(--blocked); }
 </style>
 </head>
 <body>
@@ -248,7 +259,7 @@ function buildTrialsTable(trials, assertions) {
       h('td', null, scoreBar(r.score)),
       h('td', null, passFailLabel(r.passed)),
       h('td', { style: 'font-size:11px;color:var(--text2)' }, r.model || '-'),
-      h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript) }, 'View') : h('span', null, '-'))
+      h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript, { assertions, assertionScores: r.assertionScores, evidence: r.evidence, blockRefs: r.blockRefs }) }, 'View') : h('span', null, '-'))
     );
     tbody.appendChild(row);
 
@@ -480,21 +491,63 @@ function renderLive() {
 }
 
 // ── Transcript Modal ──
-async function showTranscript(transcriptPath) {
+function parseTranscriptBlocks(text) {
+  return text.split(/(?=^\[(?:Tool:|Assistant))/m).filter(b => b.trim());
+}
+
+function buildBlockRefMap(ctx) {
+  const map = {};
+  if (!ctx || !ctx.blockRefs) return map;
+  for (let ai = 0; ai < ctx.blockRefs.length; ai++) {
+    const refs = ctx.blockRefs[ai];
+    if (!Array.isArray(refs)) continue;
+    for (const blockNum of refs) {
+      const idx = blockNum - 1; // blockRefs are 1-indexed
+      if (!map[idx]) map[idx] = [];
+      const score = ctx.assertionScores ? ctx.assertionScores[ai] : null;
+      map[idx].push({ assertionIdx: ai, score });
+    }
+  }
+  return map;
+}
+
+async function showTranscript(transcriptPath, ctx) {
   const resultsIdx = transcriptPath.indexOf('evals/results/');
   const relPath = resultsIdx >= 0 ? transcriptPath.slice(resultsIdx + 'evals/results/'.length) : transcriptPath;
   let text;
   try { text = await api('/api/transcript?path=' + encodeURIComponent(relPath)); }
   catch (err) { text = 'Error loading transcript: ' + err.message; }
 
-  const pre = document.createElement('pre');
-  pre.className = 'transcript';
-  // Escape HTML entities first, then apply safe highlighting
-  const escaped = esc(text);
-  const highlighted = escaped
-    .replace(/^\[Tool: (.+?)\]/gm, '<span class="tool">[Tool: $1]</span>')
-    .replace(/^\[Assistant\]/gm, '<span class="assistant">[Assistant]</span>');
-  pre.innerHTML = highlighted;
+  const blocks = parseTranscriptBlocks(text);
+  const refMap = buildBlockRefMap(ctx);
+  const container = h('div', { className: 'transcript', style: 'padding: 8px' });
+
+  for (let i = 0; i < blocks.length; i++) {
+    const refs = refMap[i];
+    const escaped = esc(blocks[i].trim());
+    const highlighted = escaped
+      .replace(/^\[Tool: (.+?)\]/gm, '<span class="tool">[Tool: $1]</span>')
+      .replace(/^\[Assistant\]/gm, '<span class="assistant">[Assistant]</span>');
+
+    const isMatched = refs && refs.length > 0;
+    const allPass = isMatched && refs.every(r => r.score >= 1.0);
+    const cls = isMatched ? 'transcript-block ref-block' + (allPass ? '' : ' ref-block-fail') : 'transcript-block';
+    const blockDiv = h('div', { className: cls });
+
+    if (isMatched) {
+      const labels = h('div', { className: 'ref-labels' });
+      for (const ref of refs) {
+        const labelCls = ref.score >= 1.0 ? 'ref-label' : 'ref-label ref-label-fail';
+        labels.appendChild(h('span', { className: labelCls }, 'A' + (ref.assertionIdx + 1)));
+      }
+      blockDiv.appendChild(labels);
+    }
+
+    const pre = document.createElement('pre');
+    pre.innerHTML = highlighted;
+    blockDiv.appendChild(pre);
+    container.appendChild(blockDiv);
+  }
 
   const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
     h('div', { className: 'modal' },
@@ -502,7 +555,7 @@ async function showTranscript(transcriptPath) {
         h('span', null, 'Transcript'),
         h('span', { className: 'modal-close', onclick: () => overlay.remove() }, '\u00d7')
       ),
-      h('div', { className: 'modal-body' }, pre)
+      h('div', { className: 'modal-body' }, container)
     )
   );
   $('#modal-root').appendChild(overlay);
