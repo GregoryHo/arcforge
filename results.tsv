@@ -1,1 +1,12 @@
 commit	metric_value	status	description
+21def2a	1.00	baseline	Initial baseline — eval-grader-selection treatment avg with current SKILL.md
+c042c6d	1.00	keep	Exp1: Added grader selection principle callout — treatment perfect, baseline had 0.92 outlier, delta +0.04
+3deeec2	1.00	keep	Exp2: Added structured-JSON proxy grading anti-pattern to Common Mistakes — treatment perfect again, delta +0.04
+fca2105	1.00	keep	Exp3: Added concrete split-grading example (JSON code review) — both conditions perfect, delta 0
+28c2ec8	1.00	keep	Exp4: Strengthened escape hatch guidance with explicit examples — no regression
+22e8a85	1.00	keep	Exp5: Added validity vs reliability trade-off principle — no regression
+a964f42	0.96	discard	Exp6: REVERTED — removed redundant paragraph, caused treatment regression to 0.92 on trial 1. Paragraph provides essential reinforcement.
+9090fcf	1.00	keep	Exp7: Added 4-point scenario design checklist — no regression
+083ae3a	1.00	keep	Exp8: Added answer leakage self-test — treatment perfect, baseline 0.92 outlier, delta +0.04
+34b3ff3	1.00	keep	Exp9: Added delta-near-zero diagnosis guide — treatment perfect, delta +0.04
+34b3ff3	1.00	keep	Exp10: Validation run k=5 — treatment PERFECT 5/5 (avg 1.00), baseline 4/5 (avg 0.98, one 0.92 outlier). Historical treatment was 0.992 (9/10).
