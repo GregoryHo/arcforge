@@ -14,10 +14,14 @@ Runs on `PostToolUse` for ALL tools (matcher: `.*`)
 
 ## Storage
 
-Counter stored in temp directory:
+Single JSON state file in temp directory:
 ```
-$TMPDIR/arcforge-tool-count-<project>-<date>
+$TMPDIR/arcforge-compact-state-<sessionId>
 ```
+
+Format: `{ "tools": number, "reads": number, "writes": number }`
+
+All three counters (tool calls, read-tool count, write-tool count) are stored in one file to minimize I/O (1 read + 1 write per hook invocation).
 
 ## Output Examples
 
