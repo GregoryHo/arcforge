@@ -83,10 +83,10 @@ def test_has_quick_reference():
     assert "## Quick Reference" in text
 
 
-def test_has_pipeline_position():
-    """Skill must document its pipeline position."""
+def test_has_position():
+    """Skill must document its position in the workflow."""
     text = _read_skill()
-    assert "Pipeline position" in text
+    assert "Position:" in text
     assert "instincts" in text.lower()
 
 

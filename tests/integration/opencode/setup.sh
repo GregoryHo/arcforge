@@ -3,8 +3,8 @@
 # Creates an isolated test environment with proper plugin installation
 set -euo pipefail
 
-# Get the repository root (two levels up from tests/opencode/)
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Get the repository root (three levels up from tests/integration/opencode/)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 # Create temp home directory for isolation
 export TEST_HOME=$(mktemp -d)
@@ -14,17 +14,21 @@ export OPENCODE_CONFIG_DIR="$TEST_HOME/.config/opencode"
 
 # Install plugin to test location
 mkdir -p "$HOME/.config/opencode/arcforge"
-cp -r "$REPO_ROOT/lib" "$HOME/.config/opencode/arcforge/"
 cp -r "$REPO_ROOT/skills" "$HOME/.config/opencode/arcforge/"
 
 # Copy plugin directory
-mkdir -p "$HOME/.config/opencode/arcforge/.opencode/plugin"
-cp "$REPO_ROOT/.opencode/plugin/arcforge.js" "$HOME/.config/opencode/arcforge/.opencode/plugin/"
+mkdir -p "$HOME/.config/opencode/arcforge/.opencode/plugins"
+cp "$REPO_ROOT/.opencode/plugins/arcforge.js" "$HOME/.config/opencode/arcforge/.opencode/plugins/"
 
 # Register plugin via symlink
-mkdir -p "$HOME/.config/opencode/plugin"
-ln -sf "$HOME/.config/opencode/arcforge/.opencode/plugin/arcforge.js" \
-       "$HOME/.config/opencode/plugin/arcforge.js"
+mkdir -p "$HOME/.config/opencode/plugins"
+ln -sf "$HOME/.config/opencode/arcforge/.opencode/plugins/arcforge.js" \
+       "$HOME/.config/opencode/plugins/arcforge.js"
+
+# Register skills via symlink (OpenCode discovers skills at ~/.config/opencode/skills/<name>/)
+mkdir -p "$HOME/.config/opencode/skills"
+ln -sf "$HOME/.config/opencode/arcforge/skills" \
+       "$HOME/.config/opencode/skills/arcforge"
 
 # Create test skills in different locations for testing
 
@@ -57,8 +61,8 @@ PROJECT_SKILL_MARKER_67890
 EOF
 
 echo "Setup complete: $TEST_HOME"
-echo "Plugin installed to: $HOME/.config/opencode/arcforge/.opencode/plugin/arcforge.js"
-echo "Plugin registered at: $HOME/.config/opencode/plugin/arcforge.js"
+echo "Plugin installed to: $HOME/.config/opencode/arcforge/.opencode/plugins/arcforge.js"
+echo "Plugin registered at: $HOME/.config/opencode/plugins/arcforge.js"
 echo "Test project at: $TEST_HOME/test-project"
 
 # Helper function for cleanup (call from tests or trap)

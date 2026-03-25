@@ -1,5 +1,7 @@
 .worktrees/
 worktrees/
+evals/results/
+.eval-trials/
 .claude/skills/
 .claude/settings.local.json
 .claude/logs/

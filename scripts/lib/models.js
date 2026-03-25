@@ -6,6 +6,7 @@
  */
 
 const { TaskStatus } = require('./dag-schema');
+const { normalizeArray } = require('./utils');
 
 /**
  * Feature class - represents a work unit within an epic
@@ -23,7 +24,7 @@ class Feature {
     this.id = data.id;
     this.name = data.name;
     this.status = data.status || TaskStatus.PENDING;
-    this.depends_on = data.depends_on || [];
+    this.depends_on = normalizeArray(data.depends_on);
     this.source_requirement = data.source_requirement || null;
   }
 
@@ -74,7 +75,7 @@ class Epic {
     this.spec_path = data.spec_path;
     this.status = data.status || TaskStatus.PENDING;
     this.worktree = data.worktree || null;
-    this.depends_on = data.depends_on || [];
+    this.depends_on = normalizeArray(data.depends_on);
     this.features = (data.features || []).map((f) => (f instanceof Feature ? f : new Feature(f)));
   }
 

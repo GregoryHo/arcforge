@@ -89,11 +89,19 @@ digraph process {
 
 **Max review cycles: 3 per reviewer.** If not converging, escalate to human with summary of unresolved issues.
 
-## Prompt Templates
+## Agents & Templates
 
-- `./implementer-prompt.md` - Dispatch implementer subagent
-- `./spec-reviewer-prompt.md` - Dispatch spec compliance reviewer
-- `./code-quality-reviewer-prompt.md` - Dispatch code quality reviewer (references arc-requesting-review)
+Dispatch these agents via the Agent tool (preferred) or use templates for custom prompts:
+
+**Agents (recommended — includes tool isolation and methodology):**
+- `implementer` — TDD implementation with full write access
+- `spec-reviewer` — Spec compliance verification (read-only)
+- `quality-reviewer` — Code quality assessment (read-only + test runner)
+
+**Templates (for custom prompts or when agents aren't available):**
+- `./implementer-prompt.md` - Implementer prompt with placeholders
+- `./spec-reviewer-prompt.md` - Spec compliance review prompt
+- `./code-quality-reviewer-prompt.md` - Code quality review prompt (references arc-requesting-review)
 
 ## Example Workflow
 
@@ -134,6 +142,19 @@ Final reviewer: All requirements met, architecture solid
 
 Done! Use arc-finishing-epic to decide merge/PR/keep/discard
 ```
+
+## Available Agents
+
+The full agent roster for arc-agent-driven workflows:
+
+| Agent | Role | Model | Access |
+|-------|------|-------|--------|
+| **implementer** | TDD implementation | sonnet | Read, Write, Edit, Bash, Grep |
+| **spec-reviewer** | Spec compliance check | sonnet | Read, Grep, Glob |
+| **quality-reviewer** | Code quality review | sonnet | Read, Grep, Glob, Bash |
+| **planner** | Architecture analysis | opus | Read, Grep, Glob (read-only) |
+| **debugger** | Bug investigation | sonnet | Read, Grep, Glob, Bash |
+| **verifier** | Independent verification | sonnet | Read, Grep, Glob, Bash |
 
 ## Subagents Should Use
 

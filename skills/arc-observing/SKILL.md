@@ -9,9 +9,10 @@ description: Use when user asks about behavioral patterns, requests instinct sta
 
 Manage automatically detected behavioral patterns (instincts) from tool usage observations. The observer daemon runs in the background, analyzing tool call patterns and creating instincts — atomic behavioral rules with confidence scores.
 
-**Two knowledge tracks in arcforge:**
-- **Behavioral (instincts)** — auto-detected from tool usage patterns (this skill)
-- **Decisional (diary→reflect→learn)** — human-directed at session boundaries
+**Three layers in arcforge — this skill handles Behavioral:**
+- **Behavioral (instincts)** — auto-detected from tool usage patterns (this skill). Focuses on tool-usage workflow patterns only. User preferences and project context are handled by Claude Code's native auto-memory.
+- **Continuity (sessions)** — user-controlled save/resume for session handoff
+- **Learning (diary→reflect→learn)** — deliberate reflection for pattern extraction
 
 ## Quick Reference
 

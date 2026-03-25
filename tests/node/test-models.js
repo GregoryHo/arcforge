@@ -176,4 +176,54 @@ const dag2 = DAG.fromObject(dagObj);
 assert.strictEqual(dag2.epics.length, 2);
 console.log('    ✓ DAG.fromObject');
 
+// Test normalizeArray in Feature constructor
+console.log('  Feature depends_on normalization...');
+const featFlowSingle = new Feature({ id: 'f1', name: 'F1', depends_on: '[feat-000]' });
+assert.deepStrictEqual(featFlowSingle.depends_on, ['feat-000']);
+
+const featFlowMulti = new Feature({ id: 'f2', name: 'F2', depends_on: '[feat-000, feat-001]' });
+assert.deepStrictEqual(featFlowMulti.depends_on, ['feat-000', 'feat-001']);
+
+const featPlainString = new Feature({ id: 'f3', name: 'F3', depends_on: 'feat-000' });
+assert.deepStrictEqual(featPlainString.depends_on, ['feat-000']);
+
+const featNull = new Feature({ id: 'f4', name: 'F4', depends_on: null });
+assert.deepStrictEqual(featNull.depends_on, []);
+
+const featUndefined = new Feature({ id: 'f5', name: 'F5' });
+assert.deepStrictEqual(featUndefined.depends_on, []);
+
+const featEmptyArray = new Feature({ id: 'f6', name: 'F6', depends_on: [] });
+assert.deepStrictEqual(featEmptyArray.depends_on, []);
+
+const featArray = new Feature({ id: 'f7', name: 'F7', depends_on: ['feat-000'] });
+assert.deepStrictEqual(featArray.depends_on, ['feat-000']);
+console.log('    ✓ Feature normalizes all depends_on formats');
+
+// Test normalizeArray in Epic constructor
+console.log('  Epic depends_on normalization...');
+const epicFlowSingle = new Epic({
+  id: 'e1',
+  name: 'E1',
+  spec_path: 's.md',
+  depends_on: '[epic-000]',
+});
+assert.deepStrictEqual(epicFlowSingle.depends_on, ['epic-000']);
+
+const epicPlainString = new Epic({
+  id: 'e2',
+  name: 'E2',
+  spec_path: 's.md',
+  depends_on: 'epic-000',
+});
+assert.deepStrictEqual(epicPlainString.depends_on, ['epic-000']);
+
+const epicNull = new Epic({ id: 'e3', name: 'E3', spec_path: 's.md', depends_on: null });
+assert.deepStrictEqual(epicNull.depends_on, []);
+
+// Epic with flow-syntax depends_on should still have working isReady
+assert.strictEqual(epicFlowSingle.isReady(new Set()), false);
+assert.strictEqual(epicFlowSingle.isReady(new Set(['epic-000'])), true);
+console.log('    ✓ Epic normalizes all depends_on formats');
+
 console.log('\n✅ All models tests passed!\n');

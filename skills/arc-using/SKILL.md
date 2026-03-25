@@ -4,11 +4,11 @@ description: Use when starting any arcforge task - establishes routing disciplin
 ---
 
 <EXTREMELY-IMPORTANT>
-If there is even a 1% chance a skill might apply, you ABSOLUTELY MUST invoke the skill.
+When a skill matches your context, invoke it before acting. Skills provide tested workflows
+that prevent common mistakes — skipping them means losing that protection.
 
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
-
-This is not negotiable. This is not optional. You cannot rationalize your way out of this.
+If a skill turns out not to fit after reading it, you can set it aside.
+If no skill fits, proceed directly.
 </EXTREMELY-IMPORTANT>
 
 ## How to Access Skills
@@ -63,13 +63,14 @@ When multiple skills could apply:
 2. **Workflow skills second** (coordinator, implementer, executing-tasks) - orchestrate and execute
 
 Examples:
-- "Let's build X" → arc-brainstorming first (explore design), then workflow skills
-- "Fix this bug" → arc-debugging first (find root cause), then fix
-- "Implement epic" → arc-planning (break down), then arc-coordinating (manage worktrees), then arc-implementing (execute features)
+- "Let's build X" → arc-brainstorming (if design is unclear) or arc-writing-tasks (if requirements are known)
+- "Fix this bug" → arc-debugging (if cause unknown) or arc-tdd (if cause is clear)
+- "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists), arc-implementing (if in worktree)
 
 ## Red Flags
 
-These thoughts mean STOP—you're rationalizing:
+These patterns often lead to skipping useful skills. When you notice them, pause and
+check — but if after checking no skill genuinely fits, proceed directly.
 
 | Thought | Reality |
 |---------|---------|

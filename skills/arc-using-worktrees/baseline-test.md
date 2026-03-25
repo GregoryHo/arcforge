@@ -29,7 +29,7 @@
 - The agent understood the CONCEPT of epic tracking
 - The agent was proactive about creating metadata
 - The agent lacked knowledge of project-specific naming conventions (`.arcforge-*`)
-- The agent didn't consider integration with the broader pipeline (dag.yaml)
+- The agent didn't consider integration with the broader workflow (dag.yaml)
 
 ## What the skill needs to address
 

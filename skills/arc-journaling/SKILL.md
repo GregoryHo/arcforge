@@ -7,7 +7,7 @@ description: Use when user explicitly requests /diary, when PreCompact hook trig
 
 ## Overview
 
-Capture session reflections as structured diary entries for future reference.
+Capture session reflections as structured diary entries for the **learning cycle** (diary → reflect → instincts). This is for deliberate reflection and pattern extraction — NOT for session continuity. For saving/resuming work across sessions, use `/sessions save` and `/sessions resume` instead.
 
 ## Quick Reference
 

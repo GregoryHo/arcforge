@@ -1,0 +1,20 @@
+{
+  "generated": "2026-03-20T10:09:29.917Z",
+  "evals": {
+    "tdd-compliance": {
+      "scope": "skill",
+      "trials": 5,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-03-20T10:07:12.080Z"
+    }
+  }
+}

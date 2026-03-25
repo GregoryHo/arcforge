@@ -293,7 +293,7 @@ Then retry: `/arc-dispatching-parallel`
 ─────────────────────────────────────────────────
 ```
 
-## Integration with Pipeline
+## Related Skills
 
 - **Before:** `/arc-planning` creates dag.yaml
 - **During:** Use this skill to plan feature execution order

@@ -1,0 +1,66 @@
+from pathlib import Path
+
+
+def _read(path: str) -> str:
+    return Path(path).read_text(encoding="utf-8")
+
+
+def _parse_frontmatter(text: str) -> dict:
+    if not text.startswith("---\n"):
+        raise AssertionError("missing frontmatter start")
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        raise AssertionError("missing frontmatter end")
+    front = text[4:end].strip().splitlines()
+    data = {}
+    for line in front:
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        data[key.strip()] = value.strip()
+    return data
+
+
+def test_eval_grader_doc_matches_trial_level_contract():
+    text = _read("agents/eval-grader.md")
+    lower = text.lower()
+    front = _parse_frontmatter(text)
+
+    assert front.get("name") == "eval-grader"
+    assert "single trial" in lower or "individual trial" in lower
+    assert "assertion" in lower and "evidence" in lower
+    assert "harness" in lower and "recompute" in lower
+
+
+def test_eval_grader_doc_describes_structured_json_response():
+    text = _read("agents/eval-grader.md")
+    lower = text.lower()
+
+    assert '"scores"' in text
+    assert '"evidence"' in text
+    assert '"overall"' in text
+    assert '"passed"' in text
+    assert "only a json object" in lower
+    assert "0.25" in text
+    assert "0.75" in text
+
+
+def test_eval_comparator_doc_is_qualitative_not_numeric_engine():
+    text = _read("agents/eval-comparator.md")
+    lower = text.lower()
+    front = _parse_frontmatter(text)
+
+    assert front.get("name") == "eval-comparator"
+    assert "qualitative" in lower
+    assert "programmatic" in lower or "provided metrics" in lower
+    assert "do not recompute" in lower or "do not invent" in lower
+
+
+def test_eval_comparator_doc_requests_analysis_over_per_assertion_math():
+    text = _read("agents/eval-comparator.md")
+    lower = text.lower()
+
+    assert '"analysis"' in text
+    assert '"recommendation"' in text
+    assert '"per_assertion"' not in text
+    assert "regression" in lower or "improvement" in lower

@@ -9,6 +9,11 @@ description: Use when converting design documents to structured specs, when spec
 
 Transform design documents into structured XML specifications. The spec becomes Source of Truth - downstream skills cannot invent requirements.
 
+## When NOT to Use
+
+- No design doc exists yet (brainstorm first)
+- Task is small enough that a structured spec is overhead
+
 ## Core Rules
 
 1. **ask, don't assume** - if unclear, ask user; never invent requirements

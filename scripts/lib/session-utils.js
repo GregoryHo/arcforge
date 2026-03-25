@@ -128,6 +128,327 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
 }
 
 // ─────────────────────────────────────────────
+// Session Listing & Briefings
+// ─────────────────────────────────────────────
+
+/**
+ * Get all date directories sorted by date descending.
+ * @param {string} parentDir - Directory containing YYYY-MM-DD subdirectories
+ * @returns {string[]} Date directory names sorted newest-first
+ */
+function getDateDirs(parentDir) {
+  return fs
+    .readdirSync(parentDir)
+    .filter((entry) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry)) return false;
+      return fs.statSync(path.join(parentDir, entry)).isDirectory();
+    })
+    .sort()
+    .reverse();
+}
+
+/**
+ * List sessions for a project with metadata.
+ * @param {string} project - Project name
+ * @param {Object} [options]
+ * @param {string} [options.date] - Filter by date (YYYY-MM-DD)
+ * @param {string} [options.query] - Filter by session ID substring
+ * @param {number} [options.limit=20] - Max results
+ * @param {number} [options.offset=0] - Skip first N results
+ * @returns {{ sessions: Object[], total: number }}
+ */
+function listSessions(project, options = {}) {
+  const { date = null, query = null, limit = 20, offset = 0 } = options;
+  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
+  if (!fs.existsSync(sessionsDir)) return { sessions: [], total: 0 };
+
+  let allSessions = [];
+  let dateDirs = getDateDirs(sessionsDir);
+
+  if (date) {
+    dateDirs = dateDirs.filter((d) => d === date);
+  }
+
+  for (const dateStr of dateDirs) {
+    const dateDir = path.join(sessionsDir, dateStr);
+    const sessionFiles = fs
+      .readdirSync(dateDir)
+      .filter((f) => f.startsWith('session-') && (f.endsWith('.json') || f.endsWith('.md')));
+
+    for (const file of sessionFiles) {
+      try {
+        if (file.endsWith('.json')) {
+          const content = fs.readFileSync(path.join(dateDir, file), 'utf-8');
+          const session = JSON.parse(content);
+          allSessions.push({ ...session, dateStr, filename: file, type: 'auto' });
+        } else {
+          // session-{alias}.md — user-saved session
+          const alias = file.replace(/^session-/, '').replace(/\.md$/, '');
+          allSessions.push({
+            sessionId: alias,
+            project,
+            date: dateStr,
+            dateStr,
+            filename: file,
+            type: 'saved',
+            lastUpdated: fs.statSync(path.join(dateDir, file)).mtime.toISOString(),
+          });
+        }
+      } catch {
+        // skip invalid
+      }
+    }
+  }
+
+  // Sort by lastUpdated descending
+  allSessions.sort(
+    (a, b) =>
+      new Date(b.lastUpdated || b.dateStr).getTime() -
+      new Date(a.lastUpdated || a.dateStr).getTime(),
+  );
+
+  // Filter by session ID substring
+  if (query) {
+    const q = query.toLowerCase();
+    allSessions = allSessions.filter((s) => (s.sessionId || '').toLowerCase().includes(q));
+  }
+
+  return {
+    sessions: allSessions.slice(offset, offset + limit),
+    total: allSessions.length,
+  };
+}
+
+/**
+ * Find a session by ID prefix or full ID.
+ * @param {string} project - Project name
+ * @param {string} idPrefix - Session ID or prefix (e.g., "session-abc" or "abc")
+ * @returns {Object|null} Session data or null
+ */
+function getSessionById(project, idPrefix) {
+  const { sessions } = listSessions(project, { limit: 1000 });
+  const normalized = idPrefix.startsWith('session-') ? idPrefix : `session-${idPrefix}`;
+
+  return (
+    sessions.find((s) => s.sessionId === normalized || s.sessionId?.startsWith(normalized)) || null
+  );
+}
+
+/**
+ * Generate a saved session markdown from session data and optional transcript data.
+ * @param {Object} session - Session JSON data
+ * @param {Object|null} transcriptData - Parsed transcript data
+ * @param {Object} [enrichment] - Claude-provided enrichment
+ * @param {string} [enrichment.summary] - What was accomplished
+ * @param {string} [enrichment.whatWorked] - Approaches that worked
+ * @param {string} [enrichment.whatFailed] - Approaches that failed
+ * @param {string} [enrichment.blockers] - Current blockers
+ * @param {string} [enrichment.nextStep] - Exact next step
+ * @returns {string} Session markdown content
+ */
+function generateSession(session, transcriptData = null, enrichment = {}) {
+  const lines = [];
+  const date = session.date || session.dateStr || new Date().toISOString().split('T')[0];
+
+  lines.push(`# Session: ${date}`);
+  lines.push(`**Project:** ${session.project || 'unknown'}`);
+  lines.push(`**Session:** ${session.sessionId || 'unknown'}`);
+  lines.push(`**Created:** ${new Date().toISOString()}`);
+  lines.push('');
+
+  // Metrics
+  lines.push('## Session Metrics');
+  const durationMins =
+    session.started && session.lastUpdated
+      ? Math.round((new Date(session.lastUpdated) - new Date(session.started)) / 60000)
+      : null;
+  lines.push(`- **Duration**: ${durationMins != null ? `~${durationMins} minutes` : 'unknown'}`);
+  lines.push(`- **Tool calls**: ${session.toolCalls || 0}`);
+  lines.push(`- **User messages**: ${session.userMessages || 0}`);
+  lines.push('');
+
+  // Tools used
+  const tools = transcriptData?.toolsUsed || session.toolsUsed || [];
+  if (tools.length > 0) {
+    lines.push('## Tools Used');
+    lines.push(tools.join(', '));
+    lines.push('');
+  }
+
+  // Files modified
+  const files = transcriptData?.filesModified || session.filesModified || [];
+  if (files.length > 0) {
+    lines.push('## Files Modified');
+    for (const f of files) {
+      lines.push(`- ${f}`);
+    }
+    lines.push('');
+  }
+
+  // User messages (conversation trail)
+  const msgs = transcriptData?.userMessages || session.userMessageContent || [];
+  if (msgs.length > 0) {
+    lines.push('## Conversation Trail');
+    for (const msg of msgs) {
+      lines.push(`> ${msg}`);
+    }
+    lines.push('');
+  }
+
+  // Enrichment sections (Claude fills these)
+  lines.push('## Summary');
+  lines.push(enrichment.summary || '<!-- TO BE ENRICHED: What was accomplished this session -->');
+  lines.push('');
+
+  lines.push('## What Worked');
+  lines.push(
+    enrichment.whatWorked || '<!-- TO BE ENRICHED: Approaches and techniques that succeeded -->',
+  );
+  lines.push('');
+
+  lines.push('## What Failed');
+  lines.push(
+    enrichment.whatFailed || '<!-- TO BE ENRICHED: Approaches that were tried and abandoned -->',
+  );
+  lines.push('');
+
+  lines.push('## Blockers');
+  lines.push(enrichment.blockers || '<!-- TO BE ENRICHED: Current blockers or open questions -->');
+  lines.push('');
+
+  lines.push('## Next Step');
+  lines.push(enrichment.nextStep || '<!-- TO BE ENRICHED: Exact next step to take -->');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a structured briefing from saved session content for resume.
+ * @param {string} sessionContent - Raw session markdown
+ * @param {string} sessionPath - Path to the session file
+ * @returns {string} Formatted briefing
+ */
+function formatSessionBriefing(sessionContent, sessionPath) {
+  const lines = [];
+  lines.push(`SESSION LOADED: ${sessionPath}`);
+  lines.push('════════════════════════════════════════════════');
+  lines.push('');
+
+  const sections = parseSessionSections(sessionContent);
+
+  if (sections.project) {
+    lines.push(`PROJECT: ${sections.project}`);
+    lines.push('');
+  }
+
+  if (sections.summary && !sections.summary.includes('TO BE ENRICHED')) {
+    lines.push('WHAT WE WERE DOING:');
+    lines.push(sections.summary);
+    lines.push('');
+  }
+
+  if (sections.metrics) {
+    lines.push('SESSION STATS:');
+    lines.push(sections.metrics);
+    lines.push('');
+  }
+
+  if (sections.filesModified) {
+    lines.push('FILES MODIFIED:');
+    lines.push(sections.filesModified);
+    lines.push('');
+  }
+
+  if (sections.whatFailed && !sections.whatFailed.includes('TO BE ENRICHED')) {
+    lines.push('WHAT NOT TO RETRY:');
+    lines.push(sections.whatFailed);
+    lines.push('');
+  }
+
+  if (sections.blockers && !sections.blockers.includes('TO BE ENRICHED')) {
+    lines.push('OPEN QUESTIONS / BLOCKERS:');
+    lines.push(sections.blockers);
+    lines.push('');
+  }
+
+  if (sections.nextStep && !sections.nextStep.includes('TO BE ENRICHED')) {
+    lines.push('NEXT STEP:');
+    lines.push(sections.nextStep);
+    lines.push('');
+  }
+
+  if (sections.conversationTrail) {
+    lines.push('CONVERSATION TRAIL:');
+    lines.push(sections.conversationTrail);
+    lines.push('');
+  }
+
+  lines.push('════════════════════════════════════════════════');
+  lines.push('Ready to continue. What would you like to do?');
+
+  return lines.join('\n');
+}
+
+/**
+ * Parse saved session markdown into named sections.
+ * @param {string} content - Session markdown
+ * @returns {Object} Parsed sections
+ */
+function parseSessionSections(content) {
+  const sections = {};
+  const lines = content.split('\n');
+
+  // Extract project from frontmatter-style line
+  const projectLine = lines.find((l) => l.startsWith('**Project:**'));
+  if (projectLine) {
+    sections.project = projectLine.replace('**Project:**', '').trim();
+  }
+
+  // Parse ## sections
+  let currentSection = null;
+  let currentContent = [];
+
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      if (currentSection) {
+        sections[currentSection] = currentContent.join('\n').trim();
+      }
+      const sectionName = line.replace('## ', '').trim();
+      currentSection = sectionNameToKey(sectionName);
+      currentContent = [];
+    } else if (currentSection) {
+      currentContent.push(line);
+    }
+  }
+
+  // Save last section
+  if (currentSection) {
+    sections[currentSection] = currentContent.join('\n').trim();
+  }
+
+  return sections;
+}
+
+/**
+ * Map section heading to object key.
+ */
+function sectionNameToKey(name) {
+  const map = {
+    'Session Metrics': 'metrics',
+    'Tools Used': 'toolsUsed',
+    'Files Modified': 'filesModified',
+    'Conversation Trail': 'conversationTrail',
+    Summary: 'summary',
+    'What Worked': 'whatWorked',
+    'What Failed': 'whatFailed',
+    Blockers: 'blockers',
+    'Next Step': 'nextStep',
+  };
+  return map[name] || name.toLowerCase().replace(/\s+/g, '_');
+}
+
+// ─────────────────────────────────────────────
 // Observation & Instinct Path Helpers
 // ─────────────────────────────────────────────
 
@@ -191,6 +512,13 @@ module.exports = {
   determineReflectStrategy,
   updateProcessedLog,
   CLAUDE_DIR,
+  // Session listing & briefings
+  getDateDirs,
+  listSessions,
+  getSessionById,
+  generateSession,
+  formatSessionBriefing,
+  parseSessionSections,
   // Observation & Instinct paths
   getObservationsPath,
   getInstinctsDir,

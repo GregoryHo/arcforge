@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a skill-based autonomous agent pipeline for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow a consistent workflow from design to implementation.
+arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow disciplined workflows from design to implementation.
 
 ## Why arcforge
 
@@ -97,48 +97,51 @@ These are the most frequently used commands:
 | `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
 | `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
 
-### Typical Flow
+### How Skills Connect
 
 ```
-┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌────────────────┐
-│ arc-brainstorming│───▶│ arc-writing-tasks│───▶│arc-executing-tasks│───▶│ arc-journaling │
-└────────▲─────────┘    └──────────────────┘    └──────────────────┘    └───────┬────────┘
-         │                                                                      │
-         │           ┌──────────────────────────────────────────────────────────┘
-         │           │  (after multiple sessions)
-         │           ▼
-         │    ┌────────────────┐
-         │    │ arc-reflecting │
-         │    └───────┬────────┘
-         │            │  (when patterns emerge)
-         │            ▼
-         │    ┌────────────────┐
-         └────│  arc-learning  │  ─── produces new skills/patterns
-              └────────────────┘
+                              ┌─────────────┐
+                              │  arc-using   │  ← routes by context
+                              └──────┬───────┘
+               ┌──────────────┬──────┴──────┬──────────────┐
+               ▼              ▼             ▼              ▼
+        ┌─────────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐
+        │brainstorming│ │ writing- │ │executing-│ │  debugging  │
+        │             │ │ tasks    │ │ tasks    │ │             │
+        └──────┬──────┘ └──────────┘ └──────────┘ └─────────────┘
+               ▼
+        ┌─────────────┐
+        │  refining    │           ┌──────────────────────────┐
+        └──────┬──────┘           │  Available at any point: │
+               ▼                  │  • arc-journaling        │
+        ┌─────────────┐           │  • arc-verifying         │
+        │  planning    │           │  • arc-debugging         │
+        └──────┬──────┘           └──────────────────────────┘
+               ▼
+        ┌─────────────┐
+        │ coordinating│
+        └─────────────┘
+
+Skills compose based on context. Enter at any point — arc-using recommends
+a starting skill, but you can invoke any skill directly.
 ```
 
-### Starting Points
+## How Skills Compose
 
-| Situation | Start With |
-|-----------|------------|
-| Vague idea or new requirement | `arc-brainstorming` |
-| Clear spec, ready to plan | `arc-writing-tasks` or `arc-planning` |
-| Tasks already defined | `arc-executing-tasks` |
-| End of work session | `arc-journaling` |
+`arc-using` inspects context and recommends a path. You can also enter at any skill directly.
 
-## The Basic Workflow
+| Context | Recommended skills | Entry point |
+|---------|-------------------|-------------|
+| Vague idea, new requirement | brainstorming, refining, planning | `arc-brainstorming` |
+| Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
+| Large multi-epic initiative | planning, coordinating, implementing | `arc-planning` |
+| Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
+| Bug or regression | debugging, tdd, verifying | `arc-debugging` |
+| End of session | journaling | `arc-journaling` |
 
-1. **routing** - `arc-using` checks context and decides between a large or small flow. Multi-epic work with cross-cutting concerns goes large; single features or bug fixes go small.
+**Within each path:** TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
 
-2. **large flow** - `arc-brainstorming` → `arc-refining` → `arc-planning` → `arc-coordinating` → `arc-implementing` (with worktree isolation per epic).
-
-3. **small flow** - `arc-writing-tasks` → `arc-executing-tasks` or `arc-agent-driven` (without DAG or worktrees).
-
-4. **execution** - TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
-
-5. **finishing** - `arc-finishing-epic` for epic worktrees, `arc-finishing` for normal branches.
-
-**The agent checks for relevant skills before any task.** Workflows are mandatory, not optional.
+**Finishing:** `arc-finishing-epic` for worktrees, `arc-finishing` for normal branches.
 
 ## Terminology
 
@@ -151,7 +154,7 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-### Pipeline Skills
+### Workflow Skills
 
 - **arc-using** - Routing check for task scale
 - **arc-brainstorming** - Design exploration
@@ -201,7 +204,7 @@ These are the most frequently used commands:
 The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
 
 ```bash
-# Show pipeline status
+# Show workflow status
 arcforge status
 
 # Get next available task
@@ -243,6 +246,10 @@ npm install
 cd hooks && npm install && cd ..
 pip install pytest pyyaml    # Required for test:skills
 ```
+
+### Plugin Development
+
+To develop arcforge itself with live plugin loading, see the [Plugin Development](CONTRIBUTING.md#plugin-development) section in CONTRIBUTING.md. Quick version: `npm run dev` starts a Claude session that loads the plugin directly from your local checkout.
 
 ### Running Tests
 

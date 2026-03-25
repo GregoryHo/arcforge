@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arcforge research dashboard</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+  --border: #30363d; --text: #e6edf3; --text2: #8b949e;
+  --accent: #58a6ff; --keep: #3fb950; --discard: #8b949e;
+  --crash: #f85149; --baseline: #58a6ff;
+  --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+
+/* Header */
+.header { padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 14px; font-weight: 600; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--keep); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.status-text { color: var(--text2); font-size: 11px; }
+
+/* Content */
+.content { padding: 20px; max-width: 1100px; }
+
+/* Cards */
+.stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; flex: 1; min-width: 130px; }
+.card-title { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.stat-keep { color: var(--keep); }
+.stat-crash { color: var(--crash); }
+.stat-baseline { color: var(--baseline); }
+
+/* Chart */
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.chart-title { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 8px 12px; color: var(--text2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+tr:hover td { background: var(--surface); }
+.table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+.table-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+
+/* Status badges */
+.status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.status-keep { background: rgba(63,185,80,0.15); color: var(--keep); }
+.status-discard { background: rgba(139,148,158,0.15); color: var(--discard); }
+.status-crash { background: rgba(248,81,73,0.15); color: var(--crash); }
+.status-baseline { background: rgba(88,166,255,0.15); color: var(--baseline); }
+
+/* Config panel */
+.config-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
+.config-toggle { padding: 12px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.config-toggle:hover { background: var(--surface2); border-radius: 8px; }
+.config-body { padding: 0 16px 16px; display: none; }
+.config-body.open { display: block; }
+.config-body pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.6; color: var(--text2); }
+.config-key { color: var(--accent); }
+
+/* Empty state */
+.empty { text-align: center; padding: 40px; color: var(--text2); }
+
+/* Legend */
+.legend { display: flex; gap: 16px; margin-bottom: 12px; font-size: 11px; color: var(--text2); }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>arcforge research dashboard</h1>
+  <div class="live-dot" id="live-dot" title="SSE connected"></div>
+  <span class="status-text" id="status-text">connecting...</span>
+  <span class="status-text" id="target-text"></span>
+</div>
+<div class="content" id="content">
+  <div class="empty">Loading...</div>
+</div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const h = (tag, attrs, ...children) => {
+  const el = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el[k] = v;
+    else if (k === 'className') el.className = v;
+    else el.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+    else if (c) el.appendChild(c);
+  }
+  return el;
+};
+const svgEl = (tag, attrs) => {
+  const el = document.createElementNS(SVG_NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  return el;
+};
+
+let config = {};
+
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(res.status + ': ' + (await res.text()));
+  return res.json();
+}
+
+function statusCls(status) {
+  return 'status status-' + (status || 'discard');
+}
+
+function fmtMetric(val) {
+  if (val == null) return 'N/A';
+  if (Math.abs(val) >= 1000) return val.toFixed(1);
+  if (Math.abs(val) >= 1) return val.toFixed(3);
+  return val.toFixed(5);
+}
+
+// ── SVG Chart (safe DOM construction) ──
+function buildChart(experiments) {
+  const valid = experiments
+    .map((e, i) => ({ ...e, idx: i }))
+    .filter((e) => e.metric_value != null);
+
+  if (valid.length < 2) {
+    return h('div', { className: 'empty', style: 'padding:20px' }, 'Need at least 2 data points for chart');
+  }
+
+  const W = 1000, H = 300, PAD = { top: 20, right: 30, bottom: 40, left: 70 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const values = valid.map((e) => e.metric_value);
+  let yMin = Math.min(...values);
+  let yMax = Math.max(...values);
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const yPad = (yMax - yMin) * 0.1;
+  yMin -= yPad;
+  yMax += yPad;
+
+  const xScale = (i) => PAD.left + (i / (valid.length - 1)) * plotW;
+  const yScale = (v) => PAD.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  const statusColor = { baseline: '#58a6ff', keep: '#3fb950', discard: '#8b949e', crash: '#f85149' };
+
+  const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, style: 'width:100%;height:auto' });
+
+  // Grid lines and Y-axis labels
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = PAD.top + (i / yTicks) * plotH;
+    const val = yMax - (i / yTicks) * (yMax - yMin);
+    svg.appendChild(svgEl('line', { x1: PAD.left, y1: y, x2: W - PAD.right, y2: y, stroke: '#30363d', 'stroke-width': 1 }));
+    const label = svgEl('text', { x: PAD.left - 8, y: y + 4, 'text-anchor': 'end', fill: '#8b949e', 'font-size': 10, 'font-family': 'monospace' });
+    label.textContent = fmtMetric(val);
+    svg.appendChild(label);
+  }
+
+  // X-axis labels
+  const xLabelStep = Math.max(1, Math.floor(valid.length / 10));
+  for (let i = 0; i < valid.length; i += xLabelStep) {
+    const x = xScale(i);
+    const label = svgEl('text', { x: x, y: H - 8, 'text-anchor': 'middle', fill: '#8b949e', 'font-size': 10, 'font-family': 'monospace' });
+    label.textContent = '#' + (valid[i].idx + 1);
+    svg.appendChild(label);
+  }
+
+  // Line path (kept + baseline only)
+  const keptPoints = valid.filter((e) => e.status === 'keep' || e.status === 'baseline');
+  if (keptPoints.length > 1) {
+    const keptSet = new Set(keptPoints.map((e) => e.idx));
+    const lineValid = valid.filter((e) => keptSet.has(e.idx));
+    const pathParts = lineValid.map((e, i) => {
+      const origIdx = valid.indexOf(e);
+      const x = xScale(origIdx);
+      const y = yScale(e.metric_value);
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    svg.appendChild(svgEl('path', { d: pathParts.join(' '), fill: 'none', stroke: '#3fb950', 'stroke-width': 2, opacity: 0.6 }));
+  }
+
+  // Baseline reference line
+  const baseline = experiments.find((e) => e.status === 'baseline');
+  if (baseline && baseline.metric_value != null) {
+    const by = yScale(baseline.metric_value);
+    svg.appendChild(svgEl('line', { x1: PAD.left, y1: by, x2: W - PAD.right, y2: by, stroke: '#58a6ff', 'stroke-width': 1, 'stroke-dasharray': '6,4', opacity: 0.5 }));
+    const blLabel = svgEl('text', { x: W - PAD.right + 4, y: by + 4, fill: '#58a6ff', 'font-size': 10, 'font-family': 'monospace' });
+    blLabel.textContent = 'baseline';
+    svg.appendChild(blLabel);
+  }
+
+  // Data points
+  for (let i = 0; i < valid.length; i++) {
+    const e = valid[i];
+    const x = xScale(i);
+    const y = yScale(e.metric_value);
+    const color = statusColor[e.status] || '#8b949e';
+    const r = (e.status === 'keep' || e.status === 'baseline') ? 5 : 3;
+    const opacity = (e.status === 'discard') ? 0.4 : 1;
+    const circle = svgEl('circle', { cx: x, cy: y, r: r, fill: color, opacity: opacity });
+    const title = svgEl('title');
+    title.textContent = '#' + (e.idx + 1) + ': ' + fmtMetric(e.metric_value) + ' (' + e.status + ')' + (e.description ? '\n' + e.description : '');
+    circle.appendChild(title);
+    svg.appendChild(circle);
+  }
+
+  // Axis labels
+  const xAxisLabel = svgEl('text', { x: PAD.left + plotW / 2, y: H - 2, 'text-anchor': 'middle', fill: '#8b949e', 'font-size': 11, 'font-family': 'monospace' });
+  xAxisLabel.textContent = 'Experiment';
+  svg.appendChild(xAxisLabel);
+
+  const yAxisLabel = svgEl('text', { x: 14, y: PAD.top + plotH / 2, 'text-anchor': 'middle', fill: '#8b949e', 'font-size': 11, 'font-family': 'monospace', transform: 'rotate(-90,14,' + (PAD.top + plotH / 2) + ')' });
+  yAxisLabel.textContent = config.metric_name || 'Metric';
+  svg.appendChild(yAxisLabel);
+
+  const container = h('div');
+  container.appendChild(svg);
+  return container;
+}
+
+// ── Render ──
+async function render() {
+  const content = $('#content');
+  try {
+    const [dataRes, configRes] = await Promise.all([api('/api/data'), api('/api/config')]);
+    const { experiments, summary } = dataRes;
+    config = configRes;
+
+    $('#target-text').textContent = config.target ? '| ' + config.target : '';
+
+    content.textContent = '';
+
+    if (experiments.length === 0) {
+      content.appendChild(h('div', { className: 'empty' }, 'Waiting for experiments... Run the research loop to generate results.'));
+      return;
+    }
+
+    // Summary cards
+    const statsRow = h('div', { className: 'stats-row' });
+    statsRow.appendChild(h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, 'Baseline'),
+      h('div', { className: 'stat-value stat-baseline' }, summary.baseline != null ? fmtMetric(summary.baseline) : '-'),
+      h('div', { className: 'stat-label' }, summary.direction)
+    ));
+    statsRow.appendChild(h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, 'Best'),
+      h('div', { className: 'stat-value stat-keep' }, summary.best != null ? fmtMetric(summary.best) : '-'),
+      h('div', { className: 'stat-label' }, summary.improvement != null ? summary.improvement + '% improvement' : '-')
+    ));
+    statsRow.appendChild(h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, 'Experiments'),
+      h('div', { className: 'stat-value' }, String(summary.total)),
+      h('div', { className: 'stat-label' }, summary.kept + ' kept / ' + summary.discarded + ' discarded')
+    ));
+    statsRow.appendChild(h('div', { className: 'card' },
+      h('div', { className: 'card-title' }, 'Crashes'),
+      h('div', { className: 'stat-value' + (summary.crashed > 0 ? ' stat-crash' : '') }, String(summary.crashed)),
+      h('div', { className: 'stat-label' }, summary.crashed === 0 ? 'clean run' : 'check logs')
+    ));
+    content.appendChild(statsRow);
+
+    // Metric trend chart
+    const chartContainer = h('div', { className: 'chart-container' });
+    chartContainer.appendChild(h('div', { className: 'chart-title' }, 'Metric Trend'));
+    const legend = h('div', { className: 'legend' });
+    [['Baseline', '#58a6ff'], ['Keep', '#3fb950'], ['Discard', '#8b949e'], ['Crash', '#f85149']].forEach(([label, color]) => {
+      legend.appendChild(h('div', { className: 'legend-item' },
+        h('span', { className: 'legend-dot', style: 'background:' + color }),
+        h('span', null, label)
+      ));
+    });
+    chartContainer.appendChild(legend);
+    chartContainer.appendChild(buildChart(experiments));
+    content.appendChild(chartContainer);
+
+    // Experiment table (most recent first)
+    const tableWrap = h('div', { className: 'table-container' });
+    tableWrap.appendChild(h('div', { className: 'table-header' },
+      h('div', { className: 'chart-title', style: 'margin:0' }, 'Experiment Log')
+    ));
+    const tbody = h('tbody');
+    for (let i = experiments.length - 1; i >= 0; i--) {
+      const e = experiments[i];
+      tbody.appendChild(h('tr', null,
+        h('td', null, '#' + (i + 1)),
+        h('td', { style: 'font-family:monospace;font-size:11px' }, e.commit || '-'),
+        h('td', null, e.metric_value != null ? fmtMetric(e.metric_value) : 'N/A'),
+        h('td', null, h('span', { className: statusCls(e.status) }, e.status || '-')),
+        h('td', { style: 'color:var(--text2)' }, e.description || '')
+      ));
+    }
+    tableWrap.appendChild(h('table', null,
+      h('thead', null, h('tr', null,
+        h('th', null, '#'), h('th', null, 'Commit'), h('th', null, 'Metric'),
+        h('th', null, 'Status'), h('th', null, 'Description')
+      )), tbody
+    ));
+    content.appendChild(tableWrap);
+
+    // Config panel (collapsible)
+    const configPanel = h('div', { className: 'config-panel' });
+    const configBody = h('div', { className: 'config-body' });
+    const toggleBtn = h('div', { className: 'config-toggle', onclick: () => {
+      configBody.classList.toggle('open');
+      arrow.textContent = configBody.classList.contains('open') ? '\u25B2' : '\u25BC';
+    } });
+    toggleBtn.appendChild(h('span', { className: 'chart-title', style: 'margin:0' }, 'Research Config'));
+    const arrow = h('span', { style: 'color:var(--text2)' }, '\u25BC');
+    toggleBtn.appendChild(arrow);
+    configPanel.appendChild(toggleBtn);
+
+    const configEntries = Object.entries(configRes).filter(([k]) => !k.startsWith('metric_') && k !== 'direction' && k !== 'target_value');
+    const pre = h('pre');
+    for (const [key, val] of configEntries) {
+      const line = h('div');
+      line.appendChild(h('span', { className: 'config-key' }, key + ': '));
+      line.appendChild(document.createTextNode(val));
+      pre.appendChild(line);
+    }
+    configBody.appendChild(pre);
+    configPanel.appendChild(configBody);
+    content.appendChild(configPanel);
+  } catch (err) {
+    content.textContent = '';
+    content.appendChild(h('div', { className: 'empty' }, 'Error: ' + err.message));
+  }
+}
+
+// ── SSE ──
+let refreshTimer = null;
+function connectSSE() {
+  const sse = new EventSource('/api/events');
+  sse.onopen = () => {
+    $('#live-dot').style.background = 'var(--keep)';
+    $('#status-text').textContent = 'live';
+  };
+  sse.onerror = () => {
+    $('#live-dot').style.background = 'var(--crash)';
+    $('#status-text').textContent = 'disconnected';
+  };
+  sse.addEventListener('new-experiment', () => {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(render, 500);
+  });
+}
+
+connectSSE();
+render();
+</script>
+</body>
+</html>

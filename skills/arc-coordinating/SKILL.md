@@ -28,7 +28,7 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 |---------|---------|-------------|
 | `expand` | Create worktrees for ready epics | `arcforge expand` |
 | `merge` | Merge completed epics | `arcforge merge` |
-| `status` | Show pipeline progress | `arcforge status` |
+| `status` | Show workflow progress | `arcforge status` |
 | `cleanup` | Remove merged worktrees | `arcforge cleanup` |
 | `sync` | Synchronize worktree ↔ DAG state | `arcforge sync` |
 | `next` | Show next ready task | `arcforge next` |

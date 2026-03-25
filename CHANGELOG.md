@@ -127,7 +127,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Skills (22 arc-* skills)
 
-**Pipeline**: arc-brainstorming, arc-refining, arc-planning, arc-coordinating, arc-implementing
+**Workflow**: arc-brainstorming, arc-refining, arc-planning, arc-coordinating, arc-implementing
 **Execution**: arc-tdd, arc-writing-tasks, arc-executing-tasks, arc-agent-driven, arc-dispatching-parallel
 **Support**: arc-debugging, arc-verifying, arc-using-worktrees, arc-finishing, arc-finishing-epic, arc-requesting-review, arc-receiving-review
 **Learning**: arc-journaling, arc-reflecting, arc-learning

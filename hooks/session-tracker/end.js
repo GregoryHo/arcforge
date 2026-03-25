@@ -4,14 +4,12 @@
  *
  * Runs on Stop to:
  * 1. Update session file with final metrics
- * 2. Save tool call count
- * 3. Output JSON with decision: "block" to prompt Claude to review diary draft
- *
- * Note: Uses Stop hook (not SessionEnd) so Claude sees and executes the prompt.
+ * 2. Generate diary draft and spawn background enricher
+ * 3. Queue pending actions (reflect-ready)
  */
 
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -24,8 +22,8 @@ const {
   getSessionId,
   getTimestamp,
   log,
-  outputDecision,
 } = require('../../scripts/lib/utils');
+const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const {
   readCount: readToolCount,
   resetCounter: resetToolCounter,
@@ -36,6 +34,7 @@ const {
 } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { calculateDurationMinutes } = require('./summary');
+const { parseTranscript } = require('../../scripts/lib/transcript');
 
 /**
  * Create default session if none exists
@@ -105,11 +104,9 @@ function checkReflectReady(project) {
 }
 
 /**
- * Format stop reason for decision: "block" output (when threshold is met)
- * Claude will see and execute this prompt.
- * @returns {string} The reason/prompt for Claude to execute
+ * Format session stats as a one-liner.
  */
-function formatStopReason(session, draftPath) {
+function formatStats(session) {
   const duration = calculateDurationMinutes(session.started, session.lastUpdated);
 
   let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
@@ -119,16 +116,65 @@ function formatStopReason(session, draftPath) {
   if (session.filesModified?.length > 0) {
     stats += `, ${session.filesModified.length} files modified`;
   }
+  return stats;
+}
 
-  let prompt;
-  if (draftPath) {
-    prompt = `Review and enrich the draft diary at ${draftPath}
-Fill in the <!-- TO BE ENRICHED --> sections from conversation memory.
-Use the arc-journaling skill to finalize.`;
-  } else {
-    prompt = `Consider creating a diary entry if this session warrants one.`;
+/**
+ * Spawn a background Claude instance to enrich the diary draft.
+ * Fire-and-forget: detached process, hook exits immediately.
+ */
+function spawnDiaryEnricher(draftPath, session) {
+  try {
+    const transcriptData = {
+      userMessages: session.userMessageContent || [],
+      toolsUsed: session.toolsUsed || [],
+      filesModified: session.filesModified || [],
+      stats: formatStats(session),
+    };
+
+    const prompt = [
+      'Read the diary draft and fill all <!-- TO BE ENRICHED --> sections.',
+      `Draft path: ${draftPath}`,
+      '',
+      'Session context (parsed summary):',
+      JSON.stringify(transcriptData, null, 2),
+      '',
+      'Write the enriched diary back to the same path.',
+      'Keep auto-generated metrics sections unchanged.',
+      'Fill Completed, In Progress, Decisions, Challenges from the session context.',
+    ].join('\n');
+
+    const systemPrompt =
+      'You are a diary enrichment agent. ' +
+      'Read the draft, fill placeholder sections using provided session data, ' +
+      'write the result back. Be concise and factual.';
+
+    const child = spawn(
+      'claude',
+      [
+        '--model',
+        'haiku',
+        '--max-turns',
+        '2',
+        '--print',
+        '--system-prompt',
+        systemPrompt,
+        '--tools',
+        'Read,Write',
+        '--disable-slash-commands',
+        '--strict-mcp-config',
+        '--mcp-config',
+        '{"mcpServers":{}}',
+      ],
+      { detached: true, stdio: ['pipe', 'ignore', 'ignore'] },
+    );
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+    child.unref();
+  } catch {
+    // Fire-and-forget — spawn failure is non-fatal
   }
-  return `Session ended. (${stats})\n\n${prompt}`;
 }
 
 /**
@@ -147,12 +193,6 @@ function main() {
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
-  if (input?.stop_hook_active) {
-    // Already processing stop hook - allow stop to prevent infinite loop
-    process.exit(0);
-    return;
-  }
-
   const session = getOrCreateSession();
   const userCount = readUserCount();
   const toolCount = readToolCount();
@@ -160,24 +200,37 @@ function main() {
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
   session.toolCalls = toolCount;
-  session.filesModified = [];
+
+  // Enrich with transcript data if available
+  const transcriptPath = input?.transcript_path;
+  const transcriptData = transcriptPath ? parseTranscript(transcriptPath) : null;
+
+  if (transcriptData) {
+    session.userMessageContent = transcriptData.userMessages;
+    session.toolsUsed = transcriptData.toolsUsed;
+    session.filesModified = transcriptData.filesModified;
+  } else {
+    session.filesModified = [];
+  }
 
   saveSessionJson(session);
 
   if (shouldTrigger(userCount, toolCount)) {
     const draftPath = tryGenerateAutoDiary(session.project, session.date, session.sessionId);
 
+    if (draftPath) {
+      spawnDiaryEnricher(draftPath, session);
+    }
+
     const reflectStatus = checkReflectReady(session.project);
     if (reflectStatus?.ready) {
-      const { addPendingAction } = require('../../scripts/lib/pending-actions');
       addPendingAction(session.project, 'reflect-ready', {
         strategy: reflectStatus.strategy,
         count: reflectStatus.count,
       });
     }
 
-    outputDecision(formatStopReason(session, draftPath));
-
+    log(formatShortMessage(userCount, toolCount));
     resetUserCounter();
     resetToolCounter();
   } else {
@@ -191,8 +244,9 @@ function main() {
 module.exports = {
   getOrCreateSession,
   saveSessionJson,
-  formatStopReason,
+  formatStats,
   formatShortMessage,
+  spawnDiaryEnricher,
   tryGenerateAutoDiary,
   checkReflectReady,
 };

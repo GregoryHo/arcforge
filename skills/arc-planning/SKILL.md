@@ -9,6 +9,11 @@ description: Use when breaking down specifications, when specs/spec.xml exists, 
 
 Convert specs into executable DAG with epic/feature breakdown. Maintain strict 1:1 mapping for traceability.
 
+## When NOT to Use
+
+- No spec.xml exists (refine first)
+- Work fits in a single feature without cross-cutting dependencies
+
 ## Trigger
 
 Implicit approval: `specs/spec.xml` exists → enter Planner.
