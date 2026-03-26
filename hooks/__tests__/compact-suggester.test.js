@@ -226,7 +226,7 @@ describe('phase-aware messaging', () => {
     trackToolType({ tool_name: 'Bash' });
     trackToolType({ tool_name: 'Agent' });
     trackToolType({ tool_name: 'Task' });
-    const { reads, writes, total } = getReadWriteRatio();
+    const { total } = getReadWriteRatio();
     assert.strictEqual(total, 0);
   });
 });

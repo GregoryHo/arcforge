@@ -39,7 +39,14 @@ hooks/
 │   └── README.md
 ├── observe/                # Tool call observation
 │   └── main.js
-└── log-lightweight.py      # Lightweight session logging
+├── log-lightweight.py      # Lightweight session logging (thin entry point)
+└── log_lightweight/        # Log-lightweight implementation package
+    ├── config.py           # Constants, schema, configuration
+    ├── tokens.py           # Token extraction, cost calculation
+    ├── state.py            # Session state persistence
+    ├── io_writer.py        # Log file I/O
+    ├── tools.py            # Tool input/output summarization
+    └── dispatcher.py       # Main event dispatcher
 ```
 
 ## Active Hooks
@@ -52,6 +59,11 @@ hooks/
 | session-tracker/inject-context | startup, resume, clear | Loads previous session context |
 | session-tracker/start | startup, resume, clear | Resets counters, initializes session |
 | log-lightweight | All | Records session start for logging |
+
+> **Why inject-skills includes `compact` but the others don't:**
+> `inject-skills` sets `ARCFORGE_ROOT` via env file, which must persist through compaction.
+> `inject-context` injects instincts into Claude's context, which gets rebuilt during compaction anyway.
+> `session-tracker/start` creates session tracking state that shouldn't be re-initialized on compact.
 
 ### UserPromptSubmit
 

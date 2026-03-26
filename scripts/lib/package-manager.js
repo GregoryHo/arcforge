@@ -278,7 +278,7 @@ module.exports = {
   getPmExecCommand,
   getRunCommand,
   hasDependency,
-  hasDevDependency: hasDependency, // Alias for backwards compatibility
+  hasDevDependency: hasDependency, // Alias: checks both dependencies AND devDependencies
   hasScript,
   getScripts,
   hasPackageJson,

@@ -13,7 +13,10 @@
 
 const path = require('node:path');
 const { readStdinSync, parseStdinJson, log, readFileSafe } = require('../../scripts/lib/utils');
-const { detectPackageManager, hasDevDependency } = require('../../scripts/lib/package-manager');
+const {
+  detectPackageManager,
+  hasDevDependency, // checks both deps + devDeps
+} = require('../../scripts/lib/package-manager');
 const { runPrettier } = require('./prettier');
 const { runTypeCheck } = require('./typescript');
 
@@ -117,9 +120,11 @@ function main() {
   process.exit(0);
 }
 
+module.exports = { checkConsoleLogs };
+
 try {
-  main();
+  if (require.main === module) main();
 } catch (err) {
-  console.error('[quality-check] Error:', err.message);
+  log(`[quality-check] Error: ${err.message}`);
   process.exit(0);
 }

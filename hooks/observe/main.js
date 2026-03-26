@@ -13,7 +13,13 @@ const path = require('node:path');
 
 const os = require('node:os');
 
-const { getProjectName, readStdinSync } = require('../../scripts/lib/utils');
+const {
+  getProjectName,
+  readStdinSync,
+  parseStdinJson,
+  setSessionIdFromInput,
+  getSessionId,
+} = require('../../scripts/lib/utils');
 const { getObservationsPath } = require('../../scripts/lib/session-utils');
 
 // ─────────────────────────────────────────────
@@ -105,17 +111,15 @@ function main() {
     const stdin = readStdinSync();
 
     // Parse hook input
-    let input;
-    try {
-      input = JSON.parse(stdin);
-    } catch {
+    const input = parseStdinJson(stdin);
+    if (!input) {
       process.exit(0);
       return;
     }
 
     const project = getProjectName();
-    const sessionId =
-      input.session_id || process.env.CLAUDE_SESSION_ID || `session-${process.ppid || 'default'}`;
+    setSessionIdFromInput(input);
+    const sessionId = getSessionId();
 
     // Extract tool information
     const toolName = input.tool_name || input.tool || 'unknown';

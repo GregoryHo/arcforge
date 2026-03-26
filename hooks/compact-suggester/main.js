@@ -134,10 +134,12 @@ function main() {
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
-  // Track read/write ratio in memory (zero file I/O cost)
+  // Track read/write ratio via persisted counters (2 file I/O ops: read + write)
   trackToolType(input);
 
-  // Increment counter (2 file I/O ops: read + write)
+  // NOTE: read-increment-write is not atomic, but hooks are serialized per event
+  // by Claude Code, so no race condition in practice. See scripts/lib/locking.js
+  // if atomic counters become necessary.
   const counter = getCounter();
   const currentCount = counter.read();
   const newCount = currentCount + 1;

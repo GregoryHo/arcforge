@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# NOTE: .cmd extension is historical; this is a bash script used as the hook
+# dispatcher. It is invoked by hooks.json for inject-skills/main.sh.
 set -euo pipefail
 
 HOOK_SCRIPT="$1"
