@@ -81,7 +81,12 @@ describe('pre-compact: updateSessionFile', () => {
     const sessionFile = path.join(sessionDir, 'session-123.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ toolCalls: 10, compactions: [] }));
 
-    const result = updateSessionFile('test-project', '2025-01-15', '2025-01-15T10:30:00Z', 'session-123');
+    const result = updateSessionFile(
+      'test-project',
+      '2025-01-15',
+      '2025-01-15T10:30:00Z',
+      'session-123',
+    );
     assert.strictEqual(result, true);
 
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
@@ -93,7 +98,12 @@ describe('pre-compact: updateSessionFile', () => {
 
   it('should return false for missing session file', () => {
     const { updateSessionFile } = require('../pre-compact/main');
-    const result = updateSessionFile('test-project', '2025-01-15', '2025-01-15T10:30:00Z', 'nonexistent');
+    const result = updateSessionFile(
+      'test-project',
+      '2025-01-15',
+      '2025-01-15T10:30:00Z',
+      'nonexistent',
+    );
     assert.strictEqual(result, false);
   });
 

@@ -23,7 +23,10 @@ def main():
     """Main entry point."""
     _start_time = time.perf_counter()  # Performance tracking
     try:
-        input_data = json.load(sys.stdin)
+        raw_input = sys.stdin.read()
+        if not raw_input.strip():
+            sys.exit(0)
+        input_data = json.loads(raw_input)
         hook_event = input_data.get("hook_event_name")
         cwd = input_data.get("cwd", "")
 

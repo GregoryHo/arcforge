@@ -96,6 +96,9 @@ describe('quality-check: checkConsoleLogs', () => {
 
     const result = checkConsoleLogs(filePath);
     assert.strictEqual(result.length, 1);
-    assert.ok(result[0].content.length <= 60, `Content should be <= 60 chars, got ${result[0].content.length}`);
+    assert.ok(
+      result[0].content.length <= 60,
+      `Content should be <= 60 chars, got ${result[0].content.length}`,
+    );
   });
 });
