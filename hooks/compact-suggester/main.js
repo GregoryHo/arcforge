@@ -18,7 +18,7 @@ const {
   readStdinSync,
   parseStdinJson,
   setSessionIdFromInput,
-  logHighlight,
+  output,
   createSessionCounter,
 } = require('../../scripts/lib/utils');
 
@@ -36,7 +36,7 @@ let writeCounter = null;
 
 function getCounter() {
   if (!toolCounter) {
-    toolCounter = createSessionCounter('tool-count');
+    toolCounter = createSessionCounter('compact-count');
   }
   return toolCounter;
 }
@@ -126,11 +126,7 @@ function trackToolType(input) {
  * Main entry point
  */
 function main() {
-  // Read and pass through stdin
   const stdin = readStdinSync();
-  process.stdout.write(stdin);
-
-  // Parse stdin and set session ID from input
   const input = parseStdinJson(stdin);
   setSessionIdFromInput(input);
 
@@ -145,18 +141,20 @@ function main() {
   const newCount = currentCount + 1;
   counter.write(newCount);
 
+  // Also increment shared tool-count (used by diary threshold in session-tracker/end)
+  const diaryCounter = createSessionCounter('tool-count');
+  diaryCounter.write(diaryCounter.read() + 1);
+
   // Check if suggestion is needed (suppress during write-heavy phases at non-threshold counts)
   if (shouldSuggest(newCount)) {
     if (shouldSuppressReminder(newCount)) {
       return;
     }
-    logHighlight(buildMessage(newCount));
+    output({ systemMessage: buildMessage(newCount) });
   }
 }
 
-// Export for use by session-tracker and testing
 module.exports = {
-  resetCounter: () => getCounter().reset(),
   readCount: () => getCounter().read(),
   getCounterFilePath: () => getCounter().getFilePath(),
   shouldSuggest,

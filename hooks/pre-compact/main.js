@@ -22,15 +22,12 @@ const {
   ensureDir,
   readFileSafe,
   writeFileSafe,
+  createSessionCounter,
   log,
   readStdinSync,
   loadSession,
   saveSession,
 } = require('../../scripts/lib/utils');
-const {
-  readCount: readToolCount,
-  resetCounter: resetToolCounter,
-} = require('../compact-suggester/main');
 const {
   readCount: readUserCount,
   resetCounter: resetUserCounter,
@@ -100,7 +97,7 @@ function main() {
 
     // Read counters
     const userCount = readUserCount();
-    const toolCount = readToolCount();
+    const toolCount = createSessionCounter('tool-count').read();
 
     // Check threshold for diary trigger
     if (shouldTrigger(userCount, toolCount)) {
@@ -141,7 +138,7 @@ A diary draft has been generated. Please use /diary skill to review and finalize
 
       // Reset counters after threshold is met
       resetUserCounter();
-      resetToolCounter();
+      createSessionCounter('tool-count').reset();
     } else {
       // Below threshold - preserve counters
       log(`

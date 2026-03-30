@@ -493,8 +493,8 @@ describe('E2E: compact-suggester/main.js', () => {
     const sessionId = 'test-threshold';
     const env = { TMPDIR: testDir };
 
-    // Pre-create counter at 49 (counter file uses "session-{sessionId}" naming)
-    const counterFile = path.join(testDir, `arcforge-tool-count-session-${sessionId}`);
+    // Pre-create counter at 49 (compact-suggester uses its own "compact-count" counter)
+    const counterFile = path.join(testDir, `arcforge-compact-count-session-${sessionId}`);
     fs.writeFileSync(counterFile, '49');
 
     // The 50th call should trigger suggestion
@@ -507,11 +507,16 @@ describe('E2E: compact-suggester/main.js', () => {
     const result = runNodeHook(scriptPath, input, env);
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
+
+    // compact-suggester outputs systemMessage via stdout JSON
+    const parsed = JSON.parse(result.stdout);
     assert.ok(
-      result.stderr.includes('tool call') ||
-        result.stderr.includes('compact') ||
-        result.stderr.includes('/compact'),
-      `Should suggest compact at threshold. stderr: "${result.stderr.trim()}"`,
+      parsed.systemMessage,
+      `Should output systemMessage at threshold. stdout: "${result.stdout.trim()}"`,
+    );
+    assert.ok(
+      parsed.systemMessage.includes('tool call') || parsed.systemMessage.includes('compact'),
+      `systemMessage should mention tool calls or compact. Got: "${parsed.systemMessage}"`,
     );
   });
 

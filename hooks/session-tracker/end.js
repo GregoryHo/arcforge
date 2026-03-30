@@ -21,13 +21,10 @@ const {
   getDateString,
   getSessionId,
   getTimestamp,
+  createSessionCounter,
   log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const {
-  readCount: readToolCount,
-  resetCounter: resetToolCounter,
-} = require('../compact-suggester/main');
 const {
   readCount: readUserCount,
   resetCounter: resetUserCounter,
@@ -195,7 +192,7 @@ function main() {
 
   const session = getOrCreateSession();
   const userCount = readUserCount();
-  const toolCount = readToolCount();
+  const toolCount = createSessionCounter('tool-count').read();
 
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
@@ -232,7 +229,7 @@ function main() {
 
     log(formatShortMessage(userCount, toolCount));
     resetUserCounter();
-    resetToolCounter();
+    createSessionCounter('tool-count').reset();
   } else {
     log(formatShortMessage(userCount, toolCount));
   }
