@@ -22,6 +22,7 @@ const {
   getSessionId,
   getTimestamp,
   createSessionCounter,
+  output,
   log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
@@ -227,11 +228,11 @@ function main() {
       });
     }
 
-    log(formatShortMessage(userCount, toolCount));
+    output({ systemMessage: formatShortMessage(userCount, toolCount) });
     resetUserCounter();
     createSessionCounter('tool-count').reset();
   } else {
-    log(formatShortMessage(userCount, toolCount));
+    output({ systemMessage: formatShortMessage(userCount, toolCount) });
   }
 
   process.exit(0);

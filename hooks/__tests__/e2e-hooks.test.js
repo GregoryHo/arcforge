@@ -460,9 +460,16 @@ describe('E2E: quality-check/main.js', () => {
     const result = runNodeHook(scriptPath, input);
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
+
+    // quality-check outputs systemMessage via stdout JSON
+    const parsed = JSON.parse(result.stdout);
     assert.ok(
-      result.stderr.includes('console.log') || result.stderr.includes('console'),
-      'Should warn about console.log in stderr',
+      parsed.systemMessage,
+      `Should output systemMessage. stdout: "${result.stdout.trim()}"`,
+    );
+    assert.ok(
+      parsed.systemMessage.includes('console'),
+      `systemMessage should mention console. Got: "${parsed.systemMessage}"`,
     );
   });
 

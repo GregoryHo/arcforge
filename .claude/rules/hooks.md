@@ -58,18 +58,20 @@ Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
 
 **Who sees hook output depends on the mechanism used:**
 
-| Mechanism | Audience | Condensed? | Use for |
-|-----------|----------|------------|---------|
-| `stderr` (`log()`, `console.error()`) | User (verbose/Ctrl+O only) | **YES** — shows as "N hooks ran" | Debug logging only |
-| `stdout` `{"systemMessage": "..."}` | **User (always visible)** | **NO** | Suggestions, warnings, notifications |
-| `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | N/A | Context injection (SessionStart, UserPromptSubmit only) |
-| Exit code 2 | Claude Code (blocks action) | N/A | Blocking hooks only (PreToolUse, UserPromptSubmit, Stop) |
+| Mechanism | Audience | Visible? | Use for |
+|-----------|----------|----------|---------|
+| `stderr` (`log()`, `console.error()`) | **Nobody** | **NO** — condensed into "N hooks ran", invisible even in Ctrl+O | Internal diagnostics only |
+| `stdout` `{"systemMessage": "..."}` | **User (always)** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings, notifications |
+| `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | YES — injected into context | Context injection (SessionStart, UserPromptSubmit only) |
+| Exit code 2 | Claude Code engine | N/A — blocks action | Blocking hooks only (PreToolUse, UserPromptSubmit, Stop) |
+
+**CRITICAL**: `stderr` is **invisible** in all events (verified: PostToolUse, Stop). Claude Code condenses it regardless of hook count. Do NOT use stderr for anything the user needs to see.
 
 **Rules:**
-- To show a message the user always sees → use `output({ systemMessage: "..." })`
-- To inject context Claude receives → use `outputContext(text, eventName)` (SessionStart/UserPromptSubmit only)
-- For debug/diagnostic logs → use `log(msg)` (stderr, verbose-only)
-- Never use `console.log` for debug — it goes to stdout and contaminates hook protocol
+- User-visible message → `output({ systemMessage: "..." })` (only mechanism that works)
+- Context for Claude → `outputContext(text, eventName)` (SessionStart/UserPromptSubmit only)
+- Internal diagnostics → `log(msg)` (stderr, but user will never see it)
+- Never use `console.log` — goes to stdout, contaminates hook protocol
 
 ## Shared Utilities
 

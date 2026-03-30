@@ -91,21 +91,23 @@ This is the most important section. Different output mechanisms reach different 
 
 ### Output Visibility Matrix
 
-| Mechanism | Audience | Always Visible? | Use For |
-|-----------|----------|----------------|---------|
-| **stderr** | User terminal | No — condensed as "N hooks ran" | Debug logging only |
-| **systemMessage** (stdout JSON) | User terminal | **Yes — always shown** | Suggestions, warnings |
-| **additionalContext** (stdout JSON) | Claude (context) | Yes — injected into Claude | Context injection |
+| Mechanism | Audience | Visible? | Use For |
+|-----------|----------|----------|---------|
+| **stderr** | **Nobody** | **NO** — condensed, invisible even in Ctrl+O | Internal diagnostics only |
+| **systemMessage** (stdout JSON) | **User (always)** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings |
+| **additionalContext** (stdout JSON) | **Claude** | YES — injected into context | Context injection |
 | **Exit code 2** | Claude Code engine | N/A — blocks event | Blocking actions |
 
-### stderr — Debug Logging (Condensed)
+### stderr — Invisible (DO NOT rely on)
 
 ```js
 const { log } = require('../../scripts/lib/utils');
-log('Processing tool call...');  // Goes to stderr
+log('Processing tool call...');  // Goes to stderr — NOBODY SEES THIS
 ```
 
-**What happens**: Claude Code shows `"4 PostToolUse hooks ran"` instead of individual hook stderr. Users only see the content in verbose mode (Ctrl+O).
+**What happens**: Claude Code condenses ALL hook stderr into `"N hooks ran"`. The individual messages are **completely invisible** — not shown in normal mode, not shown in Ctrl+O transcript mode, not shown anywhere. This was verified on PostToolUse (4 hooks) and Stop (2 hooks) events.
+
+**CRITICAL**: This means stderr is useless for communicating with users. It exists only for internal diagnostics that nobody will read unless they add custom logging.
 
 **Use for**: Diagnostic messages, progress tracking, debug info.
 
@@ -266,7 +268,7 @@ For hooks that inject context into Claude (inject-skills, inject-context), use t
 | Mistake | Fix |
 |---------|-----|
 | Using `console.log` for debug | Use `log()` (stderr) — console.log goes to stdout and corrupts hook protocol |
-| Using `logHighlight()` for user-facing messages | Use `output({ systemMessage: "..." })` — stderr is condensed |
+| Using `logHighlight()` or `log()` for user-facing messages | Use `output({ systemMessage: "..." })` — stderr is completely invisible (not just condensed) |
 | Reading `input.trigger` on SessionStart | Use `input.source` — official field name is `source` |
 | Sharing counter names across independent systems | Use separate counter names (e.g., `compact-count` vs `tool-count`) |
 | Using `execFileSync` in tests | Use `spawnSync` — captures stderr on success |

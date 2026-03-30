@@ -23,6 +23,7 @@ const {
   readFileSafe,
   writeFileSafe,
   createSessionCounter,
+  output,
   log,
   readStdinSync,
   loadSession,
@@ -129,22 +130,17 @@ function main() {
         // Non-blocking — draft generation is best-effort
       }
 
-      // Prompt to run diary skill via stderr (NOT outputDecision — preserves stdout pass-through)
-      log(`
-Context compaction detected. (${userCount} messages, ${toolCount} tool calls)
-
-A diary draft has been generated. Please use /diary skill to review and finalize it before context is compacted.
-`);
+      output({
+        systemMessage: `Context compaction detected. (${userCount} messages, ${toolCount} tool calls)\nA diary draft has been generated. Please use /diary skill to review and finalize it before context is compacted.`,
+      });
 
       // Reset counters after threshold is met
       resetUserCounter();
       createSessionCounter('tool-count').reset();
     } else {
-      // Below threshold - preserve counters
-      log(`
-📝 Context compaction. (${userCount} messages, ${toolCount} tool calls)
-   Below threshold - counters preserved.
-`);
+      output({
+        systemMessage: `📝 Context compaction. (${userCount} messages, ${toolCount} tool calls)\n   Below threshold - counters preserved.`,
+      });
     }
   } catch (e) {
     // Never block compaction
