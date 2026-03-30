@@ -247,6 +247,23 @@ function buildAssertionBreakdown(r, assertions) {
     );
     container.appendChild(row);
   }
+  // Show captured artifacts for code-graded trials (audit trail)
+  if (r.artifacts) {
+    const toggle = h('div', {
+      style: 'margin-top:8px;font-size:11px;color:var(--accent);cursor:pointer;user-select:none',
+      onclick: function() {
+        const pre = this.nextElementSibling;
+        const visible = pre.style.display !== 'none';
+        pre.style.display = visible ? 'none' : 'block';
+        this.textContent = visible ? '▶ Show trial artifacts' : '▼ Hide trial artifacts';
+      }
+    }, '▶ Show trial artifacts');
+    const pre = h('pre', {
+      style: 'display:none;margin:4px 0 0;padding:8px;background:var(--bg2);border-radius:4px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap'
+    }, r.artifacts);
+    container.appendChild(toggle);
+    container.appendChild(pre);
+  }
   return container;
 }
 

@@ -202,8 +202,55 @@ function gradeWithCode(result, testCommand, projectRoot) {
   if (result.trialDir) env.TRIAL_DIR = result.trialDir;
   env.PROJECT_ROOT = projectRoot;
   const cwd = result.trialDir || projectRoot;
-  const { exitCode } = execCommand(cmd, args, { cwd, env });
-  return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0 };
+  const { exitCode, stdout, stderr } = execCommand(cmd, args, { cwd, env });
+  const graderOutput = (stdout || stderr || '').trim() || undefined;
+  const artifacts = captureTrialArtifacts(result.trialDir) || undefined;
+  const extra = {
+    ...(graderOutput ? { graderOutput } : {}),
+    ...(artifacts ? { artifacts } : {}),
+  };
+
+  // Parse per-assertion labels from stdout (convention: A1:PASS, A2:FAIL:reason)
+  const assertions = parseAssertionLabels(stdout || '');
+  if (assertions.length > 0) {
+    const assertionScores = assertions.map((a) => (a.passed ? 1.0 : 0.0));
+    const evidence = assertions.map((a) =>
+      a.passed ? 'PASS' : `FAIL${a.reason ? `: ${a.reason}` : ''}`,
+    );
+    const score = round2(assertionScores.reduce((a, b) => a + b, 0) / assertionScores.length);
+    return {
+      ...result,
+      passed: assertionScores.every((s) => s === 1.0),
+      score,
+      assertionScores,
+      evidence,
+      ...extra,
+    };
+  }
+
+  // Fallback: binary pass/fail (backwards compatible)
+  return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0, ...extra };
+}
+
+/**
+ * Parse labeled assertion results from code grader stdout.
+ * Convention: lines matching `A<N>:PASS` or `A<N>:FAIL:<reason>`.
+ * @param {string} stdout - Grader stdout
+ * @returns {{ index: number, passed: boolean, reason: string }[]} Sorted by index
+ */
+function parseAssertionLabels(stdout) {
+  const results = [];
+  for (const line of stdout.split('\n')) {
+    const match = line.match(/^A(\d+):(PASS|FAIL)(?::(.*))?$/);
+    if (match) {
+      results.push({
+        index: parseInt(match[1], 10),
+        passed: match[2] === 'PASS',
+        reason: (match[3] || '').trim(),
+      });
+    }
+  }
+  return results.sort((a, b) => a.index - b.index);
 }
 
 /**
@@ -477,6 +524,7 @@ async function gradeWithHuman(result, rl) {
 module.exports = {
   gradeTrialResult,
   gradeWithCode,
+  parseAssertionLabels,
   captureTrialArtifacts,
   gradeWithModel,
   compareWithModel,

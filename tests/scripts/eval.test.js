@@ -25,6 +25,7 @@ const {
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
+  parseAssertionLabels,
   gradeWithModel,
   gradeTrialResult,
   saveTranscript,
@@ -1023,6 +1024,82 @@ MARKER
       } finally {
         fs.rmSync(trialDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ── parseAssertionLabels ─────────────────────────────────────
+
+  describe('parseAssertionLabels', () => {
+    it('should parse mixed PASS and FAIL labels', () => {
+      const stdout = 'A1:PASS\nA2:FAIL:found throw\nA3:PASS\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results).toHaveLength(3);
+      expect(results[0]).toEqual({ index: 1, passed: true, reason: '' });
+      expect(results[1]).toEqual({ index: 2, passed: false, reason: 'found throw' });
+      expect(results[2]).toEqual({ index: 3, passed: true, reason: '' });
+    });
+
+    it('should return empty array when no labels found', () => {
+      const stdout = 'some random output\nPASS: all good\n';
+      expect(parseAssertionLabels(stdout)).toEqual([]);
+    });
+
+    it('should sort by assertion index', () => {
+      const stdout = 'A3:PASS\nA1:FAIL:oops\nA2:PASS\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results[0].index).toBe(1);
+      expect(results[1].index).toBe(2);
+      expect(results[2].index).toBe(3);
+    });
+
+    it('should handle FAIL without reason', () => {
+      const stdout = 'A1:FAIL\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({ index: 1, passed: false, reason: '' });
+    });
+  });
+
+  // ── gradeWithCode (per-assertion labels) ─────────────────────
+
+  describe('gradeWithCode per-assertion labels', () => {
+    it('should produce assertionScores when labels present', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-labels-'));
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(
+          result,
+          'echo "A1:PASS" && echo "A2:FAIL:bad" && echo "A3:PASS" && exit 1',
+          tempDir,
+        );
+
+        expect(graded.assertionScores).toEqual([1, 0, 1]);
+        expect(graded.evidence).toEqual(['PASS', 'FAIL: bad', 'PASS']);
+        expect(graded.score).toBeCloseTo(0.67, 1);
+        expect(graded.passed).toBe(false);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should fall back to binary when no labels', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'echo "all good" && exit 0', tempDir);
+
+      expect(graded.assertionScores).toBeUndefined();
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(1.0);
+    });
+
+    it('should store graderOutput from stdout', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'echo "FAIL: something broke" && exit 1', tempDir);
+
+      expect(graded.graderOutput).toBe('FAIL: something broke');
+      expect(graded.passed).toBe(false);
     });
   });
 

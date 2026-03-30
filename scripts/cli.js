@@ -341,7 +341,12 @@ async function main() {
           if (g.infraError) {
             return `INFRA ERROR (${g.errorType || 'unknown'}${g.error ? `: ${g.error}` : ''})`;
           }
-          return g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`;
+          const base = g.passed ? `PASS (${g.score})` : `FAIL (${g.score})`;
+          if (!g.passed && g.assertionScores) {
+            const tags = g.assertionScores.map((s, i) => `A${i + 1}:${s === 1 ? '✓' : '✗'}`);
+            return `${base} [${tags.join(' ')}]`;
+          }
+          return base;
         };
 
         const requireScenario = (name, cmd) => {
