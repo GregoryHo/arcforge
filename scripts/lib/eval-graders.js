@@ -218,12 +218,14 @@ function gradeWithCode(result, testCommand, projectRoot) {
       a.passed ? 'PASS' : `FAIL${a.reason ? `: ${a.reason}` : ''}`,
     );
     const score = round2(assertionScores.reduce((a, b) => a + b, 0) / assertionScores.length);
+    const blockRefs = buildCodeGraderBlockRefs(result.output, result.trialDir, assertions.length);
     return {
       ...result,
       passed: assertionScores.every((s) => s === 1.0),
       score,
       assertionScores,
       evidence,
+      ...(blockRefs ? { blockRefs } : {}),
       ...extra,
     };
   }
@@ -251,6 +253,27 @@ function parseAssertionLabels(stdout) {
     }
   }
   return results.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Build blockRefs for code-graded trials by finding Write blocks in the transcript.
+ * Maps all assertions to transcript blocks where files were written to the trial dir.
+ * @param {string} [transcript] - Rich transcript text (result.output)
+ * @param {string} [trialDir] - Trial directory path
+ * @param {number} assertionCount - Number of assertions
+ * @returns {number[][]|null} Per-assertion block refs (1-indexed), or null if none found
+ */
+function buildCodeGraderBlockRefs(transcript, trialDir, assertionCount) {
+  if (!transcript || !trialDir || !assertionCount) return null;
+  const blocks = splitTranscriptBlocks(transcript);
+  const writeBlockIndices = [];
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].startsWith('[Tool: Write]') && blocks[i].includes(trialDir)) {
+      writeBlockIndices.push(i + 1); // 1-indexed
+    }
+  }
+  if (writeBlockIndices.length === 0) return null;
+  return Array.from({ length: assertionCount }, () => [...writeBlockIndices]);
 }
 
 /**
@@ -313,9 +336,14 @@ function captureTrialArtifacts(trialDir, opts = {}) {
  * @param {string} output - Raw transcript text
  * @returns {{ numbered: string, blockCount: number }}
  */
+function splitTranscriptBlocks(text) {
+  if (!text) return [];
+  return text.split(/(?=^\[(?:Tool:|Assistant))/m).filter((b) => b.trim());
+}
+
 function numberTranscriptBlocks(output) {
   if (!output) return { numbered: '(no output)', blockCount: 0 };
-  const blocks = output.split(/(?=^\[(?:Tool:|Assistant))/m).filter((b) => b.trim());
+  const blocks = splitTranscriptBlocks(output);
   if (blocks.length === 0) return { numbered: output, blockCount: 0 };
   const numbered = blocks.map((b, i) => `[Block ${i + 1}]\n${b.trim()}`).join('\n\n');
   return { numbered, blockCount: blocks.length };
@@ -525,6 +553,7 @@ module.exports = {
   gradeTrialResult,
   gradeWithCode,
   parseAssertionLabels,
+  buildCodeGraderBlockRefs,
   captureTrialArtifacts,
   gradeWithModel,
   compareWithModel,

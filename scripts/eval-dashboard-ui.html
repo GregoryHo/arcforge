@@ -560,9 +560,42 @@ async function showTranscript(transcriptPath, ctx) {
       blockDiv.appendChild(labels);
     }
 
-    const pre = document.createElement('pre');
-    pre.innerHTML = highlighted;
-    blockDiv.appendChild(pre);
+    const rawBlock = blocks[i].trim();
+    const isLongContent = rawBlock.startsWith('[Tool: Write]') || rawBlock.startsWith('[Tool: Edit]');
+    const rawLines = rawBlock.split('\n');
+
+    if (isLongContent && rawLines.length > 5) {
+      // Preview: escape and highlight only the first 3 lines (avoids mid-entity splits)
+      const previewText = esc(rawLines.slice(0, 3).join('\n'))
+        .replace(/^\[Tool: (.+?)\]/gm, '<span class="tool">[Tool: $1]</span>');
+      const previewPre = document.createElement('pre');
+      previewPre.innerHTML = previewText; // esc'd from rawLines
+      blockDiv.appendChild(previewPre);
+
+      // Full content created lazily on first expand
+      let fullPre = null;
+      const toggle = h('div', {
+        style: 'font-size:11px;color:var(--accent);cursor:pointer;user-select:none;padding:2px 0',
+        onclick: function() {
+          if (!fullPre) {
+            fullPre = document.createElement('pre');
+            fullPre.innerHTML = highlighted; // esc'd above
+            blockDiv.appendChild(fullPre);
+          }
+          const showing = fullPre.style.display !== 'none';
+          fullPre.style.display = showing ? 'none' : 'block';
+          previewPre.style.display = showing ? 'block' : 'none';
+          this.textContent = showing
+            ? '\u25b6 Show full content (' + rawLines.length + ' lines)'
+            : '\u25bc Collapse';
+        }
+      }, '\u25b6 Show full content (' + rawLines.length + ' lines)');
+      blockDiv.appendChild(toggle);
+    } else {
+      const pre = document.createElement('pre');
+      pre.innerHTML = highlighted; // esc'd above
+      blockDiv.appendChild(pre);
+    }
     container.appendChild(blockDiv);
   }
 

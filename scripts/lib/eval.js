@@ -322,12 +322,13 @@ function summarizeToolInput(toolName, input) {
   switch (toolName) {
     case 'Write': {
       const content = input.content || '';
-      return `${input.file_path || ''}\n\`\`\`\n${content.slice(0, 500)}${content.length > 500 ? '\n...(truncated)' : ''}\n\`\`\``;
+      return `${input.file_path || ''}\n\`\`\`\n${content}\n\`\`\``;
     }
     case 'Edit': {
       const old = input.old_string || '';
       const rep = input.new_string || '';
-      return `${input.file_path || ''} (replace "${old.slice(0, 80)}${old.length > 80 ? '...' : ''}" → "${rep.slice(0, 80)}${rep.length > 80 ? '...' : ''}")`;
+      const maxLen = 300;
+      return `${input.file_path || ''} (replace "${old.slice(0, maxLen)}${old.length > maxLen ? '...' : ''}" → "${rep.slice(0, maxLen)}${rep.length > maxLen ? '...' : ''}")`;
     }
     case 'Read':
       return input.file_path || '';

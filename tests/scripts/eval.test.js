@@ -26,6 +26,7 @@ const {
   ensureEvalsDir,
   gradeWithCode,
   parseAssertionLabels,
+  buildCodeGraderBlockRefs,
   gradeWithModel,
   gradeTrialResult,
   saveTranscript,
@@ -388,7 +389,7 @@ MARKER
       expect(richTranscript).toBe('[Assistant] Real content');
     });
 
-    it('should handle Write tool with truncation', () => {
+    it('should include full Write content without truncation', () => {
       const longContent = 'x'.repeat(600);
       const input = JSON.stringify({
         type: 'assistant',
@@ -404,7 +405,8 @@ MARKER
       });
       const { richTranscript } = parseStreamJsonOutput(input);
       expect(richTranscript).toContain('/tmp/f.js');
-      expect(richTranscript).toContain('...(truncated)');
+      expect(richTranscript).toContain(longContent);
+      expect(richTranscript).not.toContain('truncated');
     });
 
     it('should handle Edit tool summary', () => {
@@ -1060,6 +1062,42 @@ MARKER
 
       expect(results).toHaveLength(1);
       expect(results[0]).toEqual({ index: 1, passed: false, reason: '' });
+    });
+  });
+
+  // ── buildCodeGraderBlockRefs ──────────────────────────────────
+
+  describe('buildCodeGraderBlockRefs', () => {
+    it('should find Write blocks matching trial dir', () => {
+      const transcript = [
+        '[Assistant] I will write the file.',
+        '[Tool: Write] /trial/dir/order.js\n```\ncode here\n```',
+        '[Assistant] Done.',
+      ].join('\n\n');
+      const refs = buildCodeGraderBlockRefs(transcript, '/trial/dir', 2);
+
+      expect(refs).toEqual([[2], [2]]);
+    });
+
+    it('should return null when no Write blocks found', () => {
+      const transcript = '[Assistant] Hello.\n\n[Tool: Bash] $ ls';
+      expect(buildCodeGraderBlockRefs(transcript, '/trial/dir', 2)).toBeNull();
+    });
+
+    it('should return null when transcript is empty', () => {
+      expect(buildCodeGraderBlockRefs('', '/trial/dir', 2)).toBeNull();
+      expect(buildCodeGraderBlockRefs(undefined, '/trial/dir', 2)).toBeNull();
+    });
+
+    it('should map multiple Write blocks to all assertions', () => {
+      const transcript = [
+        '[Tool: Write] /trial/dir/a.js\n```\na\n```',
+        '[Assistant] Next file.',
+        '[Tool: Write] /trial/dir/b.js\n```\nb\n```',
+      ].join('\n\n');
+      const refs = buildCodeGraderBlockRefs(transcript, '/trial/dir', 3);
+
+      expect(refs).toEqual([[1, 3], [1, 3], [1, 3]]);
     });
   });
 
