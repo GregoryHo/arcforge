@@ -261,6 +261,68 @@ Do something.
 
       expect(scenario.target).toBeUndefined();
     });
+
+    it('should preserve ## lines inside heredocs in setup section', () => {
+      const content = `# Eval: heredoc-test
+
+## Scenario
+Do something.
+
+## Setup
+
+cat > briefing.md << 'EOF'
+# Title
+
+## Section One
+Content of section one.
+
+## Section Two
+Content of section two.
+EOF
+
+## Assertions
+
+- [ ] Check something
+`;
+      const filePath = writeScenario(tempDir, 'heredoc.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toContain('## Section One');
+      expect(scenario.setup).toContain('## Section Two');
+      expect(scenario.setup).toContain('Content of section two.');
+      expect(scenario.assertions).toEqual(['Check something']);
+    });
+
+    it('should handle multiple heredocs with ## lines in setup', () => {
+      const content = `# Eval: multi-heredoc
+
+## Scenario
+Do something.
+
+## Setup
+
+cat > file1.md << 'EOF'
+## Heading A
+Content A.
+EOF
+
+cat > file2.md << 'MARKER'
+## Heading B
+Content B.
+MARKER
+
+## Assertions
+
+- [ ] Verify output
+`;
+      const filePath = writeScenario(tempDir, 'multi-heredoc.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toContain('## Heading A');
+      expect(scenario.setup).toContain('## Heading B');
+      expect(scenario.setup).toContain("cat > file2.md << 'MARKER'");
+      expect(scenario.assertions).toEqual(['Verify output']);
+    });
   });
 
   // ── parseStreamJsonOutput ────────────────────────────────────
@@ -938,6 +1000,29 @@ Do something.
       const result = makeResult();
       const graded = gradeWithCode(result, 'true', tempDir);
       expect(graded.passed).toBe(true);
+    });
+
+    it('should run grader in trialDir when available', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-cwd-'));
+      fs.writeFileSync(path.join(trialDir, 'artifact.txt'), 'hello');
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(result, 'test -f artifact.txt', tempDir);
+        expect(graded.passed).toBe(true);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should inject PROJECT_ROOT env var', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-pr-'));
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(result, `test "$PROJECT_ROOT" = "${tempDir}"`, tempDir);
+        expect(graded.passed).toBe(true);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
     });
   });
 

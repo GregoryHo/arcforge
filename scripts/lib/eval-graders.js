@@ -174,7 +174,7 @@ function validateGraderResponse(grade, assertionCount) {
  */
 function gradeTrialResult(result, scenario, projectRoot) {
   if (scenario.grader === 'code') {
-    // Code grading runs in projectRoot (where test suites live), not the isolated trial dir
+    // Code grading runs in trialDir (where agent artifacts live), with $PROJECT_ROOT available
     return gradeWithCode(result, scenario.graderConfig, projectRoot);
   }
   if (scenario.grader === 'model') {
@@ -200,7 +200,9 @@ function gradeWithCode(result, testCommand, projectRoot) {
     : ['sh', ['-c', testCommand]];
   const env = { ...process.env };
   if (result.trialDir) env.TRIAL_DIR = result.trialDir;
-  const { exitCode } = execCommand(cmd, args, { cwd: projectRoot, env });
+  env.PROJECT_ROOT = projectRoot;
+  const cwd = result.trialDir || projectRoot;
+  const { exitCode } = execCommand(cmd, args, { cwd, env });
   return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0 };
 }
 
