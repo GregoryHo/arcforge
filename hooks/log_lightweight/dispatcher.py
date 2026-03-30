@@ -127,11 +127,11 @@ def _handle_session_start(input_data, state, cwd):
     """Initialize state at session start."""
     session_id = input_data.get("session_id", "")
     transcript_path = input_data.get("transcript_path", "")
-    trigger = input_data.get("trigger", "")
+    source = input_data.get("source", "")
 
     # Only preserve timeline if UserPromptSubmit fired before SessionStart (same session)
     existing_timeline = []
-    if trigger == "startup" and state.get("transcript_path") == transcript_path:
+    if source == "startup" and state.get("transcript_path") == transcript_path:
         existing_timeline = state.get("timeline", [])
 
     new_state = _make_initial_state(cwd, transcript_path, timeline=existing_timeline, session_id=session_id)
