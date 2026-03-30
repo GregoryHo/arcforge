@@ -1097,7 +1097,11 @@ MARKER
       ].join('\n\n');
       const refs = buildCodeGraderBlockRefs(transcript, '/trial/dir', 3);
 
-      expect(refs).toEqual([[1, 3], [1, 3], [1, 3]]);
+      expect(refs).toEqual([
+        [1, 3],
+        [1, 3],
+        [1, 3],
+      ]);
     });
   });
 
