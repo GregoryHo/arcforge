@@ -294,6 +294,30 @@ function outputContext(context, eventName = 'Hook') {
 }
 
 /**
+ * Output combined hook response with both systemMessage (user-visible) and additionalContext (Claude-visible).
+ * Use for: SessionStart/UserPromptSubmit hooks that need to show the user a summary AND inject context to Claude.
+ *
+ * @param {string|null} userMessage - Message shown to user (systemMessage), null to skip
+ * @param {string|null} claudeContext - Context injected into Claude (additionalContext), null to skip
+ * @param {string} eventName - The hook event name (default: 'Hook')
+ */
+function outputCombined(userMessage, claudeContext, eventName = 'Hook') {
+  if (!userMessage && !claudeContext) return;
+
+  const result = {};
+  if (userMessage) {
+    result.systemMessage = userMessage;
+  }
+  if (claudeContext) {
+    result.hookSpecificOutput = {
+      hookEventName: eventName,
+      additionalContext: claudeContext,
+    };
+  }
+  output(result);
+}
+
+/**
  * Output decision response for Stop hooks
  * Use for: Stop hooks that need Claude to execute a prompt before stopping
  *
@@ -562,6 +586,7 @@ module.exports = {
   logHighlight,
   output,
   outputContext,
+  outputCombined,
   outputDecision,
   outputDecisionHighlight,
   // Color utilities (internal: colors, colorize, supportsColor)
