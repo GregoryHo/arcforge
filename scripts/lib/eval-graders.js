@@ -221,7 +221,7 @@ function gradeWithCode(result, testCommand, projectRoot) {
     const blockRefs = buildCodeGraderBlockRefs(result.output, result.trialDir, assertions.length);
     return {
       ...result,
-      passed: assertionScores.every((s) => s === 1.0),
+      passed: assertionScores.every((s) => s === 1.0) && exitCode === 0,
       score,
       assertionScores,
       evidence,

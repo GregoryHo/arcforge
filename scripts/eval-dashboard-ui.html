@@ -580,7 +580,11 @@ async function showTranscript(transcriptPath, ctx) {
           if (!fullPre) {
             fullPre = document.createElement('pre');
             fullPre.innerHTML = highlighted; // esc'd above
+            fullPre.style.display = 'block';
             blockDiv.appendChild(fullPre);
+            previewPre.style.display = 'none';
+            this.textContent = '\u25bc Collapse';
+            return;
           }
           const showing = fullPre.style.display !== 'none';
           fullPre.style.display = showing ? 'none' : 'block';
