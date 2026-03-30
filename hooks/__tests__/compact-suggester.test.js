@@ -32,18 +32,18 @@ describe('compact-suggester counter', () => {
   it('should track counter file path', () => {
     const { getCounterFilePath } = require('../compact-suggester/main');
     const filePath = getCounterFilePath();
-    assert.ok(filePath.includes('arcforge-tool-count'));
+    assert.ok(filePath.includes('arcforge-compact-count'));
     assert.ok(filePath.includes('test-compact-session'));
   });
 
-  it('should reset counter', () => {
-    const { readCount, resetCounter } = require('../compact-suggester/main');
-    // Manually write a count
+  it('should read and write counter independently', () => {
+    const { readCount } = require('../compact-suggester/main');
     const { createSessionCounter } = require('../../scripts/lib/utils');
-    const counter = createSessionCounter('tool-count');
+    const counter = createSessionCounter('compact-count');
     counter.write(50);
 
-    resetCounter();
+    assert.strictEqual(readCount(), 50);
+    counter.write(0);
     assert.strictEqual(readCount(), 0);
   });
 });
@@ -226,7 +226,7 @@ describe('phase-aware messaging', () => {
     trackToolType({ tool_name: 'Bash' });
     trackToolType({ tool_name: 'Agent' });
     trackToolType({ tool_name: 'Task' });
-    const { reads, writes, total } = getReadWriteRatio();
+    const { total } = getReadWriteRatio();
     assert.strictEqual(total, 0);
   });
 });

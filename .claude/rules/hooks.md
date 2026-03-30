@@ -28,15 +28,50 @@ Silent catch — hooks must never crash the session:
 try { /* hook logic */ } catch { /* silently continue */ }
 ```
 
-## Stdin/Stdout
+## Hook Input Schema
 
-- Use `readStdinSync()` from `scripts/lib/utils.js` to read stdin
-- Write back to stdout for hook chaining
+All hooks receive JSON via stdin. Common fields across all events:
 
-## Logging
+| Field | All Events | Notes |
+|-------|-----------|-------|
+| `session_id` | ✓ | UUID |
+| `transcript_path` | ✓ | Full path to session transcript |
+| `cwd` | ✓ | Project working directory |
+| `hook_event_name` | ✓ | Event type string |
 
-- `log(msg)` writes to stderr (visible in Claude Code debug output, not sent to Claude)
-- Never use `console.log` for debug output in hooks (it goes to stdout and contaminates the chain)
+Event-specific fields:
+
+| Event | Extra Fields |
+|-------|-------------|
+| SessionStart | `source` (`startup\|resume\|clear\|compact`) |
+| UserPromptSubmit | `permission_mode`, `prompt` |
+| PreToolUse | `permission_mode`, `tool_name`, `tool_input`, `tool_use_id` |
+| PostToolUse | `permission_mode`, `tool_name`, `tool_input`, `tool_response`, `tool_use_id` |
+| Stop | `permission_mode`, `stop_hook_active`, `last_assistant_message` |
+| SessionEnd | `reason` |
+
+**IMPORTANT**: SessionStart uses `source` (not `trigger`). Values: `startup`, `resume`, `clear`, `compact`.
+
+Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
+
+## Output Visibility
+
+**Who sees hook output depends on the mechanism used:**
+
+| Mechanism | Audience | Visible? | Use for |
+|-----------|----------|----------|---------|
+| `stderr` (`log()`, `console.error()`) | **Nobody** | **NO** — condensed into "N hooks ran", invisible even in Ctrl+O | Internal diagnostics only |
+| `stdout` `{"systemMessage": "..."}` | **User (always)** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings, notifications |
+| `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | YES — injected into context | Context injection (SessionStart, UserPromptSubmit only) |
+| Exit code 2 | Claude Code engine | N/A — blocks action | Blocking hooks only (PreToolUse, UserPromptSubmit, Stop) |
+
+**CRITICAL**: `stderr` is **invisible** in all events (verified: PostToolUse, Stop). Claude Code condenses it regardless of hook count. Do NOT use stderr for anything the user needs to see.
+
+**Rules:**
+- User-visible message → `output({ systemMessage: "..." })` (only mechanism that works)
+- Context for Claude → `outputContext(text, eventName)` (SessionStart/UserPromptSubmit only)
+- Internal diagnostics → `log(msg)` (stderr, but user will never see it)
+- Never use `console.log` — goes to stdout, contaminates hook protocol
 
 ## Shared Utilities
 

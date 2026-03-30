@@ -31,6 +31,7 @@ const {
   getSessionId,
   getTimestamp,
   ensureDir,
+  output,
   log,
 } = require('../../scripts/lib/utils');
 
@@ -95,9 +96,9 @@ function runDecayCycles(project) {
     const instResult = runDecayCycle(getInstinctsDir(project));
 
     if (instResult.decayed.length > 0 || instResult.archived.length > 0) {
-      log(
-        `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`,
-      );
+      output({
+        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`,
+      });
     }
 
     return { instResult };

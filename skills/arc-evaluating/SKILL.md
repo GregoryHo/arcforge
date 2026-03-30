@@ -60,6 +60,16 @@ Does the full toolkit system improve agent outcomes?
 
 This is the system-level evaluation: "does having the toolkit installed make the agent better at this task?" Unlike skill evals (which vary the prompt), workflow evals vary the environment while keeping the identical prompt for both conditions.
 
+## Scope Alignment (MANDATORY)
+
+Before designing any scenario, **confirm scope with the user**. Do NOT assume — ask.
+
+1. **What is the eval target?** (skill, agent, hook, pipeline, infrastructure component)
+2. **What question are you answering?** (match to table below)
+3. **What Claude behavior would change?** If the answer is only side-effect artifacts (files, logs, counters) and not Claude's actions or output — the eval harness is the wrong tool.
+
+Do NOT proceed to scenario design until the user confirms scope.
+
 ## Question First
 
 Before you choose a metric, ask: **what are you trying to learn?**
@@ -71,13 +81,18 @@ If you cannot answer that in one sentence, you are not ready to design the scena
 | Does this instruction change agent behavior? | **skill** | Skill present vs absent | Same scenario, model, setup | `delta` |
 | Can this agent complete the task correctly? | **agent** | Trial-to-trial execution | Task, environment, assertions | `pass@k`, `pass^k` |
 | Does the toolkit/environment improve outcomes? | **workflow** | Bare agent vs full toolkit | Same prompt, model, scenario | `delta`, `pass^k` |
+| Does this component work correctly? | **none** | N/A | N/A | Use unit/integration tests, not eval harness |
 
 Three common questions:
 - **Behavior change**: "Did the skill cause different choices?"
 - **Task outcome**: "Did the agent produce the correct output?"
 - **Toolkit effect**: "Did the environment make the same agent better?"
 
+If your question is "does this infrastructure work?" — it doesn't fit any scope. Use unit tests or E2E integration tests instead. The eval harness measures **Claude's behavior**, not infrastructure correctness.
+
 Do not collapse these into one fuzzy "quality" question. A skill-adherence eval and an outcome-quality eval are different harnesses, even if both involve the same task domain.
+
+**Mixed targets** (e.g., hooks): Some components have both behavior-affecting and infrastructure aspects. Separate them — eval the behavior-affecting parts (workflow scope), test the infrastructure parts with unit/E2E tests. Do not lump both into one eval.
 
 **Validity vs Reliability trade-off:** A valid measurement captures the real signal (does the agent actually review code well?). A reliable measurement produces consistent scores across trials (does the grader always agree with itself?). When forced to choose, prefer validity — a noisy-but-real signal is more useful than a precise-but-fake one. Code grading is reliable but only valid for deterministic checks. Model grading is noisier but valid for judgment. Never sacrifice validity for reliability by converting judgment assertions into string-matching proxies.
 
@@ -159,11 +174,12 @@ Bad skill-eval scenario:
 
 If the task is deterministic but your assertion is vague, fix the assertion. If the judgment is inherently subjective, switch to model or human grading instead of pretending code grading can capture it.
 
-**Quick design checklist** (verify before writing assertions):
-1. Can I name the specific behavior this scenario tests? → If no, scope is too broad
-2. Can I describe why baseline will fail? → If no, scenario isn't discriminative
-3. Does each assertion use the right grader for its nature? → Code for facts, model for judgment
-4. Is the output format small enough for consistent grading? → Prefer short structured artifacts
+**Quick design checklist** (verify before writing assertions — applies to ALL scopes):
+1. Can I name the specific **Claude behavior** this scenario tests? → If the answer is "file exists" or "no errors", you're testing infrastructure, not behavior — use unit/E2E tests instead
+2. Would my assertions fail if I **disabled** the component under test? → If no, the eval has no discriminative power and will pass vacuously
+3. Can I describe why baseline will fail? → If no, scenario isn't discriminative
+4. Does each assertion use the right grader for its nature? → Code for facts, model for judgment
+5. Is the output format small enough for consistent grading? → Prefer short structured artifacts
 
 ### Scenario Validity Preflight
 
@@ -330,6 +346,8 @@ evals/
 | Using `--skill-file` for workflow eval | Varies the prompt instead of the environment — measures the wrong thing | Workflow A/B varies the environment. Use `eval ab <name>` without `--skill-file` for workflow scope |
 | Workflow eval with no plugins installed | Baseline and treatment are identical, delta is always 0 | Ensure toolkit plugin is installed: `claude plugin list` should show active plugins |
 | Workflow scenario too skill-specific | Biases toward the toolkit — tests one skill, not systemic value | Use realistic, diverse tasks where the toolkit's value is non-obvious |
+| Testing infrastructure artifacts instead of Claude's behavior | Eval checks "log file exists" or "JSON is valid" — passes trivially but doesn't prove the component affected Claude's session | Ask: "does my eval measure how Claude **behaved**, or just whether a side-effect file appeared?" If the latter, use unit/integration tests |
+| Choosing the easiest-to-measure aspect over the meaningful one | Eval tests a side-effect hook (easy: check file) instead of a context-injection hook (meaningful: check Claude's awareness) — results are technically correct but answer the wrong question | For each component, first identify HOW it affects Claude's behavior, then test THAT — not the convenient side-effect |
 
 ## Red Flags
 

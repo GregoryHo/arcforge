@@ -78,16 +78,16 @@ describe('counter independence', () => {
       readCount: readUserCount,
       writeCount: writeUserCount,
     } = require('../user-message-counter/main');
-    const { readCount: readToolCount } = require('../compact-suggester/main');
+    const { readCount: readCompactCount } = require('../compact-suggester/main');
     const { createSessionCounter } = require('../../scripts/lib/utils');
-    const toolCounter = createSessionCounter('tool-count');
+    const compactCounter = createSessionCounter('compact-count');
 
     // Set different values
     writeUserCount(42);
-    toolCounter.write(100);
+    compactCounter.write(100);
 
     // Verify independence
     assert.strictEqual(readUserCount(), 42);
-    assert.strictEqual(readToolCount(), 100);
+    assert.strictEqual(readCompactCount(), 100);
   });
 });

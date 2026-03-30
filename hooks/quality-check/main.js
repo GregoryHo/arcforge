@@ -7,13 +7,22 @@
  * 2. Type-check with TypeScript (if available)
  * 3. Warn about console.log statements
  *
- * Passthrough: stdin JSON is passed to stdout unchanged
- * Warnings go to stderr only
+ * Warnings output via systemMessage (user-visible)
+ * Prettier auto-formats files in-place
  */
 
 const path = require('node:path');
-const { readStdinSync, parseStdinJson, log, readFileSafe } = require('../../scripts/lib/utils');
-const { detectPackageManager, hasDevDependency } = require('../../scripts/lib/package-manager');
+const {
+  readStdinSync,
+  parseStdinJson,
+  output,
+  log,
+  readFileSafe,
+} = require('../../scripts/lib/utils');
+const {
+  detectPackageManager,
+  hasDevDependency, // checks both deps + devDeps
+} = require('../../scripts/lib/package-manager');
 const { runPrettier } = require('./prettier');
 const { runTypeCheck } = require('./typescript');
 
@@ -45,81 +54,66 @@ function checkConsoleLogs(filePath) {
  * Main entry point
  */
 function main() {
-  // Read and pass through stdin
   const stdin = readStdinSync();
-  process.stdout.write(stdin);
-
-  // Parse the hook input
   const input = parseStdinJson(stdin);
   if (!input) {
-    log('[quality-check] Could not parse hook input');
     process.exit(0);
     return;
   }
 
-  // Get the file path from tool_input
   const filePath = input.tool_input?.file_path;
-  if (!filePath) {
-    process.exit(0);
-    return; // No file path, nothing to do
-  }
-
-  // Verify it's a JS/TS file (should already be filtered by matcher, but double-check)
-  if (!/\.(ts|tsx|js|jsx)$/.test(filePath)) {
+  if (!filePath || !/\.(ts|tsx|js|jsx)$/.test(filePath)) {
     process.exit(0);
     return;
   }
 
-  // Get absolute path
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-
   const projectDir = process.cwd();
   const pm = detectPackageManager(projectDir);
+  const fileName = path.basename(filePath);
+  const warnings = [];
 
   // 1. Run Prettier (if available)
-  const hasPrettier = pm && hasDevDependency('prettier', projectDir);
-  if (hasPrettier) {
+  if (pm && hasDevDependency('prettier', projectDir)) {
     const prettierResult = runPrettier(absolutePath, pm);
     if (prettierResult.formatted) {
-      log(`[quality-check] Formatted: ${path.basename(filePath)}`);
-    } else if (prettierResult.error) {
-      log(`[quality-check] Prettier error: ${prettierResult.error}`);
+      warnings.push(`Formatted: ${fileName}`);
     }
   }
 
   // 2. Run TypeScript check (for .ts/.tsx files)
-  if (/\.(ts|tsx)$/.test(filePath)) {
-    const hasTypeScript = pm && hasDevDependency('typescript', projectDir);
-    if (hasTypeScript) {
-      const tsResult = runTypeCheck(absolutePath, pm);
-      if (tsResult.errors && tsResult.errors.length > 0) {
-        log(`[quality-check] TypeScript errors in ${path.basename(filePath)}:`);
-        tsResult.errors.forEach((err) => {
-          log(`  ${err}`);
-        });
-      }
+  if (/\.(ts|tsx)$/.test(filePath) && pm && hasDevDependency('typescript', projectDir)) {
+    const tsResult = runTypeCheck(absolutePath, pm);
+    if (tsResult.errors && tsResult.errors.length > 0) {
+      warnings.push(`TypeScript errors in ${fileName}:`);
+      for (const err of tsResult.errors) warnings.push(`  ${err}`);
     }
   }
 
   // 3. Check for console.log statements
   const consoleLogs = checkConsoleLogs(absolutePath);
   if (consoleLogs.length > 0) {
-    log(`[quality-check] console.* found in ${path.basename(filePath)}:`);
-    // Show max 15 occurrences
+    warnings.push(`console.* found in ${fileName}:`);
     consoleLogs.slice(0, 15).forEach((match) => {
-      log(`  Line ${match.line}: ${match.content}...`);
+      warnings.push(`  Line ${match.line}: ${match.content}...`);
     });
     if (consoleLogs.length > 15) {
-      log(`  ... and ${consoleLogs.length - 15} more`);
+      warnings.push(`  ... and ${consoleLogs.length - 15} more`);
     }
+  }
+
+  if (warnings.length > 0) {
+    output({ systemMessage: warnings.join('\n') });
   }
 
   process.exit(0);
 }
 
+module.exports = { checkConsoleLogs };
+
 try {
-  main();
+  if (require.main === module) main();
 } catch (err) {
-  console.error('[quality-check] Error:', err.message);
+  log(`[quality-check] Error: ${err.message}`);
   process.exit(0);
 }
