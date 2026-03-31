@@ -2,14 +2,17 @@
 /**
  * Session Tracker - Context Injection (Sync Hook)
  *
- * Runs SYNCHRONOUSLY on SessionStart to inject actionable context into Claude.
+ * Runs SYNCHRONOUSLY on SessionStart with dual output:
  *
- * Injected (to Claude via stdout):
- * - Active behavioral instincts (confidence >= 0.70)
+ * systemMessage (user-visible):
+ * - Brief summary: instinct count, pending actions
+ *
+ * additionalContext (Claude-visible):
+ * - Full instinct details with confidence scores
  * - Pending action notifications
  *
- * Logged (to user via stderr):
- * - Available session aliases (discoverability)
+ * stderr (internal diagnostics):
+ * - Available session aliases
  * - Global instinct promotions
  */
 
@@ -20,7 +23,7 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   getProjectName,
-  outputContext,
+  outputCombined,
   log,
 } = require('../../scripts/lib/utils');
 
@@ -44,7 +47,7 @@ function loadAutoInstincts(project) {
     shouldAutoLoad(i.confidence),
   );
 
-  if (autoLoaded.length === 0) return null;
+  if (autoLoaded.length === 0) return { text: null, count: 0 };
 
   const lines = [
     '## Active Behavioral Instincts\n',
@@ -60,7 +63,7 @@ function loadAutoInstincts(project) {
     '\nUse /instinct-status or invoke arc-observing to confirm/contradict these patterns.',
   );
 
-  return lines.join('\n');
+  return { text: lines.join('\n'), count: autoLoaded.length };
 }
 
 /**
@@ -100,9 +103,10 @@ function loadInstinctFiles(dir) {
 function loadPendingActions(project) {
   try {
     const actions = getPendingActions(project);
-    if (actions.length === 0) return null;
+    if (actions.length === 0) return { text: null, summary: null };
 
     const lines = [];
+    const summaryParts = [];
 
     const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
     const otherActions = actions.filter((a) => a.type !== 'reflect-ready');
@@ -113,21 +117,25 @@ function loadPendingActions(project) {
       lines.push(
         `**${count} unprocessed diaries ready for reflection.** Run /reflect to analyze patterns.`,
       );
+      summaryParts.push(`${count} diaries pending reflection`);
     }
 
     for (const action of otherActions) {
       lines.push(
         `- Pending: ${action.type} (${action.payload ? JSON.stringify(action.payload) : 'no details'})`,
       );
+      summaryParts.push(`pending: ${action.type}`);
     }
 
     for (const action of actions) {
       consumeAction(project, action.id);
     }
 
-    return lines.length > 0 ? lines.join('\n') : null;
+    const text = lines.length > 0 ? lines.join('\n') : null;
+    const summary = summaryParts.length > 0 ? summaryParts.join(', ') : null;
+    return { text, summary };
   } catch {
-    return null;
+    return { text: null, summary: null };
   }
 }
 
@@ -191,30 +199,35 @@ function main() {
 
   const project = getProjectName();
 
-  // Build context for Claude (stdout → additionalContext)
-  const parts = [];
+  // Build Claude context (full details) and user summary (brief)
+  const contextParts = [];
+  const userParts = [];
 
-  // Active instincts (behavioral patterns, always relevant)
-  const instinctsContext = loadAutoInstincts(project);
+  // Active instincts
+  const { text: instinctsContext, count: instinctCount } = loadAutoInstincts(project);
   if (instinctsContext) {
-    parts.push(instinctsContext);
-    log(instinctsContext);
+    contextParts.push(instinctsContext);
+    userParts.push(`${instinctCount} instinct${instinctCount !== 1 ? 's' : ''} active`);
   }
 
   // Pending action notifications
-  const pendingContext = loadPendingActions(project);
+  const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project);
   if (pendingContext) {
-    parts.push(pendingContext);
-    log(pendingContext);
+    contextParts.push(pendingContext);
+  }
+  if (pendingSummary) {
+    userParts.push(pendingSummary);
   }
 
-  // Stderr-only (user visibility, not injected into Claude)
+  // Stderr-only (internal diagnostics)
   logAvailableAliases(project);
   checkNewGlobalPromotions();
 
-  if (parts.length > 0) {
-    const fullContext = parts.join('\n\n');
-    outputContext(fullContext, 'SessionStart');
+  const claudeContext = contextParts.length > 0 ? contextParts.join('\n\n') : null;
+  const userMessage = userParts.length > 0 ? userParts.join(' | ') : null;
+
+  if (claudeContext || userMessage) {
+    outputCombined(userMessage, claudeContext, 'SessionStart');
   }
 
   process.exit(0);

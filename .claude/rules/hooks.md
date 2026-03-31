@@ -70,6 +70,7 @@ Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
 **Rules:**
 - User-visible message → `output({ systemMessage: "..." })` (only mechanism that works)
 - Context for Claude → `outputContext(text, eventName)` (SessionStart/UserPromptSubmit only)
+- Both at once → `outputCombined(userMsg, claudeCtx, eventName)` (verified: Claude Code processes all keys in a single JSON)
 - Internal diagnostics → `log(msg)` (stderr, but user will never see it)
 - Never use `console.log` — goes to stdout, contaminates hook protocol
 

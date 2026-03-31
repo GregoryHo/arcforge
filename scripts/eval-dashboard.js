@@ -306,6 +306,8 @@ function trialSummary(r) {
     assertionScores: r.assertionScores,
     evidence: r.evidence,
     blockRefs: r.blockRefs,
+    artifacts: r.artifacts,
+    graderOutput: r.graderOutput,
   };
 }
 

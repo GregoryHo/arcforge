@@ -95,9 +95,19 @@ function parseScenario(filePath) {
   const lines = content.split('\n');
 
   let insideFence = false;
+  let heredocMarker = null;
   for (const line of lines) {
     if (/^`{3,}/.test(line)) insideFence = !insideFence;
-    const headerMatch = !insideFence && line.match(/^##\s+(.+)/);
+
+    // Ignore ## headers inside heredocs (they contain arbitrary text)
+    if (!insideFence && !heredocMarker) {
+      const heredocMatch = line.match(/<<-?\s*['"]?(\w+)['"]?\s*$/);
+      if (heredocMatch) heredocMarker = heredocMatch[1];
+    } else if (heredocMarker && line.trim() === heredocMarker) {
+      heredocMarker = null;
+    }
+
+    const headerMatch = !insideFence && !heredocMarker && line.match(/^##\s+(.+)/);
     if (headerMatch) {
       currentSection = headerMatch[1].trim().toLowerCase();
       sections[currentSection] = [];
@@ -312,12 +322,13 @@ function summarizeToolInput(toolName, input) {
   switch (toolName) {
     case 'Write': {
       const content = input.content || '';
-      return `${input.file_path || ''}\n\`\`\`\n${content.slice(0, 500)}${content.length > 500 ? '\n...(truncated)' : ''}\n\`\`\``;
+      return `${input.file_path || ''}\n\`\`\`\n${content}\n\`\`\``;
     }
     case 'Edit': {
       const old = input.old_string || '';
       const rep = input.new_string || '';
-      return `${input.file_path || ''} (replace "${old.slice(0, 80)}${old.length > 80 ? '...' : ''}" → "${rep.slice(0, 80)}${rep.length > 80 ? '...' : ''}")`;
+      const maxLen = 300;
+      return `${input.file_path || ''} (replace "${old.slice(0, maxLen)}${old.length > maxLen ? '...' : ''}" → "${rep.slice(0, maxLen)}${rep.length > maxLen ? '...' : ''}")`;
     }
     case 'Read':
       return input.file_path || '';
@@ -372,7 +383,13 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     '--no-session-persistence',
     '--disable-slash-commands',
   ];
-  if (isolated) claudeArgs.push('--strict-mcp-config');
+  if (isolated) {
+    claudeArgs.push('--strict-mcp-config');
+    claudeArgs.push(
+      '--append-system-prompt',
+      `IMPORTANT: You are running in an isolated eval trial. Your working directory is ${trialDir}. Do NOT read, search, or access any files outside this directory. All files you need are already in the working directory.`,
+    );
+  }
   if (model) claudeArgs.push('--model', model);
 
   const result = execCommand('claude', claudeArgs, {

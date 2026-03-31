@@ -213,6 +213,45 @@ describe('E2E: session-tracker/inject-context.js', () => {
       );
     }
   });
+
+  it('should output both systemMessage and hookSpecificOutput for high-confidence instincts', () => {
+    const projectName = path.basename(testDir);
+    const instinctsDir = path.join(testDir, '.claude', 'instincts', projectName);
+    fs.mkdirSync(instinctsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(instinctsDir, 'dual-test.md'),
+      [
+        '---',
+        'id: dual-test',
+        'confidence: 0.90',
+        'trigger: When editing files',
+        '---',
+        '',
+        '## Action',
+        'Run linter first',
+      ].join('\n'),
+    );
+
+    const input = makeSessionStartInput('startup');
+    const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
+
+    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.ok(parsed.systemMessage, 'Should have systemMessage for user');
+    assert.ok(
+      parsed.systemMessage.includes('1 instinct active'),
+      `systemMessage should show count. Got: "${parsed.systemMessage}"`,
+    );
+    assert.ok(
+      parsed.hookSpecificOutput?.additionalContext,
+      'Should have additionalContext for Claude',
+    );
+    assert.ok(
+      parsed.hookSpecificOutput.additionalContext.includes('dual-test'),
+      'additionalContext should include instinct ID',
+    );
+  });
 });
 
 // ─────────────────────────────────────────────

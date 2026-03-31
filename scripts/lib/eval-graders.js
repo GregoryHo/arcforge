@@ -174,7 +174,7 @@ function validateGraderResponse(grade, assertionCount) {
  */
 function gradeTrialResult(result, scenario, projectRoot) {
   if (scenario.grader === 'code') {
-    // Code grading runs in projectRoot (where test suites live), not the isolated trial dir
+    // Code grading runs in trialDir (where agent artifacts live), with $PROJECT_ROOT available
     return gradeWithCode(result, scenario.graderConfig, projectRoot);
   }
   if (scenario.grader === 'model') {
@@ -200,8 +200,80 @@ function gradeWithCode(result, testCommand, projectRoot) {
     : ['sh', ['-c', testCommand]];
   const env = { ...process.env };
   if (result.trialDir) env.TRIAL_DIR = result.trialDir;
-  const { exitCode } = execCommand(cmd, args, { cwd: projectRoot, env });
-  return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0 };
+  env.PROJECT_ROOT = projectRoot;
+  const cwd = result.trialDir || projectRoot;
+  const { exitCode, stdout, stderr } = execCommand(cmd, args, { cwd, env });
+  const graderOutput = (stdout || stderr || '').trim() || undefined;
+  const artifacts = captureTrialArtifacts(result.trialDir) || undefined;
+  const extra = {
+    ...(graderOutput ? { graderOutput } : {}),
+    ...(artifacts ? { artifacts } : {}),
+  };
+
+  // Parse per-assertion labels from stdout (convention: A1:PASS, A2:FAIL:reason)
+  const assertions = parseAssertionLabels(stdout || '');
+  if (assertions.length > 0) {
+    const assertionScores = assertions.map((a) => (a.passed ? 1.0 : 0.0));
+    const evidence = assertions.map((a) =>
+      a.passed ? 'PASS' : `FAIL${a.reason ? `: ${a.reason}` : ''}`,
+    );
+    const score = round2(assertionScores.reduce((a, b) => a + b, 0) / assertionScores.length);
+    const blockRefs = buildCodeGraderBlockRefs(result.output, result.trialDir, assertions.length);
+    return {
+      ...result,
+      passed: assertionScores.every((s) => s === 1.0) && exitCode === 0,
+      score,
+      assertionScores,
+      evidence,
+      ...(blockRefs ? { blockRefs } : {}),
+      ...extra,
+    };
+  }
+
+  // Fallback: binary pass/fail (backwards compatible)
+  return { ...result, passed: exitCode === 0, score: exitCode === 0 ? 1.0 : 0.0, ...extra };
+}
+
+/**
+ * Parse labeled assertion results from code grader stdout.
+ * Convention: lines matching `A<N>:PASS` or `A<N>:FAIL:<reason>`.
+ * @param {string} stdout - Grader stdout
+ * @returns {{ index: number, passed: boolean, reason: string }[]} Sorted by index
+ */
+function parseAssertionLabels(stdout) {
+  const results = [];
+  for (const line of stdout.split('\n')) {
+    const match = line.match(/^A(\d+):(PASS|FAIL)(?::(.*))?$/);
+    if (match) {
+      results.push({
+        index: parseInt(match[1], 10),
+        passed: match[2] === 'PASS',
+        reason: (match[3] || '').trim(),
+      });
+    }
+  }
+  return results.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Build blockRefs for code-graded trials by finding Write blocks in the transcript.
+ * Maps all assertions to transcript blocks where files were written to the trial dir.
+ * @param {string} [transcript] - Rich transcript text (result.output)
+ * @param {string} [trialDir] - Trial directory path
+ * @param {number} assertionCount - Number of assertions
+ * @returns {number[][]|null} Per-assertion block refs (1-indexed), or null if none found
+ */
+function buildCodeGraderBlockRefs(transcript, trialDir, assertionCount) {
+  if (!transcript || !trialDir || !assertionCount) return null;
+  const blocks = splitTranscriptBlocks(transcript);
+  const writeBlockIndices = [];
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].startsWith('[Tool: Write]') && blocks[i].includes(trialDir)) {
+      writeBlockIndices.push(i + 1); // 1-indexed
+    }
+  }
+  if (writeBlockIndices.length === 0) return null;
+  return Array.from({ length: assertionCount }, () => [...writeBlockIndices]);
 }
 
 /**
@@ -264,9 +336,14 @@ function captureTrialArtifacts(trialDir, opts = {}) {
  * @param {string} output - Raw transcript text
  * @returns {{ numbered: string, blockCount: number }}
  */
+function splitTranscriptBlocks(text) {
+  if (!text) return [];
+  return text.split(/(?=^\[(?:Tool:|Assistant))/m).filter((b) => b.trim());
+}
+
 function numberTranscriptBlocks(output) {
   if (!output) return { numbered: '(no output)', blockCount: 0 };
-  const blocks = output.split(/(?=^\[(?:Tool:|Assistant))/m).filter((b) => b.trim());
+  const blocks = splitTranscriptBlocks(output);
   if (blocks.length === 0) return { numbered: output, blockCount: 0 };
   const numbered = blocks.map((b, i) => `[Block ${i + 1}]\n${b.trim()}`).join('\n\n');
   return { numbered, blockCount: blocks.length };
@@ -475,6 +552,8 @@ async function gradeWithHuman(result, rl) {
 module.exports = {
   gradeTrialResult,
   gradeWithCode,
+  parseAssertionLabels,
+  buildCodeGraderBlockRefs,
   captureTrialArtifacts,
   gradeWithModel,
   compareWithModel,

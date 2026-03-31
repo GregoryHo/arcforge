@@ -25,6 +25,8 @@ const {
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
+  parseAssertionLabels,
+  buildCodeGraderBlockRefs,
   gradeWithModel,
   gradeTrialResult,
   saveTranscript,
@@ -261,6 +263,68 @@ Do something.
 
       expect(scenario.target).toBeUndefined();
     });
+
+    it('should preserve ## lines inside heredocs in setup section', () => {
+      const content = `# Eval: heredoc-test
+
+## Scenario
+Do something.
+
+## Setup
+
+cat > briefing.md << 'EOF'
+# Title
+
+## Section One
+Content of section one.
+
+## Section Two
+Content of section two.
+EOF
+
+## Assertions
+
+- [ ] Check something
+`;
+      const filePath = writeScenario(tempDir, 'heredoc.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toContain('## Section One');
+      expect(scenario.setup).toContain('## Section Two');
+      expect(scenario.setup).toContain('Content of section two.');
+      expect(scenario.assertions).toEqual(['Check something']);
+    });
+
+    it('should handle multiple heredocs with ## lines in setup', () => {
+      const content = `# Eval: multi-heredoc
+
+## Scenario
+Do something.
+
+## Setup
+
+cat > file1.md << 'EOF'
+## Heading A
+Content A.
+EOF
+
+cat > file2.md << 'MARKER'
+## Heading B
+Content B.
+MARKER
+
+## Assertions
+
+- [ ] Verify output
+`;
+      const filePath = writeScenario(tempDir, 'multi-heredoc.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.setup).toContain('## Heading A');
+      expect(scenario.setup).toContain('## Heading B');
+      expect(scenario.setup).toContain("cat > file2.md << 'MARKER'");
+      expect(scenario.assertions).toEqual(['Verify output']);
+    });
   });
 
   // ── parseStreamJsonOutput ────────────────────────────────────
@@ -325,7 +389,7 @@ Do something.
       expect(richTranscript).toBe('[Assistant] Real content');
     });
 
-    it('should handle Write tool with truncation', () => {
+    it('should include full Write content without truncation', () => {
       const longContent = 'x'.repeat(600);
       const input = JSON.stringify({
         type: 'assistant',
@@ -341,7 +405,8 @@ Do something.
       });
       const { richTranscript } = parseStreamJsonOutput(input);
       expect(richTranscript).toContain('/tmp/f.js');
-      expect(richTranscript).toContain('...(truncated)');
+      expect(richTranscript).toContain(longContent);
+      expect(richTranscript).not.toContain('truncated');
     });
 
     it('should handle Edit tool summary', () => {
@@ -938,6 +1003,145 @@ Do something.
       const result = makeResult();
       const graded = gradeWithCode(result, 'true', tempDir);
       expect(graded.passed).toBe(true);
+    });
+
+    it('should run grader in trialDir when available', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-cwd-'));
+      fs.writeFileSync(path.join(trialDir, 'artifact.txt'), 'hello');
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(result, 'test -f artifact.txt', tempDir);
+        expect(graded.passed).toBe(true);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should inject PROJECT_ROOT env var', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-pr-'));
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(result, `test "$PROJECT_ROOT" = "${tempDir}"`, tempDir);
+        expect(graded.passed).toBe(true);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  // ── parseAssertionLabels ─────────────────────────────────────
+
+  describe('parseAssertionLabels', () => {
+    it('should parse mixed PASS and FAIL labels', () => {
+      const stdout = 'A1:PASS\nA2:FAIL:found throw\nA3:PASS\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results).toHaveLength(3);
+      expect(results[0]).toEqual({ index: 1, passed: true, reason: '' });
+      expect(results[1]).toEqual({ index: 2, passed: false, reason: 'found throw' });
+      expect(results[2]).toEqual({ index: 3, passed: true, reason: '' });
+    });
+
+    it('should return empty array when no labels found', () => {
+      const stdout = 'some random output\nPASS: all good\n';
+      expect(parseAssertionLabels(stdout)).toEqual([]);
+    });
+
+    it('should sort by assertion index', () => {
+      const stdout = 'A3:PASS\nA1:FAIL:oops\nA2:PASS\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results[0].index).toBe(1);
+      expect(results[1].index).toBe(2);
+      expect(results[2].index).toBe(3);
+    });
+
+    it('should handle FAIL without reason', () => {
+      const stdout = 'A1:FAIL\n';
+      const results = parseAssertionLabels(stdout);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({ index: 1, passed: false, reason: '' });
+    });
+  });
+
+  // ── buildCodeGraderBlockRefs ──────────────────────────────────
+
+  describe('buildCodeGraderBlockRefs', () => {
+    it('should find Write blocks matching trial dir', () => {
+      const transcript = [
+        '[Assistant] I will write the file.',
+        '[Tool: Write] /trial/dir/order.js\n```\ncode here\n```',
+        '[Assistant] Done.',
+      ].join('\n\n');
+      const refs = buildCodeGraderBlockRefs(transcript, '/trial/dir', 2);
+
+      expect(refs).toEqual([[2], [2]]);
+    });
+
+    it('should return null when no Write blocks found', () => {
+      const transcript = '[Assistant] Hello.\n\n[Tool: Bash] $ ls';
+      expect(buildCodeGraderBlockRefs(transcript, '/trial/dir', 2)).toBeNull();
+    });
+
+    it('should return null when transcript is empty', () => {
+      expect(buildCodeGraderBlockRefs('', '/trial/dir', 2)).toBeNull();
+      expect(buildCodeGraderBlockRefs(undefined, '/trial/dir', 2)).toBeNull();
+    });
+
+    it('should map multiple Write blocks to all assertions', () => {
+      const transcript = [
+        '[Tool: Write] /trial/dir/a.js\n```\na\n```',
+        '[Assistant] Next file.',
+        '[Tool: Write] /trial/dir/b.js\n```\nb\n```',
+      ].join('\n\n');
+      const refs = buildCodeGraderBlockRefs(transcript, '/trial/dir', 3);
+
+      expect(refs).toEqual([
+        [1, 3],
+        [1, 3],
+        [1, 3],
+      ]);
+    });
+  });
+
+  // ── gradeWithCode (per-assertion labels) ─────────────────────
+
+  describe('gradeWithCode per-assertion labels', () => {
+    it('should produce assertionScores when labels present', () => {
+      const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-labels-'));
+      try {
+        const result = makeResult({ trialDir });
+        const graded = gradeWithCode(
+          result,
+          'echo "A1:PASS" && echo "A2:FAIL:bad" && echo "A3:PASS" && exit 1',
+          tempDir,
+        );
+
+        expect(graded.assertionScores).toEqual([1, 0, 1]);
+        expect(graded.evidence).toEqual(['PASS', 'FAIL: bad', 'PASS']);
+        expect(graded.score).toBeCloseTo(0.67, 1);
+        expect(graded.passed).toBe(false);
+      } finally {
+        fs.rmSync(trialDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should fall back to binary when no labels', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'echo "all good" && exit 0', tempDir);
+
+      expect(graded.assertionScores).toBeUndefined();
+      expect(graded.passed).toBe(true);
+      expect(graded.score).toBe(1.0);
+    });
+
+    it('should store graderOutput from stdout', () => {
+      const result = makeResult();
+      const graded = gradeWithCode(result, 'echo "FAIL: something broke" && exit 1', tempDir);
+
+      expect(graded.graderOutput).toBe('FAIL: something broke');
+      expect(graded.passed).toBe(false);
     });
   });
 
