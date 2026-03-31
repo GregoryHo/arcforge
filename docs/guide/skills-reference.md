@@ -35,15 +35,15 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 24 skills are organized into 6 categories:
+arcforge's 29 skills are organized into 6 categories:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
-| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel | Build and ship |
-| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic | Route, isolate, integrate |
-| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review | Test, debug, verify, review |
-| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling | Capture, extract, evolve |
+| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-looping | Build and ship |
+| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
+| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
+| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Meta** | arc-writing-skills | Create and maintain skills |
 
 **How skills flow through a project:**
@@ -64,8 +64,9 @@ arcforge's 24 skills are organized into 6 categories:
   tdd (during execution)    journaling            writing-skills
   debugging (on failure)    reflecting
   verifying (before done)   learning
-  requesting-review         observing
-  receiving-review          recalling
+  evaluating (skill eval)   observing
+  requesting-review         recalling
+  receiving-review          researching
 ```
 
 ---

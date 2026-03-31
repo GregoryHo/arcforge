@@ -9,9 +9,6 @@ hooks/
 ├── hooks.json              # Hook configuration
 ├── run-hook.cmd            # Bash dispatcher
 ├── README.md
-├── lib/                    # Shared utilities
-│   ├── utils.js            # File ops, JSON helpers, command detection
-│   └── package-manager.js  # PM detection (npm/pnpm/yarn/bun)
 ├── inject-skills/          # Injects arc-using skill at session start
 │   ├── main.sh
 │   └── README.md
@@ -138,7 +135,7 @@ function main() {
   process.stdout.write(stdin);
 
   // Your logic here
-  // Warnings go to stderr (visible in Claude Code)
+  // log() goes to stderr — internal diagnostics only (invisible to users)
   log('[my-hook] Something happened');
 }
 
@@ -178,18 +175,20 @@ main();
 
 ## Shared Utilities
 
-### lib/utils.js
+Hooks import from `scripts/lib/` (canonical source). Key functions:
+
+### scripts/lib/utils.js
 
 - `escapeForJson(str)` - Safe JSON string escaping
 - `fileExists(path)` - Check file existence
-- `readFileSafe(path)` - Read file, returns null on error
+- `readFileSafe(path, default)` - Read file, returns default on error
 - `writeFileSafe(path, content)` - Write file with directory creation
-- `execCommand(cmd, args)` - Safe command execution (no shell injection)
 - `readStdinSync()` - Read all stdin content
-- `log(msg)` - Log to stderr (visible to user, not sent to Claude)
+- `log(msg)` - Log to stderr (internal diagnostics only — invisible to users)
+- `output(obj)` - Write JSON to stdout (`{ systemMessage }` for user-visible output)
 - `outputContext(context, eventName)` - Output structured hook response for Claude
 
-### lib/package-manager.js
+### scripts/lib/package-manager.js
 
 - `detectPackageManager(dir)` - Detect npm/pnpm/yarn/bun from lock files
 - `getPmExecCommand(binary, pm)` - Get exec command for a binary

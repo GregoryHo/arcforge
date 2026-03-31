@@ -2,7 +2,7 @@
  * Cross-platform utilities for Claude Code scripts and hooks
  * Provides file operations, JSON handling, and command detection
  *
- * NOTE: This is the canonical location. hooks/lib/utils.js should import from here.
+ * NOTE: This is the canonical location. Hooks import directly from here.
  */
 
 const fs = require('node:fs');

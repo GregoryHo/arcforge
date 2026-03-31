@@ -1,6 +1,6 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-1.1.2-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
@@ -173,12 +173,14 @@ a starting skill, but you can invoke any skill directly.
 - **arc-verifying** - Verification mindset (evidence before claims)
 - **arc-debugging** - Systematic debugging with four phases
 - **arc-writing-skills** - Create and edit skills using TDD principles
+- **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
 
 ### Execution Layer
 
 - **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
+- **arc-looping** - Autonomous cross-session loop execution
 
 ### Session & Learning Layer
 
@@ -187,11 +189,14 @@ a starting skill, but you can invoke any skill directly.
 - **arc-learning** - Extract reusable patterns from sessions
 - **arc-observing** - Tool call observation for behavioral pattern detection
 - **arc-recalling** - Manual instinct creation from session insights
+- **arc-managing-sessions** - Session save/resume with alias support
+- **arc-researching** - Autonomous hypothesis-driven experimentation
 
 ### Review Layer
 
 - **arc-requesting-review** - When and how to request code review
 - **arc-receiving-review** - How to handle review feedback with technical rigor
+- **arc-evaluating** - Measure whether skills and workflows change agent behavior
 
 ### Review Templates
 
