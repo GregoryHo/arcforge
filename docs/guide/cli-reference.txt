@@ -41,9 +41,42 @@
 │  │  ├── reboot                       # Generate 5-Question context                     │    │
 │  │  │   └── (no options)                                                               │    │
 │  │  │                                                                                  │    │
-│  │  └── sync                         # Synchronize state                               │    │
-│  │      └── --direction, -d          # from-base|to-base|both|scan                     │    │
-│  │                                   # (auto-detected if omitted)                      │    │
+│  │  ├── sync                         # Synchronize state                               │    │
+│  │  │   └── --direction, -d          # from-base|to-base|both|scan                     │    │
+│  │  │                                # (auto-detected if omitted)                      │    │
+│  │  │                                                                                  │    │
+│  │  ├── schema                       # Show dag.yaml schema                            │    │
+│  │  │   ├── --json                   # Output as JSON instead of YAML                  │    │
+│  │  │   └── --example                # Show complete example instead of schema         │    │
+│  │  │                                                                                  │    │
+│  │  ├── eval <subcommand>            # Run evaluations and benchmarks                  │    │
+│  │  │   ├── list                     # List all eval scenarios                         │    │
+│  │  │   ├── run <name>               # Run k trials of a scenario                     │    │
+│  │  │   │   ├── --k N               # Number of trials                                │    │
+│  │  │   │   └── --model NAME        # Model to use                                    │    │
+│  │  │   ├── ab <name>                # A/B test skill or workflow                      │    │
+│  │  │   │   ├── --skill-file PATH   # Skill file for A/B eval                         │    │
+│  │  │   │   ├── --k N               # Number of trials                                │    │
+│  │  │   │   ├── --model NAME        # Model to use                                    │    │
+│  │  │   │   └── --interleave        # Interleave baseline/treatment trials             │    │
+│  │  │   ├── compare <name>           # Compare baseline vs treatment                   │    │
+│  │  │   │   └── --model NAME        # Model to use                                    │    │
+│  │  │   ├── report [name]            # Show benchmark report                           │    │
+│  │  │   │   └── --model NAME        # Model to use                                    │    │
+│  │  │   ├── history                  # List benchmark snapshots                        │    │
+│  │  │   └── dashboard                # Start live web dashboard                        │    │
+│  │  │       └── --port N             # Dashboard port (default: 3333)                  │    │
+│  │  │                                                                                  │    │
+│  │  ├── research <subcommand>        # Research experiment tools                       │    │
+│  │  │   └── dashboard                # Start live research dashboard                   │    │
+│  │  │       ├── --results PATH       # Path to results.tsv (default: results.tsv)      │    │
+│  │  │       ├── --config PATH        # Path to research-config.md                      │    │
+│  │  │       └── --port N             # Server port (default: 3000)                     │    │
+│  │  │                                                                                  │    │
+│  │  └── loop                         # Run autonomous execution loop                   │    │
+│  │      ├── --pattern PATTERN        # sequential|dag (default: sequential)            │    │
+│  │      ├── --max-runs N             # Maximum iterations (default: 50)                │    │
+│  │      └── --max-cost N             # Maximum cost in dollars                         │    │
 │  │                                                                                     │    │
 │  │  Global Option:                                                                     │    │
 │  │  └── --project, -p PATH           # Project root (applies to all commands)          │    │
@@ -292,6 +325,122 @@
 │  │  Errors:                                                                            │    │
 │  │    - "Cannot use --direction scan in worktree"                                      │    │
 │  │    - "Cannot use --direction from-base/to-base/both in base project"                │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  schema - Show DAG Schema (顯示 DAG 結構定義)                                        │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge schema [OPTIONS]                                               │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --json       Output as JSON instead of YAML                                      │    │
+│  │    --example    Show a complete dag.yaml example instead of the schema              │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Loads schema or example from dag-schema module                                │    │
+│  │    2. Outputs in YAML format by default, JSON if --json specified                   │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    YAML or JSON representation of the dag.yaml schema or example                    │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  eval - Run Evaluations (執行評估)                                                    │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge eval <subcommand> [OPTIONS]                                    │    │
+│  │                                                                                     │    │
+│  │  Subcommands:                                                                       │    │
+│  │    list                List all eval scenarios                                      │    │
+│  │    run <name>          Run k trials of a scenario                                   │    │
+│  │    ab <name>           A/B test: baseline vs treatment                              │    │
+│  │    compare <name>      Compare baseline vs treatment results                        │    │
+│  │    report [name]       Show benchmark report (all or specific)                      │    │
+│  │    history             List benchmark snapshots                                     │    │
+│  │    dashboard           Start live web dashboard                                     │    │
+│  │                                                                                     │    │
+│  │  Options (run, ab):                                                                 │    │
+│  │    --k N               Number of trials per condition                               │    │
+│  │    --model NAME        Model to use for trials                                      │    │
+│  │                                                                                     │    │
+│  │  Options (ab only):                                                                 │    │
+│  │    --skill-file PATH   Path to skill file for skill-scope A/B eval                  │    │
+│  │    --interleave        Interleave baseline and treatment trials                     │    │
+│  │                                                                                     │    │
+│  │  Options (dashboard):                                                               │    │
+│  │    --port N            Dashboard port (default: 3333)                               │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    run:  Spawns k trials, grades each, writes results to JSONL                      │    │
+│  │    ab:   Runs baseline (no skill) and treatment (with skill), compares              │    │
+│  │    compare: Reads existing results and shows statistical comparison                 │    │
+│  │    report:  Aggregates results into pass@k metrics with verdicts                    │    │
+│  │    dashboard: Starts HTTP server with live eval results                             │    │
+│  │                                                                                     │    │
+│  │  Output (run):                                                                      │    │
+│  │    "Trial N/k: PASS|FAIL (score: X.XX)"                                            │    │
+│  │    "Result: pass@k = X.XX (N/k passed)"                                            │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Scenario not found: <name>"                                                   │    │
+│  │    - "No results found for scenario: <name>" (compare/report)                       │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  research - Research Experiment Tools (研究實驗工具)                                   │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge research dashboard [OPTIONS]                                   │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --results PATH    Path to results.tsv file (default: results.tsv)                │    │
+│  │    --config PATH     Path to research-config.md (default: research-config.md)       │    │
+│  │    --port N          Server port (default: 3000)                                    │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Resolves results and config paths relative to project root                    │    │
+│  │    2. Starts HTTP server with live research dashboard                               │    │
+│  │    3. Dashboard shows experiment history, metrics over time, current state           │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Research dashboard running at http://localhost:<port>"                           │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - Usage error if subcommand is not "dashboard"                                   │    │
+│  │                                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │  loop - Run Autonomous Execution Loop (執行自動迴圈)                                   │    │
+│  │  ─────────────────────────────────────────────────────────────────────────────────  │    │
+│  │                                                                                     │    │
+│  │  Usage: arcforge loop [OPTIONS]                                                 │    │
+│  │                                                                                     │    │
+│  │  Options:                                                                           │    │
+│  │    --pattern PATTERN    Execution pattern: sequential|dag (default: sequential)      │    │
+│  │    --max-runs N         Maximum iterations (default: 50)                            │    │
+│  │    --max-cost N         Maximum cost in dollars (no default — unlimited)             │    │
+│  │                                                                                     │    │
+│  │  Behavior:                                                                          │    │
+│  │    1. Reads dag.yaml to find pending tasks                                          │    │
+│  │    2. sequential: Processes one task at a time, stops on failure                    │    │
+│  │    3. dag: Uses parallelTasks() to find independent tasks, continues past failures  │    │
+│  │    4. Each iteration: spawn fresh Claude session, execute task, update DAG           │    │
+│  │    5. Writes state to .arcforge-loop.json after each iteration                      │    │
+│  │    6. Stops on: all complete, max-runs, cost limit, stall, or retry storm           │    │
+│  │                                                                                     │    │
+│  │  Output:                                                                            │    │
+│  │    "Loop started: pattern=<pattern>, max-runs=<N>"                                  │    │
+│  │    "Iteration N: <task_id> — PASS|FAIL"                                             │    │
+│  │    "Loop complete: <status> (N tasks completed)"                                    │    │
+│  │                                                                                     │    │
+│  │  Errors:                                                                            │    │
+│  │    - "Invalid pattern \"<pattern>\". Use \"sequential\" or \"dag\"."                │    │
+│  │    - "dag.yaml not found" if no DAG exists                                          │    │
 │  │                                                                                     │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                              │
@@ -596,6 +745,28 @@
 │  │                                                                                     │    │
 │  │  # Use with different project path                                                  │    │
 │  │  $ arcforge -p /other/project status                                            │    │
+│  │                                                                                     │    │
+│  │  # Show dag.yaml schema                                                             │    │
+│  │  $ arcforge schema                                                              │    │
+│  │  $ arcforge schema --json                                                       │    │
+│  │  $ arcforge schema --example                                                    │    │
+│  │                                                                                     │    │
+│  │  # Run evaluations                                                                  │    │
+│  │  $ arcforge eval list                                                           │    │
+│  │  $ arcforge eval run tdd-compliance --k 5                                       │    │
+│  │  $ arcforge eval ab tdd-compliance --skill-file skills/arc-tdd/SKILL.md         │    │
+│  │  $ arcforge eval compare tdd-compliance                                         │    │
+│  │  $ arcforge eval report                                                         │    │
+│  │  $ arcforge eval dashboard --port 4000                                          │    │
+│  │                                                                                     │    │
+│  │  # Research experiment dashboard                                                    │    │
+│  │  $ arcforge research dashboard                                                  │    │
+│  │  $ arcforge research dashboard --results data/results.tsv --port 8080           │    │
+│  │                                                                                     │    │
+│  │  # Run autonomous loops                                                             │    │
+│  │  $ arcforge loop --pattern sequential --max-runs 20                             │    │
+│  │  $ arcforge loop --pattern dag --max-runs 50                                    │    │
+│  │  $ arcforge loop --max-cost 10 --max-runs 100                                   │    │
 │  │                                                                                     │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                              │
