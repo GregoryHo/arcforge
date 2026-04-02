@@ -586,7 +586,17 @@ function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
  * @returns {TrialResult} Graded result
  */
 function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
-  const { projectRoot, label, onTrialComplete, isolationSettings, isolated, model, runId } = opts;
+  const {
+    projectRoot,
+    label,
+    onTrialComplete,
+    isolationSettings,
+    isolated,
+    model,
+    runId,
+    pluginDir,
+    maxTurns,
+  } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
     projectRoot,
     label,
@@ -594,6 +604,8 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     isolated,
     model,
     runId,
+    pluginDir,
+    maxTurns,
   });
   try {
     const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
