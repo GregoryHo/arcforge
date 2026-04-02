@@ -175,7 +175,7 @@ assert.deepStrictEqual(nullDepsResult.epics[0].depends_on, []);
 assert.deepStrictEqual(nullDepsResult.epics[0].features[0].depends_on, []);
 console.log('    ✓ null/missing depends_on defaults to []');
 
-// Test that flow syntax passes through as string (parser limitation)
+// Test flow syntax parsed as arrays
 const flowDepsYaml = `
 epics:
   - id: epic-002
@@ -188,9 +188,50 @@ epics:
         depends_on: [feat-001]
 `;
 const flowDepsResult = parseDagYaml(flowDepsYaml);
-// Parser doesn't support flow syntax — returns raw string, not array
-assert.strictEqual(typeof flowDepsResult.epics[0].depends_on, 'string');
-assert.strictEqual(typeof flowDepsResult.epics[0].features[0].depends_on, 'string');
-console.log('    ✓ Flow syntax passes through as string (normalized by model constructors)');
+assert.deepStrictEqual(flowDepsResult.epics[0].depends_on, ['epic-001']);
+assert.deepStrictEqual(flowDepsResult.epics[0].features[0].depends_on, ['feat-001']);
+console.log('    ✓ Flow syntax depends_on parsed as arrays');
+
+// Flow arrays with quoted items
+const quotedFlowYaml = `
+epics:
+  - id: epic-003
+    name: Quoted
+    spec_path: spec.md
+    depends_on: ["epic-001", "epic-002"]
+    features: []
+`;
+const quotedFlowResult = parseDagYaml(quotedFlowYaml);
+assert.deepStrictEqual(quotedFlowResult.epics[0].depends_on, ['epic-001', 'epic-002']);
+console.log('    ✓ Quoted flow syntax parsed correctly');
+
+// parseValue flow arrays
+console.log('  parseValue (flow arrays)...');
+assert.deepStrictEqual(parseValue('[a, b]'), ['a', 'b']);
+assert.deepStrictEqual(parseValue('[a]'), ['a']);
+assert.deepStrictEqual(parseValue('["a", "b"]'), ['a', 'b']);
+assert.deepStrictEqual(parseValue("['a', 'b']"), ['a', 'b']);
+assert.deepStrictEqual(parseValue('[]'), []);
+console.log('    ✓ Flow arrays parsed correctly');
+
+// Roundtrip: flow syntax survives parse → stringify → parse
+console.log('  Roundtrip (flow syntax)...');
+const flowRoundtripYaml = `
+epics:
+  - id: epic-rt
+    name: Roundtrip
+    spec_path: spec.md
+    depends_on: ["epic-001"]
+    features:
+      - id: feat-rt
+        name: Feature RT
+        depends_on: ["feat-001"]
+`;
+const flowParsed = parseDagYaml(flowRoundtripYaml);
+const flowStringified = stringifyDagYaml(flowParsed);
+const flowReparsed = parseDagYaml(flowStringified);
+assert.deepStrictEqual(flowReparsed.epics[0].depends_on, ['epic-001']);
+assert.deepStrictEqual(flowReparsed.epics[0].features[0].depends_on, ['feat-001']);
+console.log('    ✓ Flow syntax survives roundtrip without quote corruption');
 
 console.log('\n✅ All yaml-parser tests passed!\n');

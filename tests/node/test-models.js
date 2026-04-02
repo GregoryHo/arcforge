@@ -198,7 +198,13 @@ assert.deepStrictEqual(featEmptyArray.depends_on, []);
 
 const featArray = new Feature({ id: 'f7', name: 'F7', depends_on: ['feat-000'] });
 assert.deepStrictEqual(featArray.depends_on, ['feat-000']);
-console.log('    ✓ Feature normalizes all depends_on formats');
+
+const featQuotedFlow = new Feature({ id: 'f8', name: 'F8', depends_on: '["feat-000"]' });
+assert.deepStrictEqual(featQuotedFlow.depends_on, ['feat-000']);
+
+const featQuotedMulti = new Feature({ id: 'f9', name: 'F9', depends_on: '["feat-000", "feat-001"]' });
+assert.deepStrictEqual(featQuotedMulti.depends_on, ['feat-000', 'feat-001']);
+console.log('    ✓ Feature normalizes all depends_on formats (including quoted flow)');
 
 // Test normalizeArray in Epic constructor
 console.log('  Epic depends_on normalization...');

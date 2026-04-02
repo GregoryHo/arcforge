@@ -390,7 +390,11 @@ function checkStopConditions(state, maxCost) {
  */
 function tryCreateCoordinator(projectRoot, state) {
   try {
-    return new Coordinator(projectRoot);
+    const coord = new Coordinator(projectRoot);
+    if (coord.syncEpicStatusesFromBase()) {
+      console.log('[loop] Synced epic statuses from base DAG');
+    }
+    return coord;
   } catch {
     console.log('[loop] No dag.yaml found — nothing to do');
     state.status = 'no_dag';

@@ -1,7 +1,7 @@
 epics:
   - id: eval-core
     name: Eval Core — Action Parser, Scenario Extension, Environment Control
-    status: completed
+    status: pending
     spec_path: epics/eval-core/epic.md
     worktree: null
     depends_on: []
@@ -15,7 +15,7 @@ epics:
         name: Action Log In Trial Results
         status: pending
         depends_on:
-          - action-parser
+          - "\"action-parser\""
         source_requirement: fr-ap-002
       - id: scenario-plugin-dir
         name: Parse Plugin Dir Scenario Field
@@ -31,8 +31,8 @@ epics:
         name: Max Turns Resolution Priority
         status: pending
         depends_on:
-          - scenario-max-turns
-          - scenario-plugin-dir
+          - "\"scenario-max-turns\""
+          - "\"scenario-plugin-dir\""
         source_requirement: fr-se-003
       - id: plugin-dir-settings
         name: Semi-Isolated Settings Builder
@@ -43,21 +43,21 @@ epics:
         name: runTrial Plugin Dir Support
         status: pending
         depends_on:
-          - plugin-dir-settings
-          - scenario-plugin-dir
+          - "\"plugin-dir-settings\""
+          - "\"scenario-plugin-dir\""
         source_requirement: fr-ec-002
       - id: trial-max-turns
         name: runTrial Max Turns Support
         status: pending
         depends_on:
-          - max-turns-priority
+          - "\"max-turns-priority\""
         source_requirement: fr-ec-003
       - id: workflow-ab-plugin-dir
         name: Workflow A/B With Plugin Dir
         status: pending
         depends_on:
-          - trial-plugin-dir
-          - plugin-dir-settings
+          - "\"trial-plugin-dir\""
+          - "\"plugin-dir-settings\""
         source_requirement: fr-ec-004
   - id: eval-grading
     name: Eval Grading — Behavioral Assertions, Mixed Grading
@@ -65,24 +65,24 @@ epics:
     spec_path: epics/eval-grading/epic.md
     worktree: null
     depends_on:
-      - eval-core
+      - "\"eval-core\""
     features:
       - id: behavioral-assertion-parser
         name: Parse Behavioral Assertion Prefixes
-        status: completed
+        status: pending
         depends_on: []
         source_requirement: fr-ba-001
       - id: behavioral-assertion-grader
         name: Grade Behavioral Assertions Against Action Log
-        status: completed
+        status: pending
         depends_on:
-          - behavioral-assertion-parser
+          - "\"behavioral-assertion-parser\""
         source_requirement: fr-ba-002
       - id: mixed-grader
         name: Mixed Code + Model Grading
-        status: completed
+        status: pending
         depends_on:
-          - behavioral-assertion-grader
+          - "\"behavioral-assertion-grader\""
         source_requirement: fr-mg-001
   - id: eval-cli
     name: Eval CLI — New Flags
@@ -90,7 +90,7 @@ epics:
     spec_path: epics/eval-cli/epic.md
     worktree: null
     depends_on:
-      - eval-core
+      - "\"eval-core\""
     features:
       - id: cli-no-isolate
         name: --no-isolate Flag
@@ -113,8 +113,8 @@ epics:
     spec_path: epics/eval-dashboard/epic.md
     worktree: null
     depends_on:
-      - eval-core
-      - eval-grading
+      - "\"eval-core\""
+      - "\"eval-grading\""
     features:
       - id: dashboard-behavioral-assertions
         name: Behavioral Assertion Display

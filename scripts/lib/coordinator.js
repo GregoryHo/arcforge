@@ -490,6 +490,35 @@ class Coordinator {
     }
   }
 
+  /**
+   * Pull epic statuses from the base DAG into the local dag.yaml.
+   * No-op when not in a worktree or when base is unreachable.
+   * @returns {boolean} Whether any statuses were updated
+   */
+  syncEpicStatusesFromBase() {
+    if (!this._isInWorktree()) return false;
+
+    const basePath = this._findBaseWorktree();
+    if (!basePath) return false;
+
+    const baseCoord = new Coordinator(basePath);
+    let updated = false;
+
+    for (const localEpic of this.dag.epics) {
+      const baseEpic = baseCoord.dag.getEpic(localEpic.id);
+      if (baseEpic && baseEpic.status !== localEpic.status) {
+        localEpic.status = baseEpic.status;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      this._saveDag();
+    }
+
+    return updated;
+  }
+
   _syncWorktree(direction) {
     const epicFile = this._readAgenticEpic();
     const basePath = this._findBaseWorktree();

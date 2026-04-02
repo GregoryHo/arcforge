@@ -482,12 +482,9 @@ function normalizeArray(value) {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      const inner = trimmed.slice(1, -1).trim();
-      if (inner === '') return [];
-      return inner
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const { parseValue } = require('./yaml-parser');
+      const result = parseValue(trimmed);
+      return Array.isArray(result) ? result : [result];
     }
     return [trimmed];
   }

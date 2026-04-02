@@ -17,7 +17,7 @@
  * - Anchors and aliases
  * - Multi-line strings (|, >)
  * - Complex types
- * - Flow syntax ({}, [])
+ * - Flow objects ({})
  */
 
 /**
@@ -197,9 +197,20 @@ function parseValue(str) {
     return null;
   }
 
-  // Empty array
-  if (str === '[]') {
-    return [];
+  // Flow array: [], [a, b], ["a", "b"]
+  if (str.startsWith('[') && str.endsWith(']')) {
+    const inner = str.slice(1, -1).trim();
+    if (inner === '') return [];
+    return inner
+      .split(',')
+      .map((s) => {
+        const t = s.trim();
+        if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+          return t.slice(1, -1);
+        }
+        return t;
+      })
+      .filter(Boolean);
   }
 
   // Boolean
