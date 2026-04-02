@@ -140,9 +140,13 @@ function main() {
       resetUserCounter();
       createSessionCounter('tool-count').reset();
 
-      log(`[pre-compact] Diary draft generated (${userCount} msgs, ${toolCount} tools). Queued diary-ready action.`);
+      log(
+        `[pre-compact] Diary draft generated (${userCount} msgs, ${toolCount} tools). Queued diary-ready action.`,
+      );
     } else {
-      log(`[pre-compact] Below threshold (${userCount} msgs, ${toolCount} tools). Counters preserved.`);
+      log(
+        `[pre-compact] Below threshold (${userCount} msgs, ${toolCount} tools). Counters preserved.`,
+      );
     }
   } catch (e) {
     // Never block compaction
