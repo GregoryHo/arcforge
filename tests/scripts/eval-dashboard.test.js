@@ -292,4 +292,196 @@ describe('dashboard', () => {
       expect(result.json().generated).toBe('2026-03-20T10:00:00Z');
     });
   });
+
+  // ── Feature: dashboard-scenario-fields ──────────────────────────
+
+  describe('GET /api/scenario/:name — scenario fields', () => {
+    it('should return pluginDir and maxTurns when present', () => {
+      writeScenario(
+        tempDir,
+        'plugin-eval.md',
+        [
+          '# Eval: plugin-eval',
+          '',
+          '## Scope',
+          'skill',
+          '',
+          '## Scenario',
+          'Test plugin behavior.',
+          '',
+          '## Plugin Dir',
+          '${PROJECT_ROOT}/.claude-plugin',
+          '',
+          '## Max Turns',
+          '15',
+          '',
+          '## Grader',
+          'code',
+        ].join('\n'),
+      );
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/scenario/plugin-eval');
+      const data = result.json();
+
+      expect(result.status).toBe(200);
+      expect(data.pluginDir).toBeDefined();
+      expect(data.maxTurns).toBe(15);
+    });
+
+    it('should omit pluginDir and maxTurns when absent', () => {
+      writeScenario(
+        tempDir,
+        'simple-eval.md',
+        '# Eval: simple-eval\n\n## Scope\nagent\n\n## Scenario\nDo something.\n\n## Grader\ncode\n',
+      );
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/scenario/simple-eval');
+      const data = result.json();
+
+      expect(data.pluginDir).toBeUndefined();
+      expect(data.maxTurns).toBeUndefined();
+    });
+  });
+
+  // ── Feature: dashboard-behavioral-assertions ────────────────────
+
+  describe('GET /api/scenario/:name — assertion types', () => {
+    it('should classify assertions as behavioral or text', () => {
+      writeScenario(
+        tempDir,
+        'mixed-assert.md',
+        [
+          '# Eval: mixed-assert',
+          '',
+          '## Scope',
+          'agent',
+          '',
+          '## Scenario',
+          'Test mixed assertions.',
+          '',
+          '## Assertions',
+          '- [ ] [tool_called] Bash:npm test',
+          '- [ ] Output should mention success',
+          '- [ ] [tool_before] Read:package.json < Bash:npm test',
+          '',
+          '## Grader',
+          'mixed',
+        ].join('\n'),
+      );
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/scenario/mixed-assert');
+      const data = result.json();
+
+      expect(data.assertionTypes).toEqual(['behavioral', 'text', 'behavioral']);
+    });
+  });
+
+  // ── Feature: dashboard-turns-used ──────────────────────────────
+
+  describe('GET /api/results/:name — turns used', () => {
+    it('should include turnsUsed computed from actions', () => {
+      writeResult(tempDir, 'turns-eval', '20260320-100000', 'results', [
+        {
+          eval: 'turns-eval',
+          trial: 1,
+          k: 1,
+          passed: true,
+          score: 1.0,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:00Z',
+          actions: [
+            { type: 'tool', name: 'Read', args: 'file.js', index: 0 },
+            { type: 'text', content: 'Analyzing...', index: 1 },
+            { type: 'tool', name: 'Bash', args: 'npm test', index: 2 },
+          ],
+        },
+      ]);
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/results/turns-eval');
+      const data = result.json();
+
+      expect(data.results[0].turnsUsed).toBe(2);
+    });
+
+    it('should return null turnsUsed when no actions', () => {
+      writeResult(tempDir, 'no-actions', '20260320-100000', 'results', [
+        {
+          eval: 'no-actions',
+          trial: 1,
+          k: 1,
+          passed: true,
+          score: 1.0,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:00Z',
+        },
+      ]);
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/results/no-actions');
+      const data = result.json();
+
+      expect(data.results[0].turnsUsed).toBeNull();
+    });
+  });
+
+  // ── Feature: dashboard-action-log ──────────────────────────────
+
+  describe('GET /api/results/:name — action log', () => {
+    it('should include actions in trial results', () => {
+      const actions = [
+        { type: 'tool', name: 'Read', args: 'src/main.js', index: 0 },
+        { type: 'tool', name: 'Edit', args: 'src/main.js (replace "old" → "new")', index: 1 },
+      ];
+      writeResult(tempDir, 'action-eval', '20260320-100000', 'results', [
+        {
+          eval: 'action-eval',
+          trial: 1,
+          k: 1,
+          passed: true,
+          score: 1.0,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:00Z',
+          actions,
+        },
+      ]);
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/results/action-eval');
+      const data = result.json();
+
+      expect(data.results[0].actions).toHaveLength(2);
+      expect(data.results[0].actions[0].name).toBe('Read');
+      expect(data.results[0].actions[1].name).toBe('Edit');
+    });
+  });
+
+  // ── Feature: dashboard-mixed-grading ──────────────────────────
+
+  describe('GET /api/results/:name — mixed grading', () => {
+    it('should include grader type in trial results', () => {
+      writeResult(tempDir, 'mixed-eval', '20260320-100000', 'results', [
+        {
+          eval: 'mixed-eval',
+          trial: 1,
+          k: 1,
+          passed: true,
+          score: 0.8,
+          grader: 'mixed',
+          timestamp: '2026-03-20T10:00:00Z',
+          assertionScores: [1, 0, 1, 1],
+        },
+      ]);
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/results/mixed-eval');
+      const data = result.json();
+
+      expect(data.results[0].grader).toBe('mixed');
+      expect(data.results[0].assertionScores).toEqual([1, 0, 1, 1]);
+    });
+  });
 });

@@ -16,9 +16,9 @@
  *   schema [--json] [--example]     Show dag.yaml schema
  *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
  *   eval list                        List eval scenarios
- *   eval run <name> [--k N] [--model <name>]  Run eval scenario with k trials
+ *   eval run <name> [--k N] [--model <name>] [--no-isolate] [--plugin-dir <path>] [--max-turns N]
  *   eval report [name] [--model <name>]       Show eval benchmark report
- *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave]  A/B eval
+ *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
@@ -140,7 +140,12 @@ COMMANDS:
 
   eval list                          List eval scenarios
   eval run <name> [--k N] [--model]  Run eval trials
+      --no-isolate   Run without isolation (default: isolated)
+      --plugin-dir   Plugin directory for semi-isolated mode
+      --max-turns    Max turns for Claude CLI (overrides scenario)
   eval ab <name> [--skill-file path] A/B skill/workflow eval
+      --plugin-dir   Plugin directory for treatment trials
+      --max-turns    Max turns for treatment trials (overrides scenario)
   eval compare <name>                Compare A/B results
   eval report [name]                 Benchmark report
   eval history                       List benchmark snapshots
@@ -401,6 +406,11 @@ async function main() {
         } else if (subcommand === 'run') {
           const scenario = requireScenario(args.positional[1], 'run');
           const k = parseK(scenario, false);
+          const isolated = !args.flags['no-isolate'];
+          const pluginDir = args.options['plugin-dir'];
+          const maxTurns = args.options['max-turns']
+            ? parseInt(args.options['max-turns'], 10)
+            : undefined;
           const modelLabel = model ? ` [model: ${model}]` : '';
           console.log(`Running ${scenario.name} (k=${k})${modelLabel}...`);
 
@@ -413,7 +423,14 @@ async function main() {
 
             for (let t = 1; t <= k; t++) {
               process.stdout.write(`  Trial ${t}/${k}: `);
-              const result = eval_.runTrial(scenario, t, k, { projectRoot, model, runId });
+              const result = eval_.runTrial(scenario, t, k, {
+                projectRoot,
+                model,
+                runId,
+                isolated,
+                pluginDir,
+                maxTurns,
+              });
               let graded = eval_.gradeTrialResult(result, scenario, projectRoot);
 
               if (graded.grader === 'human-pending') {
@@ -447,6 +464,10 @@ async function main() {
           const scenario = requireScenario(args.positional[1], 'ab');
           const k = parseK(scenario, true);
           const interleave = !!args.flags.interleave;
+          const pluginDir = args.options['plugin-dir'];
+          const maxTurns = args.options['max-turns']
+            ? parseInt(args.options['max-turns'], 10)
+            : undefined;
           const onTrialComplete = (label, t, graded) => {
             console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
           };
@@ -463,6 +484,8 @@ async function main() {
               onTrialComplete,
               model,
               runId,
+              pluginDir,
+              maxTurns,
             });
           } else {
             const skillFile = args.options['skill-file'] || scenario.target;
@@ -489,6 +512,8 @@ async function main() {
               onTrialComplete,
               model,
               runId,
+              pluginDir,
+              maxTurns,
             });
           }
 

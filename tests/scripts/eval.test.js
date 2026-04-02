@@ -36,6 +36,7 @@ const {
   buildPluginDirSettings,
   resolveMaxTurns,
   runTrial,
+  executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
   snapScore,
@@ -2021,11 +2022,233 @@ Do something.
     });
   });
 
+  // ── executeAndGradeTrial — pluginDir/maxTurns forwarding ────
+
+  describe('executeAndGradeTrial', () => {
+    it('should forward pluginDir to runTrial', () => {
+      const scenario = {
+        name: 'egt-pd',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+
+      // Call 1: buildPluginDirSettings() → plugin list
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '[]',
+        stderr: '',
+        exitCode: 0,
+      });
+      // Call 2: claude -p trial
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: rawStream,
+        stderr: '',
+        exitCode: 0,
+      });
+      // Call 3: code grader
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        label: 'treatment',
+        pluginDir: tempDir,
+        isolated: false,
+      });
+
+      // Call[1] is the claude trial (call[0] is plugin list)
+      const callArgs = mockUtils.execCommand.mock.calls[1];
+      expect(callArgs[0]).toBe('claude');
+      expect(callArgs[1]).toContain('--plugin-dir');
+      expect(callArgs[1]).toContain(tempDir);
+    });
+
+    it('should forward maxTurns to runTrial', () => {
+      const scenario = {
+        name: 'egt-mt',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+
+      // Call 1: claude -p trial
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: rawStream,
+        stderr: '',
+        exitCode: 0,
+      });
+      // Call 2: code grader
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        label: 'treatment',
+        maxTurns: 20,
+        isolated: false,
+      });
+
+      const callArgs = mockUtils.execCommand.mock.calls[0];
+      expect(callArgs[0]).toBe('claude');
+      expect(callArgs[1]).toContain('--max-turns');
+      const mtIdx = callArgs[1].indexOf('--max-turns');
+      expect(callArgs[1][mtIdx + 1]).toBe('20');
+    });
+  });
+
   // ── runWorkflowEval — plugin-dir ────────────────────────────
 
   describe('runWorkflowEval', () => {
     it('should be exported as a function', () => {
       expect(typeof runWorkflowEval).toBe('function');
+    });
+
+    it('should pass pluginDir to treatment trials when scenario has pluginDir', () => {
+      const scenario = {
+        name: 'wf-pd',
+        scope: 'workflow',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        pluginDir: tempDir,
+      };
+
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+
+      // Each trial needs: isolation settings (1 call) + claude trial (1 call) + code grader (1 call)
+      // Baseline (1 trial): buildIsolationSettings plugin list + claude + grader = 3 calls
+      // Treatment (1 trial): buildPluginDirSettings plugin list + claude + grader = 3 calls
+      for (let i = 0; i < 6; i++) {
+        if (i % 3 === 0) {
+          // plugin list call
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: '[]',
+            stderr: '',
+            exitCode: 0,
+          });
+        } else if (i % 3 === 1) {
+          // claude trial call
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: rawStream,
+            stderr: '',
+            exitCode: 0,
+          });
+        } else {
+          // code grader call
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: '',
+            stderr: '',
+            exitCode: 0,
+          });
+        }
+      }
+
+      runWorkflowEval(scenario, 1, { projectRoot: tempDir });
+
+      // Find the claude calls (not plugin list or grader) — they have 'claude' as first arg
+      const claudeCalls = mockUtils.execCommand.mock.calls.filter(
+        (c) => c[0] === 'claude' && c[1].includes('-p'),
+      );
+      // Should have 2 claude calls: 1 baseline + 1 treatment
+      expect(claudeCalls.length).toBe(2);
+
+      // Treatment call should have --plugin-dir
+      const treatmentCall = claudeCalls[1];
+      expect(treatmentCall[1]).toContain('--plugin-dir');
+      expect(treatmentCall[1]).toContain(tempDir);
+
+      // Baseline call should NOT have --plugin-dir
+      const baselineCall = claudeCalls[0];
+      expect(baselineCall[1]).not.toContain('--plugin-dir');
+    });
+
+    it('should not use --plugin-dir for treatment when scenario has no pluginDir', () => {
+      const scenario = {
+        name: 'wf-no-pd',
+        scope: 'workflow',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+
+      // Baseline: buildIsolationSettings + claude + grader = 3
+      // Treatment: claude + grader = 2 (no isolation build needed for non-isolated)
+      for (let i = 0; i < 5; i++) {
+        if (i === 0) {
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: '[]',
+            stderr: '',
+            exitCode: 0,
+          });
+        } else if (i % 2 === 1) {
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: rawStream,
+            stderr: '',
+            exitCode: 0,
+          });
+        } else {
+          mockUtils.execCommand.mockReturnValueOnce({
+            stdout: '',
+            stderr: '',
+            exitCode: 0,
+          });
+        }
+      }
+
+      runWorkflowEval(scenario, 1, { projectRoot: tempDir });
+
+      const claudeCalls = mockUtils.execCommand.mock.calls.filter(
+        (c) => c[0] === 'claude' && c[1].includes('-p'),
+      );
+
+      // Neither baseline nor treatment should have --plugin-dir
+      for (const call of claudeCalls) {
+        expect(call[1]).not.toContain('--plugin-dir');
+      }
     });
   });
 });

@@ -586,7 +586,17 @@ function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
  * @returns {TrialResult} Graded result
  */
 function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts) {
-  const { projectRoot, label, onTrialComplete, isolationSettings, isolated, model, runId } = opts;
+  const {
+    projectRoot,
+    label,
+    onTrialComplete,
+    isolationSettings,
+    isolated,
+    model,
+    runId,
+    pluginDir,
+    maxTurns,
+  } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
     projectRoot,
     label,
@@ -594,9 +604,11 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     isolated,
     model,
     runId,
+    pluginDir,
+    maxTurns,
   });
   try {
-    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
+    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
     const versioned = gradeScenario.version
       ? { ...graded, version: gradeScenario.version }
       : graded;
@@ -660,6 +672,8 @@ function runSkillEval(scenario, k, options = {}) {
     interleave = false,
     model,
     runId,
+    pluginDir,
+    maxTurns,
   } = options;
   const isolationSettings = buildIsolationSettings();
 
@@ -683,6 +697,8 @@ function runSkillEval(scenario, k, options = {}) {
     isolationSettings,
     model,
     runId,
+    ...(pluginDir ? { pluginDir, isolated: false } : {}),
+    ...(maxTurns != null ? { maxTurns } : {}),
   };
   return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);
 }
@@ -706,6 +722,8 @@ function runWorkflowEval(scenario, k, options = {}) {
     interleave = false,
     model,
     runId,
+    pluginDir,
+    maxTurns,
   } = options;
   const isolationSettings = buildIsolationSettings();
 
@@ -719,20 +737,30 @@ function runWorkflowEval(scenario, k, options = {}) {
     runId,
   };
 
-  // Treatment: use semi-isolated + plugin-dir when scenario has pluginDir,
-  // otherwise fall back to existing non-isolated behavior
-  const tOpts = scenario.pluginDir
+  // Treatment: CLI --plugin-dir overrides scenario pluginDir;
+  // CLI --max-turns overrides scenario maxTurns
+  const resolvedPluginDir = pluginDir || scenario.pluginDir;
+  const resolvedMaxTurns = maxTurns != null ? maxTurns : scenario.maxTurns;
+  const tOpts = resolvedPluginDir
     ? {
         projectRoot,
         label: 'treatment',
         onTrialComplete,
-        pluginDir: scenario.pluginDir,
-        maxTurns: scenario.maxTurns,
+        pluginDir: resolvedPluginDir,
+        maxTurns: resolvedMaxTurns,
         isolated: false,
         model,
         runId,
       }
-    : { projectRoot, label: 'treatment', onTrialComplete, isolated: false, model, runId };
+    : {
+        projectRoot,
+        label: 'treatment',
+        onTrialComplete,
+        isolated: false,
+        model,
+        runId,
+        ...(resolvedMaxTurns != null ? { maxTurns: resolvedMaxTurns } : {}),
+      };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }
 
