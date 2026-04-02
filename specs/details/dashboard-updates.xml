@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="dashboard-updates">
+  <title>Dashboard Updates</title>
+  <files>
+    <file>scripts/eval-dashboard.js</file>
+    <file>scripts/eval-dashboard-ui.html</file>
+  </files>
+
+  <requirement id="fr-du-001">
+    <title>Behavioral Assertion Display</title>
+    <description>
+      Dashboard assertion breakdown renders behavioral assertions with
+      type-specific indicators and match/no-match status.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-du-001-ac1">
+        Behavioral assertions show operator type (tool_called, tool_before, etc.)
+        as a label distinct from text assertions.
+        <trace>REQ-F011</trace>
+      </criterion>
+      <criterion id="fr-du-001-ac2">
+        Behavioral assertions show match status (matched action index or "not found").
+        <trace>REQ-F011</trace>
+      </criterion>
+      <criterion id="fr-du-001-ac3">
+        Text assertions continue to display as before (no visual regression).
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-du-002">
+    <title>Action Log Timeline</title>
+    <description>
+      Dashboard transcript modal includes an action log tab showing
+      tool calls as a structured timeline.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-du-002-ac1">
+        Transcript modal has an "Action Log" tab alongside existing transcript view.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-du-002-ac2">
+        Action log shows each tool call with: index, tool name, args summary.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-du-002-ac3">
+        Trials without actions field (old results) show "No action log" message.
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-du-003">
+    <title>Scenario Detail Extension</title>
+    <description>
+      Dashboard scenario detail view shows Plugin Dir and Max Turns fields.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-du-003-ac1">
+        When scenario has pluginDir, it is shown in scenario detail.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-du-003-ac2">
+        When scenario has maxTurns, it is shown in scenario detail.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-du-003-ac3">
+        Scenarios without these fields show no extra information (no "undefined").
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-du-004">
+    <title>Turns Used Display</title>
+    <description>
+      Dashboard trial results show turns used vs max turns.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-du-004-ac1">
+        Trial results table shows turnsUsed column (counted from actions array).
+        <trace>REQ-F014</trace>
+      </criterion>
+      <criterion id="fr-du-004-ac2">
+        When maxTurns is set, display shows "N / M turns" format.
+        <trace>REQ-F014</trace>
+      </criterion>
+      <criterion id="fr-du-004-ac3">
+        Trials without actions field show "-" in turnsUsed column.
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-du-005">
+    <title>Mixed Grading Display</title>
+    <description>
+      Dashboard shows code and model scores separately for mixed-graded trials.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-du-005-ac1">
+        For mixed-graded trials, assertion breakdown groups behavioral and
+        text assertions visually.
+        <trace>REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-du-005-ac2">
+        Combined score is shown alongside the per-group breakdown.
+        <trace>REQ-F015</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

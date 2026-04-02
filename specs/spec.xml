@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <title>Agent Eval Extension</title>
+    <description>
+      Extend arc-evaluating from prompt-response eval to agent behavior eval.
+      Add transcript-based behavioral assertions, mixed grading, environment
+      control (--plugin-dir, --max-turns), and dashboard updates.
+    </description>
+    <source>docs/plans/2026-04-02-agent-eval-extension-design.md</source>
+  </overview>
+
+  <cross_cutting>
+    <constraint id="cc-001">
+      <title>Zero External Dependencies</title>
+      <description>Node.js standard library only. No npm dependencies.</description>
+    </constraint>
+    <constraint id="cc-002">
+      <title>Backward Compatible</title>
+      <description>
+        Existing scenarios, results JSONL, and grading must work unchanged.
+        New fields are additive only.
+      </description>
+    </constraint>
+    <constraint id="cc-003">
+      <title>Behavioral Grading Is Deterministic</title>
+      <description>
+        Behavioral assertions use code grading only. No model calls for
+        tool_called, tool_before, etc.
+      </description>
+    </constraint>
+    <constraint id="cc-004">
+      <title>Skill Doc Out Of Scope</title>
+      <description>
+        arc-evaluating/SKILL.md changes require arc-writing-skills TDD process.
+        Not included in this implementation scope.
+      </description>
+    </constraint>
+  </cross_cutting>
+
+  <details>
+    <detail_file path="details/action-parser.xml" />
+    <detail_file path="details/behavioral-assertions.xml" />
+    <detail_file path="details/environment-control.xml" />
+    <detail_file path="details/mixed-grading.xml" />
+    <detail_file path="details/scenario-extension.xml" />
+    <detail_file path="details/dashboard-updates.xml" />
+    <detail_file path="details/cli-flags.xml" />
+  </details>
+</spec>
