@@ -155,6 +155,7 @@ function spawnDiaryEnricher(draftPath, session) {
         '--max-turns',
         '2',
         '--print',
+        // Safe: enricher is sandboxed (Read+Write only, no MCP, max 2 turns, detached)
         '--dangerously-skip-permissions',
         '--system-prompt',
         systemPrompt,

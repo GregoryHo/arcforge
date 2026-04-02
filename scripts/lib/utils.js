@@ -606,4 +606,5 @@ module.exports = {
   getSessionFilePath,
   loadSession,
   saveSession,
+  CLAUDE_MAX_BUFFER: 50 * 1024 * 1024, // 50MB — Claude verbose output can be large
 };

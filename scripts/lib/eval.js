@@ -10,11 +10,9 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
+const { execCommand, ensureDir, getTimestamp, sanitizeFilename, CLAUDE_MAX_BUFFER } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
-
-const CLAUDE_MAX_BUFFER = 50 * 1024 * 1024; // 50MB — Claude verbose output can be large
 
 /**
  * Eval scenario parsed from a markdown file
@@ -274,40 +272,17 @@ function writeIsolationSettings(trialDir, cachedSettings) {
 /**
  * Build isolation settings JSON string (cached for reuse across trials).
  * Queries installed plugins and generates settings to disable all of them.
- * Also excludes user-level CLAUDE.md and disables auto-memory to prevent
- * user-specific instructions from contaminating eval baselines.
- * Returns base isolation settings if claude CLI is unavailable (e.g., in tests).
+ * @param {Object} [opts] - Options
+ * @param {boolean} [opts.excludeClaudeMd=true] - Exclude CLAUDE.md/rules (full isolation).
+ *   Set false for semi-isolation (plugin-dir mode) where the plugin needs project context.
  * @returns {string} JSON string for .claude/settings.json
  */
-function buildIsolationSettings() {
-  const baseSettings = {
-    claudeMdExcludes: ['**/CLAUDE.md', '**/CLAUDE.local.md', '**/rules/**'],
-    autoMemoryEnabled: false,
-  };
-  try {
-    const { stdout, exitCode } = execCommand('claude', ['plugin', 'list', '--json'], {
-      timeout: 10000,
-    });
-    if (exitCode !== 0 || !stdout) return JSON.stringify(baseSettings);
-    const plugins = JSON.parse(stdout);
-    if (!Array.isArray(plugins)) return JSON.stringify(baseSettings);
-    const disabled = {};
-    for (const p of plugins) disabled[p.id] = false;
-    return JSON.stringify({ ...baseSettings, enabledPlugins: disabled });
-  } catch {
-    return JSON.stringify(baseSettings);
-  }
-}
-
-/**
- * Build semi-isolation settings for plugin-dir mode.
- * Disables all installed plugins and auto-memory but does NOT exclude CLAUDE.md files
- * (unlike full isolation). This allows the plugin under test to access project context.
- * @returns {string} JSON string for .claude/settings.json
- */
-function buildPluginDirSettings() {
+function buildIsolationSettings({ excludeClaudeMd = true } = {}) {
   const baseSettings = {
     autoMemoryEnabled: false,
+    ...(excludeClaudeMd
+      ? { claudeMdExcludes: ['**/CLAUDE.md', '**/CLAUDE.local.md', '**/rules/**'] }
+      : {}),
   };
   try {
     const { stdout, exitCode } = execCommand('claude', ['plugin', 'list', '--json'], {
@@ -454,7 +429,6 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   // Merge CLI overrides with scenario defaults (only when not fully isolated)
   const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
-  const maxTurns = rawMaxTurns != null ? rawMaxTurns : scenario.maxTurns;
 
   // Validate pluginDir exists before running trial
   if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
@@ -479,9 +453,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
 
   // Isolation mode: full isolation uses writeIsolationSettings,
-  // pluginDir uses buildPluginDirSettings (semi-isolation, no claudeMdExcludes)
+  // pluginDir uses semi-isolation (no claudeMdExcludes)
   if (pluginDir) {
-    const semiSettings = isolationSettings || buildPluginDirSettings();
+    const semiSettings = isolationSettings || buildIsolationSettings({ excludeClaudeMd: false });
     writeIsolationSettings(trialDir, semiSettings);
   } else if (isolated) {
     writeIsolationSettings(trialDir, isolationSettings);
@@ -512,7 +486,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   // Resolve max-turns: CLI > scenario > pluginDir default (10)
   const resolvedMaxTurns = resolveMaxTurns({
-    maxTurns,
+    maxTurns: rawMaxTurns,
     scenarioMaxTurns: scenario.maxTurns,
     pluginDir,
   });
@@ -751,6 +725,11 @@ function runWorkflowEval(scenario, k, options = {}) {
     maxTurns,
   } = options;
   const isolationSettings = buildIsolationSettings();
+  const resolvedPluginDir = pluginDir || scenario.pluginDir;
+  // Cache semi-isolation settings once (avoids spawning `claude plugin list` per trial)
+  const semiSettings = resolvedPluginDir
+    ? buildIsolationSettings({ excludeClaudeMd: false })
+    : undefined;
 
   const bOpts = {
     projectRoot,
@@ -762,30 +741,16 @@ function runWorkflowEval(scenario, k, options = {}) {
     runId,
   };
 
-  // Treatment: CLI --plugin-dir overrides scenario pluginDir;
-  // CLI --max-turns overrides scenario maxTurns
-  const resolvedPluginDir = pluginDir || scenario.pluginDir;
-  const resolvedMaxTurns = maxTurns != null ? maxTurns : scenario.maxTurns;
-  const tOpts = resolvedPluginDir
-    ? {
-        projectRoot,
-        label: 'treatment',
-        onTrialComplete,
-        pluginDir: resolvedPluginDir,
-        maxTurns: resolvedMaxTurns,
-        isolated: false,
-        model,
-        runId,
-      }
-    : {
-        projectRoot,
-        label: 'treatment',
-        onTrialComplete,
-        isolated: false,
-        model,
-        runId,
-        ...(resolvedMaxTurns != null ? { maxTurns: resolvedMaxTurns } : {}),
-      };
+  const tOpts = {
+    projectRoot,
+    label: 'treatment',
+    onTrialComplete,
+    isolated: false,
+    model,
+    runId,
+    ...(resolvedPluginDir ? { pluginDir: resolvedPluginDir, isolationSettings: semiSettings } : {}),
+    ...(maxTurns != null ? { maxTurns } : {}),
+  };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }
 
@@ -1060,7 +1025,7 @@ module.exports = {
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
-  buildPluginDirSettings,
+  buildPluginDirSettings: () => buildIsolationSettings({ excludeClaudeMd: false }),
   parseStreamJsonOutput,
   parseActionsFromTranscript,
   resolveMaxTurns,

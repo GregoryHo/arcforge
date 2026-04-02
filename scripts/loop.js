@@ -21,13 +21,12 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { Coordinator } = require('./lib/coordinator');
 const { Feature } = require('./lib/models');
-const { execCommand, getTimestamp, readFileSafe } = require('./lib/utils');
+const { execCommand, getTimestamp, readFileSafe, CLAUDE_MAX_BUFFER } = require('./lib/utils');
 
 const LOOP_STATE_FILE = '.arcforge-loop.json';
 const MAX_RETRIES = 1;
 const STALL_THRESHOLD = 2; // iterations without progress
 const MAX_ERRORS_KEPT = 20;
-const CLAUDE_MAX_BUFFER = 50 * 1024 * 1024; // 50MB — Claude verbose output can be large
 
 /**
  * Parse loop CLI arguments
