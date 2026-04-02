@@ -27,7 +27,7 @@ def test_arc_looping_frontmatter():
     front = _parse_frontmatter(text)
 
     assert front.get("name") == "arc-looping"
-    assert front.get("description", "").startswith("Guide for")
+    assert front.get("description", "").startswith("Use when")
     assert len((front.get("name", "") + front.get("description", ""))) < 1024
 
     # No @ symbols in skill content

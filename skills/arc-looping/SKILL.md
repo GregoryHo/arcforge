@@ -1,6 +1,6 @@
 ---
 name: arc-looping
-description: Guide for running autonomous loops — unattended cross-session execution of DAG tasks
+description: Use when running autonomous unattended loops — cross-session execution of DAG tasks without human intervention
 ---
 
 # arc-looping
