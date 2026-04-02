@@ -608,7 +608,7 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     maxTurns,
   });
   try {
-    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot);
+    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
     const versioned = gradeScenario.version
       ? { ...graded, version: gradeScenario.version }
       : graded;

@@ -1,132 +1,143 @@
 epics:
-  - id: "eval-core"
-    name: "Eval Core — Action Parser, Scenario Extension, Environment Control"
-    status: "pending"
-    spec_path: "epics/eval-core/epic.md"
+  - id: eval-core
+    name: Eval Core — Action Parser, Scenario Extension, Environment Control
+    status: completed
+    spec_path: epics/eval-core/epic.md
     worktree: null
     depends_on: []
     features:
-      - id: "action-parser"
-        name: "Transcript Action Parser"
-        status: "pending"
-        source_requirement: "fr-ap-001"
+      - id: action-parser
+        name: Transcript Action Parser
+        status: pending
         depends_on: []
-      - id: "action-result-storage"
-        name: "Action Log In Trial Results"
-        status: "pending"
-        source_requirement: "fr-ap-002"
-        depends_on: ["action-parser"]
-      - id: "scenario-plugin-dir"
-        name: "Parse Plugin Dir Scenario Field"
-        status: "pending"
-        source_requirement: "fr-se-001"
+        source_requirement: fr-ap-001
+      - id: action-result-storage
+        name: Action Log In Trial Results
+        status: pending
+        depends_on:
+          - action-parser
+        source_requirement: fr-ap-002
+      - id: scenario-plugin-dir
+        name: Parse Plugin Dir Scenario Field
+        status: pending
         depends_on: []
-      - id: "scenario-max-turns"
-        name: "Parse Max Turns Scenario Field"
-        status: "pending"
-        source_requirement: "fr-se-002"
+        source_requirement: fr-se-001
+      - id: scenario-max-turns
+        name: Parse Max Turns Scenario Field
+        status: pending
         depends_on: []
-      - id: "max-turns-priority"
-        name: "Max Turns Resolution Priority"
-        status: "pending"
-        source_requirement: "fr-se-003"
-        depends_on: ["scenario-max-turns", "scenario-plugin-dir"]
-      - id: "plugin-dir-settings"
-        name: "Semi-Isolated Settings Builder"
-        status: "pending"
-        source_requirement: "fr-ec-001"
+        source_requirement: fr-se-002
+      - id: max-turns-priority
+        name: Max Turns Resolution Priority
+        status: pending
+        depends_on:
+          - scenario-max-turns
+          - scenario-plugin-dir
+        source_requirement: fr-se-003
+      - id: plugin-dir-settings
+        name: Semi-Isolated Settings Builder
+        status: pending
         depends_on: []
-      - id: "trial-plugin-dir"
-        name: "runTrial Plugin Dir Support"
-        status: "pending"
-        source_requirement: "fr-ec-002"
-        depends_on: ["plugin-dir-settings", "scenario-plugin-dir"]
-      - id: "trial-max-turns"
-        name: "runTrial Max Turns Support"
-        status: "pending"
-        source_requirement: "fr-ec-003"
-        depends_on: ["max-turns-priority"]
-      - id: "workflow-ab-plugin-dir"
-        name: "Workflow A/B With Plugin Dir"
-        status: "pending"
-        source_requirement: "fr-ec-004"
-        depends_on: ["trial-plugin-dir", "plugin-dir-settings"]
-
-  - id: "eval-grading"
-    name: "Eval Grading — Behavioral Assertions, Mixed Grading"
-    status: "pending"
-    spec_path: "epics/eval-grading/epic.md"
+        source_requirement: fr-ec-001
+      - id: trial-plugin-dir
+        name: runTrial Plugin Dir Support
+        status: pending
+        depends_on:
+          - plugin-dir-settings
+          - scenario-plugin-dir
+        source_requirement: fr-ec-002
+      - id: trial-max-turns
+        name: runTrial Max Turns Support
+        status: pending
+        depends_on:
+          - max-turns-priority
+        source_requirement: fr-ec-003
+      - id: workflow-ab-plugin-dir
+        name: Workflow A/B With Plugin Dir
+        status: pending
+        depends_on:
+          - trial-plugin-dir
+          - plugin-dir-settings
+        source_requirement: fr-ec-004
+  - id: eval-grading
+    name: Eval Grading — Behavioral Assertions, Mixed Grading
+    status: completed
+    spec_path: epics/eval-grading/epic.md
     worktree: null
-    depends_on: ["eval-core"]
+    depends_on:
+      - eval-core
     features:
-      - id: "behavioral-assertion-parser"
-        name: "Parse Behavioral Assertion Prefixes"
-        status: "pending"
-        source_requirement: "fr-ba-001"
+      - id: behavioral-assertion-parser
+        name: Parse Behavioral Assertion Prefixes
+        status: completed
         depends_on: []
-      - id: "behavioral-assertion-grader"
-        name: "Grade Behavioral Assertions Against Action Log"
-        status: "pending"
-        source_requirement: "fr-ba-002"
-        depends_on: ["behavioral-assertion-parser"]
-      - id: "mixed-grader"
-        name: "Mixed Code + Model Grading"
-        status: "pending"
-        source_requirement: "fr-mg-001"
-        depends_on: ["behavioral-assertion-grader"]
-
-  - id: "eval-cli"
-    name: "Eval CLI — New Flags"
-    status: "pending"
-    spec_path: "epics/eval-cli/epic.md"
+        source_requirement: fr-ba-001
+      - id: behavioral-assertion-grader
+        name: Grade Behavioral Assertions Against Action Log
+        status: completed
+        depends_on:
+          - behavioral-assertion-parser
+        source_requirement: fr-ba-002
+      - id: mixed-grader
+        name: Mixed Code + Model Grading
+        status: completed
+        depends_on:
+          - behavioral-assertion-grader
+        source_requirement: fr-mg-001
+  - id: eval-cli
+    name: Eval CLI — New Flags
+    status: pending
+    spec_path: epics/eval-cli/epic.md
     worktree: null
-    depends_on: ["eval-core"]
+    depends_on:
+      - eval-core
     features:
-      - id: "cli-no-isolate"
-        name: "--no-isolate Flag"
-        status: "pending"
-        source_requirement: "fr-cf-001"
+      - id: cli-no-isolate
+        name: --no-isolate Flag
+        status: pending
         depends_on: []
-      - id: "cli-plugin-dir"
-        name: "--plugin-dir Flag"
-        status: "pending"
-        source_requirement: "fr-cf-002"
+        source_requirement: fr-cf-001
+      - id: cli-plugin-dir
+        name: --plugin-dir Flag
+        status: pending
         depends_on: []
-      - id: "cli-max-turns"
-        name: "--max-turns Flag"
-        status: "pending"
-        source_requirement: "fr-cf-003"
+        source_requirement: fr-cf-002
+      - id: cli-max-turns
+        name: --max-turns Flag
+        status: pending
         depends_on: []
-
-  - id: "eval-dashboard"
-    name: "Eval Dashboard — Behavioral Display, Action Log, Mixed Grading"
-    status: "pending"
-    spec_path: "epics/eval-dashboard/epic.md"
+        source_requirement: fr-cf-003
+  - id: eval-dashboard
+    name: Eval Dashboard — Behavioral Display, Action Log, Mixed Grading
+    status: pending
+    spec_path: epics/eval-dashboard/epic.md
     worktree: null
-    depends_on: ["eval-core", "eval-grading"]
+    depends_on:
+      - eval-core
+      - eval-grading
     features:
-      - id: "dashboard-behavioral-assertions"
-        name: "Behavioral Assertion Display"
-        status: "pending"
-        source_requirement: "fr-du-001"
+      - id: dashboard-behavioral-assertions
+        name: Behavioral Assertion Display
+        status: pending
         depends_on: []
-      - id: "dashboard-action-log"
-        name: "Action Log Timeline"
-        status: "pending"
-        source_requirement: "fr-du-002"
+        source_requirement: fr-du-001
+      - id: dashboard-action-log
+        name: Action Log Timeline
+        status: pending
         depends_on: []
-      - id: "dashboard-scenario-fields"
-        name: "Plugin Dir and Max Turns Display"
-        status: "pending"
-        source_requirement: "fr-du-003"
+        source_requirement: fr-du-002
+      - id: dashboard-scenario-fields
+        name: Plugin Dir and Max Turns Display
+        status: pending
         depends_on: []
-      - id: "dashboard-turns-used"
-        name: "Turns Used Display"
-        status: "pending"
-        source_requirement: "fr-du-004"
+        source_requirement: fr-du-003
+      - id: dashboard-turns-used
+        name: Turns Used Display
+        status: pending
         depends_on: []
-      - id: "dashboard-mixed-grading"
-        name: "Mixed Grading Display"
-        status: "pending"
-        source_requirement: "fr-du-005"
+        source_requirement: fr-du-004
+      - id: dashboard-mixed-grading
+        name: Mixed Grading Display
+        status: pending
         depends_on: []
+        source_requirement: fr-du-005
