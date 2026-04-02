@@ -119,13 +119,12 @@ MONITORING:
  * @returns {{ inWorktree: boolean, epicId: string|null, basePath: string|null }}
  */
 function detectWorktree(projectRoot) {
-  const markerPath = path.join(projectRoot, '.arcforge-epic');
-  if (!fs.existsSync(markerPath)) {
+  const content = readFileSafe(path.join(projectRoot, '.arcforge-epic'));
+  if (!content) {
     return { inWorktree: false, epicId: null, basePath: null };
   }
   try {
     const { parseDagYaml } = require('./lib/yaml-parser');
-    const content = fs.readFileSync(markerPath, 'utf8');
     const data = parseDagYaml(content);
     return {
       inWorktree: true,
@@ -135,6 +134,20 @@ function detectWorktree(projectRoot) {
   } catch {
     return { inWorktree: true, epicId: null, basePath: null };
   }
+}
+
+/**
+ * Resolve epic scope from explicit flag or worktree auto-detection.
+ * @param {string|null} epic - Explicit epic ID from --epic flag
+ * @param {string} projectRoot - Project root directory
+ * @returns {string|null} Resolved epic scope
+ */
+function resolveEpicScope(epic, projectRoot) {
+  const scope = epic || detectWorktree(projectRoot).epicId;
+  if (!epic && scope) {
+    console.log(`[loop] Detected worktree for epic ${scope} — auto-scoping`);
+  }
+  return scope;
 }
 
 /**
@@ -451,12 +464,7 @@ function runSequential(options) {
   const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
   state.pattern = 'sequential';
-
-  // Auto-detect epic scope from worktree if not explicitly set
-  const epicScope = epic || detectWorktree(projectRoot).epicId;
-  if (!epic && epicScope) {
-    console.log(`[loop] Detected worktree for epic ${epicScope} — auto-scoping`);
-  }
+  const epicScope = resolveEpicScope(epic, projectRoot);
 
   console.log(`[loop] Starting sequential loop (max ${maxRuns} runs)`);
 
@@ -501,12 +509,7 @@ async function runDag(options) {
   const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
   state.pattern = 'dag';
-
-  // Auto-detect epic scope from worktree if not explicitly set
-  const epicScope = epic || detectWorktree(projectRoot).epicId;
-  if (!epic && epicScope) {
-    console.log(`[loop] Detected worktree for epic ${epicScope} — auto-scoping`);
-  }
+  const epicScope = resolveEpicScope(epic, projectRoot);
 
   console.log(`[loop] Starting DAG loop (max ${maxRuns} runs)`);
 
@@ -528,9 +531,9 @@ async function runDag(options) {
       console.log(`[loop] Found ${parallelEpics.length} parallel epics — running concurrently`);
 
       // Spawn all sessions concurrently
-      const taskEntries = parallelEpics.map((epic) => ({
-        epic,
-        prompt: buildTaskPrompt(epic, coord, projectRoot),
+      const taskEntries = parallelEpics.map((epicItem) => ({
+        epic: epicItem,
+        prompt: buildTaskPrompt(epicItem, coord, projectRoot),
       }));
       const spawnResults = await Promise.all(
         taskEntries.map((entry) => spawnSessionAsync(entry.prompt, projectRoot)),
@@ -539,28 +542,28 @@ async function runDag(options) {
       // Process results sequentially (state + DAG updates are not concurrent-safe)
       let anySuccess = false;
       for (let i = 0; i < parallelEpics.length; i++) {
-        const epic = parallelEpics[i];
+        const epicItem = parallelEpics[i];
         const result = spawnResults[i];
         state.total_cost += result.costUsd;
 
         if (result.exitCode !== 0) {
-          console.log(`[loop] Task ${epic.id} failed`);
-          recordError(state, epic.id, result.stderr, 1);
-          state.failed_tasks.push(epic.id);
+          console.log(`[loop] Task ${epicItem.id} failed`);
+          recordError(state, epicItem.id, result.stderr, 1);
+          state.failed_tasks.push(epicItem.id);
           try {
-            coord.blockTask(epic.id, 'Loop: failed in parallel batch');
+            coord.blockTask(epicItem.id, 'Loop: failed in parallel batch');
           } catch (err) {
-            console.error(`[loop] Warning: could not block task ${epic.id}: ${err.message}`);
+            console.error(`[loop] Warning: could not block task ${epicItem.id}: ${err.message}`);
           }
         } else {
           try {
-            coord.completeTask(epic.id);
-            state.completed_tasks.push(epic.id);
+            coord.completeTask(epicItem.id);
+            state.completed_tasks.push(epicItem.id);
             state.last_progress_at = getTimestamp();
-            console.log(`[loop] Task ${epic.id} completed successfully`);
+            console.log(`[loop] Task ${epicItem.id} completed successfully`);
             anySuccess = true;
           } catch (err) {
-            console.error(`[loop] Warning: DAG update failed for ${epic.id}: ${err.message}`);
+            console.error(`[loop] Warning: DAG update failed for ${epicItem.id}: ${err.message}`);
           }
         }
       }
@@ -587,7 +590,7 @@ async function runDag(options) {
 
     if (!success) {
       // In DAG mode, try to continue with other tasks
-      const nextTask = coord.nextTask();
+      const nextTask = coord.nextTask(epicScope);
       if (!nextTask) {
         console.log('[loop] No more tasks available after failure');
         state.status = 'failed';

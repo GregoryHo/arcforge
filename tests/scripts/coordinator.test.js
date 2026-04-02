@@ -226,9 +226,7 @@ describe('Coordinator', () => {
         twoEpicDag({
           epic1Status: TaskStatus.IN_PROGRESS,
           epic2Status: TaskStatus.IN_PROGRESS,
-          epic2Features: [
-            { id: 'feat-2a', name: 'Plugin', status: TaskStatus.IN_PROGRESS },
-          ],
+          epic2Features: [{ id: 'feat-2a', name: 'Plugin', status: TaskStatus.IN_PROGRESS }],
         }),
       );
       // Without scope: returns feat-2a (in-progress has priority)

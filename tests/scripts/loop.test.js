@@ -1,4 +1,10 @@
-const { isStalled, isRetryStorm, checkStopConditions, parseLoopArgs, detectWorktree } = require('../../scripts/loop');
+const {
+  isStalled,
+  isRetryStorm,
+  checkStopConditions,
+  parseLoopArgs,
+  detectWorktree,
+} = require('../../scripts/loop');
 
 /**
  * Helper: build a minimal loop state with sensible defaults.

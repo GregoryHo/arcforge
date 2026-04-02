@@ -84,9 +84,7 @@ class Coordinator {
    */
   nextTask(epicId = null) {
     const completedEpics = this.dag.getCompletedEpics();
-    const epics = epicId
-      ? this.dag.epics.filter((e) => e.id === epicId)
-      : this.dag.epics;
+    const epics = epicId ? this.dag.epics.filter((e) => e.id === epicId) : this.dag.epics;
 
     // First, check for in-progress features
     for (const epic of epics) {
