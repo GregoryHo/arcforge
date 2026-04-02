@@ -44,6 +44,14 @@ Every skill belongs to one of three types. The type determines how it gets trigg
 
 Discipline skills without routing entries will never be triggered — they become dead documentation. Workflow skills without handoff sections create dead-ends in autonomous mode.
 
+## Design Anti-Patterns
+
+These were discovered through eval and should not be repeated:
+
+- **"Mindset" skills** — AI agents don't internalize mindsets. A skill that says "embed me in everything" relies on copy-paste, which is unreliable. Use the routing table to trigger discipline skills instead.
+- **Self-contradicting invocation** — Never write "don't invoke me" in a skill that's registered in the routing table. The routing table says "invoke it"; the skill says "don't invoke me" → agent obeys the prohibition.
+- **Embedded-only verification** — Verification embedded in other skills (arc-finishing Step 1, arc-tdd Verify RED/GREEN) is defense-in-depth, not the primary mechanism. The primary trigger is the routing table.
+
 ## Iron Law
 
 ```
