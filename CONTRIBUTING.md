@@ -238,10 +238,10 @@ hooks/
 
 ### Shared Utilities
 
-Use `hooks/lib/utils.js` for common operations:
+Import from `scripts/lib/utils.js` (canonical location) for common operations:
 - `readStdinSync()` — read stdin for hook chaining
-- `log(msg)` — log to stderr (visible in Claude Code)
-- `execCommand(cmd, args)` — safe execution (no shell injection)
+- `readFileSafe(path, default)` — safe file read with fallback
+- `writeFileSafe(path, content)` — safe file write with directory creation
 
 ### Conventions
 

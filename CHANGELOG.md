@@ -3,6 +3,67 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0] - 2026-03-31
+
+### Added
+
+- **arc-compacting** skill: Strategic manual compaction timing at workflow phase boundaries
+- **arc-evaluating** skill: Measure whether skills, agents, or workflows change AI agent behavior — with progressive-loading references (`cli-and-metrics.md`, `common-mistakes-catalog.md`, `grading-and-execution.md`)
+- **arc-looping** skill: Autonomous loop execution with cross-session DAG task coordination
+- **arc-managing-sessions** skill: Session save/resume with alias support and cooperative auto-memory coexistence
+- **arc-researching** skill: Autonomous hypothesis-driven experimentation for metric optimization ("fixed judge + free player" pattern)
+- 9 scoped rule files in `.claude/rules/` — extracted from monolithic CLAUDE.md for context-aware loading: architecture, coding-standards, git-workflow, hooks, plugin, security, skills, templates-commands-agents, testing
+- 9 new agent definitions in `agents/`: debugger, eval-comparator, eval-grader, implementer, loop-operator, planner, quality-reviewer, spec-reviewer, verifier
+- `AGENTS.md`: Agent catalog for Codex platform discovery
+- Eval infrastructure: per-assertion code grading engine (`eval-graders.js`), statistics aggregation (`eval-stats.js`), core eval engine (`eval.js`), transcript parser (`transcript.js`)
+- Eval dashboard: `eval-dashboard.js` + `eval-dashboard-ui.html` — web UI with collapsible artifacts panel and audit trail
+- Eval scenarios: 11 new scenarios (debug-investigate-first, debug-stop-at-three, diary-quality, eval-grader-selection, eval-scenario-splitting, eval-trap-design, hook-inject-skills, instinct-adherence, reflect-pattern-detection, tdd-compliance) + eval skill-files for instinct testing
+- Eval benchmarks: JSON snapshots for 2026-03-19, 2026-03-20, 2026-03-23
+- Research dashboard: `research-dashboard.js` + `research-dashboard.html` — live monitoring with SSE and inline SVG charts
+- Loop execution engine: `scripts/loop.js` for autonomous cross-session execution
+- Session management: `session-aliases.js` for alias-based session tracking, `session-utils.js` expanded with new helpers
+- `commands/sessions.md`: Thin delegation wrapper for session management
+- `docs/guide/hooks-system.md`: Comprehensive hooks I/O visibility rules and contributor guide
+- `hooks/log_lightweight/`: Refactored Python logging into 6-module package (config, dispatcher, io_writer, state, tokens, tools)
+- `hooks/run-hook.cmd`: Windows-compatible hook dispatcher
+- `arc-writing-skills/agents/`: 4 eval subagent definitions (description-tester, skill-analyzer, skill-comparator, skill-grader) + `references/eval-schemas.md` and `testing-skills-with-subagents.md`
+- Tests: `e2e-hooks.test.js` (36 behavioral tests with real Claude Code fixtures), `observe.test.js`, `pre-compact.test.js`, `quality-check.test.js`, `coordinator.test.js`, `eval-dashboard.test.js`, `eval-integration.test.js`, `eval-stats.test.js`, `eval.test.js`, `locking.test.js`, `loop.test.js`, `package-manager.test.js`, `research-dashboard.test.js`, `session-aliases.test.js`, `session-listing.test.js`, `transcript.test.js`, `utils.test.js`, `test-models.js`, `test-yaml-parser.js`, `test_eval_agents_contract.py`, `test_eval_scenario_format.py`, `test_skill_arc_evaluating.py`
+
+### Changed
+
+- `CLAUDE.md`: Slimmed from 69 to 28 lines — bulk content extracted to `.claude/rules/` for scoped loading
+- `arc-evaluating/SKILL.md`: 8 targeted improvements from research loop — restructured for token budget with progressive-loading references; added "competence proxy" and "skill formalizes existing behavior" to Common Mistakes
+- `arc-agent-driven/SKILL.md`: Enhanced with eval-aware subagent dispatching
+- `arc-writing-skills/SKILL.md`: Updated to reference new eval agents and testing-with-subagents guide
+- `arc-brainstorming/SKILL.md`, `arc-observing/SKILL.md`, `arc-planning/SKILL.md`, `arc-refining/SKILL.md`, `arc-using/SKILL.md`: Minor refinements (cross-references, SKILL_ROOT, eval hooks)
+- Hooks output visibility: user-facing messages switched from stderr (invisible in Claude Code) to `systemMessage` JSON format across observe, pre-compact, quality-check, and compact-suggester hooks
+- `hooks/compact-suggester/main.js`: Refactored to unified `{ tools, reads, writes }` JSON state; separated compact counter from diary counter
+- `hooks/session-tracker/inject-context.js`: Major refactoring for session alias support and cooperative auto-memory
+- `hooks/session-tracker/end.js`: Enhanced session finalization with alias tracking
+- `hooks/log-lightweight.py`: Refactored from monolithic 887-line file into 6-module package under `hooks/log_lightweight/`
+- `scripts/cli.js`: Added `arc eval dashboard`, `arc research dashboard`, loop commands, and session management subcommands
+- `scripts/lib/coordinator.js`: Enhanced DAG coordination with new status helpers
+- `scripts/lib/models.js`: Added TaskStatus export from dag-schema
+- `scripts/lib/dag-schema.js`: Added TaskStatus enum export
+- `scripts/lib/utils.js`: Added new utility functions for eval and session support
+- `README.md`: Updated skill descriptions and documentation links
+- `CONTRIBUTING.md`: Updated hook architecture section
+
+### Fixed
+
+- **Hook stdin crash**: `log-lightweight` dispatcher crashed on empty stdin — now handles gracefully
+- **Hook field name**: SessionStart event sends `source` field, not `trigger` — fixed across all hooks that read session start reason
+- **Hook output invisible**: stderr output not visible to users in Claude Code — switched to `systemMessage` JSON protocol
+- **Counter collision**: compact-suggester and diary hooks shared a counter, causing incorrect compaction timing — separated into independent counters
+- `hooks/compact-suggester/README.md`: Corrected storage path documentation (`arcforge-tool-count` → `arcforge-compact-state`)
+- `skills/arc-managing-sessions/SKILL.md`: Fixed command name references (`/sessions` → `/arc-managing-sessions`)
+- `skills/arc-journaling/SKILL.md`: Fixed cross-reference to session commands
+
+### Removed
+
+- `.serena/memories/`: 4 legacy memory files (code_style_and_conventions, project_overview, suggested_commands, task_completion_checklist) — replaced by `.claude/rules/`
+- `hooks/lib/package-manager.js`, `hooks/lib/thresholds.js`, `hooks/lib/utils.js`: Removed hook-local re-exports — hooks now import directly from `scripts/lib/`
+
 ## [1.1.2] - 2026-02-14
 
 ### Added

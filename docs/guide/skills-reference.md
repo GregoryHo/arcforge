@@ -35,15 +35,15 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 24 skills are organized into 6 categories:
+arcforge's 29 skills are organized into 6 categories:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
-| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel | Build and ship |
-| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic | Route, isolate, integrate |
-| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review | Test, debug, verify, review |
-| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling | Capture, extract, evolve |
+| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-looping | Build and ship |
+| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
+| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
+| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Meta** | arc-writing-skills | Create and maintain skills |
 
 **How skills flow through a project:**
@@ -64,8 +64,9 @@ arcforge's 24 skills are organized into 6 categories:
   tdd (during execution)    journaling            writing-skills
   debugging (on failure)    reflecting
   verifying (before done)   learning
-  requesting-review         observing
-  receiving-review          recalling
+  evaluating (skill eval)   observing
+  requesting-review         recalling
+  receiving-review          researching
 ```
 
 ---
@@ -250,6 +251,28 @@ arcforge's 24 skills are organized into 6 categories:
 
 ---
 
+### arc-looping
+
+**Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
+
+**When to use:** When tasks can run fully unattended across sessions with no human judgment needed per task.
+
+**Key workflow:**
+1. Verify DAG exists (from arc-planning) and baseline tests pass
+2. Choose loop pattern: sequential (safest, one task at a time) or DAG (parallel-aware)
+3. Set bounds: `--max-runs` and optional `--max-cost`
+4. Start loop: `node scripts/cli.js loop --pattern sequential --max-runs 20`
+5. Each iteration: read dag.yaml, spawn fresh Claude session, execute task, update DAG
+6. Stop on: all complete, max-runs hit, cost limit, stall detected, or retry storm
+
+**Artifacts:**
+- Input: `dag.yaml` (required, must be committed)
+- Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
+
+**Related:** arc-planning --> **arc-looping** --> arc-finishing or arc-finishing-epic
+
+---
+
 ### Coordination Skills
 
 ---
@@ -293,6 +316,27 @@ arcforge's 24 skills are organized into 6 categories:
 - Output: `.worktrees/<epic-name>/` directory, `.arcforge-epic` marker file
 
 **Related:** arc-planning --> **arc-using-worktrees** --> arc-implementing or arc-executing-tasks
+
+---
+
+### arc-compacting
+
+**Purpose:** Guide compaction decisions at logical workflow boundaries instead of letting auto-compaction fire mid-task.
+
+**When to use:** When the compact-suggester hook fires, when transitioning between workflow phases, or when a long session has accumulated stale context.
+
+**Key workflow:**
+1. Check phase transition — compact between phases (when state is persisted to files), not during
+2. Pre-compact: save decisions to files/memory, run `/diary` if session was substantial
+3. Check for un-committed work — ensure valuable changes are committed
+4. Compact with focused seed text: `/compact Focus on implementing [next task]`
+5. Post-compact: run `arcforge reboot`, re-read needed files
+
+**Artifacts:**
+- Input: session context, rule files, memory files
+- Output: compacted context focused on next phase
+
+**Related:** compact-suggester hook --> **arc-compacting** --> arc-agent-driven, arc-planning
 
 ---
 
@@ -354,6 +398,26 @@ arcforge's 24 skills are organized into 6 categories:
 - Output: merged epic, PR, preserved branch, or discarded work + DAG updated
 
 **Related:** arc-implementing --> **arc-finishing-epic** --> arc-coordinating status
+
+---
+
+### arc-managing-sessions
+
+**Purpose:** User-controlled session saves for continuity across conversations — save what matters, resume when needed.
+
+**When to use:** When saving session state for cross-conversation handoff, resuming a previous session, listing session history, or managing session aliases.
+
+**Key workflow:**
+1. **Save:** Reflect on conversation, write enrichment (summary, what worked/failed, blockers, next step), save to session file
+2. **Resume:** Resolve alias, read session file, present structured briefing, WAIT for user confirmation
+3. **List:** Browse sessions with filters (`--limit`, `--date`, `--query`)
+4. **Alias:** Create friendly names for easy session reference
+
+**Artifacts:**
+- Input: current session data from `~/.claude/sessions/{project}/{date}/{sessionId}.json`
+- Output: `~/.claude/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
+
+**Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
 
 ---
 
@@ -422,6 +486,28 @@ arcforge's 24 skills are organized into 6 categories:
 - Output: verified status with evidence (test output, build output, etc.)
 
 **Related:** embedded in all skills as a mindset, especially arc-finishing, arc-finishing-epic, arc-tdd
+
+---
+
+### arc-evaluating
+
+**Purpose:** Measure whether skills, agents, and workflows actually change AI agent behavior — unit tests for AI agent behavior.
+
+**When to use:** Before shipping a new skill, after modifying an existing one, or when comparing alternative approaches.
+
+**Key workflow:**
+1. Confirm eval scope with user: skill (behavior change), agent (task outcome), or workflow (toolkit effect)
+2. Define the question first: "What are you trying to learn?"
+3. Design scenario with assertions and grader type (code, model, or human)
+4. Run scenario validity preflight (expected baseline failure, ceiling/floor risk, answer leakage)
+5. Run eval trials (`arc eval run` or `arc eval ab` for A/B comparison)
+6. Grade results, track in JSONL, report verdict: SHIP / NEEDS WORK / BLOCKED
+
+**Artifacts:**
+- Input: scenario files in `evals/scenarios/`
+- Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
+
+**Related:** arc-brainstorming --> **arc-evaluating** --> arc-writing-skills (for shipping)
 
 ---
 
@@ -571,6 +657,28 @@ arcforge's 24 skills are organized into 6 categories:
 - Output: `~/.claude/instincts/{project}/<id>.md`
 
 **Related:** user insight --> **arc-recalling** --> instinct saved for arc-observing lifecycle
+
+---
+
+### arc-researching
+
+**Purpose:** Autonomous hypothesis-driven experimentation to optimize any measurable metric — build times, algorithm efficiency, prompt quality, or any target with a numeric signal.
+
+**When to use:** When optimizing a measurable metric through free-form experimentation rather than a predefined task list.
+
+**Key workflow:**
+1. Phase 1 (Interactive): Analyze target, propose `research-config.md` contract (scope, goal, evaluation, constraints), lock with user
+2. Phase 2: Create research branch, run evaluation, establish baseline metric, start dashboard
+3. Phase 3 (Autonomous loop): Hypothesize, implement, commit, run, extract metric, keep or revert, log to `results.tsv`
+4. Decision rules: improved = keep, same/worse = revert, crash = log + revert
+5. Stuck protocol: 3+ failures in same direction, change direction entirely
+6. Phase 4: Report baseline, best result, improvement %, experiment counts
+
+**Artifacts:**
+- Input: measurable metric, target files, evaluation command
+- Output: `research-config.md` (locked contract), `results.tsv` (untracked), `research/{tag}` branch
+
+**Related:** arc-brainstorming --> **arc-researching** --> manual cherry-pick to main
 
 ---
 

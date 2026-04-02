@@ -7,7 +7,7 @@
 │                                                                                              │
 │  arcforge/                                                                               │
 │  ├── scripts/                     # Node.js CLI and core engine                              │
-│  │   ├── cli.js                   # CLI entry point (10 commands)                           │
+│  │   ├── cli.js                   # CLI entry point (14 commands)                           │
 │  │   └── lib/                     # Supporting modules                                      │
 │  │       ├── coordinator.js       # DAG orchestration engine                                │
 │  │       ├── dag-schema.js        # Schema validation                                       │
@@ -22,10 +22,16 @@
 │  │       ├── instinct-writer.js   # Instinct file creation                                  │
 │  │       ├── pending-actions.js   # Deferred action queue                                   │
 │  │       ├── session-utils.js     # Session/diary path helpers                              │
+│  │       ├── session-aliases.js   # Session alias management                                │
+│  │       ├── transcript.js        # Transcript parsing for eval                             │
+│  │       ├── eval.js              # Core eval engine                                        │
+│  │       ├── eval-graders.js      # Per-assertion code grading                              │
+│  │       ├── eval-stats.js        # Eval statistics aggregation                             │
+│  │       ├── research-dashboard.js # Research experiment dashboard                          │
 │  │       ├── thresholds.js        # Session evaluation thresholds                           │
 │  │       └── utils.js             # Cross-platform file/JSON utilities                      │
 │  │                                                                                          │
-│  ├── skills/                      # Markdown skill definitions (24 skills)                  │
+│  ├── skills/                      # Markdown skill definitions (29 skills)                  │
 │  │   ├── arc-using/           # Entry point skill                                       │
 │  │   ├── arc-brainstorming/      # Ideation                                                │
 │  │   ├── arc-refining/         # Spec generation                                         │
@@ -49,15 +55,29 @@
 │  │   ├── arc-reflecting/        # Diary analysis for patterns                           │
 │  │   ├── arc-learning/          # Pattern extraction from sessions                      │
 │  │   ├── arc-observing/         # Tool call observation                                 │
-│  │   └── arc-recalling/         # Manual instinct creation                              │
+│  │   ├── arc-recalling/         # Manual instinct creation                              │
+│  │   ├── arc-compacting/        # Strategic compaction timing                           │
+│  │   ├── arc-evaluating/        # Skill/workflow evaluation                             │
+│  │   ├── arc-looping/           # Autonomous loop execution                             │
+│  │   ├── arc-managing-sessions/ # Session save/resume                                   │
+│  │   └── arc-researching/       # Hypothesis-driven experimentation                     │
 │  │                                                                                          │
 │  ├── templates/                   # Subagent prompt templates                               │
 │  │   ├── implementer-prompt.md    # TDD implementer subagent                                │
 │  │   ├── spec-reviewer-prompt.md  # Spec compliance reviewer                                │
 │  │   └── quality-reviewer-prompt.md  # Code quality reviewer                                │
 │  │                                                                                          │
-│  ├── agents/                      # Persistent agent definitions                            │
-│  │   └── code-reviewer.md         # Code review agent                                       │
+│  ├── agents/                      # Persistent agent definitions (10 agents)                │
+│  │   ├── code-reviewer.md         # Code review agent                                       │
+│  │   ├── debugger.md              # Debugging specialist                                    │
+│  │   ├── eval-comparator.md       # A/B eval comparison                                     │
+│  │   ├── eval-grader.md           # Rubric-based eval grading                               │
+│  │   ├── implementer.md           # TDD implementer                                         │
+│  │   ├── loop-operator.md         # Loop health monitoring                                  │
+│  │   ├── planner.md               # Architecture analysis                                   │
+│  │   ├── quality-reviewer.md      # Code quality review                                     │
+│  │   ├── spec-reviewer.md         # Spec compliance review                                  │
+│  │   └── verifier.md              # Acceptance criteria verification                        │
 │  │                                                                                          │
 │  ├── docs/                        # Documentation                                           │
 │  │   ├── guide/                   # Architecture and workflow guides                        │
