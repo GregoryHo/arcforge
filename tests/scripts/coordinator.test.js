@@ -172,15 +172,128 @@ describe('Coordinator', () => {
       expect(coord.nextTask()).toBeNull();
     });
 
-    // TODO(human): Implement the priority ordering test
-    // This test should verify the 3-level priority:
-    //   1. In-progress features within in-progress epics (highest)
-    //   2. Ready (pending + deps met) features in in-progress epics
-    //   3. Ready epics (pending + all epic deps completed) (lowest)
-    //
-    // Build a DAG with all three levels present simultaneously
-    // and verify nextTask returns them in the correct order.
-    it('should follow 3-level priority ordering', () => {});
+    it('should follow 3-level priority ordering', () => {
+      // All three levels present: in-progress feature, ready feature, ready epic
+      const coord = createCoordinator({
+        epics: [
+          {
+            id: 'epic-1',
+            name: 'Active',
+            spec_path: 'docs/e1.md',
+            status: TaskStatus.IN_PROGRESS,
+            features: [
+              { id: 'feat-1a', name: 'InProgress', status: TaskStatus.IN_PROGRESS },
+              { id: 'feat-1b', name: 'Ready', status: TaskStatus.PENDING },
+            ],
+          },
+          {
+            id: 'epic-2',
+            name: 'Ready',
+            spec_path: 'docs/e2.md',
+            status: TaskStatus.PENDING,
+            depends_on: [],
+            features: [{ id: 'feat-2a', name: 'Waiting', status: TaskStatus.PENDING }],
+          },
+        ],
+      });
+      // Priority 1: in-progress feature
+      expect(coord.nextTask().id).toBe('feat-1a');
+    });
+
+    it('should return ready feature when no in-progress features', () => {
+      const coord = createCoordinator({
+        epics: [
+          {
+            id: 'epic-1',
+            name: 'Active',
+            spec_path: 'docs/e1.md',
+            status: TaskStatus.IN_PROGRESS,
+            features: [
+              { id: 'feat-1a', name: 'Done', status: TaskStatus.COMPLETED },
+              { id: 'feat-1b', name: 'Ready', status: TaskStatus.PENDING },
+            ],
+          },
+        ],
+      });
+      // Priority 2: ready feature in in-progress epic
+      expect(coord.nextTask().id).toBe('feat-1b');
+    });
+  });
+
+  describe('nextTask with epicId scoping', () => {
+    it('should return features only from the specified epic', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic2Status: TaskStatus.IN_PROGRESS,
+          epic2Features: [
+            { id: 'feat-2a', name: 'Plugin', status: TaskStatus.IN_PROGRESS },
+          ],
+        }),
+      );
+      // Without scope: returns feat-2a (in-progress has priority)
+      expect(coord.nextTask().id).toBe('feat-2a');
+      // With scope to epic-1: returns feat-1a (first pending in epic-1)
+      const result = coord.nextTask('epic-1');
+      expect(result).not.toBeNull();
+      expect(result.id).toBe('feat-1a');
+    });
+
+    it('should return null when scoped epic is completed', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.COMPLETED,
+          epic1Features: [
+            { id: 'feat-1a', name: 'Setup', status: TaskStatus.COMPLETED },
+            { id: 'feat-1b', name: 'Core', status: TaskStatus.COMPLETED },
+          ],
+        }),
+      );
+      // epic-1 completed, epic-2 has work, but we scoped to epic-1
+      expect(coord.nextTask('epic-1')).toBeNull();
+    });
+
+    it('should return null for nonexistent epic ID', () => {
+      const coord = createCoordinator(twoEpicDag());
+      expect(coord.nextTask('nonexistent')).toBeNull();
+    });
+
+    it('should maintain current behavior when epicId is null', () => {
+      const coord = createCoordinator(twoEpicDag());
+      // Same as calling nextTask() — returns first ready epic
+      const result = coord.nextTask(null);
+      expect(result).not.toBeNull();
+      expect(result.id).toBe('epic-1');
+    });
+  });
+
+  describe('parallelTasks with epicId scoping', () => {
+    it('should return only the specified epic when ready', () => {
+      const coord = createCoordinator(twoEpicDag());
+      const result = coord.parallelTasks('epic-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('epic-1');
+    });
+
+    it('should return empty when scoped epic is not ready', () => {
+      const coord = createCoordinator(twoEpicDag());
+      // epic-2 depends on epic-1 which is pending
+      const result = coord.parallelTasks('epic-2');
+      expect(result).toHaveLength(0);
+    });
+
+    it('should return empty when scoped epic is completed', () => {
+      const coord = createCoordinator(twoEpicDag({ epic1Status: TaskStatus.COMPLETED }));
+      const result = coord.parallelTasks('epic-1');
+      expect(result).toHaveLength(0);
+    });
+
+    it('should maintain current behavior when epicId is null', () => {
+      const coord = createCoordinator(twoEpicDag());
+      const result = coord.parallelTasks(null);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('epic-1');
+    });
   });
 
   describe('rebootContext', () => {

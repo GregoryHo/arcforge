@@ -132,9 +132,10 @@ COMMANDS:
       --json       Output schema as JSON
       --example    Show complete example
 
-  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N]
+  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>]
       Run autonomous cross-session execution loop.
       --pattern    Execution pattern: sequential (default) or dag
+      --epic       Scope loop to a single epic (auto-detected in worktrees)
       --max-runs   Maximum iterations (default: 50)
       --max-cost   Maximum cost in dollars (default: unlimited)
 
@@ -675,7 +676,8 @@ async function main() {
           process.exit(1);
         }
 
-        const loopOptions = { pattern, maxRuns, maxCost, projectRoot };
+        const epic = args.options.epic || null;
+        const loopOptions = { pattern, maxRuns, maxCost, epic, projectRoot };
         if (pattern === 'dag') {
           runDag(loopOptions);
         } else {

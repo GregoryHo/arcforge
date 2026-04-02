@@ -38,6 +38,7 @@ function parseLoopArgs(args) {
     pattern: 'sequential',
     maxRuns: 50,
     maxCost: null,
+    epic: null,
     projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   };
 
@@ -63,6 +64,9 @@ function parseLoopArgs(args) {
           console.error('Error: --max-cost must be a positive number');
           process.exit(1);
         }
+        break;
+      case '--epic':
+        options.epic = args[++i];
         break;
       case '--help':
       case '-h':
@@ -93,6 +97,7 @@ OPTIONS:
   --pattern sequential|dag   Execution pattern (default: sequential)
   --max-runs N               Maximum iterations (default: 50)
   --max-cost N               Maximum cost in dollars (default: unlimited)
+  --epic <id>                Scope loop to a single epic (safe for parallel loops)
   --help, -h                 Show this help
 
 PATTERNS:
@@ -106,6 +111,30 @@ STATE:
 MONITORING:
   Use the loop-operator agent to monitor a running loop.
 `);
+}
+
+/**
+ * Detect if running inside a worktree by checking for .arcforge-epic marker.
+ * @param {string} projectRoot - Current project root
+ * @returns {{ inWorktree: boolean, epicId: string|null, basePath: string|null }}
+ */
+function detectWorktree(projectRoot) {
+  const markerPath = path.join(projectRoot, '.arcforge-epic');
+  if (!fs.existsSync(markerPath)) {
+    return { inWorktree: false, epicId: null, basePath: null };
+  }
+  try {
+    const { parseDagYaml } = require('./lib/yaml-parser');
+    const content = fs.readFileSync(markerPath, 'utf8');
+    const data = parseDagYaml(content);
+    return {
+      inWorktree: true,
+      epicId: data.epic || null,
+      basePath: data.base_worktree || null,
+    };
+  } catch {
+    return { inWorktree: true, epicId: null, basePath: null };
+  }
 }
 
 /**
@@ -419,9 +448,15 @@ function finalizeLoop(state, maxRuns, projectRoot) {
  * @param {Object} options - Loop options
  */
 function runSequential(options) {
-  const { projectRoot, maxRuns, maxCost } = options;
+  const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
   state.pattern = 'sequential';
+
+  // Auto-detect epic scope from worktree if not explicitly set
+  const epicScope = epic || detectWorktree(projectRoot).epicId;
+  if (!epic && epicScope) {
+    console.log(`[loop] Detected worktree for epic ${epicScope} — auto-scoping`);
+  }
 
   console.log(`[loop] Starting sequential loop (max ${maxRuns} runs)`);
 
@@ -437,7 +472,7 @@ function runSequential(options) {
     const coord = tryCreateCoordinator(projectRoot, state);
     if (!coord) break;
 
-    const task = coord.nextTask();
+    const task = coord.nextTask(epicScope);
     if (!task) {
       console.log('[loop] All tasks complete!');
       state.status = 'complete';
@@ -463,9 +498,15 @@ function runSequential(options) {
  * @param {Object} options - Loop options
  */
 async function runDag(options) {
-  const { projectRoot, maxRuns, maxCost } = options;
+  const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
   state.pattern = 'dag';
+
+  // Auto-detect epic scope from worktree if not explicitly set
+  const epicScope = epic || detectWorktree(projectRoot).epicId;
+  if (!epic && epicScope) {
+    console.log(`[loop] Detected worktree for epic ${epicScope} — auto-scoping`);
+  }
 
   console.log(`[loop] Starting DAG loop (max ${maxRuns} runs)`);
 
@@ -482,7 +523,7 @@ async function runDag(options) {
     if (!coord) break;
 
     // Try parallel tasks first
-    const parallelEpics = coord.parallelTasks();
+    const parallelEpics = coord.parallelTasks(epicScope);
     if (parallelEpics.length > 1) {
       console.log(`[loop] Found ${parallelEpics.length} parallel epics — running concurrently`);
 
@@ -534,7 +575,7 @@ async function runDag(options) {
     }
 
     // Fall back to next task
-    const task = coord.nextTask();
+    const task = coord.nextTask(epicScope);
     if (!task) {
       console.log('[loop] All tasks complete!');
       state.status = 'complete';
@@ -603,6 +644,7 @@ module.exports = {
   isStalled,
   isRetryStorm,
   checkStopConditions,
+  detectWorktree,
   runSequential,
   runDag,
 };
