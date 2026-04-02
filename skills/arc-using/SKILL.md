@@ -67,6 +67,20 @@ Examples:
 - "Fix this bug" → arc-debugging (if cause unknown) or arc-tdd (if cause is clear)
 - "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists), arc-implementing (if in worktree)
 
+## Discipline Skills — Conditional Triggers
+
+These skills activate **during any workflow** when the condition is met. They are not pipeline steps — they fire cross-cutting based on what you are about to do.
+
+| Condition | Skill | Iron Law |
+|-----------|-------|----------|
+| About to write implementation code | `arc-tdd` | No production code without a failing test first |
+| Test fails or unexpected behavior | `arc-debugging` | No fixes without root cause investigation first |
+| About to claim work is complete | `arc-verifying` | No completion claims without fresh verification evidence |
+| Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
+| Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
+
+**The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
+
 ## Red Flags
 
 These patterns often lead to skipping useful skills. When you notice them, pause and

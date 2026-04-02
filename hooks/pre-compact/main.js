@@ -83,9 +83,8 @@ function getMarkdownFilePath(project, date, sessionId) {
  */
 function main() {
   try {
-    // Read and pass through stdin
-    const stdin = readStdinSync();
-    process.stdout.write(stdin);
+    // Read stdin (required by hook protocol, but we don't modify the transcript)
+    readStdinSync();
 
     const project = getProjectName();
     const date = getDateString();

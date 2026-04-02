@@ -30,6 +30,20 @@ Epics run in `.worktrees/`, tracked via `.arcforge-epic` marker file. Each workt
 
 `scripts/lib/` is canonical. `hooks/lib/` re-exports from it to prevent drift. Never duplicate logic — import from the canonical location.
 
+## Skill Routing & Composition
+
+`arc-using` is the **routing layer** — injected at session start, always in context. It contains the 1% rule: "If there's even a 1% chance a skill applies, invoke it."
+
+Skills compose in two ways depending on type:
+
+| Skill Type | Composition | Mechanism |
+|------------|-------------|-----------|
+| Workflow | Sequential handoff | Each skill's "After This Skill" section defines next step |
+| Discipline | Conditional routing | `arc-using` routing table maps conditions → skills |
+| Meta | Direct invocation | User or system triggers as needed |
+
+Discipline skills (arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review) are quality gates that fire cross-cutting during any workflow. They MUST be registered in `arc-using`'s routing table to be reliably triggered.
+
 ## Multi-Platform
 
 | Scope | Components |

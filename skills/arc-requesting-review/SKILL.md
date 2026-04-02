@@ -67,6 +67,13 @@ Minor: Magic number for reporting interval
 [Fix Important, note Minor, then continue]
 ```
 
+## After This Skill
+
+When reviewer feedback arrives:
+1. Use `arc-receiving-review` to process feedback with technical rigor
+2. After all feedback addressed → re-review until approved
+3. Once approved → `arc-verifying` → `arc-finishing` / `arc-finishing-epic`
+
 ## Integration
 
 - **Called by:** arc-agent-driven (per task)

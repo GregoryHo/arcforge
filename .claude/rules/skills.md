@@ -23,6 +23,27 @@ paths:
 - `description`: must start with "Use when..." — triggers only, NOT workflow summary
 - Never summarize the skill's workflow in the description — Claude may follow description instead of reading full skill
 
+## Skill Types
+
+Every skill belongs to one of three types. The type determines how it gets triggered and how it composes with other skills.
+
+| Type | Trigger Mechanism | Composition | Example |
+|------|-------------------|-------------|---------|
+| **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
+| **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
+| **Meta** | Independent — user or system invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
+
+### When Creating a New Skill
+
+1. **Determine its type** — Is it a pipeline step (Workflow), a cross-cutting quality gate (Discipline), or a system management tool (Meta)?
+2. **Workflow skills** MUST have an "After This Skill" section with explicit next-step guidance
+3. **Discipline skills** MUST be added to `arc-using`'s "Discipline Skills — Conditional Triggers" table
+4. **Meta skills** need no routing — they are invoked directly when needed
+
+### Why This Matters
+
+Discipline skills without routing entries will never be triggered — they become dead documentation. Workflow skills without handoff sections create dead-ends in autonomous mode.
+
 ## Iron Law
 
 ```

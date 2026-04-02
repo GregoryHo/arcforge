@@ -155,6 +155,7 @@ function spawnDiaryEnricher(draftPath, session) {
         '--max-turns',
         '2',
         '--print',
+        '--dangerously-skip-permissions',
         '--system-prompt',
         systemPrompt,
         '--tools',

@@ -157,6 +157,6 @@ node scripts/cli.js loop --max-cost 10 --max-runs 100
 - **arc-evaluating** — can run evals between loop iterations
 - **arc-compacting** — not needed (each iteration is a fresh session)
 
-**After loop completes:**
-- **arc-finishing** or **arc-finishing-epic** — wrap up and decide merge/PR
-- **arc-verifying** — verify the complete implementation
+**After loop completes (in order):**
+1. **arc-verifying** — verify all requirements met and tests pass
+2. **arc-finishing** or **arc-finishing-epic** — wrap up and decide merge/PR
