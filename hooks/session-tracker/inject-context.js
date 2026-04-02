@@ -108,8 +108,16 @@ function loadPendingActions(project) {
     const lines = [];
     const summaryParts = [];
 
+    const diaryActions = actions.filter((a) => a.type === 'diary-ready');
     const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
-    const otherActions = actions.filter((a) => a.type !== 'reflect-ready');
+    const otherActions = actions.filter(
+      (a) => a.type !== 'reflect-ready' && a.type !== 'diary-ready',
+    );
+
+    if (diaryActions.length > 0) {
+      lines.push('**📝 Diary draft ready — use /diary to review and finalize.**');
+      summaryParts.push('diary draft ready');
+    }
 
     if (reflectActions.length > 0) {
       const latest = reflectActions[reflectActions.length - 1];

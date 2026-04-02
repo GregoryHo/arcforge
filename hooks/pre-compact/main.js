@@ -23,7 +23,6 @@ const {
   readFileSafe,
   writeFileSafe,
   createSessionCounter,
-  output,
   log,
   readStdinSync,
   loadSession,
@@ -35,6 +34,7 @@ const {
 } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { generateMarkdownSummary } = require('../session-tracker/summary');
+const { addPendingAction } = require('../../scripts/lib/pending-actions');
 
 /**
  * Record compaction event to log file
@@ -129,17 +129,20 @@ function main() {
         // Non-blocking — draft generation is best-effort
       }
 
-      output({
-        systemMessage: `Context compaction detected. (${userCount} messages, ${toolCount} tool calls)\nA diary draft has been generated. Please use /diary skill to review and finalize it before context is compacted.`,
+      // Queue notification for next SessionStart (PreCompact stdout doesn't render systemMessage)
+      addPendingAction(project, 'diary-ready', {
+        trigger: 'compaction',
+        userMessages: userCount,
+        toolCalls: toolCount,
       });
 
       // Reset counters after threshold is met
       resetUserCounter();
       createSessionCounter('tool-count').reset();
+
+      log(`[pre-compact] Diary draft generated (${userCount} msgs, ${toolCount} tools). Queued diary-ready action.`);
     } else {
-      output({
-        systemMessage: `📝 Context compaction. (${userCount} messages, ${toolCount} tool calls)\n   Below threshold - counters preserved.`,
-      });
+      log(`[pre-compact] Below threshold (${userCount} msgs, ${toolCount} tools). Counters preserved.`);
     }
   } catch (e) {
     // Never block compaction

@@ -61,11 +61,13 @@ Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
 | Mechanism | Audience | Visible? | Use for |
 |-----------|----------|----------|---------|
 | `stderr` (`log()`, `console.error()`) | **Nobody** | **NO** — condensed into "N hooks ran", invisible even in Ctrl+O | Internal diagnostics only |
-| `stdout` `{"systemMessage": "..."}` | **User (always)** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings, notifications |
+| `stdout` `{"systemMessage": "..."}` | **User** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings, notifications |
 | `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | YES — injected into context | Context injection (SessionStart, UserPromptSubmit only) |
 | Exit code 2 | Claude Code engine | N/A — blocks action | Blocking hooks only (PreToolUse, UserPromptSubmit, Stop) |
 
 **CRITICAL**: `stderr` is **invisible** in all events (verified: PostToolUse, Stop). Claude Code condenses it regardless of hook count. Do NOT use stderr for anything the user needs to see.
+
+**PreCompact exception**: PreCompact stdout is reserved for transcript modification. `systemMessage` JSON is displayed as raw text in the status line, NOT rendered as a user-facing message. For user-visible notifications from PreCompact, use `addPendingAction()` — the next `SessionStart(source: "compact")` will pick it up via inject-context.js.
 
 **Rules:**
 - User-visible message → `output({ systemMessage: "..." })` (only mechanism that works)
