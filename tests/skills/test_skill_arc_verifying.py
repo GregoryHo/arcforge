@@ -51,8 +51,8 @@ def test_arc_verifying_contains_required_sections():
     # Must have rationalization prevention
     assert "Rationalization Prevention" in text
 
-    # Must be a mindset, not a procedure
-    assert "MINDSET" in text
+    # Must document integration with routing table
+    assert "arc-using" in text
 
     # Must have key patterns with correct/incorrect examples
     assert "Key Patterns" in text

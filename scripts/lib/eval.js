@@ -194,7 +194,7 @@ function listScenarios(projectRoot) {
  */
 function findScenario(name, projectRoot) {
   for (const f of listScenarios(projectRoot)) {
-    const s = parseScenario(f);
+    const s = parseScenario(f, projectRoot);
     if (s.name === name) return s;
   }
   return undefined;
@@ -498,7 +498,10 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       `IMPORTANT: You are running in an isolated eval trial. Your working directory is ${trialDir}. Do NOT read, search, or access any files outside this directory. All files you need are already in the working directory.`,
     );
   }
-  if (pluginDir) claudeArgs.push('--plugin-dir', pluginDir);
+  if (pluginDir) {
+    claudeArgs.push('--plugin-dir', path.resolve(pluginDir));
+    claudeArgs.push('--dangerously-skip-permissions');
+  }
 
   // Resolve max-turns: CLI > scenario > pluginDir default (10)
   const resolvedMaxTurns = resolveMaxTurns({
@@ -510,14 +513,28 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   if (model) claudeArgs.push('--model', model);
 
+  // Debug: log command for troubleshooting
+  if (process.env.EVAL_DEBUG) {
+    console.error(`[eval-debug] cwd: ${trialDir}`);
+    console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
+    console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
+  }
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
     cwd: trialDir,
     timeout: 300000,
+    maxBuffer: 50 * 1024 * 1024, // 50MB — plugin verbose output can be large
   });
+  if (process.env.EVAL_DEBUG) {
+    console.error(`[eval-debug] exitCode: ${result.exitCode}`);
+    console.error(`[eval-debug] stdout length: ${(result.stdout || '').length}`);
+    console.error(`[eval-debug] stderr: ${(result.stderr || '').slice(0, 300)}`);
+  }
 
   const evalName = label ? `${scenario.name}-${label}` : scenario.name;
-  const rawOutput = result.exitCode === 0 ? result.stdout : result.stderr || '';
+  // With stream-json, stdout may contain valid tool-use data even on non-zero exit
+  // (e.g., max-turns reached). Try stdout first, fall back to stderr.
+  const rawOutput = result.stdout || result.stderr || '';
   const { textResult, richTranscript } = parseStreamJsonOutput(rawOutput);
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
@@ -538,7 +555,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     ...(model ? { model } : {}),
     ...(runId ? { runId } : {}),
   };
-  if (result.exitCode !== 0) {
+  if (result.exitCode !== 0 && !parsedOutput) {
+    // Only treat as error if no usable output was captured
     return { ...base, error: result.stderr };
   }
 

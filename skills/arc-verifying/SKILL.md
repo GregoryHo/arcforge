@@ -156,22 +156,13 @@ digraph cannot_verify {
 ❌ "Tests pass, phase complete"
 ```
 
-## IMPORTANT: This is a MINDSET, not a procedure
-
-You do NOT invoke arc-verifying as a separate skill. Instead:
-
-- **arc-implementing** embeds verification (TDD's GREEN must actually run tests)
-- **arc-finishing** embeds verification (verify tests BEFORE offering merge options)
-- **arc-finishing-epic** embeds verification (verify tests BEFORE offering merge options)
-- **Spec reviewer** embeds verification (read actual code, don't trust reports)
-- **Quality reviewer** embeds verification (run tests, check output)
-
-Each skill executes its own verification. This skill just defines the mindset.
-
 ## Integration
 
-All arcforge skills should adopt this mindset:
-- Never claim without evidence
-- Run fresh verification commands
-- Show actual output
-- Be honest about failures
+**Called by:** `arc-using` routing table — triggers when about to claim work is complete.
+
+**Also embedded in:**
+- **arc-finishing** / **arc-finishing-epic** — verify tests before offering merge options
+- **arc-tdd** — Verify RED / Verify GREEN steps
+- **Spec reviewer** / **Quality reviewer** — read actual code, run tests
+
+Invoke this skill explicitly before finishing. Embedded verification in other skills is an additional layer, not a replacement.
