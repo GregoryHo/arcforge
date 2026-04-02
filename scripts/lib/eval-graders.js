@@ -760,6 +760,11 @@ function gradeWithMixed(result, scenario, projectRoot, actionLog) {
   const textScenario = { ...scenario, assertions: text.map((t) => t.assertion) };
   const textResult = gradeWithModel(result, textScenario, projectRoot);
 
+  // Propagate model grader errors instead of silently scoring 0
+  if (textResult.gradeError) {
+    return { ...result, ...textResult, grader: 'mixed' };
+  }
+
   // Binarize model scores: >= 0.8 → 1, < 0.8 → 0
   const rawModelScores = textResult.assertionScores || [];
   const modelScores = rawModelScores.map((s) => (s >= 0.8 ? 1 : 0));
