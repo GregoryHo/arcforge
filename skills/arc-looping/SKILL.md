@@ -66,6 +66,19 @@ node scripts/loop.js --pattern dag --max-runs 20
 3. **Choose pattern** — sequential for safety, DAG for throughput
 4. **Set limits** — `--max-runs` and `--max-cost` to bound execution
 
+### Worktree Awareness
+
+**Run loops from the project root**, not from inside a worktree.
+
+If you are in a worktree (`.arcforge-epic` exists), the loop auto-detects the epic and scopes to it. But running from project root with `--pattern dag` is the correct approach for multi-epic execution — it handles parallelism internally via `parallelTasks()`.
+
+**Never run separate loops in separate worktrees.** Each worktree has its own `dag.yaml` copy — multiple loops will pick up the same tasks and do duplicate work.
+
+For scoped single-epic execution, use `--epic`:
+```bash
+node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
+```
+
 ### During Execution
 
 Each iteration:
@@ -131,6 +144,9 @@ node scripts/cli.js loop --pattern dag --max-runs 50
 
 # With cost limit
 node scripts/cli.js loop --max-cost 10 --max-runs 100
+
+# Scoped to one epic (safe for parallel execution)
+node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
 ```
 
 ## Red Flags
@@ -140,6 +156,7 @@ node scripts/cli.js loop --max-cost 10 --max-runs 100
 - Run loops without `--max-runs` on unfamiliar projects
 - Ignore stall detection — it means something is fundamentally wrong
 - Skip monitoring for loops > 10 iterations
+- Run separate loops in separate worktrees — causes duplicate work
 
 **If loop is failing:**
 1. Check `.arcforge-loop.json` errors — are they the same error repeating?
