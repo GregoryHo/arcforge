@@ -10,13 +10,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const {
-  execCommand,
-  ensureDir,
-  getTimestamp,
-  sanitizeFilename,
-  generateRunId,
-} = require('./utils');
+const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
 
@@ -52,6 +46,7 @@ const graders = require('./eval-graders');
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
+ * @property {Array<{type: string, name?: string, args?: string, content?: string, index: number}>} [actions] - Parsed actions from transcript
  */
 
 const EVALS_DIR = 'evals';
@@ -84,11 +79,27 @@ function parseEvalName(evalName) {
 }
 
 /**
+ * Resolve max-turns with priority: CLI > scenario > pluginDir default (10) > undefined.
+ * @param {Object} opts
+ * @param {number} [opts.maxTurns] - CLI-specified max turns
+ * @param {number} [opts.scenarioMaxTurns] - Scenario ## Max Turns value
+ * @param {string} [opts.pluginDir] - Plugin dir (triggers default of 10)
+ * @returns {number|undefined} Resolved max turns, or undefined if none applies
+ */
+function resolveMaxTurns(opts = {}) {
+  if (opts.maxTurns != null) return opts.maxTurns;
+  if (opts.scenarioMaxTurns != null) return opts.scenarioMaxTurns;
+  if (opts.pluginDir) return 10;
+  return undefined;
+}
+
+/**
  * Parse an eval scenario from a markdown file
  * @param {string} filePath - Path to scenario markdown file
+ * @param {string} [projectRoot] - Project root for ${PROJECT_ROOT} expansion
  * @returns {EvalScenario} Parsed scenario
  */
-function parseScenario(filePath) {
+function parseScenario(filePath, projectRoot) {
   const content = fs.readFileSync(filePath, 'utf8');
   const sections = {};
   let currentSection = null;
@@ -129,6 +140,19 @@ function parseScenario(filePath) {
   const version = section('version');
   const target = section('target');
 
+  // Plugin Dir: resolve ${PROJECT_ROOT} or use absolute path
+  const pluginDirRaw = section('plugin dir');
+  let pluginDir;
+  if (pluginDirRaw) {
+    pluginDir = projectRoot
+      ? pluginDirRaw.replace(/\$\{PROJECT_ROOT\}/g, projectRoot)
+      : pluginDirRaw;
+  }
+
+  // Max Turns: parse as integer
+  const maxTurnsRaw = section('max turns');
+  const maxTurns = maxTurnsRaw ? parseInt(maxTurnsRaw, 10) : undefined;
+
   return {
     name,
     scope: section('scope') || 'skill',
@@ -141,6 +165,8 @@ function parseScenario(filePath) {
     ...(target ? { target } : {}),
     ...(trials && !Number.isNaN(trials) ? { trials } : {}),
     ...(version ? { version } : {}),
+    ...(pluginDir ? { pluginDir } : {}),
+    ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
 }
 
@@ -272,6 +298,31 @@ function buildIsolationSettings() {
 }
 
 /**
+ * Build semi-isolation settings for plugin-dir mode.
+ * Disables all installed plugins and auto-memory but does NOT exclude CLAUDE.md files
+ * (unlike full isolation). This allows the plugin under test to access project context.
+ * @returns {string} JSON string for .claude/settings.json
+ */
+function buildPluginDirSettings() {
+  const baseSettings = {
+    autoMemoryEnabled: false,
+  };
+  try {
+    const { stdout, exitCode } = execCommand('claude', ['plugin', 'list', '--json'], {
+      timeout: 10000,
+    });
+    if (exitCode !== 0 || !stdout) return JSON.stringify(baseSettings);
+    const plugins = JSON.parse(stdout);
+    if (!Array.isArray(plugins)) return JSON.stringify(baseSettings);
+    const disabled = {};
+    for (const p of plugins) disabled[p.id] = false;
+    return JSON.stringify({ ...baseSettings, enabledPlugins: disabled });
+  } catch {
+    return JSON.stringify(baseSettings);
+  }
+}
+
+/**
  * Parse stream-json output from `claude -p --output-format stream-json --verbose`.
  * Extracts assistant messages with tool calls to build a rich transcript
  * showing the full conversation flow (text + tool use in order).
@@ -308,6 +359,33 @@ function parseStreamJsonOutput(rawOutput) {
   }
 
   return { textResult, richTranscript: parts.join('\n\n') };
+}
+
+/**
+ * Parse a rich transcript into structured Action objects.
+ * Rich transcripts are produced by parseStreamJsonOutput() and contain
+ * blocks like "[Tool: Bash] $ ls" and "[Assistant] some text" separated
+ * by double newlines.
+ * @param {string} richTranscript - Rich transcript text
+ * @returns {Array<{type: string, name?: string, args?: string, content?: string, index: number}>}
+ */
+function parseActionsFromTranscript(richTranscript) {
+  if (!richTranscript) return [];
+  const blocks = richTranscript.split('\n\n').filter((b) => b.trim());
+  const actions = [];
+  for (const block of blocks) {
+    const toolMatch = block.match(/^\[Tool: ([^\]]+)\]\s*(.*)/);
+    if (toolMatch) {
+      const firstLine = toolMatch[2].split('\n')[0];
+      actions.push({ type: 'tool', name: toolMatch[1], args: firstLine, index: actions.length });
+      continue;
+    }
+    const textMatch = block.match(/^\[Assistant\]\s*([\s\S]*)/);
+    if (textMatch) {
+      actions.push({ type: 'text', content: textMatch[1].trim(), index: actions.length });
+    }
+  }
+  return actions;
 }
 
 /**
@@ -355,6 +433,8 @@ function summarizeToolInput(toolName, input) {
  * @param {string} [options.projectRoot] - Project root (for transcript storage + code grading)
  * @param {string} [options.isolationSettings] - Cached isolation settings JSON
  * @param {boolean} [options.isolated=true] - Whether to disable plugins and MCP
+ * @param {string} [options.pluginDir] - Plugin directory for semi-isolated mode
+ * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -365,13 +445,41 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     isolated = true,
     model,
     runId,
+    pluginDir,
+    maxTurns,
   } = options;
   const timestamp = getTimestamp();
+
+  // Validate pluginDir exists before running trial
+  if (pluginDir && !fs.existsSync(pluginDir)) {
+    const evalName = label ? `${scenario.name}-${label}` : scenario.name;
+    return {
+      eval: evalName,
+      trial: trialNumber,
+      k: totalTrials,
+      passed: false,
+      grader: scenario.grader,
+      score: 0,
+      timestamp,
+      error: `Plugin dir does not exist: ${pluginDir}`,
+      infraError: true,
+      ...(model ? { model } : {}),
+      ...(runId ? { runId } : {}),
+    };
+  }
 
   // Always run in trial dir for workspace safety
   const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
   if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
-  if (isolated) writeIsolationSettings(trialDir, isolationSettings);
+
+  // Isolation mode: full isolation uses writeIsolationSettings,
+  // pluginDir uses buildPluginDirSettings (semi-isolation, no claudeMdExcludes)
+  if (pluginDir) {
+    const semiSettings = isolationSettings || buildPluginDirSettings();
+    writeIsolationSettings(trialDir, semiSettings);
+  } else if (isolated) {
+    writeIsolationSettings(trialDir, isolationSettings);
+  }
 
   const prompt = buildTrialPrompt(scenario);
 
@@ -383,13 +491,23 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     '--no-session-persistence',
     '--disable-slash-commands',
   ];
-  if (isolated) {
+  if (isolated && !pluginDir) {
     claudeArgs.push('--strict-mcp-config');
     claudeArgs.push(
       '--append-system-prompt',
       `IMPORTANT: You are running in an isolated eval trial. Your working directory is ${trialDir}. Do NOT read, search, or access any files outside this directory. All files you need are already in the working directory.`,
     );
   }
+  if (pluginDir) claudeArgs.push('--plugin-dir', pluginDir);
+
+  // Resolve max-turns: CLI > scenario > pluginDir default (10)
+  const resolvedMaxTurns = resolveMaxTurns({
+    maxTurns,
+    scenarioMaxTurns: scenario.maxTurns,
+    pluginDir,
+  });
+  if (resolvedMaxTurns != null) claudeArgs.push('--max-turns', String(resolvedMaxTurns));
+
   if (model) claudeArgs.push('--model', model);
 
   const result = execCommand('claude', claudeArgs, {
@@ -404,6 +522,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
   const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
+  const actions = parseActionsFromTranscript(richTranscript);
 
   const base = {
     eval: evalName,
@@ -415,6 +534,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     timestamp,
     transcript,
     trialDir,
+    ...(actions.length > 0 ? { actions } : {}),
     ...(model ? { model } : {}),
     ...(runId ? { runId } : {}),
   };
@@ -568,9 +688,9 @@ function runSkillEval(scenario, k, options = {}) {
 }
 
 /**
- * Run a workflow eval as A/B comparison: isolated baseline vs non-isolated treatment.
- * Both conditions use identical prompts; the treatment differs by having the full
- * arcforge toolkit available (plugins, MCP, skills, hooks).
+ * Run a workflow eval as A/B comparison: isolated baseline vs semi-isolated/non-isolated treatment.
+ * Baseline always runs fully isolated. Treatment uses semi-isolated mode with --plugin-dir
+ * when the scenario has a pluginDir field; otherwise falls back to non-isolated mode.
  * @param {EvalScenario} scenario - Scenario with scope='workflow'
  * @param {number} k - Number of trials per condition
  * @param {Object} options - Run options
@@ -598,7 +718,21 @@ function runWorkflowEval(scenario, k, options = {}) {
     model,
     runId,
   };
-  const tOpts = { projectRoot, label: 'treatment', onTrialComplete, isolated: false, model, runId };
+
+  // Treatment: use semi-isolated + plugin-dir when scenario has pluginDir,
+  // otherwise fall back to existing non-isolated behavior
+  const tOpts = scenario.pluginDir
+    ? {
+        projectRoot,
+        label: 'treatment',
+        onTrialComplete,
+        pluginDir: scenario.pluginDir,
+        maxTurns: scenario.maxTurns,
+        isolated: false,
+        model,
+        runId,
+      }
+    : { projectRoot, label: 'treatment', onTrialComplete, isolated: false, model, runId };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }
 
@@ -873,7 +1007,10 @@ module.exports = {
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
+  buildPluginDirSettings,
   parseStreamJsonOutput,
+  parseActionsFromTranscript,
+  resolveMaxTurns,
   runTrial,
   buildTrialPrompt,
   executeAndGradeTrial,
