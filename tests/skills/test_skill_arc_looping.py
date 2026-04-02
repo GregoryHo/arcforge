@@ -27,7 +27,7 @@ def test_arc_looping_frontmatter():
     front = _parse_frontmatter(text)
 
     assert front.get("name") == "arc-looping"
-    assert front.get("description", "").startswith("Guide for")
+    assert front.get("description", "").startswith("Use when")
     assert len((front.get("name", "") + front.get("description", ""))) < 1024
 
     # No @ symbols in skill content
@@ -80,3 +80,21 @@ def test_arc_looping_references_related_skills():
 
     # Must reference finishing skills
     assert "arc-finishing" in text
+
+
+def test_arc_looping_has_worktree_awareness():
+    """Test skill documents worktree interaction and --epic scoping."""
+    text = _read_skill()
+
+    # Must mention worktree awareness
+    assert "worktree" in text.lower()
+    assert ".arcforge-epic" in text
+
+    # Must mention --epic flag
+    assert "--epic" in text
+
+    # Must mention running from project root
+    assert "project root" in text.lower()
+
+    # Must warn against separate loops in separate worktrees
+    assert "duplicate" in text.lower() or "separate loops" in text.lower()

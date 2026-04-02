@@ -140,7 +140,9 @@ Task 2: Add sync CLI command
 [Dispatch final code reviewer for entire implementation]
 Final reviewer: All requirements met, architecture solid
 
-Done! Use arc-finishing-epic to decide merge/PR/keep/discard
+Done! Completion pipeline:
+1. Run arc-verifying — confirm all requirements met and tests pass
+2. Use arc-finishing (regular branch) or arc-finishing-epic (worktree) to decide merge/PR/keep/discard
 ```
 
 ## Available Agents

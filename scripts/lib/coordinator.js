@@ -82,11 +82,12 @@ class Coordinator {
    * Priority: in-progress feature > ready feature > ready epic
    * @returns {Feature|Epic|null} The next task or null
    */
-  nextTask() {
+  nextTask(epicId = null) {
     const completedEpics = this.dag.getCompletedEpics();
+    const epics = epicId ? this.dag.epics.filter((e) => e.id === epicId) : this.dag.epics;
 
     // First, check for in-progress features
-    for (const epic of this.dag.epics) {
+    for (const epic of epics) {
       if (epic.status === TaskStatus.IN_PROGRESS) {
         for (const feature of epic.features) {
           if (feature.status === TaskStatus.IN_PROGRESS) {
@@ -97,7 +98,7 @@ class Coordinator {
     }
 
     // Second, check for ready features in in-progress epics
-    for (const epic of this.dag.epics) {
+    for (const epic of epics) {
       if (epic.status === TaskStatus.IN_PROGRESS) {
         const completedFeatures = this.dag.getCompletedFeatures(epic.id);
         for (const feature of epic.features) {
@@ -109,7 +110,7 @@ class Coordinator {
     }
 
     // Third, check for ready epics
-    for (const epic of this.dag.epics) {
+    for (const epic of epics) {
       if (epic.status === TaskStatus.PENDING && epic.isReady(completedEpics)) {
         return epic;
       }
@@ -120,12 +121,16 @@ class Coordinator {
 
   /**
    * Get all epics that can be worked on in parallel
+   * @param {string|null} [epicId=null] - If set, only consider this epic
    * @returns {Epic[]} List of ready epics
    */
-  parallelTasks() {
+  parallelTasks(epicId = null) {
     const completedEpics = this.dag.getCompletedEpics();
     return this.dag.epics.filter(
-      (epic) => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics),
+      (epic) =>
+        epic.status === TaskStatus.PENDING &&
+        epic.isReady(completedEpics) &&
+        (epicId === null || epic.id === epicId),
     );
   }
 
@@ -488,6 +493,35 @@ class Coordinator {
       }
       return this._syncBase();
     }
+  }
+
+  /**
+   * Pull epic statuses from the base DAG into the local dag.yaml.
+   * No-op when not in a worktree or when base is unreachable.
+   * @returns {boolean} Whether any statuses were updated
+   */
+  syncEpicStatusesFromBase() {
+    if (!this._isInWorktree()) return false;
+
+    const basePath = this._findBaseWorktree();
+    if (!basePath) return false;
+
+    const baseCoord = new Coordinator(basePath);
+    let updated = false;
+
+    for (const localEpic of this.dag.epics) {
+      const baseEpic = baseCoord.dag.getEpic(localEpic.id);
+      if (baseEpic && baseEpic.status !== localEpic.status) {
+        localEpic.status = baseEpic.status;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      this._saveDag();
+    }
+
+    return updated;
   }
 
   _syncWorktree(direction) {

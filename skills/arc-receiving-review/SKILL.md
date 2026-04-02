@@ -66,6 +66,18 @@ IF reviewer suggests "implementing properly":
   grep codebase for actual usage
   IF unused: "This isn't called. Remove it (YAGNI)?"
 
+## After This Skill
+
+When all feedback items are implemented and tested:
+
+**Autonomous mode (agent-driven / looping):**
+1. Request re-review via `arc-requesting-review` — loop until reviewer approves
+2. Once approved → run `arc-verifying` to confirm all requirements and tests pass
+3. Then use `arc-finishing` (regular branch) or `arc-finishing-epic` (worktree with `.arcforge-epic`)
+
+**Manual mode (human-in-loop):**
+- Signal completion to user — they decide whether to re-review, verify, or finish
+
 ## Integration
 
 - **Called by:** arc-agent-driven, arc-requesting-review

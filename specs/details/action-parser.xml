@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="action-parser">
+  <title>Transcript Action Parser</title>
+  <file>scripts/lib/eval.js</file>
+
+  <requirement id="fr-ap-001">
+    <title>Parse Rich Transcript Into Action Log</title>
+    <description>
+      parseActionsFromTranscript(richTranscript) parses [Tool: Name] args
+      and [Assistant] text patterns into a structured action array.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ap-001-ac1">
+        Given a transcript with "[Tool: Skill] arc-verifying", parser returns
+        { type: 'tool', name: 'Skill', args: 'arc-verifying', index: N }.
+        <trace>REQ-F001</trace>
+      </criterion>
+      <criterion id="fr-ap-001-ac2">
+        Given a transcript with "[Assistant] some text", parser returns
+        { type: 'text', content: 'some text', index: N }.
+        <trace>REQ-F001</trace>
+      </criterion>
+      <criterion id="fr-ap-001-ac3">
+        For multi-line tool output (e.g., [Tool: Write] followed by file content),
+        parser takes only the first line as args and skips subsequent lines until
+        the next [Tool:] or [Assistant] marker.
+        <trace>REQ-F001</trace>
+      </criterion>
+      <criterion id="fr-ap-001-ac4">
+        Index is 0-based, monotonically increasing across all entries.
+        <trace>REQ-F001</trace>
+      </criterion>
+      <criterion id="fr-ap-001-ac5">
+        Empty transcript returns empty array.
+        <trace>REQ-F001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-ap-002">
+    <title>Action Log Stored In Trial Result</title>
+    <description>
+      Trial results include an actions field parsed from the transcript.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ap-002-ac1">
+        TrialResult object includes actions: Action[] field after running a trial.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-ap-002-ac2">
+        Existing trial results without actions field remain valid (no breakage).
+        <trace>REQ-N002</trace>
+      </criterion>
+      <criterion id="fr-ap-002-ac3">
+        Actions field is persisted in JSONL results file.
+        <trace>REQ-F005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

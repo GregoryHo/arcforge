@@ -1,4 +1,10 @@
-const { isStalled, isRetryStorm, checkStopConditions } = require('../../scripts/loop');
+const {
+  isStalled,
+  isRetryStorm,
+  checkStopConditions,
+  parseLoopArgs,
+  detectWorktree,
+} = require('../../scripts/loop');
 
 /**
  * Helper: build a minimal loop state with sensible defaults.
@@ -272,5 +278,66 @@ describe('loop safety mechanisms', () => {
       // Both stalled (iteration 5, no progress) and retry storm
       expect(checkStopConditions(state, null)).toBe('stalled');
     });
+  });
+});
+
+describe('parseLoopArgs', () => {
+  it('should parse --epic flag', () => {
+    const result = parseLoopArgs(['--pattern', 'sequential', '--epic', 'epic-001']);
+    expect(result.epic).toBe('epic-001');
+    expect(result.pattern).toBe('sequential');
+  });
+
+  it('should default epic to null when not specified', () => {
+    const result = parseLoopArgs(['--pattern', 'dag']);
+    expect(result.epic).toBeNull();
+  });
+
+  it('should parse --epic with other flags', () => {
+    const result = parseLoopArgs(['--epic', 'my-epic', '--max-runs', '10', '--max-cost', '5']);
+    expect(result.epic).toBe('my-epic');
+    expect(result.maxRuns).toBe(10);
+    expect(result.maxCost).toBe(5);
+  });
+});
+
+describe('detectWorktree', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loop-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should detect worktree when .arcforge-epic exists', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.arcforge-epic'),
+      'epic: eval-core\nbase_worktree: /project/root\n',
+    );
+    const result = detectWorktree(tmpDir);
+    expect(result.inWorktree).toBe(true);
+    expect(result.epicId).toBe('eval-core');
+    expect(result.basePath).toBe('/project/root');
+  });
+
+  it('should return inWorktree false when no marker file', () => {
+    const result = detectWorktree(tmpDir);
+    expect(result.inWorktree).toBe(false);
+    expect(result.epicId).toBeNull();
+    expect(result.basePath).toBeNull();
+  });
+
+  it('should handle malformed marker file gracefully', () => {
+    fs.writeFileSync(path.join(tmpDir, '.arcforge-epic'), 'garbage content');
+    const result = detectWorktree(tmpDir);
+    expect(result.inWorktree).toBe(true);
+    expect(result.epicId).toBeNull();
   });
 });

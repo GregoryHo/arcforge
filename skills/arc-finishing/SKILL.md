@@ -168,6 +168,54 @@ git worktree remove <worktree-path>
 | 3. Keep as-is | - | - | ✓ | - |
 | 4. Discard | - | - | - | ✓ (force) |
 
+## Completion Format
+
+### If Merged (Option 1)
+
+```
+Branch merged → <base-branch>
+
+Branch: <feature-branch> (deleted)
+Worktree: <path> (removed if applicable)
+Commits: [N commits merged]
+
+Next: Start next task, or check project status
+```
+
+### If PR Created (Option 2)
+
+```
+Pull request created → #<PR-number>
+
+URL: <PR-URL>
+Branch: <feature-branch>
+Worktree: <path> (kept for now)
+
+Next: Review PR, then merge/close and clean up worktree
+```
+
+### If Kept (Option 3)
+
+```
+Branch preserved for future work
+
+Branch: <feature-branch>
+Worktree: <path> (kept)
+
+Next: Resume work on branch or run this skill again when ready
+```
+
+### If Discarded (Option 4)
+
+```
+Work discarded
+
+Branch: <feature-branch> (deleted)
+Worktree: <path> (removed if applicable)
+
+Next: Start fresh or check project status
+```
+
 ## Red Flags
 
 **Never:**

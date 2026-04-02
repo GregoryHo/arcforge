@@ -172,13 +172,16 @@ function validateGraderResponse(grade, assertionCount) {
  * @param {string} projectRoot - Project root directory
  * @returns {import('./eval').TrialResult} Graded result
  */
-function gradeTrialResult(result, scenario, projectRoot) {
+function gradeTrialResult(result, scenario, projectRoot, actionLog) {
   if (scenario.grader === 'code') {
     // Code grading runs in trialDir (where agent artifacts live), with $PROJECT_ROOT available
     return gradeWithCode(result, scenario.graderConfig, projectRoot);
   }
   if (scenario.grader === 'model') {
     return gradeWithModel(result, scenario, projectRoot);
+  }
+  if (scenario.grader === 'mixed') {
+    return gradeWithMixed(result, scenario, projectRoot, actionLog);
   }
   // human grader — return ungraded
   return { ...result, grader: 'human-pending' };
@@ -549,6 +552,246 @@ async function gradeWithHuman(result, rl) {
   };
 }
 
+// ============================================================
+// Behavioral Assertions — Parse, Classify, Grade
+// ============================================================
+
+/**
+ * Parse a tool reference of the form "ToolName:args_pattern".
+ * @param {string} ref - e.g. "Skill:arc-verifying" or "Bash:npm test"
+ * @returns {{ name: string, pattern: string }}
+ */
+function parseToolRef(ref) {
+  const colonIdx = ref.indexOf(':');
+  if (colonIdx === -1) return { name: ref.trim(), pattern: '' };
+  return { name: ref.slice(0, colonIdx).trim(), pattern: ref.slice(colonIdx + 1).trim() };
+}
+
+/**
+ * Parse a behavioral assertion string into a structured object.
+ * Recognized prefixes: [tool_called], [tool_not_called], [tool_before],
+ * [tool_count], [tool_adjacent].
+ *
+ * Returns null for non-behavioral assertions (e.g. "[ ] text" or plain text).
+ *
+ * @param {string} assertion - Raw assertion string
+ * @returns {{ operator: string, [key: string]: any }|null}
+ */
+function parseBehavioralAssertion(assertion) {
+  if (!assertion || typeof assertion !== 'string') return null;
+  const str = assertion.trim();
+
+  // Match [tool_<operator>] prefix
+  const prefixMatch = str.match(/^\[tool_(\w+)\]\s+(.*)/);
+  if (!prefixMatch) return null;
+
+  const operator = `tool_${prefixMatch[1]}`;
+  const body = prefixMatch[2].trim();
+
+  switch (operator) {
+    case 'tool_called':
+    case 'tool_not_called': {
+      const { name, pattern } = parseToolRef(body);
+      return { operator, name, pattern };
+    }
+
+    case 'tool_before': {
+      // "A < B" — split on " < "
+      const parts = body.split(/\s+<\s+/);
+      if (parts.length !== 2) return null;
+      return { operator, a: parseToolRef(parts[0]), b: parseToolRef(parts[1]) };
+    }
+
+    case 'tool_count': {
+      // "ToolName:pattern >= N"
+      const countMatch = body.match(/^(.+?)\s*>=\s*(\d+)$/);
+      if (!countMatch) return null;
+      const { name, pattern } = parseToolRef(countMatch[1]);
+      return { operator, name, pattern, min: parseInt(countMatch[2], 10) };
+    }
+
+    case 'tool_adjacent': {
+      // "A ~ B" — split on " ~ "
+      const parts = body.split(/\s+~\s+/);
+      if (parts.length !== 2) return null;
+      return { operator, a: parseToolRef(parts[0]), b: parseToolRef(parts[1]) };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Classify a list of assertion strings into behavioral and text groups.
+ * Preserves original indices for score reassembly in mixed grading.
+ *
+ * @param {string[]} assertions - Raw assertion strings
+ * @returns {{ behavioral: Array<{originalIndex: number, parsed: Object, assertion: string}>,
+ *             text: Array<{originalIndex: number, assertion: string}> }}
+ */
+function classifyAssertions(assertions) {
+  const behavioral = [];
+  const text = [];
+  for (let i = 0; i < assertions.length; i++) {
+    const parsed = parseBehavioralAssertion(assertions[i]);
+    if (parsed) {
+      behavioral.push({ originalIndex: i, parsed, assertion: assertions[i] });
+    } else {
+      text.push({ originalIndex: i, assertion: assertions[i] });
+    }
+  }
+  return { behavioral, text };
+}
+
+/**
+ * Check whether a single action matches a tool reference (name + args substring).
+ * @param {Object} action - Action from the action log
+ * @param {string} name - Tool name to match
+ * @param {string} pattern - Substring to match in args
+ * @returns {boolean}
+ */
+function actionMatches(action, name, pattern) {
+  if (action.type !== 'tool') return false;
+  if (action.name !== name) return false;
+  if (!pattern) return true;
+  return (action.args || '').includes(pattern);
+}
+
+/**
+ * Grade a single parsed behavioral assertion against an action log.
+ * Returns 1 (pass) or 0 (fail). No LLM calls — purely deterministic.
+ *
+ * @param {Object} parsed - Parsed assertion from parseBehavioralAssertion
+ * @param {Array<{type: string, name?: string, args?: string, index: number}>} actions
+ * @returns {0|1}
+ */
+function gradeBehavioralAssertion(parsed, actions) {
+  switch (parsed.operator) {
+    case 'tool_called': {
+      return actions.some((a) => actionMatches(a, parsed.name, parsed.pattern)) ? 1 : 0;
+    }
+
+    case 'tool_not_called': {
+      return actions.some((a) => actionMatches(a, parsed.name, parsed.pattern)) ? 0 : 1;
+    }
+
+    case 'tool_before': {
+      const aIdx = actions.findIndex((a) => actionMatches(a, parsed.a.name, parsed.a.pattern));
+      const bIdx = actions.findIndex((a) => actionMatches(a, parsed.b.name, parsed.b.pattern));
+      if (aIdx === -1 || bIdx === -1) return 0;
+      return aIdx < bIdx ? 1 : 0;
+    }
+
+    case 'tool_count': {
+      const count = actions.filter((a) => actionMatches(a, parsed.name, parsed.pattern)).length;
+      return count >= parsed.min ? 1 : 0;
+    }
+
+    case 'tool_adjacent': {
+      const aIdx = actions.findIndex((a) => actionMatches(a, parsed.a.name, parsed.a.pattern));
+      const bIdx = actions.findIndex((a) => actionMatches(a, parsed.b.name, parsed.b.pattern));
+      if (aIdx === -1 || bIdx === -1) return 0;
+      const lo = Math.min(aIdx, bIdx);
+      const hi = Math.max(aIdx, bIdx);
+      // Check no tool actions between them (text entries are allowed)
+      for (let i = lo + 1; i < hi; i++) {
+        if (actions[i].type === 'tool') return 0;
+      }
+      return 1;
+    }
+
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Grade all parsed behavioral assertions against an action log.
+ * @param {Object[]} parsedAssertions - Array of parsed assertions
+ * @param {Object[]} actions - Action log
+ * @returns {number[]} Array of 0|1 scores
+ */
+function gradeAllBehavioral(parsedAssertions, actions) {
+  return parsedAssertions.map((p) => gradeBehavioralAssertion(p, actions));
+}
+
+/**
+ * Mixed grader: split assertions into behavioral and text groups,
+ * grade behavioral deterministically, delegate text to model grader,
+ * and combine into a unified score.
+ *
+ * Falls back to pure behavioral when 0 text assertions,
+ * or pure model when 0 behavioral assertions.
+ *
+ * @param {import('./eval').TrialResult} result - Trial result to grade
+ * @param {import('./eval').EvalScenario} scenario - Scenario with assertions
+ * @param {string} projectRoot - Project root directory
+ * @param {Object[]} [actionLog] - Pre-parsed action log (avoids re-parsing)
+ * @returns {import('./eval').TrialResult} Graded result
+ */
+function gradeWithMixed(result, scenario, projectRoot, actionLog) {
+  const { behavioral, text } = classifyAssertions(scenario.assertions);
+
+  // Fallback: 0 behavioral → pure model grading
+  if (behavioral.length === 0) {
+    return gradeWithModel(result, scenario, projectRoot);
+  }
+
+  // Grade behavioral assertions
+  const actions = actionLog || [];
+  const behavioralScores = behavioral.map((b) => gradeBehavioralAssertion(b.parsed, actions));
+
+  // Fallback: 0 text → pure behavioral grading
+  if (text.length === 0) {
+    const passCount = behavioralScores.filter((s) => s === 1).length;
+    const total = behavioralScores.length;
+    const score = round2(passCount / total);
+    return {
+      ...result,
+      passed: score >= 0.8,
+      score,
+      assertionScores: behavioralScores,
+      grader: 'behavioral',
+    };
+  }
+
+  // Mixed: grade text assertions via model grader
+  const textScenario = { ...scenario, assertions: text.map((t) => t.assertion) };
+  const textResult = gradeWithModel(result, textScenario, projectRoot);
+
+  // Propagate model grader errors instead of silently scoring 0
+  if (textResult.gradeError) {
+    return { ...result, ...textResult, grader: 'mixed' };
+  }
+
+  // Binarize model scores: >= 0.8 → 1, < 0.8 → 0
+  const rawModelScores = textResult.assertionScores || [];
+  const modelScores = rawModelScores.map((s) => (s >= 0.8 ? 1 : 0));
+
+  // Reassemble into original order
+  const total = scenario.assertions.length;
+  const assertionScores = new Array(total);
+  for (let i = 0; i < behavioral.length; i++) {
+    assertionScores[behavioral[i].originalIndex] = behavioralScores[i];
+  }
+  for (let i = 0; i < text.length; i++) {
+    assertionScores[text[i].originalIndex] = modelScores[i] ?? 0;
+  }
+
+  const passCount = assertionScores.filter((s) => s === 1).length;
+  const score = round2(passCount / total);
+
+  return {
+    ...result,
+    passed: score >= 0.8,
+    score,
+    assertionScores,
+    grader: 'mixed',
+    evidence: textResult.evidence || [],
+  };
+}
+
 module.exports = {
   gradeTrialResult,
   gradeWithCode,
@@ -561,4 +804,9 @@ module.exports = {
   snapScore,
   validateGraderResponse,
   numberTranscriptBlocks,
+  parseBehavioralAssertion,
+  classifyAssertions,
+  gradeBehavioralAssertion,
+  gradeAllBehavioral,
+  gradeWithMixed,
 };

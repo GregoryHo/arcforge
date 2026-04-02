@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="behavioral-assertions">
+  <title>Behavioral Assertions</title>
+  <file>scripts/lib/eval-graders.js</file>
+
+  <requirement id="fr-ba-001">
+    <title>Parse Behavioral Assertion Prefixes</title>
+    <description>
+      Assertions prefixed with [tool_called], [tool_not_called], [tool_before],
+      [tool_count], [tool_adjacent] are recognized as behavioral assertions and
+      separated from text assertions.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ba-001-ac1">
+        "[tool_called] Skill:arc-verifying" is parsed as
+        { operator: 'tool_called', name: 'Skill', pattern: 'arc-verifying' }.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-ba-001-ac2">
+        "[tool_before] Skill:arc-verifying &lt; Skill:arc-finishing-epic" is parsed as
+        { operator: 'tool_before', a: {name:'Skill', pattern:'arc-verifying'},
+          b: {name:'Skill', pattern:'arc-finishing-epic'} }.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-ba-001-ac3">
+        "[tool_count] Bash:npm test &gt;= 2" is parsed as
+        { operator: 'tool_count', name: 'Bash', pattern: 'npm test', min: 2 }.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-ba-001-ac4">
+        "[ ] Agent mentions verification" (no prefix) is classified as text assertion.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-ba-001-ac5">
+        "[tool_not_called] Bash:git push" is parsed as
+        { operator: 'tool_not_called', name: 'Bash', pattern: 'git push' }.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-ba-001-ac6">
+        "[tool_adjacent] A ~ B" is parsed as
+        { operator: 'tool_adjacent', a: {...}, b: {...} }.
+        <trace>REQ-F006</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-ba-002">
+    <title>Grade Behavioral Assertions Deterministically</title>
+    <description>
+      Each behavioral assertion is evaluated against the action log using
+      deterministic code logic. No model calls.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ba-002-ac1">
+        tool_called: returns 1 if any action matches name AND args contains pattern
+        (substring match). Returns 0 otherwise.
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-ba-002-ac2">
+        tool_not_called: returns 1 if NO action matches name + pattern.
+        Returns 0 if any match found.
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-ba-002-ac3">
+        tool_before: compares first occurrence of A and first occurrence of B.
+        Returns 1 if A.index &lt; B.index. Returns 0 if A missing, B missing,
+        or A.index &gt;= B.index.
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-ba-002-ac4">
+        tool_count: counts actions matching name + pattern.
+        Returns 1 if count &gt;= min. Returns 0 otherwise.
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-ba-002-ac5">
+        tool_adjacent: returns 1 if A and B both exist and no other tool
+        actions appear between them (text entries are allowed between).
+        Returns 0 otherwise.
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-ba-002-ac6">
+        All behavioral assertion grading completes without any LLM API calls.
+        <trace>REQ-N003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

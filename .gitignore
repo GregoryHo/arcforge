@@ -34,3 +34,5 @@ __pycache__/
 .Python
 .claude/log-lightweight.config.json
 .serena/cache/
+
+.worktrees
