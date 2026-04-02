@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const eval_ = require('./lib/eval');
 const stats = require('./lib/eval-stats');
+const { classifyAssertions } = require('./lib/eval-graders');
 
 // ── SSE Client Management ────────────────────────────────────
 
@@ -295,6 +296,8 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
 }
 
 function trialSummary(r) {
+  const actions = r.actions || null;
+  const turnsUsed = actions ? actions.filter((a) => a.type === 'tool').length : null;
   return {
     trial: r.trial,
     passed: r.passed,
@@ -308,6 +311,8 @@ function trialSummary(r) {
     blockRefs: r.blockRefs,
     artifacts: r.artifacts,
     graderOutput: r.graderOutput,
+    actions,
+    turnsUsed,
   };
 }
 
@@ -335,12 +340,20 @@ function handleApiBenchmark(res, projectRoot) {
 function handleApiScenario(res, projectRoot, name) {
   const s = eval_.findScenario(name, projectRoot);
   if (!s) return sendError(res, 404, `Scenario "${name}" not found`);
+  const { behavioral } = classifyAssertions(s.assertions);
+  const behavioralIndices = new Set(behavioral.map((b) => b.originalIndex));
+  const assertionTypes = s.assertions.map((_, i) =>
+    behavioralIndices.has(i) ? 'behavioral' : 'text',
+  );
   sendJson(res, {
     name: s.name,
     scope: s.scope,
     target: s.target,
     grader: s.grader,
     assertions: s.assertions,
+    assertionTypes,
+    ...(s.pluginDir ? { pluginDir: s.pluginDir } : {}),
+    ...(s.maxTurns ? { maxTurns: s.maxTurns } : {}),
   });
 }
 

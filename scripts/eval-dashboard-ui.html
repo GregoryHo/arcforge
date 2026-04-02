@@ -117,6 +117,37 @@ tr:hover td { background: var(--surface); }
 .ref-labels { position: absolute; top: 4px; right: 8px; display: flex; gap: 4px; }
 .ref-label { font-size: 10px; padding: 0 5px; border-radius: 3px; background: rgba(163,113,247,0.2); color: #a371f7; }
 .ref-label-fail { background: rgba(248,81,73,0.15); color: var(--blocked); }
+
+/* Behavioral assertion type label */
+.assertion-type { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; white-space: nowrap; }
+.assertion-type-behavioral { background: rgba(88,166,255,0.15); color: var(--accent); }
+.assertion-type-text { background: rgba(139,148,158,0.15); color: var(--text2); }
+
+/* Assertion group header */
+.assertion-group { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); padding: 8px 0 4px; border-bottom: 1px solid var(--border); margin-top: 4px; }
+.assertion-group:first-child { margin-top: 0; }
+.assertion-group-score { float: right; font-weight: 700; }
+
+/* Modal tabs */
+.modal-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 16px; }
+.modal-tab { padding: 8px 12px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; }
+.modal-tab:hover { color: var(--text); }
+.modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Action log */
+.action-log { padding: 8px; }
+.action-entry { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.action-entry:last-child { border-bottom: none; }
+.action-idx { min-width: 28px; color: var(--text2); font-size: 11px; text-align: right; }
+.action-tool { color: var(--accent); font-weight: 600; min-width: 60px; }
+.action-args { color: var(--text); word-break: break-word; flex: 1; }
+.action-text { color: var(--text2); font-style: italic; }
+
+/* Scenario info fields */
+.scenario-info { display: flex; gap: 12px; margin-bottom: 12px; font-size: 12px; }
+.scenario-info-item { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+.scenario-info-label { color: var(--text2); }
+.scenario-info-value { color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -152,11 +183,14 @@ const h = (tag, attrs, ...children) => {
 // ── State ──
 const state = { view: 'scenarios', param: null, liveLog: [] };
 
-async function loadAssertions(scenario) {
+async function loadScenarioMeta(scenario) {
   try {
-    const sc = await api('/api/scenario/' + encodeURIComponent(scenario));
-    return sc.assertions || [];
-  } catch { return []; }
+    return await api('/api/scenario/' + encodeURIComponent(scenario));
+  } catch { return null; }
+}
+async function loadAssertions(scenario) {
+  const sc = await loadScenarioMeta(scenario);
+  return sc ? sc.assertions || [] : [];
 }
 
 // ── API ──
@@ -231,21 +265,62 @@ function assertionScoreCls(score) {
   return 'assertion-score-0';
 }
 
-function buildAssertionBreakdown(r, assertions) {
+function buildAssertionRow(i, score, name, ev, assertionType) {
+  const typeCls = assertionType === 'behavioral' ? 'assertion-type-behavioral' : 'assertion-type-text';
+  const typeLabel = assertionType === 'behavioral' ? 'behavioral' : 'text';
+  return h('div', { className: 'assertion-row' },
+    h('span', { className: 'assertion-score ' + assertionScoreCls(score) }, score.toFixed(2)),
+    assertionType ? h('span', { className: 'assertion-type ' + typeCls }, typeLabel) : null,
+    h('div', { className: 'assertion-name' },
+      h('span', null, name),
+      ev ? h('div', { className: 'assertion-evidence' }, ev) : null
+    )
+  );
+}
+
+function buildAssertionBreakdown(r, assertions, scenarioMeta) {
   if (!r.assertionScores || r.assertionScores.length === 0) return null;
   const container = h('div', { style: 'padding:8px 0' });
-  for (let i = 0; i < r.assertionScores.length; i++) {
-    const score = r.assertionScores[i];
-    const name = assertions && assertions[i] ? assertions[i] : 'Assertion ' + (i + 1);
-    const ev = r.evidence && r.evidence[i] ? r.evidence[i] : '';
-    const row = h('div', { className: 'assertion-row' },
-      h('span', { className: 'assertion-score ' + assertionScoreCls(score) }, score.toFixed(2)),
-      h('div', { className: 'assertion-name' },
-        h('span', null, name),
-        ev ? h('div', { className: 'assertion-evidence' }, ev) : null
-      )
-    );
-    container.appendChild(row);
+  const types = scenarioMeta && scenarioMeta.assertionTypes;
+  const isMixed = r.grader === 'mixed' || (scenarioMeta && scenarioMeta.grader === 'mixed');
+  const hasBehavioral = types && types.some(t => t === 'behavioral');
+
+  if (isMixed && hasBehavioral) {
+    // Group assertions by type for mixed grading display
+    const behavioralItems = [];
+    const textItems = [];
+    for (let i = 0; i < r.assertionScores.length; i++) {
+      const item = { index: i, score: r.assertionScores[i], name: assertions && assertions[i] ? assertions[i] : 'Assertion ' + (i + 1), ev: r.evidence && r.evidence[i] ? r.evidence[i] : '' };
+      if (types[i] === 'behavioral') behavioralItems.push(item);
+      else textItems.push(item);
+    }
+    // Behavioral group
+    if (behavioralItems.length > 0) {
+      const bScore = behavioralItems.reduce((s, x) => s + x.score, 0) / behavioralItems.length;
+      const groupHeader = h('div', { className: 'assertion-group' }, 'Behavioral Assertions', h('span', { className: 'assertion-group-score' }, (bScore * 100).toFixed(0) + '%'));
+      container.appendChild(groupHeader);
+      for (const item of behavioralItems) {
+        container.appendChild(buildAssertionRow(item.index, item.score, item.name, item.ev, 'behavioral'));
+      }
+    }
+    // Text group
+    if (textItems.length > 0) {
+      const tScore = textItems.reduce((s, x) => s + x.score, 0) / textItems.length;
+      const groupHeader = h('div', { className: 'assertion-group' }, 'Text Assertions', h('span', { className: 'assertion-group-score' }, (tScore * 100).toFixed(0) + '%'));
+      container.appendChild(groupHeader);
+      for (const item of textItems) {
+        container.appendChild(buildAssertionRow(item.index, item.score, item.name, item.ev, 'text'));
+      }
+    }
+  } else {
+    // Flat list (non-mixed or no type info)
+    for (let i = 0; i < r.assertionScores.length; i++) {
+      const score = r.assertionScores[i];
+      const name = assertions && assertions[i] ? assertions[i] : 'Assertion ' + (i + 1);
+      const ev = r.evidence && r.evidence[i] ? r.evidence[i] : '';
+      const aType = types ? types[i] : null;
+      container.appendChild(buildAssertionRow(i, score, name, ev, aType));
+    }
   }
   // Show captured artifacts for code-graded trials (audit trail)
   if (r.artifacts) {
@@ -255,9 +330,9 @@ function buildAssertionBreakdown(r, assertions) {
         const pre = this.nextElementSibling;
         const visible = pre.style.display !== 'none';
         pre.style.display = visible ? 'none' : 'block';
-        this.textContent = visible ? '▶ Show trial artifacts' : '▼ Hide trial artifacts';
+        this.textContent = visible ? '\u25b6 Show trial artifacts' : '\u25bc Hide trial artifacts';
       }
-    }, '▶ Show trial artifacts');
+    }, '\u25b6 Show trial artifacts');
     const pre = h('pre', {
       style: 'display:none;margin:4px 0 0;padding:8px;background:var(--bg2);border-radius:4px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap'
     }, r.artifacts);
@@ -267,7 +342,14 @@ function buildAssertionBreakdown(r, assertions) {
   return container;
 }
 
-function buildTrialsTable(trials, assertions) {
+function fmtTurns(r, maxTurns) {
+  if (r.turnsUsed == null) return '-';
+  if (maxTurns) return r.turnsUsed + ' / ' + maxTurns;
+  return String(r.turnsUsed);
+}
+
+function buildTrialsTable(trials, assertions, scenarioMeta) {
+  const maxTurns = scenarioMeta && scenarioMeta.maxTurns;
   const tbody = h('tbody');
   for (const r of trials) {
     const row = h('tr', null,
@@ -275,15 +357,16 @@ function buildTrialsTable(trials, assertions) {
       h('td', null, '#' + r.trial),
       h('td', null, scoreBar(r.score)),
       h('td', null, passFailLabel(r.passed)),
+      h('td', { style: 'font-size:11px;color:var(--text2)' }, fmtTurns(r, maxTurns)),
       h('td', { style: 'font-size:11px;color:var(--text2)' }, r.model || '-'),
-      h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript, { assertions, assertionScores: r.assertionScores, evidence: r.evidence, blockRefs: r.blockRefs }) }, 'View') : h('span', null, '-'))
+      h('td', null, r.transcript ? h('a', { onclick: () => showTranscript(r.transcript, { assertions, assertionScores: r.assertionScores, evidence: r.evidence, blockRefs: r.blockRefs, actions: r.actions }) }, 'View') : h('span', null, '-'))
     );
     tbody.appendChild(row);
 
     // Expandable assertion detail row
     if (r.assertionScores && r.assertionScores.length > 0) {
-      const detailCell = h('td', { colspan: '6', style: 'padding:0' });
-      const detail = buildAssertionBreakdown(r, assertions);
+      const detailCell = h('td', { colspan: '7', style: 'padding:0' });
+      const detail = buildAssertionBreakdown(r, assertions, scenarioMeta);
       const detailRow = h('tr', { style: 'display:none' }, detailCell);
       detailCell.appendChild(h('div', { className: 'assertion-detail' }, detail));
       tbody.appendChild(detailRow);
@@ -298,7 +381,7 @@ function buildTrialsTable(trials, assertions) {
   return h('table', null,
     h('thead', null, h('tr', null,
       h('th', null, 'Condition'), h('th', null, 'Trial'), h('th', null, 'Score'),
-      h('th', null, 'Passed'), h('th', null, 'Model'), h('th', null, 'Transcript')
+      h('th', null, 'Passed'), h('th', null, 'Turns'), h('th', null, 'Model'), h('th', null, 'Transcript')
     )), tbody
   );
 }
@@ -356,13 +439,33 @@ async function renderScenarios() {
 }
 
 async function renderRuns(scenario) {
-  const data = await api('/api/runs/' + encodeURIComponent(scenario));
+  const [data, scenarioMeta] = await Promise.all([
+    api('/api/runs/' + encodeURIComponent(scenario)),
+    loadScenarioMeta(scenario),
+  ]);
   const content = $('#content');
   content.textContent = '';
   content.appendChild(h('div', { className: 'breadcrumb' },
     h('a', { onclick: () => navigate('scenarios') }, 'Scenarios'),
     h('span', null, ' / ' + scenario)
   ));
+  // Scenario info fields (pluginDir, maxTurns)
+  if (scenarioMeta && (scenarioMeta.pluginDir || scenarioMeta.maxTurns)) {
+    const infoRow = h('div', { className: 'scenario-info' });
+    if (scenarioMeta.pluginDir) {
+      infoRow.appendChild(h('div', { className: 'scenario-info-item' },
+        h('span', { className: 'scenario-info-label' }, 'Plugin Dir: '),
+        h('span', { className: 'scenario-info-value' }, scenarioMeta.pluginDir)
+      ));
+    }
+    if (scenarioMeta.maxTurns) {
+      infoRow.appendChild(h('div', { className: 'scenario-info-item' },
+        h('span', { className: 'scenario-info-label' }, 'Max Turns: '),
+        h('span', { className: 'scenario-info-value' }, String(scenarioMeta.maxTurns))
+      ));
+    }
+    content.appendChild(infoRow);
+  }
   const actions = h('div', { style: 'margin-bottom:16px;display:flex;gap:8px' },
     h('a', { onclick: () => navigate('compare', scenario), style: 'padding:4px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px' }, 'A/B Compare')
   );
@@ -433,8 +536,9 @@ async function renderResults(param) {
     ));
   }
   content.appendChild(statsRow);
-  const assertions = await loadAssertions(scenario);
-  content.appendChild(buildTrialsTable(allResults, assertions));
+  const scenarioMeta = await loadScenarioMeta(scenario);
+  const assertions = scenarioMeta ? scenarioMeta.assertions || [] : [];
+  content.appendChild(buildTrialsTable(allResults, assertions, scenarioMeta));
 }
 
 async function renderCompare(scenario) {
@@ -481,8 +585,9 @@ async function renderCompare(scenario) {
     ...(data.treatment?.results || []).map(r => ({ ...r, condition: 'treatment' })),
   ];
   if (allTrials.length > 0) {
-    const assertions = await loadAssertions(scenario);
-    content.appendChild(buildTrialsTable(allTrials, assertions));
+    const scenarioMeta = await loadScenarioMeta(scenario);
+    const assertions = scenarioMeta ? scenarioMeta.assertions || [] : [];
+    content.appendChild(buildTrialsTable(allTrials, assertions, scenarioMeta));
   }
 }
 
@@ -528,13 +633,7 @@ function buildBlockRefMap(ctx) {
   return map;
 }
 
-async function showTranscript(transcriptPath, ctx) {
-  const resultsIdx = transcriptPath.indexOf('evals/results/');
-  const relPath = resultsIdx >= 0 ? transcriptPath.slice(resultsIdx + 'evals/results/'.length) : transcriptPath;
-  let text;
-  try { text = await api('/api/transcript?path=' + encodeURIComponent(relPath)); }
-  catch (err) { text = 'Error loading transcript: ' + err.message; }
-
+function buildTranscriptContainer(text, ctx) {
   const blocks = parseTranscriptBlocks(text);
   const refMap = buildBlockRefMap(ctx);
   const container = h('div', { className: 'transcript', style: 'padding: 8px' });
@@ -565,21 +664,19 @@ async function showTranscript(transcriptPath, ctx) {
     const rawLines = rawBlock.split('\n');
 
     if (isLongContent && rawLines.length > 5) {
-      // Preview: escape and highlight only the first 3 lines (avoids mid-entity splits)
+      const previewPre = document.createElement('pre');
       const previewText = esc(rawLines.slice(0, 3).join('\n'))
         .replace(/^\[Tool: (.+?)\]/gm, '<span class="tool">[Tool: $1]</span>');
-      const previewPre = document.createElement('pre');
-      previewPre.innerHTML = previewText; // esc'd from rawLines
+      previewPre.innerHTML = previewText; // safe: esc'd from rawLines
       blockDiv.appendChild(previewPre);
 
-      // Full content created lazily on first expand
       let fullPre = null;
       const toggle = h('div', {
         style: 'font-size:11px;color:var(--accent);cursor:pointer;user-select:none;padding:2px 0',
         onclick: function() {
           if (!fullPre) {
             fullPre = document.createElement('pre');
-            fullPre.innerHTML = highlighted; // esc'd above
+            fullPre.innerHTML = highlighted; // safe: esc'd above
             fullPre.style.display = 'block';
             blockDiv.appendChild(fullPre);
             previewPre.style.display = 'none';
@@ -597,11 +694,72 @@ async function showTranscript(transcriptPath, ctx) {
       blockDiv.appendChild(toggle);
     } else {
       const pre = document.createElement('pre');
-      pre.innerHTML = highlighted; // esc'd above
+      pre.innerHTML = highlighted; // safe: esc'd above
       blockDiv.appendChild(pre);
     }
     container.appendChild(blockDiv);
   }
+  return container;
+}
+
+function buildActionLogView(actions) {
+  if (!actions || actions.length === 0) {
+    return h('div', { className: 'empty' }, 'No action log available for this trial.');
+  }
+  const container = h('div', { className: 'action-log' });
+  for (const action of actions) {
+    if (action.type === 'tool') {
+      container.appendChild(h('div', { className: 'action-entry' },
+        h('span', { className: 'action-idx' }, '#' + action.index),
+        h('span', { className: 'action-tool' }, action.name),
+        h('span', { className: 'action-args' }, action.args || '')
+      ));
+    } else {
+      const preview = (action.content || '').slice(0, 120);
+      container.appendChild(h('div', { className: 'action-entry' },
+        h('span', { className: 'action-idx' }, '#' + action.index),
+        h('span', { className: 'action-text' }, preview + (action.content && action.content.length > 120 ? '...' : ''))
+      ));
+    }
+  }
+  return container;
+}
+
+async function showTranscript(transcriptPath, ctx) {
+  const resultsIdx = transcriptPath.indexOf('evals/results/');
+  const relPath = resultsIdx >= 0 ? transcriptPath.slice(resultsIdx + 'evals/results/'.length) : transcriptPath;
+  let text;
+  try { text = await api('/api/transcript?path=' + encodeURIComponent(relPath)); }
+  catch (err) { text = 'Error loading transcript: ' + err.message; }
+
+  const transcriptView = buildTranscriptContainer(text, ctx);
+  const actionLogView = buildActionLogView(ctx && ctx.actions);
+
+  // Tab system for Transcript / Action Log
+  const hasActions = ctx && ctx.actions && ctx.actions.length > 0;
+  let activeTab = 'transcript';
+
+  const tabBar = h('div', { className: 'modal-tabs' });
+  const transcriptTab = h('div', { className: 'modal-tab active' }, 'Transcript');
+  const actionTab = h('div', { className: 'modal-tab' }, 'Action Log');
+  tabBar.appendChild(transcriptTab);
+  if (hasActions) tabBar.appendChild(actionTab);
+
+  actionLogView.style.display = 'none';
+
+  function switchTab(e) {
+    const clicked = e.target.textContent === 'Action Log' ? 'actions' : 'transcript';
+    if (clicked === activeTab) return;
+    activeTab = clicked;
+    transcriptTab.classList.toggle('active', activeTab === 'transcript');
+    actionTab.classList.toggle('active', activeTab === 'actions');
+    transcriptView.style.display = activeTab === 'transcript' ? '' : 'none';
+    actionLogView.style.display = activeTab === 'actions' ? '' : 'none';
+  }
+  transcriptTab.onclick = switchTab;
+  actionTab.onclick = switchTab;
+
+  const bodyContent = h('div', null, transcriptView, actionLogView);
 
   const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
     h('div', { className: 'modal' },
@@ -609,7 +767,8 @@ async function showTranscript(transcriptPath, ctx) {
         h('span', null, 'Transcript'),
         h('span', { className: 'modal-close', onclick: () => overlay.remove() }, '\u00d7')
       ),
-      h('div', { className: 'modal-body' }, container)
+      tabBar,
+      h('div', { className: 'modal-body' }, bodyContent)
     )
   );
   $('#modal-root').appendChild(overlay);
