@@ -27,6 +27,7 @@ const LOOP_STATE_FILE = '.arcforge-loop.json';
 const MAX_RETRIES = 1;
 const STALL_THRESHOLD = 2; // iterations without progress
 const MAX_ERRORS_KEPT = 20;
+const CLAUDE_MAX_BUFFER = 50 * 1024 * 1024; // 50MB — Claude verbose output can be large
 
 /**
  * Parse loop CLI arguments
@@ -278,7 +279,8 @@ function spawnSession(prompt, projectRoot) {
     {
       input: prompt,
       cwd: projectRoot,
-      timeout: 600000, // 10 minute timeout per task
+      timeout: 600000,
+      maxBuffer: CLAUDE_MAX_BUFFER,
     },
   );
   return extractCost(result);
@@ -296,7 +298,7 @@ function spawnSessionAsync(prompt, projectRoot) {
     const child = execFile(
       'claude',
       ['-p', '--output-format', 'json', '--no-session-persistence'],
-      { cwd: projectRoot, timeout: 600000, maxBuffer: 50 * 1024 * 1024 },
+      { cwd: projectRoot, timeout: 600000, maxBuffer: CLAUDE_MAX_BUFFER },
       (error, stdout, stderr) => {
         const exitCode = error ? (error.status ?? 1) : 0;
         resolve(extractCost({ stdout: stdout || '', stderr: stderr || '', exitCode }));

@@ -408,14 +408,10 @@ async function main() {
           const scenario = requireScenario(args.positional[1], 'run');
           const k = parseK(scenario, false);
           const isolated = !args.flags['no-isolate'];
-          const cliPluginDir = args.options['plugin-dir'];
-          const cliMaxTurns = args.options['max-turns']
+          const pluginDir = args.options['plugin-dir'];
+          const maxTurns = args.options['max-turns']
             ? parseInt(args.options['max-turns'], 10)
             : undefined;
-          const pluginDir = (cliPluginDir || scenario.pluginDir)
-            ? path.resolve(cliPluginDir || scenario.pluginDir)
-            : undefined;
-          const maxTurns = cliMaxTurns != null ? cliMaxTurns : scenario.maxTurns;
           const modelLabel = model ? ` [model: ${model}]` : '';
           console.log(`Running ${scenario.name} (k=${k})${modelLabel}...`);
 

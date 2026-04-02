@@ -14,6 +14,8 @@ const { execCommand, ensureDir, getTimestamp, sanitizeFilename } = require('./ut
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
 
+const CLAUDE_MAX_BUFFER = 50 * 1024 * 1024; // 50MB — Claude verbose output can be large
+
 /**
  * Eval scenario parsed from a markdown file
  * @typedef {Object} EvalScenario
@@ -445,13 +447,17 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     isolated = true,
     model,
     runId,
-    pluginDir,
-    maxTurns,
+    pluginDir: rawPluginDir,
+    maxTurns: rawMaxTurns,
   } = options;
   const timestamp = getTimestamp();
 
+  // Merge CLI overrides with scenario defaults (only when not fully isolated)
+  const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
+  const maxTurns = rawMaxTurns != null ? rawMaxTurns : scenario.maxTurns;
+
   // Validate pluginDir exists before running trial
-  if (pluginDir && !fs.existsSync(pluginDir)) {
+  if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
     const evalName = label ? `${scenario.name}-${label}` : scenario.name;
     return {
       eval: evalName,
@@ -500,6 +506,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   }
   if (pluginDir) {
     claudeArgs.push('--plugin-dir', path.resolve(pluginDir));
+    // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
     claudeArgs.push('--dangerously-skip-permissions');
   }
 
@@ -523,7 +530,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     input: prompt,
     cwd: trialDir,
     timeout: 300000,
-    maxBuffer: 50 * 1024 * 1024, // 50MB — plugin verbose output can be large
+    maxBuffer: CLAUDE_MAX_BUFFER,
   });
   if (process.env.EVAL_DEBUG) {
     console.error(`[eval-debug] exitCode: ${result.exitCode}`);
