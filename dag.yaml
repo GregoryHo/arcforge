@@ -1,63 +1,63 @@
 epics:
   - id: eval-core
     name: Eval Core — Action Parser, Scenario Extension, Environment Control
-    status: pending
+    status: completed
     spec_path: epics/eval-core/epic.md
     worktree: null
     depends_on: []
     features:
       - id: action-parser
         name: Transcript Action Parser
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-ap-001
       - id: action-result-storage
         name: Action Log In Trial Results
-        status: pending
+        status: completed
         depends_on:
-          - "\"action-parser\""
+          - "action-parser"
         source_requirement: fr-ap-002
       - id: scenario-plugin-dir
         name: Parse Plugin Dir Scenario Field
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-se-001
       - id: scenario-max-turns
         name: Parse Max Turns Scenario Field
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-se-002
       - id: max-turns-priority
         name: Max Turns Resolution Priority
-        status: pending
+        status: completed
         depends_on:
-          - "\"scenario-max-turns\""
-          - "\"scenario-plugin-dir\""
+          - "scenario-max-turns"
+          - "scenario-plugin-dir"
         source_requirement: fr-se-003
       - id: plugin-dir-settings
         name: Semi-Isolated Settings Builder
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-ec-001
       - id: trial-plugin-dir
         name: runTrial Plugin Dir Support
-        status: pending
+        status: completed
         depends_on:
-          - "\"plugin-dir-settings\""
-          - "\"scenario-plugin-dir\""
+          - "plugin-dir-settings"
+          - "scenario-plugin-dir"
         source_requirement: fr-ec-002
       - id: trial-max-turns
         name: runTrial Max Turns Support
-        status: pending
+        status: completed
         depends_on:
-          - "\"max-turns-priority\""
+          - "max-turns-priority"
         source_requirement: fr-ec-003
       - id: workflow-ab-plugin-dir
         name: Workflow A/B With Plugin Dir
-        status: pending
+        status: completed
         depends_on:
-          - "\"trial-plugin-dir\""
-          - "\"plugin-dir-settings\""
+          - "trial-plugin-dir"
+          - "plugin-dir-settings"
         source_requirement: fr-ec-004
   - id: eval-grading
     name: Eval Grading — Behavioral Assertions, Mixed Grading
@@ -65,79 +65,79 @@ epics:
     spec_path: epics/eval-grading/epic.md
     worktree: null
     depends_on:
-      - "\"eval-core\""
+      - "eval-core"
     features:
       - id: behavioral-assertion-parser
         name: Parse Behavioral Assertion Prefixes
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-ba-001
       - id: behavioral-assertion-grader
         name: Grade Behavioral Assertions Against Action Log
-        status: pending
+        status: completed
         depends_on:
-          - "\"behavioral-assertion-parser\""
+          - "behavioral-assertion-parser"
         source_requirement: fr-ba-002
       - id: mixed-grader
         name: Mixed Code + Model Grading
-        status: pending
+        status: completed
         depends_on:
-          - "\"behavioral-assertion-grader\""
+          - "behavioral-assertion-grader"
         source_requirement: fr-mg-001
   - id: eval-cli
     name: Eval CLI — New Flags
-    status: pending
+    status: completed
     spec_path: epics/eval-cli/epic.md
     worktree: null
     depends_on:
-      - "\"eval-core\""
+      - "eval-core"
     features:
       - id: cli-no-isolate
         name: --no-isolate Flag
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cf-001
       - id: cli-plugin-dir
         name: --plugin-dir Flag
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cf-002
       - id: cli-max-turns
         name: --max-turns Flag
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cf-003
   - id: eval-dashboard
     name: Eval Dashboard — Behavioral Display, Action Log, Mixed Grading
-    status: pending
+    status: completed
     spec_path: epics/eval-dashboard/epic.md
     worktree: null
     depends_on:
-      - "\"eval-core\""
-      - "\"eval-grading\""
+      - "eval-core"
+      - "eval-grading"
     features:
       - id: dashboard-behavioral-assertions
         name: Behavioral Assertion Display
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-du-001
       - id: dashboard-action-log
         name: Action Log Timeline
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-du-002
       - id: dashboard-scenario-fields
         name: Plugin Dir and Max Turns Display
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-du-003
       - id: dashboard-turns-used
         name: Turns Used Display
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-du-004
       - id: dashboard-mixed-grading
         name: Mixed Grading Display
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-du-005
