@@ -267,6 +267,16 @@ Use as timeline markers, bullet points, connection nodes.
 }
 ```
 
+## Text Width Estimation
+
+Excalidraw clips text that exceeds its `width` property. Estimate minimum width before writing:
+
+```
+minimum_width ≈ character_count × fontSize × 0.6
+```
+
+For example: "The Schema" (10 chars) at fontSize 28 → minimum width ≈ 10 × 28 × 0.6 = 168px. When in doubt, round up generously — extra width is invisible, clipped text is a defect.
+
 ## Binding Checklist
 
 When connecting elements with arrows:
