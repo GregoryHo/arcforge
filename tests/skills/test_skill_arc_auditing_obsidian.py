@@ -82,3 +82,27 @@ def test_arc_auditing_obsidian_has_completion_formats():
     text = _read_skill()
     assert "✅" in text
     assert "⚠️" in text
+
+
+def test_arc_auditing_obsidian_has_single_file_link():
+    """Auditor must support single-file LINK mode for post-creation linking."""
+    text = _read_skill().lower()
+    assert "--file" in text and "single" in text.replace("single-file", "single file") or "--file" in text
+
+
+def test_arc_auditing_obsidian_has_index_generation():
+    """LINT must generate/update index.md for vault navigation."""
+    text = _read_skill().lower()
+    assert "index.md" in text and "index" in text
+
+
+def test_arc_auditing_obsidian_has_log_validation():
+    """LINT must validate log.md consistency."""
+    text = _read_skill().lower()
+    assert "log.md" in text and "log" in text
+
+
+def test_arc_auditing_obsidian_grow_uses_link_failures():
+    """GROW must use unresolved LINK mentions as entity candidates."""
+    text = _read_skill().lower()
+    assert "link failure" in text or "link couldn" in text or "unresolved" in text

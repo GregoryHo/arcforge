@@ -25,6 +25,15 @@ Classify → Confirm → Create
 
 Skip the Confirm step when classification is unambiguous. A single obvious keyword trigger (e.g., "log this meeting" → Log, "document this decision" → Decision) means you can go straight to Create. When in doubt, confirm — false confidence wastes more time than one extra question.
 
+### Query-as-Ingest
+
+When the user says "file this back," "save this insight," "keep this," or "crystallize this" during conversation, skip Classify — the conversation context determines the type:
+
+- If the conversation contains a choice or trade-off → **Decision**
+- Otherwise → **Synthesis**
+
+Go straight to Create with the conversational context as input. This makes compounding frictionless — valuable discussion threads become vault artifacts without re-deriving the page type. The insight here is from Karpathy: good answers should be filed back into the wiki as new pages, so explorations compound just like ingested sources.
+
 ## Page Types
 
 Classify user input into one of these six types. The trigger signals help — but use judgment, not keyword matching.
@@ -216,6 +225,20 @@ Source note: autonomous-agent-core-concepts.md
 
 The original file stays immutable. Knowledge flows into the wiki as text, where the auditor can LINK it into the knowledge graph.
 
+## Batch Mode
+
+When invoked with `--batch` on a folder of raw files:
+
+1. **Scan** — List all files in the target folder
+2. **Auto-classify** — Classify each file using fast-path only (skip Confirm unless classification is genuinely ambiguous)
+3. **Create** — Process each file sequentially, creating typed notes
+4. **Log** — Append each creation to `log.md` (see Session Log)
+5. **Summarize** — Emit a batch summary: `✅ Batch complete: N notes created (X sources, Y entities, ...)`
+
+Batch mode trades per-source discussion for throughput. Use it for initial vault population or bulk ingestion of reference material. For ongoing curation where each source deserves attention, use the standard one-at-a-time pipeline.
+
+**Warning:** Classification errors cascade in batch mode — a misclassified source won't get a Confirm gate to catch it. Review the batch summary and spot-check a few notes after completion.
+
 ## Artifact Tiers
 
 **Tier 1 (default):** Markdown notes + embedded Mermaid diagrams. Use for all page types.
@@ -247,6 +270,20 @@ Competes with traditional RAG approaches.
 
 The auditor later converts these into `[[Karpathy's LLM Wiki]]`, `[[kepano]]`, `[[RAG]]` etc.
 
+## Session Log
+
+After creating any artifact (including Log appends to daily notes), append a structured entry to `log.md` in the vault root:
+
+```
+## [YYYY-MM-DD] create | [type] | [filename]
+```
+
+This dual-write serves two audiences:
+- **Daily notes** → for the human browsing in Obsidian
+- **log.md** → for the LLM to quickly scan recent vault activity (`grep "^## \[" log.md | tail -10`)
+
+If `log.md` doesn't exist, create it with a `# Vault Log` header. Entries are append-only — never edit or remove existing entries. The auditor validates `log.md` consistency during LINT.
+
 ## Vault Path
 
 On first invocation, determine the vault path:
@@ -261,6 +298,21 @@ If Obsidian is not running, fall back to direct file writes using the `obsidian-
 ```
 ✅ Created [type] note → [vault-path/filename.md]
 ```
+
+### LINK-on-Create
+
+When invoked with `--link`, run a targeted LINK pass on the newly created note immediately after creation:
+
+1. Create the note (normal pipeline)
+2. Invoke `arc-auditing-obsidian link --file=<path>` on the new note only
+3. Report both results:
+
+```
+✅ Created [type] note → [vault-path/filename.md]
+   Linked: N relationships resolved
+```
+
+This preserves separation of concerns — the writer delegates linking to the auditor — while giving the user immediate graph connectivity instead of waiting for a full audit pass.
 
 ## Blocked Format
 

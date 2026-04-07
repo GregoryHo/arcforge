@@ -50,6 +50,8 @@ Scan notes that have plain-text relationship fields (created by `arc-writing-obs
 
 Only modify notes during LINK — never during LINT or GROW.
 
+**Single-file mode:** When invoked with `link --file=<path>`, run LINK on only that one note instead of scanning the batch. This is used by `arc-writing-obsidian`'s `--link` flag for immediate post-creation linking. Same resolution logic, just scoped to one file.
+
 **Example transformation:**
 ```
 Before: Related to Karpathy's LLM Wiki concept
@@ -69,6 +71,36 @@ Check for:
 | **Stale detection** | Source notes older than 30 days with no synthesis note referencing them |
 | **Tag hygiene** | Unused tags, inconsistent naming (e.g., `#AI` vs `#ai`), missing tags |
 | **Untyped notes** | Notes without a `type` field in frontmatter — report but never auto-fix |
+| **Index freshness** | Auto-generate or update `index.md` in the vault root (see below) |
+| **Log consistency** | Verify `log.md` entries reference existing vault files; flag gaps where notes exist without log entries |
+
+#### index.md — Central Navigation
+
+During every LINT pass, generate or update `index.md` in the vault root. This is the LLM's primary orientation file — it reads `index.md` first to find relevant pages before drilling into individual notes.
+
+Format: organize by page type, one line per note with a wikilink and one-line summary.
+
+```markdown
+# Vault Index
+Last updated: YYYY-MM-DD
+
+## Sources
+- [[Note Title]] — one-line summary
+
+## Entities
+- [[Note Title]] — one-line summary
+
+## Syntheses
+- [[Note Title]] — one-line summary
+
+## Maps of Content
+- [[Note Title]] — one-line summary
+
+## Decisions
+- [[Note Title]] — one-line summary
+```
+
+Only include typed wiki-layer notes (skip Raw Sources, audit reports, and plugin-managed files). If a note has no `type` frontmatter, list it under an "Untyped" section at the bottom.
 
 Do not attempt to detect contradictions automatically — that requires semantic understanding beyond reliable automation. Flag notes that discuss the same entity with different claims and let the user judge.
 
@@ -82,6 +114,13 @@ Analyze the vault structure and suggest artifacts that would strengthen the know
 | 3+ notes mention an entity with no entity note | "Consider an entity note for [name]" |
 | A topic area has 8+ notes with no MOC | "Consider a Map of Content for [topic]" |
 | Source notes reference related entities that don't exist | "These entities appear in sources but have no notes: [list]" |
+| **LINK failures** → unresolved plain-text mentions | "LINK couldn't resolve these mentions — consider creating entity notes: [list]" |
+
+#### GROW from LINK Failures
+
+When LINK runs before GROW (either in sequence or via full audit), collect all plain-text mentions that LINK could not resolve to a vault match. Pass these to GROW as high-confidence entity candidates — they represent concepts the user has written about but hasn't formalized into notes yet.
+
+This creates a tight feedback loop: LINK → unresolved mentions → GROW suggestions → user approves → writer creates entity notes → next LINK pass resolves them.
 
 Present suggestions as a ranked list — most impactful first. The user approves, then invokes `arc-writing-obsidian` to create.
 
@@ -90,6 +129,7 @@ Present suggestions as a ranked list — most impactful first. The user approves
 | Command | Action |
 |---------|--------|
 | `/arc-auditing-obsidian link` | Run LINK on recent unlinked notes |
+| `/arc-auditing-obsidian link --file=<path>` | Run LINK on a single note (used by writer's `--link` flag) |
 | `/arc-auditing-obsidian lint` | Full vault health report |
 | `/arc-auditing-obsidian grow` | Gap analysis + suggestions |
 | `/arc-auditing-obsidian` (no args) | All three in sequence: LINK → LINT → GROW |

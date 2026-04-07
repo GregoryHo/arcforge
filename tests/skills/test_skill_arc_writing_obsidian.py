@@ -79,3 +79,27 @@ def test_arc_writing_obsidian_no_vault_awareness():
     """Writer must NOT resolve wikilinks — that's the auditor's job."""
     text = _read_skill().lower()
     assert "plain text" in text and "relationship" in text
+
+
+def test_arc_writing_obsidian_has_query_as_ingest():
+    """Writer must support filing conversation insights back as artifacts."""
+    text = _read_skill().lower()
+    assert "query-as-ingest" in text or "file this back" in text
+
+
+def test_arc_writing_obsidian_has_batch_mode():
+    """Writer must support batch ingestion of raw files."""
+    text = _read_skill().lower()
+    assert "batch" in text and ("--batch" in text or "batch mode" in text)
+
+
+def test_arc_writing_obsidian_has_session_log():
+    """Writer must dual-write to log.md for LLM-parseable activity tracking."""
+    text = _read_skill().lower()
+    assert "log.md" in text and "session log" in text
+
+
+def test_arc_writing_obsidian_has_link_on_create():
+    """Writer must support --link flag for immediate post-creation linking."""
+    text = _read_skill().lower()
+    assert "--link" in text and "link-on-create" in text
