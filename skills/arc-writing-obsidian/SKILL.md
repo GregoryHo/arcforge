@@ -1,6 +1,6 @@
 ---
 name: arc-writing-obsidian
-description: Use when the user wants to capture ideas, research, decisions, or conversations as structured Obsidian vault artifacts. Trigger on any mention of creating notes, documents, diagrams, or saving something to a vault. Also trigger when the user shares a URL or article to save, discusses a concept worth documenting, makes a decision worth recording, or when a brainstorm produces something worth preserving — even if they don't explicitly say "Obsidian" or "vault." Covers knowledge capture, second brain, note-taking, and wiki workflows.
+description: Use when the user wants to capture ideas, research, decisions, or conversations as structured Obsidian vault artifacts. Trigger on any mention of creating notes, documents, diagrams, or saving something to a vault. Also trigger when the user shares a URL or article to save, discusses a concept worth documenting, makes a decision worth recording, or when a brainstorm produces something worth preserving — even if they don't explicitly say "Obsidian" or "vault." Also trigger when the user wants to ingest non-Markdown files into the vault — Excalidraw drawings, PDFs, HTML reports, screenshots, or any Raw Source that should become a wiki note. Covers knowledge capture, second brain, note-taking, wiki workflows, and Raw Source ingestion.
 ---
 
 # arc-writing-obsidian
@@ -183,19 +183,28 @@ Logs do not create a new file. Append to the daily note using the obsidian-cli s
 [Content — brief, timestamped, factual]
 ```
 
-## Excalidraw Ingest
+## Raw Source Ingest
 
-Excalidraw drawings (`.excalidraw.md`) are **Raw Sources** in Karpathy's three-layer model — immutable originals that should be ingested into the wiki layer as text.
+In Karpathy's three-layer model, anything that isn't a Markdown wiki note is a **Raw Source** — immutable originals that should be ingested into the wiki layer as text. This includes Excalidraw drawings, PDFs, HTML reports, screenshots, and any other non-Markdown file in the vault.
 
-When the user shares an Excalidraw drawing or asks to document one:
+When the user shares a non-Markdown file or asks to document one:
 
-1. **Extract** — Read the `## Text Elements` section (ignore `## Drawing` compressed data)
+1. **Detect format** — Determine file type and choose extraction method:
+
+   | File Type | Extraction Method |
+   |-----------|------------------|
+   | `.excalidraw.md` | Read `## Text Elements` section (ignore `## Drawing` compressed data) |
+   | `.html` | Use `defuddle` skill or read raw HTML |
+   | `.pdf` | Read with Claude's PDF reader |
+   | `.png` / `.jpg` | Describe with Claude's vision |
+   | URL | Use `defuddle` skill or WebFetch |
+
 2. **Classify** — The result is always a **Source** note
 3. **Create** — Write a Source note with:
-   - `source_url` pointing to the original drawing (relative vault path)
-   - Summary synthesized from the extracted text elements
-   - Key Takeaways distilled from the concepts and relationships visible in the drawing
-4. **Preserve** — Never modify the original `.excalidraw.md` file
+   - `source_url` pointing to the original file (relative vault path or URL)
+   - Summary synthesized from extracted content
+   - Key Takeaways distilled from the source material
+4. **Preserve** — Never modify the original file
 
 **Example:**
 ```
@@ -205,7 +214,7 @@ Source note: autonomous-agent-core-concepts.md
      source_url: "Excalidraw/AI/autonomous-agent-core-concepts.excalidraw.md"
 ```
 
-The original drawing stays immutable. Knowledge flows into the wiki as text, where the auditor can LINK it into the knowledge graph.
+The original file stays immutable. Knowledge flows into the wiki as text, where the auditor can LINK it into the knowledge graph.
 
 ## Artifact Tiers
 

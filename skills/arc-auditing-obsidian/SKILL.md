@@ -21,11 +21,20 @@ The auditor operates on the **wiki layer** — plain Markdown notes (`.md`) that
 ### What to skip
 
 - **Plugin-managed folders** — Detect dynamically, not by hardcoded path. If the Excalidraw plugin is installed, read its script folder via `obsidian eval code="app.plugins.plugins['obsidian-excalidraw-plugin'].settings.scriptFolderPath"` and exclude that folder. Apply the same pattern for any plugin that stores non-note files in the vault.
-- **`.excalidraw.md` files** — These are Raw Sources (drawings), not wiki-layer notes. Their knowledge should be ingested into Source notes via `arc-writing-obsidian` before the auditor can work with it.
+- **Raw Source files** — Non-Markdown files (`.excalidraw.md`, `.html`, `.pdf`, `.png`, `.jpg`, `.canvas`) are Raw Sources, not wiki-layer notes. Their knowledge should be ingested into Source notes via `arc-writing-obsidian` before the auditor can work with it.
 
 ### GROW: Un-ingested Raw Sources
 
-During GROW, detect `.excalidraw.md` files that have meaningful `## Text Elements` content but no corresponding Source note (no `.md` file with `source_url` pointing to the drawing). Suggest: "This drawing has content that hasn't been ingested into the wiki — consider running `arc-writing-obsidian` to create a Source note from it."
+During GROW, detect non-Markdown files that have meaningful content but no corresponding Source note (no `.md` file with `source_url` pointing to the file).
+
+| File Type | How to detect meaningful content |
+|-----------|--------------------------------|
+| `.excalidraw.md` | Has `## Text Elements` with text content |
+| `.html` | File size > 1KB |
+| `.pdf` | Exists in vault |
+| `.png` / `.jpg` | Not inside a plugin-managed folder |
+
+Suggest: "These files have content that hasn't been ingested into the wiki — consider running `arc-writing-obsidian` to create Source notes from them."
 
 ## Operations
 
