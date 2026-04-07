@@ -1,6 +1,6 @@
 ---
 name: arc-writing-obsidian
-description: Use when the user wants to capture ideas, research, decisions, or conversations as structured Obsidian vault artifacts. Trigger on any mention of notes, documents, diagrams, knowledge capture, second brain, Obsidian, vault, or when the user shares a URL/article to save. Also trigger when a brainstorm or discussion naturally produces something worth preserving.
+description: Use when the user wants to capture ideas, research, decisions, or conversations as structured Obsidian vault artifacts. Trigger on any mention of creating notes, documents, diagrams, or saving something to a vault. Also trigger when the user shares a URL or article to save, discusses a concept worth documenting, makes a decision worth recording, or when a brainstorm produces something worth preserving — even if they don't explicitly say "Obsidian" or "vault." Covers knowledge capture, second brain, note-taking, and wiki workflows.
 ---
 
 # arc-writing-obsidian

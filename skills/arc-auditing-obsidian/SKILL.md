@@ -1,6 +1,6 @@
 ---
 name: arc-auditing-obsidian
-description: Use when the user wants to check vault health, find missing links, detect orphan notes, identify knowledge gaps, or maintain their Obsidian knowledge graph. Trigger on mentions of vault audit, missing connections, orphan notes, wikilinks, knowledge graph maintenance, vault hygiene, or when bulk note creation just happened. Also trigger when the user says "check my notes" or "what's missing in my vault."
+description: Use when the user wants to check vault health, find missing links, detect orphan notes, identify knowledge gaps, or maintain their Obsidian knowledge graph. Trigger on mentions of vault audit, missing connections, orphan notes, wikilinks, knowledge graph maintenance, vault cleanup, or stale notes. Also trigger when the user says "check my notes," "what's missing," "link my notes," "audit my vault," or after bulk note creation in a session. Even if the user just says "clean up my vault" or "anything I should connect?" — this skill applies.
 argument-hint: "[link|lint|grow] — or no argument to run all three"
 ---
 
