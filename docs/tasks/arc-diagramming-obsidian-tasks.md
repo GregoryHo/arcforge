@@ -4,7 +4,7 @@
 > **Architecture:** Independent skill delegated from arc-writing-obsidian. JSON direct write for generation. Render-validate loop via any available Chrome access.
 > **Tech Stack:** Excalidraw JSON format, coleam00 methodology, obsidian-cli for vault ops
 
-> **For Claude:** Use arc-agent-driven or arc-executing-tasks to implement.
+> **For Claude:** Use arc-agent-driven or arc-executing-tasks to implement. After Task 5, run behavioral evals via skill-creator before continuing.
 
 ## Context
 
@@ -270,7 +270,76 @@ Expected: Still PASS
 
 ---
 
-### Task 6: Update arc-writing-obsidian delegation
+### Task 6: Behavioral eval — does the skill actually produce better diagrams?
+
+**This is qualitative evaluation — visual outputs need human judgment.**
+
+**Step 1: Write test prompts**
+
+Save to `skills/arc-diagramming-obsidian-workspace/evals/evals.json`:
+
+```json
+{
+  "skill_name": "arc-diagramming-obsidian",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Draw me a diagram showing how arc-writing-obsidian works — the classify/confirm/create pipeline, 6 page types, and how they flow into the vault",
+      "expected_output": "An .excalidraw file with fan-out pattern from Classify to 6 types, convergence into Vault, cool minimal colors, hand-drawn style"
+    },
+    {
+      "id": 2,
+      "prompt": "I need an architecture diagram for a RAG pipeline — document ingestion, chunking, embedding, vector store, query, reranking, and LLM generation",
+      "expected_output": "An .excalidraw file with assembly-line pattern showing the transformation pipeline, with evidence artifacts (real embedding dimensions, chunk sizes)"
+    },
+    {
+      "id": 3,
+      "prompt": "Visualize the relationship between Karpathy's 3-layer wiki model — raw sources, the wiki layer, and the schema — show how ingest/query/lint operations connect them",
+      "expected_output": "An .excalidraw file with multiple patterns (side-by-side for layers, arrows for operations), clear visual hierarchy"
+    }
+  ]
+}
+```
+
+**Step 2: Run with-skill and without-skill agents**
+
+For each test prompt, spawn two agents in the same turn:
+- **With skill:** Point agent at `skills/arc-diagramming-obsidian/SKILL.md`, save outputs to `workspace/iteration-1/<eval-name>/with_skill/outputs/`
+- **Without skill:** Same prompt, no skill, save to `workspace/iteration-1/<eval-name>/without_skill/outputs/`
+
+**Step 3: Render all outputs to PNG**
+
+For each `.excalidraw` file produced, render via available Chrome access or Playwright:
+```bash
+cd ~/GitHub/AI/excalidraw-diagram-skill/references && uv run python render_excalidraw.py <path-to-excalidraw> --output <path-to-png>
+```
+
+**Step 4: Launch eval viewer for human review**
+
+```bash
+python -m scripts.aggregate_benchmark workspace/iteration-1 --skill-name arc-diagramming-obsidian
+nohup python <skill-creator-path>/eval-viewer/generate_review.py workspace/iteration-1 --skill-name "arc-diagramming-obsidian" --benchmark workspace/iteration-1/benchmark.json > /dev/null 2>&1 &
+```
+
+Tell user: "Results are in the browser — Outputs tab lets you compare with/without skill diagrams. Leave feedback on each."
+
+**Step 5: Read feedback and iterate**
+
+Read `feedback.json`. Focus on:
+- Did the skill produce valid Excalidraw JSON?
+- Did it follow the visual patterns?
+- Did it apply cool minimal colors?
+- Did it run the render-validate loop?
+- How does it compare to without-skill output?
+
+Fix SKILL.md based on feedback. Re-run into `iteration-2/`. Repeat until user is satisfied.
+
+**Step 6: Commit**
+`git commit -m "test(skills): behavioral eval for arc-diagramming-obsidian"`
+
+---
+
+### Task 7: Update arc-writing-obsidian delegation
 
 **Files:**
 - Modify: `skills/arc-writing-obsidian/SKILL.md`
@@ -296,7 +365,7 @@ Expected: ALL 181+ tests PASS (no regressions)
 
 ---
 
-### Task 7: Final validation + cleanup
+### Task 8: Final validation + cleanup
 
 **Step 1: Run full test suite**
 Run: `npm test`
