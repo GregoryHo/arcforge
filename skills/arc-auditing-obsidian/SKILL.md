@@ -10,6 +10,23 @@ Wiki Lint Layer — maintain knowledge graph health through three operations: LI
 
 The core insight: wikis die from maintenance burden, not lack of content. This skill eliminates that burden by automating the tedious work — resolving links, checking consistency, finding gaps — so the vault keeps growing in value.
 
+## Scope
+
+The auditor operates on the **wiki layer** — plain Markdown notes (`.md`) that represent processed knowledge. It does not operate on Raw Sources directly.
+
+### What to scan
+
+- All `.md` files that are user-created knowledge artifacts
+
+### What to skip
+
+- **Plugin-managed folders** — Detect dynamically, not by hardcoded path. If the Excalidraw plugin is installed, read its script folder via `obsidian eval code="app.plugins.plugins['obsidian-excalidraw-plugin'].settings.scriptFolderPath"` and exclude that folder. Apply the same pattern for any plugin that stores non-note files in the vault.
+- **`.excalidraw.md` files** — These are Raw Sources (drawings), not wiki-layer notes. Their knowledge should be ingested into Source notes via `arc-writing-obsidian` before the auditor can work with it.
+
+### GROW: Un-ingested Raw Sources
+
+During GROW, detect `.excalidraw.md` files that have meaningful `## Text Elements` content but no corresponding Source note (no `.md` file with `source_url` pointing to the drawing). Suggest: "This drawing has content that hasn't been ingested into the wiki — consider running `arc-writing-obsidian` to create a Source note from it."
+
 ## Operations
 
 ### LINK — Resolve relationships into wikilinks

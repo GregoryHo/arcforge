@@ -183,6 +183,30 @@ Logs do not create a new file. Append to the daily note using the obsidian-cli s
 [Content — brief, timestamped, factual]
 ```
 
+## Excalidraw Ingest
+
+Excalidraw drawings (`.excalidraw.md`) are **Raw Sources** in Karpathy's three-layer model — immutable originals that should be ingested into the wiki layer as text.
+
+When the user shares an Excalidraw drawing or asks to document one:
+
+1. **Extract** — Read the `## Text Elements` section (ignore `## Drawing` compressed data)
+2. **Classify** — The result is always a **Source** note
+3. **Create** — Write a Source note with:
+   - `source_url` pointing to the original drawing (relative vault path)
+   - Summary synthesized from the extracted text elements
+   - Key Takeaways distilled from the concepts and relationships visible in the drawing
+4. **Preserve** — Never modify the original `.excalidraw.md` file
+
+**Example:**
+```
+Raw Source: Excalidraw/AI/autonomous-agent-core-concepts.excalidraw.md
+     ↓ Ingest
+Source note: autonomous-agent-core-concepts.md
+     source_url: "Excalidraw/AI/autonomous-agent-core-concepts.excalidraw.md"
+```
+
+The original drawing stays immutable. Knowledge flows into the wiki as text, where the auditor can LINK it into the knowledge graph.
+
 ## Artifact Tiers
 
 **Tier 1 (default):** Markdown notes + embedded Mermaid diagrams. Use for all page types.
