@@ -213,6 +213,8 @@ The original drawing stays immutable. Knowledge flows into the wiki as text, whe
 
 **Tier 2 (spatial):** Canvas (.canvas) files. Use when the user explicitly asks for a mind map, visual board, or relationship web — or when the content is fundamentally spatial (many nodes with cross-connections that linear text can't capture). Delegate canvas creation to the `json-canvas` skill.
 
+**Tier 3 (visual argument):** Excalidraw diagrams. Use when the user explicitly asks for a diagram, architecture visualization, or when a Synthesis note needs a relationship diagram more expressive than Mermaid. Delegate to `arc-diagramming-obsidian`.
+
 ## Delegation
 
 Delegate format correctness to kepano's obsidian skills — they know the syntax rules, this skill knows the workflow:
@@ -220,6 +222,7 @@ Delegate format correctness to kepano's obsidian skills — they know the syntax
 - Markdown formatting → invoke `/obsidian:obsidian-markdown`
 - Canvas creation → invoke `/obsidian:json-canvas`
 - Daily note append → invoke `/obsidian:obsidian-cli`
+- Excalidraw diagrams → invoke `arc-diagramming-obsidian`
 
 ## Relationship Handling
 
