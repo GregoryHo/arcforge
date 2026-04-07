@@ -66,6 +66,7 @@ Examples:
 - "Let's build X" → arc-brainstorming (if design is unclear) or arc-writing-tasks (if requirements are known)
 - "Fix this bug" → arc-debugging (if cause unknown) or arc-tdd (if cause is clear)
 - "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists), arc-implementing (if in worktree)
+- "Save this to my vault" or "create a note about X" → arc-writing-obsidian
 
 ## Discipline Skills — Conditional Triggers
 
@@ -78,6 +79,7 @@ These skills activate **during any workflow** when the condition is met. They ar
 | About to claim work is complete | `arc-verifying` | No completion claims without fresh verification evidence |
 | Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
 | Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
+| User asks about vault health, missing links, or orphan notes | `arc-auditing-obsidian` | Propose changes, never auto-modify without approval |
 
 **The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
 
