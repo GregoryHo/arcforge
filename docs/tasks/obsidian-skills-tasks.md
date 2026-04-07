@@ -279,20 +279,26 @@ Expected: PASS (all 9 tests)
 **Files:**
 - Modify: `skills/arc-using/SKILL.md`
 
-**Step 1: Add routing entries**
+**Step 1: Add writer to Skill Priority section**
 
-Add to the Discipline Skills table in arc-using:
+Add example to the existing Skill Priority examples list:
+```
+- "Create a note/document/diagram for Obsidian" → arc-writing-obsidian
+```
+
+**Step 2: Add auditor to Discipline Skills table**
+
+Add to the Discipline Skills — Conditional Triggers table:
 
 | Condition | Skill | Iron Law |
 |-----------|-------|----------|
-| User asks to create a note, document, or diagram for Obsidian | `arc-writing-obsidian` | Classify before creating — never guess artifact type |
 | User asks about vault health, missing links, or orphan notes | `arc-auditing-obsidian` | Propose changes, never auto-modify without approval |
 
-**Step 2: Run test**
+**Step 3: Run test**
 Run: `npm run test:skills`
 Expected: All tests PASS (161 existing + 17 new = 178)
 
-**Step 3: Commit**
+**Step 4: Commit**
 `git commit -m "feat(skills): register obsidian skills in arc-using routing table"`
 
 ---
@@ -309,3 +315,67 @@ Expected: All 4 runners pass
 
 **Step 3: Commit (if lint fixes needed)**
 `git commit -m "chore: lint fixes for obsidian skills"`
+
+---
+
+### Task 7: Real-prompt evaluation — arc-writing-obsidian
+
+Test the writer skill with realistic user scenarios. Create test prompts and run Claude with the skill loaded.
+
+**Test prompts:**
+
+1. **Source ingestion**: "I just read this article about RAG vs fine-tuning, here's the key points: [paste]. Save this to my vault."
+2. **Entity creation**: "I keep hearing about LangGraph — what is it and can you add it to my notes?"
+3. **Synthesis from conversation**: "We've been discussing Karpathy's LLM Wiki and kepano's file-over-app philosophy. How do they relate? Create a note connecting these ideas."
+4. **Decision capture**: "I'm choosing between Obsidian Sync and git for vault backup. Sync is easier but costs money, git is free but manual. I'm going with git."
+5. **Fast path test**: "Log: met with Alice about the API migration timeline — targeting Q3"
+
+**Evaluation criteria:**
+- Does it classify the correct page type?
+- Does it use the confirm step (or correctly skip via fast path)?
+- Is the frontmatter schema correct for the page type?
+- Does it delegate to kepano's obsidian-markdown skill?
+- Are relationships left as plain text (not wikilinks)?
+- Is the output a note you'd actually want in your vault?
+
+**Step 1:** Save test prompts to `evals/arc-writing-obsidian/evals.json`
+**Step 2:** Run each prompt with the skill loaded, save outputs
+**Step 3:** Review outputs qualitatively — iterate on SKILL.md if needed
+**Step 4:** Commit any improvements
+
+---
+
+### Task 8: Real-prompt evaluation — arc-auditing-obsidian
+
+Test the auditor skill against a sample vault structure.
+
+**Test prompts:**
+
+1. **Link pass**: "I just created 3 new notes. Can you link them into my vault?" (provide sample notes with plain-text relationships)
+2. **Lint pass**: "Check my vault health" (provide sample notes, some missing frontmatter, some orphans)
+3. **Grow pass**: "What's missing in my vault?" (provide 5+ source notes on a topic with no synthesis note)
+
+**Evaluation criteria:**
+- Does LINK correctly identify plain-text relationships and propose wikilinks?
+- Does LINT catch schema violations and orphan notes?
+- Does GROW propose (not auto-create) new artifacts?
+- Does the audit report use the correct format?
+- Does it batch correctly (default 50 most recent)?
+
+**Step 1:** Create sample vault fixture in `evals/arc-auditing-obsidian/`
+**Step 2:** Run each prompt with the skill loaded, save outputs
+**Step 3:** Review outputs qualitatively — iterate on SKILL.md if needed
+**Step 4:** Commit any improvements
+
+---
+
+### Task 9: Description optimization
+
+After skills are stable and eval passes, optimize the `description` frontmatter field for reliable triggering.
+
+**Step 1:** Draft 20 trigger eval queries (10 should-trigger, 10 should-not-trigger) per skill
+**Step 2:** Run description optimization loop (skill-creator methodology)
+**Step 3:** Update SKILL.md frontmatter with optimized descriptions
+**Step 4:** Verify pytest still passes
+**Step 5:** Commit
+`git commit -m "feat(skills): optimize obsidian skill descriptions for triggering"`

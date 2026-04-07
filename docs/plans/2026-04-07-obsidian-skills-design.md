@@ -3,8 +3,8 @@
 ## Vision
 
 Two complementary skills that bring Karpathy's LLM Wiki pattern to Obsidian:
-- **arc-obsidian-writer**: Conversational Crystallizer — classifies ideas into Karpathy page types and creates opinionated Obsidian artifacts
-- **arc-obsidian-auditor**: Wiki Lint Layer — maintains knowledge graph health through linking, linting, and gap detection
+- **arc-writing-obsidian**: Conversational Crystallizer — classifies ideas into Karpathy page types and creates opinionated Obsidian artifacts
+- **arc-auditing-obsidian**: Wiki Lint Layer — maintains knowledge graph health through linking, linting, and gap detection
 
 Philosophy: kepano's "file over app" (plain markdown, no plugins) + Karpathy's "persistent compounding wiki" (LLM-maintained, schema-driven).
 
@@ -24,7 +24,7 @@ All notes follow a strict frontmatter schema per page type. This is the contract
 - **Tier 2 (spatial)**: Canvas (.canvas) for mind maps and relationship webs
 - **Tier 3 (skip for now)**: Bases (.base), Excalidraw
 
-## Document Writer — arc-obsidian-writer
+## Document Writer — arc-writing-obsidian
 
 ### Skill Type
 Workflow (sequential pipeline with clear start/end)
@@ -197,7 +197,7 @@ Writer leaves relationship fields as plain text (not wikilinks). The auditor res
 - Canvas creation → `/obsidian:json-canvas`
 - Daily note append → `/obsidian:obsidian-cli`
 
-## Wiki Auditor — arc-obsidian-auditor
+## Wiki Auditor — arc-auditing-obsidian
 
 ### Skill Type
 Discipline (cross-cutting quality gate, fires standalone or during workflows)
@@ -228,10 +228,10 @@ Discipline (cross-cutting quality gate, fires standalone or during workflows)
 
 | Command | Action |
 |---------|--------|
-| `/auditor link` | LINK on recent unlinked notes |
-| `/auditor lint` | Full vault health report |
-| `/auditor grow` | Gap analysis + suggestions |
-| `/auditor` | All three: link → lint → grow |
+| `/arc-auditing-obsidian link` | LINK on recent unlinked notes |
+| `/arc-auditing-obsidian lint` | Full vault health report |
+| `/arc-auditing-obsidian grow` | Gap analysis + suggestions |
+| `/arc-auditing-obsidian` | All three: link → lint → grow |
 
 ### Output
 Audit report note in vault (type: audit-report) with findings and suggested actions. Only LINK modifies existing notes (adding wikilinks). LINT and GROW are suggestions only.
@@ -241,31 +241,39 @@ Audit report note in vault (type: audit-report) with findings and suggested acti
 ### Dependency Chain
 ```
 User
- ├── /arc-obsidian-writer   (Workflow)
+ ├── /arc-writing-obsidian   (Workflow)
  │    ├── /obsidian:obsidian-markdown
  │    ├── /obsidian:json-canvas
  │    └── /obsidian:obsidian-cli
  │
- └── /arc-obsidian-auditor  (Discipline)
+ └── /arc-auditing-obsidian  (Discipline)
       ├── /obsidian:obsidian-cli
       ├── /obsidian:obsidian-markdown
-      └── proposes → /arc-obsidian-writer (user approves)
+      └── proposes → /arc-writing-obsidian (user approves)
 ```
 
 ### arc-using Routing
 
-| Condition | Routes to |
-|-----------|-----------|
-| User asks to create a note/document/diagram for Obsidian | arc-obsidian-writer |
-| User asks about vault health, missing links, orphan notes | arc-obsidian-auditor |
-| User says "audit my vault" or "check my notes" | arc-obsidian-auditor |
-| Writer finishes creating 3+ artifacts in one session | Suggest arc-obsidian-auditor link |
+**Workflow routing** (Skill Priority section):
+- "Create a note/document/diagram for Obsidian" → `arc-writing-obsidian`
+
+**Discipline routing** (Conditional Triggers table):
+
+| Condition | Skill | Iron Law |
+|-----------|-------|----------|
+| User asks about vault health, missing links, or orphan notes | `arc-auditing-obsidian` | Propose changes, never auto-modify without approval |
+| Writer finishes creating 3+ artifacts in one session | `arc-auditing-obsidian` | Suggest link pass after bulk creation |
 
 ### What We Do NOT Build
 - No MCP server (use obsidian-cli skill)
 - No custom Obsidian plugin (file-first philosophy)
 - No RAG/vector search (Neural Composer territory)
 - No sync/backup (Obsidian Sync or git)
+
+### Naming Convention
+Design uses gerund-first per arcforge rules:
+- `arc-writing-obsidian` (not `arc-obsidian-writer`)
+- `arc-auditing-obsidian` (not `arc-obsidian-auditor`)
 
 ## Error Handling
 
