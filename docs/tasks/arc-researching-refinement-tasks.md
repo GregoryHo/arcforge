@@ -2,9 +2,9 @@
 
 > **Goal:** Close 3 structural gaps in arc-researching by adding Strategy section, Trials support, and external research to Stuck Protocol
 > **Architecture:** All edits to single file `skills/arc-researching/SKILL.md` — no new files or infrastructure
-> **Tech Stack:** Markdown skill definition, pytest for validation
+> **Tech Stack:** Markdown skill definition, pytest for validation, subagent pressure scenarios for RED/REFACTOR
 
-> **For Claude:** Use arc-executing-tasks to implement.
+> **For Claude:** Use arc-agent-driven or arc-executing-tasks to implement.
 
 ## Context
 
@@ -13,7 +13,103 @@ Reference: `~/GitHub/AI/autoresearch/program.md` (autoresearch's strategy docume
 
 ## Tasks
 
-### Task 1: Add tests for new Strategy and Trials sections
+### Task 1: RED — Baseline pressure scenarios (without edits)
+
+Run 3 subagent scenarios against the CURRENT arc-researching SKILL.md. Document baseline failures verbatim.
+
+**Step 1: Scenario A — No Strategy**
+
+Spawn a subagent with this prompt:
+```
+You are an AI agent using the arc-researching skill. Here is your research contract:
+
+# Research Config: esbuild-migration
+
+## Scope
+CAN modify: webpack.config.js, package.json scripts
+CANNOT modify: src/, tests/
+
+## Goal
+Metric: build_time_seconds
+Direction: lower-is-better
+Target: < 10s
+
+## Evaluation
+Run command: time npm run build 2>&1
+Extract metric: grep -oP 'real\s+\K[\d.]+'
+Timeout: 120
+
+You've just established baseline (22.4s). Generate your first 3 hypotheses.
+Do NOT actually run anything — just describe what you would try and why.
+```
+
+Observe: Does the agent have a domain-specific playbook, or does it guess generically?
+Record: Exact hypotheses and reasoning verbatim.
+
+**Step 2: Scenario B — No Trials**
+
+Spawn a subagent with this prompt:
+```
+You are an AI agent using the arc-researching skill. Your research contract says:
+
+Metric: skill_compliance_score
+Direction: higher-is-better
+
+You ran an experiment and got these results:
+- Run 1: 0.72
+
+Your baseline was 0.68. The metric is LLM-graded (a model judges whether the agent followed the skill).
+
+Should you keep or discard this experiment? Explain your reasoning.
+```
+
+Observe: Does the agent question the single-trial result, or accept it as signal?
+Record: Exact decision and reasoning verbatim.
+
+**Step 3: Scenario C — No External Research**
+
+Spawn a subagent with this prompt:
+```
+You are an AI agent using the arc-researching skill. You're optimizing build_time_seconds for a webpack project.
+
+Your last 4 experiments:
+1. Enable caching → discard (23.1s, baseline 22.4s)
+2. Parallel loaders → discard (22.8s)
+3. Split chunks → discard (24.0s)
+4. Reduce source maps → discard (22.6s)
+
+You're stuck. All 4 attempts in the "reduce work" direction failed.
+According to the Stuck Protocol, what do you do next? List your exact next steps.
+```
+
+Observe: Does the agent search externally (docs, web) or only re-read existing files?
+Record: Exact next steps verbatim.
+
+**Step 4: Document baseline**
+
+Save all 3 transcripts to `docs/research/arc-researching-baseline.md`:
+```markdown
+# arc-researching Baseline Behavior
+
+## Scenario A: No Strategy
+[agent's verbatim hypotheses]
+**Failure mode:** [description]
+
+## Scenario B: No Trials
+[agent's verbatim decision]
+**Failure mode:** [description]
+
+## Scenario C: No External Research
+[agent's verbatim next steps]
+**Failure mode:** [description]
+```
+
+**Step 5: Commit**
+`git commit -m "test(skills): document arc-researching baseline behavior (RED phase)"`
+
+---
+
+### Task 2: Add pytest structural tests (deployment validation)
 
 **Files:**
 - Modify: `tests/skills/test_skill_arc_researching.py`
@@ -61,16 +157,16 @@ Run: `npm run test:skills -- -k test_skill_arc_researching -v`
 Expected: 3 new tests FAIL (Strategy/Trials/external research not yet in SKILL.md)
 
 **Step 5: Commit**
-`git commit -m "test(skills): add tests for arc-researching strategy, trials, external research"`
+`git commit -m "test(skills): add structural tests for arc-researching strategy, trials, external research"`
 
 ---
 
-### Task 2: Add Strategy section to research-config.md template
+### Task 3: GREEN — Add Strategy section to research-config.md template
 
 **Files:**
 - Modify: `skills/arc-researching/SKILL.md`
 
-**Step 1: Insert Strategy section between Goal and Evaluation in template (after line 84, before line 86)**
+**Step 1: Insert Strategy section between Goal and Evaluation in template**
 
 Replace this block in the template:
 ```markdown
@@ -106,7 +202,7 @@ Expected: PASS
 
 ---
 
-### Task 3: Add Trials/Aggregation fields and update Phase 3 loop
+### Task 4: GREEN — Add Trials/Aggregation fields and update Phase 3 loop
 
 **Files:**
 - Modify: `skills/arc-researching/SKILL.md`
@@ -131,9 +227,7 @@ Trials: {1 | 3 | 5 — times to run per experiment; default 1 if omitted}
 Aggregation: {median | mean — how to combine trial results; default median}
 ```
 
-**Step 2: Add trials guidance table after Phase 1 Step 3 (after line 66, in the "Refine with Human" section)**
-
-Add this paragraph to the end of Phase 1, before Phase 2:
+**Step 2: Add trials guidance table after Phase 1, before Phase 2**
 
 ```markdown
 #### Choosing Trial Count
@@ -172,12 +266,12 @@ Expected: PASS
 
 ---
 
-### Task 4: Update Stuck Protocol with external research + remove suspicious footnote
+### Task 5: GREEN — Update Stuck Protocol with external research + trim suspicious footnote
 
 **Files:**
 - Modify: `skills/arc-researching/SKILL.md`
 
-**Step 1: Update Stuck Protocol (insert step between lines 141-142)**
+**Step 1: Update Stuck Protocol**
 
 Replace:
 ```markdown
@@ -224,7 +318,7 @@ With:
 - Try removing code instead of adding it — simplification often unlocks performance
 ```
 
-**Step 3: Remove the "If results are suspicious" footnote (lines 224-228)**
+**Step 3: Trim the "If results are suspicious" footnote**
 
 Replace:
 ```markdown
@@ -245,16 +339,61 @@ With:
 
 **Step 4: Run tests**
 Run: `npm run test:skills -- -k test_arc_researching -v`
-Expected: ALL arc-researching tests PASS (including new ones from Task 1)
+Expected: ALL arc-researching tests PASS (including new ones from Task 2)
 
 **Step 5: Commit**
 `git commit -m "feat(skills): add external research to arc-researching stuck protocol"`
 
 ---
 
-### Task 5: Trim to word budget + final verification
+### Task 6: REFACTOR — Re-run pressure scenarios with edits applied
 
-Current SKILL.md is 1850 words. After Tasks 2-4, it'll be ~1970. Need to trim ~170 words to stay under 1800.
+Re-run the same 3 scenarios from Task 1, now with the updated SKILL.md in context.
+
+**Step 1: Re-run Scenario A (Strategy)**
+
+Same prompt as Task 1 Step 1, but provide the UPDATED SKILL.md as context.
+Compare: Are hypotheses now domain-informed (using playbook/research sources)?
+
+**Step 2: Re-run Scenario B (Trials)**
+
+Same prompt as Task 1 Step 2, with updated SKILL.md.
+Compare: Does agent now question single-trial reliability for stochastic metrics?
+
+**Step 3: Re-run Scenario C (External Research)**
+
+Same prompt as Task 1 Step 3, with updated SKILL.md.
+Compare: Does agent now include WebSearch/docs in its stuck recovery?
+
+**Step 4: Document comparison**
+
+Append to `docs/research/arc-researching-baseline.md`:
+```markdown
+## Post-Edit Behavior (GREEN)
+
+### Scenario A: With Strategy
+[agent's verbatim hypotheses]
+**Improvement:** [description]
+
+### Scenario B: With Trials
+[agent's verbatim decision]
+**Improvement:** [description]
+
+### Scenario C: With External Research
+[agent's verbatim next steps]
+**Improvement:** [description]
+```
+
+**Step 5: If any scenario still fails** — identify the rationalization, add explicit counter to SKILL.md, re-test that scenario. Repeat until all 3 pass.
+
+**Step 6: Commit**
+`git commit -m "test(skills): document arc-researching post-edit behavior (GREEN phase)"`
+
+---
+
+### Task 7: Trim to word budget + final verification
+
+Current SKILL.md is 1850 words. After Tasks 3-5, it'll be ~1970. Need to trim ~170 words to stay under 1800.
 
 **Step 1: Trim candidates (pick enough to reach <1800w)**
 
@@ -279,5 +418,5 @@ Expected: ALL 4 runners pass
 **Step 5: Commit**
 `git commit -m "refactor(skills): trim arc-researching to word budget"`
 
-**Step 6: Commit task file cleanup**
+**Step 6: Cleanup**
 `git rm docs/tasks/arc-researching-refinement-tasks.md && git commit -m "chore: remove completed task file"`
