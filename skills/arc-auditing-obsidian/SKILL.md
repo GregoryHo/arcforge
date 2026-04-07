@@ -47,6 +47,7 @@ Scan notes that have plain-text relationship fields (created by `arc-writing-obs
 3. Replace plain text with `[[wikilinks]]` where matches are found
 4. Add backlink references to target notes: append "Referenced by: `[[source note]]`" to the target's Relationships section
 5. Update MOC notes when new notes match their declared scope
+6. Collect all plain-text mentions where no vault match was found into an unresolved mentions list. Pass this list to GROW if GROW runs in the same session (see GROW from LINK Failures)
 
 Only modify notes during LINK — never during LINT or GROW.
 
@@ -72,7 +73,7 @@ Check for:
 | **Tag hygiene** | Unused tags, inconsistent naming (e.g., `#AI` vs `#ai`), missing tags |
 | **Untyped notes** | Notes without a `type` field in frontmatter — report but never auto-fix |
 | **Index freshness** | Auto-generate or update `index.md` in the vault root (see below) |
-| **Log consistency** | Verify `log.md` entries reference existing vault files; flag gaps where notes exist without log entries |
+| **Log consistency** | Verify `log.md` entries reference existing vault files; for notes with `created:` date newer than the first `log.md` entry, flag any missing log entries |
 
 #### index.md — Central Navigation
 

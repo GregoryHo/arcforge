@@ -34,6 +34,16 @@ When the user says "file this back," "save this insight," "keep this," or "cryst
 
 Go straight to Create with the conversational context as input. This makes compounding frictionless — valuable discussion threads become vault artifacts without re-deriving the page type. The insight here is from Karpathy: good answers should be filed back into the wiki as new pages, so explorations compound just like ingested sources.
 
+### LINK-on-Create
+
+When invoked with `--link`, add an automatic linking step after Create:
+
+1. Create the note (normal pipeline)
+2. Invoke `arc-auditing-obsidian link --file=<path>` on the new note only
+3. Report both creation and linking results
+
+This preserves separation of concerns — the writer delegates linking to the auditor — while giving the user immediate graph connectivity instead of waiting for a full audit pass.
+
 ## Page Types
 
 Classify user input into one of these six types. The trigger signals help — but use judgment, not keyword matching.
@@ -232,7 +242,7 @@ When invoked with `--batch` on a folder of raw files:
 1. **Scan** — List all files in the target folder
 2. **Auto-classify** — Classify each file using fast-path only (skip Confirm unless classification is genuinely ambiguous)
 3. **Create** — Process each file sequentially, creating typed notes
-4. **Log** — Append each creation to `log.md` (see Session Log)
+4. **Log** — Append each creation to `log.md`: `## [YYYY-MM-DD] create | [type] | [filename]`
 5. **Summarize** — Emit a batch summary: `✅ Batch complete: N notes created (X sources, Y entities, ...)`
 
 Batch mode trades per-source discussion for throughput. Use it for initial vault population or bulk ingestion of reference material. For ongoing curation where each source deserves attention, use the standard one-at-a-time pipeline.
@@ -299,20 +309,11 @@ If Obsidian is not running, fall back to direct file writes using the `obsidian-
 ✅ Created [type] note → [vault-path/filename.md]
 ```
 
-### LINK-on-Create
-
-When invoked with `--link`, run a targeted LINK pass on the newly created note immediately after creation:
-
-1. Create the note (normal pipeline)
-2. Invoke `arc-auditing-obsidian link --file=<path>` on the new note only
-3. Report both results:
-
+With `--link`:
 ```
 ✅ Created [type] note → [vault-path/filename.md]
    Linked: N relationships resolved
 ```
-
-This preserves separation of concerns — the writer delegates linking to the auditor — while giving the user immediate graph connectivity instead of waiting for a full audit pass.
 
 ## Blocked Format
 

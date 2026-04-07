@@ -87,7 +87,8 @@ def test_arc_auditing_obsidian_has_completion_formats():
 def test_arc_auditing_obsidian_has_single_file_link():
     """Auditor must support single-file LINK mode for post-creation linking."""
     text = _read_skill().lower()
-    assert "--file" in text and "single" in text.replace("single-file", "single file") or "--file" in text
+    assert "--file" in text
+    assert "single" in text
 
 
 def test_arc_auditing_obsidian_has_index_generation():
