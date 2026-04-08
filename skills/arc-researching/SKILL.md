@@ -11,28 +11,10 @@ Autonomous iterative research: define a measurable optimization target, establis
 
 ## When to Use
 
-```dot
-digraph when_to_use {
-    "Have a measurable metric?" [shape=diamond];
-    "Structured task list?" [shape=diamond];
-    "Free-form hypothesis iteration?" [shape=diamond];
-    "arc-researching" [shape=box];
-    "arc-looping" [shape=box];
-    "arc-implementing" [shape=box];
-    "Define metric first" [shape=box];
-
-    "Have a measurable metric?" -> "Structured task list?" [label="yes"];
-    "Have a measurable metric?" -> "Define metric first" [label="no"];
-    "Structured task list?" -> "arc-looping" [label="yes - DAG tasks"];
-    "Structured task list?" -> "Free-form hypothesis iteration?" [label="no"];
-    "Free-form hypothesis iteration?" -> "arc-researching" [label="yes"];
-    "Free-form hypothesis iteration?" -> "arc-implementing" [label="no - known solution"];
-}
-```
-
-**vs. arc-looping:** arc-looping executes a DAG of predefined tasks across sessions. arc-researching runs a free-form hypothesis-driven experiment loop within a single session — no predefined task list.
-
-**vs. arc-implementing:** arc-implementing follows a structured epic/feature/task plan. arc-researching iterates on hypotheses with no predetermined path.
+- Have a measurable metric? **No** → define metric first
+- Have a metric + structured task list? → **arc-looping** (DAG tasks across sessions)
+- Have a metric + free-form iteration? → **arc-researching** (hypothesis loop, single session)
+- Have a metric + known solution? → **arc-implementing** (structured plan)
 
 ## Iron Laws
 
@@ -75,28 +57,45 @@ Agent proposes, human reacts, refine iteratively, then lock.
 # Research Config: {target}
 
 ## Scope
-CAN modify: {files and directories the agent may change}
-CANNOT modify: {files and directories that are off-limits}
+CAN modify: {files/dirs the agent may change}
+CANNOT modify: {files/dirs that are off-limits}
 
 ## Goal
-Metric: {metric name, e.g., "build_time_seconds", "val_bpb", "p95_latency_ms"}
+Metric: {name, e.g., "build_time_seconds", "val_bpb"}
 Direction: {lower-is-better | higher-is-better}
-Target: {optional target value, e.g., "< 30s" or "none"}
+Target: {optional, e.g., "< 30s" or "none"}
+
+## Strategy
+Hypothesis playbook: {domain-specific approaches, ordered by likelihood}
+Research sources: {docs URLs, reference implementations, config files}
+First moves: {2-3 concrete experiments after baseline}
 
 ## Evaluation
-Run command: {exact shell command to execute, e.g., "npm run build 2>&1"}
-Extract metric: {grep/parse pattern to extract metric from output, e.g., "grep -oP 'Time: \K[\d.]+' build.log"}
-Timeout: {seconds per experiment, e.g., "300"}
+Run command: {exact shell command, e.g., "npm run build 2>&1"}
+Extract metric: {grep pattern, e.g., "grep -oP 'Time: \K[\d.]+' build.log"}
+Timeout: {seconds per experiment}
+Trials: {1 | 3 | 5 — runs per experiment; default 1 if omitted}
+Aggregation: {median | mean — default median}
 
 ## Constraints
-Soft constraints: {secondary considerations, e.g., "keep memory usage under 4GB", "maintain test pass rate"}
+{secondary considerations, e.g., "keep memory under 4GB"}
 
 ## Autonomy
 Mode: {run-until-interrupted | run-N-times | run-until-target}
 
 ## Simplicity Criterion
-{When two experiments achieve similar results, prefer simpler code. A small improvement that adds ugly complexity is not worth it. Removing code and getting equal or better results is a great outcome — that's a simplification win. Default examples: "0.1% improvement + 20 lines of hacky code? Probably not." "0.1% improvement from deleting code? Definitely keep." "No improvement but much simpler code? Keep."}
+{Prefer simpler code when results are similar. Removing code for equal results is a win. "0.1% + 20 hacky lines? No." "0.1% from deleting code? Yes." "No improvement but simpler? Keep."}
 ```
+
+#### Choosing Trial Count
+
+| Judge Type | Signal Stability | Recommended Trials |
+|------------|-----------------|-------------------|
+| Deterministic (build time, algorithm) | Stable ±2% | `1` |
+| Semi-stochastic (E2E tests, flaky metrics) | Varies ±10% | `3` |
+| Stochastic (LLM-graded eval, model behavior) | Varies ±30% | `5` with median |
+
+The contract author decides at lock time, not the loop at runtime. If Trials is omitted from an existing contract, default to `1`.
 
 ### Phase 2: Establish Baseline
 
@@ -119,9 +118,9 @@ LOOP (until stop condition):
   2. HYPOTHESIZE   — pick a direction based on results so far
   3. IMPLEMENT     — modify files within declared scope only
   4. COMMIT        — git commit with descriptive message
-  5. RUN           — execute command, redirect ALL output to run.log (never tee or raw stdout)
-  6. EXTRACT       — grep for metric in run.log (never read the full log)
-  7. DECIDE        — improved? keep. Same/worse? revert. Crash? log + revert.
+  5. RUN           — execute command `trials` times → run-1.log, run-2.log, ... (never tee or raw stdout)
+  6. EXTRACT       — grep metric from each log, compute aggregation (median/mean)
+  7. DECIDE        — aggregated value improved? keep. Same/worse? revert. Crash? log + revert.
   8. LOG           — append row to results.tsv (every experiment, no exceptions)
   9. ANALYZE       — 3+ failures in same direction? change direction entirely
 ```
@@ -139,11 +138,18 @@ LOOP (until stop condition):
 If **3 or more consecutive experiments** fail in the same direction (e.g., all trying to reduce allocations):
 1. Stop that line of investigation entirely
 2. Read all results so far and identify untried approaches
-3. Choose a fundamentally different direction
-4. If all major directions exhausted, try combinations of previously successful changes
+3. Research — search for domain knowledge you don't have yet:
+   - Read documentation for tools/libraries in the target files
+   - WebSearch for optimization techniques in this domain
+   - Check the Strategy section's research sources for unexplored leads
+   - Look at similar projects or reference implementations for patterns
+4. Choose a fundamentally different direction informed by your research
+5. If all major directions exhausted, try combinations of previously successful changes
 
 **Idea generation when stuck:**
 - Re-read the target files for angles you missed on first read
+- Search docs/web for domain-specific techniques you haven't tried
+- Read the Strategy section's research sources for unexplored leads
 - Try combining two previously successful changes
 - Try the opposite of your last 3 failed approaches
 - Try removing code instead of adding it — simplification often unlocks performance
@@ -222,20 +228,17 @@ If the agent is interrupted and resumes in a new session:
 - Ask the human questions during the experiment loop
 
 **If results are suspicious:**
-1. Check if the evaluation command is deterministic (run it twice, compare)
-2. Check if the metric extraction pattern matches correctly
-3. Check if external factors (network, disk, other processes) affect the metric
-4. If non-deterministic: run each experiment 3 times and use the median
+1. Check if the metric extraction pattern matches correctly
+2. Check if external factors (network, disk, other processes) affect the metric
+3. If variance is higher than expected, increase Trials in the contract (requires human approval to unlock and re-lock)
 
 ## Common Rationalizations
 
-| Rationalization | Why It's Wrong | What to Do Instead |
-|----------------|---------------|-------------------|
-| "The eval method has a bug, let me fix it" | You are the player, not the judge. Fixing the eval changes the game. | Stop the loop and tell the human the eval may be flawed. |
-| "This file is technically in scope" | If you have to argue about it, it's out of scope. | Check the CAN/CANNOT lists literally. |
-| "I'll skip logging this failed experiment" | Incomplete records make analysis impossible. Future you needs the full picture. | Log every experiment. No exceptions. |
-| "I should ask the human about this approach" | You are autonomous. The contract has everything you need. | Make your best judgment and log the reasoning. |
-| "The metric barely regressed, I'll keep it" | "Barely" is a slippery slope. The rule is binary: improved or not. | Revert. If the approach has promise, try a refined version next. |
+| Rationalization | What to Do Instead |
+|----------------|-------------------|
+| "The eval has a bug, let me fix it" | You're the player, not the judge. Stop and tell the human. |
+| "The metric barely regressed, I'll keep it" | Binary rule: improved or not. Revert. |
+| "I should ask the human about this" | You are autonomous. Decide, log reasoning, keep going. |
 
 ## Completion Format
 
@@ -260,14 +263,6 @@ If the agent is interrupted and resumes in a new session:
 
 ## Integration
 
-**Before:**
-- **arc-brainstorming** → explore what to optimize and identify measurable targets
-
-**Works with:**
-- **research dashboard** → `arc research dashboard` for live monitoring
-- **git** → branch-based isolation, commit per experiment, revert on failure
-
-**After:**
-- Review the `research/{tag}` branch
-- Cherry-pick or merge successful experiments to main
-- Run project tests to confirm nothing was broken outside scope
+**Before:** arc-brainstorming → explore what to optimize and identify measurable targets
+**During:** `arc research dashboard` for live monitoring
+**After:** Review `research/{tag}` branch, cherry-pick or merge to main, run project tests

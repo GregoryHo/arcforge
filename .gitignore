@@ -36,3 +36,5 @@ __pycache__/
 .serena/cache/
 
 .worktrees
+skills/*-workspace/
+hooks/.claude/

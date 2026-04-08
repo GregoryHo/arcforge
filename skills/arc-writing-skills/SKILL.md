@@ -79,15 +79,19 @@ API docs, syntax guides, tool documentation
 ```
 skills/
   skill-name/
-    SKILL.md              # Main reference (required)
-    supporting-file.*     # Only if needed
+    SKILL.md              # Core logic and decisions (required)
+    references/           # Detailed material, loaded on-demand
+      patterns.md         # Detailed patterns, examples
+      api.md              # API docs, syntax reference
+    scripts/              # Executable utilities (run, not loaded)
+    agents/               # Subagent templates
 ```
 
 **Flat namespace** - all skills in one searchable namespace
 
-**Separate files for:**
-1. **Heavy reference** (100+ lines) - API docs, comprehensive syntax
-2. **Reusable tools** - Scripts, utilities, templates
+**What stays in SKILL.md:** Iron law, decision logic, routing, red flags, checklists — anything the agent needs to make the right choice.
+
+**What moves to `references/`:** Detailed examples, API docs, comprehensive syntax, lengthy tables, extended rationale. Reference from SKILL.md so the agent knows when to load them.
 
 **Keep inline:** Principles, concepts, code patterns (< 50 lines)
 
@@ -182,12 +186,45 @@ Use words Claude would search for:
 
 ### 4. Token Efficiency
 
-**Target word counts (soft guidance, not test-enforced):**
-- Lean (< 500w): Simple triggers, thin wrappers
-- Standard (< 1000w): Most workflow skills
-- Comprehensive (< 1800w): Complex multi-path skills
-- Meta (< 2500w): Self-referential teaching skills (like this one)
-- Over limit? Move details to `references/` directory for progressive loading
+#### 3-Level Loading Model
+
+Skills use progressive disclosure — not everything loads at once:
+
+| Level | What loads | When | Token cost |
+|-------|-----------|------|------------|
+| **1. Description** | `name` + `description` frontmatter | Always in context | ~100 tokens per skill |
+| **2. SKILL.md body** | Full markdown content | On skill invocation | 500–4,000 tokens |
+| **3. References** | Files in `references/`, `agents/`, etc. | On-demand when agent reads them | Zero until needed |
+
+**Keep SKILL.md lean and high-signal. Move detail to references.**
+
+#### Word Count Tiers (soft guidance)
+
+| Tier | Limit | Use for |
+|------|-------|---------|
+| Lean | <500w | Simple triggers, thin wrappers |
+| Standard | <1000w | Most workflow skills |
+| Comprehensive | <1800w | Complex multi-path skills |
+| Meta | <2500w | Self-referential teaching skills |
+
+#### When to Split into References
+
+Split when any of these are true:
+- A section has **100+ lines** of examples, tables, or API docs
+- Content is only needed for **specific subtasks**, not the core flow
+- The same reference material applies to **multiple skills**
+- SKILL.md is approaching its tier limit and has extractable detail
+
+#### How to Reference
+
+Point to reference files from SKILL.md with clear loading guidance:
+
+```markdown
+**Testing methodology:** See `testing-skills-with-subagents.md` for complete testing methodology.
+```
+
+For large reference files (300+ lines), include a table of contents at the top so the agent can navigate efficiently.
+
 
 ### 5. Cross-Referencing Other Skills
 

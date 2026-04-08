@@ -82,6 +82,38 @@ def test_arc_researching_has_stuck_protocol():
     assert "Iron Law" in text or "NEVER modify" in text or "immutable" in text.lower()
 
 
+def test_arc_researching_has_strategy_section():
+    """Test skill documents strategy guidance for hypothesis generation."""
+    text = _read_skill()
+
+    # Must have strategy-related content in template
+    assert "## Strategy" in text
+    assert "playbook" in text.lower() or "hypothesis playbook" in text.lower()
+    assert "research sources" in text.lower()
+    assert "first moves" in text.lower()
+
+
+def test_arc_researching_has_trials_support():
+    """Test skill documents multi-trial evaluation for stochastic judges."""
+    text = _read_skill()
+
+    # Must have trials field in contract template
+    assert "Trials:" in text or "trials" in text.lower()
+    assert "Aggregation:" in text or "aggregation" in text.lower()
+
+    # Must have guidance for choosing trial count
+    assert "deterministic" in text.lower() or "stochastic" in text.lower()
+
+
+def test_arc_researching_stuck_protocol_includes_external_research():
+    """Test stuck protocol leverages external research tools."""
+    text = _read_skill()
+
+    # Must mention searching docs/web when stuck
+    assert "WebSearch" in text or "search" in text.lower()
+    assert "documentation" in text.lower() or "docs" in text.lower()
+
+
 def test_arc_researching_has_completion_format():
     """Test skill has structured completion output."""
     text = _read_skill()

@@ -137,8 +137,8 @@ function parseScenario(filePath, projectRoot) {
   const name = nameMatch ? nameMatch[1].trim() : path.basename(filePath, '.md');
 
   const assertions = (sections.assertions || [])
-    .filter((line) => line.match(/^-\s*\[[ x]?\]/))
-    .map((line) => line.replace(/^-\s*\[[ x]?\]\s*/, '').trim());
+    .filter((line) => line.match(/^-\s*\[[ x\w_]*\]/))
+    .map((line) => line.replace(/^-\s*\[[ x\w_]*\]\s*/, '').trim());
 
   const section = (key) => (sections[key] || []).join('\n').trim();
   const trialsRaw = section('trials');
@@ -467,7 +467,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Isolation mode: full isolation uses writeIsolationSettings,
   // pluginDir uses semi-isolation (no claudeMdExcludes)
   if (pluginDir) {
-    const semiSettings = isolationSettings || buildIsolationSettings({ excludeClaudeMd: false });
+    const semiSettings = buildIsolationSettings({ excludeClaudeMd: false });
     writeIsolationSettings(trialDir, semiSettings);
   } else if (isolated) {
     writeIsolationSettings(trialDir, isolationSettings);
@@ -618,6 +618,11 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     pluginDir,
     maxTurns,
   });
+  if (result.infraError) {
+    appendResult(result, projectRoot);
+    if (onTrialComplete) onTrialComplete(label, trialNumber, result);
+    return result;
+  }
   try {
     const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
     const versioned = gradeScenario.version

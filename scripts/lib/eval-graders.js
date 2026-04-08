@@ -782,13 +782,20 @@ function gradeWithMixed(result, scenario, projectRoot, actionLog) {
   const passCount = assertionScores.filter((s) => s === 1).length;
   const score = round2(passCount / total);
 
+  // Reassemble evidence into original assertion order (text evidence at original indices)
+  const rawEvidence = textResult.evidence || [];
+  const evidence = new Array(total).fill('');
+  for (let i = 0; i < text.length; i++) {
+    evidence[text[i].originalIndex] = rawEvidence[i] || '';
+  }
+
   return {
     ...result,
     passed: score >= 0.8,
     score,
     assertionScores,
     grader: 'mixed',
-    evidence: textResult.evidence || [],
+    evidence,
   };
 }
 

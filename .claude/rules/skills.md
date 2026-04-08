@@ -79,7 +79,7 @@ If you wrote the skill before testing, delete it and start over.
 | Comprehensive | <1800w |
 | Meta | <2500w |
 
-Over-limit skills should extract details to `references/` for progressive loading.
+**Progressive disclosure over raising limits.** Keep SKILL.md focused on decision logic and routing. Extract detailed examples, API docs, and lengthy tables to `references/` for on-demand loading.
 
 ## File Layout
 

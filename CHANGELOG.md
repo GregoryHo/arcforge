@@ -3,6 +3,42 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] - 2026-04-08
+
+### Added
+
+- **arc-maintaining-obsidian** skill: Unified Obsidian vault skill — merged arc-writing-obsidian, arc-querying-obsidian, and arc-auditing-obsidian into one skill with three modes (ingest, query, audit). Implements Karpathy's LLM Wiki pattern with PROPAGATE (cross-page update on ingest), EVOLVE checks, and outward GROW.
+- **arc-diagramming-obsidian** skill: Excalidraw diagram generation with JSON direct write, render-validate loop, and cool minimal color palette
+- **arc-querying-obsidian** skill: Vault-only query with inline citations and file-back capability (later merged into arc-maintaining-obsidian)
+- **Obsidian knowledge base**: 83 wiki notes (62 Source + 11 Entity + 5 Synthesis + 5 MOC) published at https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge — covers all skills, rules, agents, templates, guides, designs, and research
+- `.claude/rules/obsidian-wiki.md`: Scope definition for what project artifacts belong in the wiki
+- `.claude/rules/eval.md`: Evaluation framework rules (extracted from inline guidance)
+- `.md` extraction method in `page-templates.md` for ingesting plain markdown files from `Raw/`
+- `docs/guide/eval-system.md`: Core eval mechanism guide (A/B testing, discriminative scenarios, grader types)
+- arc-researching refinements: Strategy selection, trial management, external research integration
+
+### Changed
+
+- **arc-researching** skill: Trimmed to 1776 words (under 1800 budget), added strategy/trials/external research sections
+- Obsidian skills: Added obsidian-cli pipe safety warning (never pipe `obsidian read` through head/tail), path safety guidance (`file=` vs `path=`), progressive disclosure in token efficiency section
+- Eval harness: Added `--no-isolate`, `--plugin-dir`, `--max-turns` flags; behavioral assertions with deterministic grading; mixed grader support; action log display in dashboard
+- `docs/` folder: Removed 263KB of auto-generated reference dumps and superseded design docs — wiki knowledge base is now the authoritative documentation source
+
+### Fixed
+
+- **obsidian-cli pipe safety**: `obsidian read` hangs on SIGPIPE when piped through `head`/`tail` — documented workaround (read full output or use Read tool)
+- **eval option resolution**: Simplified eval settings consolidation, fixed double maxTurns resolution and maxBuffer bug
+- **YAML flow array parsing**: Fixed parsing of inline YAML arrays in DAG state sync
+- **arc-verifying invocation**: Removed self-contradicting "don't invoke me" prohibition from a routing-table-registered skill
+- **loop epic scoping**: Simplified loop epic detection after code review feedback
+
+### Removed
+
+- **arc-writing-obsidian**, **arc-querying-obsidian**, **arc-auditing-obsidian**: Merged into arc-maintaining-obsidian (one skill, three modes)
+- `docs/guide/architecture-overview.txt` (47KB), `cli-reference.txt` (96KB), `skills-workflow.txt` (56KB), `skill-loading-platforms.txt` (54KB), `workflow-overview.txt` (9.5KB): Auto-generated reference dumps replaced by Obsidian wiki knowledge base
+- `docs/plans/2026-04-07-obsidian-skills-design.md`, `obsidian-skills-improvements-design.md`: Superseded by arc-maintaining-obsidian merge design
+- `docs/research/gemini-cli-skills.md`: Stale stub (12 lines, 3 months old)
+
 ## [1.2.0] - 2026-03-31
 
 ### Added

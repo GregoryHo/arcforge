@@ -1,6 +1,6 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
@@ -99,32 +99,9 @@ These are the most frequently used commands:
 
 ### How Skills Connect
 
-```
-                              ┌─────────────┐
-                              │  arc-using   │  ← routes by context
-                              └──────┬───────┘
-               ┌──────────────┬──────┴──────┬──────────────┐
-               ▼              ▼             ▼              ▼
-        ┌─────────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐
-        │brainstorming│ │ writing- │ │executing-│ │  debugging  │
-        │             │ │ tasks    │ │ tasks    │ │             │
-        └──────┬──────┘ └──────────┘ └──────────┘ └─────────────┘
-               ▼
-        ┌─────────────┐
-        │  refining    │           ┌──────────────────────────┐
-        └──────┬──────┘           │  Available at any point: │
-               ▼                  │  • arc-journaling        │
-        ┌─────────────┐           │  • arc-verifying         │
-        │  planning    │           │  • arc-debugging         │
-        └──────┬──────┘           └──────────────────────────┘
-               ▼
-        ┌─────────────┐
-        │ coordinating│
-        └─────────────┘
+![ArcForge Overview](assets/arcforge-overview.png)
 
-Skills compose based on context. Enter at any point — arc-using recommends
-a starting skill, but you can invoke any skill directly.
-```
+`arc-using` sits at the center as the routing layer. Skills fan out into four categories: Workflow Pipeline (left), Quality Gates (right), Infrastructure (bottom), and Learning (far right).
 
 ## How Skills Compose
 
@@ -283,12 +260,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ## Documentation
 
-- [Architecture Overview](docs/guide/architecture-overview.txt) — System design, module map, and data flow
-- [Skills Workflow](docs/guide/skills-workflow.txt) — How skills load, trigger, and chain
-- [Skills Reference](docs/guide/skills-reference.md) — Complete skill catalog with workflows and comparison tables
-- [Worktree Workflow](docs/guide/worktree-workflow.md) — Epic isolation with git worktrees
-- [CLI Reference](docs/guide/cli-reference.txt) — Full command tree, options, and examples
-- [Changelog](CHANGELOG.md) — Release history and migration notes
+**[Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge)** — 83 interconnected wiki notes covering architecture, skills, agents, eval, and design history. Start with the [Master Map](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge).
+
+| Topic | Link |
+|-------|------|
+| Skill System | [MOC-ArcForge-Skills](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Skills) |
+| Agent System | [MOC-ArcForge-Agents](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Agents) |
+| Rules & Standards | [MOC-ArcForge-Rules](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Rules) |
+| Eval System | [MOC-ArcForge-Eval](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Eval) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
 
 ## Contributing
 
