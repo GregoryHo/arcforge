@@ -66,6 +66,8 @@ Delegate format correctness to kepano's skills — this skill knows the workflow
 
 **obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
 
+**obsidian-cli pipe safety:** Never pipe `obsidian read` through `head` or `tail` — the CLI doesn't handle SIGPIPE and the process hangs indefinitely. Read the full output without piping, or use the Read tool with the vault filesystem path for partial reads.
+
 ## Mode: Ingest
 
 ### Pipeline
