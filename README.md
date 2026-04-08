@@ -99,32 +99,9 @@ These are the most frequently used commands:
 
 ### How Skills Connect
 
-```
-                              ┌─────────────┐
-                              │  arc-using   │  ← routes by context
-                              └──────┬───────┘
-               ┌──────────────┬──────┴──────┬──────────────┐
-               ▼              ▼             ▼              ▼
-        ┌─────────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐
-        │brainstorming│ │ writing- │ │executing-│ │  debugging  │
-        │             │ │ tasks    │ │ tasks    │ │             │
-        └──────┬──────┘ └──────────┘ └──────────┘ └─────────────┘
-               ▼
-        ┌─────────────┐
-        │  refining    │           ┌──────────────────────────┐
-        └──────┬──────┘           │  Available at any point: │
-               ▼                  │  • arc-journaling        │
-        ┌─────────────┐           │  • arc-verifying         │
-        │  planning    │           │  • arc-debugging         │
-        └──────┬──────┘           └──────────────────────────┘
-               ▼
-        ┌─────────────┐
-        │ coordinating│
-        └─────────────┘
+![ArcForge Overview](assets/arcforge-overview.png)
 
-Skills compose based on context. Enter at any point — arc-using recommends
-a starting skill, but you can invoke any skill directly.
-```
+`arc-using` sits at the center as the routing layer. Skills fan out into four categories: Workflow Pipeline (left), Quality Gates (right), Infrastructure (bottom), and Learning (far right).
 
 ## How Skills Compose
 

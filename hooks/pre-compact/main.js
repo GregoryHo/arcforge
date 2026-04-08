@@ -83,8 +83,9 @@ function getMarkdownFilePath(project, date, sessionId) {
  */
 function main() {
   try {
-    // Read stdin (required by hook protocol, but we don't modify the transcript)
-    readStdinSync();
+    // Read stdin and passthrough to stdout (PreCompact stdout is the transcript channel)
+    const stdin = readStdinSync();
+    if (stdin) process.stdout.write(stdin);
 
     const project = getProjectName();
     const date = getDateString();
