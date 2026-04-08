@@ -21,6 +21,20 @@ Determine the mode from user intent:
 
 When intent is ambiguous, ask: "Do you want to create a note, search your vault, or run an audit?"
 
+### Mode Entry Gate
+
+Each mode depends on reference knowledge that isn't in the SKILL.md body — extraction methods, search strategies, audit checks. Reading the wrong reference (or none) causes cascading errors: wrong schemas, skipped pipeline steps, mishandled sources.
+
+Before executing any mode, read its reference file:
+
+| Mode | Read first | What it provides |
+|---|---|---|
+| **Ingest** | `references/page-templates.md` | Frontmatter schemas, extraction methods per file type, Raw Source ingest flow |
+| **Query** | `references/search-strategies.md` | Search strategy by question type, output format adaptation |
+| **Audit** | `references/audit-checks.md` | Full check list, GROW thresholds, EVOLVE checks |
+
+This is a gate, not a suggestion — the reference file contains information the mode needs to execute correctly. Skip it and you'll improvise schemas, miss pipeline steps, or use the wrong extraction method.
+
 ## Shared Context
 
 ### Vault Path
@@ -106,7 +120,12 @@ Apply the template from `references/page-templates.md`, write to vault. Write re
 - Tier 2 (spatial): Canvas — delegate to `json-canvas`
 - Tier 3 (visual): Excalidraw — delegate to `arc-diagramming-obsidian`
 
-**Raw Source Ingest:** Non-Markdown files (Excalidraw, PDF, HTML, images, URLs) are detected, extracted, and ingested as Source notes. Originals stay immutable. Read `references/page-templates.md` for extraction methods.
+**Raw Source Ingest — Raw first, wiki second.** When the source is a URL, file, or non-Markdown artifact, the pipeline has two distinct writes:
+
+1. **Save the raw content** to `Raw/` (or leave it where it is if already in the vault). This is the immutable original — the thing you can diff against later when the source is updated.
+2. **Create the wiki Source note** with `source_url` pointing back to the Raw file. This is your summary and extraction — the wiki layer's interpretation of the original.
+
+Skipping step 1 and writing directly to the wiki layer conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `references/page-templates.md` for extraction methods per file type and the exact `source_url` schema.
 
 ### Propagate
 
@@ -152,7 +171,7 @@ Orient → Search → Read → Synthesize → (File Back)
 
 Read `references/search-strategies.md` for output format adaptation (prose, tables, timelines, Marp, Canvas).
 
-**Vault-only answers.** Never fall back to general knowledge. Missing knowledge is a gap signal: *"Your vault has no notes about X. Want to add sources via ingest?"* Gaps feed the audit GROW cycle.
+**Vault-only answers — including surrounding commentary.** Never fall back to general knowledge, not just in the direct answer but in any framing, insights, or comparisons you provide around it. If the vault has notes on topic A but not topic B, don't fill in B from general knowledge and present a comparison — that creates a false sense of completeness. Instead, name the gap: *"Your vault covers A but has nothing on B. Want to add sources for B via ingest?"* Gaps feed the audit GROW cycle and are more valuable surfaced than papered over.
 
 ### File Back
 
