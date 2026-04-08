@@ -224,6 +224,46 @@ def test_audit_has_batch_mode():
     assert "--all" in text
 
 
+# --- LINT Operational Robustness ---
+
+
+def test_lint_has_verify_before_fix():
+    """LINT must require verification of findings before applying fixes."""
+    text = _read_skill().lower()
+    has_verify = "verify before fix" in text or "verify" in text and "before fix" in text
+    assert has_verify, "LINT must warn to verify findings before acting on them"
+
+
+def test_lint_warns_about_yaml_multiline_format():
+    """LINT must warn about YAML multi-line list format false positives."""
+    ref = _read_reference("audit-checks.md").lower()
+    has_yaml_warning = "multi-line" in ref or "multiline" in ref or "block" in ref
+    has_indent_note = "indent" in ref or "  -" in ref
+    assert has_yaml_warning, "audit-checks must warn about YAML multi-line format"
+    assert has_indent_note, "audit-checks must show indented list syntax"
+
+
+def test_lint_has_broken_link_resolution_strategy():
+    """LINT must provide decision criteria for broken wikilinks."""
+    text = _read_skill().lower()
+    has_raw_source_check = "raw source" in text and ("backing" in text or "backed" in text)
+    has_plain_text_option = "plain text" in text or "convert to plain" in text
+    assert has_raw_source_check, "broken link resolution must check for Raw Source backing"
+    assert has_plain_text_option, "broken link resolution must offer plain text conversion"
+
+
+def test_lint_prohibits_unsourced_stub_entities():
+    """LINT must not create entity notes without source backing."""
+    text = _read_skill().lower()
+    has_prohibition = (
+        "never create stub" in text
+        or "without source backing" in text
+        or "unsourced stub" in text
+        or "anti-pattern" in text
+    )
+    assert has_prohibition, "LINT must prohibit creating stub entities without sources"
+
+
 # --- Shared Context ---
 
 

@@ -10,6 +10,7 @@ The auditor operates on the **wiki layer** — plain Markdown notes (`.md`) that
 ### What to skip
 - **Plugin-managed folders** — Detect dynamically. If the Excalidraw plugin is installed, read its script folder via `obsidian eval code="app.plugins.plugins['obsidian-excalidraw-plugin'].settings.scriptFolderPath"` and exclude that folder. Apply the same pattern for any plugin that stores non-note files.
 - **Raw Source files** — Non-Markdown files (`.excalidraw.md`, `.html`, `.pdf`, `.png`, `.jpg`, `.canvas`) are Raw Sources, not wiki-layer notes.
+- **Excalidraw drawings stored as `.md`** — Some Excalidraw drawings use plain `.md` extension instead of `.excalidraw.md`. Detect by checking frontmatter for `excalidraw-plugin: parsed`. These are Raw Sources, not wiki-layer notes — skip them in LINT and exclude from the index. During GROW, treat them the same as `.excalidraw.md` files (check for un-ingested content via `## Text Elements`).
 
 ## LINK Checks
 
@@ -36,6 +37,18 @@ When invoked with `link --file=<path>`, run LINK on only that one note. Same res
   - Synthesis: `type`, `created`, `sources`, `tags`, `aliases`
   - MOC: `type`, `created`, `scope`, `tags`, `aliases`
   - Decision: `type`, `created`, `status`, `tags`, `aliases`
+
+**YAML format caution:** Obsidian uses two equivalent list formats. Both are valid — check for both before reporting "missing" or "empty" fields:
+```yaml
+# Inline (single line)
+tags: [arcforge, tdd]
+
+# Block (multi-line, indented with -)
+tags:
+  - arcforge
+  - tdd
+```
+A field like `tags:` with no inline value is NOT empty if the next lines are indented `  - ` items. Read the full frontmatter block, not just the key's line.
 
 ### Orphan Detection
 - Notes with zero inbound or outbound links

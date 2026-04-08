@@ -184,6 +184,14 @@ Only LINK modifies existing notes. LINT and GROW never modify.
 
 Read `references/audit-checks.md` for the full check list. Core checks: schema compliance, orphan detection, stale sources, tag hygiene, untyped notes, index.md generation, log.md consistency, and EVOLVE checks (field usage analysis, type fit analysis, tag drift).
 
+**Verify before fix:** LINT findings are hypotheses, not facts. Before fixing any reported issue, read the actual file to confirm. Common false positive: YAML multi-line lists (`tags:\n  - a\n  - b`) look empty to line-by-line extraction but contain values on subsequent indented lines. Always verify frontmatter by reading the file, not by trusting extraction output.
+
+**Broken wikilink resolution:** When LINT finds links to non-existent notes, choose based on context:
+- **Has Raw Source backing** → create the entity via ingest (the link reflects real knowledge)
+- **No Raw Source, referenced from 3+ notes** → flag for user decision (may warrant a new source)
+- **No Raw Source, referenced from 1-2 notes** → convert to plain text (preserves relationship without creating unsourced stubs)
+Never create stub entity notes without source backing — these were identified as an anti-pattern in prior audits.
+
 LINT generates/updates `index.md` in vault root — organized by page type, one wikilink per note with summary. This is what query mode reads first in Orient.
 
 ### GROW — Gap Analysis
