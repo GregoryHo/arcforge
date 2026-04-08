@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.1] - 2026-04-08
+
+### Fixed
+
+- **arc-maintaining-obsidian**: Added Mode Entry Gate — each mode (ingest/query/audit) must read its reference file before executing, preventing improvised schemas and missed pipeline steps
+- **arc-maintaining-obsidian**: Raw Source ingest now enforces "raw first, wiki second" — saves immutable original to `Raw/` before creating the wiki Source note, preserving the ability to re-extract and verify
+- **arc-maintaining-obsidian**: URL extraction defaults to Defuddle over WebFetch — WebFetch returns AI-interpreted HTML while Defuddle renders in a real browser and extracts clean markdown faithful to the original
+- **arc-maintaining-obsidian**: Vault-only answers now extend to surrounding commentary — no general knowledge backfill in framing, insights, or comparisons around vault results
+- **arc-maintaining-obsidian**: LINT now requires verify-before-fix — findings are hypotheses, not facts; must read the actual file before acting on reported issues
+- **arc-maintaining-obsidian**: LINT warns about YAML multi-line list false positives — `tags:` with no inline value is not empty if followed by indented `  -` items
+- **arc-maintaining-obsidian**: Added broken wikilink resolution strategy — checks Raw Source backing, reference count, and offers plain text conversion instead of creating unsourced stub entities
+- **arc-maintaining-obsidian**: Excalidraw `.md` drawings (with `excalidraw-plugin: parsed` frontmatter) now correctly skipped during LINT audit
+- **arc-maintaining-obsidian**: Raw Source frontmatter template added (`source_url`, `source_author`, `fetched`) for traceability of immutable originals
+
 ## [1.3.0] - 2026-04-08
 
 ### Added
