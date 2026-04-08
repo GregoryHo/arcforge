@@ -77,6 +77,7 @@ Delegate format correctness to kepano's skills — this skill knows the workflow
 - Canvas creation → `obsidian:json-canvas`
 - Vault operations → `obsidian:obsidian-cli`
 - Excalidraw diagrams → `arc-diagramming-obsidian`
+- URL content extraction → `obsidian:defuddle` (Defuddle first, WebFetch only for APIs/raw text)
 
 **obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
 
