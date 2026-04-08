@@ -164,6 +164,7 @@ In Karpathy's model, anything that isn't a typed wiki-layer Markdown note is a R
 | `.pdf` | Read with Claude's PDF reader |
 | `.png` / `.jpg` | Describe with Claude's vision |
 | URL | Use `defuddle` skill or WebFetch |
+| `.md` (in Raw/) | Read full content — already markdown, no extraction needed |
 
 ### Ingest Output
 
