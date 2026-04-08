@@ -1,0 +1,248 @@
+---
+name: arc-maintaining-obsidian
+description: Use when the user wants to create, query, or maintain their Obsidian vault. Trigger on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me about", "do I have notes on"), auditing vault health (missing links, orphan notes, stale content), ingesting raw files (Excalidraw, PDFs, screenshots) into wiki notes, or saying "file this back" / "save this insight" / "crystallize this". Also trigger on mentions of their wiki, knowledge base, or second brain — even casual "save this" or "what did I write about Y". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches, or explaining concepts the user doesn't have vault notes about.
+---
+
+# arc-maintaining-obsidian
+
+One skill, three modes — implementing Karpathy's LLM Wiki pattern where the LLM incrementally builds and maintains a persistent, compounding wiki. The human curates sources, asks questions, and directs analysis. The LLM does all the bookkeeping.
+
+The core insight: wikis die from maintenance burden, not lack of content. This skill eliminates that burden by handling ingest, query, and lint as a single agent with shared vault awareness.
+
+## Mode Selection
+
+Determine the mode from user intent:
+
+| User Intent | Mode | Pipeline |
+|---|---|---|
+| Create, save, capture, ingest, "file this back" | **ingest** | Classify → Confirm → Create → Propagate → Log |
+| Ask, search, "what do I know about", query | **query** | Orient → Search → Read → Synthesize → (File Back) |
+| Audit, link, lint, grow, "check my vault" | **audit** | LINK → LINT → GROW |
+
+When intent is ambiguous, ask: "Do you want to create a note, search your vault, or run an audit?"
+
+## Shared Context
+
+### Vault Path
+
+On first invocation:
+1. Check if `obsidian-cli` is available — ask it for vault location
+2. If Obsidian not running, ask the user for the vault path
+3. Store the path for subsequent invocations in the session
+
+If Obsidian is not running, fall back to direct file writes. Warn that LINK resolution and search require the CLI.
+
+### Vault Structure — Karpathy's Three Layers
+
+The vault has two layers of content. Never mix them:
+
+**Raw Sources (`Raw/` and format-specific folders like `Excalidraw/`)** — Immutable originals. Articles, PDFs, screenshots, Excalidraw drawings, HTML exports. The LLM reads but never modifies. These are the source of truth.
+
+**Wiki Layer (everything else)** — LLM-generated typed notes with frontmatter schema. Source notes, Entity notes, Synthesis notes, MOCs, Decisions. The LLM owns this layer entirely.
+
+When a Raw Source is ingested, the original stays where it is — a new Source note is created in the wiki layer with `source_url` pointing back to the original. Knowledge flows from Raw → Wiki as text.
+
+**First-time setup:** If the vault has no `Raw/` folder or has Raw Sources scattered outside it, note this in the audit report but do not reorganize — the user decides folder structure. The skill works with Raw Sources wherever they are.
+
+### Session Log
+
+After every operation (create, query, or audit), append to `log.md` in vault root:
+
+```
+## [YYYY-MM-DD] <operation> | <detail>
+```
+
+Operations: `create | [type] | [filename]`, `query | [question summary]`, `audit | [scope]`
+
+This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "^## [" log.md | tail -10`), daily notes for human browsing via `obsidian-cli daily:append`.
+
+### Delegation
+
+Delegate format correctness to kepano's skills — this skill knows the workflow, they know the syntax:
+- Markdown formatting → `obsidian:obsidian-markdown`
+- Canvas creation → `obsidian:json-canvas`
+- Vault operations → `obsidian:obsidian-cli`
+- Excalidraw diagrams → `arc-diagramming-obsidian`
+
+**obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
+
+## Mode: Ingest
+
+### Pipeline
+
+```
+Classify → Confirm → Create → Propagate → Log
+```
+
+### Classify
+
+Determine which of 6 Karpathy page types fits the user's input. Use judgment, not keyword matching.
+
+| Type | Trigger Signal |
+|---|---|
+| **Source** | User shares URL, article, paper, reference material |
+| **Entity** | User discusses person, tool, concept, company, framework |
+| **Synthesis** | User connects ideas, asks "how does X relate to Y" |
+| **MOC** | User wants topic overview, asks "what do I know about X" |
+| **Decision** | User weighs trade-offs, compares options, announces choice |
+| **Log** | User captures something timestamped — meeting notes, events |
+
+Read `references/page-templates.md` for full frontmatter schema and templates for each type.
+
+### Confirm
+
+Tell the user: "This looks like a **[type]** note — agree?" Wait for confirmation.
+
+**Fast path:** Skip when classification is unambiguous (e.g., "log this meeting" → Log). When in doubt, confirm — false confidence wastes more time than one extra question.
+
+### Create
+
+Apply the template from `references/page-templates.md`, write to vault. Write relationships as plain text, not wikilinks — Propagate and audit mode resolve these later.
+
+**Three artifact tiers:**
+- Tier 1 (default): Markdown + embedded Mermaid
+- Tier 2 (spatial): Canvas — delegate to `json-canvas`
+- Tier 3 (visual): Excalidraw — delegate to `arc-diagramming-obsidian`
+
+**Raw Source Ingest:** Non-Markdown files (Excalidraw, PDF, HTML, images, URLs) are detected, extracted, and ingested as Source notes. Originals stay immutable. Read `references/page-templates.md` for extraction methods.
+
+### Propagate
+
+After creating the new note, update related existing pages — this is Karpathy's "one source touches 10-15 pages."
+
+1. **Search** — Find vault pages related to the new note's concepts via `obsidian-cli search`
+2. **Match** — Determine what each related page needs:
+
+| Existing Page Type | Update Action |
+|---|---|
+| Entity | Add new properties or relationships from the source |
+| Synthesis | Add new evidence (supporting or contradicting) |
+| MOC | Add the new note if it matches the MOC's scope |
+| Source | Cross-reference if both discuss same topic |
+
+3. **Propose** — Present all updates in one summary: *"This source would update 3 pages: [[Docker]] (new security properties), [[Container Security]] (new evidence), [[DevOps MOC]] (add to index). Apply all / select / skip?"*
+4. **Apply** — User approves (all, some, or none) → apply approved updates
+
+**Contradiction detection:** During step 2, if new source claims conflict with existing page content, flag: *"⚠️ Conflict: new source says X, [[Entity]] says Y — update, keep existing, or note both?"*
+
+**Scope guard:** Cap at 10 pages per ingest. If more related, update top 10 by relevance, report: *"10 pages updated, N more potentially related — run audit for full pass."*
+
+### Special Modes
+
+**Query-as-Ingest:** When user says "file this back," "save this insight," "crystallize this" — skip Classify. Context determines type: trade-off → Decision, otherwise → Synthesis. Go straight to Create.
+
+**Batch mode (`--batch`):** Process a folder of raw files with fast-path-only classification. Skip Confirm unless ambiguous. **Skip Propagate during batch** — suggest audit afterward: *"Batch complete: N notes created. Run audit to link and propagate?"*
+
+**LINK-on-Create (`--link`):** After Create, trigger audit mode's LINK on the new note only for immediate graph connectivity.
+
+## Mode: Query
+
+### Pipeline
+
+```
+Orient → Search → Read → Synthesize → (File Back)
+```
+
+1. **Orient** — Read `index.md` for vault map. If none exists, suggest: *"No index — run audit lint to generate one."*
+2. **Search** — Use `obsidian-cli search`. Read `references/search-strategies.md` for strategy by question type.
+3. **Read** — Drill into matching notes. Read frontmatter first (understand type), then content. Follow `sources:` arrays for provenance.
+4. **Synthesize** — Answer with inline `[[citations]]`. Every key claim references its source note.
+
+Read `references/search-strategies.md` for output format adaptation (prose, tables, timelines, Marp, Canvas).
+
+**Vault-only answers.** Never fall back to general knowledge. Missing knowledge is a gap signal: *"Your vault has no notes about X. Want to add sources via ingest?"* Gaps feed the audit GROW cycle.
+
+### File Back
+
+If the answer is substantive (comparison, analysis, discovered connection), suggest filing back: *"This connects several notes in a new way — file as a Synthesis note?"*
+
+File Back triggers ingest mode internally — same skill, same context, no handoff. Uses Query-as-Ingest (skip Classify).
+
+Always state your file-back decision: either suggest it, or explain why not (e.g., "A Synthesis covering this already exists at [[Note]]").
+
+## Mode: Audit
+
+### Pipeline
+
+```
+LINK → LINT → GROW
+```
+
+Invoke with arguments: `audit link`, `audit lint`, `audit grow`, or no argument for all three.
+
+### LINK — Resolve Relationships
+
+Scan notes with plain-text `## Relationships` sections. For each mention, search vault for matching titles/aliases. Replace with `[[wikilinks]]`, add backlinks to targets, update MOCs.
+
+**Single-file mode (`audit link --file=<path>`):** Run on one note only — used by ingest's `--link` flag.
+
+Only LINK modifies existing notes. LINT and GROW never modify.
+
+### LINT — Health Check
+
+Read `references/audit-checks.md` for the full check list. Core checks: schema compliance, orphan detection, stale sources, tag hygiene, untyped notes, index.md generation, log.md consistency, and EVOLVE checks (field usage analysis, type fit analysis, tag drift).
+
+LINT generates/updates `index.md` in vault root — organized by page type, one wikilink per note with summary. This is what query mode reads first in Orient.
+
+### GROW — Gap Analysis
+
+Read `references/audit-checks.md` for thresholds. Two categories:
+
+**Internal** (create these artifacts):
+- 5+ sources on topic without synthesis → suggest synthesis
+- 3+ mentions without entity note → suggest entity
+- 8+ notes without MOC → suggest MOC
+- LINK failures (unresolved mentions) → suggest entity notes
+
+**External** (investigate these topics):
+- Topic with only 1-2 sources → suggest search terms for more
+- Synthesis with open questions → surface as research leads
+- Stale sources (>90 days) → suggest checking for updates
+
+GROW proposes — never auto-creates, never auto-fetches. User approves, then ingest mode creates.
+
+### Batch Mode
+
+Default: 50 most recently modified notes. Full scan: `--all`. Report scope at start.
+
+### Audit Report
+
+Save as typed vault note:
+
+```yaml
+---
+type: audit-report
+created: YYYY-MM-DD
+scope: "50 most recent" | "full vault"
+tags: [audit]
+---
+```
+
+## Completion Formats
+
+**Ingest:**
+```
+✅ Created [type] note → [path]
+   Propagated: updated N existing pages
+```
+
+**Query:**
+```
+✅ Query answered — cited N notes
+```
+
+**Audit:**
+```
+✅ Audit complete → [audit-report-path]
+- LINK: resolved N relationships
+- LINT: found N issues
+- GROW: N suggestions (M internal, K external)
+```
+
+## Blocked Format
+
+```
+⚠️ [Mode] blocked
+Issue: [what went wrong]
+To resolve: [specific action needed]
+```
