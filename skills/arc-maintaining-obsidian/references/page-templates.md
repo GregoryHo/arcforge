@@ -143,6 +143,24 @@ Logs do not create a new file. Append to daily note via obsidian-cli:
 
 ## Raw Source Ingest
 
+### Raw Source Frontmatter
+
+Raw Sources are immutable originals, but they need minimal metadata for traceability. When saving a new Raw Source to the vault, include this frontmatter:
+
+```yaml
+---
+source_url: ""
+source_author: ""
+fetched: YYYY-MM-DD
+---
+```
+
+- `source_url` — Original URL or "local" for files already in the vault
+- `source_author` — Author or organization name
+- `fetched` — Date the content was captured (not the content's publication date)
+
+The body is the raw content exactly as extracted — no summarization, no restructuring. The Wiki-layer Source note handles interpretation.
+
 ### What is a Raw Source?
 
 In Karpathy's model, anything that isn't a typed wiki-layer Markdown note is a Raw Source — immutable originals that should be ingested into the wiki layer as text. Common types:
@@ -163,8 +181,10 @@ In Karpathy's model, anything that isn't a typed wiki-layer Markdown note is a R
 | `.html` | Use `defuddle` skill or read raw HTML |
 | `.pdf` | Read with Claude's PDF reader |
 | `.png` / `.jpg` | Describe with Claude's vision |
-| URL | Use `defuddle` skill or WebFetch |
+| URL | **Defuddle first** (`defuddle parse <url> --md`). Only fall back to WebFetch for APIs or raw text endpoints. |
 | `.md` (in Raw/) | Read full content — already markdown, no extraction needed |
+
+**Why Defuddle over WebFetch for URLs:** WebFetch fetches raw HTML and runs it through an AI summarization layer — the output is AI-interpreted, not the original content. For SPA/client-rendered sites (React, Obsidian docs, etc.) it often gets only the JavaScript shell. Defuddle renders the page in a real browser and extracts the DOM as clean markdown, preserving tables, code blocks, and structure without AI interpretation. Raw Sources must be faithful to the original — AI-processed content defeats the purpose of an immutable source layer.
 
 ### Ingest Output
 
