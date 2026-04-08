@@ -185,6 +185,8 @@ Use kepano's obsidian skills for vault operations:
 - Vault search, backlinks, tags → invoke `/obsidian:obsidian-cli`
 - Note formatting when modifying → invoke `/obsidian:obsidian-markdown`
 
+**obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
+
 ## Error Handling
 
 - If `obsidian-cli` is unavailable (Obsidian not running), report the error clearly — do not silently skip operations

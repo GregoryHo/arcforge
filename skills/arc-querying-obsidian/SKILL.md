@@ -79,6 +79,8 @@ This delegates to `arc-writing-obsidian` via Query-as-Ingest. The answer becomes
 
 Don't suggest file-back for quick lookups or simple factual retrievals — only for answers that add intellectual value beyond what any single note contains.
 
+Always include your file-back decision at the end of the answer — either suggest filing back, or briefly explain why it's not needed (e.g., "A Synthesis note covering this already exists at [[Note]]"). This makes the decision visible to the user rather than silently skipping it.
+
 ## Session Log
 
 After answering a query, append a structured entry to `log.md`:
@@ -94,6 +96,16 @@ This follows the writer's dual-write pattern: `log.md` for LLM context (grep-par
 - Search, read, backlinks → invoke `/obsidian:obsidian-cli`
 - File-back → invoke `arc-writing-obsidian` (Query-as-Ingest)
 - Page type schema → defined by `arc-writing-obsidian` (source of truth)
+
+**obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths. The `&` character in filenames like "Search & Retrieval.md" breaks shell parsing with `path=`.
+
+```
+# Broken — & splits the shell command
+obsidian-cli read path="Paradise/AI/RAG/Search & Retrieval.md"
+
+# Works — file= resolves by name
+obsidian-cli read file="Search & Retrieval"
+```
 
 ## Vault Path
 

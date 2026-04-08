@@ -266,6 +266,8 @@ Delegate format correctness to kepano's obsidian skills — they know the syntax
 - Daily note append → invoke `/obsidian:obsidian-cli`
 - Excalidraw diagrams → invoke `arc-diagramming-obsidian`
 
+**obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
+
 ## Relationship Handling
 
 Write relationships as plain text, not wikilinks. The auditor skill (`arc-auditing-obsidian`) resolves plain text into `[[wikilinks]]` after scanning the vault. This keeps the writer simple — it does not need vault awareness.
