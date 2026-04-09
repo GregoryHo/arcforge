@@ -5,7 +5,7 @@ description: Use when the user wants to create, query, or maintain their Obsidia
 
 # arc-maintaining-obsidian
 
-One skill, three modes — implementing Karpathy's LLM Wiki pattern where the LLM incrementally builds and maintains a persistent, compounding wiki. The human curates sources, asks questions, and directs analysis. The LLM does all the bookkeeping.
+One skill, three modes — the LLM incrementally builds and maintains a persistent, compounding wiki. The human curates sources, asks questions, and directs analysis. The LLM does all the bookkeeping.
 
 The core insight: wikis die from maintenance burden, not lack of content. This skill eliminates that burden by handling ingest, query, and lint as a single agent with shared vault awareness.
 
@@ -15,7 +15,7 @@ Determine the mode from user intent:
 
 | User Intent | Mode | Pipeline |
 |---|---|---|
-| Create, save, capture, ingest, "file this back" | **ingest** | Classify → Confirm → Create → Propagate → Log |
+| Create, save, capture, ingest, "file this back" | **ingest** | Classify → Confirm → Create → Index → Propagate → Log |
 | Ask, search, "what do I know about", query | **query** | Orient → Search → Read → Synthesize → (File Back) |
 | Audit, link, lint, grow, "check my vault" | **audit** | LINK → LINT → GROW |
 
@@ -46,7 +46,7 @@ On first invocation:
 
 If Obsidian is not running, fall back to direct file writes. Warn that LINK resolution and search require the CLI.
 
-### Vault Structure — Karpathy's Three Layers
+### Vault Structure — Two Layers
 
 The vault has two layers of content. Never mix them:
 
@@ -72,9 +72,7 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 
 ### Delegation
 
-**Search (highest priority):**
-- **`qmd query`** — Primary search for ALL vault discovery. Hybrid search (BM25 + vector + LLM reranking) finds both keyword and semantic matches. Use this FIRST for every search operation: Query mode lookups, Propagate relation finding, Audit LINK resolution. See `references/search-strategies.md` for query patterns.
-- `obsidian-cli search` — Fallback only when QMD is unavailable (not installed, index empty, or embeddings not generated). Never prefer it over QMD when both are available.
+**Search:** Prefer QMD — it provides hybrid search (keyword + semantic + reranking) that finds both exact matches and conceptually related notes. Fall back to `obsidian-cli search` (keyword only) when QMD is unavailable. Read `references/search-strategies.md` Route Selection on first search to confirm availability, then follow the active route for all operations: query, propagate, LINK resolution, and index sync. The QMD route includes an Index Sync step (`qmd update && qmd embed`, ~3s incremental) that runs after each ingest or audit cycle to keep newly created notes searchable.
 
 **Read/Write (vault operations):**
 - Vault operations (read, create, append, properties) → `obsidian:obsidian-cli`
@@ -82,10 +80,6 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 - Canvas creation → `obsidian:json-canvas`
 - Excalidraw diagrams → `arc-diagramming-obsidian`
 - URL content extraction → `obsidian:defuddle` (Defuddle first, WebFetch only for APIs/raw text)
-
-**QMD availability check:** On first search, run `qmd status`. If QMD reports 0 documents or no collections, warn: *"QMD index is empty — search quality will be degraded. Run `qmd collection add <vault-path> --name obsidian-vault && qmd embed` to enable hybrid search."* Then fall back to `obsidian-cli search`.
-
-**QMD index freshness:** After creating or modifying vault notes, run `qmd update` to keep the index current. Batch this — update once after a full ingest/audit cycle, not after every individual write.
 
 **obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
 
@@ -96,12 +90,12 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 ### Pipeline
 
 ```
-Classify → Confirm → Create → Propagate → Log
+Classify → Confirm → Create → Index → Propagate → Log
 ```
 
 ### Classify
 
-Determine which of 6 Karpathy page types fits the user's input. Use judgment, not keyword matching.
+Determine which of 6 page types fits the user's input. Use judgment, not keyword matching.
 
 | Type | Trigger Signal |
 |---|---|
@@ -138,11 +132,24 @@ Apply the template from `references/page-templates.md`, write to vault. Write re
 
 Skipping step 1 and writing directly to the wiki layer conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `references/page-templates.md` for extraction methods per file type and the exact `source_url` schema.
 
+### Index
+
+Add the new note to `index.md` — the vault's table of contents. Every new note gets registered in the catalog so subsequent queries and human browsing reflect the current state.
+
+1. Read `index.md`, find the section matching the note's type (Sources, Entities, Syntheses, MOCs, Decisions)
+2. Add one line: `- [[Note Title]] — one-line summary`
+3. Update the `Last updated:` date
+4. Write directly — no user confirmation needed (this is catalog registration, not a content decision)
+
+If `index.md` doesn't exist, suggest: *"No index yet — run audit lint to generate one, or I can create a starter index now."*
+
+Audit LINT does a full index rebuild (scanning all notes). This step does an incremental add — one note at a time, keeping the index current between audits.
+
 ### Propagate
 
-After creating the new note, update related existing pages — this is Karpathy's "one source touches 10-15 pages."
+After creating the new note, update related existing pages — one source typically touches 5-15 pages across the wiki.
 
-1. **Search** — Find vault pages related to the new note's concepts via `qmd query`
+1. **Search** — Find vault pages related to the new note's concepts (see search-strategies.md, Propagate section for the active route)
 2. **Match** — Determine what each related page needs:
 
 | Existing Page Type | Update Action |
@@ -167,7 +174,7 @@ After creating the new note, update related existing pages — this is Karpathy'
 
 **Query-as-Ingest:** When user says "file this back," "save this insight," "crystallize this" — skip Classify. Context determines type: trade-off → Decision, otherwise → Synthesis. Go straight to Create.
 
-**Batch mode (`--batch`):** Process a folder of raw files with fast-path-only classification. Skip Confirm unless ambiguous. **Skip Propagate during batch** — suggest audit afterward: *"Batch complete: N notes created. Run audit to link and propagate?"*
+**Batch mode (`--batch`):** Process a folder of raw files with fast-path-only classification. Skip Confirm unless ambiguous. **Skip Index and Propagate during batch** — audit LINT rebuilds the full index afterward: *"Batch complete: N notes created. Run audit to link, index, and propagate?"*
 
 **LINK-on-Create (`--link`):** After Create, trigger audit mode's LINK on the new note only for immediate graph connectivity.
 
@@ -180,7 +187,7 @@ Orient → Search → Read → Synthesize → (File Back)
 ```
 
 1. **Orient** — Read `index.md` for vault map. If none exists, suggest: *"No index — run audit lint to generate one."*
-2. **Search** — Use `qmd query` (hybrid search). Read `references/search-strategies.md` for strategy by question type and QMD query patterns.
+2. **Search** — Search the vault using the active route. Read `references/search-strategies.md` for strategy by question type.
 3. **Read** — Drill into matching notes. Read frontmatter first (understand type), then content. Follow `sources:` arrays for provenance.
 4. **Synthesize** — Answer with inline `[[citations]]`. Every key claim references its source note.
 

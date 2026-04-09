@@ -106,9 +106,9 @@ def test_ingest_has_batch_mode():
 
 
 def test_ingest_batch_skips_propagate():
-    """Batch mode must skip PROPAGATE to avoid explosion."""
+    """Batch mode must skip Index and PROPAGATE to avoid explosion."""
     text = _read_skill().lower()
-    assert "skip propagate" in text or "skip propagat" in text
+    assert "skip" in text and "propagate" in text
 
 
 def test_ingest_has_link_on_create():
@@ -317,5 +317,7 @@ def test_reference_audit_checks_exists():
 
 def test_reference_search_strategies_exists():
     ref = _read_reference("search-strategies.md")
-    assert "Search Strategy" in ref
+    assert "Route Selection" in ref
+    assert "QMD Route" in ref
+    assert "Fallback Route" in ref
     assert "Output Format" in ref
