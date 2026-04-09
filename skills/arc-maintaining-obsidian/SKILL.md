@@ -106,6 +106,8 @@ Determine which of 6 Karpathy page types fits the user's input. Use judgment, no
 
 Read `references/page-templates.md` for full frontmatter schema and templates for each type.
 
+**Paper detection:** When the source is a PDF with Abstract/References sections, or the user says "paper"/"論文", use the **Paper variant** of the Source template (see `references/page-templates.md`). Paper variant adds: `reading_status`, `methodology`, `venue`, `year`, `cites`, `cited_by`, and a structured Claims section. Default `reading_status` to `queued` if user just drops the paper without discussion, `deep-read` if they ask for analysis.
+
 ### Confirm
 
 Tell the user: "This looks like a **[type]** note — agree?" Wait for confirmation.
@@ -148,6 +150,10 @@ After creating the new note, update related existing pages — this is Karpathy'
 **Contradiction detection:** During step 2, if new source claims conflict with existing page content, flag: *"⚠️ Conflict: new source says X, [[Entity]] says Y — update, keep existing, or note both?"*
 
 **Scope guard:** Cap at 10 pages per ingest. If more related, update top 10 by relevance, report: *"10 pages updated, N more potentially related — run audit for full pass."*
+
+**Citation-aware propagation (papers only):** For paper Source notes at `deep-read` or `extracted` status, Propagation has an additional step: parse the `## Related Work (Graph Seeds)` section for cited paper titles. For each cited paper, search the vault — if found, add a `[[wikilink]]` to the new paper's `cites:` and update the found paper's `cited_by:`. If not found, leave as plain text in `cites:` — audit GROW will surface high-impact missing papers later.
+
+**Claim-level contradiction (papers only):** During Propagation step 2, if the new paper's Claims conflict with Claims in existing paper Source notes, flag at claim level: *"⚠️ Paper A claims X (strong evidence), but [[Paper B]] claims Y (moderate evidence) — mark contested on both?"* Update claim `Status` fields on approval.
 
 ### Special Modes
 

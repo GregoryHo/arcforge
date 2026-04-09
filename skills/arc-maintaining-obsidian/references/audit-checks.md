@@ -147,6 +147,38 @@ Suggest: "These files have content that hasn't been ingested — consider runnin
 
 Before suggesting new artifacts, check for potential duplicates (80%+ title match with existing note). Skip the suggestion if a near-match exists.
 
+### Citation Graph Checks (Paper Sources)
+
+These checks apply only to Source notes with `reading_status` in their frontmatter (i.e., paper variants).
+
+| Check | What It Detects | Action |
+|---|---|---|
+| **Citation orphans** | `cites:` entries that are plain text (not wikilinks to vault notes) | GROW suggestion: "This paper cites [title] which isn't in your vault — ingest it?" Prioritize by: how many vault papers cite the same missing paper |
+| **Reverse citation updates** | A newly ingested paper cites an existing vault paper, but the existing paper's `cited_by:` doesn't include it | Auto-fix: add to `cited_by:` (this is a LINK-level fix, not GROW) |
+| **High-impact missing papers** | A paper appears in 3+ vault papers' `cites:` but has no vault note | High-priority GROW: "N papers in your vault cite [title] — strongly consider ingesting" |
+| **Citation island** | A paper has empty `cites:` and `cited_by:` despite being `deep-read` or `extracted` | Flag: "This paper has no citation connections — was Related Work parsed?" |
+
+### Reading Status Checks
+
+| Check | What It Detects | Suggestion |
+|---|---|---|
+| **Queued backlog** | Papers in `queued` status for >14 days | Report count: "N papers queued for >2 weeks" |
+| **Priority queue** | `queued` papers with high `cited_by` count in vault | "These queued papers are cited by N vault papers — prioritize reading: [list]" |
+| **Stale skimmed** | Papers in `skimmed` status for >30 days | "N papers skimmed but never deep-read — promote or archive?" |
+| **Incomplete extraction** | Papers in `deep-read` with empty `cites:` | "These papers were deep-read but Related Work wasn't parsed — run extraction to complete?" |
+
+### Claim Consistency Checks
+
+Scan all paper Source notes with `## Claims` sections:
+
+| Check | What It Detects | Report |
+|---|---|---|
+| **Uncontested conflicts** | Two papers make contradictory claims but neither has `Status: contested` | "⚠️ Claim conflict: Paper A says X, Paper B says Y — neither is marked contested" |
+| **Evidence asymmetry** | A `contested` claim has weaker evidence than the contesting paper's claim | Note in report: "Paper A's claim (weak evidence) contested by Paper B (strong evidence) — consider marking superseded" |
+| **Stale supported claims** | Claims marked `supported` from papers >1 year old with no recent corroboration | "These claims haven't been corroborated by recent papers — worth checking" |
+
+Claim checks are observations — flag in the audit report but never auto-modify claim statuses. The user decides.
+
 ## Batch Mode
 
 - **Default**: 50 most recently modified notes

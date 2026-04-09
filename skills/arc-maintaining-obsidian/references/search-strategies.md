@@ -9,6 +9,9 @@
 | "What's the latest on X?" | Search + sort by `created:` date, check `log.md` for recent activity |
 | "Summarize everything about X" | Start from MOC if one exists, expand to linked notes |
 | "Do I have notes on X?" | Quick search, report count and types found |
+| "What's the evidence for X?" | Search Claims sections across paper Sources, trace evidence strength |
+| "What papers cite / are cited by X?" | Follow `cites:` and `cited_by:` fields in paper Source frontmatter |
+| "What should I read next?" | Check `reading_status: queued` papers, prioritize by `cited_by` count |
 
 ### Result Prioritization
 
@@ -20,6 +23,25 @@ If search returns 20+ results, narrow by prioritizing:
 ### Provenance Tracing
 
 For Synthesis notes, follow the `sources:` array to trace claims back to original sources when the user needs deeper evidence.
+
+### Citation Graph Traversal (Papers)
+
+For questions about academic topics, leverage the citation graph in addition to semantic search:
+
+1. **Forward citations** (`cites:`) — "What is this paper built on?" Follow `cites:` to find foundational papers
+2. **Backward citations** (`cited_by:`) — "Who uses this paper's work?" Follow `cited_by:` to find downstream applications
+3. **Citation clustering** — Papers that share 3+ citations likely belong to the same research thread — group them in answers
+
+### Claim-Aware Synthesis (Papers)
+
+When answering questions about contested topics, don't just cite notes — report the claim landscape:
+
+- Count how many papers support vs. contest each relevant claim
+- Weight by evidence strength (strong > moderate > weak)
+- Note conditional claims: "X holds for Y but not Z"
+- Surface `superseded` claims explicitly: "Earlier work claimed X, but this has been superseded by Y"
+
+Format: *"4 papers support [claim] (3 strong, 1 moderate). 1 paper contests it on [specific condition] (moderate evidence)."*
 
 ## Query Mode: Output Format Adaptation
 
