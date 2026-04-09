@@ -1,6 +1,7 @@
 ---
 name: arc-maintaining-obsidian
 description: Use when the user wants to create, query, or maintain their Obsidian vault. Trigger on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me about", "do I have notes on"), auditing vault health (missing links, orphan notes, stale content), ingesting raw files (Excalidraw, PDFs, screenshots) into wiki notes, or saying "file this back" / "save this insight" / "crystallize this". Also trigger on mentions of their wiki, knowledge base, or second brain — even casual "save this" or "what did I write about Y". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches, or explaining concepts the user doesn't have vault notes about.
+argument-hint: "help | ingest <url|text> [--batch] [--link] | query <question> | audit [link|lint|grow]"
 ---
 
 # arc-maintaining-obsidian
@@ -20,6 +21,32 @@ Determine the mode from user intent:
 | Audit, link, lint, grow, "check my vault" | **audit** | LINK → LINT → GROW |
 
 When intent is ambiguous, ask: "Do you want to create a note, search your vault, or run an audit?"
+
+### Help
+
+If the argument is `help`, display this usage summary and stop:
+
+```
+arc-maintaining-obsidian — Obsidian wiki lifecycle manager
+
+INGEST (create notes):
+  ingest <url>              Ingest URL as Source note (paper auto-detected)
+  ingest <text>             Classify and create from description
+  ingest --batch            Batch ingest a folder of raw files
+  ingest --link             Create + immediately resolve wikilinks
+
+QUERY (search vault):
+  query <question>          Search vault and synthesize answer
+  "what do I know about X"  Natural language query
+
+AUDIT (vault health):
+  audit                     Run all three: LINK → LINT → GROW
+  audit link                Resolve plain-text mentions → wikilinks
+  audit lint                Schema check + rebuild index.md
+  audit grow                Gap analysis and suggestions
+
+Also accepts natural language: "file this back", "check my vault", "save this insight"
+```
 
 ### Mode Entry Gate
 
@@ -70,6 +97,8 @@ Operations: `create | [type] | [filename]`, `query | [question summary]`, `audit
 
 This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "^## [" log.md | tail -10`), daily notes for human browsing via `obsidian-cli daily:append`.
 
+**Daily notes folder:** `daily:append` respects Obsidian's Daily Notes plugin settings (folder, date format). On first use in a session, verify the plugin is configured: `obsidian eval code="app.internalPlugins.plugins['daily-notes']?.instance?.options?.folder"`. If it returns a folder path, daily:append will write there. If unconfigured or the plugin is disabled, skip daily:append and log to `log.md` only — do not create date-stamped files at vault root.
+
 ### Delegation
 
 **Search:** Prefer QMD — it provides hybrid search (keyword + semantic + reranking) that finds both exact matches and conceptually related notes. Fall back to `obsidian-cli search` (keyword only) when QMD is unavailable. Read `references/search-strategies.md` Route Selection on first search to confirm availability, then follow the active route for all operations: query, propagate, LINK resolution, and index sync. The QMD route includes an Index Sync step (`qmd update && qmd embed`, ~3s incremental) that runs after each ingest or audit cycle to keep newly created notes searchable.
@@ -84,6 +113,8 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 **obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
 
 **obsidian-cli pipe safety:** Never pipe `obsidian read` through `head` or `tail` — the CLI doesn't handle SIGPIPE and the process hangs indefinitely. Read the full output without piping, or use the Read tool with the vault filesystem path for partial reads.
+
+**obsidian-cli create syntax:** `create` uses `name=` (filename only, no slashes) or `path=` (full path with folder). Never use `file=` with create — it's silently ignored and produces `Untitled.md`. For subfolder placement: `obsidian create path="ai/My-Note.md" content="..."`. Use `name=` only for vault-root notes without subdirectories.
 
 ## Mode: Ingest
 
@@ -176,6 +207,8 @@ After creating the new note, update related existing pages — one source typica
 
 **Batch mode (`--batch`):** Process a folder of raw files with fast-path-only classification. Skip Confirm unless ambiguous. **Skip Index and Propagate during batch** — audit LINT rebuilds the full index afterward: *"Batch complete: N notes created. Run audit to link, index, and propagate?"*
 
+**Parallel batch caveat:** When batch ingest uses parallel agents (e.g., 4 agents ingesting 7 papers simultaneously), each agent cannot cross-reference notes being created by other agents — they don't exist yet. This leaves `cites:`/`cited_by:` fields as plain text for vault papers being created in the same batch. A post-batch `audit link` pass is **mandatory** after parallel ingest to resolve these cross-references. State this explicitly when reporting batch completion.
+
 **LINK-on-Create (`--link`):** After Create, trigger audit mode's LINK on the new note only for immediate graph connectivity.
 
 ## Mode: Query
@@ -212,6 +245,8 @@ LINK → LINT → GROW
 ```
 
 Invoke with arguments: `audit link`, `audit lint`, `audit grow`, or no argument for all three.
+
+Every audit sub-command (link, lint, grow, or full) produces an audit report note — this gives the user a persistent record of what was found and fixed, and allows future sessions to reference past audit results. Use the Audit Report template below. Name the file `audit-YYYY-MM-DD-<subcommand>.md`.
 
 ### LINK — Resolve Relationships
 
