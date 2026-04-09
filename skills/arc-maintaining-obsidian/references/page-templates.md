@@ -8,10 +8,36 @@ All page types include:
 ---
 type: source | entity | synthesis | moc | decision | log
 created: YYYY-MM-DD
+langs: [en, zh]
 tags: []
 aliases: []
 ---
 ```
+
+## Bilingual Format
+
+All wiki-layer notes are created in both English and Chinese. The format uses Obsidian callouts to separate language versions, enabling language switching on Publish via `publish.js` and locally via CSS snippet.
+
+### Rules
+
+1. Frontmatter includes `langs: [en, zh]` — always both languages
+2. H1 title is bilingual outside callouts: `# 中文標題 / English Title`
+3. Each language version wraps in `> [!multi-lang-{code}]` callout
+4. Full markdown works inside callouts — wikilinks, images, lists, code blocks, Mermaid
+5. No content between callouts — shared content (frontmatter, H1) goes before all callouts
+6. Wikilinks point to the same file (no language suffix)
+7. H2+ subheadings go inside callouts, translated to match the language
+
+### What is NOT bilingual
+
+- **Raw Source Ingest** frontmatter and body — immutable originals, not wiki layer
+- **Log entries** — appended to daily notes, timestamped, write in whichever language the user used
+- **Audit Reports** — internal tooling, English only
+- **Frontmatter values** — tags, aliases, type stay in English (searchable across languages)
+
+### Pattern
+
+Every wiki-layer template below follows this structure. The Source template shows the full bilingual example. Other templates follow the same callout wrapping pattern — only the Source is shown fully expanded to avoid duplication.
 
 ## Source
 
@@ -19,19 +45,36 @@ aliases: []
 ---
 type: source
 created: YYYY-MM-DD
+langs: [en, zh]
 source_url: ""
 source_author: ""
 tags: []
 aliases: []
 ---
-## Summary
-[2-3 sentence overview of the source material]
+```
 
-## Key Takeaways
-- [Most important points, not exhaustive]
+```markdown
+# 來源標題 / Source Title
 
-## Raw Notes
-[Detailed extraction — quotes, data, arguments worth preserving]
+> [!multi-lang-en]
+> ## Summary
+> [2-3 sentence overview of the source material]
+>
+> ## Key Takeaways
+> - [Most important points, not exhaustive]
+>
+> ## Raw Notes
+> [Detailed extraction — quotes, data, arguments worth preserving]
+
+> [!multi-lang-zh]
+> ## 摘要
+> [2-3 句概述來源材料]
+>
+> ## 重點
+> - [最重要的要點，非詳盡列表]
+>
+> ## 原始筆記
+> [詳細摘錄 — 值得保留的引用、數據、論點]
 ```
 
 ## Source — Paper Variant
@@ -42,6 +85,7 @@ When the source is an academic paper (detected by: PDF with Abstract/References 
 ---
 type: source
 created: YYYY-MM-DD
+langs: [en, zh]
 source_url: ""
 source_author: []          # list — papers have multiple authors
 venue: ""                  # conference or journal name
@@ -119,19 +163,35 @@ When Propagation finds a conflict, update the claim's status and add a cross-ref
 ---
 type: entity
 created: YYYY-MM-DD
+langs: [en, zh]
 entity_type: person | tool | concept | company | framework
 tags: []
 aliases: []
 ---
-## What It Is
-[Concise definition — what would someone need to know in 30 seconds]
+```
 
-## Properties
-[Key attributes — depends on entity_type]
+```markdown
+# 實體名稱 / Entity Name
 
-## Relationships
-[Plain text descriptions of how this entity connects to other concepts.
-The auditor resolves these into wikilinks later — write naturally here.]
+> [!multi-lang-en]
+> ## What It Is
+> [Concise definition — what would someone need to know in 30 seconds]
+>
+> ## Properties
+> [Key attributes — depends on entity_type]
+>
+> ## Relationships
+> [Plain text descriptions — auditor resolves into wikilinks later]
+
+> [!multi-lang-zh]
+> ## 定義
+> [簡潔定義 — 30 秒內需要知道的內容]
+>
+> ## 屬性
+> [關鍵特徵 — 取決於 entity_type]
+>
+> ## 關係
+> [純文字描述 — 審計模式稍後將其轉為 wikilinks]
 ```
 
 ## Synthesis
@@ -140,25 +200,38 @@ The auditor resolves these into wikilinks later — write naturally here.]
 ---
 type: synthesis
 created: YYYY-MM-DD
+langs: [en, zh]
 sources: []
 tags: []
 aliases: []
 ---
-## Thesis
-[The core argument or connection being made]
-
-## Evidence
-[Supporting points from sources]
-
-## Relationships
-` ``mermaid
-graph LR
-    A[Concept A] --> B[Concept B]
-` ``
-
-## Open Questions
-- [What remains unresolved or worth exploring]
 ```
+
+```markdown
+# 綜合標題 / Synthesis Title
+
+> [!multi-lang-en]
+> ## Thesis
+> [The core argument or connection being made]
+>
+> ## Evidence
+> [Supporting points from sources]
+>
+> ## Open Questions
+> - [What remains unresolved or worth exploring]
+
+> [!multi-lang-zh]
+> ## 論點
+> [核心論點或建立的連結]
+>
+> ## 證據
+> [來源支持的要點]
+>
+> ## 開放問題
+> - [尚未解決或值得探索的問題]
+```
+
+Note: Mermaid diagrams and wikilink lists are language-neutral — place them outside callouts if shared, or inside each callout if labels need translation.
 
 ## MOC (Map of Content)
 
@@ -166,19 +239,35 @@ graph LR
 ---
 type: moc
 created: YYYY-MM-DD
+langs: [en, zh]
 scope: ""
 tags: []
 aliases: []
 ---
-## Overview
-[What this map covers and why it exists]
+```
 
-## Core Notes
-[Organized list of related notes — audit mode populates wikilinks.
-Group by subtopic or chronology, whichever makes more sense.]
+```markdown
+# 主題地圖 / Topic MOC
 
-## Frontier
-[Areas not yet explored — gaps worth filling]
+> [!multi-lang-en]
+> ## Overview
+> [What this map covers and why it exists]
+>
+> ## Core Notes
+> [Organized list — audit mode populates wikilinks]
+>
+> ## Frontier
+> [Areas not yet explored — gaps worth filling]
+
+> [!multi-lang-zh]
+> ## 概述
+> [此地圖涵蓋的內容及其存在的原因]
+>
+> ## 核心筆記
+> [分類列表 — 審計模式填入 wikilinks]
+>
+> ## 前沿
+> [尚未探索的領域 — 值得填補的缺口]
 ```
 
 ## Decision
@@ -187,28 +276,55 @@ Group by subtopic or chronology, whichever makes more sense.]
 ---
 type: decision
 created: YYYY-MM-DD
+langs: [en, zh]
 status: proposed | decided | superseded
 tags: []
 aliases: []
 ---
-## Context
-[Why this decision is needed — what prompted it]
+```
 
-## Options
+```markdown
+# 決策標題 / Decision Title
 
-### Option A: [Name]
-**Pros:** ...
-**Cons:** ...
+> [!multi-lang-en]
+> ## Context
+> [Why this decision is needed — what prompted it]
+>
+> ## Options
+>
+> ### Option A: [Name]
+> **Pros:** ...
+> **Cons:** ...
+>
+> ### Option B: [Name]
+> **Pros:** ...
+> **Cons:** ...
+>
+> ## Decision
+> [What was chosen]
+>
+> ## Rationale
+> [Why — the reasoning that tipped the scale]
 
-### Option B: [Name]
-**Pros:** ...
-**Cons:** ...
-
-## Decision
-[What was chosen]
-
-## Rationale
-[Why — the reasoning that tipped the scale]
+> [!multi-lang-zh]
+> ## 背景
+> [為什麼需要這個決策 — 觸發因素]
+>
+> ## 選項
+>
+> ### 選項 A：[名稱]
+> **優點：** ...
+> **缺點：** ...
+>
+> ### 選項 B：[名稱]
+> **優點：** ...
+> **缺點：** ...
+>
+> ## 決策
+> [選擇了什麼]
+>
+> ## 理由
+> [為什麼 — 決定性的推理]
 ```
 
 ## Log
