@@ -72,12 +72,20 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 
 ### Delegation
 
-Delegate format correctness to kepano's skills — this skill knows the workflow, they know the syntax:
+**Search (highest priority):**
+- **`qmd query`** — Primary search for ALL vault discovery. Hybrid search (BM25 + vector + LLM reranking) finds both keyword and semantic matches. Use this FIRST for every search operation: Query mode lookups, Propagate relation finding, Audit LINK resolution. See `references/search-strategies.md` for query patterns.
+- `obsidian-cli search` — Fallback only when QMD is unavailable (not installed, index empty, or embeddings not generated). Never prefer it over QMD when both are available.
+
+**Read/Write (vault operations):**
+- Vault operations (read, create, append, properties) → `obsidian:obsidian-cli`
 - Markdown formatting → `obsidian:obsidian-markdown`
 - Canvas creation → `obsidian:json-canvas`
-- Vault operations → `obsidian:obsidian-cli`
 - Excalidraw diagrams → `arc-diagramming-obsidian`
 - URL content extraction → `obsidian:defuddle` (Defuddle first, WebFetch only for APIs/raw text)
+
+**QMD availability check:** On first search, run `qmd status`. If QMD reports 0 documents or no collections, warn: *"QMD index is empty — search quality will be degraded. Run `qmd collection add <vault-path> --name obsidian-vault && qmd embed` to enable hybrid search."* Then fall back to `obsidian-cli search`.
+
+**QMD index freshness:** After creating or modifying vault notes, run `qmd update` to keep the index current. Batch this — update once after a full ingest/audit cycle, not after every individual write.
 
 **obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
 
@@ -134,7 +142,7 @@ Skipping step 1 and writing directly to the wiki layer conflates "what the sourc
 
 After creating the new note, update related existing pages — this is Karpathy's "one source touches 10-15 pages."
 
-1. **Search** — Find vault pages related to the new note's concepts via `obsidian-cli search`
+1. **Search** — Find vault pages related to the new note's concepts via `qmd query`
 2. **Match** — Determine what each related page needs:
 
 | Existing Page Type | Update Action |
@@ -172,7 +180,7 @@ Orient → Search → Read → Synthesize → (File Back)
 ```
 
 1. **Orient** — Read `index.md` for vault map. If none exists, suggest: *"No index — run audit lint to generate one."*
-2. **Search** — Use `obsidian-cli search`. Read `references/search-strategies.md` for strategy by question type.
+2. **Search** — Use `qmd query` (hybrid search). Read `references/search-strategies.md` for strategy by question type and QMD query patterns.
 3. **Read** — Drill into matching notes. Read frontmatter first (understand type), then content. Follow `sources:` arrays for provenance.
 4. **Synthesize** — Answer with inline `[[citations]]`. Every key claim references its source note.
 

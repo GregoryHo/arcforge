@@ -16,7 +16,7 @@ The auditor operates on the **wiki layer** — plain Markdown notes (`.md`) that
 
 ### Relationship Resolution
 - Find notes with `## Relationships` sections containing plain text (no `[[` links)
-- For each mention, search vault using `obsidian-cli` for matching note titles and aliases
+- For each mention, search vault using `qmd query` — the semantic layer resolves mentions even when titles don't exactly match the plain text (e.g., "Karpathy's wiki idea" → matches note titled "LLM-Wiki-Mechanism")
 - Replace plain text with `[[wikilinks]]` where matches are found
 - Add backlink references to target notes: append "Referenced by: `[[source note]]`"
 - Update MOC notes when new notes match their declared scope

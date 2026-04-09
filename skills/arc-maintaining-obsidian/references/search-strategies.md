@@ -1,17 +1,63 @@
 # Search Strategies
 
+## Primary Search Tool: QMD
+
+All vault search goes through `qmd query` first. QMD provides hybrid search (BM25 lexical + vector semantic + LLM reranking) that finds both exact keyword matches and conceptual/semantic matches.
+
+### QMD Query Patterns
+
+```bash
+# Simple query — auto-expands keywords, searches both lexically and semantically
+qmd query "machine learning optimization" -c obsidian-vault
+
+# Structured query — control lexical vs semantic independently
+qmd query $'lex: Docker container security\nvec: how to secure containerized applications' -c obsidian-vault
+
+# Phrase search with negation
+qmd query $'lex: "exact phrase" topic -exclude_this' -c obsidian-vault
+
+# Hypothetical document embedding (great for "what would an answer look like?")
+qmd query $'hyde: A note explaining the tradeoffs between consistency and availability in distributed systems' -c obsidian-vault
+```
+
+**Key flags:**
+- `-c obsidian-vault` — Always scope to the vault collection
+- `-n <num>` — Max results (default 5, use 10-20 for broad searches)
+- `--full` — Return full document content instead of snippets
+- `--json` — Machine-readable output for programmatic use
+- `--line-numbers` — Include line numbers for precise references
+
+### Fallback: obsidian-cli search
+
+Use `obsidian-cli search query=<text>` only when QMD is unavailable (not installed, index empty, or embeddings not generated). It provides keyword-only BM25 — no semantic matching, no reranking.
+
+**Fallback equivalents by operation:**
+
+| Operation | QMD (primary) | obsidian-cli (fallback) |
+|---|---|---|
+| Simple lookup | `qmd query "X" -c obsidian-vault` | `obsidian search query="X"` |
+| Semantic / relational | `qmd query $'vec: how X relates to Y'` | `obsidian search query="X"` then `obsidian search query="Y"` — merge results manually |
+| Broad search | `qmd query "X" -n 20` | `obsidian search query="X" limit=20` |
+| File count | `qmd query "X" --files` | `obsidian search query="X" total` |
+| Structured (lex+vec) | `qmd query $'lex: ...\nvec: ...'` | `obsidian search query="<lex terms>"` — semantic part is lost |
+| Hypothetical (hyde) | `qmd query $'hyde: ...'` | Not possible — use multiple keyword searches with synonyms |
+| Propagate (new note) | Structured lex+vec query | Run separate `obsidian search` per key concept, union results |
+| LINK resolution | Single hybrid query per mention | `obsidian search query="<exact title>"`, then `obsidian search query="<partial>"` if no match |
+
+**What you lose with fallback:** Semantic matches (notes about the same concept using different words), automatic query expansion, reranking by relevance. Compensate by running multiple keyword variations and manually prioritizing results.
+
 ## Query Mode: Search Strategy by Question Type
 
-| Question Type | Strategy |
+| Question Type | QMD Strategy |
 |---|---|
-| "What do I know about X?" | Keyword search, check MOCs first for structured overviews |
-| "How does X relate to Y?" | Search both terms, follow `## Relationships` sections in results |
-| "What's the latest on X?" | Search + sort by `created:` date, check `log.md` for recent activity |
-| "Summarize everything about X" | Start from MOC if one exists, expand to linked notes |
-| "Do I have notes on X?" | Quick search, report count and types found |
-| "What's the evidence for X?" | Search Claims sections across paper Sources, trace evidence strength |
+| "What do I know about X?" | `qmd query "X"` — auto-expansion catches related terms. Check MOCs first for structured overviews |
+| "How does X relate to Y?" | `qmd query $'vec: relationship between X and Y'` — semantic search finds connection notes even without exact terms |
+| "What's the latest on X?" | `qmd query "X"` then sort results by `created:` date, check `log.md` for recent activity |
+| "Summarize everything about X" | `qmd query "X" -n 20` — broad search. Start from MOC if one exists, expand to linked notes |
+| "Do I have notes on X?" | `qmd query "X" --files` — quick count of matching files |
+| "What's the evidence for X?" | `qmd query $'lex: claims evidence\nvec: X'` — combines keyword precision with semantic breadth |
 | "What papers cite / are cited by X?" | Follow `cites:` and `cited_by:` fields in paper Source frontmatter |
-| "What should I read next?" | Check `reading_status: queued` papers, prioritize by `cited_by` count |
+| "What should I read next?" | `qmd query $'lex: reading_status: queued'` — find queued papers, prioritize by `cited_by` count |
 
 ### Result Prioritization
 
@@ -87,7 +133,12 @@ Always state the decision: either suggest filing back, or briefly explain why no
 After creating a new note, search the vault for related pages to update:
 
 1. Extract key concepts from the new note (entities, topics, proper nouns)
-2. Search vault for each concept via `obsidian-cli search`
+2. Search vault via `qmd query` with a structured query combining key concepts:
+   ```bash
+   qmd query $'lex: <entity names, proper nouns>\nvec: <conceptual summary of the note>' -c obsidian-vault -n 15
+   ```
+   The semantic layer catches related notes that don't share exact keywords with the new note.
+   **Fallback:** Run `obsidian search query="<concept>"` separately for each key concept, then union and deduplicate results.
 3. Filter results to wiki-layer notes only (skip Raw Sources, audit reports)
 4. Prioritize by type: Entity > Synthesis > MOC > Source
 5. Cap at 10 results — update top 10 by relevance
@@ -97,8 +148,14 @@ After creating a new note, search the vault for related pages to update:
 When resolving plain-text mentions to wikilinks:
 
 1. Extract the mention text (e.g., "Karpathy's LLM Wiki")
-2. Search vault by exact title match first
-3. If no exact match, search by aliases
-4. If no alias match, try partial/fuzzy match (e.g., "LLM Wiki" matching "Karpathy-LLM-Wiki-Mechanism")
-5. If multiple matches, pick the best match by relevance — don't create ambiguous links
-6. If no match found, add to unresolved mentions list for GROW
+2. Search with `qmd query "<mention text>" -c obsidian-vault -n 5` — hybrid search handles exact matches, alias matches, and semantic near-matches in one pass
+3. From QMD results, pick the best match by relevance score — don't create ambiguous links
+4. If QMD returns no results or all results score below threshold, add to unresolved mentions list for GROW
+
+QMD's semantic layer makes the old multi-step resolution (exact → alias → fuzzy) unnecessary — a single query catches all three match types.
+
+**Fallback (obsidian-cli):** Without QMD, resolve mentions with the multi-step cascade:
+1. `obsidian search query="<exact title>"` — exact match
+2. If no match: `obsidian search query="<alias or abbreviation>"` — alias match
+3. If no match: `obsidian search query="<partial key words>"` — fuzzy match
+4. If multiple matches: pick best by context. If no match: add to unresolved list for GROW.
