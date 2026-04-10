@@ -33,7 +33,7 @@ If no skill fits, proceed directly.
 
 ArcForge worktrees live at `~/.arcforge-worktrees/<project>-<hash>-<epic>/`,
 computed at runtime by `scripts/lib/worktree-paths.js` and managed by
-`coordinator.js`. Because the path is derived, not literal, three norms
+`coordinator.js`. Because the path is derived, not literal, four norms
 apply whenever you touch worktrees:
 
 - **Don't hardcode paths in output.** Use abstract language ("the worktree",
@@ -47,6 +47,17 @@ apply whenever you touch worktrees:
 - **Enter worktrees via `arcforge status --json`.** It returns the absolute
   path. Don't reconstruct it from pattern knowledge — you'll get the hash
   wrong.
+- **Use file-editing tools only where `.arcforge-epic` lives.** A session
+  "owns" the side whose cwd contains the `.arcforge-epic` marker — worktree
+  sessions have it, base sessions don't (they have `dag.yaml` without the
+  marker). Limit direct file-editing tools (Read/Edit/Write in Claude Code,
+  or your platform's equivalent) to the owning session; to modify worktree
+  code from base, start a fresh agent session in the worktree path rather
+  than reaching across. This keeps coordination (`expand`/`status`/`sync`/
+  `merge`) architecturally separate from implementation and sidesteps
+  out-of-cwd permission issues that most agent platforms enforce. Shell
+  subprocess calls (`arcforge sync`, `git status`, `grep`, etc.) are not
+  restricted — the norm is scoped to direct file-editing tools only.
 
 For the full derivation rules (hash function, marker schema, cleanup
 semantics), see `docs/guide/worktree-workflow.md`.

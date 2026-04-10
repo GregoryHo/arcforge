@@ -4,6 +4,8 @@
 
 arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
 
+> **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
+
 **Start here — the 5 skills every user should learn first:**
 
 1. **arc-using** — Entry point for all tasks (routing discipline)
@@ -253,6 +255,8 @@ arcforge's 29 skills are organized into 6 categories:
 
 ### arc-looping
 
+**Platform:** Claude Code only — spawns fresh sessions via `claude -p` subprocess. Other platforms have no equivalent invocation mechanism (yet).
+
 **Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
 
 **When to use:** When tasks can run fully unattended across sessions with no human judgment needed per task.
@@ -409,6 +413,8 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-managing-sessions
 
+**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.claude/sessions/` directory layout.
+
 **Purpose:** User-controlled session saves for continuity across conversations — save what matters, resume when needed.
 
 **When to use:** When saving session state for cross-conversation handoff, resuming a previous session, listing session history, or managing session aliases.
@@ -496,6 +502,8 @@ Rule in `skills/arc-using/SKILL.md`.
 ---
 
 ### arc-evaluating
+
+**Platform:** Claude Code only — eval harness invokes `claude` subprocess to execute scenario trials.
 
 **Purpose:** Measure whether skills, agents, and workflows actually change AI agent behavior — unit tests for AI agent behavior.
 
@@ -625,6 +633,8 @@ Rule in `skills/arc-using/SKILL.md`.
 ---
 
 ### arc-observing
+
+**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.claude/observations/` which is populated by Claude Code PostToolUse hooks.
 
 **Purpose:** Manage automatically detected behavioral patterns (instincts) from tool usage observations.
 
