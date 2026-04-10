@@ -98,7 +98,7 @@ When multiple skills could apply:
 Examples:
 - "Let's build X" → arc-brainstorming (if design is unclear) or arc-writing-tasks (if requirements are known)
 - "Fix this bug" → arc-debugging (if cause unknown) or arc-tdd (if cause is clear)
-- "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists), arc-implementing (if in worktree)
+- "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists, single epic), arc-dispatching-teammates (if 2+ ready epics and lead staying present), arc-looping (if 2+ ready epics and lead walking away), arc-implementing (if in worktree)
 - "Save this to my vault", "create a note", "what do I know about X", "audit my vault" → arc-maintaining-obsidian (ingest/query/audit modes)
 
 ## Discipline Skills — Conditional Triggers

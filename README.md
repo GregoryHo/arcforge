@@ -157,6 +157,7 @@ These are the most frequently used commands:
 - **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
+- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via Claude Code agent teammates
 - **arc-looping** - Autonomous cross-session loop execution
 
 ### Session & Learning Layer

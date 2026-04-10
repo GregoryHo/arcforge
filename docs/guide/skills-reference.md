@@ -4,7 +4,7 @@
 
 arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
+> **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
 
 **Start here — the 5 skills every user should learn first:**
 
@@ -37,12 +37,12 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 29 skills are organized into 6 categories:
+arcforge's 30 skills are organized into 6 categories:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
-| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-looping | Build and ship |
+| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping | Build and ship |
 | **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
@@ -250,6 +250,30 @@ arcforge's 29 skills are organized into 6 categories:
 - Output: parallel fixes integrated, test suite passing
 
 **Related:** arc-planning --> **arc-dispatching-parallel** --> arc-implementing
+
+---
+
+### arc-dispatching-teammates
+
+**Platform:** Claude Code only — requires the agent teammates feature (Claude Code 2.1.32+) and the Agent tool's `team_name`/`name` parameters. Other platforms have no equivalent multi-worker coordination substrate.
+
+**Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between `arc-coordinating` (single-epic interactive) and `arc-looping` (multi-epic unattended).
+
+**When to use:** When `dag.yaml` has 2+ epics in a ready state AND the user is staying at the keyboard to monitor (not walking away). The discriminator against `arc-looping` is **attendance, not risk** — a risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still `arc-looping`.
+
+**Key workflow:**
+1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
+2. Cap team size at 5 — if more ready epics, queue the rest for continuous dispatch
+3. Create or reuse a team (shared SendMessage / TaskList namespace)
+4. Per epic: `arcforge expand --epic <id>` → read canonical worktree path → spawn teammate with spawn prompt template
+5. Monitor via SendMessage and TaskList — dispatch queued epics into freed slots as teammates complete
+6. Each teammate handles its own `arc-finishing-epic` inside `/arc-implementing` — lead runs `arc-verifying` at end
+
+**Artifacts:**
+- Input: `dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
+- Output: per-epic worktrees at `~/.arcforge-worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step
+
+**Related:** arc-planning → **arc-dispatching-teammates** → arc-verifying (at lead); each teammate runs arc-implementing → arc-finishing-epic on its own
 
 ---
 
