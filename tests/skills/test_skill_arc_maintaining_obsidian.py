@@ -295,6 +295,39 @@ def test_has_completion_and_blocked_formats():
     assert "⚠️" in text
 
 
+# --- Bilingual Format ---
+
+
+def test_page_templates_has_bilingual_format():
+    """Page templates must define bilingual format rules."""
+    ref = _read_reference("page-templates.md")
+    assert "langs: [en, zh]" in ref, "universal frontmatter must include langs"
+    assert "## Bilingual Format" in ref, "must have bilingual format section"
+    assert "multi-lang-en" in ref, "must define English callout"
+    assert "multi-lang-zh" in ref, "must define Chinese callout"
+
+
+def test_page_templates_bilingual_in_universal_frontmatter():
+    """langs field must be in the Universal Frontmatter section, not buried later."""
+    ref = _read_reference("page-templates.md")
+    universal_section_end = ref.find("## Source")
+    universal_section = ref[:universal_section_end]
+    assert "langs: [en, zh]" in universal_section, "langs must be in Universal Frontmatter, not a per-type afterthought"
+
+
+def test_all_standalone_page_type_templates_have_bilingual():
+    """Every standalone page type template must include callout structure.
+    Log is excluded — it appends to daily notes, not a standalone file."""
+    ref = _read_reference("page-templates.md")
+    for page_type in ["Source", "Entity", "Synthesis", "MOC", "Decision"]:
+        section_start = ref.find(f"## {page_type}")
+        assert section_start != -1, f"missing section for {page_type}"
+        next_section = ref.find("\n## ", section_start + 1)
+        section = ref[section_start:next_section] if next_section != -1 else ref[section_start:]
+        assert "multi-lang-en" in section, f"{page_type} template must have English callout"
+        assert "multi-lang-zh" in section, f"{page_type} template must have Chinese callout"
+
+
 # --- Reference Files Exist ---
 
 
