@@ -128,6 +128,49 @@ def test_ingest_has_three_artifact_tiers():
     assert "excalidraw" in text or "arc-diagramming" in text
 
 
+def test_ingest_pipeline_includes_visuals_step():
+    """Ingest pipeline must include Visuals step between Create and Index."""
+    text = _read_skill()
+    pipeline_line = [l for l in text.splitlines() if "Classify" in l and "Index" in l]
+    assert pipeline_line, "pipeline diagram line must exist"
+    assert "Visuals" in pipeline_line[0], "pipeline must include Visuals step"
+
+
+def test_ingest_visuals_has_decision_tree():
+    """Visuals step must have a decision framework, not just tier labels."""
+    text = _read_skill().lower()
+    assert "decision tree" in text or "q1:" in text or "q2:" in text
+    assert "3+ named entities" in text or "3+ entities" in text
+
+
+def test_ingest_visuals_has_conservative_default():
+    """Visuals must default to skipping — noise diagrams are worse than none."""
+    text = _read_skill().lower()
+    assert "conservative" in text or "skip visuals" in text or "when in doubt" in text
+
+
+def test_ingest_visuals_embed_is_deterministic():
+    """Image embedding must be deterministic — no LLM judgment for embeds."""
+    text = _read_skill().lower()
+    assert "deterministic" in text or "no judgment" in text
+
+
+def test_ingest_visuals_excalidraw_needs_confirmation():
+    """Excalidraw must be a suggestion, not auto-generated."""
+    text = _read_skill().lower()
+    assert "suggest" in text and "excalidraw" in text
+    assert "not auto-create" in text or "do not auto-create" in text or "suggest to user" in text
+
+
+def test_page_templates_have_visual_guidance():
+    """Each standalone page type in page-templates must have Visual Guidance."""
+    ref = _read_reference("page-templates.md")
+    for page_type in ["Source", "Paper", "Entity", "Synthesis", "MOC", "Decision", "Log"]:
+        assert f"Visual Guidance — {page_type}" in ref, (
+            f"page-templates.md must have Visual Guidance for {page_type}"
+        )
+
+
 # --- Query Mode ---
 
 

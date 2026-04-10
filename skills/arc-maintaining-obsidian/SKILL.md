@@ -16,7 +16,7 @@ Determine the mode from user intent:
 
 | User Intent | Mode | Pipeline |
 |---|---|---|
-| Create, save, capture, ingest, "file this back" | **ingest** | Classify → Confirm → Create → Index → Propagate → Log |
+| Create, save, capture, ingest, "file this back" | **ingest** | Classify → Confirm → Create → Visuals → Index → Propagate → Log |
 | Ask, search, "what do I know about", query | **query** | Orient → Search → Read → Synthesize → (File Back) |
 | Audit, link, lint, grow, "check my vault" | **audit** | LINK → LINT → GROW |
 
@@ -121,7 +121,7 @@ This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "
 ### Pipeline
 
 ```
-Classify → Confirm → Create → Index → Propagate → Log
+Classify → Confirm → Create → Visuals → Index → Propagate → Log
 ```
 
 ### Classify
@@ -151,17 +151,62 @@ Tell the user: "This looks like a **[type]** note — agree?" Wait for confirmat
 
 Apply the template from `references/page-templates.md`, write to vault. Write relationships as plain text, not wikilinks — Propagate and audit mode resolve these later.
 
-**Three artifact tiers:**
-- Tier 1 (default): Markdown + embedded Mermaid
-- Tier 2 (spatial): Canvas — delegate to `json-canvas`
-- Tier 3 (visual): Excalidraw — delegate to `arc-diagramming-obsidian`
-
 **Raw Source Ingest — Raw first, wiki second.** When the source is a URL, file, or non-Markdown artifact, the pipeline has two distinct writes:
 
 1. **Save the raw content** to `Raw/` (or leave it where it is if already in the vault). This is the immutable original — the thing you can diff against later when the source is updated.
 2. **Create the wiki Source note** with `source_url` pointing back to the Raw file. This is your summary and extraction — the wiki layer's interpretation of the original.
 
 Skipping step 1 and writing directly to the wiki layer conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `references/page-templates.md` for extraction methods per file type and the exact `source_url` schema.
+
+### Visuals
+
+After creating the note, assess whether it benefits from visual elements. This step reads the note content you just wrote and applies a decision framework — you need the content to exist before you can judge its structure.
+
+**Decision tree:**
+
+```
+Q1: Does the raw source contain an image or diagram?
+    → Yes → Embed reference: ![[filename.png]] in the note body. Always do this — no judgment needed.
+    → No  → Continue to Q2.
+
+Q2: Does the note content have 3+ named entities with directional relationships?
+    → No  → Skip visuals. Text is sufficient.
+    → Yes → Continue to Q3.
+
+Q3: Is the insight primarily ABOUT how entities relate — hierarchies, flows,
+    cycles, dependencies, abstraction layers, pipelines, or state transitions?
+    Test: if you removed the relationship description from the prose, would
+    the insight collapse? If yes, the shape IS the insight.
+    → Yes → Mermaid by default. Continue to Q4 only if considering Excalidraw.
+    → No  → The content is explanatory (definitions, reasoning, narrative).
+             Skip visuals — text carries explanations better than diagrams.
+
+Q4: Is the spatial/architectural layout complex enough to warrant manual
+    positioning (freeform architecture sketches, not auto-layoutable graphs)?
+    → No  → Stay with Mermaid (text-based, diffable, LLM-generatable).
+    → Yes → Suggest Excalidraw delegation to user: "This has complex spatial
+             layout — want me to create an Excalidraw diagram?" Do not auto-create.
+```
+
+**Tier outputs:**
+
+| Tier | Output | When | LLM Judgment? |
+|---|---|---|---|
+| **Embed** | `![[image.png]]` in note body | Raw source has image/diagram | No — deterministic |
+| **Mermaid** | Fenced `mermaid` block in note | 3+ entities with relationships | Yes — conservative |
+| **Canvas** | Separate `.canvas` file | MOC with 8+ notes in scope | Yes — suggest to user |
+| **Excalidraw** | Delegate to `arc-diagramming-obsidian` | Complex spatial/architectural content | Yes — suggest to user |
+
+**Default behavior, not conservative skipping:**
+
+The decision tree should produce a clear answer for most notes. Two common failure modes to avoid:
+
+1. **Over-generation** — adding Mermaid to purely explanatory content (definitions, reasoning, narratives). A bullet list is faster to read than a diagram for these.
+2. **Under-generation** — skipping Mermaid when the content IS relational because you're "not 100% sure." For relational content (Q3 = yes), the shape carries the insight — prefer Mermaid even under uncertainty.
+
+If you reach Q3 = yes, generate Mermaid. Do not second-guess with "but text could also work" — text always *could* work, the question is whether the shape communicates faster. Mermaid is cheap: text-based, easy to revise, costs only a few tokens. Canvas and Excalidraw are the expensive tiers that wait for user approval.
+
+**Placement:** See `references/page-templates.md` Visual Guidance sections for where each visual type goes within each note template (inside/outside callouts, which section).
 
 ### Index
 

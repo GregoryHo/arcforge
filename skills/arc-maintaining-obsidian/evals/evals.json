@@ -1,0 +1,19 @@
+{
+  "skill_name": "arc-maintaining-obsidian",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "synthesis-with-relationships-should-mermaid",
+      "prompt": "I want to file back an insight to my Obsidian vault. Vault path is provided below — obsidian-cli is NOT available, so fall back to direct file writes. Create the note as a file inside the vault path.\n\nVault path: {{VAULT_PATH}}\n\nInsight to file back: Docker, Kubernetes, and containerd form a layered container runtime. containerd runs the actual containers at the lowest level. Docker provides a developer-friendly CLI and image format on top of containerd. Kubernetes orchestrates many containerd instances across a cluster, treating Docker as optional. This is a classic layered architecture where each level abstracts the one below.\n\nPlease ingest this as a Synthesis note. When done, report: (1) the file path you created, and (2) whether you added any visual elements (Mermaid diagram, image embeds, etc.) and why you made that decision.",
+      "expected_output": "A Synthesis note file with 3+ entities (Docker, Kubernetes, containerd) and directional relationships. Per the decision tree, this should trigger auto-generation of a Mermaid diagram showing the layered relationship. The note body should contain a ```mermaid fenced block.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "simple-source-should-skip-visuals",
+      "prompt": "I want to save a quote to my Obsidian vault as a Source note. Vault path is provided below — obsidian-cli is NOT available, so fall back to direct file writes. Create the note as a file inside the vault path.\n\nVault path: {{VAULT_PATH}}\n\nContent to save: \"The best code is no code at all.\" — Jeff Atwood, from the Coding Horror blog (https://blog.codinghorror.com/).\n\nPlease ingest this as a Source note. When done, report: (1) the file path you created, and (2) whether you added any visual elements (Mermaid diagram, image embeds, etc.) and why you made that decision.",
+      "expected_output": "A Source note containing the quote and attribution. Per the decision tree: no image in the raw source (Q1=No), no named entities with relationships (Q2=No) → should SKIP visuals entirely. No Mermaid block, no image embeds. The conservative default applies.",
+      "files": []
+    }
+  ]
+}

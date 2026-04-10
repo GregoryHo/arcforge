@@ -77,6 +77,12 @@ aliases: []
 > [詳細摘錄 — 值得保留的引用、數據、論點]
 ```
 
+### Visual Guidance — Source
+
+- **Embed (always):** If the raw source is an image (`.png`, `.jpg`) or Excalidraw diagram, add `![[filename]]` inside the Raw Notes / 原始筆記 section of the matching language callout.
+- **Mermaid (rare):** Only if the source describes a system with 3+ components and directional data flow. Place outside callouts (diagram is language-neutral). Most Source notes don't need Mermaid — the text extraction is the value.
+- **Excalidraw:** Never auto-generate for Source notes. If the source itself is an Excalidraw file, embed it; don't recreate it.
+
 ## Source — Paper Variant
 
 When the source is an academic paper (detected by: PDF with Abstract/References sections, or user explicitly says "paper"/"論文"), use this extended frontmatter and extraction template instead of the generic Source template.
@@ -157,6 +163,12 @@ Claims track contestation across papers:
 
 When Propagation finds a conflict, update the claim's status and add a cross-reference: `Contested by: [[Paper B]] — [brief reason]`.
 
+### Visual Guidance — Paper
+
+- **Embed (always):** If the PDF was downloaded to `Raw/Papers/`, embed the first figure if it's a key diagram: `![[paper-figure1.png]]`. For papers at `queued` status, skip — no figures extracted yet.
+- **Mermaid (when 3+ papers in `cites:`):** Generate a citation relationship graph showing this paper's position in the citation network. Place outside callouts after the Related Work section. Use `graph LR` with paper titles as nodes.
+- **Excalidraw (suggest for deep-read):** When a paper has complex methodology (multi-stage pipeline, novel architecture), suggest: *"This paper's method has N stages — want an Excalidraw diagram?"* Do not auto-create.
+
 ## Entity
 
 ```yaml
@@ -193,6 +205,12 @@ aliases: []
 > ## 關係
 > [純文字描述 — 審計模式稍後將其轉為 wikilinks]
 ```
+
+### Visual Guidance — Entity
+
+- **Embed:** If the entity has an associated logo, screenshot, or photo in the vault, embed it at the top of each language callout: `![[entity-logo.png]]`.
+- **Mermaid (only for tool/framework entities):** When `entity_type` is `tool` or `framework` and the entity has 3+ components or a clear architecture, add a component diagram. Place outside callouts. Concepts, people, and companies rarely benefit from Mermaid.
+- **Canvas (suggest for hub entities):** If an entity has relationships to 8+ other vault notes, suggest: *"[[Entity]] is a hub — want a Canvas showing its connections?"*
 
 ## Synthesis
 
@@ -233,6 +251,19 @@ aliases: []
 
 Note: Mermaid diagrams and wikilink lists are language-neutral — place them outside callouts if shared, or inside each callout if labels need translation.
 
+### Visual Guidance — Synthesis
+
+Synthesis is the most visual-friendly note type — it connects ideas, which means relationships are its core content. Generate Mermaid by default; only skip when the synthesis is purely explanatory.
+
+- **Mermaid (default when 3+ entities OR 3+ sources):** Generate a relationship diagram. Two scenarios trigger this:
+  - **Query-as-Ingest syntheses** (user insights, no cited sources): Use the entities named in the thesis. `sources: []` is normal here — don't let it block Mermaid generation.
+  - **Vault-distilled syntheses** (`sources:` populated): Use the cited source titles as nodes, show how they support/contradict/extend the thesis.
+  Place outside callouts (language-neutral). Use `graph TD` for hierarchies/layers, `graph LR` for flow/pipeline, or subgraphs to group related entities.
+- **Excalidraw (suggest for complex syntheses):** When the synthesis connects 5+ concepts across multiple domains with spatial layout that Mermaid's auto-layout can't capture, suggest: *"This synthesis spans N domains — want an Excalidraw diagram showing the conceptual map?"*
+- **Embed:** If any source note has an embedded image relevant to the synthesis argument, re-embed it as supporting evidence.
+
+**Anti-pattern:** Skipping Mermaid because "the layered architecture is simple enough for prose." If the synthesis IS about relationships (layers, flows, cycles, dependencies), the shape makes the insight instantly graspable — prose buries it. A 3-node Mermaid diagram is not overkill for a 3-entity thesis; it's exactly right.
+
 ## MOC (Map of Content)
 
 ```yaml
@@ -269,6 +300,14 @@ aliases: []
 > ## 前沿
 > [尚未探索的領域 — 值得填補的缺口]
 ```
+
+### Visual Guidance — MOC
+
+MOCs are inherently spatial — they map territory. Visuals are high-value here.
+
+- **Mermaid (default when 4+ core notes):** Generate a topic map showing how core notes cluster and relate. Place outside callouts. Use `graph TD` for hierarchical topics or `graph LR` for peer relationships.
+- **Canvas (suggest when 8+ notes):** For large MOCs, suggest: *"This MOC covers N notes — want a Canvas for spatial exploration?"* Canvas lets the user drag and rearrange, which is more natural for maps than fixed Mermaid.
+- **Embed:** Rarely applicable — MOCs are about connections, not artifacts.
 
 ## Decision
 
@@ -327,6 +366,12 @@ aliases: []
 > [為什麼 — 決定性的推理]
 ```
 
+### Visual Guidance — Decision
+
+- **Mermaid (when 3+ options):** Generate a comparison flowchart showing option → trade-offs → outcome. Place outside callouts. Use `graph TD` with decision diamond shapes. For 2 options, a text table is clearer — don't force a diagram.
+- **Embed:** If the decision references screenshots, mockups, or benchmark charts, embed them in the relevant Options section inside each language callout.
+- **Excalidraw:** Rarely needed. Only suggest for architectural decisions where the options involve different system layouts.
+
 ## Log
 
 Logs do not create a new file. Append to daily note via obsidian-cli:
@@ -335,6 +380,10 @@ Logs do not create a new file. Append to daily note via obsidian-cli:
 ## HH:MM — [Title]
 [Content — brief, timestamped, factual]
 ```
+
+### Visual Guidance — Log
+
+No visuals. Logs are timestamped text appended to daily notes. Adding diagrams to a daily note creates noise and breaks the chronological flow.
 
 ## Raw Source Ingest
 
