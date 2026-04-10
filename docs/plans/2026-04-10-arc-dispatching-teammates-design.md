@@ -109,15 +109,35 @@ must sync source to cache manually, or rely on the next version bump and
 `/reload-plugins`. Marketplace-installed users will receive the fix when
 a new plugin version publishes.
 
-### Unrelated finding: `claude -p` subprocesses
+### Retracted finding: `claude -p` subprocesses are fine
 
-`arc-looping`'s `claude -p` subprocess mechanism does NOT fire arcforge
-hooks at all — not `inject-skills`, not `session-tracker`. This is a
-separate, deeper bug in plugin loading for subprocess mode and is NOT
-addressed by the inject-skills fix. `arc-looping` has been running without
-arc-using's routing discipline for its entire existence. This deserves its
-own investigation session and is explicitly out of scope for the
-`arc-dispatching-teammates` work.
+An earlier version of this document claimed `arc-looping`'s `claude -p`
+subprocess mechanism did not fire arcforge hooks at all. **This claim was
+wrong and has been retracted.** A follow-up controlled diagnostic proved
+the original observation was contamination: the failing test had been run
+from inside the arcforge dev repo itself, where `.claude/settings.json`
+deliberately disables the arcforge plugin at project level to keep
+development work clean. The same test run from a neutral directory
+(`/tmp/loop-hook-test/`) showed all three SessionStart hooks firing
+cleanly: `session-tracker`, `inject-skills`, and `log-lightweight`. The
+system prompt token count was also a signal — ~20K in the contaminated
+test vs ~42K in the clean test, with the ~22K delta being the
+`inject-skills` payload.
+
+**Implication**: `arc-looping`, `arc-evaluating`, and every subprocess-
+spawned arcforge workflow has always been routing-discipline-aware. Past
+eval results are not invalidated. The only remaining concern is a
+contributor-facing fact (the dev repo disables its own plugin), which has
+been documented in `.claude/rules/dev-context.md` per the audience-
+separation principle: contributor concerns belong in project rules, never
+in shipped surface (skills, hooks, commands, agents, templates, engine,
+or user docs). A SKILL-level red flag was the wrong impulse — `arc-looping`
+ships to users on their own projects, who never encounter this situation.
+
+**Lesson**: when observing hook behavior, always check whether the test
+cwd has a project-scope settings override before concluding anything
+about global plugin loading. And: contributor-specific quirks never
+belong in any shipped layer of the toolkit.
 
 ## Skill Type and Testing Approach
 
@@ -314,8 +334,6 @@ Additional application scenarios:
 - **No auto-detection of "lead present" vs "unattended"**: user picks via
   which skill they invoke. Routing happens in `arc-using`, not inside
   either skill
-- **No fix for the `claude -p` subprocess hook bug**: separate
-  investigation, separate session, separate commit
 - **No belt-and-suspenders spawn prompt**: the inject-skills fix is
   verified; trusting it is correct
 
