@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.0] - 2026-04-10
+
+### Added
+
+- **arc-dispatching-teammates** skill: Lead-present multi-epic parallel execution via Claude Code agent teammates. Fills the gap between `arc-coordinating` (single-epic interactive) and `arc-looping` (multi-epic unattended) — the discriminator is **attendance, not risk**. Caps at 5 teammates per Anthropic best practice; continuous dispatch as slots free; each teammate runs its own `/arc-implementing` → `arc-finishing-epic`
+- **Obsidian bilingual notes**: All wiki-layer notes now dual-language (EN/ZH) using `[!multi-lang-{code}]` callouts. Includes `publish.js` + `publish.css` for runtime language switching on Obsidian Publish (with `MutationObserver` for SPA navigation and CSS fallback), plus `.obsidian/snippets/multi-lang.css` for local app toggling
+- **Paper variant** for arc-maintaining-obsidian Source template: academic paper extraction with `reading_status` (queued/skimmed/deep-read/extracted), `methodology`, `venue`, `year`, `cites`, `cited_by`, structured Claims section (evidence + basis + status), and citation-aware propagation that auto-resolves `cites:`/`cited_by:` cross-references on ingest
+- **QMD hybrid search** integration in arc-maintaining-obsidian: prefers QMD (keyword + semantic + reranking) over `obsidian-cli search` for vault discovery; includes Index Sync step (`qmd update && qmd embed`, ~3s incremental) after each ingest or audit cycle to keep new notes searchable
+- **Visuals decision framework** in arc-maintaining-obsidian ingest pipeline: 4-question decision tree (image embed → entity count → relational test → spatial complexity) with Embed/Mermaid/Canvas/Excalidraw tiers. Mermaid is the default output when content is relational; Canvas and Excalidraw require user approval
+- **Index pipeline step** in arc-maintaining-obsidian: ingest now writes `Classify → Confirm → Create → Visuals → Index → Propagate → Log` — `index.md` gets incremental one-line additions per new note, keeping the catalog current between full audit rebuilds
+- `scripts/lib/worktree-paths.js`: Canonical path helper (`getWorktreePath`, `parseWorktreePath`, `hashRepoPath`, `getWorktreeRoot`) computing `~/.arcforge-worktrees/<project>-<hash>-<epic>/` from the absolute project root. Replaces hardcoded `.worktrees/` paths throughout the engine
+- `expand --epic <id> --project-setup` CLI mode: single-epic worktree expansion with auto-detected dependency install (npm/pnpm/yarn/bun via `detectPackageManager()`, pip via `pyproject.toml` or `requirements.txt`, cargo, go). `package-manager.js` adds `getDefaultInstallCommand()` routing to the project's actual package manager — no more hardcoded `npm install`
+- `docs/guide/worktree-workflow.md`: Authoritative bilingual (EN/ZH) human guide covering path derivation rules, `.arcforge-epic` marker schema, cleanup semantics, sync flow, and troubleshooting. All skills and rules defer to this doc for the full story
+- `.claude/rules/dev-context.md`: Contributor-facing rule separating dev-environment facts (project-level plugin disablement, `--plugin-dir .` workflow, Ships/No-ship audience table) from shipped surface. Introduces the audience-separation principle: contributor-only concerns never belong in skills, hooks, commands, agents, templates, engine, or user docs
+- `tests/skills/pressure/`: New pressure test fixture format for discipline skills (`arc-using-path-reconstruction`, `arc-using-worktrees-cli-failure`, `arc-finishing-epic-completion-format`) plus `test_pressure_fixtures.py` runner and `README.md` documenting the format
+- `tests/scripts/worktree-paths.test.js`: 150+ line Jest suite covering hashing, path derivation, parsing edge cases, and sanitization
+- Skill test: `tests/skills/test_skill_arc_dispatching_teammates.py` (163 lines, frontmatter + structure validation)
+- Design docs: `docs/plans/2026-04-09-obsidian-bilingual-notes-design.md`, `docs/plans/2026-04-10-arc-dispatching-teammates-design.md`
+- Task list: `docs/tasks/bilingual-notes-tasks.md`
+- arc-maintaining-obsidian evals: 2 new scenarios (`synthesis-with-relationships-should-mermaid`, `simple-source-should-skip-visuals`) to discriminate the Visuals decision framework
+- `assets/arcforge-overview.png` (README diagram — referenced from the Skills Connect section)
+
+### Changed
+
+- **Worktree location migration**: moved from in-repo `.worktrees/<epic>/` to home-based `~/.arcforge-worktrees/<project>-<hash>-<epic>/`. The 6-char sha256 prefix of the absolute project path prevents collisions between multiple clones of the same repo. All skills, rules, tests, and agent output stop hardcoding worktree paths — the path is derived at runtime via `scripts/lib/worktree-paths.js` and surfaced through `arcforge status --json`
+- **`arc-using` Worktree Rule** now enforces **four** norms (previously three): no hardcoded paths, no manual `git worktree add`, enter via `arcforge status --json`, and — new — **direct file-editing tools are restricted to the session owning `.arcforge-epic`**. A session "owns" the side whose cwd contains the marker; to modify worktree code from base, start a fresh agent session in the worktree path instead of reaching across. This sidesteps out-of-cwd permission issues most agent platforms enforce
+- **Cleanup semantics**: `coordinator.cleanup` now removes directories via `fs.rmSync` then runs a single `git worktree prune` pass. Replaces the per-epic `git worktree remove --force` with fallback — cheaper (O(1) git invocations instead of N) and works around git's refusal to remove worktrees that contain the untracked `.arcforge-epic` marker
+- **Subprocess I/O**: install and test subprocesses (`_runSubprocess`) now use `stdio: 'inherit'` — streams output directly to the parent terminal. Avoids `execFileSync`'s 1 MB `maxBuffer` which long-running `npm install` / `cargo build` / `pip install` could exceed and incorrectly report as ENOBUFS
+- **`arc-using-worktrees`**: simplified to a thin wrapper around `node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <id> --project-setup`. All path derivation, marker writing, and dependency install delegated to `scripts/lib/coordinator.js` — the skill is now ~180 lines down from ~400
+- **`arc-finishing-epic`**: completion format now reports absolute worktree paths sourced from `arcforge status --json` (or `(removed)` when cleaned up), never reconstructed from pattern knowledge. Added explicit Step 4.6 "Look Up the Worktree Path"
+- **`arc-coordinating`** Merge From Worktree: base detection now uses `parseWorktreePath()` to recognize which `git worktree list` entries are arcforge-managed — no more string-matching `.worktrees`
+- **`arc-maintaining-obsidian`** Mode Entry Gate: each mode (ingest/query/audit) now reads its reference file before executing. Skipping the gate causes cascading errors (improvised schemas, missed pipeline steps, wrong extraction methods)
+- **`arc-maintaining-obsidian`** raw-first ingest: Raw Source ingest always saves the immutable original to `Raw/` before creating the wiki Source note. Conflating "what the source said" with "what I understood" would lose re-extraction ability
+- **`arc-maintaining-obsidian`** vault-only answers extend to surrounding commentary — query mode never fills gaps with general knowledge in framing, insights, or comparisons around vault results; surfaces gaps as GROW suggestions instead
+- **`arc-maintaining-obsidian`** broken wikilink resolution strategy: choose based on Raw Source backing + reference count (3+ refs → flag for user, 1-2 refs → convert to plain text). Never create stub entity notes without source backing
+- **`arc-maintaining-obsidian`** LINT verify-before-fix: findings are hypotheses, not facts — read the actual file before acting on reported issues (fixes common false positive with YAML multi-line `tags:` lists)
+- **`arc-maintaining-obsidian`** LINT correctly skips Excalidraw `.md` drawings (`excalidraw-plugin: parsed` frontmatter) during audit
+- **`docs/guide/skills-reference.md`**: added `arc-dispatching-teammates` entry with platform marker; platform-only markers added to `arc-looping`, `arc-evaluating`, `arc-observing`, `arc-managing-sessions` flagging them as Claude Code only
+- **`README.md`**: `arc-dispatching-teammates` added to Execution Layer skill list; version badge bumped
+- **`.claude/rules/architecture.md`**: Worktree Isolation section rewritten to describe home-based canonical path + `worktree-paths.js`
+- **`hooks/hooks.json`** loader now supports the sync fix (see Fixed)
+
+### Fixed
+
+- **`inject-skills` hook race condition**: the hook was registered with `"async": true`, so its output (the arc-using routing layer) arrived *after* the first assistant turn for spawned teammate subagents. The race was invisible for interactive user sessions because humans type slowly, but fatal for teammate spawns where the first prompt is delivered immediately. Removed `async: true` — the hook now fires synchronously on `SessionStart` (~829ms) and teammates reliably receive routing discipline. Root cause identified during arc-dispatching-teammates PoC (3 rounds of behavioral verification — LLM self-introspection about system prompt contents proved unreliable, so verification had to use exact-string behavioral tests)
+- **`--project-setup` package manager selection**: previously hardcoded `npm install`. Now routes through `detectPackageManager()` so pnpm/yarn/bun projects use their own installer instead of corrupting the lockfile with the wrong tool
+- **`git worktree remove` failures on `.arcforge-epic` marker**: git refused to remove worktrees containing the untracked marker file. Replaced with direct `fs.rmSync` + one `git worktree prune`
+- **ENOBUFS on long installs**: `npm install`/`cargo build`/`pip install` no longer risk ENOBUFS thanks to streamed stdio (`_runSubprocess` with `stdio: 'inherit'`)
+- **Retracted: false `claude -p` subprocess bug**: a prior debugging note claimed `arc-looping`'s `claude -p` subprocesses did not fire arcforge hooks. Controlled re-test from a neutral directory (`/tmp/loop-hook-test/`) proved this was contamination from running tests inside arcforge's dev repo, where `.claude/settings.json` deliberately disables the arcforge plugin at project level. All past eval results remain valid; the root fact has been moved to `.claude/rules/dev-context.md` per the audience-separation principle (contributor concerns never belong in shipped surface)
+- **`marketplace.json` version drift**: `.claude-plugin/marketplace.json` was stuck at 1.2.0 (last manually updated two versions ago) while `plugin.json` and `package.json` had moved on. Synced all three version sources to 1.4.0 as part of this release
+
+### Removed
+
+- `.worktrees/` in-repo worktree directory (and its `.gitignore` entries) — superseded by the home-based canonical location
+- `_ensureWorktreesIgnored()` helper — orphaned after the migration
+- `_runTestCommand()` internal — replaced by the generic `_runSubprocess()` used by both test verify and project setup
+- `skills/arc-using-worktrees/baseline-test.md` — consolidated into the new `tests/skills/pressure/` fixture format
+
 ## [1.3.1] - 2026-04-08
 
 ### Fixed

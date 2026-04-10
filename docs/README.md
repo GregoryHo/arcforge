@@ -1,6 +1,6 @@
 # Documentation
 
-arcforge's primary documentation lives in the [Obsidian Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge) — 83 interconnected wiki notes covering all skills, rules, agents, templates, and design history.
+arcforge's primary documentation lives in the [Obsidian Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge) — an interconnected wiki knowledge base covering all skills, rules, agents, templates, and design history.
 
 ## Quick Links
 

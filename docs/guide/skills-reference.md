@@ -6,13 +6,14 @@ arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemin
 
 > **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
 
-**Start here — the 5 skills every user should learn first:**
+**Start here — the core skills every user should learn first:**
 
 1. **arc-using** — Entry point for all tasks (routing discipline)
 2. **arc-writing-tasks** — Break features into executable tasks
 3. **arc-executing-tasks** — Run task lists with human checkpoints
 4. **arc-debugging** — Systematic root cause investigation
 5. **arc-journaling** — Capture session reflections
+6. **arc-maintaining-obsidian** — Ingest, query, and audit an Obsidian vault (if you keep a knowledge base)
 
 **What are you trying to do?**
 
@@ -37,7 +38,7 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 30 skills are organized into 6 categories:
+arcforge's 32 skills are organized into 7 categories:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
@@ -46,6 +47,7 @@ arcforge's 30 skills are organized into 6 categories:
 | **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
+| **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
 | **Meta** | arc-writing-skills | Create and maintain skills |
 
 **How skills flow through a project:**
@@ -719,6 +721,54 @@ Rule in `skills/arc-using/SKILL.md`.
 - Output: `research-config.md` (locked contract), `results.tsv` (untracked), `research/{tag}` branch
 
 **Related:** arc-brainstorming --> **arc-researching** --> manual cherry-pick to main
+
+---
+
+### Knowledge Base Skills
+
+---
+
+### arc-maintaining-obsidian
+
+**Platform:** All platforms. Requires an Obsidian vault; `obsidian-cli` is preferred for vault operations but the skill falls back to direct file writes when the CLI is unavailable.
+
+**Purpose:** Unified Obsidian vault lifecycle skill — one agent, three modes (ingest, query, audit) — implementing Karpathy's LLM Wiki pattern for a persistent, compounding knowledge base. Eliminates wiki maintenance burden by handling classification, schema compliance, propagation, and gap analysis as a single shared-context operation.
+
+**When to use:** When creating, querying, or maintaining an Obsidian vault. Triggers on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about X"), auditing vault health (missing links, orphan notes, stale content), or ingesting raw files (Excalidraw, PDFs, screenshots, papers).
+
+**Key workflow:**
+- **Ingest** pipeline: `Classify → Confirm → Create → Visuals → Index → Propagate → Log` — 6 page types (Source, Entity, Synthesis, MOC, Decision, Log) + Paper variant for academic papers. Raw-first-then-wiki rule preserves re-extraction ability.
+- **Query** pipeline: `Orient → Search → Read → Synthesize → (File Back)` — vault-only answers (no general-knowledge backfill), inline citations, optional file-back as a new synthesis note.
+- **Audit** pipeline: `LINK → LINT → GROW` — resolve plain-text mentions into wikilinks, schema/orphan/stale checks with `index.md` rebuild, gap analysis with internal and external suggestions.
+
+**Artifacts:**
+- Input: URLs, files, text descriptions, natural-language queries
+- Output: typed wiki notes with bilingual `[!multi-lang-{code}]` callout format, audit reports under `audit-YYYY-MM-DD-<subcommand>.md`, rolling `index.md` and `log.md`
+
+**Related:** user input --> **arc-maintaining-obsidian** (three modes) --> vault state updated. Delegates Excalidraw creation to **arc-diagramming-obsidian** via the Visuals decision tree.
+
+---
+
+### arc-diagramming-obsidian
+
+**Platform:** All platforms. Requires an Obsidian vault with the Excalidraw community plugin installed.
+
+**Purpose:** Create Excalidraw diagrams directly in an Obsidian vault via structured JSON write with a render-validate loop, applying a cool minimal color palette for visual consistency.
+
+**When to use:** When the user wants an Excalidraw diagram, architecture visualization, flowchart, mind map, or any visual representation of concepts and relationships. Trigger on mentions of drawing, diagramming, visualizing, mapping, or illustrating — especially when `arc-maintaining-obsidian`'s Visuals decision tree routes here for complex spatial layouts.
+
+**Key workflow:**
+1. Identify target concept and relationships (nodes + edges)
+2. Draft Excalidraw JSON with positions, groups, and color palette
+3. Write the `.excalidraw.md` file into the vault's Excalidraw folder
+4. Render-validate loop: open in Obsidian, verify layout, iterate on positioning
+5. Return the vault path for embedding in a Source note
+
+**Artifacts:**
+- Input: concept description, existing vault note to visualize, or relationship graph
+- Output: `.excalidraw.md` file in the vault's Excalidraw folder, ready for embedding via `![[filename]]`
+
+**Related:** arc-maintaining-obsidian (Visuals step, Q4 spatial complexity) --> **arc-diagramming-obsidian** --> diagram embedded in the originating note
 
 ---
 
