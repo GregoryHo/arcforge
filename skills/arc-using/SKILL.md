@@ -23,11 +23,33 @@ If no skill fits, proceed directly.
 - `docs/plans/*-design.md` → Design documents
 - `specs/spec.xml` → Refined specifications
 - `dag.yaml` + `epics/` → Implementation plans
-- `.worktrees/` → Isolated feature work
+- Isolated feature work → see Worktree Rule below
 
 **Session context = current workflow only**
 - Don't rely on memory of past sessions
 - Resume from file artifacts, not conversation history
+
+## Worktree Rule
+
+ArcForge worktrees live at `~/.arcforge-worktrees/<project>-<hash>-<epic>/`,
+computed at runtime by `scripts/lib/worktree-paths.js` and managed by
+`coordinator.js`. Because the path is derived, not literal, three norms
+apply whenever you touch worktrees:
+
+- **Don't hardcode paths in output.** Use abstract language ("the worktree",
+  "the epic's checkout") in messages and completion formats, or fill from
+  CLI output. Hardcoded paths become stale the moment the rule evolves —
+  and the rule has evolved before.
+- **Don't create worktrees manually.** Delegate to `arc-coordinating expand`
+  (batch) or `arc-using-worktrees` (single). Raw `git worktree add` bypasses
+  the `.arcforge-epic` marker schema that DAG sync depends on, producing
+  silently broken state.
+- **Enter worktrees via `arcforge status --json`.** It returns the absolute
+  path. Don't reconstruct it from pattern knowledge — you'll get the hash
+  wrong.
+
+For the full derivation rules (hash function, marker schema, cleanup
+semantics), see `docs/guide/worktree-workflow.md`.
 
 ## The Rule
 
@@ -80,20 +102,6 @@ These skills activate **during any workflow** when the condition is met. They ar
 | Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
 | Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
 | User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` (audit mode) | Propose changes, never auto-modify without approval |
-
-**The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
-
-## Discipline Skills — Conditional Triggers
-
-These skills activate **during any workflow** when the condition is met. They are not pipeline steps — they fire cross-cutting based on what you are about to do.
-
-| Condition | Skill | Iron Law |
-|-----------|-------|----------|
-| About to write implementation code | `arc-tdd` | No production code without a failing test first |
-| Test fails or unexpected behavior | `arc-debugging` | No fixes without root cause investigation first |
-| About to claim work is complete | `arc-verifying` | No completion claims without fresh verification evidence |
-| Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
-| Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
 
 **The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
 

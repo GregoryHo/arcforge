@@ -303,4 +303,32 @@ describe('Coordinator', () => {
       expect(context.blocked_count).toBeDefined();
     });
   });
+
+  describe('expandWorktrees single-epic preconditions', () => {
+    it('throws when the named epic is not in the DAG', () => {
+      const coord = createCoordinator(twoEpicDag());
+      expect(() => coord.expandWorktrees({ epicId: 'nope' })).toThrow(/not found/i);
+    });
+
+    it('throws when the named epic has unmet dependencies', () => {
+      const coord = createCoordinator(twoEpicDag());
+      // epic-2 depends on epic-1 (still pending)
+      expect(() => coord.expandWorktrees({ epicId: 'epic-2' })).toThrow(/waiting on epic-1/);
+    });
+
+    it('throws when the named epic is already in progress', () => {
+      const coord = createCoordinator(twoEpicDag({ epic1Status: TaskStatus.IN_PROGRESS }));
+      expect(() => coord.expandWorktrees({ epicId: 'epic-1' })).toThrow(/status is in_progress/);
+    });
+
+    it('returns empty array when a batch run has no ready epics', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic2Status: TaskStatus.BLOCKED,
+        }),
+      );
+      expect(coord.expandWorktrees()).toEqual([]);
+    });
+  });
 });

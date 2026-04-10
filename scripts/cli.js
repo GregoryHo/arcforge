@@ -8,7 +8,7 @@
  *   complete <task_id>              Mark task as completed
  *   block <task_id> <reason>        Mark task as blocked
  *   parallel                        Get parallelizable epics
- *   expand [--verify] [--verify-cmd "..."]  Create worktrees for ready epics
+ *   expand [--epic <id>] [--project-setup] [--verify] [--verify-cmd "..."]  Create worktrees
  *   merge [epic_ids...] [--base branch]     Merge epics to base
  *   cleanup [epic_ids...]           Remove worktrees for completed epics
  *   sync [--direction from-base|to-base|both|scan]  Sync state
@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Coordinator } = require('./lib/coordinator');
 const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
+const { getWorktreePath } = require('./lib/worktree-paths');
 
 // Parse command line arguments
 function parseArgs(args) {
@@ -108,8 +109,10 @@ COMMANDS:
   parallel
       List all epics that can be worked on in parallel.
 
-  expand [--verify] [--verify-cmd "..."]
-      Create git worktrees for ready epics.
+  expand [--epic <id>] [--project-setup] [--verify] [--verify-cmd "..."]
+      Create git worktrees for ready epics at ~/.arcforge-worktrees/.
+      --epic           Expand only the named epic (single-epic mode)
+      --project-setup  Auto-detect and run installer (npm/pip/cargo/go)
       --verify         Run tests after creation
       --verify-cmd     Custom test command (default: auto-detect)
 
@@ -249,8 +252,10 @@ async function main() {
         const coord = new Coordinator(projectRoot);
         const verifyCmd = args.options['verify-cmd'];
         const created = coord.expandWorktrees({
+          epicId: args.options.epic,
           verify: args.flags.verify,
           verifyCommand: verifyCmd ? verifyCmd.split(' ') : undefined,
+          projectSetup: args.flags['project-setup'] || false,
         });
         output(
           {
@@ -258,6 +263,7 @@ async function main() {
             epics: created.map((e) => ({
               id: e.id,
               worktree: e.worktree,
+              path: getWorktreePath(projectRoot, e.id),
             })),
           },
           asJson,

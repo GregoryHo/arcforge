@@ -270,6 +270,33 @@ function getDefaultTestCommand(projectDir = process.cwd()) {
   throw new Error('Cannot detect project type for test command');
 }
 
+/**
+ * Get default install command for a project.
+ * Routes to the detected package manager so pnpm/yarn/bun projects don't
+ * get a hardcoded `npm install` that corrupts their lockfile.
+ * @param {string} projectDir - Project directory
+ * @returns {string[] | null} Command array, or null if no installer applies
+ */
+function getDefaultInstallCommand(projectDir = process.cwd()) {
+  if (hasPackageJson(projectDir)) {
+    const pmName = detectPackageManager(projectDir) || 'npm';
+    return PACKAGE_MANAGERS[pmName].install;
+  }
+  if (hasPyprojectToml(projectDir)) {
+    return ['pip', 'install', '-e', '.'];
+  }
+  if (fileExists(path.join(projectDir, 'requirements.txt'))) {
+    return ['pip', 'install', '-r', 'requirements.txt'];
+  }
+  if (fileExists(path.join(projectDir, 'Cargo.toml'))) {
+    return ['cargo', 'build'];
+  }
+  if (fileExists(path.join(projectDir, 'go.mod'))) {
+    return ['go', 'mod', 'download'];
+  }
+  return null;
+}
+
 module.exports = {
   PACKAGE_MANAGERS,
   detectPackageManager,
@@ -284,5 +311,6 @@ module.exports = {
   hasPackageJson,
   hasPyprojectToml,
   getDefaultTestCommand,
+  getDefaultInstallCommand,
   readPackageJson,
 };

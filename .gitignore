@@ -1,5 +1,3 @@
-.worktrees/
-worktrees/
 evals/results/
 .eval-trials/
 .claude/skills/
@@ -35,6 +33,5 @@ __pycache__/
 .claude/log-lightweight.config.json
 .serena/cache/
 
-.worktrees
 skills/*-workspace/
 hooks/.claude/

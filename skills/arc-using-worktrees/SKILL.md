@@ -1,158 +1,84 @@
 ---
 name: arc-using-worktrees
-description: Use when creating isolated workspace for epic development
+description: Use when setting up an isolated workspace for a single epic, when starting work on a specific epic id from dag.yaml, or when any task mentions creating a branch or checkout for epic-level work. Use this skill even if the user doesn't say "worktree" — if they're scoping work to one epic, this applies. For batch (multi-epic) expansion, use arc-coordinating expand instead.
 ---
 
 # arc-using-worktrees
 
 ## When to Use
 
-Use this skill when you need to create an isolated git worktree for developing an epic. This enables parallel development of multiple epics without interference.
+Create an isolated workspace for a single epic. This skill is a thin wrapper
+around `arcforge expand --epic <id>` — it does not create worktrees by hand.
 
-**IMPORTANT:** This skill is specific to arcforge. Do NOT use any other worktree skill. The metadata format is different.
+For multi-epic batch expansion, use `arc-coordinating expand` instead.
+
+**REQUIRED BACKGROUND:** `arc-using` — read the Worktree Rule for the three
+norms (no hardcoded paths, no manual `git worktree add`, enter via
+`arcforge status --json`).
 
 ## Core Workflow
 
-### Step 1: Verify Directory Structure
+### Step 1: Identify the epic
 
-Check if `.worktrees/` directory exists:
+Read the epic id from `dag.yaml` or the user's request. Abort if the epic id
+is unknown — you cannot create a worktree for an epic that is not in the DAG.
 
-```bash
-ls .worktrees/ 2>/dev/null || mkdir -p .worktrees/
-```
-
-### Step 1.5: Safety Verification
-
-Ensure .worktrees/ is in .gitignore:
+### Step 2: Delegate to coordinator
 
 ```bash
-git check-ignore -q .worktrees 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo ".worktrees" >> .gitignore
-    git add .gitignore
-    git commit -m "chore: ignore .worktrees directory"
-fi
+node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <epic-id> --project-setup
 ```
 
-### Step 1.6: Worktree Context Check
+What this does (single authoritative implementation in `scripts/lib/coordinator.js`):
 
-If already in a worktree, STOP and use current worktree:
+- Derives the canonical worktree path via `scripts/lib/worktree-paths.js`
+  (`~/.arcforge-worktrees/<project>-<hash>-<epic>/`).
+- Runs `git worktree add <path> -b <epic-id>`.
+- Writes the `.arcforge-epic` marker with base worktree + base branch.
+- Auto-detects the project installer (`package.json` → `npm install`,
+  `pyproject.toml` → `pip install -e .`, `Cargo.toml` → `cargo build`,
+  `go.mod` → `go mod download`) when `--project-setup` is passed.
+- Updates `dag.yaml` epic status and worktree field.
 
-```bash
-git rev-parse --show-superproject-working-tree >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-    echo "Already in a worktree. Stay here and continue."
-    exit 1
-fi
-```
+### Step 3: Read the returned path
 
-### Step 2: Create Git Worktree
+The command prints JSON. Read the `path` field — do not reconstruct it from
+pattern knowledge, and do not hardcode it in subsequent messages.
 
-Create the worktree with a matching branch name:
+### Step 4: Report to the user
 
-```bash
-git worktree add .worktrees/<epic-name> -b <epic-name>
-```
-
-**Important:** Use the exact epic name from `dag.yaml` if it exists.
-
-### Step 2.5: Project Setup
-
-Auto-detect and run setup:
-
-```bash
-# Python
-if [ -f pyproject.toml ]; then pip install -e .; fi
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-# Node
-if [ -f package.json ]; then npm install; fi
-```
-
-### Step 2.6: Baseline Test
-
-Verify clean baseline:
-
-```bash
-# Auto-detect test command from project files
-if [ -f package.json ]; then
-  npm test
-elif [ -f Cargo.toml ]; then
-  cargo test
-elif [ -f pyproject.toml ] || [ -f setup.py ]; then
-  pytest
-elif [ -f go.mod ]; then
-  go test ./...
-else
-  echo "No test command detected. Specify manually."
-fi
-```
-
-If tests fail: Report failures, ask whether to proceed.
-
-### Step 3: Create Epic Metadata
-
-**CRITICAL:** Create `.arcforge-epic` file (NOT `.epic`, NOT `.worktree`, NOT any other name):
-
-```bash
-cd .worktrees/<epic-name>
-echo "<epic-name>" > .arcforge-epic
-```
-
-**Why `.arcforge-epic` specifically?**
-- Follows project naming convention (`.arcforge-progress.json`, etc.)
-- Ensures arc-coordinating CLI can find it
-- Distinguishes from other project's worktree tracking
-
-**DO NOT:**
-- ❌ Create `.epic` (wrong name)
-- ❌ Create `.worktree` (wrong name)
-- ❌ Skip this file (required for tracking)
-- ❌ Use other tracking mechanisms (this is the standard)
-
-### Step 4: DAG Integration (if dag.yaml exists)
-
-If `dag.yaml` exists in the main worktree:
-- Read the epic status
-- Verify the epic is in "ready" state (dependencies complete)
-- Note: Status updates happen via `arc-coordinating`, not here
-
-### Step 5: Notify User
-
-Use the standardized completion format (see below).
+Use the completion format below, filling the absolute path from the command
+output.
 
 ## Red Flags
 
 Stop immediately if you catch yourself thinking:
 
-1. **".epic is fine"** — NO! Must use `.arcforge-epic` exactly
-2. **"I'll use another worktree skill"** — NO! Wrong metadata format
-3. **"Skip DAG check"** — Always check if dag.yaml exists
-4. **"Create worktree anywhere"** — Must be in `.worktrees/` directory
-5. **"Use main/master branch"** — Must create new branch with epic name
-6. **"Metadata file is optional"** — It's REQUIRED for coordinator tracking
-7. **"Any name starting with dot is fine"** — NO! `.arcforge-epic` ONLY
-
-## Common Rationalizations
-
-| Excuse | Reality |
-|--------|---------|
-| "Any tracking file works" | `.arcforge-epic` is the standard |
-| "DAG check slows things down" | Integration prevents conflicts |
-| "User knows where they are" | Tools depend on `.arcforge-epic` |
-| ".epic is shorter" | Consistency > brevity |
+1. **"I'll just `git worktree add` it directly"** — NO. Bypasses the
+   `.arcforge-epic` marker and dag.yaml update that `arc-coordinating sync`
+   depends on, producing silently broken state.
+2. **"I'll put it somewhere convenient like `./worktrees/`"** — NO. The
+   canonical path is derived at runtime; putting it elsewhere makes every
+   downstream tool fail to find it.
+3. **"I'll hardcode `~/.arcforge-worktrees/...` in my output"** — NO. Read
+   the `path` field from the CLI's JSON output. The derivation rule has
+   evolved before and will evolve again.
+4. **"I'll skip the dag.yaml check"** — NO. If the epic is not in the DAG,
+   `arcforge expand` will refuse and that refusal is correct.
+5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a
+   real problem, not a prompt to bypass the mechanism. Report blocked.
 
 ## Stage Completion Format
 
 ```
 ─────────────────────────────────────────────────
-✅ Worktree created → `.worktrees/<epic-name>/`
+✅ Worktree created for <epic-id>
 
-Branch: <epic-name>
+Path: <absolute path from arcforge expand JSON>
+Branch: <epic-id>
 Tracking: .arcforge-epic
-DAG status: [ready/blocked/N/A]
 
-Next: Work in the worktree, then use `/arc-finishing-epic` when complete
+Next: cd to the path, then use `/arc-finishing-epic` when work is complete
 ─────────────────────────────────────────────────
 ```
 
@@ -162,19 +88,20 @@ Next: Work in the worktree, then use `/arc-finishing-epic` when complete
 ─────────────────────────────────────────────────
 ⚠️ Worktree creation blocked
 
-Issue: [description]
-Location: [epic name or path]
+Epic: <epic-id>
+Reason: <stderr from arcforge expand>
 
-To resolve:
-1. [action]
+Common causes:
+- Epic not in dag.yaml
+- Epic not ready (dependencies incomplete)
+- Git worktree add failed (uncommitted changes, branch conflict)
 
-Then retry: `/arc-using-worktrees`
+Report the exact CLI error and stop.
 ─────────────────────────────────────────────────
 ```
 
 ## Related Skills
 
-- **Called by:** `arc-agent-driven`, `arc-executing-tasks`, `arc-coordinating`
-- **Before:** `arc-coordinating expand` (creates multiple worktrees)
-- **After:** Work in worktree, then `/arc-finishing-epic` (merge decision)
-- **Related:** `arc-dispatching-parallel` (for feature-level parallelization within worktree)
+- **Called by:** `arc-coordinating` (when a single epic needs expansion), `arc-agent-driven`, `arc-executing-tasks`
+- **After this skill:** Work in the created worktree, then `/arc-finishing-epic` to integrate
+- **Alternative:** `arc-coordinating expand` (batch mode — all ready epics at once, no `--epic` flag)

@@ -300,20 +300,26 @@ arcforge's 29 skills are organized into 6 categories:
 
 ### arc-using-worktrees
 
-**Purpose:** Create isolated git worktrees for epic development with proper metadata tracking.
+**Purpose:** Thin wrapper around `arcforge expand --epic <id>` for creating
+an isolated worktree for a single epic. Delegates all path derivation,
+marker writing, and project setup to `scripts/lib/coordinator.js`.
 
 **When to use:** When creating isolated workspace for epic development.
 
 **Key workflow:**
-1. Verify `.worktrees/` directory exists and is in `.gitignore`
-2. Check if already in a worktree (if so, STOP)
-3. Create worktree: `git worktree add .worktrees/<epic-name> -b <epic-name>`
-4. Run project setup (auto-detect: npm install, pip install, etc.)
-5. Create `.arcforge-epic` metadata file (REQUIRED, not `.epic`)
-6. Run baseline tests to verify clean state
+1. Identify the epic id from `dag.yaml` or the user's request
+2. Invoke `node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <id> --project-setup`
+3. Read the absolute worktree path from the command's JSON output
+4. Report it verbatim to the user — do not reconstruct or hardcode
 
 **Artifacts:**
-- Output: `.worktrees/<epic-name>/` directory, `.arcforge-epic` marker file
+- Output: worktree at the canonical path
+  (`~/.arcforge-worktrees/<project>-<hash>-<epic>/`), `.arcforge-epic` marker
+  authored by the coordinator, `dag.yaml` epic status updated
+
+For the full derivation rules see
+[`docs/guide/worktree-workflow.md`](worktree-workflow.md) and the Worktree
+Rule in `skills/arc-using/SKILL.md`.
 
 **Related:** arc-planning --> **arc-using-worktrees** --> arc-implementing or arc-executing-tasks
 

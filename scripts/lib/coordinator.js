@@ -13,8 +13,9 @@ const { execFileSync } = require('node:child_process');
 const { DAG, Feature, BlockedItem, SyncResult, TaskStatus } = require('./models');
 const { parseDagYaml, stringifyDagYaml } = require('./yaml-parser');
 const { withLock } = require('./locking');
-const { getDefaultTestCommand } = require('./package-manager');
+const { getDefaultTestCommand, getDefaultInstallCommand } = require('./package-manager');
 const { objectToYaml } = require('./dag-schema');
+const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
 
 /**
  * Coordinator class - manages DAG operations
@@ -186,19 +187,42 @@ class Coordinator {
   }
 
   /**
-   * Expand worktrees for ready epics
+   * Expand worktrees for ready epics, or a single epic when epicId is supplied.
+   *
+   * Worktrees are created at the canonical location computed by
+   * worktree-paths.js (~/.arcforge-worktrees/<project>-<hash>-<epic>/).
+   *
    * @param {Object} options - Expand options
+   * @param {string} [options.epicId] - Single-epic mode: only expand this epic
    * @param {boolean} [options.verify=false] - Run tests after creation
    * @param {string[]} [options.verifyCommand] - Custom test command
+   * @param {boolean} [options.projectSetup=false] - Auto-detect and run installer
    * @returns {Epic[]} List of epics with newly created worktrees
    */
   expandWorktrees(options = {}) {
-    const { verify = false, verifyCommand } = options;
+    const { epicId, verify = false, verifyCommand, projectSetup = false } = options;
 
     const completedEpics = this.dag.getCompletedEpics();
-    const readyEpics = this.dag.epics.filter(
-      (epic) => epic.status === TaskStatus.PENDING && epic.isReady(completedEpics),
-    );
+
+    let readyEpics;
+    if (epicId) {
+      const epic = this.dag.getEpic(epicId);
+      if (!epic) {
+        throw new Error(`Epic not found: ${epicId}`);
+      }
+      if (epic.status !== TaskStatus.PENDING || !epic.isReady(completedEpics)) {
+        const blocking = epic.depends_on.filter((depId) => !completedEpics.has(depId));
+        const reason = blocking.length
+          ? `waiting on ${blocking.join(', ')}`
+          : `status is ${epic.status}`;
+        throw new Error(`Epic ${epicId} is not ready to expand: ${reason}`);
+      }
+      readyEpics = [epic];
+    } else {
+      readyEpics = this.dag.epics.filter(
+        (e) => e.status === TaskStatus.PENDING && e.isReady(completedEpics),
+      );
+    }
 
     const created = [];
     const createdPaths = [];
@@ -207,22 +231,18 @@ class Coordinator {
       return created;
     }
 
-    this._ensureWorktreesIgnored();
-    const worktreesDir = path.join(this.projectRoot, '.worktrees');
-    fs.mkdirSync(worktreesDir, { recursive: true });
+    fs.mkdirSync(getWorktreeRoot(), { recursive: true });
 
     for (const epic of readyEpics) {
       if (epic.worktree) {
         continue;
       }
 
-      const worktreePath = path.join(worktreesDir, epic.id);
+      const worktreePath = getWorktreePath(this.projectRoot, epic.id);
       const result = this._runGit(['worktree', 'add', worktreePath, '-b', epic.id]);
       if (result.exitCode !== 0) {
         throw new Error(`Failed to create worktree for ${epic.id}: ${result.stderr.trim()}`);
       }
-
-      fs.mkdirSync(worktreePath, { recursive: true });
 
       // Create .arcforge-epic marker
       const epicData = {
@@ -237,7 +257,7 @@ class Coordinator {
       };
       fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(epicData));
 
-      epic.worktree = path.join('.worktrees', epic.id);
+      epic.worktree = epic.id;
       epic.status = TaskStatus.IN_PROGRESS;
       created.push(epic);
       createdPaths.push({ epic, worktreePath });
@@ -247,14 +267,29 @@ class Coordinator {
       this._saveDag();
     }
 
+    // Auto-detect project setup (install dependencies) if requested
+    if (projectSetup) {
+      for (const { epic, worktreePath } of createdPaths) {
+        const installCmd = getDefaultInstallCommand(worktreePath);
+        if (!installCmd) continue;
+        const setupResult = this._runSubprocess(worktreePath, installCmd);
+        if (setupResult.exitCode !== 0) {
+          throw new Error(
+            `Project setup failed for ${epic.id} (see output above). Command: ${installCmd.join(' ')}`,
+          );
+        }
+      }
+    }
+
     // Verify with tests if requested
     if (verify) {
       const command = verifyCommand || getDefaultTestCommand(this.projectRoot);
       for (const { epic, worktreePath } of createdPaths) {
-        const result = this._runTestCommand(worktreePath, command);
+        const result = this._runSubprocess(worktreePath, command);
         if (result.exitCode !== 0) {
-          const output = (result.stdout || '') + (result.stderr || '');
-          throw new Error(`Baseline tests failed for ${epic.id}:\n${output.trim()}`);
+          throw new Error(
+            `Baseline tests failed for ${epic.id} (see output above). Command: ${(Array.isArray(command) ? command : [command]).join(' ')}`,
+          );
         }
       }
     }
@@ -359,28 +394,25 @@ class Coordinator {
       epics = this.dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
     }
 
+    // Remove the directories directly, then prune git's registry once.
+    // `git worktree remove` refuses on the untracked `.arcforge-epic` marker
+    // we authored, and `--force` per-epic plus a fallback was fragile. A
+    // filesystem remove + single `git worktree prune` is cheaper (O(1) git
+    // invocations instead of N) and has the same net effect on git state.
     const removed = [];
     for (const epic of epics) {
-      if (!epic.worktree) {
-        continue;
-      }
-
+      if (!epic.worktree) continue;
       const worktreePath = this._resolveWorktreePath(epic.worktree);
-      const result = this._runGit(['worktree', 'remove', worktreePath]);
-      if (result.exitCode !== 0) {
-        throw new Error(`Failed to remove worktree for ${epic.id}: ${result.stderr.trim()}`);
-      }
-
-      // Force remove if still exists
-      if (fs.existsSync(worktreePath)) {
-        fs.rmSync(worktreePath, { recursive: true, force: true });
-      }
-
+      fs.rmSync(worktreePath, { recursive: true, force: true });
       removed.push(worktreePath);
       epic.worktree = null;
     }
 
     if (removed.length > 0) {
+      const pruneResult = this._runGit(['worktree', 'prune']);
+      if (pruneResult.exitCode !== 0) {
+        throw new Error(`git worktree prune failed: ${pruneResult.stderr.trim()}`);
+      }
       this._saveDag();
     }
 
@@ -568,29 +600,23 @@ class Coordinator {
   }
 
   _syncBase() {
-    const worktreesDir = path.join(this.projectRoot, '.worktrees');
-    if (!fs.existsSync(worktreesDir)) {
-      return new SyncResult({ scanned: 0 });
-    }
-
     const result = new SyncResult({ scanned: 0, updates: [] });
 
-    const entries = fs.readdirSync(worktreesDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+    // Only scan worktrees that belong to this project, keyed by the path hash.
+    for (const epic of this.dag.epics) {
+      if (!epic.worktree) continue;
 
-      const worktreePath = path.join(worktreesDir, entry.name);
+      const worktreePath = this._resolveWorktreePath(epic.worktree);
       const epicFilePath = path.join(worktreePath, '.arcforge-epic');
       if (!fs.existsSync(epicFilePath)) continue;
 
       const epicData = this._readAgenticEpic(epicFilePath);
       const local = epicData.local || {};
 
-      const dagEpic = this.dag.getEpic(epicData.epic);
-      if (dagEpic && local.status) {
-        const oldStatus = dagEpic.status;
+      if (local.status) {
+        const oldStatus = epic.status;
         if (local.status !== oldStatus) {
-          dagEpic.status = local.status;
+          epic.status = local.status;
           result.updates.push({
             epic: epicData.epic,
             old_status: oldStatus,
@@ -651,29 +677,32 @@ class Coordinator {
     }
   }
 
-  _runTestCommand(workdir, command) {
+  _runSubprocess(workdir, command) {
+    // stdio: 'inherit' streams install/test output directly to the parent
+    // terminal. This avoids execFileSync's default 1 MB maxBuffer, which
+    // `npm install` / `cargo build` can exceed and incorrectly report as
+    // ENOBUFS even on success. The user sees progress live; on failure the
+    // output is already on their screen, so we don't need to capture it.
     try {
       const [cmd, ...args] = Array.isArray(command) ? command : command.split(' ');
-      const stdout = execFileSync(cmd, args, {
-        cwd: workdir,
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      return { stdout, stderr: '', exitCode: 0 };
+      execFileSync(cmd, args, { cwd: workdir, stdio: 'inherit' });
+      return { exitCode: 0 };
     } catch (err) {
-      return {
-        stdout: err.stdout || '',
-        stderr: err.stderr || err.message,
-        exitCode: err.status || 1,
-      };
+      return { exitCode: err.status || 1, error: err };
     }
   }
 
-  _resolveWorktreePath(worktreePath) {
-    if (path.isAbsolute(worktreePath)) {
-      return worktreePath;
+  _resolveWorktreePath(worktreeValue) {
+    if (!worktreeValue) return null;
+    if (path.isAbsolute(worktreeValue)) {
+      return worktreeValue;
     }
-    return path.join(this.projectRoot, worktreePath);
+    // epic-id (no separators) → derive via helper.
+    if (!worktreeValue.includes('/') && !worktreeValue.includes(path.sep)) {
+      return getWorktreePath(this.projectRoot, worktreeValue);
+    }
+    // Legacy relative path (pre-migration fixture) — resolve against project root.
+    return path.join(this.projectRoot, worktreeValue);
   }
 
   _inferEpicIdFromWorktree() {
@@ -714,9 +743,8 @@ class Coordinator {
       }
     }
 
-    // Find path not in .worktrees
     for (const p of paths) {
-      if (!p.includes('.worktrees')) {
+      if (parseWorktreePath(p) === null) {
         return p;
       }
     }
@@ -733,34 +761,6 @@ class Coordinator {
       throw new Error('Base branch could not be inferred from git');
     }
     return branch;
-  }
-
-  _ensureWorktreesIgnored() {
-    const result = this._runGit(['check-ignore', '-q', '.worktrees']);
-    if (result.exitCode === 0) {
-      return; // Already ignored
-    }
-
-    const ignorePath = path.join(this.projectRoot, '.gitignore');
-    let lines = [];
-    if (fs.existsSync(ignorePath)) {
-      lines = fs.readFileSync(ignorePath, 'utf8').split('\n');
-    }
-
-    if (!lines.includes('.worktrees')) {
-      lines.push('.worktrees');
-      fs.writeFileSync(ignorePath, `${lines.join('\n')}\n`);
-
-      const addResult = this._runGit(['add', '.gitignore']);
-      if (addResult.exitCode !== 0) {
-        throw new Error(`Failed to stage .gitignore: ${addResult.stderr.trim()}`);
-      }
-
-      const commitResult = this._runGit(['commit', '-m', 'chore: ignore .worktrees directory']);
-      if (commitResult.exitCode !== 0) {
-        throw new Error(`Failed to commit .gitignore: ${commitResult.stderr.trim()}`);
-      }
-    }
   }
 
   _loadDag() {

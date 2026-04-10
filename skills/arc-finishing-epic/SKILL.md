@@ -144,7 +144,7 @@ Report: "Keeping epic <name>. Worktree preserved."
 This will permanently delete:
 - Branch <epic-name>
 - All commits on the branch
-- Worktree at .worktrees/<epic-name>/
+- The epic's worktree (absolute path from `arcforge status --json`)
 
 Type 'discard' to confirm.
 ```
@@ -160,7 +160,10 @@ if [ -f dag.yaml ]; then
   node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 fi
 
-git worktree remove .worktrees/<epic-name>
+# Delegate worktree removal to the coordinator — it derives the canonical
+# path via scripts/lib/worktree-paths.js and handles force-remove of the
+# .arcforge-epic marker. Never call `git worktree remove` by hand.
+node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup <epic-name>
 git branch -D <epic-name>
 ```
 
@@ -175,6 +178,21 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 
 **Purpose:** Ensure the base DAG reflects the epic's final status (completed or merged).
 
+### Step 4.6: Look Up the Worktree Path
+
+Before emitting the completion format, query the coordinator for the epic's
+absolute worktree path — don't reconstruct it from pattern knowledge, because
+the derivation rule can change and the cached value is authoritative:
+
+```bash
+node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
+```
+
+Extract the epic's `worktree` / `path` field from the JSON. Use that literal
+string in the "Worktree:" line of the completion format. If the epic has
+already been cleaned up (Option 1 or Option 4), the path may be null — in
+that case use the exact text `(removed)` instead of a path.
+
 ## Completion Format
 
 ### If Merged (Option 1)
@@ -183,7 +201,7 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 Epic merged → <base-branch>
 
 Branch: <epic-name> (deleted)
-Worktree: .worktrees/<epic-name>/ (removed)
+Worktree: <absolute path from arcforge status --json> (removed)
 Commits: [N commits merged]
 
 Next: Continue with next epic or check status
@@ -196,7 +214,7 @@ Pull request created → #<PR-number>
 
 URL: <PR-URL>
 Branch: <epic-name>
-Worktree: .worktrees/<epic-name>/ (kept for now)
+Worktree: <absolute path from arcforge status --json> (kept for now)
 
 Next: Review PR, then merge/close and clean up worktree
 ```
@@ -207,7 +225,7 @@ Next: Review PR, then merge/close and clean up worktree
 Epic preserved for future work
 
 Tag: epic/<epic-name>-complete
-Worktree: .worktrees/<epic-name>/ (kept)
+Worktree: <absolute path from arcforge status --json> (kept)
 Backup: Pushed to origin/<epic-name>
 
 Next: Resume work in worktree or run this skill again when ready
@@ -219,7 +237,7 @@ Next: Resume work in worktree or run this skill again when ready
 Epic discarded
 
 Branch: <epic-name> (deleted)
-Worktree: .worktrees/<epic-name>/ (removed)
+Worktree: <absolute path from arcforge status --json> (removed)
 
 Next: Check status to see remaining epics
 ```
@@ -232,7 +250,7 @@ Next: Check status to see remaining epics
 Epic completion blocked
 
 Issue: Tests failing (<N> failures)
-Location: .worktrees/<epic-name>/
+Location: <absolute path from arcforge status --json>
 
 To resolve:
 1. Fix failing tests

@@ -41,7 +41,9 @@ const schema = {
       worktree: {
         type: 'string|null',
         required: false,
-        description: 'Path to git worktree (relative to project root)',
+        description:
+          'Epic identifier marking that a worktree exists. The absolute path is ' +
+          'derived at runtime via scripts/lib/worktree-paths.js (never committed).',
       },
       depends_on: {
         type: 'array',
@@ -118,7 +120,7 @@ const example = {
       name: 'User Authentication System',
       status: 'in_progress',
       spec_path: 'docs/specs/epic-001-auth.md',
-      worktree: '.worktrees/epic-001',
+      worktree: 'epic-001',
       depends_on: [],
       features: [
         {
@@ -191,7 +193,9 @@ function schemaToYaml() {
     `    status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`,
   );
   lines.push('    spec_path: string  # Path to spec document (required)');
-  lines.push('    worktree: string|null  # Git worktree path (optional)');
+  lines.push(
+    '    worktree: string|null  # Epic id when a worktree exists (path derived at runtime)',
+  );
   lines.push('    depends_on: [string]  # Epic IDs this depends on (default: [])');
   lines.push('    features:  # List of features (optional)');
   lines.push('      - id: string  # Unique identifier (required)');
