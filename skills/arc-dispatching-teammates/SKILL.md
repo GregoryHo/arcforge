@@ -11,6 +11,8 @@ Dispatch one Claude Code **agent teammate** per ready epic so the lead session s
 
 **Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows and tab between them" is a fallback when teammates are unavailable, not the default.
 
+**Dev-branch mental model:** The lead operates from a short-lived dev branch where the session's commits accumulate. Teammates branch off and merge back. Intermediate noise (retries, failed attempts, fix-forward commits) is fine — the deliverable is **stability at HEAD**, not clean history. The user decides promotion afterward. Don't over-protect the dev branch, don't pre-identify conflicts — let runtime handle runtime.
+
 ## When to Use
 
 | Condition | Route to |
@@ -40,36 +42,38 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 2. **Cap team size at 5.** If `|R| > 5`, take the first 5 as the initial team and queue the rest. ≤5 teammates is Anthropic's documented best practice; beyond 5 coordination overhead exceeds benefit.
 
-3. **Create or reuse a team.** Use the team creation tool available in your environment (e.g. `TeamCreate`) with a descriptive name like `dispatch-<project>-<timestamp>`, or pass `team_name` to the first Agent dispatch. The team is the shared namespace for SendMessage and TaskList.
+3. **Create the team BEFORE any Agent dispatch.** Use `TeamCreate` with a descriptive name like `dispatch-<project>-<timestamp>`. Per [official Agent Teams docs](https://code.claude.com/docs/en/agent-teams), `TeamCreate` must precede every `Agent` call — passing `team_name` to Agent does NOT auto-create and triggers a state-sync bug requiring `TeamDelete` recovery.
 
-4. **Expand worktrees and spawn teammates in a single pass.** For each epic in the initial 5:
+4. **Expand worktrees and dispatch teammates in parallel.** For each epic in the initial 5:
    - Run `node scripts/cli.js expand --epic <epic-id>` from the project root. This creates the canonical worktree and stamps `.arcforge-epic`. Do NOT pre-batch-expand; per-epic auto-expand keeps failures attributable.
    - Read the new absolute worktree path from `arcforge status --json` — do not reconstruct it from hash knowledge.
-   - Dispatch a teammate via the Agent tool with `team_name=<the team>`, `name=worker-<epic-id>`, and the Spawn Prompt Template below.
+   - Dispatch a teammate via the Agent tool with `team_name=<the team>`, `name=worker-<epic-id>`, and the spawn prompt from `references/spawn-prompt-template.md`.
 
-5. **Monitor.** The lead stays present. Read TaskList and mailbox periodically, respond to teammate questions via SendMessage, intervene on genuinely stuck teammates. When a teammate completes, dispatch the next queued epic into the freed slot (continuous dispatch, not waves).
+   **Dispatch in parallel, not sequentially.** Parallel spawn is the documented good pattern — sequential spawn is an explicit anti-pattern per Agent Teams docs and external teammate skills. If some spawns fail with `Failed to create teammate pane: no space for new pane`, you hit [GH #40168](https://github.com/anthropics/claude-code/issues/40168) — retry the failed ones sequentially. See `references/tmux-timing-race.md` for the fallback playbook.
 
-6. **Wrap up.** Teammates each run their own `arc-finishing-epic` as part of `/arc-implementing` — the lead does not merge on their behalf. When all done, report completion.
+5. **Monitor.** The lead stays present. Read TaskList and mailbox periodically, respond to teammate questions via SendMessage, intervene on genuinely stuck teammates. When a teammate completes, go to Step 6 for that teammate. When a teammate is accepted (Step 6 passes) and the queue has more epics waiting, dispatch the next queued epic into the freed slot (continuous dispatch, not waves).
+
+6. **Acceptance check (per teammate completion).** Do NOT implicitly accept. When a teammate reports done, run both checks before considering the epic complete:
+
+   - **Spec compliance**: Read `epics/<epic-id>/epic.md` and each `features/*.md` it references. For every acceptance criterion, locate the code in the merged dev branch and verify it actually implements the behavior — not just references it in test names or commit messages.
+   - **Fresh-eyes verification**: Run `arc-verifying` or the project test command from the lead's own context. Teammate already ran it; your fresh context catches different failures (stale caches, uncommitted state, flakiness).
+
+   Both must pass → accept (implicit — no ack needed). Either fails → Step 7. See `references/acceptance-and-retry.md` for common defect patterns, why fresh-eyes verify is not redundant, and feedback formulation rules.
+
+7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
+   - Formulate specific feedback naming the failed criterion, quoting spec text verbatim, and stating current-vs-required behavior.
+   - Run `node scripts/cli.js expand --epic <epic-id>` — fresh worktree, fix-forward from the current dev HEAD (which already contains the rejected attempt's commits; the retry teammate may build on top or revert, per feedback).
+   - Dispatch a new teammate via Agent with `name=worker-<epic-id>-retry<N>`. Use the standard template from `references/spawn-prompt-template.md` with a `## Previous Attempt Feedback` section prepended containing all prior rejection feedback cumulatively.
+   - Track retry count in lead session memory (no persistence).
+   - Resume monitoring (Step 5). If retry 3 also fails → mark **permanently failed** and record the final rejection reason for Step 8.
+
+   **Retries are for acceptance failures only.** Mid-work blockers and merge-conflict escalations are arbitration flows, not retries — counter does not increment. See `references/acceptance-and-retry.md` for retry mechanics, edge cases, and when to pause retries to revise the spec instead.
+
+8. **Wrap up with final report.** When every epic is in a terminal state (accepted or permanently failed), emit the Final Report (format below). The dev branch IS the deliverable — do NOT auto-merge to main, revert failed epics, or clean up. Those are user decisions.
 
 ## Spawn Prompt Template
 
-Use verbatim. The inject-skills hook synchronously loads arc-using into teammate context (commit `10b61a0`), so no belt-and-suspenders inlining is needed.
-
-```
-You are teammate worker-<epic-id> implementing epic <epic-id>.
-
-1. cd to <absolute-worktree-path>
-2. Invoke /arc-implementing to execute this epic per arcforge's workflow.
-3. Report progress and completion via SendMessage to team-lead. Your plain
-   text output is NOT visible to the lead — always use SendMessage for
-   anything the lead needs to see.
-
-If you hit a blocker you cannot resolve, report it via SendMessage describing
-the blocker, then stop. The lead will continue with other epics and present
-a summary. Do not attempt to work on epics other than <epic-id>.
-```
-
-Replace `<epic-id>` and `<absolute-worktree-path>` per teammate. The SendMessage instruction is not optional — teammate plain text is invisible to the lead (PoC verified).
+The template lives in `references/spawn-prompt-template.md` with three sections: **Your Authority** (explicit autonomous end-to-end execution grant — closes the qmd worker-epic-history failure where a terse prompt left the teammate waiting for phase approval), **Your Workspace** (cd + invoke `/arc-implementing` or `/arc-agent-driven`), **Coordination** (SendMessage-only channel, narrow exception list). Read that file before dispatching, fill in `<epic-id>` and `<absolute-worktree-path>`, paste into each Agent call. SendMessage is not optional — teammate plain text is invisible to the lead.
 
 ## Red Flags
 
@@ -81,16 +85,50 @@ Rationalizations observed in baseline testing. If you catch yourself saying any 
 - **"`arc-dispatching-parallel` already covers this."** No — that skill is feature-level inside one worktree. This is epic-level across worktrees.
 - **"Let me spawn 8 teammates since there are 8 ready epics."** Cap at 5. Queue the rest. Continuous dispatch.
 - **"Worktrees already exist, so I'll just dispatch."** Fine — skip the expand step for epics whose worktree is non-null. Do not re-expand.
+- **"I'll dispatch all teammates in a single rapid burst to save a turn."** Fine — parallel is the default. But if any spawn returns `Failed to create teammate pane`, you hit GH #40168. Retry those sequentially — do NOT rationalize as "pane budget exhausted" and downscale the team. See `references/tmux-timing-race.md`.
+- **"I need to tell teammates which shared files not to touch / what ownership boundaries apply."** No. The dev-branch mental model says: let teammates work, let conflicts happen, handle them at finishing time via the arc-finishing-epic escalation path. Trying to statically predict cross-epic file conflicts at dispatch time is over-engineering — the lead doesn't have ground truth and will misjudge. Let runtime handle runtime.
+- **"Let me pin the arcforge version defensively: `ARCFORGE_ROOT=.../x.y.z node "${ARCFORGE_ROOT}/scripts/cli.js" ...`"** POSIX shell footgun — `"${VAR}"` is expanded before the inline `VAR=x` assignment takes effect, so the override is silently ignored on the command path. Use plain relative `node scripts/cli.js ...` and trust cwd.
 
-## Completion Format
+## Completion Formats
+
+### Dispatch ready (after Step 4 — initial spawn successful)
 
 ```
 ✅ Teammate dispatch: team ready
 - Team: dispatch-<project>-<timestamp>
 - Teammates spawned: 3 (worker-epic-auth, worker-epic-api, worker-epic-ui)
 - Queued: 0
-- Lead: monitoring via SendMessage
+- Lead: monitoring via SendMessage, will run acceptance check per completion
 ```
+
+### Final Report (after Step 8 — session end)
+
+Use this after every dispatched epic has reached a terminal state (accepted
+or permanently failed). This is the user-facing hand-off — they read this
+and decide what to do with the dev branch.
+
+```
+🏁 Dispatch session complete
+
+Dev branch: <branch-name> (current HEAD is the deliverable)
+
+Epics:
+  ✅ epic-yaml-output  — accepted on attempt 1
+  ✅ epic-stats        — accepted on attempt 2 (retry 1)
+       Attempt 1 rejected: getStats() missing perCollection breakdown
+       (fr-stats-001 AC #5). Retry fixed it.
+  ❌ epic-history      — permanently failed after 4 attempts (3 retries)
+       Final rejection: query_history migration fails on existing DBs;
+       teammate kept producing variants that broke the migration test.
+
+Next actions you may consider:
+  - Inspect dev branch HEAD: git checkout <branch-name>
+  - Promote successful work: merge/cherry-pick from <branch-name> to main
+  - Debug the failed epic: /arc-debugging on epic-history
+  - Discard the session: git branch -D <branch-name> && arcforge cleanup
+```
+
+Keep per-epic details accurate (attempt count, rejection reasons). "Next actions" lists options — the user picks, not you.
 
 ## Blocked Format
 
