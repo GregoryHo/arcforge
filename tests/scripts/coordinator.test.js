@@ -2,7 +2,10 @@ const { DAG, TaskStatus } = require('../../scripts/lib/models');
 
 // We test Coordinator's pure scheduling logic by injecting a DAG directly,
 // bypassing file I/O. For methods that call _saveDag (which uses withLock + fs),
-// we mock _saveDag to be a no-op.
+// we mock _saveDag to be a no-op. For methods that use _dagTransaction, we
+// replace the transaction with a pass-through — the injected _dag stays the
+// source of truth (no re-read, no re-save), matching the test's intent of
+// exercising pure in-memory scheduling logic.
 
 // Helper: create a Coordinator with an injected DAG (no file I/O needed)
 function createCoordinator(dagData) {
@@ -11,6 +14,11 @@ function createCoordinator(dagData) {
   const coord = new Coordinator('/tmp/fake-project');
   coord._dag = new DAG(dagData);
   coord._saveDag = jest.fn(); // no-op mock — avoids file system + locking
+  // Pass-through: run fn against the already-injected _dag. Skips the
+  // lock-acquire + _loadDag re-read that the real transaction performs,
+  // because those would hit the filesystem. Tests that need real
+  // transaction semantics use tempdir-based setups instead of this helper.
+  coord._dagTransaction = jest.fn((fn) => fn());
   return coord;
 }
 

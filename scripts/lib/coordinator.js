@@ -202,72 +202,83 @@ class Coordinator {
   expandWorktrees(options = {}) {
     const { epicId, verify = false, verifyCommand, projectSetup = false } = options;
 
-    const completedEpics = this.dag.getCompletedEpics();
+    // Phase 1: DAG mutation + worktree creation under a single lock.
+    // Two concurrent expansions on different epics would otherwise race:
+    // both load the dag, both set their own epic.worktree/epic.status,
+    // and the second save clobbers the first. Same pattern as the merge
+    // race fixed in the previous commit.
+    const { created, createdPaths } = this._dagTransaction(
+      () => {
+        const completedEpics = this.dag.getCompletedEpics();
 
-    let readyEpics;
-    if (epicId) {
-      const epic = this.dag.getEpic(epicId);
-      if (!epic) {
-        throw new Error(`Epic not found: ${epicId}`);
-      }
-      if (epic.status !== TaskStatus.PENDING || !epic.isReady(completedEpics)) {
-        const blocking = epic.depends_on.filter((depId) => !completedEpics.has(depId));
-        const reason = blocking.length
-          ? `waiting on ${blocking.join(', ')}`
-          : `status is ${epic.status}`;
-        throw new Error(`Epic ${epicId} is not ready to expand: ${reason}`);
-      }
-      readyEpics = [epic];
-    } else {
-      readyEpics = this.dag.epics.filter(
-        (e) => e.status === TaskStatus.PENDING && e.isReady(completedEpics),
-      );
-    }
+        let readyEpics;
+        if (epicId) {
+          const epic = this.dag.getEpic(epicId);
+          if (!epic) {
+            throw new Error(`Epic not found: ${epicId}`);
+          }
+          if (epic.status !== TaskStatus.PENDING || !epic.isReady(completedEpics)) {
+            const blocking = epic.depends_on.filter((depId) => !completedEpics.has(depId));
+            const reason = blocking.length
+              ? `waiting on ${blocking.join(', ')}`
+              : `status is ${epic.status}`;
+            throw new Error(`Epic ${epicId} is not ready to expand: ${reason}`);
+          }
+          readyEpics = [epic];
+        } else {
+          readyEpics = this.dag.epics.filter(
+            (e) => e.status === TaskStatus.PENDING && e.isReady(completedEpics),
+          );
+        }
 
-    const created = [];
-    const createdPaths = [];
+        const createdLocal = [];
+        const createdPathsLocal = [];
 
-    if (readyEpics.length === 0) {
-      return created;
-    }
+        if (readyEpics.length === 0) {
+          return { created: createdLocal, createdPaths: createdPathsLocal };
+        }
 
-    fs.mkdirSync(getWorktreeRoot(), { recursive: true });
+        fs.mkdirSync(getWorktreeRoot(), { recursive: true });
 
-    for (const epic of readyEpics) {
-      if (epic.worktree) {
-        continue;
-      }
+        for (const epic of readyEpics) {
+          if (epic.worktree) {
+            continue;
+          }
 
-      const worktreePath = getWorktreePath(this.projectRoot, epic.id);
-      const result = this._runGit(['worktree', 'add', worktreePath, '-b', epic.id]);
-      if (result.exitCode !== 0) {
-        throw new Error(`Failed to create worktree for ${epic.id}: ${result.stderr.trim()}`);
-      }
+          const worktreePath = getWorktreePath(this.projectRoot, epic.id);
+          const result = this._runGit(['worktree', 'add', worktreePath, '-b', epic.id]);
+          if (result.exitCode !== 0) {
+            throw new Error(`Failed to create worktree for ${epic.id}: ${result.stderr.trim()}`);
+          }
 
-      // Create .arcforge-epic marker
-      const epicData = {
-        epic: epic.id,
-        base_worktree: this.projectRoot,
-        base_branch: this._currentBranch(),
-        local: {
-          status: TaskStatus.IN_PROGRESS,
-          started_at: new Date().toISOString(),
-        },
-        synced: null,
-      };
-      fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(epicData));
+          // Create .arcforge-epic marker
+          const epicData = {
+            epic: epic.id,
+            base_worktree: this.projectRoot,
+            base_branch: this._currentBranch(),
+            local: {
+              status: TaskStatus.IN_PROGRESS,
+              started_at: new Date().toISOString(),
+            },
+            synced: null,
+          };
+          fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(epicData));
 
-      epic.worktree = epic.id;
-      epic.status = TaskStatus.IN_PROGRESS;
-      created.push(epic);
-      createdPaths.push({ epic, worktreePath });
-    }
+          epic.worktree = epic.id;
+          epic.status = TaskStatus.IN_PROGRESS;
+          createdLocal.push(epic);
+          createdPathsLocal.push({ epic, worktreePath });
+        }
 
-    if (created.length > 0) {
-      this._saveDag();
-    }
+        return { created: createdLocal, createdPaths: createdPathsLocal };
+      },
+      { timeout: 30000 },
+    );
 
-    // Auto-detect project setup (install dependencies) if requested
+    // Phase 2: long-running project setup / test verification OUTSIDE
+    // the lock. `npm install` and full test suites can take minutes;
+    // holding the DAG lock across them would block every concurrent
+    // dispatch operation (merge, sync, expand) for the full duration.
     if (projectSetup) {
       for (const { epic, worktreePath } of createdPaths) {
         const installCmd = getDefaultInstallCommand(worktreePath);
@@ -543,21 +554,18 @@ class Coordinator {
     if (!basePath) return false;
 
     const baseCoord = new Coordinator(basePath);
-    let updated = false;
 
-    for (const localEpic of this.dag.epics) {
-      const baseEpic = baseCoord.dag.getEpic(localEpic.id);
-      if (baseEpic && baseEpic.status !== localEpic.status) {
-        localEpic.status = baseEpic.status;
-        updated = true;
+    return this._dagTransaction(() => {
+      let updated = false;
+      for (const localEpic of this.dag.epics) {
+        const baseEpic = baseCoord.dag.getEpic(localEpic.id);
+        if (baseEpic && baseEpic.status !== localEpic.status) {
+          localEpic.status = baseEpic.status;
+          updated = true;
+        }
       }
-    }
-
-    if (updated) {
-      this._saveDag();
-    }
-
-    return updated;
+      return updated;
+    });
   }
 
   _syncWorktree(direction) {
@@ -590,12 +598,17 @@ class Coordinator {
       const baseCoord = new Coordinator(basePath);
       const local = epicFile.local || {};
       if (local.status) {
-        const dagEpic = baseCoord.dag.getEpic(epicFile.epic);
-        if (dagEpic && local.status !== dagEpic.status) {
-          dagEpic.status = local.status;
-          baseCoord._saveDag();
-          result.pushed = true;
-        }
+        // Resolve the target epic inside the base's transaction so we
+        // act on the fresh-loaded state, not the pre-transaction cache.
+        const pushed = baseCoord._dagTransaction(() => {
+          const dagEpic = baseCoord.dag.getEpic(epicFile.epic);
+          if (dagEpic && local.status !== dagEpic.status) {
+            dagEpic.status = local.status;
+            return true;
+          }
+          return false;
+        });
+        if (pushed) result.pushed = true;
       }
     }
 
@@ -604,39 +617,37 @@ class Coordinator {
   }
 
   _syncBase() {
-    const result = new SyncResult({ scanned: 0, updates: [] });
+    return this._dagTransaction(() => {
+      const result = new SyncResult({ scanned: 0, updates: [] });
 
-    // Only scan worktrees that belong to this project, keyed by the path hash.
-    for (const epic of this.dag.epics) {
-      if (!epic.worktree) continue;
+      // Only scan worktrees that belong to this project, keyed by the path hash.
+      for (const epic of this.dag.epics) {
+        if (!epic.worktree) continue;
 
-      const worktreePath = this._resolveWorktreePath(epic.worktree);
-      const epicFilePath = path.join(worktreePath, '.arcforge-epic');
-      if (!fs.existsSync(epicFilePath)) continue;
+        const worktreePath = this._resolveWorktreePath(epic.worktree);
+        const epicFilePath = path.join(worktreePath, '.arcforge-epic');
+        if (!fs.existsSync(epicFilePath)) continue;
 
-      const epicData = this._readAgenticEpic(epicFilePath);
-      const local = epicData.local || {};
+        const epicData = this._readAgenticEpic(epicFilePath);
+        const local = epicData.local || {};
 
-      if (local.status) {
-        const oldStatus = epic.status;
-        if (local.status !== oldStatus) {
-          epic.status = local.status;
-          result.updates.push({
-            epic: epicData.epic,
-            old_status: oldStatus,
-            new_status: local.status,
-          });
+        if (local.status) {
+          const oldStatus = epic.status;
+          if (local.status !== oldStatus) {
+            epic.status = local.status;
+            result.updates.push({
+              epic: epicData.epic,
+              old_status: oldStatus,
+              new_status: local.status,
+            });
+          }
         }
+
+        result.scanned++;
       }
 
-      result.scanned++;
-    }
-
-    if (result.updates.length > 0) {
-      this._saveDag();
-    }
-
-    return result;
+      return result;
+    });
   }
 
   _getDependencyStatuses(dag, epic) {
