@@ -78,6 +78,12 @@ only channel the lead sees. Any blocker, question, or completion notice
 must go through SendMessage — do not rely on your final text output
 being read.
 
+Marking a task as completed in TaskList is ALSO not visible to the
+lead as a conversation-turn event — the lead would only see the task
+status change if they happen to re-read the task list. On completion,
+SendMessage the lead directly with a short summary. Do not assume
+TaskUpdate is a notification channel.
+
 Do not attempt to work on epics other than <epic-id>.
 ```
 
