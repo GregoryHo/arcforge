@@ -330,48 +330,52 @@ class Coordinator {
   }
 
   _mergeEpicsInBase(baseBranch, epicIds) {
-    let epics;
-    if (epicIds) {
-      epics = this.dag.epics.filter((e) => epicIds.includes(e.id));
-      const missing = epicIds.filter((id) => !epics.some((e) => e.id === id));
-      if (missing.length > 0) {
-        throw new Error(`Epic not found: ${missing.join(', ')}`);
-      }
-    } else {
-      epics = this.dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
-    }
+    // Serialize the whole read-merge-write under one lock. Git ops can
+    // take several seconds on large repos, so bump the lock timeout
+    // beyond the 5s default — concurrent teammates will queue cleanly.
+    return this._dagTransaction(
+      () => {
+        let epics;
+        if (epicIds) {
+          epics = this.dag.epics.filter((e) => epicIds.includes(e.id));
+          const missing = epicIds.filter((id) => !epics.some((e) => e.id === id));
+          if (missing.length > 0) {
+            throw new Error(`Epic not found: ${missing.join(', ')}`);
+          }
+        } else {
+          epics = this.dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
+        }
 
-    if (epics.length === 0) {
-      return [];
-    }
+        if (epics.length === 0) {
+          return [];
+        }
 
-    const resolvedBranch = baseBranch || this._currentBranch();
-    const checkout = this._runGit(['checkout', resolvedBranch]);
-    if (checkout.exitCode !== 0) {
-      throw new Error(`Failed to checkout ${resolvedBranch}: ${checkout.stderr.trim()}`);
-    }
+        const resolvedBranch = baseBranch || this._currentBranch();
+        const checkout = this._runGit(['checkout', resolvedBranch]);
+        if (checkout.exitCode !== 0) {
+          throw new Error(`Failed to checkout ${resolvedBranch}: ${checkout.stderr.trim()}`);
+        }
 
-    const merged = [];
-    for (const epic of epics) {
-      const result = this._runGit([
-        'merge',
-        '--no-ff',
-        epic.id,
-        '-m',
-        `feat: integrate ${epic.id} epic`,
-      ]);
-      if (result.exitCode !== 0) {
-        throw new Error(`Failed to merge ${epic.id}: ${result.stderr.trim()}`);
-      }
-      epic.status = TaskStatus.COMPLETED;
-      merged.push(epic);
-    }
+        const merged = [];
+        for (const epic of epics) {
+          const result = this._runGit([
+            'merge',
+            '--no-ff',
+            epic.id,
+            '-m',
+            `feat: integrate ${epic.id} epic`,
+          ]);
+          if (result.exitCode !== 0) {
+            throw new Error(`Failed to merge ${epic.id}: ${result.stderr.trim()}`);
+          }
+          epic.status = TaskStatus.COMPLETED;
+          merged.push(epic);
+        }
 
-    if (merged.length > 0) {
-      this._saveDag();
-    }
-
-    return merged;
+        return merged;
+      },
+      { timeout: 60000 },
+    );
   }
 
   /**
@@ -777,6 +781,39 @@ class Coordinator {
       const content = stringifyDagYaml(this.dag.toObject());
       fs.writeFileSync(this.dagPath, content);
     });
+  }
+
+  /**
+   * Run a DAG mutation under a single exclusive lock covering both read
+   * and write. This closes the read-modify-write race where two Coordinator
+   * instances load the dag concurrently, each mutate different epics, and
+   * the second save overwrites the first. See `fix: serialize merge dag
+   * transaction` commit for the qmd dispatch incident that exposed this.
+   *
+   * Usage: wrap any body that mutates `this.dag` and would have ended in
+   * `this._saveDag()`. Do NOT call `_saveDag()` inside `fn` — it would
+   * deadlock (withLock is not re-entrant).
+   *
+   * @param {Function} fn - Mutation body; return value is forwarded
+   * @param {Object} [options] - withLock options (e.g. { timeout })
+   * @returns {*} Return value of fn
+   */
+  _dagTransaction(fn, options = {}) {
+    return withLock(
+      this.projectRoot,
+      () => {
+        // Fresh read under lock — any previously-cached DAG state
+        // is stale the moment a concurrent writer acquired the lock.
+        this._dag = this._loadDag();
+        const result = fn();
+        // Write under the already-held lock; bypass _saveDag (it would
+        // try to re-acquire and deadlock).
+        const content = stringifyDagYaml(this.dag.toObject());
+        fs.writeFileSync(this.dagPath, content);
+        return result;
+      },
+      options,
+    );
   }
 }
 
