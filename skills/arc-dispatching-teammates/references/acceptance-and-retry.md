@@ -3,26 +3,140 @@
 This reference expands SKILL.md Steps 6–8. SKILL.md keeps the decision
 logic; everything procedural and example-heavy lives here.
 
-## Why acceptance cannot be implicit
+## Why acceptance is subagent-delegated, not inline
 
-Baseline behavior of a naive lead: on teammate completion SendMessage,
-implicitly accept. Continue monitoring other teammates. Defer any
+Baseline behavior of a naive lead (observed in the qmd 2026-04-11
+dispatch): on teammate completion SendMessage, implicitly accept by
+mapping test names to acceptance criteria ("the test is named 'handles
+per-collection breakdown' → AC covered → pass"). Defer any genuine
 "is this right?" check to a single aggregate `arc-verifying` after the
-whole dispatch. This fails in two ways:
+whole dispatch. This fails in **three** ways:
 
-1. **Aggregate `arc-verifying` only catches what tests cover.** If the
+1. **Inline checks encode the lead's prior context as bias.** The lead
+   remembers chatting with the teammate about the epic, knows roughly
+   what was built, and rationalizes acceptance based on vibes. The
+   observed failure: the lead "verified" epic-explain-query's AC by
+   reading test NAMES and inferring that a passing test named
+   `"returns originalQuery, expansion, preRerank, postRerank"` meant
+   the code actually returns those fields. It did not verify by
+   reading the code.
+2. **Aggregate `arc-verifying` only catches what tests cover.** If the
    teammate's own tests were incomplete (e.g., forgot to test a
    required acceptance criterion), both the teammate's own verify AND
    the aggregate verify will pass while the epic silently fails the
    spec. Tests are not spec compliance.
-2. **By the time aggregate verify runs, all teammates are done.** If
+3. **By the time aggregate verify runs, all teammates are done.** If
    epic A fails the spec but is discovered only after epics B and C
-   also completed (on top of epic A's merge), debugging and retry
-   becomes expensive — the dev branch has layered commits from other
-   epics that the retry has to navigate around.
+   completed on top of epic A's merge, debugging and retry becomes
+   expensive — the dev branch has layered commits the retry has to
+   navigate around.
 
-Per-completion acceptance checks catch defects early, while the retry
+The structural fix is to delegate the two checks to subagents with
+**fresh context**. A subagent loaded with the epic's spec files and
+no prior conversation history has no way to rationalize — it reads
+the spec, locates the code, runs the test, and reports. The lead's
+job is to READ the reports and decide, not execute the checks. This
+matches arcforge's existing pattern in `arc-agent-driven`, which
+delegates every task to spec-reviewer + quality-reviewer subagents
+precisely because inline review produces rationalizations.
+
+Per-completion acceptance catches defects early, while the retry
 cost is low.
+
+## Subagent dispatch templates
+
+### Template: `arcforge:spec-reviewer` per-epic acceptance
+
+```
+Agent(
+  subagent_type='arcforge:spec-reviewer',
+  description='Spec compliance review for epic <epic-id>',
+  prompt='''
+Review epic <epic-id> for spec compliance. The teammate reported
+completion and the work has been merged into dev branch
+<dev-branch-name> at HEAD <commit-sha>.
+
+Spec files to verify against:
+- epics/<epic-id>/epic.md
+- epics/<epic-id>/features/<feature-1>.md
+- epics/<epic-id>/features/<feature-2>.md
+- [... list every feature file the epic.md references]
+
+For every acceptance criterion across all feature files:
+1. Locate the implementing code in the merged dev branch (do NOT
+   trust test names or commit messages — find the actual code).
+2. Verify the code does what the criterion requires.
+3. Report PASS/FAIL with file:line evidence.
+
+Apply the three-check pattern from your agent definition: Missing,
+Extra, Misunderstand. Return the standard Spec Compliance Review
+format.
+
+The lead will read your report and decide accept/reject. Do not
+make changes — you are a reviewer, not an implementer.
+'''
+)
+```
+
+Substitute `<epic-id>`, `<dev-branch-name>`, `<commit-sha>`, and the
+feature file list before dispatching. The lead should have all of
+this in context from Steps 4–5.
+
+### Template: `arcforge:verifier` per-epic fresh-eyes
+
+```
+Agent(
+  subagent_type='arcforge:verifier',
+  description='Fresh-eyes verification for epic <epic-id>',
+  prompt='''
+Independently verify epic <epic-id>. The teammate reported tests
+passing, but I need a fresh verification from an empty context.
+
+Acceptance criteria (copied from epic.md for offline verification):
+<paste all acceptance criteria verbatim>
+
+Project test command: <e.g., npm test, or `npx vitest run <specific-files>`>
+Expected: all criteria have implementing code, all tests pass.
+
+From the project root <absolute-path-to-project-root>:
+1. Run the test command fresh.
+2. Read the output and count pass/fail.
+3. Check exit code.
+4. Report PASS/FAIL with raw evidence (not summaries).
+
+Use the Verification Report format from your agent definition.
+Do not make code changes.
+'''
+)
+```
+
+**Run the verifier from the project root, not a worktree.** The
+whole point of fresh-eyes is to catch issues the teammate's context
+may have masked — running in the same worktree where the teammate
+worked defeats that.
+
+### Lead reads both reports → decides
+
+After both subagents return:
+
+- Both PASS → accept. Log `spec-reviewer: PASS (<X>/<Y> ACs), verifier:
+  PASS (<X>/<Y> tests, exit 0)` in your Step 8 Final Report evidence
+  block.
+- Either FAIL → Step 7 retry. Use the failing subagent's report
+  verbatim as the feedback quote in the retry spawn prompt. Do not
+  paraphrase.
+- One PASS, one FAIL → treat as FAIL. The failing report names the
+  specific issue.
+- Either subagent errors (tool failure, not a FAIL verdict) → retry
+  the subagent dispatch once. If it fails again, fall back to a
+  manual inline check and flag this in the Final Report as a
+  degraded acceptance for that epic.
+
+**Do not re-verify the subagent's findings inline.** If spec-reviewer
+says "fr-stats-001 AC #5 missing" and you look at the code and think
+"actually I see it", you are back in the rationalization failure
+mode. Either trust the subagent or dispatch a second one — never
+overrule with inline reasoning.
 
 ## Spec compliance check — how
 
