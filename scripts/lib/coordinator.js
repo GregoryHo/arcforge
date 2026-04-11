@@ -202,6 +202,13 @@ class Coordinator {
   expandWorktrees(options = {}) {
     const { epicId, verify = false, verifyCommand, projectSetup = false } = options;
 
+    // Ensure the .arcforge-epic marker can never enter git staging in
+    // any worktree this project has or will have. Idempotent — no-op
+    // if already excluded. Must happen before any worktree creates a
+    // marker file, so teammate `git add -A` / `git add .` patterns
+    // never pick it up.
+    this._ensureArcforgeExcluded();
+
     // Phase 1: DAG mutation + worktree creation under a single lock.
     // Two concurrent expansions on different epics would otherwise race:
     // both load the dag, both set their own epic.worktree/epic.status,
@@ -764,6 +771,48 @@ class Coordinator {
       }
     }
     return null;
+  }
+
+  /**
+   * Add `.arcforge-epic` to the main repo's git info/exclude so the
+   * worktree marker never gets staged by any teammate's `git add -A`
+   * or `git add .` patterns.
+   *
+   * Linked worktrees share their exclude configuration with the main
+   * repo via the `commondir` file — writing to a per-worktree
+   * `info/exclude` path does NOT work (verified empirically). The only
+   * path that git consults for all linked worktrees is the main repo's
+   * common gitdir, which `git rev-parse --git-common-dir` resolves to
+   * regardless of which worktree the command runs from.
+   *
+   * Idempotent: no-op if the marker rule is already present.
+   *
+   * Surfaced by the qmd 2026-04-11 dispatch where `.arcforge-epic`
+   * leaked into dev-branch commit history because teammates' commit
+   * steps used blanket `git add`.
+   */
+  _ensureArcforgeExcluded() {
+    const result = this._runGit(['rev-parse', '--git-common-dir']);
+    if (result.exitCode !== 0) return;
+
+    // git-common-dir can be relative to cwd (older git versions); resolve
+    // against projectRoot so we always get an absolute path.
+    const commonDir = path.resolve(this.projectRoot, result.stdout.trim());
+    const infoDir = path.join(commonDir, 'info');
+    const excludePath = path.join(infoDir, 'exclude');
+    const marker = '.arcforge-epic';
+
+    const current = fs.existsSync(excludePath) ? fs.readFileSync(excludePath, 'utf8') : '';
+
+    // Match the exact line (not a substring) to avoid re-adding if the
+    // rule already exists, while still tolerating comments and other
+    // entries around it.
+    if (current.split('\n').includes(marker)) return;
+
+    fs.mkdirSync(infoDir, { recursive: true });
+    const needsNewline = current.length > 0 && !current.endsWith('\n');
+    const prefix = needsNewline ? '\n' : '';
+    fs.appendFileSync(excludePath, `${prefix}# arcforge worktree marker (auto-added)\n${marker}\n`);
   }
 
   _currentBranch() {
