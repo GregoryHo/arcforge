@@ -32,12 +32,12 @@ def test_arc_diagramming_obsidian_frontmatter():
 
 
 def test_arc_diagramming_obsidian_has_pipeline():
-    """Skill must define the Understand > Pattern > Generate > Validate > Save pipeline."""
+    """Skill must define the Build > Export > Validate > Save pipeline."""
     text = _read_skill().lower()
-    assert "understand" in text
-    assert "pattern" in text
-    assert "generate" in text
+    assert "build" in text
+    assert "export" in text
     assert "validate" in text
+    assert "save" in text
 
 
 def test_arc_diagramming_obsidian_has_visual_patterns():
@@ -88,11 +88,18 @@ def test_arc_diagramming_obsidian_references_element_templates():
     assert "element-templates" in text
 
 
-def test_arc_diagramming_obsidian_has_rendering_flexibility():
-    """Skill must support any Chrome access, not just Playwright."""
+def test_arc_diagramming_obsidian_has_playwright_renderer():
+    """Skill must use Playwright as primary render method."""
     text = _read_skill().lower()
-    assert "chrome" in text or "browser" in text
-    assert "playwright" not in text or ("chrome" in text and "playwright" in text)
+    assert "playwright" in text
+    assert "render_excalidraw.py" in text
+
+
+def test_arc_diagramming_obsidian_has_ea_api():
+    """Skill must document ExcalidrawAutomate API for building diagrams."""
+    text = _read_skill().lower()
+    assert "excalidrawautomate" in text or "ea.addtext" in text.replace(" ", "")
+    assert "connectobjects" in text
 
 
 def test_arc_diagramming_obsidian_has_dark_mode():
@@ -109,7 +116,6 @@ def test_arc_diagramming_obsidian_has_completion_formats():
 
 
 def test_arc_diagramming_obsidian_has_shortcut_paths():
-    """Skill must define Mermaid and elkjs shortcut paths."""
+    """Skill must define Mermaid shortcut path."""
     text = _read_skill().lower()
     assert "mermaid" in text
-    assert "elkjs" in text or "elk" in text
