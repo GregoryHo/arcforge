@@ -56,9 +56,9 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
    - **Spec compliance** — `Agent(subagent_type='arcforge:spec-reviewer')` with the epic's `epic.md` and referenced `features/*.md` attached. It independently locates every acceptance criterion in the merged dev branch and returns PASS/FAIL with file:line evidence.
    - **Fresh-eyes verification** — `Agent(subagent_type='arcforge:verifier')` with the project test command. It runs tests from an empty context and returns raw output.
 
-   Both PASS → accept. Either FAIL → Step 7. **Subagents ARE the gate** — running either check inline defeats the purpose. Baseline testing found the lead rationalizes inline acceptance by mapping test names to acceptance criteria instead of locating code, and by treating its own prior test run as fresh-eyes. A subagent has no prior context to rationalize from. The lead's job is to READ the reports and decide, not execute the checks.
+   Both PASS → accept. Either FAIL → Step 7 **unless** the FAIL is a spec defect (spec references wrong file/path, not an impl gap) — see `references/acceptance-and-retry.md` override-accept protocol. **Subagents ARE the gate** — running either check inline defeats the purpose. The lead's job is to READ the reports and decide, not execute the checks.
 
-   See `references/acceptance-and-retry.md` for subagent prompt templates, defect patterns, and feedback rules.
+   See `references/acceptance-and-retry.md` for subagent prompts, defect patterns, override-accept, and feedback rules.
 
 7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
    - Formulate feedback naming the failed criterion, quoting spec text verbatim, stating current-vs-required behavior.
@@ -130,7 +130,7 @@ Epics:
   ❌ epic-history      — permanently failed after 4 attempts (3 retries)
        Final rejection: query_history migration fails on existing DBs.
        Last spec-reviewer: FAIL (fr-hist-002 AC #3)
-       Worktree retained for debugging.
+       Worktree: <absolute-path> (retained for debugging)
 
 Spec defects recorded for follow-up:
   - epic-history, epic-bookmark: spec references src/db.ts but codebase
