@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [1.4.0] - 2026-04-10
+## [1.4.0] - 2026-04-12
 
 ### Added
 
@@ -24,6 +24,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Task list: `docs/tasks/bilingual-notes-tasks.md`
 - arc-maintaining-obsidian evals: 2 new scenarios (`synthesis-with-relationships-should-mermaid`, `simple-source-should-skip-visuals`) to discriminate the Visuals decision framework
 - `assets/arcforge-overview.png` (README diagram — referenced from the Skills Connect section)
+- `normalizeStatus()` in `scripts/lib/dag-schema.js`: maps agent-written status aliases (`done`/`finished`/`complete` → `completed`) and rejects unknown values, providing defense-in-depth for status values that bypass the `TaskStatus` enum
+- `_dagTransaction()` helper in `scripts/lib/coordinator.js`: serializes read-modify-write access to `dag.yaml` under file lock — fresh read under lock, mutation, conditional write — preventing concurrent teammate processes from clobbering each other's status updates
+- `_ensureArcforgeExcluded()` in `scripts/lib/coordinator.js`: adds `.arcforge-epic` to the main repo's `.git/info/exclude` at expand time, preventing teammates' `git add -A` patterns from staging the worktree marker. Uses `git rev-parse --git-common-dir` because linked worktrees share exclude config with the main repo
+- `arc-dispatching-teammates` reference docs: `references/acceptance-and-retry.md` (subagent-gated acceptance, retry loop mechanics, spec-defect override protocol), `references/spawn-prompt-template.md` (full authority grant template with retry feedback section), `references/tmux-timing-race.md` (GH #40168 parallel dispatch fallback), `references/wrap-up-sequence.md` (three-action teardown: report → cleanup → TeamDelete)
+- Race condition test suite: `tests/scripts/coordinator-merge-race.test.js`, `coordinator-expand-race.test.js`, `coordinator-marker-exclude.test.js`, and shared `coordinator-test-helpers.js`
+- Design doc: `docs/plans/2026-04-11-coordinator-dag-transaction-sweep.md` (deferred cold-path transaction sweep for `completeTask`, `blockTask`, `cleanupWorktrees`)
+- Task list: `docs/tasks/sync-status-validation-tasks.md` (7-task TDD plan for status validation)
 
 ### Changed
 
@@ -44,6 +51,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **`README.md`**: `arc-dispatching-teammates` added to Execution Layer skill list; version badge bumped
 - **`.claude/rules/architecture.md`**: Worktree Isolation section rewritten to describe home-based canonical path + `worktree-paths.js`
 - **`hooks/hooks.json`** loader now supports the sync fix (see Fixed)
+- **`arc-dispatching-teammates`**: reworked with subagent-gated acceptance check (dispatch `arcforge:spec-reviewer` + `arcforge:verifier` per teammate completion — lead reads reports and decides, does not run checks inline), retry loop (up to 3 retries per epic with cumulative feedback in spawn prompt), wrap-up sequence (emit Final Report with per-epic subagent evidence → cleanup accepted worktrees → shut down teammates → `TeamDelete`), per-completion teammate shutdown to prevent tmux pane accumulation, spec-defect override protocol (distinguish spec defects from impl defects via independent grep evidence), and TaskUpdate visibility warning (TaskUpdate is not a notification channel — completion must go through SendMessage). Spawn prompt template extracted to `references/spawn-prompt-template.md` with explicit `## Your Authority` section that prevents mid-phase stalling
+- **`arc-finishing-epic`**: added Step 4.1 Merge Conflict Handling — multi-teammate merge conflicts escalate to lead via SendMessage using a structured `Merge Conflict (Multi-Teammate)` blocked format (conflict files, hunks verbatim, proposed resolution, risk assessment); solo-epic conflicts present to user for resolution guidance. Never auto-resolve by taking ours/theirs/guessed union
+- **Coordinator DAG mutations**: `_mergeEpicsInBase` now updates `.arcforge-epic` marker to `completed` after merge (prevents sync from overwriting DAG's correct `completed` back to stale `in_progress`); `expandWorktrees`, `_syncWorktree`, `_syncBase`, and `syncEpicStatusesFromBase` wrapped in `_dagTransaction` to prevent concurrent teammate race conditions; both sync paths validate `local.status` via `normalizeStatus()` before propagating to DAG
 
 ### Fixed
 
@@ -53,6 +63,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **ENOBUFS on long installs**: `npm install`/`cargo build`/`pip install` no longer risk ENOBUFS thanks to streamed stdio (`_runSubprocess` with `stdio: 'inherit'`)
 - **Retracted: false `claude -p` subprocess bug**: a prior debugging note claimed `arc-looping`'s `claude -p` subprocesses did not fire arcforge hooks. Controlled re-test from a neutral directory (`/tmp/loop-hook-test/`) proved this was contamination from running tests inside arcforge's dev repo, where `.claude/settings.json` deliberately disables the arcforge plugin at project level. All past eval results remain valid; the root fact has been moved to `.claude/rules/dev-context.md` per the audience-separation principle (contributor concerns never belong in shipped surface)
 - **`marketplace.json` version drift**: `.claude-plugin/marketplace.json` was stuck at 1.2.0 (last manually updated two versions ago) while `plugin.json` and `package.json` had moved on. Synced all three version sources to 1.4.0 as part of this release
+- **DAG read-modify-write race condition**: concurrent teammate processes (merge, expand, sync) could load stale `dag.yaml` snapshots, mutate independently, and the second save would clobber the first — leaving an epic stuck at `in_progress` despite its branch being merged successfully. `_dagTransaction()` serializes all hot-path mutation paths under a single file lock with fresh-read-before-mutate semantics
+- **`done` vs `completed` status bug**: agent-written `.arcforge-epic` marker values (`done`, `finished`, `complete`) bypassed the `TaskStatus` enum, breaking `_getBlockedBy()` dependency resolution — downstream epics remained blocked despite their dependencies being complete. `normalizeStatus()` maps known aliases to canonical values and throws on unknown
+- **`.arcforge-epic` marker stale after merge**: `_mergeEpicsInBase` set `epic.status = TaskStatus.COMPLETED` in the DAG but never updated the worktree marker, which retained `in_progress` from expand time. Subsequent sync would overwrite the DAG's correct value with the stale marker value, un-completing the epic
+- **`.arcforge-epic` leaking into git commits**: teammates' blanket `git add -A` / `git add .` patterns staged the worktree marker file, which appeared in commit history after merge. `_ensureArcforgeExcluded()` writes the marker to `.git/info/exclude` (linked worktrees share this via `commondir`)
+- **Teammate pane accumulation**: completed teammates were not shut down between dispatches during continuous dispatch, causing tmux panes to accumulate and eventually hitting pane limits. Per-completion shutdown in Step 6/7 keeps active pane count ≤5
 
 ### Removed
 

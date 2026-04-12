@@ -266,16 +266,19 @@ arcforge's 32 skills are organized into 7 categories:
 **Key workflow:**
 1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
 2. Cap team size at 5 — if more ready epics, queue the rest for continuous dispatch
-3. Create or reuse a team (shared SendMessage / TaskList namespace)
-4. Per epic: `arcforge expand --epic <id>` → read canonical worktree path → spawn teammate with spawn prompt template
-5. Monitor via SendMessage and TaskList — dispatch queued epics into freed slots as teammates complete
-6. Each teammate handles its own `arc-finishing-epic` inside `/arc-implementing` — lead runs `arc-verifying` at end
+3. `TeamCreate` before any Agent dispatch (passing `team_name` to Agent does NOT auto-create)
+4. Per epic: `arcforge expand --epic <id>` → read canonical worktree path → spawn teammate with spawn prompt template (parallel dispatch, sequential retry on GH #40168 timing race)
+5. Monitor via SendMessage — dispatch queued epics into freed slots as teammates complete (continuous, not waves)
+6. **Acceptance check** per teammate completion: dispatch `arcforge:spec-reviewer` + `arcforge:verifier` subagents with fresh context. Both PASS = accept and shut down teammate; either FAIL = Step 7. Lead reads reports and decides — does NOT run checks inline
+7. **Retry loop** on rejection: up to 3 retries per epic with cumulative feedback. Fresh worktree from dev HEAD (fix-forward), dispatch retry teammate. Spec-defect overrides (spec references wrong file/path) skip retry via override-accept protocol
+8. **Wrap up** when all epics reach terminal state: emit Final Report with per-epic subagent evidence, cleanup accepted worktrees, shut down remaining teammates, `TeamDelete`
 
 **Artifacts:**
 - Input: `dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
-- Output: per-epic worktrees at `~/.arcforge-worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step
+- Output: per-epic worktrees at `~/.arcforge-worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
+- Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
 
-**Related:** arc-planning → **arc-dispatching-teammates** → arc-verifying (at lead); each teammate runs arc-implementing → arc-finishing-epic on its own
+**Related:** arc-planning → **arc-dispatching-teammates** → (per completion: spec-reviewer + verifier subagents); each teammate runs arc-implementing → arc-finishing-epic on its own
 
 ---
 
