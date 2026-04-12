@@ -62,20 +62,53 @@ Evidence artifacts are concrete examples that prove the diagram is accurate and 
 | **Real input content** | Showing what goes IN to a system | Rectangle with sample content |
 | **API/method names** | Real function calls, endpoints | Use actual names from docs |
 
+### Evidence Placement Rule (HARD CONSTRAINT)
+
+Evidence artifacts are large (250-300px wide, 120-280px tall). They MUST be placed in a **separate spatial lane** from flow elements. Placing them inline with flow causes the most common and visible layout defect — flow elements buried inside evidence blocks.
+
+**Two-column layout (required for comprehensive diagrams):**
+
+```
+x=50  FLOW COLUMN          x=400  EVIDENCE COLUMN
+┌──────────────┐            ┌──────────────────┐
+│ Build Request │────────→  │ {                │
+└──────────────┘            │   "model": ...,  │
+       ↓                    │   "messages": ...│
+┌──────────────┐            │ }                │
+│ Parse Response│            └──────────────────┘
+└──────────────┘            ┌──────────────────┐
+       ↓                    │ {                │
+┌──────────────┐            │   "role": ...    │
+│ Execute Tool  │────────→  │ }                │
+└──────────────┘            └──────────────────┘
+```
+
+Flow elements at x=50 (left), evidence at x=400 (right). They share Y-ranges but **never X-ranges** — no overlap possible.
+
+**Use `plan_layout.py` to compute coordinates automatically:**
+
+```bash
+cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+  uv run python plan_layout.py /tmp/diagram-spec.json --output /tmp/layout.json --ea-script
+```
+
+This takes a spec with elements marked as `"type": "flow"` or `"type": "evidence"` and computes coordinates with guaranteed separation. Use the output coordinates in your EA build script.
+
 ### Rendering Evidence in EA
 
 Use a dark rectangle with light-colored text for code/JSON artifacts:
 
 ```javascript
-// Code snippet artifact
+// Evidence artifact — ALWAYS in the evidence column (x=400+)
 s.backgroundColor = '#1e293b';  // dark background (from palette: evidence artifact)
 s.fontSize = 12;
 s.strokeColor = '#22c55e';      // green text for JSON
-const code = ea.addText(x, y, '{\n  "event": "RUN_STARTED",\n  "threadId": "abc-123"\n}', {
+const code = ea.addText(400, y, '{\n  "event": "RUN_STARTED",\n  "threadId": "abc-123"\n}', {
   box: 'rectangle',
   boxPadding: 12,
   boxStrokeColor: '#334155'
 });
+// Note: x=400 puts this in the evidence column, not inline with flow at x=50
 ```
 
 ### Simple vs Comprehensive Comparison

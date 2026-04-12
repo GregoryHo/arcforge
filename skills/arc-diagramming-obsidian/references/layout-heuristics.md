@@ -1,6 +1,130 @@
 # Layout Heuristics
 
-Specific fix strategies for common layout problems. Read this during Phase 3 (Validate) when the overlap checker or visual inspection reveals issues.
+Two parts: **preventive planning** (read during Phase 1 Build) and **corrective fixes** (read during Phase 3 Validate).
+
+---
+
+## Part 1: Preventive Planning (Phase 1)
+
+Read this BEFORE writing the EA build script. Good spacing prevents 80% of overlap issues.
+
+### Grid-Based Coordinate Planning
+
+Before calling any EA API method, plan your layout on a virtual grid:
+
+```
+Columns: x = 50, 250, 450, 650, 850, ...  (200px increments)
+Rows:    y = 50, 200, 350, 500, 650, ...   (150px increments)
+```
+
+This ensures minimum 40px gap between Primary-sized elements (180px wide, 200px column spacing = 20px gap on each side).
+
+For Hero elements (300px wide), skip a column — they occupy two grid slots.
+
+### Zone Layout Template
+
+For multi-zone diagrams (like the teammates architecture), plan vertical space per zone:
+
+```
+Zone 1 title:    y = 30
+Zone 1 elements: y = 70 to 170
+Separator:       y = 200
+Zone 2 title:    y = 220
+Zone 2 elements: y = 260 to 360
+Separator:       y = 390
+Zone 3 title:    y = 410
+Zone 3 elements: y = 450 to 550
+```
+
+Each zone gets 170px of element space + 30px gap to separator. Adjust zone height based on content — more elements = taller zone.
+
+### Evidence Artifact Placement
+
+Evidence artifacts (code/JSON blocks) are large — typically 250-300px wide and 200-280px tall. They MUST NOT share Y-space with flow elements.
+
+**Two strategies:**
+
+**Strategy A: Below-step placement** (simpler, works for vertical flows)
+```
+Flow element:     y = 200
+Evidence block:   y = 310  (flow.y + flow.height + 20)
+Next flow element: y = 600  (evidence.y + evidence.height + 20)
+```
+
+**Strategy B: Side lane** (compact, works for horizontal flows)
+```
+Flow lane:      x = 50 to 400
+Evidence lane:  x = 450 to 800
+```
+
+The key rule: **evidence blocks are NOT inline labels — they are large shapes that need their own space.**
+
+### Arrow Corridor Reservation
+
+Leave at least 60px between shapes for arrows to route through without crossing other elements:
+
+```
+[Shape A]  ←60px→  [Shape B]
+              ↑
+         arrow corridor
+```
+
+For fan-out patterns, make the corridor wider (100px) since multiple arrows share it.
+
+### Cross-Zone Arrow Routing
+
+When arrows connect elements across zones (crossing separator lines and zone titles), they must NOT pass through text. Route them through a dedicated **arrow corridor** to the left of flow elements:
+
+```
+x=20  ARROW CORRIDOR    x=50  FLOW COLUMN          x=400  EVIDENCE COLUMN
+  │                     ┌──────────────┐
+  │                     │ Step 1       │
+  │                     └──────────────┘
+  │   ← arrow goes       ─ ─ ─ ─ ─ ─ ─ ─ (separator)
+  │     through here    STEP 2 TITLE        (zone title at x=50)
+  │                     subtitle text
+  ↓                     ┌──────────────┐
+  └────────────────────→│ Step 2       │
+                        └──────────────┘
+```
+
+**In EA code:** use `connectObjects` with `null` anchors (auto-detect), OR manually add arrows with waypoints at x=20:
+
+```javascript
+// Cross-zone arrow that avoids zone titles
+s.strokeColor = '#5eead4';
+ea.addArrow(
+  [[step1_x + 90, step1_bottom],   // from bottom of step 1
+   [20, step1_bottom + 40],         // route left to corridor
+   [20, step2_top - 40],            // travel down in corridor
+   [step2_x, step2_top]],           // enter step 2 from left
+  {endArrowHead: 'arrow'}
+);
+```
+
+This keeps arrows out of the zone title area entirely.
+
+### Stagger connectObjects Anchors
+
+When multiple arrows leave the same shape, distribute across different anchors:
+
+```javascript
+// BAD — all from 'bottom', arrows overlap
+ea.connectObjects(lead, 'bottom', wt1, 'top', ...);
+ea.connectObjects(lead, 'bottom', wt2, 'top', ...);
+ea.connectObjects(lead, 'bottom', wt3, 'top', ...);
+
+// GOOD — spread across anchors
+ea.connectObjects(lead, 'left',   wt1, 'top', ...);
+ea.connectObjects(lead, 'bottom', wt2, 'top', ...);
+ea.connectObjects(lead, 'right',  wt3, 'top', ...);
+```
+
+---
+
+## Part 2: Corrective Fixes (Phase 3)
+
+Read this when the overlap checker or visual inspection reveals issues.
 
 ## Arrow Crossing Through Shapes
 

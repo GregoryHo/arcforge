@@ -102,6 +102,11 @@ obsidian eval code="document.body.classList.contains('theme-dark') ? 'dark' : 'l
 
 Use the EA API via `obsidian eval` to create elements programmatically. EA handles the two hardest problems automatically: text measurement (sizing containers to fit text) and bidirectional arrow binding (arrows that snap to shape edges).
 
+**Before writing any EA code**, plan your layout:
+
+1. Read Part 1 of `references/layout-heuristics.md` — grid-based coordinate planning, zone spacing templates
+2. **For comprehensive diagrams with evidence artifacts**: use `references/plan_layout.py` to compute coordinates automatically — it enforces two-column separation (flow left, evidence right) that prevents the most common overlap defect. Write a spec JSON, run the planner, use its output coordinates in your EA build script. See `references/depth-enhancements.md` for the spec format and the evidence placement constraint.
+
 Read `references/element-templates.md` for the complete EA API reference with examples.
 
 ### Core Pattern

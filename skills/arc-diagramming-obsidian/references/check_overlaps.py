@@ -122,6 +122,34 @@ def label_for(el: dict) -> str:
     return f'{el["type"]}#{el.get("id", "?")[:8]}'
 
 
+def _is_timeline_dot_on_line(dot: dict, line: dict) -> bool:
+    """Check if a small ellipse is a timeline marker sitting on a line (by design)."""
+    if dot.get("type") != "ellipse":
+        return False
+    # Timeline dots are small (< 20px)
+    if dot.get("width", 0) > 20 or dot.get("height", 0) > 20:
+        return False
+    # Check if the dot center is near the line path
+    dot_cx = dot["x"] + dot.get("width", 0) / 2
+    dot_cy = dot["y"] + dot.get("height", 0) / 2
+    line_x = line.get("x", 0)
+    line_y = line.get("y", 0)
+    for pt in line.get("points", []):
+        px, py = line_x + pt[0], line_y + pt[1]
+        if abs(dot_cy - py) < 15 or abs(dot_cx - px) < 15:
+            return True
+    return False
+
+
+def _min_gap(a: tuple, b: tuple) -> float:
+    """Compute minimum gap between two bounding boxes (0 if overlapping)."""
+    x_gap = max(0, max(a[0], b[0]) - min(a[2], b[2]))
+    y_gap = max(0, max(a[1], b[1]) - min(a[3], b[3]))
+    if x_gap == 0 and y_gap == 0:
+        return 0  # overlapping
+    return min(x_gap, y_gap) if x_gap > 0 and y_gap > 0 else max(x_gap, y_gap)
+
+
 def check_overlaps(
     data: dict, min_overlap: float = 100, padding: float = 10
 ) -> dict:
@@ -135,12 +163,20 @@ def check_overlaps(
     shapes = [e for e in elements if e["type"] in ("rectangle", "ellipse", "diamond")]
     texts = [e for e in elements if e["type"] == "text"]
     arrows = [e for e in elements if e["type"] in ("arrow", "line")]
+    lines_only = [e for e in elements if e["type"] == "line"]
 
     # Free-floating texts (not inside a container)
     free_texts = [t for t in texts if not t.get("containerId")]
 
     # Contained texts (inside a shape) — skip these for overlap checks
     contained_text_ids = {t["id"] for t in texts if t.get("containerId")}
+
+    # Build set of timeline-dot-on-line pairs to skip (by design, not a defect)
+    timeline_pairs: set[tuple[str, str]] = set()
+    for line in lines_only:
+        for shape in shapes:
+            if _is_timeline_dot_on_line(shape, line):
+                timeline_pairs.add((line["id"], shape["id"]))
 
     issues = []
 
@@ -196,6 +232,9 @@ def check_overlaps(
         for shape in shapes:
             if shape["id"] in bound_ids:
                 continue  # Arrow is supposed to touch its bound shapes
+            # Skip timeline dots on their line (by design)
+            if (arrow["id"], shape["id"]) in timeline_pairs:
+                continue
             sb = bbox(shape)
             if not sb:
                 continue
@@ -224,6 +263,35 @@ def check_overlaps(
                         }
                     )
                     break  # One crossing per arrow-shape pair is enough
+
+    # 2b. Arrow-text crossings (arrows passing through free-floating text)
+    for arrow in arrows:
+        segs = segments_from_arrow(arrow)
+        for text_el in free_texts:
+            tb = bbox(text_el)
+            if not tb:
+                continue
+            # Pad text bbox slightly — arrows near text are also visually bad
+            padded_tb = (tb[0] - 5, tb[1] - 3, tb[2] + 5, tb[3] + 3)
+            for seg in segs:
+                crossing = segment_crosses_box(seg, padded_tb)
+                if crossing:
+                    cx, cy = crossing
+                    # Suggest routing arrow to the left of the text
+                    wp_x = tb[0] - 30
+                    wp_y = cy
+                    issues.append(
+                        {
+                            "type": "arrow-text-crossing",
+                            "severity": "high",
+                            "arrow": label_for(arrow),
+                            "arrow_id": arrow["id"],
+                            "text": label_for(text_el),
+                            "crossing_point": [cx, cy],
+                            "suggestion": f"Route arrow left of text: add waypoint at [{round(wp_x)}, {round(wp_y)}]",
+                        }
+                    )
+                    break
 
     # 3. Text-text overlaps (free-floating only)
     for i, a in enumerate(free_texts):
@@ -275,6 +343,33 @@ def check_overlaps(
                     }
                 )
 
+    # 5. Spacing checks — shapes too close (not overlapping, but crowded)
+    MIN_SHAPE_GAP = 30
+    for i, a in enumerate(shapes):
+        ba = bbox(a)
+        if not ba:
+            continue
+        for b in shapes[i + 1 :]:
+            bb = bbox(b)
+            if not bb:
+                continue
+            # Skip if already reported as overlapping
+            area = overlap_area(ba, bb)
+            if area >= min_overlap:
+                continue
+            gap = _min_gap(ba, bb)
+            if 0 < gap < MIN_SHAPE_GAP:
+                issues.append(
+                    {
+                        "type": "crowded-shapes",
+                        "severity": "low",
+                        "element_a": label_for(a),
+                        "element_b": label_for(b),
+                        "gap_px": round(gap),
+                        "suggestion": f"Increase gap between {label_for(a)} and {label_for(b)} from {round(gap)}px to {MIN_SHAPE_GAP}px",
+                    }
+                )
+
     # Build summary
     by_type = {}
     for issue in issues:
@@ -290,7 +385,7 @@ def check_overlaps(
             "high_severity": high_count,
             "by_type": by_type,
         },
-        "verdict": "clean" if len(issues) == 0 else ("needs_fix" if high_count > 0 else "minor_issues"),
+        "verdict": "clean" if len(issues) == 0 else ("needs_fix" if high_count > 0 else ("minor_issues" if any(i["severity"] == "medium" for i in issues) else "spacing_only")),
     }
 
 
@@ -330,9 +425,11 @@ def main() -> None:
             print(f"  {sev} #{i} [{issue['type']}]")
             if "element_a" in issue:
                 print(f"     {issue['element_a']} ↔ {issue['element_b']}")
-            elif "arrow" in issue:
+            elif "arrow" in issue and "shape" in issue:
                 print(f"     {issue['arrow']} crosses {issue['shape']}")
-            elif "text" in issue:
+            elif "arrow" in issue and "text" in issue:
+                print(f"     {issue['arrow']} crosses {issue['text']}")
+            elif "text" in issue and "shape" in issue:
                 print(f"     {issue['text']} overlaps {issue['shape']}")
             if "overlap_px" in issue:
                 print(f"     Overlap: {issue['overlap_px']}px²")
