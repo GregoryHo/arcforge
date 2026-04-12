@@ -17,6 +17,11 @@ const { getDefaultTestCommand, getDefaultInstallCommand } = require('./package-m
 const { objectToYaml, normalizeStatus } = require('./dag-schema');
 const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
 
+// Lock timeouts for DAG transactions that include slow git operations.
+// Default withLock timeout is 5s; these accommodate heavier workloads.
+const EXPAND_LOCK_TIMEOUT = 30000; // git worktree add + fs ops
+const MERGE_LOCK_TIMEOUT = 60000; // git merge can be slow on large repos
+
 /**
  * Coordinator class - manages DAG operations
  */
@@ -212,8 +217,7 @@ class Coordinator {
     // Phase 1: DAG mutation + worktree creation under a single lock.
     // Two concurrent expansions on different epics would otherwise race:
     // both load the dag, both set their own epic.worktree/epic.status,
-    // and the second save clobbers the first. Same pattern as the merge
-    // race fixed in the previous commit.
+    // and the second save clobbers the first.
     const { created, createdPaths } = this._dagTransaction(
       () => {
         const completedEpics = this.dag.getCompletedEpics();
@@ -279,7 +283,7 @@ class Coordinator {
 
         return { created: createdLocal, createdPaths: createdPathsLocal };
       },
-      { timeout: 30000 },
+      { timeout: EXPAND_LOCK_TIMEOUT },
     );
 
     // Phase 2: long-running project setup / test verification OUTSIDE
@@ -411,7 +415,7 @@ class Coordinator {
 
         return merged;
       },
-      { timeout: 60000 },
+      { timeout: MERGE_LOCK_TIMEOUT },
     );
   }
 
@@ -807,10 +811,6 @@ class Coordinator {
    * regardless of which worktree the command runs from.
    *
    * Idempotent: no-op if the marker rule is already present.
-   *
-   * Surfaced by the qmd 2026-04-11 dispatch where `.arcforge-epic`
-   * leaked into dev-branch commit history because teammates' commit
-   * steps used blanket `git add`.
    */
   _ensureArcforgeExcluded() {
     const result = this._runGit(['rev-parse', '--git-common-dir']);
@@ -868,8 +868,7 @@ class Coordinator {
    * Run a DAG mutation under a single exclusive lock covering both read
    * and write. This closes the read-modify-write race where two Coordinator
    * instances load the dag concurrently, each mutate different epics, and
-   * the second save overwrites the first. See `fix: serialize merge dag
-   * transaction` commit for the qmd dispatch incident that exposed this.
+   * the second save overwrites the first.
    *
    * Usage: wrap any body that mutates `this.dag` and would have ended in
    * `this._saveDag()`. Do NOT call `_saveDag()` inside `fn` — it would
@@ -885,12 +884,15 @@ class Coordinator {
       () => {
         // Fresh read under lock — any previously-cached DAG state
         // is stale the moment a concurrent writer acquired the lock.
-        this._dag = this._loadDag();
+        const original = fs.readFileSync(this.dagPath, 'utf8');
+        this._dag = DAG.fromObject(parseDagYaml(original));
         const result = fn();
-        // Write under the already-held lock; bypass _saveDag (it would
-        // try to re-acquire and deadlock).
+        // Only write if the DAG actually changed — avoids unnecessary
+        // disk I/O and reduces lock hold time on no-mutation paths.
         const content = stringifyDagYaml(this.dag.toObject());
-        fs.writeFileSync(this.dagPath, content);
+        if (content !== original) {
+          fs.writeFileSync(this.dagPath, content);
+        }
         return result;
       },
       options,

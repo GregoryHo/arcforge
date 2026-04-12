@@ -1,89 +1,12 @@
 const fs = require('node:fs');
-const path = require('node:path');
-const os = require('node:os');
-const { execFileSync } = require('node:child_process');
 
 const { Coordinator } = require('../../scripts/lib/coordinator');
-const { parseDagYaml, stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
+const { setupRepo, readDagFromDisk, cleanupWorktrees } = require('./coordinator-test-helpers');
 
-// Regression guard for the same read-modify-write race as the merge
-// path, but in the expand path. Two processes expanding different
-// epics concurrently would each load a stale dag, set their own
-// epic's worktree field and in_progress status, and the second save
-// would clobber the first — leaving the first epic's DAG state as
-// pending/no-worktree even though its worktree directory exists on
-// disk and is tracked by git.
-//
-// Same helper (_dagTransaction) applies; this test exists to prove
-// the helper covers the expand path too.
-
-function runGit(args, cwd) {
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
-}
-
-function setupRepo() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-expand-race-'));
-
-  runGit(['init', '-q', '-b', 'main'], root);
-  runGit(['config', 'user.email', 'test@example.com'], root);
-  runGit(['config', 'user.name', 'Test User'], root);
-  fs.writeFileSync(path.join(root, 'README.md'), 'base\n');
-  runGit(['add', 'README.md'], root);
-  runGit(['commit', '-q', '-m', 'init'], root);
-
-  const dagData = {
-    epics: [
-      {
-        id: 'epic-a',
-        name: 'Epic A',
-        spec_path: 'specs/epic-a.md',
-        status: TaskStatus.PENDING,
-        worktree: null,
-        depends_on: [],
-        features: [],
-      },
-      {
-        id: 'epic-b',
-        name: 'Epic B',
-        spec_path: 'specs/epic-b.md',
-        status: TaskStatus.PENDING,
-        worktree: null,
-        depends_on: [],
-        features: [],
-      },
-    ],
-    blocked: [],
-  };
-  fs.writeFileSync(path.join(root, 'dag.yaml'), stringifyDagYaml(dagData));
-  return root;
-}
-
-function readDagFromDisk(root) {
-  const content = fs.readFileSync(path.join(root, 'dag.yaml'), 'utf8');
-  return parseDagYaml(content);
-}
-
-function cleanupWorktrees(root) {
-  // Best-effort git-level cleanup before rm -rf so stale worktree
-  // metadata in the main .git doesn't confuse subsequent tests.
-  try {
-    const list = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-    for (const line of list.split('\n')) {
-      if (!line.startsWith('worktree ')) continue;
-      const p = line.slice(9);
-      if (p !== root && fs.existsSync(p)) {
-        fs.rmSync(p, { recursive: true, force: true });
-      }
-    }
-    execFileSync('git', ['worktree', 'prune'], { cwd: root });
-  } catch {
-    // ignore — rm -rf root will remove any leftovers
-  }
-}
+// Regression guard for the expand-path read-modify-write race.
+// Two processes expanding different epics concurrently would each load
+// a stale dag, and the second save clobbers the first.
 
 describe('Coordinator expand concurrency', () => {
   let root;

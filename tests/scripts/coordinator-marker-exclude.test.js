@@ -1,79 +1,14 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 
 const { Coordinator } = require('../../scripts/lib/coordinator');
-const { stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
-const { TaskStatus } = require('../../scripts/lib/models');
+const { setupRepo, runGit, cleanupWorktrees } = require('./coordinator-test-helpers');
 
 // Regression guard for the `.arcforge-epic` marker leaking into git
-// commit history (qmd 2026-04-11 dispatch). The marker is written to
-// each worktree at expand time but was never excluded from git
-// staging, so teammates' blanket `git add -A` / `git add .` patterns
-// caught it. The fix adds `.arcforge-epic` to the main repo's
+// commit history. The fix adds `.arcforge-epic` to the main repo's
 // `.git/info/exclude` at expand time — linked worktrees share this
-// file via `commondir`, so one write covers all current and future
-// worktrees.
-
-function runGit(args, cwd) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
-}
-
-function setupRepo() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-marker-exclude-'));
-
-  runGit(['init', '-q', '-b', 'main'], root);
-  runGit(['config', 'user.email', 'test@example.com'], root);
-  runGit(['config', 'user.name', 'Test User'], root);
-  fs.writeFileSync(path.join(root, 'README.md'), 'base\n');
-  runGit(['add', 'README.md'], root);
-  runGit(['commit', '-q', '-m', 'init'], root);
-
-  fs.writeFileSync(
-    path.join(root, 'dag.yaml'),
-    stringifyDagYaml({
-      epics: [
-        {
-          id: 'epic-a',
-          name: 'Epic A',
-          spec_path: 'specs/epic-a.md',
-          status: TaskStatus.PENDING,
-          worktree: null,
-          depends_on: [],
-          features: [],
-        },
-        {
-          id: 'epic-b',
-          name: 'Epic B',
-          spec_path: 'specs/epic-b.md',
-          status: TaskStatus.PENDING,
-          worktree: null,
-          depends_on: [],
-          features: [],
-        },
-      ],
-      blocked: [],
-    }),
-  );
-  return root;
-}
-
-function cleanupWorktrees(root) {
-  try {
-    const list = runGit(['worktree', 'list', '--porcelain'], root);
-    for (const line of list.split('\n')) {
-      if (!line.startsWith('worktree ')) continue;
-      const p = line.slice(9);
-      if (p !== root && fs.existsSync(p)) {
-        fs.rmSync(p, { recursive: true, force: true });
-      }
-    }
-    runGit(['worktree', 'prune'], root);
-  } catch {
-    // ignore
-  }
-}
+// file via `commondir`, so one write covers all worktrees.
 
 describe('arcforge marker git-exclude', () => {
   let root;

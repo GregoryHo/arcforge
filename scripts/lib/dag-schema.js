@@ -42,9 +42,7 @@ function normalizeStatus(raw) {
   if (VALID_STATUSES.has(raw)) return raw;
   const normalized = STATUS_ALIASES[raw];
   if (normalized) return normalized;
-  throw new Error(
-    `Invalid status "${raw}". Must be one of: ${[...VALID_STATUSES].join(', ')}`,
-  );
+  throw new Error(`Invalid status "${raw}". Must be one of: ${[...VALID_STATUSES].join(', ')}`);
 }
 
 /**

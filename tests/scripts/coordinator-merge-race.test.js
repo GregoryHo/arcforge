@@ -1,95 +1,24 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
-const { execFileSync } = require('node:child_process');
 
 const { Coordinator } = require('../../scripts/lib/coordinator');
 const { parseDagYaml, stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
+const { setupRepo, readDagFromDisk } = require('./coordinator-test-helpers');
 
 // Regression guard for a read-modify-write race in the dag merge path.
-//
-// In the real qmd 2026-04-11 dispatch, each teammate was a separate node
-// process. Each process created a fresh Coordinator, ran `_loadDag()`
-// once (loading the current dag snapshot from disk), mutated its own
-// epic's status in memory, and called `_saveDag()`. Because `_loadDag`
-// happens OUTSIDE the withLock boundary but `_saveDag` happens INSIDE,
-// two processes could both load a stale snapshot (both seeing all epics
-// as pending), then the locked writes would serialize — but the second
-// write would clobber the first, leaving one epic stuck at in_progress
-// on disk even though its branch had been merged successfully.
-//
-// To reproduce this in-process we must call `_mergeEpicsInBase` directly
-// on two separate Coordinator instances that have each already triggered
-// their lazy `_loadDag`. The public `mergeEpics()` can't reproduce the
-// race in-process because its delegation path (`new Coordinator(basePath)`)
-// creates a fresh coordinator per call, masking the in-memory staleness
-// that the cross-process scenario depends on.
-
-function runGit(args, cwd) {
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
-}
-
-function setupRepo() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-merge-race-'));
-
-  runGit(['init', '-q', '-b', 'main'], root);
-  runGit(['config', 'user.email', 'test@example.com'], root);
-  runGit(['config', 'user.name', 'Test User'], root);
-
-  // Initial commit so HEAD is born and we have a parent for branches
-  fs.writeFileSync(path.join(root, 'README.md'), 'base\n');
-  runGit(['add', 'README.md'], root);
-  runGit(['commit', '-q', '-m', 'init'], root);
-
-  // dag.yaml with 2 pending epics
-  const dagData = {
-    epics: [
-      {
-        id: 'epic-a',
-        name: 'Epic A',
-        spec_path: 'specs/epic-a.md',
-        status: TaskStatus.PENDING,
-        worktree: null,
-        depends_on: [],
-        features: [],
-      },
-      {
-        id: 'epic-b',
-        name: 'Epic B',
-        spec_path: 'specs/epic-b.md',
-        status: TaskStatus.PENDING,
-        worktree: null,
-        depends_on: [],
-        features: [],
-      },
-    ],
-    blocked: [],
-  };
-  fs.writeFileSync(path.join(root, 'dag.yaml'), stringifyDagYaml(dagData));
-
-  // Create epic branches with one distinct commit each
-  for (const id of ['epic-a', 'epic-b']) {
-    runGit(['checkout', '-q', '-b', id], root);
-    fs.writeFileSync(path.join(root, `${id}.txt`), `${id} content\n`);
-    runGit(['add', `${id}.txt`], root);
-    runGit(['commit', '-q', '-m', `feat: ${id}`], root);
-    runGit(['checkout', '-q', 'main'], root);
-  }
-
-  return root;
-}
-
-function readDagFromDisk(root) {
-  const content = fs.readFileSync(path.join(root, 'dag.yaml'), 'utf8');
-  return parseDagYaml(content);
-}
+// Two processes merging different epics concurrently could both load a
+// stale dag snapshot, then the second save clobbers the first —
+// leaving one epic stuck at in_progress despite its branch being merged.
 
 describe('Coordinator merge concurrency', () => {
   let root;
 
   beforeEach(() => {
-    root = setupRepo();
+    root = setupRepo({
+      prefix: 'arcforge-merge-race-',
+      createBranches: ['epic-a', 'epic-b'],
+    });
   });
 
   afterEach(() => {
