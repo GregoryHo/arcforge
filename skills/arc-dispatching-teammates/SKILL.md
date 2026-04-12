@@ -49,7 +49,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
    **Parallel, not sequential** — documented good pattern. If some spawns fail with `Failed to create teammate pane`, you hit [GH #40168](https://github.com/anthropics/claude-code/issues/40168); retry those sequentially. See `references/tmux-timing-race.md`.
 
-5. **Monitor.** Stay present. Read TaskList and mailbox periodically, answer teammate questions via SendMessage, intervene on stuck teammates. On teammate completion → Step 6. On acceptance → if queue has more epics, dispatch one into the freed slot (continuous, not waves).
+5. **Monitor.** Stay present. Read mailbox periodically, answer questions via SendMessage, intervene on stuck teammates. On completion → Step 6. On acceptance → dispatch next queued epic if any (continuous, not waves).
 
 6. **Acceptance check (per teammate completion) — delegate, do NOT inline.** The lead dispatches two subagents with fresh context; the lead does NOT locate code or run tests itself. When a teammate reports done:
 
@@ -58,9 +58,12 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
    Both PASS → accept. Either FAIL → Step 7 **unless** the FAIL is a spec defect (spec references wrong file/path, not an impl gap) — see `references/acceptance-and-retry.md` override-accept protocol. **Subagents ARE the gate** — running either check inline defeats the purpose. The lead's job is to READ the reports and decide, not execute the checks.
 
+   **After accepting, shut down the completed teammate** to reclaim its pane. Without this, panes accumulate across continuous dispatch and hit tmux limits.
+
    See `references/acceptance-and-retry.md` for subagent prompts, defect patterns, override-accept, and feedback rules.
 
 7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
+   - Shut down the rejected teammate's session (reclaim the pane).
    - Formulate feedback naming the failed criterion, quoting spec text verbatim, stating current-vs-required behavior.
    - `node scripts/cli.js expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
    - Dispatch `worker-<epic-id>-retry<N>` using `references/spawn-prompt-template.md` with a prepended `## Previous Attempt Feedback` section (cumulative).
@@ -72,7 +75,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
    - **8a.** Emit the Final Report (format below). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
    - **8b.** Clean up **accepted** worktrees from the project root: `node scripts/cli.js cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
-   - **8c.** Shut down teammates and call `TeamDelete` with the team name. Without this, tmux panes orphan and the team's runtime state lingers. See `references/wrap-up-sequence.md` for ordering, failure handling, and the rationale.
+   - **8c.** Shut down any remaining teammates (most already down from Steps 6/7), then call `TeamDelete`. See `references/wrap-up-sequence.md` for ordering and failure handling.
 
 ## Spawn Prompt Template
 
