@@ -14,7 +14,7 @@ const { DAG, Feature, BlockedItem, SyncResult, TaskStatus } = require('./models'
 const { parseDagYaml, stringifyDagYaml } = require('./yaml-parser');
 const { withLock } = require('./locking');
 const { getDefaultTestCommand, getDefaultInstallCommand } = require('./package-manager');
-const { objectToYaml } = require('./dag-schema');
+const { objectToYaml, normalizeStatus } = require('./dag-schema');
 const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
 
 /**
@@ -387,6 +387,25 @@ class Coordinator {
             throw new Error(`Failed to merge ${epic.id}: ${result.stderr.trim()}`);
           }
           epic.status = TaskStatus.COMPLETED;
+
+          // Update the worktree's .arcforge-epic marker so that subsequent
+          // sync propagates the correct status. Without this, the marker
+          // retains the stale 'in_progress' from expand time, and sync
+          // overwrites the DAG's correct 'completed' back to 'in_progress'.
+          if (epic.worktree) {
+            const wtPath = this._resolveWorktreePath(epic.worktree);
+            const markerPath = path.join(wtPath, '.arcforge-epic');
+            try {
+              const marker = this._readAgenticEpic(markerPath);
+              if (!marker.local) marker.local = {};
+              marker.local.status = TaskStatus.COMPLETED;
+              this._writeAgenticEpic(marker, markerPath);
+            } catch {
+              // Marker missing or unreadable — skip silently. The DAG
+              // status is already correct; the marker is best-effort.
+            }
+          }
+
           merged.push(epic);
         }
 
@@ -605,12 +624,13 @@ class Coordinator {
       const baseCoord = new Coordinator(basePath);
       const local = epicFile.local || {};
       if (local.status) {
+        const validStatus = normalizeStatus(local.status);
         // Resolve the target epic inside the base's transaction so we
         // act on the fresh-loaded state, not the pre-transaction cache.
         const pushed = baseCoord._dagTransaction(() => {
           const dagEpic = baseCoord.dag.getEpic(epicFile.epic);
-          if (dagEpic && local.status !== dagEpic.status) {
-            dagEpic.status = local.status;
+          if (dagEpic && validStatus !== dagEpic.status) {
+            dagEpic.status = validStatus;
             return true;
           }
           return false;
@@ -639,13 +659,14 @@ class Coordinator {
         const local = epicData.local || {};
 
         if (local.status) {
+          const validStatus = normalizeStatus(local.status);
           const oldStatus = epic.status;
-          if (local.status !== oldStatus) {
-            epic.status = local.status;
+          if (validStatus !== oldStatus) {
+            epic.status = validStatus;
             result.updates.push({
               epic: epicData.epic,
               old_status: oldStatus,
-              new_status: local.status,
+              new_status: validStatus,
             });
           }
         }
@@ -741,9 +762,9 @@ class Coordinator {
     return fs.existsSync(path.join(this.projectRoot, '.arcforge-epic'));
   }
 
-  _writeAgenticEpic(data) {
-    const filePath = path.join(this.projectRoot, '.arcforge-epic');
-    fs.writeFileSync(filePath, objectToYaml(data));
+  _writeAgenticEpic(data, filePath = null) {
+    const target = filePath || path.join(this.projectRoot, '.arcforge-epic');
+    fs.writeFileSync(target, objectToYaml(data));
   }
 
   _readAgenticEpic(filePath = null) {

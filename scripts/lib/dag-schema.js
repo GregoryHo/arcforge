@@ -20,6 +20,34 @@ const TaskStatus = {
 };
 
 /**
+ * Aliases that agents commonly write instead of the canonical TaskStatus values.
+ * Maps each alias to its canonical TaskStatus value.
+ */
+const STATUS_ALIASES = {
+  done: TaskStatus.COMPLETED,
+  finished: TaskStatus.COMPLETED,
+  complete: TaskStatus.COMPLETED,
+};
+
+/**
+ * Normalize a status string to a valid TaskStatus value.
+ * Passes through canonical values unchanged, maps known aliases,
+ * and throws on unknown values.
+ * @param {string} raw - Status string (possibly agent-written)
+ * @returns {string} Canonical TaskStatus value
+ */
+const VALID_STATUSES = new Set(Object.values(TaskStatus));
+
+function normalizeStatus(raw) {
+  if (VALID_STATUSES.has(raw)) return raw;
+  const normalized = STATUS_ALIASES[raw];
+  if (normalized) return normalized;
+  throw new Error(
+    `Invalid status "${raw}". Must be one of: ${[...VALID_STATUSES].join(', ')}`,
+  );
+}
+
+/**
  * Schema definition with field descriptions
  * Machine-readable format for documentation
  */
@@ -471,6 +499,7 @@ function validate(dag) {
 
 module.exports = {
   TaskStatus,
+  normalizeStatus,
   schema,
   example,
   schemaToYaml,

@@ -312,6 +312,52 @@ describe('Coordinator', () => {
     });
   });
 
+  describe('sync status validation', () => {
+    function setupSyncMock(coord, localStatus) {
+      coord._resolveWorktreePath = jest.fn(() => '/tmp/fake-worktree');
+      const origExistsSync = require('node:fs').existsSync;
+      jest.spyOn(require('node:fs'), 'existsSync').mockImplementation((p) => {
+        if (p === '/tmp/fake-worktree/.arcforge-epic') return true;
+        return origExistsSync(p);
+      });
+      coord._readAgenticEpic = jest.fn(() => ({
+        epic: 'epic-1',
+        local: { status: localStatus },
+      }));
+    }
+
+    afterEach(() => {
+      require('node:fs').existsSync.mockRestore?.();
+    });
+
+    it('should normalize "done" to "completed" in _syncBase path', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Worktree: 'epic-1',
+        }),
+      );
+      setupSyncMock(coord, 'done');
+
+      const result = coord._syncBase();
+      const epic = coord.dag.getEpic('epic-1');
+      expect(epic.status).toBe(TaskStatus.COMPLETED);
+      expect(result.updates[0].new_status).toBe(TaskStatus.COMPLETED);
+    });
+
+    it('should reject invalid status in _syncBase path', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Worktree: 'epic-1',
+        }),
+      );
+      setupSyncMock(coord, 'banana');
+
+      expect(() => coord._syncBase()).toThrow(/Invalid status/);
+    });
+  });
+
   describe('expandWorktrees single-epic preconditions', () => {
     it('throws when the named epic is not in the DAG', () => {
       const coord = createCoordinator(twoEpicDag());

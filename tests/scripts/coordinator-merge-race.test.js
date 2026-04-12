@@ -154,6 +154,43 @@ describe('Coordinator merge concurrency', () => {
     expect(finalDag.epics.find((e) => e.id === 'epic-b').status).toBe(TaskStatus.PENDING);
   });
 
+  test('merge updates .arcforge-epic marker to completed', () => {
+    // Expand creates .arcforge-epic with local.status: in_progress.
+    // After merge, the marker should be updated to completed so that
+    // subsequent sync propagates the correct status.
+    const worktreePath = path.join(root, 'worktrees', 'epic-a');
+    fs.mkdirSync(worktreePath, { recursive: true });
+
+    // Simulate what expand() writes to .arcforge-epic
+    const { objectToYaml } = require('../../scripts/lib/dag-schema');
+    const markerData = {
+      epic: 'epic-a',
+      base_worktree: root,
+      base_branch: 'main',
+      local: {
+        status: TaskStatus.IN_PROGRESS,
+        started_at: new Date().toISOString(),
+      },
+      synced: null,
+    };
+    fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(markerData));
+
+    // Point the DAG's worktree field to our mock worktree
+    const dagContent = fs.readFileSync(path.join(root, 'dag.yaml'), 'utf8');
+    const dagData = parseDagYaml(dagContent);
+    dagData.epics.find((e) => e.id === 'epic-a').worktree = worktreePath;
+    fs.writeFileSync(path.join(root, 'dag.yaml'), stringifyDagYaml(dagData));
+
+    const coord = new Coordinator(root);
+    coord.mergeEpics({ epicIds: ['epic-a'] });
+
+    // Read the marker back — local.status should now be 'completed'
+    const updatedMarker = parseDagYaml(
+      fs.readFileSync(path.join(worktreePath, '.arcforge-epic'), 'utf8'),
+    );
+    expect(updatedMarker.local.status).toBe(TaskStatus.COMPLETED);
+  });
+
   test('merge with no matching epics returns empty array', () => {
     // Calling mergeEpics() without epicIds filters to status=completed;
     // in our fixture none are completed yet, so nothing merges.
