@@ -116,37 +116,21 @@ Light mode and dark mode variants are both defined. Read the user's Obsidian the
 
 This is mandatory — not a final check. You cannot judge a diagram from JSON alone.
 
-### Rendering via ExcalidrawAutomate (preferred)
+### Rendering
 
-The cleanest export uses the Obsidian Excalidraw plugin's API — produces diagram-only PNGs with no toolbar, sidebar, or UI artifacts. Requires Obsidian running with the Excalidraw plugin installed.
+Any tool that can access Chrome works identically — they all use the same `excalidraw library` `exportToSvg()` under the hood.
 
-```js
-// via obsidian eval (use .then() — obsidian eval doesn't support top-level await)
-const ea = window.ExcalidrawAutomate;
-const file = app.vault.getAbstractFileByPath('Excalidraw/diagram.excalidraw.md');
-ea.reset();
-ea.getSceneFromFile(file)
-  .then(() => ea.createPNG(file.path, 2))  // scale=2 for retina
-  .then(blob => blob.arrayBuffer())
-  .then(buf => {
-    require('fs').writeFileSync('/tmp/diagram.png', Buffer.from(buf));
-  });
-```
+**Tool detection (use first available):**
+1. User's existing browser access (claude-in-chrome, puppeteer, agent browser, etc.)
+2. Playwright with coleam00's render script (`render_excalidraw.py`)
+3. If neither available — report to user, ask them to choose
 
-Key points:
-- `ea.reset()` + `ea.getSceneFromFile(file)` must be called first — loads elements into EA context
-- `createPNG(path, scale)` returns a Blob, not a file path
-- Scale 2 produces retina-quality output
-- Write via `fs.writeFileSync` to a known path, then view with Read tool
-
-### Fallback: Browser screenshot
-
-If Obsidian is not running, any tool that can access Chrome works — they all use the same Excalidraw `exportToSvg()` under the hood. Use `obsidian dev:screenshot` or browser tools (claude-in-chrome, Playwright). These include UI chrome — crop afterward if needed.
+The rendering tool does NOT affect quality. Use whatever is available.
 
 ### The Loop
 
 ```
-Step 1: Render to PNG (ExcalidrawAutomate preferred, browser fallback)
+Step 1: Render to PNG
 Step 2: View the image. Check DESIGN INTENT first:
         - Does visual structure match the conceptual plan?
         - Does each section use the intended pattern?
