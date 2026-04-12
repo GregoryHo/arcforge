@@ -218,26 +218,31 @@ cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
 ### The Fix Loop
 
 ```
-Step 1: Render to PNG with Playwright, view with Read tool
-Step 2: Check DESIGN INTENT:
+Step 1: Run overlap checker (automated — catches issues invisible to the eye)
+        cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+          uv run python check_overlaps.py /tmp/diagram.excalidraw
+Step 2: Render to PNG with Playwright, view with Read tool
+Step 3: Check DESIGN INTENT:
         - Does visual structure match your conceptual plan?
         - Does each section use the intended pattern?
         - Is visual hierarchy correct — hero dominant, supporting smaller?
-Step 3: Check for DEFECTS:
-        - Text clipped or overflowing containers
-        - Elements overlapping
-        - Arrows crossing through elements
-        - Uneven spacing / lopsided composition
-        - Text too small to read
-Step 4: Fix by editing .excalidraw JSON directly:
-        - Read /tmp/diagram.excalidraw
-        - Find element by ID
-        - Edit x/y/width/height properties
-        - Re-render → back to Step 1
-Step 5: Max 3 iterations. After 3 → proceed to save, report remaining issues.
+Step 4: Check for DEFECTS (overlap checker + visual):
+        - Arrow crossing through unconnected shapes (checker catches this)
+        - Shape-shape overlaps (checker catches this)
+        - Text overlapping shapes or other text (checker catches this)
+        - Uneven spacing / lopsided composition (visual only)
+        - Text too small to read (visual only)
+Step 5: Fix using overlap checker suggestions + layout heuristics:
+        - Read references/layout-heuristics.md for specific fix strategies
+        - Edit .excalidraw JSON directly (Read → find element → Edit x/y)
+        - Re-run overlap checker to verify fix
+        - Re-render → back to Step 2
+Step 6: Max 3 iterations. After 3 → proceed to save, report remaining issues.
 ```
 
 **Fix strategy:** Edit the `.excalidraw` JSON directly for positional fixes (move, resize, spacing). Moving a shape does NOT break arrow binding — Excalidraw recalculates arrow routes from the binding data. The only dangerous edit is changing an element's `id`, which would orphan connected arrows.
+
+Read `references/layout-heuristics.md` for specific fix techniques: arrow waypoints for crossings, spacing rules for overlaps, anchor distribution for congestion.
 
 Only re-run the EA build (Phase 1) for structural changes — adding/removing elements or changing connections.
 
@@ -274,6 +279,7 @@ This skill delegates format details to reference files — read them when needed
 - **Color palette** → `references/color-palette.md` (semantic colors for light + dark mode)
 - **Visual patterns** → `references/visual-patterns.md` (9 patterns with layout guidance)
 - **Element templates + EA API** → `references/element-templates.md` (JSON templates + EA usage)
+- **Layout heuristics** → `references/layout-heuristics.md` (fix strategies for overlaps, crossings, spacing)
 - **Depth enhancements** → `references/depth-enhancements.md` (Research, Multi-Zoom, Evidence — comprehensive diagrams only)
 
 For vault operations, delegate to:
