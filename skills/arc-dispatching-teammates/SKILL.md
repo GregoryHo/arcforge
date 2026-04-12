@@ -132,6 +132,11 @@ Epics:
        Last spec-reviewer: FAIL (fr-hist-002 AC #3)
        Worktree retained for debugging.
 
+Spec defects recorded for follow-up:
+  - epic-history, epic-bookmark: spec references src/db.ts but codebase
+    convention is src/store.ts — override-accepted, spec needs revision
+  - (or: none observed)
+
 Cleanup performed:
   - Accepted worktrees removed: epic-yaml-output, epic-stats
   - Team torn down (TeamDelete)
@@ -144,7 +149,7 @@ Next actions you may consider:
   - Discard the session: git branch -D <branch-name>
 ```
 
-Each accepted epic MUST show the subagent evidence lines (spec-reviewer + verifier PASS). Missing evidence = you skipped Step 6. Failed epics show the last failing subagent report and are NOT auto-cleaned. "Next actions" lists user options — you don't execute them.
+Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). Missing = Step 6 was skipped. Failed epics show the last subagent FAIL and are NOT auto-cleaned. "Next actions" lists user options — you don't execute them.
 
 ## Blocked Format
 

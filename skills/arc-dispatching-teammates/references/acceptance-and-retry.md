@@ -138,6 +138,55 @@ says "fr-stats-001 AC #5 missing" and you look at the code and think
 mode. Either trust the subagent or dispatch a second one — never
 overrule with inline reasoning.
 
+## Spec defect vs implementation defect
+
+Sometimes spec-reviewer reports FAIL because **the spec itself is
+wrong**, not the implementation. The qmd 2026-04-12 dispatch observed
+this: the spec referenced `src/db.ts` but the codebase convention was
+`src/store.ts` — teammates correctly followed the convention, and
+spec-reviewer flagged a mismatch against the literal spec text. This
+appeared across 2 separate epics (epic-history and epic-bookmark),
+proving it was a spec-level typo, not an implementation-level mistake.
+
+### How to distinguish
+
+| Signal | Likely spec defect | Likely impl defect |
+|---|---|---|
+| Spec names a file/module/path that doesn't exist in the codebase | ✓ | |
+| Teammate's code follows an existing codebase pattern that contradicts the spec | ✓ | |
+| Multiple teammates independently make the same "mistake" on different epics | ✓ | |
+| Spec-reviewer's FAIL points to a behavioral gap, not a naming/path issue | | ✓ |
+| The spec's criterion IS achievable with the current codebase | | ✓ |
+
+### Override-accept protocol
+
+When the lead determines a spec-reviewer FAIL is caused by a spec
+defect (not an implementation defect):
+
+1. **Independently verify.** Don't trust your memory of the spec.
+   Run `grep` / `find` to confirm the spec's reference is wrong and
+   the teammate's alternative is correct. Quote the evidence.
+2. **Override-accept the epic.** Do NOT send a retry — retrying a
+   spec defect wastes a teammate cycle on something they can't fix
+   without a spec revision.
+3. **Record the spec defect.** Add it to the Final Report's "Spec
+   defects" section (see SKILL.md Final Report template) so the user
+   can fix the spec post-dispatch.
+4. **Retry counter does NOT increment.** Same as merge-conflict
+   arbitration: spec defects are arbitration flows, not acceptance
+   failures.
+
+### Common trap: override as rationalization
+
+The override path looks identical to inline rationalization from the
+outside: "spec-reviewer says FAIL but I think it's fine." The
+distinguishing factor is **independent evidence** (grep output, file
+listing) vs **inference** ("I remember the teammate mentioned...").
+If your override reasoning includes "I think", "probably", "the
+teammate likely..." — you're rationalizing, not overriding. Re-read
+the spec-reviewer report and either find concrete evidence or send
+the retry.
+
 ## Spec compliance check — how
 
 The check compares **what the spec says** against **what the merged
