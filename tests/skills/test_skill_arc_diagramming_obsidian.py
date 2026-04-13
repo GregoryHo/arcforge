@@ -32,10 +32,9 @@ def test_arc_diagramming_obsidian_frontmatter():
 
 
 def test_arc_diagramming_obsidian_has_pipeline():
-    """Skill must define the Build > Export > Validate > Save pipeline."""
+    """Skill must define the Build > Validate > Save pipeline."""
     text = _read_skill().lower()
     assert "build" in text
-    assert "export" in text
     assert "validate" in text
     assert "save" in text
 
@@ -48,10 +47,10 @@ def test_arc_diagramming_obsidian_has_visual_patterns():
 
 
 def test_arc_diagramming_obsidian_has_json_generation():
-    """Skill must specify JSON direct write as generation method."""
+    """Skill must specify JSON export as part of the build phase."""
     text = _read_skill().lower()
     assert "json" in text
-    assert "section-by-section" in text or "section by section" in text
+    assert ".excalidraw" in text
 
 
 def test_arc_diagramming_obsidian_has_render_validate():

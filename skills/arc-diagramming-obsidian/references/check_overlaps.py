@@ -122,6 +122,13 @@ def label_for(el: dict) -> str:
     return f'{el["type"]}#{el.get("id", "?")[:8]}'
 
 
+def _share_group(a: dict, b: dict) -> bool:
+    """Check if two elements share any groupId (by-design proximity, skip overlap check)."""
+    groups_a = set(a.get("groupIds") or [])
+    groups_b = set(b.get("groupIds") or [])
+    return bool(groups_a & groups_b)
+
+
 def _is_timeline_dot_on_line(dot: dict, line: dict) -> bool:
     """Check if a small ellipse is a timeline marker sitting on a line (by design)."""
     if dot.get("type") != "ellipse":
@@ -186,6 +193,8 @@ def check_overlaps(
         if not ba:
             continue
         for b in shapes[i + 1 :]:
+            if _share_group(a, b):
+                continue
             bb = bbox(b)
             if not bb:
                 continue
@@ -232,6 +241,9 @@ def check_overlaps(
         for shape in shapes:
             if shape["id"] in bound_ids:
                 continue  # Arrow is supposed to touch its bound shapes
+            # Skip elements in the same group (by-design proximity)
+            if _share_group(arrow, shape):
+                continue
             # Skip timeline dots on their line (by design)
             if (arrow["id"], shape["id"]) in timeline_pairs:
                 continue
@@ -268,6 +280,8 @@ def check_overlaps(
     for arrow in arrows:
         segs = segments_from_arrow(arrow)
         for text_el in free_texts:
+            if _share_group(arrow, text_el):
+                continue
             tb = bbox(text_el)
             if not tb:
                 continue

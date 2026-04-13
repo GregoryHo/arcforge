@@ -9,16 +9,15 @@ Diagrams should ARGUE, not DISPLAY. A diagram is a visual argument — structure
 
 ## Pipeline
 
-Every invocation follows four phases:
+Every invocation follows three phases:
 
 ```
-BUILD (EA API) → EXPORT (.excalidraw JSON) → VALIDATE (Playwright render) → SAVE (vault)
+BUILD (EA API → .excalidraw) → VALIDATE (Playwright render → fix loop) → SAVE (vault)
 ```
 
-1. **Build** — Create elements programmatically using ExcalidrawAutomate. It handles text sizing, container binding, and arrow routing automatically.
-2. **Export** — Extract elements as portable `.excalidraw` JSON for rendering.
-3. **Validate** — Render to PNG with Playwright, visually inspect, fix JSON directly. Mandatory — up to 3 iterations.
-4. **Save** — Convert to `.excalidraw.md` format and write to vault.
+1. **Build** — Create elements programmatically using ExcalidrawAutomate, then export as portable `.excalidraw` JSON. EA handles text sizing, container binding, and arrow routing automatically.
+2. **Validate** — Render to PNG with Playwright, run overlap checker, visually inspect, fix JSON directly. Mandatory — up to 3 iterations.
+3. **Save** — Convert to `.excalidraw.md` format and write to vault.
 
 ## Design Process (Before Building)
 
@@ -100,12 +99,12 @@ obsidian eval code="document.body.classList.contains('theme-dark') ? 'dark' : 'l
 
 ## Phase 1: Build with ExcalidrawAutomate
 
-Use the EA API via `obsidian eval` to create elements programmatically. EA handles the two hardest problems automatically: text measurement (sizing containers to fit text) and bidirectional arrow binding (arrows that snap to shape edges).
+Use the EA API via `obsidian eval` to create elements programmatically. EA handles the two hardest problems automatically: text measurement (sizing containers to fit text) and bidirectional arrow binding (arrows that snap to shape edges). The build script ends by exporting all elements as a `.excalidraw` JSON file for validation.
 
 **Before writing any EA code**, plan your layout:
 
 1. Read Part 1 of `references/layout-heuristics.md` — grid-based coordinate planning, zone spacing templates
-2. **For comprehensive diagrams with evidence artifacts**: use `references/plan_layout.py` to compute coordinates automatically — it enforces two-column separation (flow left, evidence right) that prevents the most common overlap defect. Write a spec JSON, run the planner, use its output coordinates in your EA build script. See `references/depth-enhancements.md` for the spec format and the evidence placement constraint.
+2. **For diagrams with 20+ elements or evidence artifacts**: use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation (flow left, evidence right) that prevents the most common overlap defects. Write a spec JSON, run the planner, use its output coordinates in your EA build script.
 
 Read `references/element-templates.md` for the complete EA API reference with examples.
 
@@ -183,23 +182,11 @@ Set `ea.style.*` properties BEFORE each `addX()` call. Key properties:
 - `strokeWidth`, `strokeStyle` — line/arrow properties (`"solid"`, `"dashed"`)
 - `roughness` — `0` (clean) or `1` (hand-drawn)
 
-### Section-by-Section (Mandatory for Large Diagrams)
-
-For diagrams with 20+ elements, build one section per `obsidian eval` call:
-
-1. First call: set up EA, build Section 1, export to `/tmp/diagram.excalidraw`
-2. Subsequent calls: read the JSON, parse `elements` array, add new section elements via EA, merge arrays, write back
-3. Use descriptive IDs: `"lead_rect"`, `"gate_arrow"` (not numeric)
-
 ### Shortcut: Mermaid (simple flowcharts)
 
 For flowcharts under 10 elements, use `ea.addMermaid()` via `obsidian eval`. Only flowcharts produce native editable elements — other Mermaid types fall back to SVG images.
 
-## Phase 2: Export
-
-Phase 1 already writes the `.excalidraw` file. This phase is embedded in the build script — the last lines export `ea.getElements()` wrapped in the standard Excalidraw JSON structure to `/tmp/diagram.excalidraw`.
-
-## Phase 3: Validate (Mandatory)
+## Phase 2: Validate (Mandatory)
 
 You cannot judge a diagram from JSON alone. After generating, you MUST render to PNG, view it, and fix issues.
 
@@ -251,7 +238,7 @@ Read `references/layout-heuristics.md` for specific fix techniques: arrow waypoi
 
 Only re-run the EA build (Phase 1) for structural changes — adding/removing elements or changing connections.
 
-## Phase 4: Save to Vault
+## Phase 3: Save to Vault
 
 Convert the validated `.excalidraw` JSON to Obsidian's `.excalidraw.md` format and write to the vault.
 
