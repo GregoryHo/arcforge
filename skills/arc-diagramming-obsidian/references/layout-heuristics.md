@@ -1,6 +1,6 @@
 # Layout Heuristics
 
-Two parts: **preventive planning** (read during Phase 1 Build) and **corrective fixes** (read during Phase 3 Validate).
+Two parts: **preventive planning** (read during Phase 1 Build) and **corrective fixes** (read during Phase 2 Validate).
 
 ---
 
@@ -73,36 +73,37 @@ For fan-out patterns, make the corridor wider (100px) since multiple arrows shar
 
 ### Cross-Zone Arrow Routing
 
-When arrows connect elements across zones (crossing separator lines and zone titles), they must NOT pass through text. Route them through a dedicated **arrow corridor** to the left of flow elements:
+When arrows cross zones, the most common mistake is trying to fix routing while the layout is wrong. **If connectObjects produces an arrow that crosses through unrelated elements, the first response should be: is my layout wrong?**
 
-```
-x=20  ARROW CORRIDOR    x=50  FLOW COLUMN          x=400  EVIDENCE COLUMN
-  │                     ┌──────────────┐
-  │                     │ Step 1       │
-  │                     └──────────────┘
-  │   ← arrow goes       ─ ─ ─ ─ ─ ─ ─ ─ (separator)
-  │     through here    STEP 2 TITLE        (zone title at x=50)
-  │                     subtitle text
-  ↓                     ┌──────────────┐
-  └────────────────────→│ Step 2       │
-                        └──────────────┘
-```
+**Root cause of most crossings: zone ordering doesn't match logical flow.** If the logical sequence is A→B→C and zones are ordered A→C→B (top to bottom), arrows from A to B must cross zone C. No routing technique fixes this — reorder zones to A→B→C.
 
-**In EA code:** use `connectObjects` with `null` anchors (auto-detect), OR manually add arrows with waypoints at x=20:
+**When layout is correct but arrows still cross zone titles/separators:**
+
+Use `connectObjects` with explicit anchors to control direction. When an arrow must pass a separator line, ensure adequate vertical spacing (60px+) between the separator and elements on both sides — this gives the arrow room to cross the separator in empty space rather than through text.
 
 ```javascript
-// Cross-zone arrow that avoids zone titles
-s.strokeColor = '#5eead4';
-ea.addArrow(
-  [[step1_x + 90, step1_bottom],   // from bottom of step 1
-   [20, step1_bottom + 40],         // route left to corridor
-   [20, step2_top - 40],            // travel down in corridor
-   [step2_x, step2_top]],           // enter step 2 from left
-  {endArrowHead: 'arrow'}
-);
+// Cross-zone arrow: explicit anchors control direction
+ea.connectObjects(stepA, 'bottom', stepB, 'top', {
+  endArrowHead: 'arrow'
+});
+// Works cleanly when:
+// 1. stepA is directly above stepB (same column or close)
+// 2. Nothing sits between them except empty separator space
+// 3. Separator has 60px+ clearance above and below
 ```
 
-This keeps arrows out of the zone title area entirely.
+**Back-edges (retry loops, error paths):** These rare arrows go against the primary flow. Route them along the diagram edge (far left or far right) using `connectObjects` with 'left'/'right' anchors, or `addArrow` with waypoints along the edge. Use a distinct style (dashed, different color) so readers know it's not part of the main flow.
+
+```javascript
+// Retry loop along right edge
+s.strokeStyle = 'dashed';
+s.strokeColor = '#fbbf24';  // distinct color
+ea.connectObjects(rejectNode, 'right', targetNode, 'right', {
+  endArrowHead: 'arrow'
+});
+```
+
+**Prefer connectObjects over addArrow.** connectObjects produces bound arrows that snap to shape edges and maintain visual connection as shapes move. addArrow produces unbound arrows that float independently — they look disconnected and don't snap. Only use addArrow when connectObjects genuinely cannot route cleanly after layout optimization.
 
 ### Stagger connectObjects Anchors
 
@@ -122,7 +123,7 @@ ea.connectObjects(lead, 'right',  wt3, 'top', ...);
 
 ---
 
-## Part 2: Corrective Fixes (Phase 3)
+## Part 2: Corrective Fixes (Phase 2)
 
 Read this when the overlap checker or visual inspection reveals issues.
 

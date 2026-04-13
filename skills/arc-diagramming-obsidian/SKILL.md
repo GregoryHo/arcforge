@@ -55,9 +55,17 @@ Read `references/visual-patterns.md` for detailed layout guidance, ASCII sketche
 
 If two adjacent sections look the same (both rectangular grids, both simple chains), redesign one. Visual monotony kills comprehension.
 
-### Step 4: Sketch the Flow
+### Step 4: Plan the Layout
 
-Mentally trace how the eye moves through the diagram. There should be a clear visual story — not a scattered collection of shapes.
+The layout determines whether a diagram is readable BEFORE you draw a single arrow. A bad layout cannot be saved by clever arrow routing.
+
+**Zone ordering = logic ordering.** If the logical flow is A→B→C, zones must be stacked A (top) → B (middle) → C (bottom). When zone order matches logic, most arrows naturally flow downward — short, direct, crossing nothing. When zone order doesn't match logic, arrows are forced to cross zones and spaghetti is inevitable.
+
+**Clear sight lines.** For every pair of elements you plan to connect with an arrow, check: is there another element sitting directly between them? If yes, the problem is element POSITIONING, not arrow routing. Move the blocking element out of the path.
+
+**Back-edges are rare and edge-routed.** Arrows that go AGAINST the primary flow (retry loops, error paths, feedback) should be ≤2 per diagram. Route them along the diagram edge (far left or far right) with a distinct visual style (dashed, different color). If you need more than 2 back-edges, your zone ordering probably doesn't match the primary flow — redesign the layout.
+
+**Verify before building:** Mentally trace every arrow. Can you follow each one from source to target without crossing an unrelated element? If not, reposition elements until you can. Only then start writing EA code.
 
 ## Layout Rules
 
@@ -105,15 +113,18 @@ Use the EA API via `obsidian eval` to create elements programmatically. EA handl
 
 1. Read Part 1 of `references/layout-heuristics.md` — grid-based coordinate planning, zone spacing templates
 2. **For diagrams with 20+ elements or evidence artifacts**: use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation (flow left, evidence right) that prevents the most common overlap defects. Write a spec JSON, run the planner, use its output coordinates in your EA build script.
+3. **Verify zone ordering matches Step 4** — if your layout forces arrows to cross through zones they're not connecting, the zone order is wrong. Fix the layout, don't route around it.
 
 Read `references/element-templates.md` for the complete EA API reference with examples.
 
 ### Core Pattern
 
+**`ea.reset()` is mandatory at the start of every EA invocation.** Without it, EA accumulates elements from previous calls — new elements are appended on top of old ones, producing invisible duplicate layers that look like a single diagram in JSON but render as overlapping copies. This is the most common cause of "ghosting" artifacts.
+
 ```javascript
 (async () => {
   const ea = window.ExcalidrawAutomate;
-  ea.reset();
+  ea.reset();              // ALWAYS first — clears element buffer from previous invocations
   const s = ea.style;
   s.roughness = 0;          // clean modern aesthetic
   s.opacity = 100;
@@ -209,34 +220,35 @@ cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
 
 ### The Fix Loop
 
+Each iteration is a complete cycle. Every cycle ends with a render — the overlap checker alone is not sufficient because it cannot judge composition, readability, or visual hierarchy. Max 3 iterations, then proceed to save and report remaining issues.
+
 ```
-Step 1: Run overlap checker (automated — catches issues invisible to the eye)
-        cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-          uv run python check_overlaps.py /tmp/diagram.excalidraw
-Step 2: Render to PNG with Playwright, view with Read tool
-Step 3: Check DESIGN INTENT:
-        - Does visual structure match your conceptual plan?
-        - Does each section use the intended pattern?
-        - Is visual hierarchy correct — hero dominant, supporting smaller?
-Step 4: Check for DEFECTS (overlap checker + visual):
-        - Arrow crossing through unconnected shapes (checker catches this)
-        - Shape-shape overlaps (checker catches this)
-        - Text overlapping shapes or other text (checker catches this)
-        - Uneven spacing / lopsided composition (visual only)
-        - Text too small to read (visual only)
-Step 5: Fix using overlap checker suggestions + layout heuristics:
-        - Read references/layout-heuristics.md for specific fix strategies
-        - Edit .excalidraw JSON directly (Read → find element → Edit x/y)
-        - Re-run overlap checker to verify fix
-        - Re-render → back to Step 2
-Step 6: Max 3 iterations. After 3 → proceed to save, report remaining issues.
+ITERATION (repeat up to 3×):
+  1. CHECK  — Run overlap checker:
+             cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+               uv run python check_overlaps.py /tmp/diagram.excalidraw
+  2. RENDER — Render to PNG, view with Read tool (non-negotiable every iteration):
+             cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+               uv run python render_excalidraw.py /tmp/diagram.excalidraw --output /tmp/diagram.png --scale 2
+             Then: Read /tmp/diagram.png
+  3. JUDGE  — Evaluate the rendered image:
+             Design intent: Does structure match conceptual plan? Correct patterns? Hero dominant?
+             Defects: Overlaps, crossings, uneven spacing, text too small?
+  4. FIX    — If issues found:
+             Edit .excalidraw JSON directly (Read → find element → Edit x/y)
+             Read references/layout-heuristics.md for fix strategies
+             → Go to step 1 of next iteration
+         — If clean:
+             → Proceed to Phase 3 (Save)
 ```
 
 **Fix strategy:** Edit the `.excalidraw` JSON directly for positional fixes (move, resize, spacing). Moving a shape does NOT break arrow binding — Excalidraw recalculates arrow routes from the binding data. The only dangerous edit is changing an element's `id`, which would orphan connected arrows.
 
 Read `references/layout-heuristics.md` for specific fix techniques: arrow waypoints for crossings, spacing rules for overlaps, anchor distribution for congestion.
 
-Only re-run the EA build (Phase 1) for structural changes — adding/removing elements or changing connections.
+**When to JSON-edit vs EA-rebuild:**
+- **JSON edit** (Phase 2 fix loop) — Positional fixes: move, resize, spacing. Faster, preserves arrow bindings.
+- **EA rebuild** (back to Phase 1) — Structural changes: adding/removing elements, changing connections. Always start with `ea.reset()` — EA appends by default, so rebuilding without reset produces duplicate layers.
 
 ## Phase 3: Save to Vault
 
@@ -254,9 +266,20 @@ The `.excalidraw.md` format wraps the JSON with frontmatter and a text index for
    - `## Drawing` section with the full JSON in a ` ```json ``` ` code block inside `%% %%` markers
 4. Write to vault via filesystem or `obsidian-cli`
 
+### Post-Save Verification
+
+After writing to vault, verify the saved file renders correctly. The `.excalidraw.md` format has complex internal structure (element ID mapping, text indexing, JSON encoding) — silent corruption during conversion is common. Re-render the saved file and compare with the pre-save validated PNG:
+
+```bash
+cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+  uv run python render_excalidraw.py <vault-path>/diagram.excalidraw --output /tmp/diagram-post-save.png --scale 2
+```
+
+Then Read `/tmp/diagram-post-save.png` and confirm it matches the validated version. If it doesn't, the save conversion introduced corruption — fix the `.excalidraw.md` file.
+
 ### Embed in Wiki Notes
 
-After saving, embed in relevant wiki notes:
+After verification, embed in relevant wiki notes:
 
 ```markdown
 ![[diagram-name]]

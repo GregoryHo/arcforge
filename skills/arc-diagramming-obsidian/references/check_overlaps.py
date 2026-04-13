@@ -37,8 +37,6 @@ def bbox(el: dict) -> tuple[float, float, float, float] | None:
         if not points:
             return None
         xs = [x + p[0] for p in points]
-        ys = [x + p[1] for p in points]
-        # Fix: ys should use y not x
         ys = [y + p[1] for p in points]
         return (min(xs), min(ys), max(xs), max(ys))
 

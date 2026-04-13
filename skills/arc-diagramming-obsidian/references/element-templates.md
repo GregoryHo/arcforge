@@ -1,6 +1,6 @@
 # Element Templates & EA API Reference
 
-Two ways to create Excalidraw elements: the **EA API** (recommended — handles text sizing and arrow binding automatically) and **raw JSON** (for Phase 3 manual fixes). Both produce the same output format.
+Two ways to create Excalidraw elements: the **EA API** (recommended — handles text sizing and arrow binding automatically) and **raw JSON** (for Phase 2 validate-loop fixes). Both produce the same output format.
 
 ## EA API (Phase 1: Build)
 
@@ -49,6 +49,8 @@ const startId = ea.addText(50, 100, 'Start', {
 ```
 
 **How it works:** EA measures the text dimensions at the current fontSize/fontFamily, creates the container at `(x - padding, y - padding)` with size `(textWidth + 2*padding, textHeight + 2*padding)`, creates the text with `containerId` pointing to the container, and adds `{type: "text", id: textId}` to the container's `boundElements`.
+
+**Diamond text limit:** Diamonds have ~50% less usable area than rectangles of the same bounding box (corners are cut off). Limit diamond text to 1-2 short words (≤12 characters total). For longer labels like "Message Queue", use a rectangle instead — diamonds are for decision/condition semantics, not general labeling.
 
 ### Connected Arrows (auto-bound)
 
@@ -133,7 +135,7 @@ Set these on `ea.style` BEFORE each element creation:
 
 ---
 
-## Raw JSON Templates (Phase 3: Fix)
+## Raw JSON Templates (Phase 2: Fix)
 
 Use these when editing `.excalidraw` JSON directly during the validate loop. Replace placeholder colors with values from `color-palette.md`.
 
@@ -376,7 +378,7 @@ When editing JSON directly, estimate text width to prevent clipping:
 minimum_width ≈ character_count × fontSize × 0.6
 ```
 
-EA handles this automatically — only needed when creating elements by hand in Phase 3.
+EA handles this automatically — only needed when creating elements by hand in Phase 2.
 
 ## Binding Checklist (for manual JSON only)
 
