@@ -9,160 +9,109 @@ Diagrams should ARGUE, not DISPLAY. A diagram is a visual argument — structure
 
 ## Pipeline
 
-Every invocation follows three phases:
+Three phases, one diagram:
 
 ```
-BUILD (EA API → .excalidraw) → VALIDATE (Playwright render → fix loop) → SAVE (vault)
+DESIGN → BUILD → VALIDATE → SAVE
 ```
 
-1. **Build** — Create elements programmatically using ExcalidrawAutomate, then export as portable `.excalidraw` JSON. EA handles text sizing, container binding, and arrow routing automatically.
-2. **Validate** — Render to PNG with Playwright, run overlap checker, visually inspect, fix JSON directly. Mandatory — up to 3 iterations.
-3. **Save** — Convert to `.excalidraw.md` format and write to vault.
+You own the full workflow. For complex diagrams, delegate mechanical phases (Build, Validate, Save) to subagents that read from `agents/` — this keeps your context clean. For simple diagrams or when subagents aren't available, execute each phase yourself. The instructions below are self-contained either way.
 
 ## Design Process (Before Building)
 
 ### Step 0: Assess Depth
 
-Determine what level of detail this diagram needs:
-
-**Simple/Conceptual** — Abstract shapes for mental models. This is the default. The main pipeline handles it entirely.
-
-**Comprehensive/Technical** — Concrete examples for real systems. Read `references/depth-enhancements.md` for additional steps: Research Mandate, Multi-Zoom Architecture, Evidence Artifacts. These enhance the main pipeline — they don't replace it.
+**Simple/Conceptual** (default) — Abstract shapes for mental models.
+**Comprehensive/Technical** — Read `references/depth-enhancements.md` for additional steps: Research Mandate, Multi-Zoom Architecture, Evidence Artifacts.
 
 ### Step 1: Understand Deeply
 
-For each concept ask: What does it DO? What relationships exist? What's the core transformation? What would someone need to SEE to understand this?
+For each concept: What does it DO? What relationships exist? What's the core transformation? What would someone need to SEE to understand this?
 
 ### Step 2: Map Concepts to Visual Patterns
 
 | Pattern | Use Case | Structure |
 |---------|----------|-----------|
-| **Fan-Out** | One-to-many (sources, hubs) | Central element + radiating arrows |
-| **Convergence** | Many-to-one (aggregation) | Multiple inputs merging |
-| **Tree** | Hierarchy (org charts, taxonomies) | Lines + free-floating text (no boxes) |
-| **Timeline** | Sequences of steps | Line + small dots + labels |
-| **Spiral/Cycle** | Feedback loops, iteration | Elements with arrow returning to start |
-| **Cloud** | Abstract state (context, memory) | Overlapping ellipses, varied sizes |
-| **Assembly Line** | Transformation (before → after) | Input → Process → Output |
-| **Side-by-Side** | Comparison, trade-offs | Two parallel structures |
+| **Fan-Out** | One-to-many | Central element + radiating arrows |
+| **Convergence** | Many-to-one | Multiple inputs merging |
+| **Tree** | Hierarchy | Lines + free-floating text (no boxes) |
+| **Timeline** | Sequences | Line + small dots + labels |
+| **Spiral/Cycle** | Feedback loops | Elements with arrow returning to start |
+| **Cloud** | Abstract state (memory, context) | Overlapping ellipses, varied sizes |
+| **Assembly Line** | Transformation | Input → Process → Output |
+| **Side-by-Side** | Comparison | Two parallel structures |
 | **Gap/Break** | Phase boundaries | Visual whitespace or barrier |
 
-Each major concept uses a different pattern. No uniform card grids — that's a list, not a diagram.
+Each major concept uses a different pattern. If two adjacent sections look the same, redesign one. Visual monotony kills comprehension.
 
-Read `references/visual-patterns.md` for detailed layout guidance, ASCII sketches, and shape meaning tables.
+Read `references/visual-patterns.md` for ASCII sketches, shape meaning tables, and when NOT to use each pattern.
 
-### Step 3: Ensure Variety
+### Step 3: Plan the Layout
 
-If two adjacent sections look the same (both rectangular grids, both simple chains), redesign one. Visual monotony kills comprehension.
+**Zone ordering = logic ordering.** If the logical flow is A→B→C, zones must stack top to bottom in that order. When zone order matches logic, most arrows naturally flow downward.
 
-### Step 4: Plan the Layout
+**Clear sight lines.** For every planned arrow, check: is another element blocking the path? Fix element positioning, not arrow routing.
 
-The layout determines whether a diagram is readable BEFORE you draw a single arrow. A bad layout cannot be saved by clever arrow routing.
+**Size hierarchy communicates importance:**
+- Hero: 300×150 — visual anchor, most important concept
+- Primary: 180×90 — major components
+- Secondary: 120×60 — supporting elements
+- Small: 60×40 — markers, minor nodes
 
-**Zone ordering = logic ordering.** If the logical flow is A→B→C, zones must be stacked A (top) → B (middle) → C (bottom). When zone order matches logic, most arrows naturally flow downward — short, direct, crossing nothing. When zone order doesn't match logic, arrows are forced to cross zones and spaghetti is inevitable.
+**Whitespace = importance.** The hero element gets 200px+ of empty space around it.
 
-**Clear sight lines.** For every pair of elements you plan to connect with an arrow, check: is there another element sitting directly between them? If yes, the problem is element POSITIONING, not arrow routing. Move the blocking element out of the path.
+**Container discipline:** Less than 30% of text in containers. Default to free-floating text. Container test: "Would this work without the box?" If yes, remove it.
 
-**Back-edges are rare and edge-routed.** Arrows that go AGAINST the primary flow (retry loops, error paths, feedback) should be ≤2 per diagram. Route them along the diagram edge (far left or far right) with a distinct visual style (dashed, different color). If you need more than 2 back-edges, your zone ordering probably doesn't match the primary flow — redesign the layout.
+For diagrams with 20+ elements or evidence artifacts, use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation (flow left, evidence right) that prevents the most common overlap defects.
 
-**Verify before building:** Mentally trace every arrow. Can you follow each one from source to target without crossing an unrelated element? If not, reposition elements until you can. Only then start writing EA code.
+### Step 4: Detect Theme
 
-## Layout Rules
-
-### Size Hierarchy
-
-Use size to communicate importance — the viewer's eye goes to the largest element first:
-
-- **Hero**: 300×150 — visual anchor, most important concept
-- **Primary**: 180×90 — major components
-- **Secondary**: 120×60 — supporting elements
-- **Small**: 60×40 — markers, minor nodes
-
-### Whitespace = Importance
-
-The most important element gets 200px+ of empty space around it. Crowded elements feel equally weighted.
-
-### Container Discipline
-
-Less than 30% of text elements should be inside containers. Default to free-floating text — add containers only when the shape itself carries meaning (a process box, a decision diamond, a start/end ellipse).
-
-**Container test:** For each boxed element, ask "Would this work as free-floating text?" If yes, remove the container.
-
-## Colors
-
-All colors come from `references/color-palette.md`. Two hue families — ice blue (flow) and teal (action). Decision uses pale yellow as the sole warm breakpoint.
-
-### Dark Mode Detection
-
-Read the user's Obsidian theme before generating:
-
-```
+```bash
 obsidian eval code="document.body.classList.contains('theme-dark') ? 'dark' : 'light'"
 ```
 
-- Dark mode: set `viewBackgroundColor` to `#1e1e1e`, use dark mode palette
-- Light mode: set `viewBackgroundColor` to `#ffffff`, use light mode palette
+All colors come from `references/color-palette.md`. Two hue families: ice blue (flow) and teal (action). Decision uses pale yellow as the sole warm breakpoint. Do not invent new colors.
 
-**Rule:** Do not invent new colors. If a concept doesn't fit an existing semantic category, use Primary.
+### Step 5: Isomorphism Test
+
+Before building: if you removed all text, would the structure alone communicate the concept? A fan-out visually says "one source, many outputs" without labels. If your diagram is just labeled boxes connected by arrows, the structure communicates nothing — redesign.
 
 ## Phase 1: Build with ExcalidrawAutomate
 
-Use the EA API via `obsidian eval` to create elements programmatically. EA handles the two hardest problems automatically: text measurement (sizing containers to fit text) and bidirectional arrow binding (arrows that snap to shape edges). The build script ends by exporting all elements as a `.excalidraw` JSON file for validation.
+Create elements using the EA API via `obsidian eval`. EA handles text sizing and arrow binding automatically. The build ends by exporting all elements as a `.excalidraw` JSON file.
 
-**Before writing any EA code**, plan your layout:
-
-1. Read Part 1 of `references/layout-heuristics.md` — grid-based coordinate planning, zone spacing templates
-2. **For diagrams with 20+ elements or evidence artifacts**: use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation (flow left, evidence right) that prevents the most common overlap defects. Write a spec JSON, run the planner, use its output coordinates in your EA build script.
-3. **Verify zone ordering matches Step 4** — if your layout forces arrows to cross through zones they're not connecting, the zone order is wrong. Fix the layout, don't route around it.
-
-Read `references/element-templates.md` for the complete EA API reference with examples.
+Before writing EA code, read `references/layout-heuristics.md` Part 1 for grid-based coordinate planning. For 20+ elements, run `references/plan_layout.py` to compute coordinates.
 
 ### Core Pattern
 
-**`ea.reset()` is mandatory at the start of every EA invocation.** Without it, EA accumulates elements from previous calls — new elements are appended on top of old ones, producing invisible duplicate layers that look like a single diagram in JSON but render as overlapping copies. This is the most common cause of "ghosting" artifacts.
+**`ea.reset()` is mandatory** at the start of every EA invocation — without it, elements accumulate from previous calls.
 
 ```javascript
 (async () => {
   const ea = window.ExcalidrawAutomate;
-  ea.reset();              // ALWAYS first — clears element buffer from previous invocations
+  ea.reset();
   const s = ea.style;
-  s.roughness = 0;          // clean modern aesthetic
-  s.opacity = 100;
-  s.fillStyle = 'solid';
-  s.fontFamily = 3;         // monospace
-  s.roundness = {type: 3};  // rounded corners
+  s.roughness = 0; s.opacity = 100; s.fillStyle = 'solid';
+  s.fontFamily = 3; s.roundness = {type: 3};
 
-  // --- Shapes: addText with box option ---
-  // Returns the BOX id (not text id) — use this for arrow binding
-  s.strokeColor = '#e2e8f0';           // text color
-  s.backgroundColor = '#1e40af';       // box fill
-  s.fontSize = 16;
+  // --- Style BEFORE each element ---
+  s.strokeColor = '#e2e8f0'; s.backgroundColor = '#1e40af'; s.fontSize = 16;
   const boxA = ea.addText(200, 50, 'Lead Session', {
-    box: 'rectangle',
-    boxPadding: 20,
-    boxStrokeColor: '#60a5fa'          // box stroke (separate from text)
+    box: 'rectangle', boxPadding: 20, boxStrokeColor: '#60a5fa'
   });
 
-  // --- Arrows: connectObjects for bound arrows ---
-  s.strokeColor = '#475569';           // arrow color
-  ea.connectObjects(boxA, 'bottom', boxB, 'top', {
-    endArrowHead: 'arrow'
-  });
+  // --- Arrows ---
+  s.strokeColor = '#475569';
+  ea.connectObjects(boxA, 'bottom', boxB, 'top', { endArrowHead: 'arrow' });
 
-  // --- Structural: lines and free-floating text ---
-  s.strokeColor = '#64748b';
-  s.strokeStyle = 'dashed';
-  ea.addLine([[30, 200], [800, 200]]); // separator
-
-  s.strokeColor = '#93c5fd';
-  s.fontSize = 20;
-  ea.addText(40, 210, 'SECTION TITLE'); // free-floating, no box
+  // --- Free text + structural lines ---
+  s.strokeColor = '#93c5fd'; s.fontSize = 20;
+  ea.addText(40, 210, 'SECTION TITLE');
 
   // --- Export ---
   const els = ea.getElements();
   const json = {
-    type: 'excalidraw', version: 2,
-    source: 'https://excalidraw.com',
+    type: 'excalidraw', version: 2, source: 'https://excalidraw.com',
     elements: els,
     appState: { viewBackgroundColor: '#1e1e1e', gridSize: 20 },
     files: {}
@@ -172,114 +121,81 @@ Read `references/element-templates.md` for the complete EA API reference with ex
 })()
 ```
 
-### Key API Methods
+Key rules:
+- **Style before element** — `ea.style.*` applies to the NEXT element created
+- **`addText` with box returns the BOX id** — use this for `connectObjects`, not the text id
+- **Stagger anchors** when multiple arrows leave one shape (left/bottom/right, not all bottom)
+- **Diamond text ≤12 chars** — diamonds have ~50% less usable area; use rectangles for longer labels
+- **viewBackgroundColor** — `#1e1e1e` (dark) or `#ffffff` (light) per Step 4
 
-| Method | Returns | Use |
-|--------|---------|-----|
-| `ea.addText(x, y, text, {box: "rectangle"})` | box ID | Text-in-shape with auto sizing. Also supports `"diamond"`, `"ellipse"` |
-| `ea.connectObjects(idA, anchorA, idB, anchorB, opts)` | arrow ID | Bound arrow between shapes. Anchors: `"top"`, `"bottom"`, `"left"`, `"right"`, or `null` (auto) |
-| `ea.addText(x, y, text)` | text ID | Free-floating label (no container) |
-| `ea.addLine([[x1,y1], [x2,y2]])` | line ID | Structural lines (separators, timelines) |
-| `ea.addEllipse(x, y, w, h)` | ellipse ID | Marker dots, start/end nodes |
-| `ea.getElements()` | element[] | Extract all elements as clean JSON objects |
+Read `references/element-templates.md` for the full EA API reference, raw JSON templates for Phase 2 fixes, and the binding checklist.
 
-### Style Control
-
-Set `ea.style.*` properties BEFORE each `addX()` call. Key properties:
-
-- `strokeColor` — for text: text color; for shapes: not used (use `boxStrokeColor` instead)
-- `backgroundColor` — box fill color
-- `fontSize`, `fontFamily` — text properties
-- `strokeWidth`, `strokeStyle` — line/arrow properties (`"solid"`, `"dashed"`)
-- `roughness` — `0` (clean) or `1` (hand-drawn)
-
-### Shortcut: Mermaid (simple flowcharts)
-
-For flowcharts under 10 elements, use `ea.addMermaid()` via `obsidian eval`. Only flowcharts produce native editable elements — other Mermaid types fall back to SVG images.
+**Mermaid shortcut:** For simple flowcharts under 10 elements, use `ea.addMermaid()` instead. Only flowchart type produces native editable elements — other Mermaid types fall back to SVG images.
 
 ## Phase 2: Validate (Mandatory)
 
-You cannot judge a diagram from JSON alone. After generating, you MUST render to PNG, view it, and fix issues.
+You cannot judge a diagram from JSON alone. After building, render to PNG, check for overlaps, and fix. Up to 3 iterations — then save and report remaining issues.
 
-### Render with Playwright
-
-```bash
-cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-  uv run python render_excalidraw.py /tmp/diagram.excalidraw --output /tmp/diagram.png --scale 2
+```
+ITERATION (repeat up to 3×):
+  1. CHECK  — cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+                uv run python check_overlaps.py /tmp/diagram.excalidraw
+  2. RENDER — cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+                uv run python render_excalidraw.py /tmp/diagram.excalidraw \
+                --output /tmp/diagram.png --scale 2
+              Then view /tmp/diagram.png — non-negotiable every iteration.
+  3. JUDGE  — Design intent: correct patterns? Hero dominant?
+              Defects: overlaps, crossings, uneven spacing, text too small?
+  4. FIX    — Edit .excalidraw JSON directly (Read → find element → Edit x/y).
+              Moving shapes does NOT break arrow binding.
+              Never change element IDs — this orphans connected arrows.
+              → Next iteration, or proceed to Save if clean.
 ```
 
-This produces a **diagram-only PNG** — no UI chrome, no toolbar, no sidebar. Just the diagram. Then use the Read tool to view `/tmp/diagram.png`.
+Read `references/layout-heuristics.md` Part 2 for fix strategies: arrow waypoints, spacing rules, anchor distribution.
 
-**First-time setup** (if renderer hasn't been configured):
+**First-time setup** (if renderer fails with missing deps):
 ```bash
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
   uv sync && uv run playwright install chromium
 ```
 
-**Never use `obsidian dev:screenshot` for validation.** It captures the entire Obsidian window — sidebar, toolbar, tabs — making it impossible to properly assess diagram layout. The Playwright renderer is the only acceptable validation method.
-
-### The Fix Loop
-
-Each iteration is a complete cycle. Every cycle ends with a render — the overlap checker alone is not sufficient because it cannot judge composition, readability, or visual hierarchy. Max 3 iterations, then proceed to save and report remaining issues.
-
-```
-ITERATION (repeat up to 3×):
-  1. CHECK  — Run overlap checker:
-             cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-               uv run python check_overlaps.py /tmp/diagram.excalidraw
-  2. RENDER — Render to PNG, view with Read tool (non-negotiable every iteration):
-             cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-               uv run python render_excalidraw.py /tmp/diagram.excalidraw --output /tmp/diagram.png --scale 2
-             Then: Read /tmp/diagram.png
-  3. JUDGE  — Evaluate the rendered image:
-             Design intent: Does structure match conceptual plan? Correct patterns? Hero dominant?
-             Defects: Overlaps, crossings, uneven spacing, text too small?
-  4. FIX    — If issues found:
-             Edit .excalidraw JSON directly (Read → find element → Edit x/y)
-             Read references/layout-heuristics.md for fix strategies
-             → Go to step 1 of next iteration
-         — If clean:
-             → Proceed to Phase 3 (Save)
-```
-
-**Fix strategy:** Edit the `.excalidraw` JSON directly for positional fixes (move, resize, spacing). Moving a shape does NOT break arrow binding — Excalidraw recalculates arrow routes from the binding data. The only dangerous edit is changing an element's `id`, which would orphan connected arrows.
-
-Read `references/layout-heuristics.md` for specific fix techniques: arrow waypoints for crossings, spacing rules for overlaps, anchor distribution for congestion.
-
-**When to JSON-edit vs EA-rebuild:**
-- **JSON edit** (Phase 2 fix loop) — Positional fixes: move, resize, spacing. Faster, preserves arrow bindings.
-- **EA rebuild** (back to Phase 1) — Structural changes: adding/removing elements, changing connections. Always start with `ea.reset()` — EA appends by default, so rebuilding without reset produces duplicate layers.
+**When to rebuild vs. JSON-edit:** Positional fixes (move, resize, spacing) → edit JSON. Structural changes (add/remove elements, change connections) → rebuild from Phase 1 with `ea.reset()`.
 
 ## Phase 3: Save to Vault
 
-Convert the validated `.excalidraw` JSON to Obsidian's `.excalidraw.md` format and write to the vault.
+Load validated elements into EA and save using `ea.create()`, which handles `.excalidraw.md` format correctly — compressed JSON, text indexing, frontmatter. Never manually construct this format.
 
-### Conversion
+```javascript
+(async () => {
+  const ea = window.ExcalidrawAutomate;
+  ea.reset();
+  const json = JSON.parse(require('fs').readFileSync('/tmp/diagram.excalidraw', 'utf8'));
+  json.elements.forEach(el => { ea.elementsDict[el.id] = el; });
+  ea.setView('new');
+  await ea.create({
+    filename: '<name>', foldername: '<folder>',
+    onNewPane: false, silent: true
+  });
+  return 'Saved to vault';
+})()
+```
 
-The `.excalidraw.md` format wraps the JSON with frontmatter and a text index for Obsidian search:
-
-1. Parse the `.excalidraw` JSON
-2. Extract text elements → `"text content ^elementId"` lines (for search indexing)
-3. Build the markdown wrapper:
-   - Frontmatter: `excalidraw-plugin: parsed`, `tags: [excalidraw]`
-   - `## Text Elements` section with extracted text
-   - `## Drawing` section with the full JSON in a ` ```json ``` ` code block inside `%% %%` markers
-4. Write to vault via filesystem or `obsidian-cli`
+`ea.elementsDict` is a documented public property used in official Excalidraw scripts. Injecting elements then calling `ea.create()` produces the correct vault format without manual construction.
 
 ### Post-Save Verification
 
-After writing to vault, verify the saved file renders correctly. The `.excalidraw.md` format has complex internal structure (element ID mapping, text indexing, JSON encoding) — silent corruption during conversion is common. Re-render the saved file and compare with the pre-save validated PNG:
+Re-render the saved file to confirm the save didn't corrupt anything:
 
 ```bash
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-  uv run python render_excalidraw.py <vault-path>/diagram.excalidraw --output /tmp/diagram-post-save.png --scale 2
+  uv run python render_excalidraw.py <vault-path>/diagram.excalidraw \
+  --output /tmp/diagram-post-save.png --scale 2
 ```
 
-Then Read `/tmp/diagram-post-save.png` and confirm it matches the validated version. If it doesn't, the save conversion introduced corruption — fix the `.excalidraw.md` file.
+View `/tmp/diagram-post-save.png`. If it doesn't match the validated version, the save introduced corruption — fix the `.excalidraw.md` file.
 
 ### Embed in Wiki Notes
-
-After verification, embed in relevant wiki notes:
 
 ```markdown
 ![[diagram-name]]
@@ -287,31 +203,35 @@ After verification, embed in relevant wiki notes:
 
 Place outside bilingual callouts (diagrams are language-neutral).
 
-## Delegation
+## Delegation (Optional)
 
-This skill delegates format details to reference files — read them when needed:
+For complex diagrams, spawn a subagent for each mechanical phase to keep context clean. For simple diagrams or when subagents aren't available, follow the phases above directly — they are self-contained.
 
-- **Color palette** → `references/color-palette.md` (semantic colors for light + dark mode)
-- **Visual patterns** → `references/visual-patterns.md` (9 patterns with layout guidance)
-- **Element templates + EA API** → `references/element-templates.md` (JSON templates + EA usage)
-- **Layout heuristics** → `references/layout-heuristics.md` (fix strategies for overlaps, crossings, spacing)
-- **Depth enhancements** → `references/depth-enhancements.md` (Research, Multi-Zoom, Evidence — comprehensive diagrams only)
+When delegating, pass the agent file and relevant context. Each subagent reads its instructions and the reference files it needs:
 
-For vault operations, delegate to:
-- File creation/search → `obsidian:obsidian-cli`
-- Markdown formatting → `obsidian:obsidian-markdown`
+- **Build** — pass the design spec (theme, zones, elements, connections, patterns) and tell the subagent to read `agents/diagram-builder.md`. Output: `/tmp/diagram.excalidraw` + element count.
+- **Validate** — pass the diagram path and a 1-2 sentence design intent summary. Tell the subagent to read `agents/diagram-validator.md`. Output: validated `.excalidraw` + PNG at `/tmp/diagram.png` + issues report.
+- **Save** — pass the diagram path, filename, folder, and embed target. Tell the subagent to read `agents/diagram-saver.md`. Output: vault path of saved file.
 
-## Isomorphism Test
+**Quality gate:** After validation returns, view the PNG yourself before proceeding to Save. If it doesn't match your design intent, revise the spec and re-run Build, or give specific fix instructions to a new Validate pass.
 
-Before finalizing any diagram, apply this test: **If you removed all text, would the structure alone communicate the concept?**
+### Reference Files
 
-A fan-out visually says "one source, many outputs" without labels. A timeline visually says "sequence" without labels. If your diagram is just labeled boxes connected by arrows, the structure communicates nothing — redesign it.
+Read on demand — don't load all at once:
+- `references/color-palette.md` — Semantic colors for light + dark mode
+- `references/visual-patterns.md` — 9 patterns with layout guidance
+- `references/element-templates.md` — Full EA API reference + raw JSON templates
+- `references/layout-heuristics.md` — Grid planning (Part 1) + fix strategies (Part 2)
+- `references/depth-enhancements.md` — Research, Multi-Zoom, Evidence (comprehensive only)
+- `references/plan_layout.py` — Automatic coordinate computation for 20+ elements
+
+For vault operations: `obsidian:obsidian-cli` for file creation/search, `obsidian:obsidian-markdown` for formatting.
 
 ## Completion Format
 
 ```
 ✅ Created diagram → [vault-path/filename.excalidraw]
-   Pattern: [which visual patterns used]
+   Pattern: [visual patterns used]
    Elements: [count]
    Validated: [iterations completed]
 ```
@@ -320,6 +240,6 @@ A fan-out visually says "one source, many outputs" without labels. A timeline vi
 
 ```
 ⚠️ Diagramming blocked
-Issue: [what went wrong — e.g., renderer not set up, concept too ambiguous]
+Issue: [what went wrong]
 To resolve: [specific action needed]
 ```
