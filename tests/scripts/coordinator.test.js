@@ -2,7 +2,10 @@ const { DAG, TaskStatus } = require('../../scripts/lib/models');
 
 // We test Coordinator's pure scheduling logic by injecting a DAG directly,
 // bypassing file I/O. For methods that call _saveDag (which uses withLock + fs),
-// we mock _saveDag to be a no-op.
+// we mock _saveDag to be a no-op. For methods that use _dagTransaction, we
+// replace the transaction with a pass-through — the injected _dag stays the
+// source of truth (no re-read, no re-save), matching the test's intent of
+// exercising pure in-memory scheduling logic.
 
 // Helper: create a Coordinator with an injected DAG (no file I/O needed)
 function createCoordinator(dagData) {
@@ -11,6 +14,11 @@ function createCoordinator(dagData) {
   const coord = new Coordinator('/tmp/fake-project');
   coord._dag = new DAG(dagData);
   coord._saveDag = jest.fn(); // no-op mock — avoids file system + locking
+  // Pass-through: run fn against the already-injected _dag. Skips the
+  // lock-acquire + _loadDag re-read that the real transaction performs,
+  // because those would hit the filesystem. Tests that need real
+  // transaction semantics use tempdir-based setups instead of this helper.
+  coord._dagTransaction = jest.fn((fn) => fn());
   return coord;
 }
 
@@ -301,6 +309,80 @@ describe('Coordinator', () => {
       expect(context.remaining_count).toBeDefined();
       expect(context.completed_count).toBeDefined();
       expect(context.blocked_count).toBeDefined();
+    });
+  });
+
+  describe('sync status validation', () => {
+    function setupSyncMock(coord, localStatus) {
+      coord._resolveWorktreePath = jest.fn(() => '/tmp/fake-worktree');
+      const origExistsSync = require('node:fs').existsSync;
+      jest.spyOn(require('node:fs'), 'existsSync').mockImplementation((p) => {
+        if (p === '/tmp/fake-worktree/.arcforge-epic') return true;
+        return origExistsSync(p);
+      });
+      coord._readAgenticEpic = jest.fn(() => ({
+        epic: 'epic-1',
+        local: { status: localStatus },
+      }));
+    }
+
+    afterEach(() => {
+      require('node:fs').existsSync.mockRestore?.();
+    });
+
+    it('should normalize "done" to "completed" in _syncBase path', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Worktree: 'epic-1',
+        }),
+      );
+      setupSyncMock(coord, 'done');
+
+      const result = coord._syncBase();
+      const epic = coord.dag.getEpic('epic-1');
+      expect(epic.status).toBe(TaskStatus.COMPLETED);
+      expect(result.updates[0].new_status).toBe(TaskStatus.COMPLETED);
+    });
+
+    it('should reject invalid status in _syncBase path', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Worktree: 'epic-1',
+        }),
+      );
+      setupSyncMock(coord, 'banana');
+
+      expect(() => coord._syncBase()).toThrow(/Invalid status/);
+    });
+  });
+
+  describe('expandWorktrees single-epic preconditions', () => {
+    it('throws when the named epic is not in the DAG', () => {
+      const coord = createCoordinator(twoEpicDag());
+      expect(() => coord.expandWorktrees({ epicId: 'nope' })).toThrow(/not found/i);
+    });
+
+    it('throws when the named epic has unmet dependencies', () => {
+      const coord = createCoordinator(twoEpicDag());
+      // epic-2 depends on epic-1 (still pending)
+      expect(() => coord.expandWorktrees({ epicId: 'epic-2' })).toThrow(/waiting on epic-1/);
+    });
+
+    it('throws when the named epic is already in progress', () => {
+      const coord = createCoordinator(twoEpicDag({ epic1Status: TaskStatus.IN_PROGRESS }));
+      expect(() => coord.expandWorktrees({ epicId: 'epic-1' })).toThrow(/status is in_progress/);
+    });
+
+    it('returns empty array when a batch run has no ready epics', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic2Status: TaskStatus.BLOCKED,
+        }),
+      );
+      expect(coord.expandWorktrees()).toEqual([]);
     });
   });
 });

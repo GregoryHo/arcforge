@@ -1,6 +1,6 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
@@ -157,6 +157,7 @@ These are the most frequently used commands:
 - **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
+- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via Claude Code agent teammates
 - **arc-looping** - Autonomous cross-session loop execution
 
 ### Session & Learning Layer
@@ -168,6 +169,11 @@ These are the most frequently used commands:
 - **arc-recalling** - Manual instinct creation from session insights
 - **arc-managing-sessions** - Session save/resume with alias support
 - **arc-researching** - Autonomous hypothesis-driven experimentation
+
+### Knowledge Base Layer
+
+- **arc-maintaining-obsidian** - Unified Obsidian vault lifecycle: ingest, query, audit (Karpathy LLM Wiki pattern)
+- **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
 
 ### Review Layer
 
@@ -260,7 +266,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ## Documentation
 
-**[Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge)** — 83 interconnected wiki notes covering architecture, skills, agents, eval, and design history. Start with the [Master Map](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge).
+**[Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge)** — an interconnected wiki knowledge base covering architecture, skills, agents, eval, and design history. Start with the [Master Map](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge).
 
 | Topic | Link |
 |-------|------|

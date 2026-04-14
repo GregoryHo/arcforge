@@ -1,6 +1,6 @@
 # Documentation
 
-arcforge's primary documentation lives in the [Obsidian Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge) — 83 interconnected wiki notes covering all skills, rules, agents, templates, and design history.
+arcforge's primary documentation lives in the [Obsidian Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge) — an interconnected wiki knowledge base covering all skills, rules, agents, templates, and design history.
 
 ## Quick Links
 
@@ -25,6 +25,12 @@ Three eval scopes (Skill, Agent, Workflow) feed into an A/B mechanism with valid
 ![arc-maintaining-obsidian flow](../assets/arc-maintaining-obsidian-flow.png)
 
 Three modes (Ingest, Query, Audit) with PROPAGATE as the key differentiator. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Maintaining-Obsidian)
+
+### Teammate Dispatch — Lead-Present Multi-Epic Parallelism
+
+![arc-dispatching-teammates flow](../assets/arc-dispatching-teammates-flow.png)
+
+Three numbered stages (Dispatch, Accept, Deliver) with AND-gated acceptance — both spec-reviewer and verifier must PASS from fresh context before merge to the dev branch. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Dispatching-Teammates)
 
 ## Local Docs
 

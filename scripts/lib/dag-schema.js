@@ -20,6 +20,32 @@ const TaskStatus = {
 };
 
 /**
+ * Aliases that agents commonly write instead of the canonical TaskStatus values.
+ * Maps each alias to its canonical TaskStatus value.
+ */
+const STATUS_ALIASES = {
+  done: TaskStatus.COMPLETED,
+  finished: TaskStatus.COMPLETED,
+  complete: TaskStatus.COMPLETED,
+};
+
+/**
+ * Normalize a status string to a valid TaskStatus value.
+ * Passes through canonical values unchanged, maps known aliases,
+ * and throws on unknown values.
+ * @param {string} raw - Status string (possibly agent-written)
+ * @returns {string} Canonical TaskStatus value
+ */
+const VALID_STATUSES = new Set(Object.values(TaskStatus));
+
+function normalizeStatus(raw) {
+  if (VALID_STATUSES.has(raw)) return raw;
+  const normalized = STATUS_ALIASES[raw];
+  if (normalized) return normalized;
+  throw new Error(`Invalid status "${raw}". Must be one of: ${[...VALID_STATUSES].join(', ')}`);
+}
+
+/**
  * Schema definition with field descriptions
  * Machine-readable format for documentation
  */
@@ -41,7 +67,9 @@ const schema = {
       worktree: {
         type: 'string|null',
         required: false,
-        description: 'Path to git worktree (relative to project root)',
+        description:
+          'Epic identifier marking that a worktree exists. The absolute path is ' +
+          'derived at runtime via scripts/lib/worktree-paths.js (never committed).',
       },
       depends_on: {
         type: 'array',
@@ -118,7 +146,7 @@ const example = {
       name: 'User Authentication System',
       status: 'in_progress',
       spec_path: 'docs/specs/epic-001-auth.md',
-      worktree: '.worktrees/epic-001',
+      worktree: 'epic-001',
       depends_on: [],
       features: [
         {
@@ -191,7 +219,9 @@ function schemaToYaml() {
     `    status: ${Object.values(TaskStatus).join('|')}  # Current status (default: pending)`,
   );
   lines.push('    spec_path: string  # Path to spec document (required)');
-  lines.push('    worktree: string|null  # Git worktree path (optional)');
+  lines.push(
+    '    worktree: string|null  # Epic id when a worktree exists (path derived at runtime)',
+  );
   lines.push('    depends_on: [string]  # Epic IDs this depends on (default: [])');
   lines.push('    features:  # List of features (optional)');
   lines.push('      - id: string  # Unique identifier (required)');
@@ -467,6 +497,7 @@ function validate(dag) {
 
 module.exports = {
   TaskStatus,
+  normalizeStatus,
   schema,
   example,
   schemaToYaml,

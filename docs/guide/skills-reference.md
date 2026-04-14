@@ -4,13 +4,16 @@
 
 arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
 
-**Start here — the 5 skills every user should learn first:**
+> **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
+
+**Start here — the core skills every user should learn first:**
 
 1. **arc-using** — Entry point for all tasks (routing discipline)
 2. **arc-writing-tasks** — Break features into executable tasks
 3. **arc-executing-tasks** — Run task lists with human checkpoints
 4. **arc-debugging** — Systematic root cause investigation
 5. **arc-journaling** — Capture session reflections
+6. **arc-maintaining-obsidian** — Ingest, query, and audit an Obsidian vault (if you keep a knowledge base)
 
 **What are you trying to do?**
 
@@ -35,15 +38,16 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 29 skills are organized into 6 categories:
+arcforge's 32 skills are organized into 7 categories:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
-| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-looping | Build and ship |
+| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping | Build and ship |
 | **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
+| **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
 | **Meta** | arc-writing-skills | Create and maintain skills |
 
 **How skills flow through a project:**
@@ -251,7 +255,36 @@ arcforge's 29 skills are organized into 6 categories:
 
 ---
 
+### arc-dispatching-teammates
+
+**Platform:** Claude Code only — requires the agent teammates feature (Claude Code 2.1.32+) and the Agent tool's `team_name`/`name` parameters. Other platforms have no equivalent multi-worker coordination substrate.
+
+**Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between `arc-coordinating` (single-epic interactive) and `arc-looping` (multi-epic unattended).
+
+**When to use:** When `dag.yaml` has 2+ epics in a ready state AND the user is staying at the keyboard to monitor (not walking away). The discriminator against `arc-looping` is **attendance, not risk** — a risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still `arc-looping`.
+
+**Key workflow:**
+1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
+2. Cap team size at 5 — if more ready epics, queue the rest for continuous dispatch
+3. `TeamCreate` before any Agent dispatch (passing `team_name` to Agent does NOT auto-create)
+4. Per epic: `arcforge expand --epic <id>` → read canonical worktree path → spawn teammate with spawn prompt template (parallel dispatch, sequential retry on GH #40168 timing race)
+5. Monitor via SendMessage — dispatch queued epics into freed slots as teammates complete (continuous, not waves)
+6. **Acceptance check** per teammate completion: dispatch `arcforge:spec-reviewer` + `arcforge:verifier` subagents with fresh context. Both PASS = accept and shut down teammate; either FAIL = Step 7. Lead reads reports and decides — does NOT run checks inline
+7. **Retry loop** on rejection: up to 3 retries per epic with cumulative feedback. Fresh worktree from dev HEAD (fix-forward), dispatch retry teammate. Spec-defect overrides (spec references wrong file/path) skip retry via override-accept protocol
+8. **Wrap up** when all epics reach terminal state: emit Final Report with per-epic subagent evidence, cleanup accepted worktrees, shut down remaining teammates, `TeamDelete`
+
+**Artifacts:**
+- Input: `dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
+- Output: per-epic worktrees at `~/.arcforge-worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
+- Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
+
+**Related:** arc-planning → **arc-dispatching-teammates** → (per completion: spec-reviewer + verifier subagents); each teammate runs arc-implementing → arc-finishing-epic on its own
+
+---
+
 ### arc-looping
+
+**Platform:** Claude Code only — spawns fresh sessions via `claude -p` subprocess. Other platforms have no equivalent invocation mechanism (yet).
 
 **Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
 
@@ -300,20 +333,26 @@ arcforge's 29 skills are organized into 6 categories:
 
 ### arc-using-worktrees
 
-**Purpose:** Create isolated git worktrees for epic development with proper metadata tracking.
+**Purpose:** Thin wrapper around `arcforge expand --epic <id>` for creating
+an isolated worktree for a single epic. Delegates all path derivation,
+marker writing, and project setup to `scripts/lib/coordinator.js`.
 
 **When to use:** When creating isolated workspace for epic development.
 
 **Key workflow:**
-1. Verify `.worktrees/` directory exists and is in `.gitignore`
-2. Check if already in a worktree (if so, STOP)
-3. Create worktree: `git worktree add .worktrees/<epic-name> -b <epic-name>`
-4. Run project setup (auto-detect: npm install, pip install, etc.)
-5. Create `.arcforge-epic` metadata file (REQUIRED, not `.epic`)
-6. Run baseline tests to verify clean state
+1. Identify the epic id from `dag.yaml` or the user's request
+2. Invoke `node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <id> --project-setup`
+3. Read the absolute worktree path from the command's JSON output
+4. Report it verbatim to the user — do not reconstruct or hardcode
 
 **Artifacts:**
-- Output: `.worktrees/<epic-name>/` directory, `.arcforge-epic` marker file
+- Output: worktree at the canonical path
+  (`~/.arcforge-worktrees/<project>-<hash>-<epic>/`), `.arcforge-epic` marker
+  authored by the coordinator, `dag.yaml` epic status updated
+
+For the full derivation rules see
+[`docs/guide/worktree-workflow.md`](worktree-workflow.md) and the Worktree
+Rule in `skills/arc-using/SKILL.md`.
 
 **Related:** arc-planning --> **arc-using-worktrees** --> arc-implementing or arc-executing-tasks
 
@@ -403,6 +442,8 @@ arcforge's 29 skills are organized into 6 categories:
 
 ### arc-managing-sessions
 
+**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.claude/sessions/` directory layout.
+
 **Purpose:** User-controlled session saves for continuity across conversations — save what matters, resume when needed.
 
 **When to use:** When saving session state for cross-conversation handoff, resuming a previous session, listing session history, or managing session aliases.
@@ -490,6 +531,8 @@ arcforge's 29 skills are organized into 6 categories:
 ---
 
 ### arc-evaluating
+
+**Platform:** Claude Code only — eval harness invokes `claude` subprocess to execute scenario trials.
 
 **Purpose:** Measure whether skills, agents, and workflows actually change AI agent behavior — unit tests for AI agent behavior.
 
@@ -620,6 +663,8 @@ arcforge's 29 skills are organized into 6 categories:
 
 ### arc-observing
 
+**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.claude/observations/` which is populated by Claude Code PostToolUse hooks.
+
 **Purpose:** Manage automatically detected behavioral patterns (instincts) from tool usage observations.
 
 **When to use:** When user asks about behavioral patterns, requests instinct status, or wants to confirm/contradict a detected pattern.
@@ -679,6 +724,54 @@ arcforge's 29 skills are organized into 6 categories:
 - Output: `research-config.md` (locked contract), `results.tsv` (untracked), `research/{tag}` branch
 
 **Related:** arc-brainstorming --> **arc-researching** --> manual cherry-pick to main
+
+---
+
+### Knowledge Base Skills
+
+---
+
+### arc-maintaining-obsidian
+
+**Platform:** All platforms. Requires an Obsidian vault; `obsidian-cli` is preferred for vault operations but the skill falls back to direct file writes when the CLI is unavailable.
+
+**Purpose:** Unified Obsidian vault lifecycle skill — one agent, three modes (ingest, query, audit) — implementing Karpathy's LLM Wiki pattern for a persistent, compounding knowledge base. Eliminates wiki maintenance burden by handling classification, schema compliance, propagation, and gap analysis as a single shared-context operation.
+
+**When to use:** When creating, querying, or maintaining an Obsidian vault. Triggers on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about X"), auditing vault health (missing links, orphan notes, stale content), or ingesting raw files (Excalidraw, PDFs, screenshots, papers).
+
+**Key workflow:**
+- **Ingest** pipeline: `Classify → Confirm → Create → Visuals → Index → Propagate → Log` — 6 page types (Source, Entity, Synthesis, MOC, Decision, Log) + Paper variant for academic papers. Raw-first-then-wiki rule preserves re-extraction ability.
+- **Query** pipeline: `Orient → Search → Read → Synthesize → (File Back)` — vault-only answers (no general-knowledge backfill), inline citations, optional file-back as a new synthesis note.
+- **Audit** pipeline: `LINK → LINT → GROW` — resolve plain-text mentions into wikilinks, schema/orphan/stale checks with `index.md` rebuild, gap analysis with internal and external suggestions.
+
+**Artifacts:**
+- Input: URLs, files, text descriptions, natural-language queries
+- Output: typed wiki notes with bilingual `[!multi-lang-{code}]` callout format, audit reports under `audit-YYYY-MM-DD-<subcommand>.md`, rolling `index.md` and `log.md`
+
+**Related:** user input --> **arc-maintaining-obsidian** (three modes) --> vault state updated. Delegates Excalidraw creation to **arc-diagramming-obsidian** via the Visuals decision tree.
+
+---
+
+### arc-diagramming-obsidian
+
+**Platform:** All platforms. Requires an Obsidian vault with the Excalidraw community plugin installed.
+
+**Purpose:** Create Excalidraw diagrams directly in an Obsidian vault via structured JSON write with a render-validate loop, applying a cool minimal color palette for visual consistency.
+
+**When to use:** When the user wants an Excalidraw diagram, architecture visualization, flowchart, mind map, or any visual representation of concepts and relationships. Trigger on mentions of drawing, diagramming, visualizing, mapping, or illustrating — especially when `arc-maintaining-obsidian`'s Visuals decision tree routes here for complex spatial layouts.
+
+**Key workflow:**
+1. Identify target concept and relationships (nodes + edges)
+2. Draft Excalidraw JSON with positions, groups, and color palette
+3. Write the `.excalidraw.md` file into the vault's Excalidraw folder
+4. Render-validate loop: open in Obsidian, verify layout, iterate on positioning
+5. Return the vault path for embedding in a Source note
+
+**Artifacts:**
+- Input: concept description, existing vault note to visualize, or relationship graph
+- Output: `.excalidraw.md` file in the vault's Excalidraw folder, ready for embedding via `![[filename]]`
+
+**Related:** arc-maintaining-obsidian (Visuals step, Q4 spatial complexity) --> **arc-diagramming-obsidian** --> diagram embedded in the originating note
 
 ---
 

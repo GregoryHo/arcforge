@@ -71,10 +71,13 @@ Workflow:
 
 ## Merge From Worktree (Auto-Detect)
 
-If inside `.worktrees/<epic-id>` with `.arcforge-epic`:
+If the current directory is an arcforge-managed worktree (contains
+`.arcforge-epic`):
 
 1. **Infer epic id** from `.arcforge-epic`
-2. **Find base worktree** via `git worktree list --porcelain` (path without `.worktrees/`)
+2. **Find base worktree** via `git worktree list --porcelain` — the coordinator
+   automatically recognizes which entries are arcforge-managed worktrees and
+   picks the base for you
 3. **Infer base branch** from the base worktree `HEAD`
 4. **Merge** the epic into base, and mark epic completed in `dag.yaml`
 

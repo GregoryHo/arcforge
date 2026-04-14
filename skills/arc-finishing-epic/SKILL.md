@@ -103,6 +103,8 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" merge
 node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup
 ```
 
+**If the merge produces a conflict** (coordinator returns non-zero, or `git status` shows unmerged paths), STOP before resolving. Go to **Step 4.1: Merge Conflict Handling** below. Do NOT auto-resolve, hand-edit conflict markers, or retry blindly.
+
 Report completion format when done.
 
 #### Option 2: Push and Create PR
@@ -144,7 +146,7 @@ Report: "Keeping epic <name>. Worktree preserved."
 This will permanently delete:
 - Branch <epic-name>
 - All commits on the branch
-- Worktree at .worktrees/<epic-name>/
+- The epic's worktree (absolute path from `arcforge status --json`)
 
 Type 'discard' to confirm.
 ```
@@ -160,9 +162,41 @@ if [ -f dag.yaml ]; then
   node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 fi
 
-git worktree remove .worktrees/<epic-name>
+# Delegate worktree removal to the coordinator — it derives the canonical
+# path via scripts/lib/worktree-paths.js and handles force-remove of the
+# .arcforge-epic marker. Never call `git worktree remove` by hand.
+node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup <epic-name>
 git branch -D <epic-name>
 ```
+
+### Step 4.1: Merge Conflict Handling (Option 1 only)
+
+A merge conflict during epic finishing means another change has landed on the base branch since your epic started. In a multi-teammate dispatch (epics dispatched via `arc-dispatching-teammates`), the conflict typically comes from another teammate's already-merged epic touching a shared file.
+
+**First, always abort to a clean state.** Do not leave a half-merged worktree:
+
+```bash
+git merge --abort
+git status  # expect: clean working tree on epic branch
+```
+
+**Then decide based on context:**
+
+| Context | Resolution Path |
+|---|---|
+| **Solo epic** — you (or a human user) invoked this skill directly, no team-lead in the loop | Present the conflict to the user. Show the unmerged files, the conflicting hunks verbatim, and ask for resolution guidance. Wait for explicit direction before editing. |
+| **Multi-teammate dispatch** — you are a teammate spawned via `arc-dispatching-teammates`, a lead is present, conflict is on a file listed in your spawn prompt's Shared Files section | **SendMessage to `team-lead`** using the Merge Conflict (Multi-Teammate) blocked format below. Do NOT auto-resolve. The lead has the global view of which teammates landed in what order and is the correct arbiter. |
+| **Multi-teammate dispatch, conflict on a file NOT listed in your Shared Files section** | Same as above (SendMessage lead) — AND flag that the shared-file scan missed this file. The lead needs to update the other teammates' ownership if they're still running. |
+
+**Never:**
+- Auto-resolve conflicts by taking "ours" / "theirs" / a guessed union
+- Hand-edit conflict markers without explicit authorization (from user or lead)
+- Silently retry `finish-epic.js merge` hoping git produces a different result
+- Report completion until the conflict is resolved AND tests re-verified
+
+**Why escalation beats auto-resolve in the multi-teammate case:** teammates work in isolation and see only their own epic's spec. The conflicting hunks may come from a teammate who will still make more changes, or from a semantic disagreement the other teammate needs to know about. The lead is the only role that can verify the resolution is globally consistent.
+
+After the user or lead provides resolution guidance and you edit/commit, re-run the test suite (per arc-verifying's iron law: no completion without fresh evidence) and then return to Step 4.5 as if the merge had succeeded on the first try.
 
 ### Step 4.5: Sync After Choice
 
@@ -175,6 +209,21 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 
 **Purpose:** Ensure the base DAG reflects the epic's final status (completed or merged).
 
+### Step 4.6: Look Up the Worktree Path
+
+Before emitting the completion format, query the coordinator for the epic's
+absolute worktree path — don't reconstruct it from pattern knowledge, because
+the derivation rule can change and the cached value is authoritative:
+
+```bash
+node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
+```
+
+Extract the epic's `worktree` / `path` field from the JSON. Use that literal
+string in the "Worktree:" line of the completion format. If the epic has
+already been cleaned up (Option 1 or Option 4), the path may be null — in
+that case use the exact text `(removed)` instead of a path.
+
 ## Completion Format
 
 ### If Merged (Option 1)
@@ -183,7 +232,7 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 Epic merged → <base-branch>
 
 Branch: <epic-name> (deleted)
-Worktree: .worktrees/<epic-name>/ (removed)
+Worktree: <absolute path from arcforge status --json> (removed)
 Commits: [N commits merged]
 
 Next: Continue with next epic or check status
@@ -196,7 +245,7 @@ Pull request created → #<PR-number>
 
 URL: <PR-URL>
 Branch: <epic-name>
-Worktree: .worktrees/<epic-name>/ (kept for now)
+Worktree: <absolute path from arcforge status --json> (kept for now)
 
 Next: Review PR, then merge/close and clean up worktree
 ```
@@ -207,7 +256,7 @@ Next: Review PR, then merge/close and clean up worktree
 Epic preserved for future work
 
 Tag: epic/<epic-name>-complete
-Worktree: .worktrees/<epic-name>/ (kept)
+Worktree: <absolute path from arcforge status --json> (kept)
 Backup: Pushed to origin/<epic-name>
 
 Next: Resume work in worktree or run this skill again when ready
@@ -219,7 +268,7 @@ Next: Resume work in worktree or run this skill again when ready
 Epic discarded
 
 Branch: <epic-name> (deleted)
-Worktree: .worktrees/<epic-name>/ (removed)
+Worktree: <absolute path from arcforge status --json> (removed)
 
 Next: Check status to see remaining epics
 ```
@@ -232,7 +281,7 @@ Next: Check status to see remaining epics
 Epic completion blocked
 
 Issue: Tests failing (<N> failures)
-Location: .worktrees/<epic-name>/
+Location: <absolute path from arcforge status --json>
 
 To resolve:
 1. Fix failing tests
@@ -255,6 +304,45 @@ To resolve:
 
 Then retry this skill.
 ```
+
+### Merge Conflict (Multi-Teammate)
+
+Use this format when merging an epic dispatched via `arc-dispatching-teammates` hits a conflict. Send this as a `SendMessage` to `team-lead`, not as a plain-text report (teammate plain text is invisible to the lead).
+
+```
+Epic finishing blocked — merge conflict
+
+Epic: <epic-id>
+Branch: <epic-name>
+Base: <base-branch>
+State: merge aborted, worktree clean on epic branch
+Commits ready: <N commits>
+
+Conflict files:
+- <path1>  [listed in my Shared Files: yes | no]
+- <path2>  [listed in my Shared Files: yes | no]
+
+Conflict hunks (verbatim from `git diff`):
+<paste each hunk, keeping conflict markers intact>
+
+My read:
+- Nature: <additive-both-sides | semantic-disagreement | unknown>
+- Proposed resolution: <union / keep-theirs / keep-ours / unclear>
+- Risk: <low / medium / high>
+
+I am waiting for arbitration. Not pushing, not creating PR, not
+re-attempting merge until you respond.
+```
+
+If the conflict is on a file NOT listed in your spawn prompt's Shared Files section, add this line above the conflict files block:
+
+```
+ALERT: this file was NOT in my Shared Files section — the lead's
+scan in arc-dispatching-teammates step 4 may have missed it. Other
+running teammates should be notified.
+```
+
+Wait for the lead's response before taking further git action. Hold `epic` branch state, do not modify or push.
 
 ### Coordinator Not Available
 
@@ -287,6 +375,7 @@ Then retry this skill.
 - Delete work without typed "discard" confirmation
 - Skip `.arcforge-epic` verification
 - Use this skill when `.arcforge-epic` is missing
+- Auto-resolve a merge conflict in a multi-teammate context — escalate to lead via SendMessage using the Merge Conflict (Multi-Teammate) blocked format
 
 **Always:**
 - Verify tests before offering options

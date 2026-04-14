@@ -48,7 +48,7 @@ const epic1 = new Epic({
   name: 'Test Epic',
   spec_path: 'docs/spec.md',
   status: TaskStatus.IN_PROGRESS,
-  worktree: '.worktrees/epic-001',
+  worktree: 'epic-001',
   depends_on: [],
   features: [
     { id: 'feat-001', name: 'Feature 1', status: TaskStatus.COMPLETED },

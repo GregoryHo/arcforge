@@ -115,4 +115,26 @@ assert.ok(objYaml.includes('nested:'));
 assert.ok(objYaml.includes('list:'));
 console.log('    ✓ Object serialization correct');
 
+// Test normalizeStatus
+console.log('  normalizeStatus...');
+const { normalizeStatus } = require('../../scripts/lib/dag-schema');
+
+// Valid values pass through unchanged
+assert.strictEqual(normalizeStatus('pending'), 'pending');
+assert.strictEqual(normalizeStatus('in_progress'), 'in_progress');
+assert.strictEqual(normalizeStatus('completed'), 'completed');
+assert.strictEqual(normalizeStatus('blocked'), 'blocked');
+console.log('    ✓ Valid statuses pass through');
+
+// Common agent aliases normalize to canonical values
+assert.strictEqual(normalizeStatus('done'), 'completed');
+assert.strictEqual(normalizeStatus('finished'), 'completed');
+assert.strictEqual(normalizeStatus('complete'), 'completed');
+console.log('    ✓ Agent aliases normalize correctly');
+
+// Unknown values throw
+assert.throws(() => normalizeStatus('banana'), /Invalid status/);
+assert.throws(() => normalizeStatus(''), /Invalid status/);
+console.log('    ✓ Unknown values throw');
+
 console.log('\n✅ All dag-schema tests passed!\n');
