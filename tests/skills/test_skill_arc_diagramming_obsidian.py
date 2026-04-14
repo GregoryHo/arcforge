@@ -201,7 +201,43 @@ def test_arc_diagramming_obsidian_saver_uses_ea_create():
 
 
 def test_arc_diagramming_obsidian_saver_has_post_save_verify():
-    """Saver agent must verify saved file by re-rendering."""
+    """Saver agent must invoke the post-save verifier script."""
     saver = _read_agent("diagram-saver.md").lower()
-    assert "render_excalidraw.py" in saver
-    assert "post-save" in saver or "diagram-post-save" in saver
+    assert "verify_saved_diagram.py" in saver
+    assert "post-save" in saver
+
+
+# === Save-format reference + verify script tests ===
+
+
+def test_arc_diagramming_obsidian_has_save_format_reference():
+    """SKILL.md must point at references/save-format.md for fallback template."""
+    text = _read_skill()
+    assert "save-format" in text
+
+
+def test_arc_diagramming_obsidian_has_verify_script_reference():
+    """SKILL.md must invoke verify_saved_diagram.py for post-save verification."""
+    text = _read_skill()
+    assert "verify_saved_diagram.py" in text
+
+
+def test_arc_diagramming_obsidian_save_format_file_exists():
+    """save-format.md must exist and document the canonical manual template."""
+    save_format = SKILL_DIR / "references" / "save-format.md"
+    assert save_format.is_file()
+    content = save_format.read_text(encoding="utf-8")
+    assert "excalidraw-plugin: parsed" in content
+    assert "tags: [excalidraw]" in content
+    assert "Switch to EXCALIDRAW VIEW" in content
+    assert "# Excalidraw Data" in content
+
+
+def test_arc_diagramming_obsidian_verify_script_exists():
+    """verify_saved_diagram.py must exist and define the two verification checks."""
+    script = SKILL_DIR / "references" / "verify_saved_diagram.py"
+    assert script.is_file()
+    content = script.read_text(encoding="utf-8")
+    assert "check_format_markers" in content
+    assert "render_and_compare" in content
+    assert "excalidraw-plugin: parsed" in content

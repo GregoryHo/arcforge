@@ -195,7 +195,7 @@ cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
 
 ## Phase 3: Save to Vault
 
-Preferred path: use `ea.create()` — it handles `.excalidraw.md` format correctly (compressed JSON, text indexing, frontmatter). Fallback path: manual canonical template when EA is unavailable.
+Two paths — prefer `ea.create()`, fall back to manual write only if EA is unreachable.
 
 ### Preferred: `ea.create()` via obsidian eval
 
@@ -216,95 +216,20 @@ Preferred path: use `ea.create()` — it handles `.excalidraw.md` format correct
 
 `ea.elementsDict` is a documented public property used in official Excalidraw scripts.
 
-### Fallback: Manual Canonical Format (only if EA unavailable)
+### Fallback: Manual Canonical Format
 
-**Only use this when `obsidian eval` returns no response within 5 seconds.** Before falling back, verify EA is truly unreachable:
+Only use when `obsidian eval code="typeof window.ExcalidrawAutomate"` returns empty (EA plugin unavailable). Obsidian checks format heuristics — any deviation causes **silent corruption** (canvas renders, markdown bleeds through, and the Playwright renderer cannot detect this).
+
+Read `references/save-format.md` for the byte-exact template and the format rules that cause silent failure if violated.
+
+### Post-Save Verification (mandatory)
 
 ```bash
-obsidian eval code="typeof window.ExcalidrawAutomate"
-# expected: "object" — if empty, EA plugin is not loaded
-```
-
-If EA is unavailable, manually construct `.excalidraw.md` using this EXACT template. Obsidian's plugin checks format heuristics — any deviation causes **silent corruption** (the canvas renders but markdown text bleeds through, and the Playwright renderer cannot detect this). Copy the structure byte-for-byte:
-
-```
----
-
-excalidraw-plugin: parsed
-tags: [excalidraw]
-
----
-==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'
-
-# Excalidraw Data
-
-## Text Elements
-<text content> ^<elementId>
-
-<text content> ^<elementId>
-
-%%
-## Drawing
-```json
-{...complete JSON from .excalidraw file...}
-```
-%%
-```
-
-**Format details that matter (silent failure if violated):**
-- Blank lines INSIDE frontmatter block (`---\n\n...\n\n---`)
-- `tags: [excalidraw]` **inline array** — NOT a YAML list (`  - excalidraw` breaks it)
-- Warning line `==⚠  Switch to EXCALIDRAW VIEW...==` must be present (plugin's recognition marker)
-- `# Excalidraw Data` single-hash parent heading before sub-sections
-- Blank line between each `text ^id` entry in Text Elements
-- `%%` wraps ONLY the `## Drawing` section (not Text Elements)
-
-### Post-Save Verification
-
-The `render_excalidraw.py` helper only reads raw `.excalidraw` JSON — pointing it at `.excalidraw.md` will fail with a JSON parse error. Two-step verification:
-
-**Step 1 — Format markers present** (catches silent corruption from manual-fallback path):
-```bash
-python3 <<'EOF'
-import sys
-with open('<vault-path>/<name>.excalidraw.md') as f:
-    content = f.read()
-checks = {
-    'plugin_parsed': 'excalidraw-plugin: parsed' in content,
-    'tags_inline': 'tags: [excalidraw]' in content,
-    'warning_line': '==⚠  Switch to EXCALIDRAW VIEW' in content,
-    'heading': '# Excalidraw Data' in content,
-}
-missing = [k for k, v in checks.items() if not v]
-if missing:
-    print(f'CORRUPTED: missing {missing}')
-    sys.exit(1)
-print('Format OK')
-EOF
-```
-
-**Step 2 — Canvas still renders** (catches JSON corruption from either save path):
-```bash
-python3 <<'EOF'
-import re, json
-with open('<vault-path>/<name>.excalidraw.md') as f:
-    content = f.read()
-# ea.create() uses compressed-json; manual fallback uses json
-match = re.search(r'```(?:compressed-)?json\n(.*?)\n```', content, re.DOTALL)
-if not match:
-    raise RuntimeError('No json block found')
-# For uncompressed path, validate JSON parses
-if '```json' in content:
-    json.loads(match.group(1))
-    open('/tmp/verify.excalidraw', 'w').write(match.group(1))
-EOF
-
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-  uv run python render_excalidraw.py /tmp/verify.excalidraw \
-  --output /tmp/diagram-post-save.png --scale 2
+  uv run python verify_saved_diagram.py <vault-path>/<name>.excalidraw.md
 ```
 
-If the post-save render doesn't match the pre-save validated version, the save corrupted the file — regenerate using the canonical template (not the one you just wrote).
+Exits non-zero on format corruption or render mismatch. For the manual-fallback path, also compares the re-rendered PNG against `/tmp/diagram.png` to catch JSON corruption. If verification fails, regenerate using the canonical template from `references/save-format.md` — not the file you just wrote.
 
 ### Embed in Wiki Notes
 
@@ -334,7 +259,9 @@ Read on demand — don't load all at once:
 - `references/element-templates.md` — Full EA API reference + raw JSON templates
 - `references/layout-heuristics.md` — Grid planning (Part 1) + fix strategies (Part 2)
 - `references/depth-enhancements.md` — Research, Multi-Zoom, Evidence (comprehensive only)
+- `references/save-format.md` — Manual `.excalidraw.md` canonical template (fallback save path)
 - `references/plan_layout.py` — Automatic coordinate computation for 20+ elements
+- `references/verify_saved_diagram.py` — Post-save verification (format markers + render check)
 
 ### What to do yourself vs. delegate
 

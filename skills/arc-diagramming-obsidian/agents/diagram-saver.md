@@ -38,22 +38,21 @@ await app.vault.adapter.remove('<FOLDER>/<FILENAME>.excalidraw.md');
 
 ### 2. Verify Save
 
-Get the vault base path, then confirm the file exists and has content:
+Get the vault base path and confirm the file exists:
 
 ```bash
 obsidian eval code="app.vault.adapter.basePath" 2>/dev/null
 ls -la "<VAULT_PATH>/<FOLDER>/<FILENAME>.excalidraw.md"
 ```
 
-Then re-render the saved file to confirm the save didn't corrupt anything:
+Then run the post-save verifier — it checks format markers (catches silent corruption from the manual-fallback path) and re-renders to catch JSON damage:
 
 ```bash
 cd <SKILL_ROOT>/references && \
-  uv run python render_excalidraw.py "<VAULT_PATH>/<FOLDER>/<FILENAME>.excalidraw" \
-  --output /tmp/diagram-post-save.png --scale 2
+  uv run python verify_saved_diagram.py "<VAULT_PATH>/<FOLDER>/<FILENAME>.excalidraw.md"
 ```
 
-View `/tmp/diagram-post-save.png`. If it doesn't match the pre-save validated version, the save introduced corruption — investigate and fix.
+Exits non-zero on failure with a clear message. For `ea.create()` saves (compressed-json block), format-marker check is sufficient — plugin writes the compressed payload reliably. For manual-fallback saves, the script also re-renders and size-compares against `/tmp/diagram.png` to detect JSON corruption.
 
 ### 3. Embed in Wiki Notes (if requested)
 
