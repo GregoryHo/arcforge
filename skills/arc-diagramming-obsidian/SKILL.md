@@ -60,15 +60,46 @@ Read `references/visual-patterns.md` for ASCII sketches, shape meaning tables, a
 
 **Whitespace = importance.** The hero element gets 200px+ of empty space around it.
 
+**Symmetric concepts deserve symmetric visuals — do not fabricate a hero where none exists.** Hierarchy is a tool for *revealing real differences in importance*, not a default to apply everywhere. For `Input → Process → Output`, the three stages are conceptually equal; forcing Process to be larger implies it's more important, which the concept doesn't claim. Before picking a hero, ask: "Does the concept actually say this element matters more?" If no, give all peers the same size. Over-applying hierarchy makes diagrams lie; honest symmetry is often the stronger argument.
+
+**Match the prompt's register — don't decorate past it.** If the user's prompt uses a single language, keep labels in that language. If the user asks for a "simple" diagram, resist adding hero sizing, bilingual subtitles, decorative titles, or color ceremonies they didn't request. Every extra detail is noise that dilutes the core message. Restraint is a skill, not a shortage.
+
 **Container discipline:** Less than 30% of text in containers. Default to free-floating text. Container test: "Would this work without the box?" If yes, remove it.
 
 For diagrams with 20+ elements or evidence artifacts, use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation (flow left, evidence right) that prevents the most common overlap defects.
 
-### Step 4: Detect Theme
+#### Common Layout Traps (audit before building)
+
+These defects recur across diagrams. Audit your plan against each — fixing them at design time is far cheaper than fixing them in Phase 2 iterations.
+
+**Trap 1: Converging arrows collide with annotations.** When multiple arrows merge into one element, they travel through the *corridor below* the source elements. Annotations placed below source boxes (e.g., "sequential" under "Workflow") will be crossed by those arrows.
+→ Fix: put annotations inside source boxes (as subtitle text in a taller box) or above them — never directly below when converging arrows follow.
+
+**Trap 2: Back-edges routed through the source zone.** A back-edge from zone C up to zone A that travels horizontally at the Y-midpoint of zone B will cross zone B's elements.
+→ Fix: route back-edge **down 40px below its source first**, then horizontally to the diagram edge, then up to the target. Three segments, not one.
+
+**Trap 3: "yes" / "no" labels in fan-out exit paths.** Decision diamond labels placed at the bottom center will be crossed by any fan-out arrow exiting from the bottom.
+→ Fix: offset labels laterally by 30px+ from the arrow's exit point, or place them along the arrow's horizontal run rather than the exit.
+
+**Trap 4: Back-edge label overlapping its own arrow.** Free text describing a back-edge, placed at the arrow's vertical-run X, sits on the arrow line.
+→ Fix: place the label at `arrow_x + 12` (to the right of the vertical run), not on it.
+
+Mentally trace every arrow from source to target. If the path crosses an unrelated element, reposition BEFORE writing EA code.
+
+### Step 4: Detect Theme (required — not optional)
 
 ```bash
 obsidian eval code="document.body.classList.contains('theme-dark') ? 'dark' : 'light'"
 ```
+
+**Why this is required, not optional:** choosing the wrong palette silently produces an unreadable diagram. A dark-mode user opening a light-palette diagram sees washed-out pastel; a light-mode user opening a dark-palette diagram sees near-invisible text. The Playwright renderer happily renders in whatever colors you picked, so there's no feedback loop to catch this.
+
+**If `obsidian eval` returns no response within 5 seconds**, Obsidian isn't running with the plugin loaded. Do one of:
+1. Ask the user to open Obsidian, then retry
+2. Pick a palette based on prompt signals (user mentioned "dark mode")
+3. Fall back to dark mode and **state the assumption in your completion output** so the user can correct it
+
+Never silently assume dark mode — the assumption must be visible to the user.
 
 All colors come from `references/color-palette.md`. Two hue families: ice blue (flow) and teal (action). Decision uses pale yellow as the sole warm breakpoint. Do not invent new colors.
 
@@ -164,7 +195,9 @@ cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
 
 ## Phase 3: Save to Vault
 
-Load validated elements into EA and save using `ea.create()`, which handles `.excalidraw.md` format correctly — compressed JSON, text indexing, frontmatter. Never manually construct this format.
+Preferred path: use `ea.create()` — it handles `.excalidraw.md` format correctly (compressed JSON, text indexing, frontmatter). Fallback path: manual canonical template when EA is unavailable.
+
+### Preferred: `ea.create()` via obsidian eval
 
 ```javascript
 (async () => {
@@ -181,19 +214,97 @@ Load validated elements into EA and save using `ea.create()`, which handles `.ex
 })()
 ```
 
-`ea.elementsDict` is a documented public property used in official Excalidraw scripts. Injecting elements then calling `ea.create()` produces the correct vault format without manual construction.
+`ea.elementsDict` is a documented public property used in official Excalidraw scripts.
+
+### Fallback: Manual Canonical Format (only if EA unavailable)
+
+**Only use this when `obsidian eval` returns no response within 5 seconds.** Before falling back, verify EA is truly unreachable:
+
+```bash
+obsidian eval code="typeof window.ExcalidrawAutomate"
+# expected: "object" — if empty, EA plugin is not loaded
+```
+
+If EA is unavailable, manually construct `.excalidraw.md` using this EXACT template. Obsidian's plugin checks format heuristics — any deviation causes **silent corruption** (the canvas renders but markdown text bleeds through, and the Playwright renderer cannot detect this). Copy the structure byte-for-byte:
+
+```
+---
+
+excalidraw-plugin: parsed
+tags: [excalidraw]
+
+---
+==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'
+
+# Excalidraw Data
+
+## Text Elements
+<text content> ^<elementId>
+
+<text content> ^<elementId>
+
+%%
+## Drawing
+```json
+{...complete JSON from .excalidraw file...}
+```
+%%
+```
+
+**Format details that matter (silent failure if violated):**
+- Blank lines INSIDE frontmatter block (`---\n\n...\n\n---`)
+- `tags: [excalidraw]` **inline array** — NOT a YAML list (`  - excalidraw` breaks it)
+- Warning line `==⚠  Switch to EXCALIDRAW VIEW...==` must be present (plugin's recognition marker)
+- `# Excalidraw Data` single-hash parent heading before sub-sections
+- Blank line between each `text ^id` entry in Text Elements
+- `%%` wraps ONLY the `## Drawing` section (not Text Elements)
 
 ### Post-Save Verification
 
-Re-render the saved file to confirm the save didn't corrupt anything:
+The `render_excalidraw.py` helper only reads raw `.excalidraw` JSON — pointing it at `.excalidraw.md` will fail with a JSON parse error. Two-step verification:
 
+**Step 1 — Format markers present** (catches silent corruption from manual-fallback path):
 ```bash
+python3 <<'EOF'
+import sys
+with open('<vault-path>/<name>.excalidraw.md') as f:
+    content = f.read()
+checks = {
+    'plugin_parsed': 'excalidraw-plugin: parsed' in content,
+    'tags_inline': 'tags: [excalidraw]' in content,
+    'warning_line': '==⚠  Switch to EXCALIDRAW VIEW' in content,
+    'heading': '# Excalidraw Data' in content,
+}
+missing = [k for k, v in checks.items() if not v]
+if missing:
+    print(f'CORRUPTED: missing {missing}')
+    sys.exit(1)
+print('Format OK')
+EOF
+```
+
+**Step 2 — Canvas still renders** (catches JSON corruption from either save path):
+```bash
+python3 <<'EOF'
+import re, json
+with open('<vault-path>/<name>.excalidraw.md') as f:
+    content = f.read()
+# ea.create() uses compressed-json; manual fallback uses json
+match = re.search(r'```(?:compressed-)?json\n(.*?)\n```', content, re.DOTALL)
+if not match:
+    raise RuntimeError('No json block found')
+# For uncompressed path, validate JSON parses
+if '```json' in content:
+    json.loads(match.group(1))
+    open('/tmp/verify.excalidraw', 'w').write(match.group(1))
+EOF
+
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
-  uv run python render_excalidraw.py <vault-path>/diagram.excalidraw \
+  uv run python render_excalidraw.py /tmp/verify.excalidraw \
   --output /tmp/diagram-post-save.png --scale 2
 ```
 
-View `/tmp/diagram-post-save.png`. If it doesn't match the validated version, the save introduced corruption — fix the `.excalidraw.md` file.
+If the post-save render doesn't match the pre-save validated version, the save corrupted the file — regenerate using the canonical template (not the one you just wrote).
 
 ### Embed in Wiki Notes
 
@@ -225,7 +336,21 @@ Read on demand — don't load all at once:
 - `references/depth-enhancements.md` — Research, Multi-Zoom, Evidence (comprehensive only)
 - `references/plan_layout.py` — Automatic coordinate computation for 20+ elements
 
-For vault operations: `obsidian:obsidian-cli` for file creation/search, `obsidian:obsidian-markdown` for formatting.
+### What to do yourself vs. delegate
+
+Keep in-scope tasks yourself; route out-of-scope tasks to the dedicated skill. Reinventing vault lookup or theme detection burns context on work another skill does cleaner.
+
+| Task | Do yourself | Delegate to |
+|------|------------|-------------|
+| Generate elements (EA API or raw JSON) | ✓ | — |
+| Render to PNG (Playwright) | ✓ | — |
+| Check overlaps (`check_overlaps.py`) | ✓ | — |
+| Layout planning (`plan_layout.py`) | ✓ | — |
+| Detect Obsidian theme | — | `obsidian:obsidian-cli` (via `obsidian eval`) |
+| Find vault path / search existing notes | — | `obsidian:obsidian-cli` |
+| Write `.excalidraw.md` to vault | ✓ (direct filesystem write) — OR `ea.create()` | — |
+| Embed diagram in a wiki note | — | `obsidian:obsidian-cli` + `obsidian:obsidian-markdown` |
+| Reload a changed diagram in Obsidian | — | `obsidian:obsidian-cli` |
 
 ## Completion Format
 
