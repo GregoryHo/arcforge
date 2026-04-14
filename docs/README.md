@@ -26,6 +26,12 @@ Three eval scopes (Skill, Agent, Workflow) feed into an A/B mechanism with valid
 
 Three modes (Ingest, Query, Audit) with PROPAGATE as the key differentiator. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Maintaining-Obsidian)
 
+### Teammate Dispatch — Lead-Present Multi-Epic Parallelism
+
+![arc-dispatching-teammates flow](../assets/arc-dispatching-teammates-flow.png)
+
+Three numbered stages (Dispatch, Accept, Deliver) with AND-gated acceptance — both spec-reviewer and verifier must PASS from fresh context before merge to the dev branch. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Dispatching-Teammates)
+
 ## Local Docs
 
 These files are kept in-repo as raw source material for the wiki:
