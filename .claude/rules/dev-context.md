@@ -5,7 +5,13 @@ to forget or rediscover incorrectly. Read this whenever you're contributing
 to arcforge itself, not when using arcforge as a toolkit on another
 project.
 
-## The plugin is disabled in this repo
+## The arcforge plugin is disabled in this repo
+
+Scope: this rule is about the **arcforge plugin specifically** — other
+plugins (skill-creator, obsidian, etc.) load normally in this repo. Don't
+over-apply this rule to skill-authoring workflows that read a skill via
+an explicit `--skill-path` argument rather than through arcforge's plugin
+loader.
 
 `.claude/settings.json` sets `"arcforge@arcforge-dev": false` deliberately
 to avoid local↔global conflicts during plugin development. Without this
