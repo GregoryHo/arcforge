@@ -72,17 +72,20 @@ def test_arc_diagramming_obsidian_has_render_validate():
 
 
 def test_arc_diagramming_obsidian_has_size_hierarchy():
-    """Skill must define size hierarchy (Hero, Primary, Secondary, Small)."""
+    """Skill must reason about size via importance — tier table lives in painters-toolkit.md."""
+    skill_text = _read_skill().lower()
+    assert "hero" in skill_text
+    assert "painters-toolkit" in skill_text
+    toolkit = (SKILL_DIR / "references" / "painters-toolkit.md").read_text(encoding="utf-8").lower()
+    for tier in ("hero", "primary", "secondary"):
+        assert tier in toolkit, f"painters-toolkit.md missing size tier: {tier}"
+
+
+def test_arc_diagramming_obsidian_has_restraint_principle():
+    """SOFT layer must teach 'every element serves the concept' over mechanical rules."""
     text = _read_skill().lower()
-    assert "hero" in text
-    assert "primary" in text
-    assert "secondary" in text
-
-
-def test_arc_diagramming_obsidian_has_container_discipline():
-    """Skill must enforce <30% container rule."""
-    text = _read_skill()
-    assert "30%" in text or "30 %" in text
+    assert "serve the concept" in text
+    assert "unjustified" in text
 
 
 def test_arc_diagramming_obsidian_references_color_palette():
