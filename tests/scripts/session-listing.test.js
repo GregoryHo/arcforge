@@ -34,7 +34,7 @@ describe('session listing', () => {
   const dateStr = '2026-03-13';
 
   beforeAll(() => {
-    const sessionDir = path.join(testDir, '.claude', 'sessions', project, dateStr);
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', project, dateStr);
     fs.mkdirSync(sessionDir, { recursive: true });
 
     const session1 = {
@@ -99,7 +99,7 @@ describe('session listing', () => {
 
     it('includes saved session .md files with type=saved', () => {
       const { listSessions } = getSessionUtils();
-      const sessionDir = path.join(testDir, '.claude', 'sessions', project, dateStr);
+      const sessionDir = path.join(testDir, '.arcforge', 'sessions', project, dateStr);
       fs.writeFileSync(
         path.join(sessionDir, 'session-my-feature.md'),
         '# Session: 2026-03-13\n**Project:** test-project\n\n## Summary\nBuilt feature X',

@@ -62,7 +62,7 @@ def test_arc_managing_sessions_has_session_paths():
     text = _read_skill()
 
     # Must reference session storage path
-    assert "~/.claude/sessions" in text or ".claude/sessions" in text
+    assert "~/.arcforge/sessions" in text or ".arcforge/sessions" in text
 
     # Must reference aliases.json
     assert "aliases.json" in text

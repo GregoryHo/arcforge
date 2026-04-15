@@ -14,7 +14,7 @@ No database. All state as YAML, JSON, JSONL, or Markdown files:
 
 Epics run in their own git worktrees, each tracked via an `.arcforge-epic`
 marker file. Worktrees live at a home-based canonical location
-(`~/.arcforge-worktrees/<project>-<hash>-<epic>/`) computed by
+(`~/.arcforge/worktrees/<project>-<hash>-<epic>/`) computed by
 `scripts/lib/worktree-paths.js`; never hardcode worktree paths in skills,
 rules, or tests. See `docs/guide/worktree-workflow.md` for the full
 derivation rules and `skills/arc-using/SKILL.md` for the agent Worktree Rule.
@@ -68,5 +68,5 @@ agents/           # Specialized subagent definitions
 docs/             # Design docs, platform guides
 ```
 
-Worktrees live outside the repo at `~/.arcforge-worktrees/` — derived by
+Worktrees live outside the repo at `~/.arcforge/worktrees/` — derived by
 `scripts/lib/worktree-paths.js`, not a tracked directory.

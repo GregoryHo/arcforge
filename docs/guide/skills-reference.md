@@ -275,7 +275,7 @@ arcforge's 32 skills are organized into 7 categories:
 
 **Artifacts:**
 - Input: `dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
-- Output: per-epic worktrees at `~/.arcforge-worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
+- Output: per-epic worktrees at `~/.arcforge/worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
 - Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
 
 **Related:** arc-planning → **arc-dispatching-teammates** → (per completion: spec-reviewer + verifier subagents); each teammate runs arc-implementing → arc-finishing-epic on its own
@@ -347,7 +347,7 @@ marker writing, and project setup to `scripts/lib/coordinator.js`.
 
 **Artifacts:**
 - Output: worktree at the canonical path
-  (`~/.arcforge-worktrees/<project>-<hash>-<epic>/`), `.arcforge-epic` marker
+  (`~/.arcforge/worktrees/<project>-<hash>-<epic>/`), `.arcforge-epic` marker
   authored by the coordinator, `dag.yaml` epic status updated
 
 For the full derivation rules see
@@ -442,7 +442,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-managing-sessions
 
-**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.claude/sessions/` directory layout.
+**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.arcforge/sessions/` directory layout.
 
 **Purpose:** User-controlled session saves for continuity across conversations — save what matters, resume when needed.
 
@@ -455,8 +455,8 @@ Rule in `skills/arc-using/SKILL.md`.
 4. **Alias:** Create friendly names for easy session reference
 
 **Artifacts:**
-- Input: current session data from `~/.claude/sessions/{project}/{date}/{sessionId}.json`
-- Output: `~/.claude/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
+- Input: current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
+- Output: `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
 
 **Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
 
@@ -609,11 +609,11 @@ Rule in `skills/arc-using/SKILL.md`.
 1. Pre-diary check — verify session had non-trivial decisions or challenges
 2. Reflect on conversation from memory (do NOT read files)
 3. Fill template: decisions, preferences, challenges, solutions
-4. Save to `~/.claude/sessions/{project}/{date}/diary-{sessionId}.md`
+4. Save to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`
 5. Offer follow-up: "run `/reflect` to extract patterns"
 
 **Artifacts:**
-- Output: `~/.claude/sessions/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
+- Output: `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
 **Related:** **arc-journaling** --> arc-reflecting (after 5+ entries)
 
@@ -633,8 +633,8 @@ Rule in `skills/arc-using/SKILL.md`.
 5. Save reflection + instincts, update processed.log
 
 **Artifacts:**
-- Input: `~/.claude/sessions/{project}/*/diary-*.md`
-- Output: `~/.claude/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
+- Input: `~/.arcforge/diaries/{project}/*/diary-*.md`
+- Output: `~/.arcforge/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
 
 **Related:** arc-journaling (5+ entries) --> **arc-reflecting** --> arc-learning (instinct clustering)
 
@@ -647,14 +647,14 @@ Rule in `skills/arc-using/SKILL.md`.
 **When to use:** When you have accumulated instincts and want to cluster related ones into higher-level skills, commands, or agents.
 
 **Key workflow:**
-1. Scan all instincts from `~/.claude/instincts/{project}/` and `global/`
+1. Scan all instincts from `~/.arcforge/instincts/{project}/` and `global/`
 2. Cluster by domain, then by trigger fingerprint similarity (Jaccard >= 0.6)
 3. Filter: only clusters with 3+ instincts, at least 1 with confidence >= 0.6
 4. Preview candidate clusters for user review
 5. Generate: user decides what to create (skill, command, or agent)
 
 **Artifacts:**
-- Input: `~/.claude/instincts/{project}/` and `global/` instinct files
+- Input: `~/.arcforge/instincts/{project}/` and `global/` instinct files
 - Output: new skill, command, or agent definition
 
 **Related:** arc-reflecting --> **arc-learning** --> arc-writing-skills
@@ -663,7 +663,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-observing
 
-**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.claude/observations/` which is populated by Claude Code PostToolUse hooks.
+**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/` which is populated by Claude Code PostToolUse hooks.
 
 **Purpose:** Manage automatically detected behavioral patterns (instincts) from tool usage observations.
 
@@ -677,8 +677,8 @@ Rule in `skills/arc-using/SKILL.md`.
 5. Loading: instincts with confidence >= 0.7 auto-loaded into context
 
 **Artifacts:**
-- Input: `~/.claude/observations/{project}/observations.jsonl`
-- Output: `~/.claude/instincts/{project}/*.md`
+- Input: `~/.arcforge/observations/{project}/observations.jsonl`
+- Output: `~/.arcforge/instincts/{project}/*.md`
 
 **Related:** automatic background process --> **arc-observing** --> arc-learning
 
@@ -699,7 +699,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Artifacts:**
 - Input: user-described pattern or insight
-- Output: `~/.claude/instincts/{project}/<id>.md`
+- Output: `~/.arcforge/instincts/{project}/<id>.md`
 
 **Related:** user insight --> **arc-recalling** --> instinct saved for arc-observing lifecycle
 

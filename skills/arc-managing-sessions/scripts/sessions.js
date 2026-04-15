@@ -7,7 +7,6 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const {
   getProjectName,
@@ -76,7 +75,7 @@ function cmdResume(args) {
     const saved = sessions.find((s) => s.type === 'saved');
     if (saved) {
       sessionPath = path.join(
-        os.homedir(), '.claude', 'sessions', project, saved.dateStr, saved.filename,
+        getSessionDir(project, saved.dateStr), saved.filename,
       );
     }
   }

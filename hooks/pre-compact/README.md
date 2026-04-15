@@ -4,7 +4,7 @@ Records context compaction events for session tracking and triggers diary prompt
 
 ## What It Does
 
-1. **Logs compaction events** to `~/.claude/sessions/<project>/compaction-log.txt`
+1. **Logs compaction events** to `~/.arcforge/sessions/<project>/compaction-log.txt`
    - Format: `[YYYY-MM-DDTHH:MM:SS.sssZ] Context compaction - sessionId: <id>`
    - Append-only log for historical tracking
 

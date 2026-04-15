@@ -13,7 +13,7 @@ describe('pre-compact: logCompactionEvent', () => {
     process.env.HOME = testDir;
     process.env.CLAUDE_SESSION_ID = 'test-precompact-session';
     // Create sessions directory
-    fs.mkdirSync(path.join(testDir, '.claude', 'sessions', 'test-project'), { recursive: true });
+    fs.mkdirSync(path.join(testDir, '.arcforge', 'sessions', 'test-project'), { recursive: true });
     delete require.cache[require.resolve('../pre-compact/main')];
     delete require.cache[require.resolve('../../scripts/lib/utils')];
   });
@@ -28,7 +28,13 @@ describe('pre-compact: logCompactionEvent', () => {
     const { logCompactionEvent } = require('../pre-compact/main');
     logCompactionEvent('test-project', '2025-01-15T10:00:00Z', 'session-123');
 
-    const logPath = path.join(testDir, '.claude', 'sessions', 'test-project', 'compaction-log.txt');
+    const logPath = path.join(
+      testDir,
+      '.arcforge',
+      'sessions',
+      'test-project',
+      'compaction-log.txt',
+    );
     assert.ok(fs.existsSync(logPath), 'compaction-log.txt should exist');
   });
 
@@ -36,7 +42,13 @@ describe('pre-compact: logCompactionEvent', () => {
     const { logCompactionEvent } = require('../pre-compact/main');
     logCompactionEvent('test-project', '2025-01-15T10:00:00Z', 'session-123');
 
-    const logPath = path.join(testDir, '.claude', 'sessions', 'test-project', 'compaction-log.txt');
+    const logPath = path.join(
+      testDir,
+      '.arcforge',
+      'sessions',
+      'test-project',
+      'compaction-log.txt',
+    );
     const content = fs.readFileSync(logPath, 'utf-8');
     assert.ok(content.includes('2025-01-15T10:00:00Z'), 'should contain timestamp');
     assert.ok(content.includes('session-123'), 'should contain session ID');
@@ -47,7 +59,13 @@ describe('pre-compact: logCompactionEvent', () => {
     logCompactionEvent('test-project', '2025-01-15T10:00:00Z', 'session-1');
     logCompactionEvent('test-project', '2025-01-15T11:00:00Z', 'session-2');
 
-    const logPath = path.join(testDir, '.claude', 'sessions', 'test-project', 'compaction-log.txt');
+    const logPath = path.join(
+      testDir,
+      '.arcforge',
+      'sessions',
+      'test-project',
+      'compaction-log.txt',
+    );
     const content = fs.readFileSync(logPath, 'utf-8');
     assert.ok(content.includes('session-1'), 'should contain first entry');
     assert.ok(content.includes('session-2'), 'should contain second entry');
@@ -76,7 +94,7 @@ describe('pre-compact: updateSessionFile', () => {
     const { updateSessionFile } = require('../pre-compact/main');
 
     // Create a session file
-    const sessionDir = path.join(testDir, '.claude', 'sessions', 'test-project', '2025-01-15');
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', 'test-project', '2025-01-15');
     fs.mkdirSync(sessionDir, { recursive: true });
     const sessionFile = path.join(sessionDir, 'session-123.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ toolCalls: 10, compactions: [] }));
@@ -110,7 +128,7 @@ describe('pre-compact: updateSessionFile', () => {
   it('should append multiple compaction markers', () => {
     const { updateSessionFile } = require('../pre-compact/main');
 
-    const sessionDir = path.join(testDir, '.claude', 'sessions', 'test-project', '2025-01-15');
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', 'test-project', '2025-01-15');
     fs.mkdirSync(sessionDir, { recursive: true });
     const sessionFile = path.join(sessionDir, 'session-123.json');
     fs.writeFileSync(sessionFile, JSON.stringify({ toolCalls: 10 }));

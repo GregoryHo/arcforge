@@ -195,7 +195,7 @@ class Coordinator {
    * Expand worktrees for ready epics, or a single epic when epicId is supplied.
    *
    * Worktrees are created at the canonical location computed by
-   * worktree-paths.js (~/.arcforge-worktrees/<project>-<hash>-<epic>/).
+   * worktree-paths.js (~/.arcforge/worktrees/<project>-<hash>-<epic>/).
    *
    * @param {Object} options - Expand options
    * @param {string} [options.epicId] - Single-epic mode: only expand this epic

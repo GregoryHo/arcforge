@@ -5,17 +5,17 @@
  * shown to the user on next session start. Uses per-action consume
  * to avoid losing concurrent actions.
  *
- * Storage: ~/.claude/sessions/{project}/pending-actions.json
+ * Storage: ~/.arcforge/sessions/{project}/pending-actions.json
  * Format: { actions: [{ id, type, payload, created, consumed, consumed_at }] }
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const crypto = require('node:crypto');
 
+const { getProjectSessionsDir } = require('./utils');
+
 const EXPIRY_DAYS = 7;
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
 /**
  * Get the pending-actions.json path for a project.
@@ -23,7 +23,7 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
  * @returns {string} Path to pending-actions.json
  */
 function getActionsPath(project) {
-  return path.join(CLAUDE_DIR, 'sessions', project, 'pending-actions.json');
+  return path.join(getProjectSessionsDir(project), 'pending-actions.json');
 }
 
 /**

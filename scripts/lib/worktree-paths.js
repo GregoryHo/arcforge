@@ -1,7 +1,7 @@
 /**
  * worktree-paths.js - Canonical path helper for arcforge worktrees.
  *
- * Worktrees live under ~/.arcforge-worktrees/<project>-<hash>-<epic>/
+ * Worktrees live under ~/.arcforge/worktrees/<project>-<hash>-<epic>/
  * where <hash> is a 6-char sha256 prefix of the absolute project root.
  * Storing worktrees outside the git tree keeps them from polluting the
  * working copy; the hash prevents collisions between same-named projects.
@@ -15,7 +15,8 @@ const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 
-const WORKTREE_DIR_NAME = '.arcforge-worktrees';
+const ARCFORGE_HOME_NAME = '.arcforge';
+const WORKTREE_SUBDIR = 'worktrees';
 const HASH_LENGTH = 6;
 // Matches `<project>-<hash>-<epic>` where hash is exactly HASH_LENGTH hex chars.
 // Greedy `.+` on both sides of a fixed-width hash anchor matches the last
@@ -29,7 +30,7 @@ const WORKTREE_NAME_RE = new RegExp(`^(.+)-([0-9a-f]{${HASH_LENGTH}})-(.+)$`);
  * @returns {string}
  */
 function getWorktreeRoot(homeDir) {
-  return path.join(homeDir || os.homedir(), WORKTREE_DIR_NAME);
+  return path.join(homeDir || os.homedir(), ARCFORGE_HOME_NAME, WORKTREE_SUBDIR);
 }
 
 /**
@@ -124,7 +125,8 @@ function parseWorktreePath(worktreePath) {
 }
 
 module.exports = {
-  WORKTREE_DIR_NAME,
+  ARCFORGE_HOME_NAME,
+  WORKTREE_SUBDIR,
   getWorktreeRoot,
   hashRepoPath,
   getWorktreePath,

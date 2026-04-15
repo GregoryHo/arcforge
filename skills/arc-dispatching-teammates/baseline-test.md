@@ -88,7 +88,7 @@ Verbatim, as drafted in
 >    ```
 >    This reads `dag.yaml`, finds `epic-auth`, `epic-api`, `epic-ui` (all
 >    pending, no deps, no worktrees), and creates an isolated git worktree
->    for each at `~/.arcforge-worktrees/dispatching-baseline-<hash>-<epic>/`.
+>    for each at `~/.arcforge/worktrees/dispatching-baseline-<hash>-<epic>/`.
 >    It stamps each with an `.arcforge-epic` marker so DAG sync stays
 >    honest.
 >

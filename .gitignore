@@ -1,6 +1,9 @@
 evals/results/
 .eval-trials/
-.claude/skills/
+# Project-local contributor skills — ignored by default (experimental/workspace).
+# Skills meant to ship in the repo are explicitly allowlisted below.
+.claude/skills/*/
+!.claude/skills/arc-releasing/
 .claude/settings.local.json
 .claude/logs/
 

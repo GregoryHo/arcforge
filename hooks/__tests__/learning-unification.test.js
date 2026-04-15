@@ -23,10 +23,10 @@ describe('instinct-writer creates correct frontmatter', () => {
 
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-instinct-writer-'));
-    // Point CLAUDE_DIR (via HOME) to our temp dir so getInstinctsDir resolves there
+    // Point HOME to our temp dir so getInstinctsDir resolves there
     process.env.HOME = testDir;
-    // Create the .claude/instincts/test-project directory
-    fs.mkdirSync(path.join(testDir, '.claude', 'instincts', 'test-project'), { recursive: true });
+    // Create the arcforge instincts directory
+    fs.mkdirSync(path.join(testDir, '.arcforge', 'instincts', 'test-project'), { recursive: true });
     // Clear module caches so session-utils picks up new HOME
     delete require.cache[require.resolve('../../scripts/lib/session-utils')];
     delete require.cache[require.resolve('../../scripts/lib/instinct-writer')];
@@ -264,8 +264,8 @@ describe('pending-actions create + consume flow', () => {
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-pending-actions-'));
     process.env.HOME = testDir;
-    // Create the .claude/sessions directory
-    fs.mkdirSync(path.join(testDir, '.claude', 'sessions', 'test-project'), { recursive: true });
+    // Create the arcforge sessions directory (where pending-actions.json lives)
+    fs.mkdirSync(path.join(testDir, '.arcforge', 'sessions', 'test-project'), { recursive: true });
     delete require.cache[require.resolve('../../scripts/lib/pending-actions')];
   });
 

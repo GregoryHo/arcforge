@@ -13,8 +13,11 @@ const path = require('path');
 const {
   getDiaryPath,
   getObservationsPath,
-  CLAUDE_DIR
 } = require('../../../scripts/lib/session-utils');
+const {
+  getSessionDir,
+  getDiaryDraftPath,
+} = require('../../../scripts/lib/utils');
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -37,7 +40,7 @@ function parseArgs(argv) {
  * Load session JSON for a given project/date/session.
  */
 function loadSessionJson(project, date, sessionId) {
-  const sessionFile = path.join(CLAUDE_DIR, 'sessions', project, date, `${sessionId}.json`);
+  const sessionFile = path.join(getSessionDir(project, date), `${sessionId}.json`);
   if (!fs.existsSync(sessionFile)) return null;
   try {
     return JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
@@ -112,7 +115,7 @@ function summarizeObservations(project) {
  * Get draft diary path.
  */
 function getDraftPath(project, date, sessionId) {
-  return path.join(CLAUDE_DIR, 'sessions', project, date, `diary-${sessionId}-draft.md`);
+  return getDiaryDraftPath(project, date, sessionId);
 }
 
 /**

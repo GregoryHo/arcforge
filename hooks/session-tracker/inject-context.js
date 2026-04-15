@@ -23,6 +23,8 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   getProjectName,
+  getProjectDiariesDir,
+  getProjectSessionsDir,
   outputCombined,
   log,
 } = require('../../scripts/lib/utils');
@@ -95,6 +97,61 @@ function loadInstinctFiles(dir) {
       }
     })
     .filter(Boolean);
+}
+
+// The TO BE ENRICHED markers always appear in the template-stub header
+// region (Decisions/Challenges/etc.) within the first ~2KB of any draft.
+// Bounded read keeps SessionStart cheap even with hundreds of drafts.
+const STALE_DRAFT_PROBE_BYTES = 2048;
+
+function draftIsStale(filePath) {
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(STALE_DRAFT_PROBE_BYTES);
+    const n = fs.readSync(fd, buf, 0, STALE_DRAFT_PROBE_BYTES, 0);
+    return buf.subarray(0, n).includes('TO BE ENRICHED');
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* already closed */
+      }
+    }
+  }
+}
+
+/**
+ * Returns { count, message } when stale drafts exist, else null.
+ * Surfaces silent enrichment failures so they don't accumulate forever.
+ */
+function loadStaleDraftWarning(project) {
+  try {
+    const dir = getProjectDiariesDir(project);
+    if (!fs.existsSync(dir)) return null;
+
+    let stale = 0;
+    for (const dateEntry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!dateEntry.isDirectory()) continue;
+      const dateDirPath = path.join(dir, dateEntry.name);
+      for (const file of fs.readdirSync(dateDirPath)) {
+        if (!file.startsWith('diary-') || !file.endsWith('-draft.md')) continue;
+        if (draftIsStale(path.join(dateDirPath, file))) stale++;
+      }
+    }
+
+    if (stale === 0) return null;
+    const enricherLog = path.join(getProjectSessionsDir(project), 'enricher.log');
+    return {
+      count: stale,
+      message: `⚠️ ${stale} diary draft${stale === 1 ? '' : 's'} unenriched — background enricher may be failing. Check ${enricherLog}`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -227,6 +284,13 @@ function main() {
     userParts.push(pendingSummary);
   }
 
+  // Stale-draft healthcheck (re-evaluated every session start, not consumed)
+  const staleWarning = loadStaleDraftWarning(project);
+  if (staleWarning) {
+    contextParts.push(staleWarning.message);
+    userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);
+  }
+
   // Stderr-only (internal diagnostics)
   logAvailableAliases(project);
   checkNewGlobalPromotions();
@@ -246,6 +310,7 @@ module.exports = {
   loadAutoInstincts,
   loadInstinctFiles,
   loadPendingActions,
+  loadStaleDraftWarning,
   logAvailableAliases,
   checkNewGlobalPromotions,
 };

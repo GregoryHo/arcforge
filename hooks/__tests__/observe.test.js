@@ -105,12 +105,12 @@ describe('observe: getPidFile', () => {
     );
   });
 
-  it('should be under .claude/instincts/', () => {
+  it('should be under .arcforge/instincts/', () => {
     const { getPidFile } = require('../observe/main');
     const result = getPidFile();
     assert.ok(
-      result.includes('.claude') && result.includes('instincts'),
-      `Expected .claude/instincts/ in path, got: ${result}`,
+      result.includes('.arcforge') && result.includes('instincts'),
+      `Expected .arcforge/instincts/ in path, got: ${result}`,
     );
   });
 });

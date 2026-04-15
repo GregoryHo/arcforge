@@ -1,0 +1,26 @@
+{
+  "skill_name": "arc-releasing",
+  "evals": [
+    {
+      "id": 0,
+      "name": "patch-with-architectural-decision",
+      "prompt": "OK I'm ready to release 1.4.2 on the arcforge repo. I just merged the fix/teammate-pane-leak branch into my fix branch — it has 4 commits. Three of them patch a real bug: teammate tmux panes were leaking after arc-dispatching-teammates runs because the shutdown sequence didn't drain stdout before TeamDelete. The fourth commit is a refactor that moved the pane-tracking state from an in-memory Map to a file-backed JSON at ~/.arcforge/pane-tracker.jsonl so we can diagnose across restarts. The tests all pass, lint is green. Current version is 1.4.1. Walk me through the release.",
+      "expected_output": "The response should (1) confirm pre-flight was verified, (2) present the 4 commits and pause to ask the user to confirm semver level with a recommendation of 'patch' (since the pane-tracker move is an internal refactor, not a breaking change), (3) propose arc-maintaining-obsidian ingest with Decision-note scope for the architectural pane-tracker decision, (4) walk through the CHANGELOG entry, (5) enumerate all 5 version-bump locations explicitly, (6) commit → push → PR, (7) post-merge git tag. Should catch the pane-tracker.jsonl path migration as worth a Decision note.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "minor-new-skill",
+      "prompt": "準備發版 1.5.0. feat/arc-refining-graphs 這個 branch 加了一個新的 skill — arc-refining-graphs，從 design docs 生成 Mermaid 圖表的 workflow skill。SKILL.md 已經寫好了放在 skills/arc-refining-graphs/ 下，有 2 個 reference files 在 references/，還有一個 commands/arc-refining-graphs.md 的 wrapper。docs/guide/skills-reference.md 也更新了。所有測試都過了。版本現在是 1.4.1。幫我 release。",
+      "expected_output": "Response should recognize this is a MINOR bump (new skill added = new feature). Should propose full vault sync: new Source note for the skill, update MOC-ArcForge-Skills.md, possibly propagate to related skill MOCs. CHANGELOG entry under Added should describe the new skill's purpose. All 5 canonical version locations bumped to 1.5.0. Should include post-merge tag v1.5.0. Should verify skills-reference.md update is correctly reflected. Should pause and ask user to confirm semver level is 'minor' before proceeding.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "tiny-doc-fix-patch",
+      "prompt": "I want to bump to 1.4.2. The branch is fix/readme-typos — just one commit that fixes three typos in README.md (one was 'arcfroge' instead of 'arcforge', one was a broken markdown link, one was an extra period). That's literally all that changed. Can we release?",
+      "expected_output": "Response should recognize this is a trivial patch with no architectural content. Vault ingest scope should be 'skip or just log.md entry' — NOT a full decision note, NOT a refresh of multiple Source notes. CHANGELOG entry should go under Fixed with a brief single-bullet entry. All 5 version locations still need bumping (the minimum is still the minimum). Should still suggest the post-merge tag. Should pause for semver confirmation with 'patch' recommendation.",
+      "files": []
+    }
+  ]
+}

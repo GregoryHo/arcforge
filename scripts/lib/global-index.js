@@ -8,9 +8,14 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { buildTriggerFingerprint, jaccardSimilarity } = require('./fingerprint');
 const { parseConfidenceFrontmatter } = require('./confidence');
+const {
+  getInstinctsRoot,
+  getInstinctsDir,
+  getGlobalInstinctsDir,
+  getInstinctsGlobalIndex,
+} = require('./session-utils');
 
 /**
  * Append an entry to a JSONL index file.
@@ -152,10 +157,10 @@ function main() {
  * @param {string} project - Project name
  */
 function checkBubbleUpForProject(project) {
-  const instinctsBase = path.join(os.homedir(), '.claude', 'instincts');
-  const projectInstincts = path.join(instinctsBase, project);
-  const globalDir = path.join(instinctsBase, 'global');
-  const indexPath = path.join(instinctsBase, 'global-index.jsonl');
+  const instinctsBase = getInstinctsRoot();
+  const projectInstincts = getInstinctsDir(project);
+  const globalDir = getGlobalInstinctsDir();
+  const indexPath = getInstinctsGlobalIndex();
 
   if (!fs.existsSync(projectInstincts)) {
     return;
@@ -175,7 +180,7 @@ function checkBubbleUpForProject(project) {
     });
 
     for (const projName of projectDirs) {
-      const projInstinctFile = path.join(instinctsBase, projName, file);
+      const projInstinctFile = path.join(getInstinctsDir(projName), file);
       if (fs.existsSync(projInstinctFile)) {
         projectCount++;
       }
@@ -207,7 +212,7 @@ function checkBubbleUpForProject(project) {
     for (const otherProj of projectDirs) {
       if (otherProj === project) continue;
 
-      const otherProjDir = path.join(instinctsBase, otherProj);
+      const otherProjDir = getInstinctsDir(otherProj);
       const otherFiles = fs.readdirSync(otherProjDir).filter((f) => f.endsWith('.md'));
 
       for (const otherFile of otherFiles) {

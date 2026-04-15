@@ -54,7 +54,7 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 - **Diary = observations, context, decisions made** (stored in session directory)
 - **Learn = instinct clustering** (combines related instincts into skills)
 
-**Storage:** `~/.claude/sessions/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
+**Storage:** `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
 ## Pre-Diary Check (Noise Gate)
 
@@ -146,7 +146,7 @@ _Captured at {timestamp}_
 ### 3. Save to Session Directory
 
 1. Ensure session directory exists
-2. Write to `~/.claude/sessions/{project}/{date}/diary-{sessionId}.md`
+2. Write to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`
 3. Confirm save location with path
 
 ### 4. Offer Follow-up
@@ -213,11 +213,17 @@ Keep entries focused. Don't over-document routine work.
 ## Output Location
 
 ```
-~/.claude/sessions/{project}/{YYYY-MM-DD}/
-├── {sessionId}.json          # Session data (auto-generated)
-├── {sessionId}.md            # Session summary (auto-generated)
+~/.arcforge/diaries/{project}/{YYYY-MM-DD}/
 └── diary-{sessionId}.md      # Diary entry (from /diary)
+
+~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
+├── {sessionId}.json          # Session data (auto-generated)
+└── {sessionId}.md            # Session summary (auto-generated)
 ```
+
+Diary files live under `~/.arcforge/diaries/` (not `~/.claude/sessions/`)
+because Claude Code v2.1.78+ blocks subprocess writes to `~/.claude/`.
+The Stop-hook background enricher needs to be able to write there.
 
 ## Example Diary Entry
 

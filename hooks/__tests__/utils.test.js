@@ -252,7 +252,7 @@ describe('getSessionDir', () => {
     const result = getSessionDir('my-project', '2025-01-01');
     assert.ok(result.includes('my-project'));
     assert.ok(result.includes('2025-01-01'));
-    assert.ok(result.includes('.claude'));
+    assert.ok(result.includes('.arcforge'));
     assert.ok(result.includes('sessions'));
   });
 });

@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.1] - 2026-04-15
+
+### Fixed
+
+- **Diary enricher silently failing for ~30 days**: the Stop-hook background enricher (`spawnDiaryEnricher`) could not write to `~/.claude/sessions/...` because Claude Code v2.1.78+ added protection on nested Write tool calls inside `~/.claude/`. The error was invisible because the subprocess's stderr was piped to `'ignore'` and `--max-turns 2` exhausted the agent's budget before it could emit a Write. Result: 91 of 109 diary drafts sat as unenriched stubs. Fix: raise `--max-turns`, stop swallowing stderr, and move diary state to `~/.arcforge/` (see Changed)
+- **Observer daemon split-brain after initial state move**: `observer-daemon.sh` still pointed at `~/.claude/instincts/` and `~/.claude/observations/` while the JS side had moved to `~/.arcforge/`. Daemon wrote lock/log to one tree, the hook read from another; SIGUSR1 coordination was broken and the daemon could not see new observations. Fix: rename `CLAUDE_DIR` → `ARCFORGE_DIR` in the bash daemon and repoint to `~/.arcforge/`
+- **Leaky observer paths in `hooks/observe/main.js`**: the hook was reaching into `getInstinctsRoot()` to rebuild `.last_signal` and `.observer.lock/pid` paths inline — magic strings in hook code waiting to drift. Fix: add `getObserverSignalFile()` and `getObserverPidFile()` to `session-utils.js`; hook now uses the helpers, structural assumption lives in one place
+
+### Changed
+
+- **Consolidated all arcforge-owned state under `~/.arcforge/`**: sessions, diaries, instincts, diaryed, observations, and evolved directories moved from `~/.claude/` in a 3-commit sequence. Introduced `getArcforgeHome()` returning `~/.arcforge/`; deleted the `CLAUDE_DIR` constant entirely. After this, `~/.claude/` no longer holds any arcforge-owned state — Claude Code owns `~/.claude/`, arcforge owns `~/.arcforge/`, with no overlap. Existing user data migrated in place via `mv` (verified: 8 instincts still load from the new location post-migration)
+- Path helpers in `scripts/lib/session-utils.js` now compose on `getArcforgeHome()`: `getProcessedLogPath`, `getObservationsPath`, `getInstinctsDir`, `getInstinctsArchivedDir`, `getGlobalInstinctsDir`, `getInstinctsGlobalIndex`, `getEvolvedLogPath`, and new `getInstinctsRoot` for the daemon coordination dir. `getInstinctsArchivedDir` composes on `getInstinctsDir` (one less repeat of the `<root>/<project>/` structural assumption)
+- `scripts/lib/utils.js` `getDiaryedDir` repoints to `~/.arcforge/diaryed/`; `getSessionsDir` and diary path helpers repoint to `~/.arcforge/sessions/` and `~/.arcforge/diaries/`
+- `scripts/lib/global-index.js` inner loop uses `getInstinctsDir(projName)` instead of reconstructing `path.join(instinctsBase, projName, ...)` — matches the canonical helper pattern
+- `hooks/pre-compact/README.md`, `hooks/session-tracker/README.md`, `hooks/session-tracker/end.js`, `scripts/cli.js`, `scripts/lib/coordinator.js`, `scripts/lib/pending-actions.js`, `scripts/lib/worktree-paths.js`: path references updated to `~/.arcforge/`
+- Skill SKILL.md files updated to reference `~/.arcforge/` paths: `arc-journaling`, `arc-learning`, `arc-managing-sessions`, `arc-observing`, `arc-reflecting`, `arc-using`, `arc-using-worktrees`; plus `arc-dispatching-teammates` baseline/green test fixtures
+- `arc-journaling/scripts/auto-diary.js` and `diary.js`: emit paths under `~/.arcforge/sessions/`
+- `arc-managing-sessions/scripts/sessions.js`: session list/save/load paths repointed
+- `.claude/rules/architecture.md`: Worktree Isolation / `.arcforge-epic` marker section aligned with helper-based path derivation
+- `docs/guide/skills-reference.md`, `docs/guide/worktree-workflow.md`: path references updated
+- Test fixtures under `tests/skills/pressure/`: `arc-finishing-epic-completion-format.md`, `arc-using-path-reconstruction.md`, `arc-using-worktrees-cli-failure.md` use the current path format
+- Minor: `tests/scripts/coordinator-marker-exclude.test.js` — fixed a stale comment referencing the pre-migration `~/.arcforge-worktrees/` path (and a "slinged" typo → "linked")
+
+### Added
+
+- `hooks/session-tracker/inject-context.js` (65 lines): injects session context at session start — part of the diary enricher's unblock (pre-creating the target path so the enricher Write becomes Edit)
+- Diary enricher test coverage: `hooks/__tests__/diary-enricher.test.js` (128 lines, unit) and `hooks/__tests__/diary-enricher-e2e.test.js` (139 lines, E2E). The E2E suite prevents a future silent-failure regression — unit tests would have missed the original bug because the enricher's "failure" was Claude Code's subprocess exiting normally with no Write performed
+
 ## [1.4.0] - 2026-04-12
 
 ### Added

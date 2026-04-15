@@ -1,15 +1,16 @@
 // scripts/lib/session-utils.js
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const {
+  getArcforgeHome,
+  getProjectDiariesDir,
+  getDateDiariesDir,
+  getProjectSessionsDir,
+} = require('./utils');
 
-/**
- * Get diary file path: ~/.claude/sessions/{project}/{date}/diary-{sessionId}.md
- */
 function getDiaryPath(project, date, sessionId) {
-  return path.join(CLAUDE_DIR, 'sessions', project, date, `diary-${sessionId}.md`);
+  return path.join(getDateDiariesDir(project, date), `diary-${sessionId}.md`);
 }
 
 /**
@@ -26,7 +27,7 @@ function saveDiary(filePath, content) {
  * Get processed.log path for project or global.
  */
 function getProcessedLogPath(project) {
-  const base = path.join(CLAUDE_DIR, 'diaryed');
+  const base = path.join(getArcforgeHome(), 'diaryed');
   return project
     ? path.join(base, project, 'processed.log')
     : path.join(base, 'global', 'processed.log');
@@ -53,20 +54,19 @@ function parseProcessedLog(logPath) {
  * Scan for diary files based on strategy.
  */
 function scanDiaries(project, strategy, processedLogPath) {
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
-  if (!fs.existsSync(sessionsDir)) return [];
+  const diariesDir = getProjectDiariesDir(project);
+  if (!fs.existsSync(diariesDir)) return [];
 
   const processed = parseProcessedLog(processedLogPath);
   const allDiaries = [];
 
-  // Find all diary files sorted by date
   const dateDirs = fs
-    .readdirSync(sessionsDir)
-    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory())
+    .readdirSync(diariesDir)
+    .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory())
     .sort();
 
   for (const dateDir of dateDirs) {
-    const dirPath = path.join(sessionsDir, dateDir);
+    const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
       .filter((f) => f.startsWith('diary-') && f.endsWith('.md'))
@@ -75,7 +75,6 @@ function scanDiaries(project, strategy, processedLogPath) {
     allDiaries.push(...diaries);
   }
 
-  // Filter based on strategy
   if (strategy === 'unprocessed') {
     return allDiaries.filter((d) => !processed.has(path.basename(d)));
   } else if (strategy === 'project_focused') {
@@ -89,16 +88,15 @@ function scanDiaries(project, strategy, processedLogPath) {
  * Determine which reflection strategy to use.
  */
 function determineReflectStrategy(project, processedLogPath) {
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
-  if (!fs.existsSync(sessionsDir)) return 'recent_window';
+  const diariesDir = getProjectDiariesDir(project);
+  if (!fs.existsSync(diariesDir)) return 'recent_window';
 
-  // Count all diaries
   const allDiaries = [];
   const dateDirs = fs
-    .readdirSync(sessionsDir)
-    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory());
+    .readdirSync(diariesDir)
+    .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory());
   for (const dateDir of dateDirs) {
-    const dirPath = path.join(sessionsDir, dateDir);
+    const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
       .filter((f) => f.startsWith('diary-') && f.endsWith('.md'));
@@ -159,7 +157,7 @@ function getDateDirs(parentDir) {
  */
 function listSessions(project, options = {}) {
   const { date = null, query = null, limit = 20, offset = 0 } = options;
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
+  const sessionsDir = getProjectSessionsDir(project);
   if (!fs.existsSync(sessionsDir)) return { sessions: [], total: 0 };
 
   let allSessions = [];
@@ -453,54 +451,43 @@ function sectionNameToKey(name) {
 // ─────────────────────────────────────────────
 
 /**
- * Get observations JSONL path for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/observations/{project}/observations.jsonl
+ * Root for instinct storage. Also hosts observer daemon coordination
+ * files — see `getObserverSignalFile` / `getObserverPidFile`.
  */
+function getInstinctsRoot() {
+  return path.join(getArcforgeHome(), 'instincts');
+}
+
 function getObservationsPath(project) {
-  return path.join(CLAUDE_DIR, 'observations', project, 'observations.jsonl');
+  return path.join(getArcforgeHome(), 'observations', project, 'observations.jsonl');
 }
 
-/**
- * Get instincts directory for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/instincts/{project}/
- */
 function getInstinctsDir(project) {
-  return path.join(CLAUDE_DIR, 'instincts', project);
+  return path.join(getInstinctsRoot(), project);
 }
 
-/**
- * Get archived instincts directory for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/instincts/{project}/archived/
- */
 function getInstinctsArchivedDir(project) {
-  return path.join(CLAUDE_DIR, 'instincts', project, 'archived');
+  return path.join(getInstinctsDir(project), 'archived');
 }
 
-/**
- * Get global instincts directory.
- * @returns {string} ~/.claude/instincts/global/
- */
 function getGlobalInstinctsDir() {
-  return path.join(CLAUDE_DIR, 'instincts', 'global');
+  return path.join(getInstinctsRoot(), 'global');
 }
 
-/**
- * Get global index for instinct bubble-up tracking.
- * @returns {string} ~/.claude/instincts/global-index.jsonl
- */
 function getInstinctsGlobalIndex() {
-  return path.join(CLAUDE_DIR, 'instincts', 'global-index.jsonl');
+  return path.join(getInstinctsRoot(), 'global-index.jsonl');
 }
 
-/**
- * Get evolved log path for tracking instinct-to-artifact evolution.
- * @returns {string} ~/.claude/evolved/evolved.jsonl
- */
+function getObserverSignalFile() {
+  return path.join(getInstinctsRoot(), '.last_signal');
+}
+
+function getObserverPidFile() {
+  return path.join(getInstinctsRoot(), '.observer.lock', 'pid');
+}
+
 function getEvolvedLogPath() {
-  return path.join(CLAUDE_DIR, 'evolved', 'evolved.jsonl');
+  return path.join(getArcforgeHome(), 'evolved', 'evolved.jsonl');
 }
 
 module.exports = {
@@ -511,7 +498,6 @@ module.exports = {
   scanDiaries,
   determineReflectStrategy,
   updateProcessedLog,
-  CLAUDE_DIR,
   // Session listing & briefings
   getDateDirs,
   listSessions,
@@ -521,9 +507,12 @@ module.exports = {
   parseSessionSections,
   // Observation & Instinct paths
   getObservationsPath,
+  getInstinctsRoot,
   getInstinctsDir,
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
+  getObserverSignalFile,
+  getObserverPidFile,
   getEvolvedLogPath,
 };

@@ -33,8 +33,8 @@ describe('session-utils', () => {
   describe('getDiaryPath', () => {
     it('returns correct path structure', () => {
       const result = getDiaryPath('my-project', '2026-01-15', 'abc123');
-      expect(result).toContain('.claude');
-      expect(result).toContain('sessions');
+      expect(result).toContain('.arcforge');
+      expect(result).toContain('diaries');
       expect(result).toContain('my-project');
       expect(result).toContain('2026-01-15');
       expect(result).toContain('diary-abc123.md');
@@ -61,8 +61,8 @@ describe('session-utils', () => {
     it('creates directories and saves content', () => {
       const diaryPath = path.join(
         testDir,
-        '.claude',
-        'sessions',
+        '.arcforge',
+        'diaries',
         'test-project',
         '2026-01-15',
         'diary-test.md',

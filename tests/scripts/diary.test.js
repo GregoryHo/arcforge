@@ -24,8 +24,8 @@ describe('diary.js CLI', () => {
         ],
         { encoding: 'utf-8' },
       );
-      expect(result.trim()).toContain('.claude');
-      expect(result.trim()).toContain('sessions');
+      expect(result.trim()).toContain('.arcforge');
+      expect(result.trim()).toContain('diaries');
       expect(result.trim()).toContain('test-project');
       expect(result.trim()).toContain('2026-01-15');
       expect(result.trim()).toContain('diary-abc123.md');

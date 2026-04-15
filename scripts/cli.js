@@ -110,7 +110,7 @@ COMMANDS:
       List all epics that can be worked on in parallel.
 
   expand [--epic <id>] [--project-setup] [--verify] [--verify-cmd "..."]
-      Create git worktrees for ready epics at ~/.arcforge-worktrees/.
+      Create git worktrees for ready epics at ~/.arcforge/worktrees/.
       --epic           Expand only the named epic (single-epic mode)
       --project-setup  Auto-detect and run installer (npm/pip/cargo/go)
       --verify         Run tests after creation
