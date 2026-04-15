@@ -451,9 +451,8 @@ function sectionNameToKey(name) {
 // ─────────────────────────────────────────────
 
 /**
- * Get the instincts root directory (~/.arcforge/instincts/).
- * Holds <project>/, global/, global-index.jsonl, and observer daemon
- * coordination files (.last_signal, .observer.lock/).
+ * Root for instinct storage. Also hosts observer daemon coordination
+ * files — see `getObserverSignalFile` / `getObserverPidFile`.
  */
 function getInstinctsRoot() {
   return path.join(getArcforgeHome(), 'instincts');
@@ -468,7 +467,7 @@ function getInstinctsDir(project) {
 }
 
 function getInstinctsArchivedDir(project) {
-  return path.join(getInstinctsRoot(), project, 'archived');
+  return path.join(getInstinctsDir(project), 'archived');
 }
 
 function getGlobalInstinctsDir() {
@@ -477,6 +476,14 @@ function getGlobalInstinctsDir() {
 
 function getInstinctsGlobalIndex() {
   return path.join(getInstinctsRoot(), 'global-index.jsonl');
+}
+
+function getObserverSignalFile() {
+  return path.join(getInstinctsRoot(), '.last_signal');
+}
+
+function getObserverPidFile() {
+  return path.join(getInstinctsRoot(), '.observer.lock', 'pid');
 }
 
 function getEvolvedLogPath() {
@@ -505,5 +512,7 @@ module.exports = {
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
+  getObserverSignalFile,
+  getObserverPidFile,
   getEvolvedLogPath,
 };

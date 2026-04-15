@@ -8,9 +8,9 @@
 
 set -euo pipefail
 
-CLAUDE_DIR="${HOME}/.claude"
-INSTINCTS_DIR="${CLAUDE_DIR}/instincts"
-OBS_DIR="${CLAUDE_DIR}/observations"
+ARCFORGE_DIR="${HOME}/.arcforge"
+INSTINCTS_DIR="${ARCFORGE_DIR}/instincts"
+OBS_DIR="${ARCFORGE_DIR}/observations"
 LOCK_DIR="${INSTINCTS_DIR}/.observer.lock"
 LOG_FILE="${INSTINCTS_DIR}/observer.log"
 GLOBAL_INDEX="${INSTINCTS_DIR}/global-index.jsonl"

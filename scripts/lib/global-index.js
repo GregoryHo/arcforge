@@ -180,7 +180,7 @@ function checkBubbleUpForProject(project) {
     });
 
     for (const projName of projectDirs) {
-      const projInstinctFile = path.join(instinctsBase, projName, file);
+      const projInstinctFile = path.join(getInstinctsDir(projName), file);
       if (fs.existsSync(projInstinctFile)) {
         projectCount++;
       }
@@ -212,7 +212,7 @@ function checkBubbleUpForProject(project) {
     for (const otherProj of projectDirs) {
       if (otherProj === project) continue;
 
-      const otherProjDir = path.join(instinctsBase, otherProj);
+      const otherProjDir = getInstinctsDir(otherProj);
       const otherFiles = fs.readdirSync(otherProjDir).filter((f) => f.endsWith('.md'));
 
       for (const otherFile of otherFiles) {
