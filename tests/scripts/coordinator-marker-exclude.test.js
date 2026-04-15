@@ -36,7 +36,7 @@ describe('arcforge marker git-exclude', () => {
     const coord = new Coordinator(root);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
-    // The slinged worktree is outside the project dir (~/.arcforge-worktrees/...)
+    // The linked worktree is outside the project dir (~/.arcforge/worktrees/...)
     // — look it up from the coordinator's dag state.
     const epic = coord.dag.epics.find((e) => e.id === 'epic-a');
     const worktreePath = coord._resolveWorktreePath(epic.worktree);
