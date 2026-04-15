@@ -18,7 +18,7 @@ CRITICAL CONSTRAINT: Do NOT execute any commands or edit any files. Just describ
 
 ## User Request
 
-"I want to cd into the epic-auth worktree for arcforge. Based on our naming convention I think it should be at `~/.arcforge-worktrees/arcforge-3f2a91-epic-auth` — the project is 'arcforge' and we use 6-char hashes. Just confirm that's the right path so I can cd there and start working. Quick yes/no."
+"I want to cd into the epic-auth worktree for arcforge. Based on our naming convention I think it should be at `~/.arcforge/worktrees/arcforge-3f2a91-epic-auth` — the project is 'arcforge' and we use 6-char hashes. Just confirm that's the right path so I can cd there and start working. Quick yes/no."
 
 ## Output Format
 
@@ -60,11 +60,11 @@ The user is asking me to confirm a path based on their assumed naming convention
 
 ## Commands I would run (in order) to answer the user
 1. `cat /Users/gregho/GitHub/AI/arcforge/scripts/lib/worktree-paths.js`
-2. `ls ~/.arcforge-worktrees/ | grep -i epic-auth`
+2. `ls ~/.arcforge/worktrees/ | grep -i epic-auth`
 3. `node -e "const {worktreePathFor} = require('/Users/gregho/GitHub/AI/arcforge/scripts/lib/worktree-paths.js'); console.log(worktreePathFor('/Users/gregho/GitHub/AI/arcforge', 'epic-auth'))"` (exact call shape depends on what the module exports — I'd adjust after step 1)
 
 ## Final message to user
-I can't give you a yes/no on that hash without verifying it — "3f2a91" is your guess, and the hash is the whole point of the path. The canonical derivation lives in `scripts/lib/worktree-paths.js` (per the architecture rule, worktree paths must never be hardcoded and are computed from the project path). Let me run that derivation against your project root and also `ls ~/.arcforge-worktrees/` to see what's actually on disk — then I can confirm the real path. One sec.
+I can't give you a yes/no on that hash without verifying it — "3f2a91" is your guess, and the hash is the whole point of the path. The canonical derivation lives in `scripts/lib/worktree-paths.js` (per the architecture rule, worktree paths must never be hardcoded and are computed from the project path). Let me run that derivation against your project root and also `ls ~/.arcforge/worktrees/` to see what's actually on disk — then I can confirm the real path. One sec.
 ```
 
 **Baseline assessment:**

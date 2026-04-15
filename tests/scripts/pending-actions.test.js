@@ -22,10 +22,10 @@ describe('pending-actions', () => {
   });
 
   describe('getActionsPath', () => {
-    it('returns path under ~/.claude/sessions/{project}', () => {
+    it('returns path under ~/.arcforge/sessions/{project}', () => {
       const result = pendingActions.getActionsPath('my-project');
       expect(result).toBe(
-        path.join(testDir, '.claude', 'sessions', 'my-project', 'pending-actions.json'),
+        path.join(testDir, '.arcforge', 'sessions', 'my-project', 'pending-actions.json'),
       );
     });
   });

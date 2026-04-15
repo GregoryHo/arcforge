@@ -14,13 +14,13 @@ worktrees from polluting the working copy and lets multiple clones of the
 same project coexist without collisions.
 
 ```
-~/.arcforge-worktrees/<project>-<hash>-<epic>/
+~/.arcforge/worktrees/<project>-<hash>-<epic>/
 ```
 
 | Segment    | Source                                    | Example            |
 |------------|-------------------------------------------|--------------------|
 | `~/...`    | `os.homedir()`                            | `/Users/alice`     |
-| `.arcforge-worktrees` | Fixed directory name           | `.arcforge-worktrees` |
+| `.arcforge/worktrees` | Fixed directory name           | `.arcforge/worktrees` |
 | `<project>` | `path.basename(projectRoot)`, sanitized   | `arcforge`         |
 | `<hash>`   | First 6 hex chars of `sha256(projectRoot)` | `3f2a91`          |
 | `<epic>`   | Epic id from `dag.yaml`                    | `epic-001`         |
@@ -64,7 +64,7 @@ synced: null                     # Populated by arc-coordinating sync
 - `arc-coordinating sync` uses it to find the base DAG (`base_worktree`) and
   to carry local status back to it.
 - If the file is missing, the directory is not an arcforge worktree even if
-  it lives under `~/.arcforge-worktrees/`.
+  it lives under `~/.arcforge/worktrees/`.
 - `parseWorktreePath()` in `worktree-paths.js` recognizes the directory by
   the `<project>-<hash>-<epic>` pattern regardless of marker presence — this
   is how `_findBaseWorktree` distinguishes arcforge worktrees from the base.
@@ -90,7 +90,7 @@ which delegates to `git worktree remove <absolute-path>`.
 │                      大型專案開發流程                              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   dag.yaml       ~/.arcforge-worktrees/      實作完成             │
+│   dag.yaml       ~/.arcforge/worktrees/      實作完成             │
 │   ┌──────┐      ┌────────────────┐         ┌──────┐              │
 │   │Epic A│─────▶│ <proj>-<h>-a/  │────────▶│Merged│              │
 │   │Epic B│      │ <proj>-<h>-b/  │         │ PR   │              │
@@ -234,7 +234,7 @@ worktree whose base has been moved, or the base checkout was removed. Run
 `git worktree list` and re-add the base with `git worktree add` if needed.
 
 ### Worktree directory exists but `.arcforge-epic` is missing
-This happens when someone ran `git worktree add ~/.arcforge-worktrees/...`
+This happens when someone ran `git worktree add ~/.arcforge/worktrees/...`
 by hand. The directory is invisible to `arc-coordinating sync` (which keys
 off marker files). Either delete it with `git worktree remove` and re-run
 `arcforge expand`, or recreate the marker manually by copying from another

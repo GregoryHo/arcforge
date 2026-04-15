@@ -43,7 +43,7 @@ Save the current session with enrichment.
 
 **Process:**
 
-1. Get current session data from `~/.claude/sessions/{project}/{date}/{sessionId}.json`
+1. Get current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
 2. Use transcript data if available (user messages, tools used, files modified)
 3. Enrich with your understanding from conversation memory:
    - **Summary**: What was accomplished
@@ -51,7 +51,7 @@ Save the current session with enrichment.
    - **What Failed**: Approaches that were tried and abandoned (with reasons)
    - **Blockers**: Current blockers or open questions
    - **Next Step**: Exact next step to take
-4. Save to `~/.claude/sessions/{project}/{date}/session-{alias}.md`
+4. Save to `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`
 5. Create alias if name provided
 
 **Infrastructure:**
@@ -120,7 +120,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" aliases
 ## Storage Layout
 
 ```
-~/.claude/sessions/{project}/
+~/.arcforge/sessions/{project}/
 ├── aliases.json                          # Project-scoped alias registry
 ├── {YYYY-MM-DD}/
 │   ├── {sessionId}.json                  # Auto-saved session metrics

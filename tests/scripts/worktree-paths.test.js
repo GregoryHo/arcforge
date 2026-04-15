@@ -10,12 +10,14 @@ const {
 } = require('../../scripts/lib/worktree-paths');
 
 describe('getWorktreeRoot', () => {
-  it('returns ~/.arcforge-worktrees', () => {
-    expect(getWorktreeRoot()).toBe(path.join(os.homedir(), '.arcforge-worktrees'));
+  it('returns ~/.arcforge/worktrees', () => {
+    expect(getWorktreeRoot()).toBe(path.join(os.homedir(), '.arcforge', 'worktrees'));
   });
 
   it('honors a custom home directory override', () => {
-    expect(getWorktreeRoot('/custom/home')).toBe(path.join('/custom/home', '.arcforge-worktrees'));
+    expect(getWorktreeRoot('/custom/home')).toBe(
+      path.join('/custom/home', '.arcforge', 'worktrees'),
+    );
   });
 });
 
@@ -94,7 +96,7 @@ describe('getWorktreePath', () => {
 
   it('honors a custom home directory override', () => {
     const result = getWorktreePath('/Users/foo/projects/bar', 'epic-001', '/custom/home');
-    expect(result.startsWith('/custom/home/.arcforge-worktrees/')).toBe(true);
+    expect(result.startsWith('/custom/home/.arcforge/worktrees/')).toBe(true);
   });
 
   it('rejects a missing epic id', () => {

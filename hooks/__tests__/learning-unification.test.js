@@ -264,8 +264,8 @@ describe('pending-actions create + consume flow', () => {
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-pending-actions-'));
     process.env.HOME = testDir;
-    // Create the .claude/sessions directory
-    fs.mkdirSync(path.join(testDir, '.claude', 'sessions', 'test-project'), { recursive: true });
+    // Create the arcforge sessions directory (where pending-actions.json lives)
+    fs.mkdirSync(path.join(testDir, '.arcforge', 'sessions', 'test-project'), { recursive: true });
     delete require.cache[require.resolve('../../scripts/lib/pending-actions')];
   });
 

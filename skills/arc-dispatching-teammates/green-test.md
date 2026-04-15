@@ -88,7 +88,7 @@ STEP 3 draft + STEP 4 debrief:
 > > 2. **For each of the three epics (auth, api, ui), in a single pass:**
 > >    - Run `node scripts/cli.js expand --epic <epic-id>` from the
 > >      project root. This creates the canonical worktree at
-> >      `~/.arcforge-worktrees/...` and stamps the `.arcforge-epic`
+> >      `~/.arcforge/worktrees/...` and stamps the `.arcforge-epic`
 > >      marker. Per-epic expand (not batch) so any failure is
 > >      attributable to one epic.
 > >    - Re-read `arcforge status --json` to get the absolute worktree

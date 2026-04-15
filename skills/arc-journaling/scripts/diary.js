@@ -2,6 +2,7 @@
 // skills/arc-journaling/scripts/diary.js
 
 const { getDiaryPath, saveDiary } = require('../../../scripts/lib/session-utils');
+const { getDiaryDraftPath } = require('../../../scripts/lib/utils');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -50,8 +51,7 @@ if (command === 'save') {
   }
   const fs = require('fs');
   const path = require('path');
-  const { CLAUDE_DIR } = require('../../../scripts/lib/session-utils');
-  const draftPath = path.join(CLAUDE_DIR, 'sessions', project, date, `diary-${session}-draft.md`);
+  const draftPath = getDiaryDraftPath(project, date, session);
   const finalPath = getDiaryPath(project, date, session);
 
   if (!fs.existsSync(draftPath)) {

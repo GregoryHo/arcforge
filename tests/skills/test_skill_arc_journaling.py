@@ -59,7 +59,7 @@ def test_has_quick_reference_section():
 def test_documents_storage_location():
     """Skill should document where diaries are stored."""
     text = _read_skill()
-    assert "~/.claude/sessions" in text or ".claude/sessions" in text
+    assert "~/.arcforge/diaries" in text or ".arcforge/diaries" in text
 
 
 def test_has_template():

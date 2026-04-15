@@ -137,7 +137,7 @@ Output the strategy header at start of reflection:
 
 Search for diary files:
 ```
-~/.claude/sessions/{project}/*/diary-*.md
+~/.arcforge/diaries/{project}/*/diary-*.md
 ```
 
 Count entries. If fewer than 3:

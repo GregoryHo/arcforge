@@ -386,41 +386,53 @@ function generateRunId() {
 }
 
 /**
- * Get Claude sessions directory (~/.claude/sessions/)
+ * Root for all arcforge user state (worktrees, sessions, diaries).
+ * Lives outside ~/.claude/ because Claude Code v2.1.78+ protects ~/.claude/
+ * from nested-subprocess Write calls, which breaks the background enricher.
  */
-function getSessionsDir() {
-  return path.join(os.homedir(), '.claude', 'sessions');
+function getArcforgeHome() {
+  return path.join(os.homedir(), '.arcforge');
 }
 
-/**
- * Get project-specific sessions directory (~/.claude/sessions/{project}/)
- */
+function getSessionsDir() {
+  return path.join(getArcforgeHome(), 'sessions');
+}
+
 function getProjectSessionsDir(project) {
   return path.join(getSessionsDir(), project);
 }
 
-/**
- * Get session directory for a specific date (~/.claude/sessions/{project}/{date}/)
- */
 function getSessionDir(project, date) {
   return path.join(getSessionsDir(), project, date);
 }
 
-/**
- * Get diary file path for current session
- * Returns ~/.claude/sessions/{project}/{date}/diary-{sessionId}.md
- */
+function getDiariesDir() {
+  return path.join(getArcforgeHome(), 'diaries');
+}
+
+function getProjectDiariesDir(project) {
+  return path.join(getDiariesDir(), project);
+}
+
+function getDateDiariesDir(project, date) {
+  return path.join(getDiariesDir(), project, date);
+}
+
+function getDiaryDraftPath(project, date, sessionId) {
+  return path.join(getDateDiariesDir(project, date), `diary-${sessionId}-draft.md`);
+}
+
 function getDiaryFilePath() {
-  const project = getProjectName();
-  const date = getDateString();
-  const sessionId = getSessionId();
-  return path.join(getSessionDir(project, date), `diary-${sessionId}.md`);
+  return path.join(
+    getDateDiariesDir(getProjectName(), getDateString()),
+    `diary-${getSessionId()}.md`,
+  );
 }
 
 /**
- * Get diaryed directory for extracted insights
- * @param {string|null} project - Project name, null for global
- * @returns {string} Path to diaryed directory
+ * Reflections still live under ~/.claude/ because they're written by Node
+ * code, not via the nested Write tool — so the ~/.claude/ protection
+ * doesn't apply.
  */
 function getDiaryedDir(project = null) {
   const base = path.join(os.homedir(), '.claude', 'diaryed');
@@ -429,7 +441,7 @@ function getDiaryedDir(project = null) {
 
 /**
  * Get compaction log file path for a project
- * Located at ~/.claude/sessions/{project}/compaction-log.txt
+ * Located at ~/.arcforge/sessions/{project}/compaction-log.txt
  */
 function getCompactionLogPath(project) {
   return path.join(getProjectSessionsDir(project), 'compaction-log.txt');
@@ -533,7 +545,7 @@ function createSessionCounter(name) {
 
 /**
  * Get session file path for current session
- * Returns ~/.claude/sessions/{project}/{date}/{sessionId}.json
+ * Returns ~/.arcforge/sessions/{project}/{date}/{sessionId}.json
  */
 function getSessionFilePath() {
   const project = getProjectName();
@@ -593,10 +605,15 @@ module.exports = {
   getDateString,
   getTimestamp,
   generateRunId,
+  getArcforgeHome,
   getSessionsDir,
   getProjectSessionsDir,
   getSessionDir,
+  getDiariesDir,
+  getProjectDiariesDir,
+  getDateDiariesDir,
   getDiaryFilePath,
+  getDiaryDraftPath,
   getDiaryedDir,
   getCompactionLogPath,
   ensureDir,

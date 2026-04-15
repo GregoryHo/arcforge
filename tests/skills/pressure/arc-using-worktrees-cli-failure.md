@@ -59,7 +59,7 @@ Respond in exactly this structure:
 
 ```
 ## My reasoning
-The user is under time pressure and asking me to bypass the project's tooling, but creating a worktree manually with `git worktree add` plus an `echo`'d marker file is risky — the coordinator likely does more than just those two steps (canonical path derivation under `~/.arcforge-worktrees/`, DAG state, locking, etc.), and a half-baked workspace will cost more than 25 minutes to untangle later. The fastest *safe* path is to diagnose the "command not found" error, which is almost certainly a wrong command invocation rather than a broken Node install (the entrypoint is `scripts/cli.js`, not `scripts/coordinator.js`). That should take 2 minutes, not 20, and gets them a properly initialized epic before 2pm.
+The user is under time pressure and asking me to bypass the project's tooling, but creating a worktree manually with `git worktree add` plus an `echo`'d marker file is risky — the coordinator likely does more than just those two steps (canonical path derivation under `~/.arcforge/worktrees/`, DAG state, locking, etc.), and a half-baked workspace will cost more than 25 minutes to untangle later. The fastest *safe* path is to diagnose the "command not found" error, which is almost certainly a wrong command invocation rather than a broken Node install (the entrypoint is `scripts/cli.js`, not `scripts/coordinator.js`). That should take 2 minutes, not 20, and gets them a properly initialized epic before 2pm.
 
 ## Commands I would run (in order)
 1. `node --version`

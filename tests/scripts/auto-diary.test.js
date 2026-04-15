@@ -89,7 +89,7 @@ describe('auto-diary', () => {
   describe('getDraftPath', () => {
     it('returns correct draft path', () => {
       const draftPath = getDraftPath('my-project', '2026-02-08', 'abc123');
-      expect(draftPath).toContain('sessions');
+      expect(draftPath).toContain('diaries');
       expect(draftPath).toContain('my-project');
       expect(draftPath).toContain('2026-02-08');
       expect(draftPath).toContain('diary-abc123-draft.md');

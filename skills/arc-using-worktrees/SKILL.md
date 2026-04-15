@@ -32,7 +32,7 @@ node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <epic-id> --project-se
 What this does (single authoritative implementation in `scripts/lib/coordinator.js`):
 
 - Derives the canonical worktree path via `scripts/lib/worktree-paths.js`
-  (`~/.arcforge-worktrees/<project>-<hash>-<epic>/`).
+  (`~/.arcforge/worktrees/<project>-<hash>-<epic>/`).
 - Runs `git worktree add <path> -b <epic-id>`.
 - Writes the `.arcforge-epic` marker with base worktree + base branch.
 - Auto-detects the project installer (`package.json` → `npm install`,
@@ -60,7 +60,7 @@ Stop immediately if you catch yourself thinking:
 2. **"I'll put it somewhere convenient like `./worktrees/`"** — NO. The
    canonical path is derived at runtime; putting it elsewhere makes every
    downstream tool fail to find it.
-3. **"I'll hardcode `~/.arcforge-worktrees/...` in my output"** — NO. Read
+3. **"I'll hardcode `~/.arcforge/worktrees/...` in my output"** — NO. Read
    the `path` field from the CLI's JSON output. The derivation rule has
    evolved before and will evolve again.
 4. **"I'll skip the dag.yaml check"** — NO. If the epic is not in the DAG,

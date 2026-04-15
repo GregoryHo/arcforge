@@ -8,6 +8,7 @@
  * 3. Queue pending actions (reflect-ready)
  */
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const {
@@ -17,11 +18,13 @@ const {
   writeFileSafe,
   loadSession,
   getSessionDir,
+  getProjectSessionsDir,
   getProjectName,
   getDateString,
   getSessionId,
   getTimestamp,
   createSessionCounter,
+  ensureDir,
   output,
   log,
 } = require('../../scripts/lib/utils');
@@ -147,15 +150,20 @@ function spawnDiaryEnricher(draftPath, session) {
       'Read the draft, fill placeholder sections using provided session data, ' +
       'write the result back. Be concise and factual.';
 
+    // Capture stderr to a log file so silent failures leave a trail.
+    const sessionsDir = getProjectSessionsDir(session.project);
+    ensureDir(sessionsDir);
+    const stderrFd = fs.openSync(path.join(sessionsDir, 'enricher.log'), 'a');
+
     const child = spawn(
       'claude',
       [
         '--model',
         'haiku',
+        // Haiku needs Read + Write + thinking; 10 leaves headroom (2 hits max-turns).
         '--max-turns',
-        '2',
+        '10',
         '--print',
-        // Safe: enricher is sandboxed (Read+Write only, no MCP, max 2 turns, detached)
         '--dangerously-skip-permissions',
         '--system-prompt',
         systemPrompt,
@@ -166,12 +174,13 @@ function spawnDiaryEnricher(draftPath, session) {
         '--mcp-config',
         '{"mcpServers":{}}',
       ],
-      { detached: true, stdio: ['pipe', 'ignore', 'ignore'] },
+      { detached: true, stdio: ['pipe', 'ignore', stderrFd] },
     );
 
     child.stdin.write(prompt);
     child.stdin.end();
     child.unref();
+    fs.closeSync(stderrFd);
   } catch {
     // Fire-and-forget — spawn failure is non-fatal
   }

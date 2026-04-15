@@ -279,7 +279,7 @@ describe('E2E: session-tracker/start.js', () => {
 
     // Verify session file was created
     const projectName = path.basename(testDir);
-    const sessionsBase = path.join(testDir, '.claude', 'sessions', projectName);
+    const sessionsBase = path.join(testDir, '.arcforge', 'sessions', projectName);
     if (fs.existsSync(sessionsBase)) {
       const dateDirs = fs.readdirSync(sessionsBase);
       assert.ok(dateDirs.length > 0, 'Should have a date directory');
@@ -615,7 +615,7 @@ describe('E2E: pre-compact/main.js', () => {
 
     // Check compaction log was written
     const projectName = path.basename(testDir);
-    const logPath = path.join(testDir, '.claude', 'sessions', projectName, 'compaction-log.txt');
+    const logPath = path.join(testDir, '.arcforge', 'sessions', projectName, 'compaction-log.txt');
     if (fs.existsSync(logPath)) {
       const content = fs.readFileSync(logPath, 'utf-8');
       assert.ok(

@@ -126,7 +126,7 @@ describe('session persistence', () => {
   });
 
   afterEach(() => {
-    // Clean up the session file (written to ~/.claude/sessions/...)
+    // Clean up the session file (written to ~/.arcforge/sessions/...)
     try {
       fs.unlinkSync(sessionFilePath);
     } catch {}
@@ -166,19 +166,19 @@ describe('path helpers', () => {
     expect(getProjectName()).toBe('my-app');
   });
 
-  it('getSessionsDir should return ~/.claude/sessions/', () => {
-    expect(getSessionsDir()).toBe(path.join(os.homedir(), '.claude', 'sessions'));
+  it('getSessionsDir should return ~/.arcforge/sessions/', () => {
+    expect(getSessionsDir()).toBe(path.join(os.homedir(), '.arcforge', 'sessions'));
   });
 
   it('getProjectSessionsDir should append project name', () => {
     expect(getProjectSessionsDir('foo')).toBe(
-      path.join(os.homedir(), '.claude', 'sessions', 'foo'),
+      path.join(os.homedir(), '.arcforge', 'sessions', 'foo'),
     );
   });
 
   it('getCompactionLogPath should build correct path', () => {
     expect(getCompactionLogPath('bar')).toBe(
-      path.join(os.homedir(), '.claude', 'sessions', 'bar', 'compaction-log.txt'),
+      path.join(os.homedir(), '.arcforge', 'sessions', 'bar', 'compaction-log.txt'),
     );
   });
 

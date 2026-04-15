@@ -135,7 +135,7 @@ Loaded `/Users/gregho/GitHub/AI/arcforge/skills/arc-finishing-epic/SKILL.md` (ar
 Epic merged → main
 
 Branch: epic-002 (deleted)
-Worktree: /Users/gregho/.arcforge-worktrees/arcforge-<hash>-epic-002 (removed)
+Worktree: /Users/gregho/.arcforge/worktrees/arcforge-<hash>-epic-002 (removed)
   — or, if status --json returns null for the path after cleanup —
 Worktree: (removed)
 Commits: [N commits merged]

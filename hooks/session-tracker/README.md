@@ -24,9 +24,9 @@ Provides session persistence across Claude Code sessions.
 
 ## Storage
 
-Sessions stored in `~/.claude/sessions/` in both JSON and Markdown formats:
+Sessions stored in `~/.arcforge/sessions/` in both JSON and Markdown formats:
 ```
-~/.claude/sessions/
+~/.arcforge/sessions/
 ├── my-project-2025-01-24.json    # Machine-readable
 ├── my-project-2025-01-24.md      # Human-readable summary
 ├── my-project-2025-01-23.json
@@ -101,14 +101,14 @@ If previous session exists:
   Duration: ~45 minutes
   Tool calls: 32
   Files modified: 5
-  Session saved to: ~/.claude/sessions/my-project-2025-01-24.json
+  Session saved to: ~/.arcforge/sessions/my-project-2025-01-24.json
 ```
 
 ## Editing Notes
 
 You can manually edit the session JSON to add notes:
 ```bash
-vim ~/.claude/sessions/my-project-2025-01-24.json
+vim ~/.arcforge/sessions/my-project-2025-01-24.json
 ```
 
 Change the `notes` field to leave yourself reminders for next session.

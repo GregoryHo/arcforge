@@ -3,13 +3,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
+const { getProjectDiariesDir, getDateDiariesDir, getProjectSessionsDir } = require('./utils');
+
+// Instinct/observation/diaryed trees still live under ~/.claude/ — they're
+// written by Node code (not via the nested Write tool) so they're not
+// affected by Claude's subprocess write protection.
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
-/**
- * Get diary file path: ~/.claude/sessions/{project}/{date}/diary-{sessionId}.md
- */
 function getDiaryPath(project, date, sessionId) {
-  return path.join(CLAUDE_DIR, 'sessions', project, date, `diary-${sessionId}.md`);
+  return path.join(getDateDiariesDir(project, date), `diary-${sessionId}.md`);
 }
 
 /**
@@ -53,20 +55,19 @@ function parseProcessedLog(logPath) {
  * Scan for diary files based on strategy.
  */
 function scanDiaries(project, strategy, processedLogPath) {
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
-  if (!fs.existsSync(sessionsDir)) return [];
+  const diariesDir = getProjectDiariesDir(project);
+  if (!fs.existsSync(diariesDir)) return [];
 
   const processed = parseProcessedLog(processedLogPath);
   const allDiaries = [];
 
-  // Find all diary files sorted by date
   const dateDirs = fs
-    .readdirSync(sessionsDir)
-    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory())
+    .readdirSync(diariesDir)
+    .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory())
     .sort();
 
   for (const dateDir of dateDirs) {
-    const dirPath = path.join(sessionsDir, dateDir);
+    const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
       .filter((f) => f.startsWith('diary-') && f.endsWith('.md'))
@@ -75,7 +76,6 @@ function scanDiaries(project, strategy, processedLogPath) {
     allDiaries.push(...diaries);
   }
 
-  // Filter based on strategy
   if (strategy === 'unprocessed') {
     return allDiaries.filter((d) => !processed.has(path.basename(d)));
   } else if (strategy === 'project_focused') {
@@ -89,16 +89,15 @@ function scanDiaries(project, strategy, processedLogPath) {
  * Determine which reflection strategy to use.
  */
 function determineReflectStrategy(project, processedLogPath) {
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
-  if (!fs.existsSync(sessionsDir)) return 'recent_window';
+  const diariesDir = getProjectDiariesDir(project);
+  if (!fs.existsSync(diariesDir)) return 'recent_window';
 
-  // Count all diaries
   const allDiaries = [];
   const dateDirs = fs
-    .readdirSync(sessionsDir)
-    .filter((d) => fs.statSync(path.join(sessionsDir, d)).isDirectory());
+    .readdirSync(diariesDir)
+    .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory());
   for (const dateDir of dateDirs) {
-    const dirPath = path.join(sessionsDir, dateDir);
+    const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
       .filter((f) => f.startsWith('diary-') && f.endsWith('.md'));
@@ -159,7 +158,7 @@ function getDateDirs(parentDir) {
  */
 function listSessions(project, options = {}) {
   const { date = null, query = null, limit = 20, offset = 0 } = options;
-  const sessionsDir = path.join(CLAUDE_DIR, 'sessions', project);
+  const sessionsDir = getProjectSessionsDir(project);
   if (!fs.existsSync(sessionsDir)) return { sessions: [], total: 0 };
 
   let allSessions = [];
@@ -511,7 +510,6 @@ module.exports = {
   scanDiaries,
   determineReflectStrategy,
   updateProcessedLog,
-  CLAUDE_DIR,
   // Session listing & briefings
   getDateDirs,
   listSessions,
