@@ -8,9 +8,14 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { buildTriggerFingerprint, jaccardSimilarity } = require('./fingerprint');
 const { parseConfidenceFrontmatter } = require('./confidence');
+const {
+  getInstinctsRoot,
+  getInstinctsDir,
+  getGlobalInstinctsDir,
+  getInstinctsGlobalIndex,
+} = require('./session-utils');
 
 /**
  * Append an entry to a JSONL index file.
@@ -152,10 +157,10 @@ function main() {
  * @param {string} project - Project name
  */
 function checkBubbleUpForProject(project) {
-  const instinctsBase = path.join(os.homedir(), '.claude', 'instincts');
-  const projectInstincts = path.join(instinctsBase, project);
-  const globalDir = path.join(instinctsBase, 'global');
-  const indexPath = path.join(instinctsBase, 'global-index.jsonl');
+  const instinctsBase = getInstinctsRoot();
+  const projectInstincts = getInstinctsDir(project);
+  const globalDir = getGlobalInstinctsDir();
+  const indexPath = getInstinctsGlobalIndex();
 
   if (!fs.existsSync(projectInstincts)) {
     return;

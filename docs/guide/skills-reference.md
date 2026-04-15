@@ -634,7 +634,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Artifacts:**
 - Input: `~/.arcforge/diaries/{project}/*/diary-*.md`
-- Output: `~/.claude/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
+- Output: `~/.arcforge/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
 
 **Related:** arc-journaling (5+ entries) --> **arc-reflecting** --> arc-learning (instinct clustering)
 
@@ -647,14 +647,14 @@ Rule in `skills/arc-using/SKILL.md`.
 **When to use:** When you have accumulated instincts and want to cluster related ones into higher-level skills, commands, or agents.
 
 **Key workflow:**
-1. Scan all instincts from `~/.claude/instincts/{project}/` and `global/`
+1. Scan all instincts from `~/.arcforge/instincts/{project}/` and `global/`
 2. Cluster by domain, then by trigger fingerprint similarity (Jaccard >= 0.6)
 3. Filter: only clusters with 3+ instincts, at least 1 with confidence >= 0.6
 4. Preview candidate clusters for user review
 5. Generate: user decides what to create (skill, command, or agent)
 
 **Artifacts:**
-- Input: `~/.claude/instincts/{project}/` and `global/` instinct files
+- Input: `~/.arcforge/instincts/{project}/` and `global/` instinct files
 - Output: new skill, command, or agent definition
 
 **Related:** arc-reflecting --> **arc-learning** --> arc-writing-skills
@@ -663,7 +663,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-observing
 
-**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.claude/observations/` which is populated by Claude Code PostToolUse hooks.
+**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/` which is populated by Claude Code PostToolUse hooks.
 
 **Purpose:** Manage automatically detected behavioral patterns (instincts) from tool usage observations.
 
@@ -677,8 +677,8 @@ Rule in `skills/arc-using/SKILL.md`.
 5. Loading: instincts with confidence >= 0.7 auto-loaded into context
 
 **Artifacts:**
-- Input: `~/.claude/observations/{project}/observations.jsonl`
-- Output: `~/.claude/instincts/{project}/*.md`
+- Input: `~/.arcforge/observations/{project}/observations.jsonl`
+- Output: `~/.arcforge/instincts/{project}/*.md`
 
 **Related:** automatic background process --> **arc-observing** --> arc-learning
 
@@ -699,7 +699,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Artifacts:**
 - Input: user-described pattern or insight
-- Output: `~/.claude/instincts/{project}/<id>.md`
+- Output: `~/.arcforge/instincts/{project}/<id>.md`
 
 **Related:** user insight --> **arc-recalling** --> instinct saved for arc-observing lifecycle
 

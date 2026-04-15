@@ -11,8 +11,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const os = require('node:os');
-
 const {
   getProjectName,
   readStdinSync,
@@ -20,7 +18,7 @@ const {
   setSessionIdFromInput,
   getSessionId,
 } = require('../../scripts/lib/utils');
-const { getObservationsPath } = require('../../scripts/lib/session-utils');
+const { getObservationsPath, getInstinctsRoot } = require('../../scripts/lib/session-utils');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -30,7 +28,7 @@ const MAX_INPUT_LENGTH = 5000;
 const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SIGNAL_COOLDOWN_MS = 30000; // 30 seconds between SIGUSR1 signals
-const SIGNAL_TIMESTAMP_FILE = path.join(os.homedir(), '.claude', 'instincts', '.last_signal');
+const SIGNAL_TIMESTAMP_FILE = path.join(getInstinctsRoot(), '.last_signal');
 
 /**
  * Get observations archive directory for a project.
@@ -40,7 +38,7 @@ function getArchiveDir(project) {
 }
 
 function getPidFile() {
-  return path.join(os.homedir(), '.claude', 'instincts', '.observer.lock', 'pid');
+  return path.join(getInstinctsRoot(), '.observer.lock', 'pid');
 }
 
 // ─────────────────────────────────────────────

@@ -156,7 +156,7 @@ describe('E2E: session-tracker/inject-context.js', () => {
 
   it('should inject high-confidence instincts into stdout', () => {
     const projectName = path.basename(testDir);
-    const instinctsDir = path.join(testDir, '.claude', 'instincts', projectName);
+    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
     fs.writeFileSync(
       path.join(instinctsDir, 'test-instinct.md'),
@@ -186,7 +186,7 @@ describe('E2E: session-tracker/inject-context.js', () => {
 
   it('should NOT inject instincts below 0.70 threshold', () => {
     const projectName = path.basename(testDir);
-    const instinctsDir = path.join(testDir, '.claude', 'instincts', projectName);
+    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
     fs.writeFileSync(
       path.join(instinctsDir, 'low.md'),
@@ -216,7 +216,7 @@ describe('E2E: session-tracker/inject-context.js', () => {
 
   it('should output both systemMessage and hookSpecificOutput for high-confidence instincts', () => {
     const projectName = path.basename(testDir);
-    const instinctsDir = path.join(testDir, '.claude', 'instincts', projectName);
+    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
     fs.writeFileSync(
       path.join(instinctsDir, 'dual-test.md'),

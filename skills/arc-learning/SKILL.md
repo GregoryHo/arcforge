@@ -33,12 +33,12 @@ fi
 
 ## Workflow
 
-1. **Scan**: Load all instincts from `~/.claude/instincts/{project}/` and `global/`
+1. **Scan**: Load all instincts from `~/.arcforge/instincts/{project}/` and `global/`
 2. **Cluster**: Group by domain, then within each domain use trigger fingerprint similarity (Jaccard >= 0.6) to find sub-clusters
 3. **Filter**: Only process clusters with 3+ instincts, at least 1 with confidence >= 0.6
 4. **Preview**: Display candidate clusters with type recommendations and suggested names
 5. **Generate**: Create skill, command, or agent from a cluster (auto-classified or user-overridden)
-6. **Track**: Record evolution to `~/.claude/evolved/evolved.jsonl` for deduplication
+6. **Track**: Record evolution to `~/.arcforge/evolved/evolved.jsonl` for deduplication
 
 **Note:** Generated files are scaffolds — refine before deployment.
 

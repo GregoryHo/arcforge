@@ -1,14 +1,13 @@
 // scripts/lib/session-utils.js
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
-const { getProjectDiariesDir, getDateDiariesDir, getProjectSessionsDir } = require('./utils');
-
-// Instinct/observation/diaryed trees still live under ~/.claude/ — they're
-// written by Node code (not via the nested Write tool) so they're not
-// affected by Claude's subprocess write protection.
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const {
+  getArcforgeHome,
+  getProjectDiariesDir,
+  getDateDiariesDir,
+  getProjectSessionsDir,
+} = require('./utils');
 
 function getDiaryPath(project, date, sessionId) {
   return path.join(getDateDiariesDir(project, date), `diary-${sessionId}.md`);
@@ -28,7 +27,7 @@ function saveDiary(filePath, content) {
  * Get processed.log path for project or global.
  */
 function getProcessedLogPath(project) {
-  const base = path.join(CLAUDE_DIR, 'diaryed');
+  const base = path.join(getArcforgeHome(), 'diaryed');
   return project
     ? path.join(base, project, 'processed.log')
     : path.join(base, 'global', 'processed.log');
@@ -452,54 +451,36 @@ function sectionNameToKey(name) {
 // ─────────────────────────────────────────────
 
 /**
- * Get observations JSONL path for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/observations/{project}/observations.jsonl
+ * Get the instincts root directory (~/.arcforge/instincts/).
+ * Holds <project>/, global/, global-index.jsonl, and observer daemon
+ * coordination files (.last_signal, .observer.lock/).
  */
+function getInstinctsRoot() {
+  return path.join(getArcforgeHome(), 'instincts');
+}
+
 function getObservationsPath(project) {
-  return path.join(CLAUDE_DIR, 'observations', project, 'observations.jsonl');
+  return path.join(getArcforgeHome(), 'observations', project, 'observations.jsonl');
 }
 
-/**
- * Get instincts directory for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/instincts/{project}/
- */
 function getInstinctsDir(project) {
-  return path.join(CLAUDE_DIR, 'instincts', project);
+  return path.join(getInstinctsRoot(), project);
 }
 
-/**
- * Get archived instincts directory for a project.
- * @param {string} project - Project name
- * @returns {string} ~/.claude/instincts/{project}/archived/
- */
 function getInstinctsArchivedDir(project) {
-  return path.join(CLAUDE_DIR, 'instincts', project, 'archived');
+  return path.join(getInstinctsRoot(), project, 'archived');
 }
 
-/**
- * Get global instincts directory.
- * @returns {string} ~/.claude/instincts/global/
- */
 function getGlobalInstinctsDir() {
-  return path.join(CLAUDE_DIR, 'instincts', 'global');
+  return path.join(getInstinctsRoot(), 'global');
 }
 
-/**
- * Get global index for instinct bubble-up tracking.
- * @returns {string} ~/.claude/instincts/global-index.jsonl
- */
 function getInstinctsGlobalIndex() {
-  return path.join(CLAUDE_DIR, 'instincts', 'global-index.jsonl');
+  return path.join(getInstinctsRoot(), 'global-index.jsonl');
 }
 
-/**
- * Get evolved log path for tracking instinct-to-artifact evolution.
- * @returns {string} ~/.claude/evolved/evolved.jsonl
- */
 function getEvolvedLogPath() {
-  return path.join(CLAUDE_DIR, 'evolved', 'evolved.jsonl');
+  return path.join(getArcforgeHome(), 'evolved', 'evolved.jsonl');
 }
 
 module.exports = {
@@ -519,6 +500,7 @@ module.exports = {
   parseSessionSections,
   // Observation & Instinct paths
   getObservationsPath,
+  getInstinctsRoot,
   getInstinctsDir,
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,

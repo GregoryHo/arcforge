@@ -38,9 +38,9 @@ fi
 
 ## How Observations Work
 
-1. **Capture**: `hooks/observe/main.js` records every tool call to `~/.claude/observations/{project}/observations.jsonl`
+1. **Capture**: `hooks/observe/main.js` records every tool call to `~/.arcforge/observations/{project}/observations.jsonl`
 2. **Analysis**: Background daemon reads observations (10+ required), calls Haiku to detect patterns
-3. **Creation**: Instincts saved as `.md` files with YAML frontmatter in `~/.claude/instincts/{project}/`
+3. **Creation**: Instincts saved as `.md` files with YAML frontmatter in `~/.arcforge/instincts/{project}/`
 4. **Loading**: Session start loads instincts with confidence >= 0.7 into Claude context
 5. **Lifecycle**: Confirm (+0.05) / Contradict (-0.10, -0.05 for manual/reflection) / Decay (-0.02/week, -0.01 for manual/reflection) / Archive (< 0.15)
 
@@ -142,7 +142,7 @@ When user agrees or disagrees with a pattern:
 
 ### Bubble-up to Global
 
-Patterns appearing in 2+ projects are auto-promoted to `~/.claude/instincts/global/`. At session start, user is notified of newly promoted global patterns.
+Patterns appearing in 2+ projects are auto-promoted to `~/.arcforge/instincts/global/`. At session start, user is notified of newly promoted global patterns.
 
 ## Common Mistakes
 

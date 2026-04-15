@@ -183,7 +183,7 @@ describe('path helpers', () => {
   });
 
   it('getDiaryedDir should separate project and global', () => {
-    const base = path.join(os.homedir(), '.claude', 'diaryed');
+    const base = path.join(os.homedir(), '.arcforge', 'diaryed');
     expect(getDiaryedDir('proj')).toBe(path.join(base, 'proj'));
     expect(getDiaryedDir()).toBe(path.join(base, 'global'));
   });

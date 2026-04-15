@@ -429,13 +429,8 @@ function getDiaryFilePath() {
   );
 }
 
-/**
- * Reflections still live under ~/.claude/ because they're written by Node
- * code, not via the nested Write tool — so the ~/.claude/ protection
- * doesn't apply.
- */
 function getDiaryedDir(project = null) {
-  const base = path.join(os.homedir(), '.claude', 'diaryed');
+  const base = path.join(getArcforgeHome(), 'diaryed');
   return project ? path.join(base, project) : path.join(base, 'global');
 }
 

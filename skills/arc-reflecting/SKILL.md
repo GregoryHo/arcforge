@@ -7,7 +7,7 @@ description: Use when user requests /reflect, after 5+ diary entries accumulated
 
 ## Overview
 
-Analyze multiple diary entries to identify recurring patterns. Save insights to `~/.claude/diaryed/` for user review.
+Analyze multiple diary entries to identify recurring patterns. Save insights to `~/.arcforge/diaryed/` for user review.
 
 ## Quick Reference
 
@@ -61,7 +61,7 @@ node "${SKILL_ROOT}/scripts/reflect.js" update-log \
 For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) to read diaries in an isolated context without polluting the main conversation.
 
 **Integration with instincts:**
-- `/reflect` → `~/.claude/diaryed/` (reflections) + instincts saved via `save-instinct`
+- `/reflect` → `~/.arcforge/diaryed/` (reflections) + instincts saved via `save-instinct`
 - `/recall` → retrieves instincts and learned patterns
 
 **Core principle:** Patterns must appear 3+ times across diary entries to be considered "Pattern". 1-2 occurrences are labeled "Observation".
@@ -83,7 +83,7 @@ For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) 
 ## Storage
 
 ```
-~/.claude/diaryed/
+~/.arcforge/diaryed/
 ├── global/                              # Cross-project patterns
 │   ├── processed.log                    # Tracks which diaries were processed
 │   └── prefers-explicit-errors.md
@@ -160,7 +160,7 @@ Read each diary entry. Look for:
 - Common techniques
 - **Rule violations:** Cases where user corrected Claude for breaking a CLAUDE.md rule
 
-**Observation Cross-Reference:** When observations are available (`~/.claude/observations/{project}/observations.jsonl`), cross-reference diary patterns with tool call data for stronger evidence. Tool usage sequences that match diary-reported techniques provide quantitative backing for patterns. For example, if a diary mentions "always grep before editing", check observations for Grep→Read→Edit sequences to confirm frequency.
+**Observation Cross-Reference:** When observations are available (`~/.arcforge/observations/{project}/observations.jsonl`), cross-reference diary patterns with tool call data for stronger evidence. Tool usage sequences that match diary-reported techniques provide quantitative backing for patterns. For example, if a diary mentions "always grep before editing", check observations for Grep→Read→Edit sequences to confirm frequency.
 
 ### 5. Identify Patterns and Violations
 
@@ -241,7 +241,7 @@ For rule violations, additionally inform:
 
 ### 8. Save Reflections and Instincts
 
-1. Ensure `~/.claude/diaryed/{project}/` or `~/.claude/diaryed/global/` exists
+1. Ensure `~/.arcforge/diaryed/{project}/` or `~/.arcforge/diaryed/global/` exists
 2. Write the reflection markdown file (e.g., `YYYY-MM-reflection-N.md`)
 3. **Update processed.log** with each diary that was analyzed:
    ```

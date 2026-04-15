@@ -152,7 +152,7 @@ describe('global-index', () => {
 
     beforeEach(() => {
       mockHomeDir = path.join(testDir, 'home');
-      instinctsBase = path.join(mockHomeDir, '.claude', 'instincts');
+      instinctsBase = path.join(mockHomeDir, '.arcforge', 'instincts');
       jest.spyOn(os, 'homedir').mockReturnValue(mockHomeDir);
     });
 
