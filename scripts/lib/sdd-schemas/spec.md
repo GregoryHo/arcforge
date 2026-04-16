@@ -1,0 +1,337 @@
+# Spec Identity Header Schema
+
+Defines the format that pipeline skills (arc-refining, arc-planning) produce and consume for `spec.xml` identity headers. Deterministic enforcement is delegated to `sdd-utils.js`.
+
+---
+
+## Overview Element (fr-sd-005)
+
+Every `specs/<spec-id>/spec.xml` MUST contain an `<overview>` element as its first child. The `<overview>` is the identity header — it tells the planner and any downstream consumer what the spec is, where it came from, and what changed.
+
+### Always-Required Fields
+
+All seven fields are required. Missing any field is ERROR.
+
+| Field | Type | Rule |
+|---|---|---|
+| `spec_id` | string | kebab-case; MUST match the folder name under `specs/` |
+| `spec_version` | positive integer | starts at 1, increments for each iteration |
+| `status` | enum | MUST be `"active"` |
+| `title` | string | human-readable name for the spec |
+| `description` | string | brief scope summary (1–3 sentences) |
+| `source/design_path` | string | valid file path to the design doc that produced this version |
+| `source/design_iteration` | date | YYYY-MM-DD; iteration date extracted from the design doc's directory name |
+
+### Conditionally-Required Field
+
+| Field | Condition | Format | Rule |
+|---|---|---|---|
+| `supersedes` | spec_version > 1 | `<spec-id>:v<N>` | MUST be present for v2+; missing is ERROR |
+
+`supersedes` records the identity of the spec version this one replaces. For v1, the field is omitted — its absence signals "first version, no prior spec."
+
+### Scope Element
+
+The `<scope>` element is always required inside `<overview>`.
+
+- `<includes>` — list of `<feature>` elements, each with an `id` attribute and a text description. Always required. Empty `<includes>` is WARNING.
+- `<excludes>` — list of `<reason>` elements explaining what is deliberately out of scope. Recommended; not required.
+
+---
+
+## Detail File Structure (fr-sd-006)
+
+`spec.xml` references detail files via `<detail_file>` elements inside a `<details>` block. Each detail file is a separate XML document containing `<requirement>` elements.
+
+### Referencing Detail Files
+
+```xml
+<details>
+  <detail_file path="details/authentication.xml" />
+  <detail_file path="details/session.xml" />
+</details>
+```
+
+Each path is relative to the spec directory (`specs/<spec-id>/`).
+
+### Requirement Element Structure
+
+Every `<requirement>` in a detail file requires:
+
+| Element / Attribute | Rule |
+|---|---|
+| `id` attribute | Unique across all detail files; format `fr-<domain>-NNN` (e.g., `fr-bs-001`) |
+| `<title>` | Short name for the requirement |
+| `<description>` | What the system must do |
+| `<acceptance_criteria>` | Container for at least one `<criterion>` |
+| `<criterion id="...">` | Each criterion MUST have a unique `id` attribute |
+| `<trace>` inside criterion | References the source requirement (e.g., `REQ-F010`); MUST be present |
+
+---
+
+## Delta Element (fr-sd-005, iteration specs)
+
+When the refiner updates an existing spec (spec_version > 1), it writes a `<delta>` element directly inside `<spec>` (sibling of `<overview>`). The delta records what changed in this version.
+
+```xml
+<delta version="N" iteration="YYYY-MM-DD">
+  <added ref="req-id" />
+  <modified ref="req-id" />
+  <removed ref="req-id" />
+</delta>
+```
+
+| Attribute / Element | Rule |
+|---|---|
+| `version` | MUST match the new `spec_version` |
+| `iteration` | MUST match the new `source/design_iteration` |
+| `<added ref="...">` | ref MUST correspond to a real requirement id in a detail file |
+| `<modified ref="...">` | ref MUST correspond to a real requirement id |
+| `<removed ref="...">` | ref MUST correspond to a requirement id that existed in the prior version |
+
+For v1 specs: no `<delta>` element. Its absence signals "plan all requirements."
+
+The planner reads the latest `<delta>` to scope its sprint — only requirements listed in the delta are planned. For v1, the planner plans all requirements (no delta = full scope).
+
+---
+
+## Valid Examples (fr-sd-007)
+
+### Valid v1 — auth-system initial spec
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>auth-system</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <source>
+      <design_path>docs/plans/auth-system/2026-04-10/design.md</design_path>
+      <design_iteration>2026-04-10</design_iteration>
+    </source>
+    <title>User Authentication System</title>
+    <description>
+      JWT-based stateless authentication covering registration, login, logout,
+      email verification, and password reset. Provides the identity foundation
+      that all downstream features depend on.
+    </description>
+    <scope>
+      <includes>
+        <feature id="registration">Email and password registration with bcrypt hashing</feature>
+        <feature id="login">JWT issuance with 15-minute access tokens and 30-day refresh cookies</feature>
+        <feature id="logout">Session invalidation propagating within 60 seconds</feature>
+        <feature id="email-verification">Required before first login; token delivered by email</feature>
+        <feature id="password-reset">Time-limited single-use reset tokens delivered by email</feature>
+        <feature id="rate-limiting">10 requests per minute per IP on all auth endpoints</feature>
+      </includes>
+      <excludes>
+        <reason>OAuth/SSO providers — deferred until base layer is stable</reason>
+        <reason>Multi-factor authentication — not in scope for initial release</reason>
+        <reason>Admin impersonation — requires separate access control spec</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <details>
+    <detail_file path="details/auth-core.xml" />
+    <detail_file path="details/auth-flows.xml" />
+  </details>
+</spec>
+```
+
+No `<supersedes>` — this is v1. No `<delta>` — planner plans all requirements.
+
+---
+
+### Valid v2+ — auth-system OAuth iteration
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>auth-system</spec_id>
+    <spec_version>2</spec_version>
+    <status>active</status>
+    <supersedes>auth-system:v1</supersedes>
+    <source>
+      <design_path>docs/plans/auth-system/2026-05-10/design.md</design_path>
+      <design_iteration>2026-05-10</design_iteration>
+    </source>
+    <title>User Authentication System</title>
+    <description>
+      Extends the JWT authentication base (v1) with OAuth 2.0 support for Google
+      and GitHub. OAuth users bypass email verification; the existing email/password
+      flow is unchanged.
+    </description>
+    <scope>
+      <includes>
+        <feature id="registration">Email and password registration with bcrypt hashing</feature>
+        <feature id="login">JWT issuance with 15-minute access tokens and 30-day refresh cookies</feature>
+        <feature id="logout">Session invalidation propagating within 60 seconds</feature>
+        <feature id="email-verification">Required before first login for email/password users</feature>
+        <feature id="password-reset">Time-limited single-use reset tokens delivered by email</feature>
+        <feature id="rate-limiting">10 requests per minute per IP on all auth endpoints</feature>
+        <feature id="oauth-google">Google OAuth 2.0 login flow with standard JWT issuance on callback</feature>
+        <feature id="oauth-github">GitHub OAuth 2.0 login flow with standard JWT issuance on callback</feature>
+      </includes>
+      <excludes>
+        <reason>Multi-factor authentication — not in scope for this iteration</reason>
+        <reason>Admin impersonation — requires separate access control spec</reason>
+        <reason>Additional OAuth providers (Apple, Microsoft) — deferred</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <delta version="2" iteration="2026-05-10">
+    <added ref="fr-as-007" />
+    <added ref="fr-as-008" />
+    <modified ref="fr-as-002" />
+  </delta>
+
+  <details>
+    <detail_file path="details/auth-core.xml" />
+    <detail_file path="details/auth-flows.xml" />
+    <detail_file path="details/auth-oauth.xml" />
+  </details>
+</spec>
+```
+
+`supersedes` is set to `auth-system:v1`. The `<delta>` tells the planner to plan only `fr-as-007`, `fr-as-008`, and `fr-as-002` — the two new OAuth requirements plus the modified email verification requirement.
+
+---
+
+## Invalid Examples (fr-sd-007)
+
+### Missing spec_version
+
+```xml
+<overview>
+  <spec_id>auth-system</spec_id>
+  <!-- spec_version omitted -->
+  <status>active</status>
+  <source>
+    <design_path>docs/plans/auth-system/2026-04-10/design.md</design_path>
+    <design_iteration>2026-04-10</design_iteration>
+  </source>
+  <title>User Authentication System</title>
+  <description>JWT-based authentication system.</description>
+  <scope>
+    <includes>
+      <feature id="login">JWT login flow</feature>
+    </includes>
+  </scope>
+</overview>
+```
+
+**Error:** `spec_id: auth-system — missing required field: spec_version`
+
+---
+
+### Broken design_path
+
+```xml
+<overview>
+  <spec_id>auth-system</spec_id>
+  <spec_version>1</spec_version>
+  <status>active</status>
+  <source>
+    <design_path>docs/plans/auth-system/2026-03-01/design.md</design_path>
+    <design_iteration>2026-03-01</design_iteration>
+  </source>
+  <title>User Authentication System</title>
+  <description>JWT-based authentication system.</description>
+  <scope>
+    <includes>
+      <feature id="login">JWT login flow</feature>
+    </includes>
+  </scope>
+</overview>
+```
+
+**Error:** `spec_id: auth-system — design_path does not exist: docs/plans/auth-system/2026-03-01/design.md`
+
+The path must point to a file that exists on disk. The check is deterministic.
+
+---
+
+### Missing supersedes for v2+
+
+```xml
+<overview>
+  <spec_id>auth-system</spec_id>
+  <spec_version>2</spec_version>
+  <status>active</status>
+  <!-- supersedes omitted — ERROR for spec_version > 1 -->
+  <source>
+    <design_path>docs/plans/auth-system/2026-05-10/design.md</design_path>
+    <design_iteration>2026-05-10</design_iteration>
+  </source>
+  <title>User Authentication System</title>
+  <description>Extends v1 with OAuth support.</description>
+  <scope>
+    <includes>
+      <feature id="oauth-google">Google OAuth 2.0 login</feature>
+    </includes>
+  </scope>
+</overview>
+```
+
+**Error:** `spec_id: auth-system — spec_version 2 requires supersedes field`
+
+---
+
+### Empty scope includes
+
+```xml
+<overview>
+  <spec_id>auth-system</spec_id>
+  <spec_version>1</spec_version>
+  <status>active</status>
+  <source>
+    <design_path>docs/plans/auth-system/2026-04-10/design.md</design_path>
+    <design_iteration>2026-04-10</design_iteration>
+  </source>
+  <title>User Authentication System</title>
+  <description>JWT-based authentication system.</description>
+  <scope>
+    <includes />
+  </scope>
+</overview>
+```
+
+**Warning:** `spec_id: auth-system — scope/includes is empty; the planner will have no requirements to plan`
+
+This is a WARNING, not an ERROR. The spec is structurally valid and the pipeline continues, but an empty scope likely indicates an incomplete spec.
+
+---
+
+## Validation Summary (fr-sd-005, fr-sd-006, fr-sd-007)
+
+| Check | Type | Severity |
+|---|---|---|
+| `spec_id` present | Deterministic | ERROR |
+| `spec_id` is kebab-case and matches folder name | Deterministic | ERROR |
+| `spec_version` present | Deterministic | ERROR |
+| `spec_version` is a positive integer | Deterministic | ERROR |
+| `status` present and equals `"active"` | Deterministic | ERROR |
+| `title` present and non-empty | Deterministic | ERROR |
+| `description` present and non-empty | Deterministic | ERROR |
+| `source/design_path` present | Deterministic | ERROR |
+| `source/design_path` points to an existing file | Deterministic | ERROR |
+| `source/design_iteration` present | Deterministic | ERROR |
+| `source/design_iteration` matches YYYY-MM-DD format | Deterministic | ERROR |
+| `supersedes` present when spec_version > 1 | Deterministic | ERROR |
+| `supersedes` matches `<spec-id>:v<N>` format | Deterministic | ERROR |
+| `scope/includes` present | Deterministic | ERROR |
+| `scope/includes` contains at least one `<feature>` | Deterministic | WARNING |
+| `delta/version` matches `spec_version` (when delta present) | Deterministic | ERROR |
+| `delta/iteration` matches `design_iteration` (when delta present) | Deterministic | ERROR |
+| All `<detail_file>` paths resolve to existing files | Deterministic | ERROR |
+| Each `<requirement>` has unique `id` across all detail files | Deterministic | ERROR |
+| Each `<criterion>` has `id` attribute | Deterministic | ERROR |
+| Each `<criterion>` contains a `<trace>` element | Deterministic | ERROR |
+
+**Severity meanings:**
+- ERROR — blocks the pipeline stage; no output produced until resolved
+- WARNING — continues but alerts the user; may indicate incomplete or stub spec
