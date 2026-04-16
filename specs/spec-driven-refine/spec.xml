@@ -33,23 +33,23 @@
         <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
       </excludes>
     </scope>
-  </overview>
 
-  <delta version="2" iteration="2026-04-16-v2">
-    <modified ref="fr-bs-003">Remove REFINER_INPUT from Path A output</modified>
-    <modified ref="fr-bs-005">Remove structured Delta from Path B, gamma mode with natural language Change Intent</modified>
-    <removed ref="fr-bs-007">Change Type Derivation — replaced by output validation (fr-bs-007 repurposed)</removed>
-    <modified ref="fr-rf-005">Consolidate initial/iteration modes into single requirement</modified>
-    <removed ref="fr-rf-006">Separate iteration mode — merged into fr-rf-005</removed>
-    <added ref="fr-rf-011">Delta metadata output — refiner writes delta element to spec overview</added>
-    <modified ref="fr-pl-001">Scope planning to delta requirements, not all requirements</modified>
-    <added ref="fr-pl-007">DAG completion gate — block if incomplete dag.yaml exists</added>
-    <removed ref="fr-cc-003">Stale lint design-newer-than-spec — replaced by per-stage validation</removed>
-    <removed ref="fr-cc-004">Stale lint unrefined-design — replaced by per-stage validation</removed>
-    <removed ref="fr-cc-005">Stale lint unplanned-spec — replaced by per-stage validation</removed>
-    <modified ref="fr-cc-if-004">Clarify sdd-utils.js as validation toolkit, not merge engine</modified>
-    <modified ref="fr-cc-if-005">Add three-layer rationale for planner not reading design doc</modified>
-  </delta>
+    <delta version="2" iteration="2026-04-16-v2">
+      <modified ref="fr-bs-003">Remove REFINER_INPUT from Path A output</modified>
+      <modified ref="fr-bs-005">Remove structured Delta from Path B, gamma mode with natural language Change Intent</modified>
+      <removed ref="fr-bs-007">Change Type Derivation — replaced by output validation (fr-bs-007 repurposed)</removed>
+      <modified ref="fr-rf-005">Consolidate initial/iteration modes into single requirement</modified>
+      <removed ref="fr-rf-006">Separate iteration mode — merged into fr-rf-005</removed>
+      <added ref="fr-rf-011">Delta metadata output — refiner writes delta element to spec overview</added>
+      <modified ref="fr-pl-001">Scope planning to delta requirements, not all requirements</modified>
+      <added ref="fr-pl-007">DAG completion gate — block if incomplete dag.yaml exists</added>
+      <removed ref="fr-cc-003">Stale lint design-newer-than-spec — replaced by per-stage validation</removed>
+      <removed ref="fr-cc-004">Stale lint unrefined-design — replaced by per-stage validation</removed>
+      <removed ref="fr-cc-005">Stale lint unplanned-spec — replaced by per-stage validation</removed>
+      <modified ref="fr-cc-if-004">Clarify sdd-utils.js as validation toolkit, not merge engine</modified>
+      <modified ref="fr-cc-if-005">Add three-layer rationale for planner not reading design doc</modified>
+    </delta>
+  </overview>
 
   <cross_cutting>
     <constraint id="cc-001">
