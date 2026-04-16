@@ -2,7 +2,7 @@
 <detail id="refiner">
   <title>Stage 2 — Refiner (Formalize)</title>
   <consumes>
-    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (REFINER_INPUT)</artifact>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (complete design doc)</artifact>
     <artifact>specs/&lt;spec-id&gt;/spec.xml (iteration mode only)</artifact>
   </consumes>
   <produces>
@@ -110,19 +110,20 @@
   <requirement id="fr-rf-005">
     <title>Initial Mode — Formalize From Scratch</title>
     <description>
-      When REFINER_INPUT type is "initial", refiner MUST formalize the entire
-      design doc into a new spec.xml v1 and details/ files.
+      When no existing spec.xml is found (initial mode), refiner MUST
+      formalize the entire design doc into a new spec.xml v1 and details/ files.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-005-ac1">
-        Given a design doc with type: initial and 10 functional requirements,
-        refiner MUST produce a spec.xml with spec_version: 1 and detail files
-        covering all 10 requirements.
+        Given a design doc with 10 identifiable requirements, refiner MUST
+        produce a spec.xml with spec_version: 1 and detail files covering
+        all 10 requirements.
         <trace>REQ-F012</trace>
       </criterion>
       <criterion id="fr-rf-005-ac2">
-        Every requirement in the REFINER_INPUT MUST appear as a &lt;requirement&gt;
-        element in one of the detail files, with at least one acceptance criterion.
+        Every requirement identified in the design doc MUST appear as a
+        &lt;requirement&gt; element in one of the detail files, with at least
+        one acceptance criterion.
         <trace>REQ-F012</trace>
       </criterion>
       <criterion id="fr-rf-005-ac3">
@@ -134,10 +135,13 @@
   </requirement>
 
   <requirement id="fr-rf-006">
-    <title>Iteration Mode — Delta Application</title>
+    <title>Iteration Mode — Update Existing Spec</title>
     <description>
-      When REFINER_INPUT type is "iteration" and a Delta section with content exists,
-      refiner MUST apply ADDED/MODIFIED/REMOVED operations to the existing spec.
+      When an existing spec.xml is found (iteration mode), refiner MUST read
+      the design doc (Change Intent) alongside the existing spec, determine
+      what changed, and update the spec accordingly. The LLM identifies
+      additions, modifications, and removals by comparing the design doc's
+      intent against the current spec — like wiki ingest propagation.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-006-ac1">
@@ -158,34 +162,34 @@
         <trace>REQ-F013</trace>
       </criterion>
       <criterion id="fr-rf-006-ac4">
-        Requirements NOT mentioned in the Delta MUST remain unchanged in the
-        output spec.
+        Requirements NOT affected by the design doc's change intent MUST
+        remain unchanged in the output spec.
         <trace>REQ-F013</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-rf-007">
-    <title>Replace Mode — Full Rewrite</title>
+    <title>Spec Version Increment</title>
     <description>
-      When REFINER_INPUT type is "iteration" and the Delta section is absent
-      (replaced by full requirements), refiner MUST formalize from scratch as
-      v(N+1), superseding the previous version.
+      When updating an existing spec (iteration mode), refiner MUST increment
+      the spec version and record supersedes. This is the only version tracking
+      needed — the planner does not use version info.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-007-ac1">
-        Given type: iteration, base_version: 2, and no "### Delta" heading in the
-        REFINER_INPUT, refiner MUST produce spec.xml v3 from scratch.
-        <trace>REQ-F014</trace>
+        Updated spec.xml MUST have spec_version = previous version + 1.
+        <trace>REQ-F010</trace>
       </criterion>
       <criterion id="fr-rf-007-ac2">
-        The supersedes field MUST be set to "&lt;spec-id&gt;:v&lt;base_version&gt;".
-        <trace>REQ-F014</trace>
+        Updated spec.xml MUST set supersedes to
+        "&lt;spec-id&gt;:v&lt;previous-version&gt;".
+        <trace>REQ-F010</trace>
       </criterion>
       <criterion id="fr-rf-007-ac3">
-        All detail files from the previous version MUST be replaced (not merged)
-        with detail files derived from the new full requirements.
-        <trace>REQ-F014</trace>
+        Updated spec.xml source MUST point to the new design doc iteration
+        that triggered this update.
+        <trace>REQ-F010</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -193,46 +197,101 @@
   <requirement id="fr-rf-008">
     <title>Merged Spec Validation</title>
     <description>
-      After applying delta or producing a new spec, refiner MUST validate that the
+      After producing a new or updated spec, refiner MUST validate that the
       resulting spec has no internal contradictions before writing output.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-008-ac1">
-        Given a delta that ADDs a requirement contradicting an existing unchanged
+        Given an update that adds a requirement contradicting an existing
         requirement, refiner MUST block and produce a refiner-report.md.
         <trace>REQ-F015</trace>
       </criterion>
       <criterion id="fr-rf-008-ac2">
-        Given a delta that MODIFIEs a requirement into contradiction with another
-        requirement, refiner MUST block.
+        Given an update that modifies a requirement into contradiction with
+        another requirement, refiner MUST block.
         <trace>REQ-F015</trace>
       </criterion>
       <criterion id="fr-rf-008-ac3">
-        Given a delta that REMOVEs a requirement depended on by another requirement
-        still in the spec, refiner MUST block with a "dependency broken" issue.
+        Given an update that removes a requirement depended on by another
+        requirement still in the spec, refiner MUST block with a "dependency
+        broken" issue.
         <trace>REQ-F015</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-rf-009">
-    <title>Empty Delta Detection (Strategy 3)</title>
+    <title>Input Validation — Design Doc</title>
     <description>
-      When REFINER_INPUT type is "iteration" and a "### Delta" heading exists but
-      contains no ADDED/MODIFIED/REMOVED items, refiner MUST block. An empty delta
-      is an ambiguous signal — neither a clear no-op nor a clear replace.
+      Before any formalization, refiner MUST validate its input per the
+      design doc contract (fr-cc-if-001). All validation checks run before
+      any output is produced. The refiner consumes the complete design doc.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-009-ac1">
-        Given a design doc with type: iteration, base_version: 2, and a "### Delta"
-        heading followed by no items (empty or whitespace-only), refiner MUST block.
-        <trace>REQ-F008, REQ-F014</trace>
+        Refiner MUST verify the design doc file exists at the provided path.
+        Missing file is ERROR with remediation: "Run brainstorming to produce
+        a design doc first."
+        <trace>REQ-F008</trace>
       </criterion>
       <criterion id="fr-rf-009-ac2">
-        The refiner-report.md MUST state the issue as "ambiguous delta: ### Delta
-        heading present but no ADDED/MODIFIED/REMOVED items" and recommend either
-        removing the heading (for replace) or adding delta items (for iteration).
-        <trace>REQ-F009</trace>
+        Refiner MUST determine mode from filesystem state: if
+        specs/&lt;spec-id&gt;/spec.xml exists → iteration mode (read existing spec
+        + design doc, update spec). If not → initial mode (read design doc,
+        create spec from scratch).
+        <trace>REQ-F012, REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-009-ac3">
+        For iteration mode, refiner MUST validate the design doc has gamma
+        mode structure: Context section (with spec version reference) and
+        Change Intent section present. Missing required sections is ERROR
+        with remediation: "Iteration design doc must have Context and Change
+        Intent sections — re-run brainstorming with Path B."
+        <trace>REQ-F005, REQ-F008</trace>
+      </criterion>
+      <criterion id="fr-rf-009-ac4">
+        For iteration mode, if the design doc's date folder is older than or
+        equal to the spec's recorded design_iteration, refiner MUST produce
+        WARNING: "design iteration &lt;date&gt; is not newer than spec source
+        &lt;spec-date&gt; — this may be a stale design doc."
+        <trace>REQ-F026</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-010">
+    <title>Output Validation — Two-Pass Write</title>
+    <description>
+      Refiner MUST follow the two-pass write pattern (fr-cc-val-001): build
+      the complete spec.xml and details/ in memory, validate against the Spec
+      Identity Header contract (fr-cc-if-002), then write to disk only if
+      validation passes.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-010-ac1">
+        After building spec.xml in memory, refiner MUST validate the identity
+        header per fr-cc-if-002: spec_id, spec_version, status, source,
+        scope all present and well-formed. Missing fields are ERROR.
+        <trace>REQ-F010, REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-rf-010-ac2">
+        Every &lt;requirement&gt; in the built output MUST have at least one
+        &lt;acceptance_criteria&gt; with a &lt;trace&gt; element. Requirements without
+        testable AC are ERROR.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-rf-010-ac3">
+        If output validation finds ERRORs, refiner MUST report all findings
+        with remediation guidance and MUST NOT write any files to
+        specs/&lt;spec-id&gt;/.
+        <trace>REQ-F008, REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-rf-010-ac4">
+        If output validation passes (zero ERRORs), refiner MUST write all
+        files atomically — spec.xml and all details/*.xml in a single
+        operation. Partial writes (spec.xml written but details/ incomplete)
+        MUST NOT occur.
+        <trace>REQ-F012</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

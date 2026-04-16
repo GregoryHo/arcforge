@@ -18,18 +18,19 @@
     </description>
     <scope>
       <includes>
-        <feature id="stage-1-brainstorming">Path A/B routing, design doc structure, REFINER_INPUT format</feature>
-        <feature id="stage-2-refiner">Initial/iteration/replace modes, blocking report, identity header, empty-delta detection</feature>
-        <feature id="stage-3-planner">Initial/iteration modes, delta processing, rework epics, done signal</feature>
+        <feature id="stage-1-brainstorming">Path A/B routing, design doc structure (full and gamma mode), output validation</feature>
+        <feature id="stage-2-refiner">Initial/iteration modes (filesystem-detected), blocking report, identity header, input/output validation</feature>
+        <feature id="stage-3-planner">Always build from scratch (sprint model), 1:1 mapping, done signal, input/output validation</feature>
         <feature id="cross-cutting-rules">R1 (human consent), R2 (unidirectional), R3 (block on contradictions)</feature>
         <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec)</feature>
         <feature id="spec-identity-header">XML schema for spec self-identification and versioning</feature>
-        <feature id="stale-lint-rules">Detection rules for upstream/downstream drift and completeness</feature>
-        <feature id="stale-lint-skill">Stale lint skill implementation — core module, skill definition, report format</feature>
+        <feature id="interface-contracts">Design Doc and Spec Identity Header format contracts — sdd-schemas/ (guidance) + sdd-utils.js (enforcement)</feature>
+        <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, and deterministic/semantic split</feature>
       </includes>
       <excludes>
         <reason>Cross-spec dependencies — deferred until multi-spec usage is established</reason>
         <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
+        <reason>Landscape-level drift detection (audit skill scanning all specs/designs) — deferred; per-stage validation covers drift detected at pipeline execution time</reason>
       </excludes>
     </scope>
   </overview>
@@ -40,19 +41,19 @@
       <description>Node.js standard library only. No npm runtime dependencies.</description>
     </constraint>
     <constraint id="cc-003">
-      <title>Stale Lint as Skill Only</title>
+      <title>Three-Tier Validation Severity</title>
       <description>
-        Stale lint is implemented as a skill (arc-linting) backed by a core module
-        (scripts/lib/stale-lint.js). No SessionStart hook or automatic checking.
-        Users invoke it explicitly.
+        All per-stage validation uses three severity levels: ERROR (blocks stage,
+        no output produced), WARNING (continues but alerts user), INFO (informational).
+        A stage is "valid" when it has zero ERRORs.
       </description>
     </constraint>
     <constraint id="cc-004">
       <title>Self-Contained Stage Input</title>
       <description>
-        Each pipeline stage receives a self-contained input payload (REFINER_INPUT
-        for refiner, spec source pointer for planner). Stages MUST NOT rely on
-        implicit context from prior conversation or session state.
+        Each pipeline stage receives a self-contained input: the complete design
+        doc for refiner, the complete spec.xml for planner. Stages MUST NOT rely
+        on implicit context from prior conversation or session state.
       </description>
     </constraint>
   </cross_cutting>
@@ -62,6 +63,6 @@
     <detail_file path="details/refiner.xml" />
     <detail_file path="details/planner.xml" />
     <detail_file path="details/cross-cutting.xml" />
-    <detail_file path="details/stale-lint.xml" />
+    <detail_file path="details/sdd-schemas.xml" />
   </details>
 </spec>

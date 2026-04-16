@@ -58,8 +58,9 @@
   <requirement id="fr-bs-003">
     <title>Path A Output Format</title>
     <description>
-      Path A (new spec) produces a design doc at the canonical location with a
-      REFINER_INPUT section of type: initial containing full requirements and scope.
+      Path A (new spec) produces a complete design doc at the canonical location.
+      The refiner consumes the entire design doc — no special structured section
+      is needed.
     </description>
     <acceptance_criteria>
       <criterion id="fr-bs-003-ac1">
@@ -67,12 +68,9 @@
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-bs-003-ac2">
-        The REFINER_INPUT section MUST contain: spec_id, iteration (date), type: initial.
-        <trace>REQ-F003</trace>
-      </criterion>
-      <criterion id="fr-bs-003-ac3">
-        The REFINER_INPUT section MUST include at least one functional requirement
-        and a scope declaration (includes/excludes).
+        The design doc MUST contain substantive design content: problem description,
+        proposed solution, identifiable requirements (in prose), and scope
+        (what's included and excluded).
         <trace>REQ-F003</trace>
       </criterion>
     </acceptance_criteria>
@@ -102,23 +100,25 @@
     <title>Path B Output Format (Gamma Mode)</title>
     <description>
       Path B produces a design doc in gamma mode: context summary, change intent,
-      architecture impact, and a REFINER_INPUT with type: iteration, base_version,
-      and a Delta section.
+      and architecture impact. The refiner reads this complete design doc alongside
+      the existing spec.xml to determine what changed — no explicit delta section
+      is needed.
     </description>
     <acceptance_criteria>
       <criterion id="fr-bs-005-ac1">
-        The REFINER_INPUT MUST contain: spec_id, iteration (date), type: iteration,
-        base_version (integer matching the current spec version).
+        The design doc MUST include a Context section summarizing the current spec
+        scope in 2-3 sentences, with a reference to the spec.xml version.
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-bs-005-ac2">
-        The Delta section MUST use exactly three categories: ADDED, MODIFIED, REMOVED.
-        Each item MUST reference a requirement ID.
+        The design doc MUST include a Change Intent section describing what is
+        changing and why. This is the primary input for the refiner to understand
+        the delta.
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-bs-005-ac3">
-        The design doc MUST include a Context section summarizing the current spec
-        scope in 2-3 sentences, with a reference to the spec.xml version.
+        The design doc SHOULD include an Architecture Impact section describing
+        how changes interact with existing design. Optional for simple changes.
         <trace>REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
@@ -144,32 +144,24 @@
   </requirement>
 
   <requirement id="fr-bs-007">
-    <title>Change Type Derivation</title>
+    <title>Output Validation — Design Doc Structure</title>
     <description>
-      The change type (extend, modify, reduce, restructure, replace) MUST be
-      derived from delta content, not declared by the user.
+      Before writing the design doc to disk, brainstorming MUST validate that
+      it conforms to the design doc contract (fr-cc-if-001).
     </description>
     <acceptance_criteria>
       <criterion id="fr-bs-007-ac1">
-        Given a Delta with only ADDED items, the derived type MUST be "extend".
-        <trace>REQ-F007</trace>
+        Path A output MUST be validated: file path follows
+        docs/plans/&lt;spec-id&gt;/&lt;YYYY-MM-DD&gt;/design.md convention, design doc
+        has substantive content (not empty/stub), identifiable requirements
+        and scope present in prose. ERROR on any missing element.
+        <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-bs-007-ac2">
-        Given a Delta with only MODIFIED items, the derived type MUST be "modify".
-        <trace>REQ-F007</trace>
-      </criterion>
-      <criterion id="fr-bs-007-ac3">
-        Given a Delta with only REMOVED items, the derived type MUST be "reduce".
-        <trace>REQ-F007</trace>
-      </criterion>
-      <criterion id="fr-bs-007-ac4">
-        Given a Delta with both ADDED and REMOVED items, the derived type MUST be "restructure".
-        <trace>REQ-F007</trace>
-      </criterion>
-      <criterion id="fr-bs-007-ac5">
-        Given a type: iteration REFINER_INPUT with no Delta section and full
-        requirements listed instead, the derived type MUST be "replace".
-        <trace>REQ-F007</trace>
+        Path B output MUST be validated: Context section present (with spec
+        version reference), Change Intent section present. ERROR on missing
+        required sections.
+        <trace>REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

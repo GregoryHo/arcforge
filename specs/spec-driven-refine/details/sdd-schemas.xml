@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="sdd-schemas">
+  <title>SDD Schema Definitions</title>
+  <produces>
+    <artifact>scripts/lib/sdd-schemas/design.md (design doc structure guide)</artifact>
+    <artifact>scripts/lib/sdd-schemas/spec.md (spec identity header guide)</artifact>
+    <artifact>scripts/lib/sdd-utils.js (programmatic validators)</artifact>
+  </produces>
+
+  <!-- ═══════════════ Design Doc Schema ═══════════════ -->
+
+  <requirement id="fr-sd-001">
+    <title>Design Doc Schema — Location and Metadata</title>
+    <description>
+      scripts/lib/sdd-schemas/design.md MUST define how the refiner locates
+      and identifies design docs, and how mode is determined.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-001-ac1">
+        The schema MUST specify design doc location as
+        docs/plans/&lt;spec-id&gt;/&lt;YYYY-MM-DD&gt;/design.md, with spec-id derived
+        from directory name (kebab-case) and iteration date derived from
+        date directory name.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-sd-001-ac2">
+        The schema MUST specify mode detection rule: specs/&lt;spec-id&gt;/spec.xml
+        exists = iteration mode; does not exist = initial mode. Mode is
+        derived from filesystem state, not from design doc content.
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-002">
+    <title>Design Doc Schema — Path A Structure (Initial)</title>
+    <description>
+      The schema MUST define the minimum content requirements for a Path A
+      (new spec) design doc.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-002-ac1">
+        The schema MUST specify Path A minimum content as: problem description
+        or motivation, proposed solution or architecture, identifiable
+        requirements (in prose), and scope declaration (includes/excludes).
+        No fixed section headings required — the refiner extracts from prose.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-sd-002-ac2">
+        The schema MUST include a valid Path A example showing a complete
+        design doc with all minimum content elements identifiable.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-sd-002-ac3">
+        The schema MUST include an invalid Path A example: an empty or stub
+        design doc (e.g., only "TODO: fill in later"), with error message:
+        "design doc has no substantive content".
+        <trace>REQ-F008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-003">
+    <title>Design Doc Schema — Path B Structure (Gamma Mode)</title>
+    <description>
+      The schema MUST define the required sections for a Path B (iteration)
+      design doc in gamma mode.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-003-ac1">
+        The schema MUST specify two required sections for gamma mode:
+        Context (current spec state summary, 2-3 sentences, spec version
+        reference) and Change Intent (what is changing and why). Missing
+        either section is ERROR.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-003-ac2">
+        The schema MUST specify one recommended section: Architecture Impact
+        (how changes interact with existing design). Optional for simple
+        changes, recommended for cross-cutting changes.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-003-ac3">
+        The schema MUST include a valid Path B example showing a gamma mode
+        design doc with Context, Change Intent, and Architecture Impact
+        sections.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-003-ac4">
+        The schema MUST include invalid Path B examples: (1) missing Context
+        section with error "iteration design doc missing required Context
+        section", (2) missing Change Intent section with error "iteration
+        design doc missing required Change Intent section".
+        <trace>REQ-F005, REQ-F008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-004">
+    <title>Design Doc Schema — Validation Summary</title>
+    <description>
+      The schema MUST include a validation summary table showing all checks,
+      their type (deterministic vs LLM judgment), and applicability per path.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-004-ac1">
+        The validation summary MUST list these deterministic checks: file
+        existence (ERROR if missing, both paths), substantive content
+        (ERROR if empty/stub, both paths), Context section heading present
+        (ERROR if missing, Path B only), Change Intent section heading
+        present (ERROR if missing, Path B only), stale iteration date
+        (WARNING if date &lt;= spec's design_iteration, Path B only).
+        <trace>REQ-F003, REQ-F005, REQ-F026</trace>
+      </criterion>
+      <criterion id="fr-sd-004-ac2">
+        The validation summary MUST list these LLM judgment checks:
+        requirements identifiable in prose (ERROR if none found, Path A
+        only), scope declared (ERROR if missing, Path A only).
+        <trace>REQ-F003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Spec Identity Header Schema ═══════════════ -->
+
+  <requirement id="fr-sd-005">
+    <title>Spec Identity Header Schema — Required Fields</title>
+    <description>
+      scripts/lib/sdd-schemas/spec.md MUST define all required fields in
+      the spec.xml identity header (&lt;overview&gt; element).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-005-ac1">
+        The schema MUST define these always-required fields with types:
+        spec_id (string, kebab-case, must match folder name),
+        spec_version (positive integer, starts at 1),
+        status (enum: "active"),
+        title (string, human-readable),
+        description (string, brief scope summary),
+        source/design_path (string, valid file path to design doc),
+        source/design_iteration (date, YYYY-MM-DD).
+        Missing any field is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-005-ac2">
+        The schema MUST define the conditionally-required supersedes field:
+        required when spec_version &gt; 1, format "&lt;spec-id&gt;:v&lt;N&gt;". Missing
+        supersedes for v2+ is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-005-ac3">
+        The schema MUST define the scope element: includes (list of features
+        with id attribute and text description, always required) and excludes
+        (list of reasons, recommended). Empty includes is WARNING.
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-006">
+    <title>Spec Identity Header Schema — Detail File Structure</title>
+    <description>
+      The schema MUST define the structure of detail files referenced from
+      spec.xml.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-006-ac1">
+        The schema MUST specify that spec.xml references detail files via
+        &lt;detail_file path="details/&lt;name&gt;.xml" /&gt; elements, and each
+        detail file contains &lt;requirement&gt; elements.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-sd-006-ac2">
+        The schema MUST specify each &lt;requirement&gt; element requires: id
+        attribute (unique, e.g., "fr-bs-001"), &lt;title&gt;, &lt;description&gt;,
+        and &lt;acceptance_criteria&gt; with at least one &lt;criterion&gt;. Each
+        criterion MUST have an id attribute and a &lt;trace&gt; element
+        referencing the source requirement.
+        <trace>REQ-F012</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-007">
+    <title>Spec Identity Header Schema — Examples</title>
+    <description>
+      The schema MUST include valid and invalid examples for LLM
+      pattern-matching.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-007-ac1">
+        The schema MUST include a valid v1 spec example: complete
+        &lt;overview&gt; with all required fields, no supersedes, scope with
+        includes and excludes.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-007-ac2">
+        The schema MUST include a valid v2+ spec example: complete
+        &lt;overview&gt; with supersedes set to "&lt;spec-id&gt;:v1", updated
+        source pointing to new design iteration.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-007-ac3">
+        The schema MUST include invalid examples with error messages:
+        (1) missing spec_version, (2) broken design_path pointing to
+        non-existent file, (3) missing supersedes for v2+, (4) empty
+        scope as WARNING.
+        <trace>REQ-F010, REQ-F008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ SDD Utils Validator ═══════════════ -->
+
+  <requirement id="fr-sd-008">
+    <title>SDD Utils — Design Doc Validator API</title>
+    <description>
+      scripts/lib/sdd-utils.js MUST export functions for parsing and
+      validating design docs. These implement the deterministic checks
+      from fr-sd-004.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-008-ac1">
+        MUST export parseDesignDoc(filePath: string) that returns
+        {spec_id, iteration, mode, hasContext, hasChangeIntent} derived
+        from the file path and content. Returns null if file not found.
+        spec_id and iteration are extracted from the directory path, not
+        from file content. mode is determined by checking filesystem for
+        specs/&lt;spec_id&gt;/spec.xml existence.
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-008-ac2">
+        MUST export validateDesignDoc(parsed) that returns {valid: boolean,
+        issues: Array&lt;{level: "ERROR"|"WARNING"|"INFO", field: string,
+        message: string}&gt;}. valid is true when zero ERRORs.
+        <trace>REQ-F008</trace>
+      </criterion>
+      <criterion id="fr-sd-008-ac3">
+        validateDesignDoc deterministic checks: file exists (ERROR),
+        content not empty/stub (ERROR), for iteration mode: Context
+        heading present (ERROR), Change Intent heading present (ERROR),
+        iteration date not stale vs spec's design_iteration (WARNING).
+        <trace>REQ-F003, REQ-F005, REQ-F026</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-009">
+    <title>SDD Utils — Spec Header Validator API</title>
+    <description>
+      scripts/lib/sdd-utils.js MUST export functions for parsing and
+      validating spec.xml identity headers.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-009-ac1">
+        MUST export parseSpecHeader(specXmlContent: string) that returns
+        {spec_id, spec_version, status, design_path, design_iteration,
+        scope, supersedes?} or null if header not found. Parses the
+        &lt;overview&gt; element from XML content.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-009-ac2">
+        MUST export validateSpecHeader(parsed) that returns {valid: boolean,
+        issues: Array&lt;{level, field, message}&gt;}. valid is true when zero
+        ERRORs.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-009-ac3">
+        validateSpecHeader deterministic checks: all required fields
+        present (ERROR per missing field), spec_version is positive
+        integer (ERROR), design_path points to existing file (ERROR),
+        design_iteration matches YYYY-MM-DD format (ERROR), supersedes
+        present when spec_version &gt; 1 (ERROR), supersedes format matches
+        "&lt;spec-id&gt;:v&lt;N&gt;" (ERROR), empty scope includes (WARNING).
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
