@@ -69,6 +69,30 @@ Every `<requirement>` in a detail file requires:
 
 ---
 
+## Requirement Language (RFC 2119)
+
+Requirement descriptions and criterion text MUST use RFC 2119 keywords to
+express normativity. Non-normative language ("should usually", "maybe",
+"could potentially") is ERROR — use the keyword that matches actual intent.
+
+| Keyword | Meaning |
+|---|---|
+| MUST / SHALL | Absolute requirement |
+| MUST NOT / SHALL NOT | Absolute prohibition |
+| SHOULD / RECOMMENDED | Strong recommendation; exceptions require documented justification |
+| SHOULD NOT / NOT RECOMMENDED | Strong discouragement |
+| MAY / OPTIONAL | Truly optional |
+
+Good:
+- "The system MUST reject requests without a valid JWT."
+- "The cache SHOULD expire stale entries within 30 seconds."
+
+Bad:
+- "The system should probably handle invalid tokens." (vague — use MUST or MAY)
+- "Sessions usually expire after 15 minutes." (non-normative — use MUST)
+
+---
+
 ## Delta Element (fr-sd-005, iteration specs)
 
 When the refiner updates an existing spec (spec_version > 1), it writes a `<delta>` element directly inside `<spec>` (sibling of `<overview>`). The delta records what changed in this version.
