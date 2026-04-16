@@ -160,7 +160,8 @@ const SUPERSEDES_RE = /^[a-z0-9-]+:v\d+$/;
  *   delta: { version: string, iteration: string,
  *     added: Array<{ref: string, text: string}>,
  *     modified: Array<{ref: string, text: string}>,
- *     removed: Array<{ref: string, reason: string, migration: string, text: string}> } | null } | null}
+ *     removed: Array<{ref: string, reason: string, migration: string, text: string}>,
+ *     renamed: Array<{ref_old: string, ref_new: string, reason: string}> } | null } | null}
  */
 function parseSpecHeader(specXmlContent) {
   if (!specXmlContent || typeof specXmlContent !== 'string') {
@@ -275,12 +276,47 @@ function parseSpecHeader(specXmlContent) {
       return results;
     }
 
+    // Parse <renamed> entries:
+    //   Self-closing: <renamed ref_old="x" ref_new="y" />
+    //   With reason:  <renamed ref_old="x" ref_new="y"><reason>...</reason></renamed>
+    function parseRenamedItems() {
+      const results = [];
+      // Self-closing renamed.
+      const selfCloseRe = /<renamed\s+([^>]*?)\/>/g;
+      for (const m of deltaBody.matchAll(selfCloseRe)) {
+        const attrs = m[1];
+        const refOldMatch = /ref_old="([^"]*)"/.exec(attrs);
+        const refNewMatch = /ref_new="([^"]*)"/.exec(attrs);
+        results.push({
+          ref_old: refOldMatch ? refOldMatch[1] : '',
+          ref_new: refNewMatch ? refNewMatch[1] : '',
+          reason: '',
+        });
+      }
+      // Open/close renamed with optional <reason>.
+      const openCloseRe = /<renamed\s+([^>]*)>([\s\S]*?)<\/renamed>/g;
+      for (const m of deltaBody.matchAll(openCloseRe)) {
+        const attrs = m[1];
+        const inner = m[2];
+        const refOldMatch = /ref_old="([^"]*)"/.exec(attrs);
+        const refNewMatch = /ref_new="([^"]*)"/.exec(attrs);
+        const reasonMatch = /<reason>([^<]*)<\/reason>/.exec(inner);
+        results.push({
+          ref_old: refOldMatch ? refOldMatch[1] : '',
+          ref_new: refNewMatch ? refNewMatch[1] : '',
+          reason: reasonMatch ? reasonMatch[1].trim() : '',
+        });
+      }
+      return results;
+    }
+
     delta = {
       version: versionAttr ? versionAttr[1] : null,
       iteration: iterationAttr ? iterationAttr[1] : null,
       added: parseDeltaItems('added'),
       modified: parseDeltaItems('modified'),
       removed: parseRemovedItems(),
+      renamed: parseRenamedItems(),
     };
   }
 
@@ -403,6 +439,26 @@ function validateSpecHeader(parsed, options = {}) {
           level: 'ERROR',
           field: 'delta/removed',
           message: `removed requirement '${rem.ref}' MUST include a <reason> explaining why the requirement was removed.`,
+        });
+      }
+    }
+  }
+
+  // Each renamed entry MUST have both ref_old and ref_new (Enhancement 5).
+  if (parsed.delta?.renamed) {
+    for (const ren of parsed.delta.renamed) {
+      if (!ren.ref_old) {
+        issues.push({
+          level: 'ERROR',
+          field: 'delta/renamed',
+          message: `renamed entry is missing ref_old — both ref_old and ref_new are required.`,
+        });
+      }
+      if (!ren.ref_new) {
+        issues.push({
+          level: 'ERROR',
+          field: 'delta/renamed',
+          message: `renamed entry is missing ref_new — both ref_old and ref_new are required.`,
         });
       }
     }

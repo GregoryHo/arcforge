@@ -148,6 +148,9 @@ When the refiner updates an existing spec (spec_version > 1), it writes a `<delt
     <reason>Why this requirement was removed</reason>
     <migration>How existing consumers transition (optional)</migration>
   </removed>
+  <renamed ref_old="old-id" ref_new="new-id">
+    <reason>Why the rename (optional for clean renames)</reason>
+  </renamed>
 </delta>
 ```
 
@@ -160,10 +163,14 @@ When the refiner updates an existing spec (spec_version > 1), it writes a `<delt
 | `<removed ref="...">` | ref MUST correspond to a requirement id that existed in the prior version; MUST contain a `<reason>` child element |
 | `<removed>/<reason>` | MUST be present; explains why the requirement was removed |
 | `<removed>/<migration>` | Optional; explains how existing consumers transition. Omit when no migration path exists |
+| `<renamed ref_old="..." ref_new="...">` | `ref_old` MUST correspond to a requirement id in the previous version; `ref_new` MUST correspond to a requirement id in the current detail files |
+| `<renamed>/<reason>` | Optional; clean renames need no justification |
 
 For v1 specs: no `<delta>` element. Its absence signals "plan all requirements."
 
 The planner reads the latest `<delta>` to scope its sprint — only requirements listed in the delta are planned. For v1, the planner plans all requirements (no delta = full scope).
+
+Renamed requirements are NOT planned as new work — the planner treats them as existing requirements with updated identifiers.
 
 For backward compatibility, `sdd-utils.js` accepts two legacy `<removed>` formats:
 - Self-closing `<removed ref="x" />` — parsed with empty reason (validator flags this as ERROR)

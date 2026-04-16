@@ -814,3 +814,183 @@ describe('validateSpecHeader — removed reason validation', () => {
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseSpecHeader — Enhancement 5: renamed element
+// ---------------------------------------------------------------------------
+
+describe('parseSpecHeader — renamed element', () => {
+  it('parses renamed element with reason', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2</spec_version>
+      <status>active</status>
+      <supersedes>auth:v1</supersedes>
+      <title>Auth System</title>
+      <description>Auth v2</description>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <renamed ref_old="fr-auth-001" ref_new="fr-jwt-001">
+          <reason>Renamed to reflect broader scope after OAuth iteration</reason>
+        </renamed>
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.renamed).toHaveLength(1);
+    const ren = result.delta.renamed[0];
+    expect(ren.ref_old).toBe('fr-auth-001');
+    expect(ren.ref_new).toBe('fr-jwt-001');
+    expect(ren.reason).toBe('Renamed to reflect broader scope after OAuth iteration');
+  });
+
+  it('parses renamed element without reason — reason is empty string', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2</spec_version>
+      <status>active</status>
+      <supersedes>auth:v1</supersedes>
+      <title>Auth System</title>
+      <description>Auth v2</description>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <renamed ref_old="fr-login-001" ref_new="fr-auth-login-001" />
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.renamed).toHaveLength(1);
+    const ren = result.delta.renamed[0];
+    expect(ren.ref_old).toBe('fr-login-001');
+    expect(ren.ref_new).toBe('fr-auth-login-001');
+    expect(ren.reason).toBe('');
+  });
+
+  it('delta with no renamed elements returns empty renamed array', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2</spec_version>
+      <status>active</status>
+      <supersedes>auth:v1</supersedes>
+      <title>Auth System</title>
+      <description>Auth v2</description>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <added ref="fr-oauth-001" />
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.renamed).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpecHeader — Enhancement 5: renamed validation
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader — renamed validation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-renamed-test-'));
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function baseParsed(overrides = {}) {
+    return {
+      spec_id: 'auth',
+      spec_version: 2,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-16/design.md',
+      design_iteration: '2026-04-16',
+      supersedes: 'auth:v1',
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+      ...overrides,
+    };
+  }
+
+  it('flags renamed entry with missing ref_old as ERROR on delta/renamed', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [{ ref_old: '', ref_new: 'fr-jwt-001', reason: '' }],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/renamed');
+    expect(err).toBeDefined();
+    expect(err.message).toMatch(/ref_old/i);
+  });
+
+  it('flags renamed entry with missing ref_new as ERROR on delta/renamed', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [{ ref_old: 'fr-auth-001', ref_new: '', reason: '' }],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/renamed');
+    expect(err).toBeDefined();
+    expect(err.message).toMatch(/ref_new/i);
+  });
+
+  it('passes valid renamed entry with both refs present', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [{ ref_old: 'fr-auth-001', ref_new: 'fr-jwt-001', reason: '' }],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+
+  it('passes delta with no renamed entries — valid', () => {
+    const parsed = baseParsed();
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+});
