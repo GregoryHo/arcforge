@@ -11,30 +11,66 @@
   </produces>
 
   <requirement id="fr-pl-001">
-    <title>Always Build From Scratch</title>
+    <title>Sprint Model — Build Fresh DAG Scoped to Delta</title>
     <description>
-      Planner MUST always build dag.yaml and epics/ from scratch based on
-      the current spec.xml. There is no iteration or delta mode. Each
-      planning run produces a fresh DAG — like a sprint backlog built from
-      the current spec.
+      Planner MUST build dag.yaml and epics/ from scratch each time. The
+      scope is determined by the spec's delta metadata: if a &lt;delta&gt; element
+      exists for the current spec_version, planner plans only the requirements
+      referenced in that delta. If no delta exists (v1), planner plans all
+      requirements. DAG is a derived view (like Karpathy's index.md) — it
+      is rebuilt, not incrementally maintained.
     </description>
     <acceptance_criteria>
       <criterion id="fr-pl-001-ac1">
-        Planner MUST read specs/&lt;spec-id&gt;/spec.xml and produce a dag.yaml
-        with epics covering all requirements in the spec. All epics start
-        in "pending" status.
+        When no &lt;delta&gt; is present in spec.xml (v1), planner MUST produce
+        a dag.yaml with epics covering all requirements in the spec. All
+        epics start in "pending" status.
         <trace>REQ-F017</trace>
       </criterion>
       <criterion id="fr-pl-001-ac2">
-        If a previous dag.yaml exists at specs/&lt;spec-id&gt;/dag.yaml, planner
-        MUST replace it entirely. Previous epic statuses MUST NOT carry over.
+        When a &lt;delta&gt; is present for the current spec_version, planner
+        MUST produce a dag.yaml covering only the requirements referenced
+        in that delta (added and modified). Removed requirements do not
+        generate epics.
         <trace>REQ-F017</trace>
       </criterion>
       <criterion id="fr-pl-001-ac3">
+        If a previous dag.yaml exists, planner MUST archive or replace it.
+        Previous epic statuses MUST NOT carry over.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac4">
         For each epic in dag.yaml, planner MUST produce an
         epics/&lt;epic-id&gt;/epic.md with at minimum: title, description, and
         feature breakdown.
         <trace>REQ-F017</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-007">
+    <title>DAG Completion Gate</title>
+    <description>
+      Before building a new DAG, planner MUST check whether an existing
+      dag.yaml has incomplete work. This prevents overlapping sprints —
+      the pipeline is sequential, complete v(N) before iterating to v(N+1).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-007-ac1">
+        If no dag.yaml exists at specs/&lt;spec-id&gt;/dag.yaml, planner MUST
+        proceed normally.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-007-ac2">
+        If dag.yaml exists and all epics are in "completed" status, planner
+        MUST archive the existing dag.yaml and proceed with new planning.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-pl-007-ac3">
+        If dag.yaml exists and any epic is NOT in "completed" status,
+        planner MUST block with message: "Complete current sprint before
+        iterating. N of M epics still incomplete."
+        <trace>REQ-F023</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

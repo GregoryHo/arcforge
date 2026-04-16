@@ -108,62 +108,71 @@
   </requirement>
 
   <requirement id="fr-rf-005">
-    <title>Initial Mode — Formalize From Scratch</title>
+    <title>Formalize Spec From Design Doc</title>
     <description>
-      When no existing spec.xml is found (initial mode), refiner MUST
-      formalize the entire design doc into a new spec.xml v1 and details/ files.
+      Refiner MUST read the complete design doc and produce or update a spec.
+      There is no explicit mode distinction — the refiner checks whether
+      specs/&lt;spec-id&gt;/spec.xml exists and adapts accordingly. When no
+      existing spec is found, it formalizes from scratch. When an existing
+      spec is found, it reads the design doc (Change Intent) alongside the
+      existing spec, determines what changed, and updates the spec — like
+      wiki ingest propagation.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-005-ac1">
-        Given a design doc with 10 identifiable requirements, refiner MUST
-        produce a spec.xml with spec_version: 1 and detail files covering
-        all 10 requirements.
+        When no existing spec.xml is found, refiner MUST produce a spec.xml
+        with spec_version: 1 and detail files covering all requirements
+        identified in the design doc, each with at least one acceptance
+        criterion and trace.
         <trace>REQ-F012</trace>
       </criterion>
       <criterion id="fr-rf-005-ac2">
-        Every requirement identified in the design doc MUST appear as a
-        &lt;requirement&gt; element in one of the detail files, with at least
-        one acceptance criterion.
-        <trace>REQ-F012</trace>
+        When an existing spec.xml is found, refiner MUST read both the
+        design doc and the existing spec. ADDED items result in new
+        requirements; MODIFIED items update existing requirements in place;
+        REMOVED items delete requirements from detail files.
+        <trace>REQ-F013</trace>
       </criterion>
       <criterion id="fr-rf-005-ac3">
-        Every acceptance criterion MUST have a &lt;trace&gt; element referencing the
-        source requirement ID from the design doc.
-        <trace>REQ-F012</trace>
+        When updating an existing spec, requirements NOT affected by the
+        design doc's change intent MUST remain unchanged in the output spec.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-005-ac4">
+        A complete rewrite (aggressive iteration where the Change Intent
+        replaces everything) MUST be handled as iteration — the refiner
+        determines this from the design doc's intent, not from a declared
+        mode. No separate "replace mode" exists.
+        <trace>REQ-F012, REQ-F013</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
 
-  <requirement id="fr-rf-006">
-    <title>Iteration Mode — Update Existing Spec</title>
+  <requirement id="fr-rf-011">
+    <title>Delta Metadata Output</title>
     <description>
-      When an existing spec.xml is found (iteration mode), refiner MUST read
-      the design doc (Change Intent) alongside the existing spec, determine
-      what changed, and update the spec accordingly. The LLM identifies
-      additions, modifications, and removals by comparing the design doc's
-      intent against the current spec — like wiki ingest propagation.
+      When updating an existing spec, refiner MUST write a &lt;delta&gt; element
+      in the spec's &lt;overview&gt; recording what changed in this version. This
+      metadata stays within the spec (wiki layer) so the planner can determine
+      planning scope without reading the design doc (raw source layer).
     </description>
     <acceptance_criteria>
-      <criterion id="fr-rf-006-ac1">
-        ADDED items MUST result in new &lt;requirement&gt; elements added to the
-        appropriate detail file, with new acceptance criteria and traces.
+      <criterion id="fr-rf-011-ac1">
+        The delta element MUST include: version (matching new spec_version),
+        iteration (matching design_iteration), and child elements for each
+        change: &lt;added ref="req-id" /&gt;, &lt;modified ref="req-id" /&gt;,
+        &lt;removed ref="req-id" /&gt;.
         <trace>REQ-F013</trace>
       </criterion>
-      <criterion id="fr-rf-006-ac2">
-        MODIFIED items MUST update the matching &lt;requirement&gt; element in place.
-        The requirement's description, title, and acceptance criteria MUST reflect
-        the modification.
-        <trace>REQ-F013</trace>
+      <criterion id="fr-rf-011-ac2">
+        For a new spec (no prior version), no delta element is written.
+        Absence of delta signals "plan all requirements."
+        <trace>REQ-F012</trace>
       </criterion>
-      <criterion id="fr-rf-006-ac3">
-        REMOVED items MUST delete the matching &lt;requirement&gt; element from its
-        detail file. If a detail file becomes empty, the file MUST be deleted and
-        its reference removed from spec.xml.
-        <trace>REQ-F013</trace>
-      </criterion>
-      <criterion id="fr-rf-006-ac4">
-        Requirements NOT affected by the design doc's change intent MUST
-        remain unchanged in the output spec.
+      <criterion id="fr-rf-011-ac3">
+        Every requirement ID referenced in the delta MUST correspond to
+        an actual requirement in the spec's detail files (for added/modified)
+        or to a requirement that existed in the previous version (for removed).
         <trace>REQ-F013</trace>
       </criterion>
     </acceptance_criteria>
@@ -172,9 +181,9 @@
   <requirement id="fr-rf-007">
     <title>Spec Version Increment</title>
     <description>
-      When updating an existing spec (iteration mode), refiner MUST increment
-      the spec version and record supersedes. This is the only version tracking
-      needed — the planner does not use version info.
+      When updating an existing spec, refiner MUST increment the spec version
+      and record supersedes. The planner uses spec_version to locate the
+      correct delta for planning scope.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-007-ac1">

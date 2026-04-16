@@ -153,12 +153,14 @@
   </requirement>
 
   <requirement id="fr-cc-if-004">
-    <title>SDD Utils (Enforcement Layer)</title>
+    <title>SDD Utils (Validation Toolkit)</title>
     <description>
-      Deterministic validation checks MUST be implemented in
-      scripts/lib/sdd-utils.js. This module is the enforcement layer — the
-      single source of truth for what is valid. Full API definitions are
-      in details/sdd-schemas.xml (fr-sd-008, fr-sd-009). LLM judgment is
+      Deterministic validation and information checks MUST be implemented in
+      scripts/lib/sdd-utils.js. This module is a validation toolkit — it
+      validates structure and provides information, but does NOT merge or
+      author spec content (the LLM manages spec content directly, like
+      maintaining a wiki page). Full API definitions are in
+      details/sdd-schemas.xml (fr-sd-008, fr-sd-009). LLM judgment is
       reserved for semantic checks (contradictions, ambiguity).
     </description>
     <acceptance_criteria>
@@ -220,9 +222,12 @@
       <criterion id="fr-cc-if-005-ac4">
         arc-planning SKILL.md MUST invoke scripts/lib/sdd-utils.js
         validateSpecHeader() for spec.xml input validation before any
-        decomposition. Planner does NOT need to read the design doc —
-        it works from the spec (its direct upstream output) and the
-        existing dag.yaml.
+        decomposition. Planner MUST NOT read the design doc — it works
+        from the spec only. Rationale: the three-layer model requires
+        that the derived layer (DAG) reads only from the wiki layer
+        (spec), never from the raw source layer (design doc). The spec's
+        &lt;delta&gt; metadata provides the planning scope that would
+        otherwise require reading the design doc.
         <trace>REQ-F016</trace>
       </criterion>
     </acceptance_criteria>
