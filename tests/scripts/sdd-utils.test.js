@@ -2,7 +2,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { parseDesignDoc, validateDesignDoc } = require('../../scripts/lib/sdd-utils');
+const {
+  parseDesignDoc,
+  validateDesignDoc,
+  parseSpecHeader,
+  validateSpecHeader,
+} = require('../../scripts/lib/sdd-utils');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -278,6 +283,315 @@ describe('validateDesignDoc', () => {
       specDesignIteration: '2026-01-10',
     };
     const result = validateDesignDoc(parsed);
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseSpecHeader
+// ---------------------------------------------------------------------------
+
+const V1_XML = `<spec><overview>
+  <spec_id>auth</spec_id>
+  <spec_version>1</spec_version>
+  <status>active</status>
+  <title>Auth System</title>
+  <description>Per-user authentication</description>
+  <source>
+    <design_path>docs/plans/auth/2026-04-01/design.md</design_path>
+    <design_iteration>2026-04-01</design_iteration>
+  </source>
+  <scope>
+    <includes>
+      <feature id="login">User login</feature>
+    </includes>
+    <excludes>
+      <reason>OAuth deferred</reason>
+    </excludes>
+  </scope>
+</overview></spec>`;
+
+const V2_XML = `<spec><overview>
+  <spec_id>auth</spec_id>
+  <spec_version>2</spec_version>
+  <status>active</status>
+  <supersedes>auth:v1</supersedes>
+  <title>Auth System</title>
+  <description>Auth with OAuth</description>
+  <source>
+    <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+    <design_iteration>2026-04-16</design_iteration>
+  </source>
+  <scope>
+    <includes>
+      <feature id="login">User login</feature>
+      <feature id="oauth">OAuth support</feature>
+    </includes>
+  </scope>
+  <delta version="2" iteration="2026-04-16">
+    <added ref="fr-oauth-001">OAuth integration</added>
+    <modified ref="fr-login-001">Updated login flow</modified>
+  </delta>
+</overview></spec>`;
+
+describe('parseSpecHeader', () => {
+  it('returns null for empty string input', () => {
+    expect(parseSpecHeader('')).toBeNull();
+  });
+
+  it('returns null for null input', () => {
+    expect(parseSpecHeader(null)).toBeNull();
+  });
+
+  it('returns null for XML without <overview> element', () => {
+    expect(parseSpecHeader('<spec><body>no overview here</body></spec>')).toBeNull();
+  });
+
+  it('parses v1 spec header — all fields correct', () => {
+    const result = parseSpecHeader(V1_XML);
+    expect(result).not.toBeNull();
+    expect(result.spec_id).toBe('auth');
+    expect(result.spec_version).toBe(1);
+    expect(result.status).toBe('active');
+    expect(result.title).toBe('Auth System');
+    expect(result.description).toBe('Per-user authentication');
+    expect(result.design_path).toBe('docs/plans/auth/2026-04-01/design.md');
+    expect(result.design_iteration).toBe('2026-04-01');
+    expect(result.supersedes).toBeNull();
+    expect(result.scope.includes).toHaveLength(1);
+    expect(result.scope.includes[0]).toEqual({ id: 'login', description: 'User login' });
+    expect(result.scope.excludes).toHaveLength(1);
+    expect(result.scope.excludes[0]).toBe('OAuth deferred');
+  });
+
+  it('parses v2 spec with supersedes and delta', () => {
+    const result = parseSpecHeader(V2_XML);
+    expect(result).not.toBeNull();
+    expect(result.spec_version).toBe(2);
+    expect(result.supersedes).toBe('auth:v1');
+    expect(result.scope.includes).toHaveLength(2);
+    expect(result.delta).not.toBeNull();
+    expect(result.delta.version).toBe('2');
+    expect(result.delta.added).toHaveLength(1);
+    expect(result.delta.modified).toHaveLength(1);
+    expect(result.delta.removed).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpecHeader
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-spec-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns ERROR for null input, field: overview', () => {
+    const result = validateSpecHeader(null);
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'overview');
+    expect(err).toBeDefined();
+  });
+
+  it('flags missing required fields', () => {
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: null,
+      status: null,
+      title: null,
+      description: null,
+      design_path: null,
+      design_iteration: null,
+      supersedes: null,
+      scope: { includes: [], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const fields = result.issues.filter((i) => i.level === 'ERROR').map((i) => i.field);
+    expect(fields).toContain('spec_version');
+    expect(fields).toContain('status');
+    expect(fields).toContain('source/design_path');
+    expect(fields).toContain('source/design_iteration');
+  });
+
+  it('flags non-positive spec_version (0)', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 0,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: '2026-04-01',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'spec_version');
+    expect(err).toBeDefined();
+  });
+
+  it('flags broken design_path — points to non-existent file', () => {
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: '2026-04-01',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'source/design_path');
+    expect(err).toBeDefined();
+  });
+
+  it('flags invalid date format in design_iteration', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: 'April 2026',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find(
+      (i) => i.level === 'ERROR' && i.field === 'source/design_iteration',
+    );
+    expect(err).toBeDefined();
+  });
+
+  it('flags missing supersedes for v2+', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 2,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-16/design.md',
+      design_iteration: '2026-04-16',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'supersedes');
+    expect(err).toBeDefined();
+  });
+
+  it('flags invalid supersedes format', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 2,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-16/design.md',
+      design_iteration: '2026-04-16',
+      supersedes: 'auth-v1',
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'supersedes');
+    expect(err).toBeDefined();
+  });
+
+  it('warns on empty scope includes — valid remains true', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: '2026-04-01',
+      supersedes: null,
+      scope: { includes: [], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    const warn = result.issues.find((i) => i.level === 'WARNING' && i.field === 'scope/includes');
+    expect(warn).toBeDefined();
+  });
+
+  it('passes valid v1 header — all fields correct, zero ERRORs', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: '2026-04-01',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+
+  it('passes valid v2 header with supersedes — zero ERRORs', () => {
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 2,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-16/design.md',
+      design_iteration: '2026-04-16',
+      supersedes: 'auth:v1',
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: null,
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
   });
