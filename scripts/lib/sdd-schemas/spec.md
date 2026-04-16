@@ -18,7 +18,7 @@ All seven fields are required. Missing any field is ERROR.
 | `spec_version` | positive integer | starts at 1, increments for each iteration |
 | `status` | enum | MUST be `"active"` |
 | `title` | string | human-readable name for the spec |
-| `description` | string | brief scope summary (1–3 sentences) |
+| `description` | string | strategic purpose — why this spec exists (see Description Field below) |
 | `source/design_path` | string | valid file path to the design doc that produced this version |
 | `source/design_iteration` | date | YYYY-MM-DD; iteration date extracted from the design doc's directory name |
 
@@ -36,6 +36,26 @@ The `<scope>` element is always required inside `<overview>`.
 
 - `<includes>` — list of `<feature>` elements, each with an `id` attribute and a text description. Always required. Empty `<includes>` is WARNING.
 - `<excludes>` — list of `<reason>` elements explaining what is deliberately out of scope. Recommended; not required.
+
+### Description Field — Strategic Purpose
+
+The `<description>` field MUST state **why this spec exists** — the strategic
+motivation, not a scope summary. It answers: "What problem does this spec solve,
+and why does it need to be formalized?"
+
+Good:
+- "Convert the one-shot brainstorming-refiner-planner pipeline into an iterable
+  workflow so design docs become immutable raw sources and specs become live
+  contracts."
+- "Provide per-user authentication to replace the shared-password model that
+  prevents audit trails and per-user access control."
+
+Bad:
+- "This spec covers registration, login, logout." (scope summary — not purpose)
+- "JWT authentication system." (too terse — no reason why)
+
+Rule of thumb: if the description can be replaced by reading `scope/includes`,
+it is not a purpose — rewrite it.
 
 ---
 
