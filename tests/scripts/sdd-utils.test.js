@@ -589,7 +589,14 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-16',
       supersedes: 'auth:v1',
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [{ ref: 'fr-oauth-001', text: 'OAuth support' }],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -1040,9 +1047,7 @@ describe('validateSpecHeader — delta placement consistency', () => {
   it('flags missing delta for v2+ as ERROR', () => {
     const parsed = makeV2Parsed({ delta: null });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
-    const deltaErrors = result.issues.filter(
-      (i) => i.level === 'ERROR' && i.field === 'delta',
-    );
+    const deltaErrors = result.issues.filter((i) => i.level === 'ERROR' && i.field === 'delta');
     expect(deltaErrors.length).toBeGreaterThan(0);
   });
 
@@ -1072,9 +1077,7 @@ describe('validateSpecHeader — delta placement consistency', () => {
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ level: 'ERROR', field: 'delta/version' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ level: 'ERROR', field: 'delta/version' })]),
     );
   });
 

@@ -431,6 +431,38 @@ function validateSpecHeader(parsed, options = {}) {
     });
   }
 
+  // Delta required for v2+ (v1 has no delta by design — absence signals "plan all")
+  if (parsed.spec_version > 1 && !parsed.delta) {
+    issues.push({
+      level: 'ERROR',
+      field: 'delta',
+      message: `spec_version ${parsed.spec_version} must include a <delta> element recording what changed. v1 specs have no delta; v2+ specs must.`,
+    });
+  }
+
+  // delta.version (string from XML attribute) must match spec_version (number)
+  if (parsed.delta && parsed.spec_version !== null && parsed.spec_version !== undefined) {
+    const deltaVersionNum = Number.parseInt(parsed.delta.version, 10);
+    if (!Number.isNaN(deltaVersionNum) && deltaVersionNum !== parsed.spec_version) {
+      issues.push({
+        level: 'ERROR',
+        field: 'delta/version',
+        message: `delta version "${parsed.delta.version}" must match spec_version ${parsed.spec_version}`,
+      });
+    }
+  }
+
+  // delta.iteration must match source/design_iteration (delta applies to this iteration)
+  if (parsed.delta && parsed.design_iteration) {
+    if (parsed.delta.iteration !== parsed.design_iteration) {
+      issues.push({
+        level: 'ERROR',
+        field: 'delta/iteration',
+        message: `delta iteration "${parsed.delta.iteration}" must match source/design_iteration "${parsed.design_iteration}"`,
+      });
+    }
+  }
+
   // Each removed entry MUST include a reason (Enhancement 3).
   if (parsed.delta?.removed) {
     for (const rem of parsed.delta.removed) {
