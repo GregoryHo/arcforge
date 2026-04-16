@@ -160,7 +160,7 @@ const SUPERSEDES_RE = /^[a-z0-9-]+:v\d+$/;
  *   delta: { version: string, iteration: string,
  *     added: Array<{ref: string, text: string}>,
  *     modified: Array<{ref: string, text: string}>,
- *     removed: Array<{ref: string, text: string}> } | null } | null}
+ *     removed: Array<{ref: string, reason: string, migration: string, text: string}> } | null } | null}
  */
 function parseSpecHeader(specXmlContent) {
   if (!specXmlContent || typeof specXmlContent !== 'string') {
@@ -239,12 +239,48 @@ function parseSpecHeader(specXmlContent) {
       return [...deltaBody.matchAll(re)].map((m) => ({ ref: m[1], text: m[2].trim() }));
     }
 
+    // Parse <removed> entries — three supported formats:
+    //   1. Self-closing:  <removed ref="x" />
+    //   2. Text content: <removed ref="x">Free text explanation</removed>
+    //   3. Structured:   <removed ref="x"><reason>...</reason><migration>...</migration></removed>
+    // Returns entries with { ref, reason, migration, text } for all formats.
+    function parseRemovedItems() {
+      const results = [];
+      // Format 1: self-closing.
+      const selfCloseRe = /<removed\s+ref="([^"]*)"[^>]*\/>/g;
+      for (const m of deltaBody.matchAll(selfCloseRe)) {
+        results.push({ ref: m[1], reason: '', migration: '', text: '' });
+      }
+      // Formats 2 & 3: open/close tag.
+      const openCloseRe = /<removed\s+ref="([^"]*)"[^>]*>([\s\S]*?)<\/removed>/g;
+      for (const m of deltaBody.matchAll(openCloseRe)) {
+        const ref = m[1];
+        const inner = m[2];
+        const reasonMatch = /<reason>([^<]*)<\/reason>/.exec(inner);
+        const migrationMatch = /<migration>([^<]*)<\/migration>/.exec(inner);
+        if (reasonMatch || migrationMatch) {
+          // Format 3: structured sub-elements.
+          results.push({
+            ref,
+            reason: reasonMatch ? reasonMatch[1].trim() : '',
+            migration: migrationMatch ? migrationMatch[1].trim() : '',
+            text: '',
+          });
+        } else {
+          // Format 2: legacy free text — use as reason for backward compat.
+          const text = inner.trim();
+          results.push({ ref, reason: text, migration: '', text });
+        }
+      }
+      return results;
+    }
+
     delta = {
       version: versionAttr ? versionAttr[1] : null,
       iteration: iterationAttr ? iterationAttr[1] : null,
       added: parseDeltaItems('added'),
       modified: parseDeltaItems('modified'),
-      removed: parseDeltaItems('removed'),
+      removed: parseRemovedItems(),
     };
   }
 
@@ -357,6 +393,19 @@ function validateSpecHeader(parsed, options = {}) {
       field: 'scope/includes',
       message: 'scope/includes is empty. Add at least one feature to the scope.',
     });
+  }
+
+  // Each removed entry MUST include a reason (Enhancement 3).
+  if (parsed.delta?.removed) {
+    for (const rem of parsed.delta.removed) {
+      if (!rem.reason && !rem.text) {
+        issues.push({
+          level: 'ERROR',
+          field: 'delta/removed',
+          message: `removed requirement '${rem.ref}' MUST include a <reason> explaining why the requirement was removed.`,
+        });
+      }
+    }
   }
 
   const valid = issues.every((i) => i.level !== 'ERROR');

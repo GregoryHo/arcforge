@@ -596,3 +596,221 @@ describe('validateSpecHeader', () => {
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseSpecHeader — Enhancement 3: removed backward compat + new format
+// ---------------------------------------------------------------------------
+
+describe('parseSpecHeader — removed element formats', () => {
+  it('parses old-format removed (self-closing) — reason and text are empty strings', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2</spec_version>
+      <status>active</status>
+      <supersedes>auth:v1</supersedes>
+      <title>Auth System</title>
+      <description>Auth with OAuth</description>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <removed ref="fr-login-legacy" />
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.removed).toHaveLength(1);
+    expect(result.delta.removed[0].ref).toBe('fr-login-legacy');
+    expect(result.delta.removed[0].reason).toBe('');
+    expect(result.delta.removed[0].text).toBe('');
+  });
+
+  it('parses old-format removed (text content) — text preserved, reason set to text', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2</spec_version>
+      <status>active</status>
+      <supersedes>auth:v1</supersedes>
+      <title>Auth System</title>
+      <description>Auth with OAuth</description>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <removed ref="fr-password-reset">Replaced by OAuth flow</removed>
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.removed).toHaveLength(1);
+    expect(result.delta.removed[0].ref).toBe('fr-password-reset');
+    expect(result.delta.removed[0].text).toBe('Replaced by OAuth flow');
+    expect(result.delta.removed[0].reason).toBe('Replaced by OAuth flow');
+    expect(result.delta.removed[0].migration).toBe('');
+  });
+
+  it('parses new-format removed (structured reason + migration)', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>3</spec_version>
+      <status>active</status>
+      <supersedes>auth:v2</supersedes>
+      <title>Auth System</title>
+      <description>Auth v3</description>
+      <source>
+        <design_path>docs/plans/auth/2026-05-01/design.md</design_path>
+        <design_iteration>2026-05-01</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="3" iteration="2026-05-01">
+        <removed ref="fr-legacy-session">
+          <reason>Session tokens replaced by JWT — no stateful sessions needed</reason>
+          <migration>Existing session tokens expire naturally; clients must re-authenticate</migration>
+        </removed>
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.removed).toHaveLength(1);
+    const rem = result.delta.removed[0];
+    expect(rem.ref).toBe('fr-legacy-session');
+    expect(rem.reason).toBe('Session tokens replaced by JWT — no stateful sessions needed');
+    expect(rem.migration).toBe(
+      'Existing session tokens expire naturally; clients must re-authenticate',
+    );
+  });
+
+  it('parses new-format removed without migration — migration is empty string', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>3</spec_version>
+      <status>active</status>
+      <supersedes>auth:v2</supersedes>
+      <title>Auth System</title>
+      <description>Auth v3</description>
+      <source>
+        <design_path>docs/plans/auth/2026-05-01/design.md</design_path>
+        <design_iteration>2026-05-01</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="3" iteration="2026-05-01">
+        <removed ref="fr-debug-endpoint">
+          <reason>Debug endpoint removed for security — no migration path exists</reason>
+        </removed>
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.delta.removed).toHaveLength(1);
+    const rem = result.delta.removed[0];
+    expect(rem.ref).toBe('fr-debug-endpoint');
+    expect(rem.reason).toBe('Debug endpoint removed for security — no migration path exists');
+    expect(rem.migration).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpecHeader — Enhancement 3: missing removed reason → ERROR
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader — removed reason validation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-removed-test-'));
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function baseParsed(overrides = {}) {
+    return {
+      spec_id: 'auth',
+      spec_version: 2,
+      status: 'active',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-16/design.md',
+      design_iteration: '2026-04-16',
+      supersedes: 'auth:v1',
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+      ...overrides,
+    };
+  }
+
+  it('flags removed entry with no reason and no text as ERROR on delta/removed', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [{ ref: 'fr-legacy-001', reason: '', text: '', migration: '' }],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/removed');
+    expect(err).toBeDefined();
+    expect(err.message).toMatch(/reason/i);
+  });
+
+  it('passes removed entry with reason set via new structured format', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [
+          {
+            ref: 'fr-legacy-001',
+            reason: 'Session tokens replaced by JWT',
+            text: '',
+            migration: '',
+          },
+        ],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+
+  it('passes removed entry with reason from legacy text content', () => {
+    const parsed = baseParsed({
+      delta: {
+        version: '2',
+        iteration: '2026-04-16',
+        added: [],
+        modified: [],
+        removed: [
+          {
+            ref: 'fr-password-reset',
+            reason: 'Replaced by OAuth flow',
+            text: 'Replaced by OAuth flow',
+            migration: '',
+          },
+        ],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(true);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+  });
+});

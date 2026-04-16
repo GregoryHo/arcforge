@@ -144,7 +144,10 @@ When the refiner updates an existing spec (spec_version > 1), it writes a `<delt
 <delta version="N" iteration="YYYY-MM-DD">
   <added ref="req-id" />
   <modified ref="req-id" />
-  <removed ref="req-id" />
+  <removed ref="req-id">
+    <reason>Why this requirement was removed</reason>
+    <migration>How existing consumers transition (optional)</migration>
+  </removed>
 </delta>
 ```
 
@@ -154,11 +157,17 @@ When the refiner updates an existing spec (spec_version > 1), it writes a `<delt
 | `iteration` | MUST match the new `source/design_iteration` |
 | `<added ref="...">` | ref MUST correspond to a real requirement id in a detail file |
 | `<modified ref="...">` | ref MUST correspond to a real requirement id |
-| `<removed ref="...">` | ref MUST correspond to a requirement id that existed in the prior version |
+| `<removed ref="...">` | ref MUST correspond to a requirement id that existed in the prior version; MUST contain a `<reason>` child element |
+| `<removed>/<reason>` | MUST be present; explains why the requirement was removed |
+| `<removed>/<migration>` | Optional; explains how existing consumers transition. Omit when no migration path exists |
 
 For v1 specs: no `<delta>` element. Its absence signals "plan all requirements."
 
 The planner reads the latest `<delta>` to scope its sprint — only requirements listed in the delta are planned. For v1, the planner plans all requirements (no delta = full scope).
+
+For backward compatibility, `sdd-utils.js` accepts two legacy `<removed>` formats:
+- Self-closing `<removed ref="x" />` — parsed with empty reason (validator flags this as ERROR)
+- Text content `<removed ref="x">Free text</removed>` — text treated as the reason
 
 ---
 
