@@ -138,7 +138,9 @@ Bad:
 
 ## Delta Element (fr-sd-005, iteration specs)
 
-When the refiner updates an existing spec (spec_version > 1), it writes a `<delta>` element directly inside `<spec>` (sibling of `<overview>`). The delta records what changed in this version.
+When the refiner updates an existing spec (spec_version > 1), it writes a `<delta>` element as the **last child of `<overview>`**. The delta records what changed in this version.
+
+Placement is deliberate: `<delta>` is identity metadata, not separate content. It is tightly coupled to `<spec_version>`, `<supersedes>`, and `<source/design_iteration>` — all of which live in `<overview>`. `delta.version` MUST match `spec_version`; `delta.iteration` MUST match `source/design_iteration`.
 
 ```xml
 <delta version="N" iteration="YYYY-MM-DD">
@@ -264,13 +266,12 @@ No `<supersedes>` — this is v1. No `<delta>` — planner plans all requirement
         <reason>Additional OAuth providers (Apple, Microsoft) — deferred</reason>
       </excludes>
     </scope>
+    <delta version="2" iteration="2026-05-10">
+      <added ref="fr-as-007" />
+      <added ref="fr-as-008" />
+      <modified ref="fr-as-002" />
+    </delta>
   </overview>
-
-  <delta version="2" iteration="2026-05-10">
-    <added ref="fr-as-007" />
-    <added ref="fr-as-008" />
-    <modified ref="fr-as-002" />
-  </delta>
 
   <details>
     <detail_file path="details/auth-core.xml" />
