@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="planner">
+  <title>Stage 3 — Planner (Decompose)</title>
+  <consumes>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (follow source pointer to design doc)</artifact>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (read REFINER_INPUT for delta info)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml (iteration mode only)</artifact>
+  </consumes>
+  <produces>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml</artifact>
+    <artifact>specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/epic.md</artifact>
+    <artifact>specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/features/*.md</artifact>
+  </produces>
+
+  <requirement id="fr-pl-001">
+    <title>Delta Discovery via Source Pointer</title>
+    <description>
+      Planner MUST read delta information by following the spec's source pointer
+      to the design doc, then reading its REFINER_INPUT section.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-001-ac1">
+        Given a spec.xml with source/design_path pointing to
+        docs/plans/my-feature/2026-04-16/design.md, planner MUST read that file's
+        REFINER_INPUT to determine type (initial vs iteration) and delta content.
+        <trace>REQ-F016</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac2">
+        Planner MUST NOT infer delta information from spec.xml diff or git history.
+        The design doc's REFINER_INPUT is the sole delta source.
+        <trace>REQ-F016</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-002">
+    <title>Initial/Replace Mode — Build From Scratch</title>
+    <description>
+      When REFINER_INPUT type is "initial" or type is "iteration" with no Delta
+      section (replace), planner MUST build dag.yaml and epics/ from scratch.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-002-ac1">
+        Given a spec.xml v1 (initial), planner MUST produce a dag.yaml with all
+        epics in "pending" status and source_spec_version: 1.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-002-ac2">
+        Given a replace-mode spec.xml v3 (iteration, no delta), planner MUST
+        rebuild the entire dag.yaml. Pre-existing epic statuses from the previous
+        DAG MUST NOT carry over.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-002-ac3">
+        For each epic in dag.yaml, planner MUST produce an epics/&lt;epic-id&gt;/epic.md
+        with at minimum: title, description, and feature breakdown.
+        <trace>REQ-F017</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-003">
+    <title>Iteration Mode — Delta Processing Matrix</title>
+    <description>
+      When REFINER_INPUT type is "iteration" with a Delta section, planner MUST
+      apply changes to the existing dag.yaml according to the delta-by-epic-status
+      matrix.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-003-ac1">
+        ADDED requirements MUST result in new epics with status: pending and
+        source_spec_version: N (current spec version).
+        <trace>REQ-F018</trace>
+      </criterion>
+      <criterion id="fr-pl-003-ac2">
+        MODIFIED requirements where the affected epic is "completed" MUST result
+        in a new rework epic with status: pending and rework_of pointing to the
+        original epic id.
+        <trace>REQ-F018</trace>
+      </criterion>
+      <criterion id="fr-pl-003-ac3">
+        REMOVED requirements where the affected epic is "pending" MUST result in
+        the epic being removed from dag.yaml entirely.
+        <trace>REQ-F018</trace>
+      </criterion>
+      <criterion id="fr-pl-003-ac4">
+        MODIFIED requirements where the affected epic is "pending" MUST update
+        the existing epic in place (no rework epic needed).
+        <trace>REQ-F018</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-004">
+    <title>Block on In-Progress Conflicts</title>
+    <description>
+      When MODIFIED or REMOVED delta affects an epic with status "in_progress",
+      planner MUST block and produce a diff report. Human decides resolution.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-004-ac1">
+        Given a MODIFIED requirement and an in_progress epic implementing it,
+        planner MUST NOT auto-apply the change. It MUST produce a diff report
+        presenting three options: (1) complete first then rework, (2) abort and
+        create rework epic, (3) merge changes into current work.
+        <trace>REQ-F019</trace>
+      </criterion>
+      <criterion id="fr-pl-004-ac2">
+        Given a REMOVED requirement and an in_progress epic implementing it,
+        planner MUST NOT auto-remove the epic. It MUST produce a diff report
+        and wait for human decision.
+        <trace>REQ-F019</trace>
+      </criterion>
+      <criterion id="fr-pl-004-ac3">
+        Auto-applied changes (ADDED epics, REMOVED pending epics, MODIFIED
+        completed epics) MUST be listed in the report's "Auto-applied" section
+        for user awareness, even when no blocking occurs.
+        <trace>REQ-F019</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-005">
+    <title>Source Spec Version Tagging</title>
+    <description>
+      Every epic MUST carry a source_spec_version field indicating which spec
+      version introduced or last modified it.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-005-ac1">
+        New epics created during spec v2 planning MUST have source_spec_version: 2.
+        <trace>REQ-F020</trace>
+      </criterion>
+      <criterion id="fr-pl-005-ac2">
+        Unchanged epics from a previous version MUST retain their original
+        source_spec_version value.
+        <trace>REQ-F020</trace>
+      </criterion>
+      <criterion id="fr-pl-005-ac3">
+        Rework epics MUST have source_spec_version set to the version that
+        triggered the rework, not the original version.
+        <trace>REQ-F020</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-006">
+    <title>Rework Epic Tracking</title>
+    <description>
+      Rework epics MUST include a rework_of field referencing the original epic
+      id, providing a traceable chain from modification to source.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-006-ac1">
+        Given epic "capability-a" (completed, v1) modified in v2, the rework epic
+        MUST be named "capability-a-v2" with rework_of: capability-a.
+        <trace>REQ-F021</trace>
+      </criterion>
+      <criterion id="fr-pl-006-ac2">
+        The original epic's status MUST NOT be changed by the creation of a
+        rework epic. It remains "completed".
+        <trace>REQ-F021</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-007">
+    <title>Self-Contained Project Unit</title>
+    <description>
+      DAG and epics MUST live inside the spec folder. Each spec/&lt;spec-id&gt;/ is a
+      self-contained project unit with all artifacts needed for execution.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-007-ac1">
+        dag.yaml MUST be written to specs/&lt;spec-id&gt;/dag.yaml, not to the
+        project root or any other location.
+        <trace>REQ-F022</trace>
+      </criterion>
+      <criterion id="fr-pl-007-ac2">
+        Epic folders MUST be at specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/.
+        <trace>REQ-F022</trace>
+      </criterion>
+      <criterion id="fr-pl-007-ac3">
+        No dag.yaml field MUST reference paths outside of specs/&lt;spec-id&gt;/
+        except for the source pointer back to the design doc.
+        <trace>REQ-F022</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-008">
+    <title>Done Signal</title>
+    <description>
+      An iteration is considered "done" when all epics with a given
+      source_spec_version are in "completed" status.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-008-ac1">
+        Given 3 epics with source_spec_version: 2 and all 3 in "completed" status,
+        iteration v2 MUST be considered done.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-pl-008-ac2">
+        Given 3 epics with source_spec_version: 2 and 1 still "pending", iteration
+        v2 MUST NOT be considered done.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-pl-008-ac3">
+        Epics from previous versions (source_spec_version: 1) MUST NOT affect the
+        done signal for version 2.
+        <trace>REQ-F023</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

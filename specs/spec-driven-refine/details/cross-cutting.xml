@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="cross-cutting">
+  <title>Cross-Cutting Rules and Non-Functional Requirements</title>
+
+  <!-- ═══════════════ Foundational Rules ═══════════════ -->
+
+  <requirement id="fr-cc-001">
+    <title>R1 — Human Consent for Raw Source</title>
+    <description>
+      Design docs (raw source) MUST NOT be created or modified without human
+      consent or initiation. The LLM assists in elicitation but the human
+      controls when a design doc is committed.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-001-ac1">
+        A design doc MUST NOT be written to disk until the user explicitly confirms
+        the content (e.g., "looks good", "commit it", section-by-section approval).
+        <trace>REQ-F024</trace>
+      </criterion>
+      <criterion id="fr-cc-001-ac2">
+        After a design doc is committed, it MUST NOT be modified. Any change
+        requires a new iteration (new date folder, new design.md).
+        <trace>REQ-F024</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-002">
+    <title>R2 — Unidirectional Flow</title>
+    <description>
+      Downstream stages MUST NOT modify upstream artifacts. Refiner cannot modify
+      design docs; planner cannot modify spec.xml.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-002-ac1">
+        Refiner MUST NOT write to any file under docs/plans/. Its only output
+        paths are specs/&lt;spec-id&gt;/ (on success) and
+        docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md (on block; this is a
+        report alongside the design, not a modification of it).
+        <trace>REQ-F025</trace>
+      </criterion>
+      <criterion id="fr-cc-002-ac2">
+        Planner MUST NOT write to specs/&lt;spec-id&gt;/spec.xml or
+        specs/&lt;spec-id&gt;/details/. Its only output paths are
+        specs/&lt;spec-id&gt;/dag.yaml and specs/&lt;spec-id&gt;/epics/.
+        <trace>REQ-F025</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Stale Lint Detection Rules ═══════════════ -->
+
+  <requirement id="fr-cc-003">
+    <title>Stale Lint — Design Newer Than Spec</title>
+    <description>
+      When a design iteration exists that is newer than the spec's recorded
+      design_iteration, the lint system MUST flag it.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-003-ac1">
+        Given spec.xml with design_iteration: 2026-04-01 and a design doc at
+        docs/plans/my-feature/2026-04-16/design.md, lint MUST produce a warning:
+        "stale spec: design iteration 2026-04-16 is newer than spec source 2026-04-01".
+        <trace>REQ-F026</trace>
+      </criterion>
+      <criterion id="fr-cc-003-ac2">
+        Given spec.xml with design_iteration: 2026-04-16 and no newer design doc,
+        lint MUST NOT produce a warning.
+        <trace>REQ-F026</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-004">
+    <title>Stale Lint — Unrefined Design</title>
+    <description>
+      When a design folder exists under docs/plans/&lt;spec-id&gt;/ but no corresponding
+      specs/&lt;spec-id&gt;/spec.xml exists, lint MUST flag "unrefined design".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-004-ac1">
+        Given docs/plans/new-feature/2026-04-16/design.md exists but
+        specs/new-feature/ does not exist, lint MUST produce:
+        "unrefined design: new-feature has design but no spec".
+        <trace>REQ-F027</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-005">
+    <title>Stale Lint — Unplanned Spec</title>
+    <description>
+      When a spec.xml exists but no dag.yaml exists in the same spec folder,
+      lint MUST flag "unplanned spec".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-005-ac1">
+        Given specs/my-feature/spec.xml exists but specs/my-feature/dag.yaml does
+        not, lint MUST produce: "unplanned spec: my-feature has spec but no DAG".
+        <trace>REQ-F028</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Skill Descriptions ═══════════════ -->
+
+  <requirement id="fr-cc-006">
+    <title>Path-Agnostic Skill Descriptions</title>
+    <description>
+      Pipeline skill descriptions (frontmatter) MUST NOT hardcode artifact paths.
+      Triggering conditions MUST describe intent and context, not file locations.
+      The user provides the spec-id or target via their prompt.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-006-ac1">
+        arc-brainstorming, arc-refining, and arc-planning descriptions MUST NOT
+        contain literal paths like "specs/spec.xml" or "specs/&lt;spec-id&gt;/spec.xml".
+        They MUST describe triggering conditions in terms of user intent (e.g.,
+        "when converting design documents to structured specs").
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="fr-cc-006-ac2">
+        Each pipeline skill MUST accept a spec-id from the user's prompt as the
+        primary routing input. The skill resolves the spec-id to the correct
+        artifact paths internally.
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="fr-cc-006-ac3">
+        When the user does not provide a spec-id, the skill MUST scan specs/ and
+        docs/plans/ to present available targets and ask the user to choose.
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-007">
+    <title>Arc-Using Routing Discoverability</title>
+    <description>
+      New and modified skills MUST be discoverable through arc-using's routing
+      examples. When this spec adds arc-linting or changes pipeline skill behavior,
+      arc-using's example section MUST be updated accordingly.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-007-ac1">
+        arc-using's Skill Priority examples MUST include an entry for arc-linting
+        (e.g., "Check for stale artifacts" -> arc-linting).
+        <trace>REQ-F026</trace>
+      </criterion>
+      <criterion id="fr-cc-007-ac2">
+        arc-using's pipeline routing examples MUST reflect the updated triggering
+        conditions (no hardcoded paths; spec-id driven).
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Non-Functional Requirements ═══════════════ -->
+
+  <requirement id="nfr-001">
+    <title>Existing Infrastructure Compatibility</title>
+    <description>
+      The SDD pipeline MUST work with arcforge's existing CLI and skill
+      infrastructure. No new runtime dependencies.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-001-ac1">
+        All pipeline operations MUST be invocable via existing arcforge skill
+        mechanism (arc-brainstorming, arc-refining, arc-planning) or their
+        updated versions.
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-001-ac2">
+        No new npm packages MUST be added to package.json dependencies.
+        devDependencies are exempt.
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="nfr-002">
+    <title>File-Based Artifacts</title>
+    <description>
+      All artifacts MUST be file-based (YAML, XML, Markdown). No database,
+      no server, no external state store.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-002-ac1">
+        Pipeline state MUST be fully derivable from files on disk. Running
+        `ls` and `cat` on the specs/ and docs/plans/ directories MUST be
+        sufficient to determine the complete pipeline state.
+        <trace>REQ-N002</trace>
+      </criterion>
+      <criterion id="nfr-002-ac2">
+        No pipeline operation MUST require network access, a running server,
+        or a database connection.
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

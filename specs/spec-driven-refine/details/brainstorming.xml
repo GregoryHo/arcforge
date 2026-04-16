@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="brainstorming">
+  <title>Stage 1 — Brainstorming (Elicit)</title>
+  <consumes>
+    <artifact>specs/*/spec.xml (scan for existing spec_ids)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (Path B: existing spec)</artifact>
+    <artifact>docs/plans/&lt;spec-id&gt;/*/design.md (Path B: previous iterations)</artifact>
+  </consumes>
+  <produces>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md</artifact>
+  </produces>
+
+  <requirement id="fr-bs-001">
+    <title>Scan Existing Specs Before Starting</title>
+    <description>
+      Brainstorming MUST scan the specs/ directory for existing spec_ids before
+      beginning any elicitation, to detect potential iteration scenarios.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-001-ac1">
+        Given a specs/ directory containing specs/auth/spec.xml and specs/payments/spec.xml,
+        brainstorming MUST present both spec_ids (auth, payments) to the user before proceeding.
+        <trace>REQ-F001</trace>
+      </criterion>
+      <criterion id="fr-bs-001-ac2">
+        Given an empty specs/ directory, brainstorming MUST proceed directly to
+        new-spec flow without presenting any existing spec_ids.
+        <trace>REQ-F001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-002">
+    <title>Route to Path A or Path B</title>
+    <description>
+      After scanning, brainstorming MUST ask the user to confirm whether this is a
+      new spec (Path A) or an iteration on an existing spec (Path B). The user's
+      explicit confirmation determines the path.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-002-ac1">
+        Given a similar spec found, brainstorming MUST ask: "Iterating on &lt;spec-id&gt;
+        (v&lt;N&gt; active)?" and wait for user confirmation before routing.
+        <trace>REQ-F002</trace>
+      </criterion>
+      <criterion id="fr-bs-002-ac2">
+        Given no matching spec, brainstorming MUST propose a spec-id and ask:
+        "New topic — proposed spec-id: &lt;suggestion&gt;. OK?" before proceeding.
+        <trace>REQ-F002</trace>
+      </criterion>
+      <criterion id="fr-bs-002-ac3">
+        Brainstorming MUST NOT auto-detect the path without user confirmation.
+        <trace>REQ-F002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-003">
+    <title>Path A Output Format</title>
+    <description>
+      Path A (new spec) produces a design doc at the canonical location with a
+      REFINER_INPUT section of type: initial containing full requirements and scope.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-003-ac1">
+        Path A output MUST be written to docs/plans/&lt;spec-id&gt;/&lt;YYYY-MM-DD&gt;/design.md.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-bs-003-ac2">
+        The REFINER_INPUT section MUST contain: spec_id, iteration (date), type: initial.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-bs-003-ac3">
+        The REFINER_INPUT section MUST include at least one functional requirement
+        and a scope declaration (includes/excludes).
+        <trace>REQ-F003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-004">
+    <title>Path B Reads Existing State</title>
+    <description>
+      Path B (iteration) MUST read the existing spec.xml and all previous design
+      iterations before eliciting the delta from the user.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-004-ac1">
+        Given specs/my-feature/spec.xml at v2, brainstorming MUST read the spec.xml
+        content during Phase 1 (Understanding) before asking the user about changes.
+        <trace>REQ-F004</trace>
+      </criterion>
+      <criterion id="fr-bs-004-ac2">
+        Given two previous iterations (2026-01-01, 2026-03-15), brainstorming MUST
+        read both design docs to understand the evolution history.
+        <trace>REQ-F004</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-005">
+    <title>Path B Output Format (Gamma Mode)</title>
+    <description>
+      Path B produces a design doc in gamma mode: context summary, change intent,
+      architecture impact, and a REFINER_INPUT with type: iteration, base_version,
+      and a Delta section.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-005-ac1">
+        The REFINER_INPUT MUST contain: spec_id, iteration (date), type: iteration,
+        base_version (integer matching the current spec version).
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-bs-005-ac2">
+        The Delta section MUST use exactly three categories: ADDED, MODIFIED, REMOVED.
+        Each item MUST reference a requirement ID.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-bs-005-ac3">
+        The design doc MUST include a Context section summarizing the current spec
+        scope in 2-3 sentences, with a reference to the spec.xml version.
+        <trace>REQ-F005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-006">
+    <title>Spec ID Derivation and Confirmation</title>
+    <description>
+      For Path A, the spec_id MUST be derived from content at the end of Phase 2
+      (when scope is clear) and confirmed by the user before output.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-006-ac1">
+        The spec_id MUST NOT be finalized before Phase 2 completes.
+        <trace>REQ-F006</trace>
+      </criterion>
+      <criterion id="fr-bs-006-ac2">
+        The user MUST explicitly confirm or modify the proposed spec_id before the
+        design doc is written.
+        <trace>REQ-F006</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-007">
+    <title>Change Type Derivation</title>
+    <description>
+      The change type (extend, modify, reduce, restructure, replace) MUST be
+      derived from delta content, not declared by the user.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-007-ac1">
+        Given a Delta with only ADDED items, the derived type MUST be "extend".
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-bs-007-ac2">
+        Given a Delta with only MODIFIED items, the derived type MUST be "modify".
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-bs-007-ac3">
+        Given a Delta with only REMOVED items, the derived type MUST be "reduce".
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-bs-007-ac4">
+        Given a Delta with both ADDED and REMOVED items, the derived type MUST be "restructure".
+        <trace>REQ-F007</trace>
+      </criterion>
+      <criterion id="fr-bs-007-ac5">
+        Given a type: iteration REFINER_INPUT with no Delta section and full
+        requirements listed instead, the derived type MUST be "replace".
+        <trace>REQ-F007</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

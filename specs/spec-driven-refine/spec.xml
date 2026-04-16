@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>spec-driven-refine</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <source>
+      <design_path>docs/plans/spec-driven-refine/2026-04-16/design.md</design_path>
+      <design_iteration>2026-04-16</design_iteration>
+    </source>
+    <title>Spec-Driven Development Pipeline</title>
+    <description>
+      Convert arcforge's one-shot brainstorming-refiner-planner pipeline into an
+      iterable Spec-Driven Development workflow. Design docs become immutable raw
+      sources; specs become live contracts updated via delta integration; DAGs become
+      derived views that preserve execution state. Three foundational rules (R1 Human
+      Consent, R2 Unidirectional Flow, R3 Block on Contradictions) govern the entire flow.
+    </description>
+    <scope>
+      <includes>
+        <feature id="stage-1-brainstorming">Path A/B routing, design doc structure, REFINER_INPUT format</feature>
+        <feature id="stage-2-refiner">Initial/iteration/replace modes, blocking report, identity header, empty-delta detection</feature>
+        <feature id="stage-3-planner">Initial/iteration modes, delta processing, rework epics, done signal</feature>
+        <feature id="cross-cutting-rules">R1 (human consent), R2 (unidirectional), R3 (block on contradictions)</feature>
+        <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec)</feature>
+        <feature id="spec-identity-header">XML schema for spec self-identification and versioning</feature>
+        <feature id="stale-lint-rules">Detection rules for upstream/downstream drift and completeness</feature>
+        <feature id="stale-lint-skill">Stale lint skill implementation — core module, skill definition, report format</feature>
+      </includes>
+      <excludes>
+        <reason>Cross-spec dependencies — deferred until multi-spec usage is established</reason>
+        <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <cross_cutting>
+    <constraint id="cc-001">
+      <title>Zero External Dependencies</title>
+      <description>Node.js standard library only. No npm runtime dependencies.</description>
+    </constraint>
+    <constraint id="cc-003">
+      <title>Stale Lint as Skill Only</title>
+      <description>
+        Stale lint is implemented as a skill (arc-linting) backed by a core module
+        (scripts/lib/stale-lint.js). No SessionStart hook or automatic checking.
+        Users invoke it explicitly.
+      </description>
+    </constraint>
+    <constraint id="cc-004">
+      <title>Self-Contained Stage Input</title>
+      <description>
+        Each pipeline stage receives a self-contained input payload (REFINER_INPUT
+        for refiner, spec source pointer for planner). Stages MUST NOT rely on
+        implicit context from prior conversation or session state.
+      </description>
+    </constraint>
+  </cross_cutting>
+
+  <details>
+    <detail_file path="details/brainstorming.xml" />
+    <detail_file path="details/refiner.xml" />
+    <detail_file path="details/planner.xml" />
+    <detail_file path="details/cross-cutting.xml" />
+    <detail_file path="details/stale-lint.xml" />
+  </details>
+</spec>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="refiner">
+  <title>Stage 2 — Refiner (Formalize)</title>
+  <consumes>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (REFINER_INPUT)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (iteration mode only)</artifact>
+  </consumes>
+  <produces>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml</artifact>
+    <artifact>specs/&lt;spec-id&gt;/details/*.xml</artifact>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md (on block only)</artifact>
+  </produces>
+
+  <requirement id="fr-rf-001">
+    <title>Block on Design Contradictions</title>
+    <description>
+      Refiner MUST block when the design doc contains contradictory requirements,
+      per Rule R3 (Block on Contradictions).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-001-ac1">
+        Given a design doc where REQ-A requires "sessions expire after 15 minutes"
+        and REQ-B requires "sessions never expire", refiner MUST block and produce
+        a refiner-report.md.
+        <trace>REQ-F008</trace>
+      </criterion>
+      <criterion id="fr-rf-001-ac2">
+        When blocked, refiner MUST NOT produce or update any spec.xml or details/ files.
+        <trace>REQ-F008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-002">
+    <title>Rejection Report</title>
+    <description>
+      When refiner blocks, the rejection report MUST be stored alongside the
+      rejected design doc at docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-002-ac1">
+        The refiner-report.md MUST be at the same directory level as the rejected
+        design.md (e.g., docs/plans/my-feature/2026-04-16/refiner-report.md).
+        <trace>REQ-F009</trace>
+      </criterion>
+      <criterion id="fr-rf-002-ac2">
+        The report MUST list each contradiction, missing acceptance criterion, and
+        broken dependency with specific requirement IDs.
+        <trace>REQ-F009</trace>
+      </criterion>
+      <criterion id="fr-rf-002-ac3">
+        The report MUST include a Recommendations section with a specific suggestion
+        for resolving each listed issue.
+        <trace>REQ-F009</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-003">
+    <title>Spec Identity Header</title>
+    <description>
+      Every spec.xml MUST contain an identity header with spec_id, spec_version,
+      status, source (design path + iteration date), scope, and supersedes fields.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-003-ac1">
+        A newly created spec.xml MUST have spec_version: 1, status: active, and
+        supersedes empty or absent.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-rf-003-ac2">
+        An updated spec.xml MUST have spec_version: base_version + 1, and
+        supersedes set to "&lt;spec-id&gt;:v&lt;previous-version&gt;".
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-rf-003-ac3">
+        The source element MUST contain design_path pointing to the exact design
+        doc file and design_iteration matching the YYYY-MM-DD iteration date.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-rf-003-ac4">
+        The scope element MUST list included features with IDs and excluded items
+        with reasons.
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-004">
+    <title>Per-Spec Directory Isolation</title>
+    <description>
+      Multiple specs MUST coexist in separate specs/&lt;spec-id&gt;/ folders. Each
+      folder is a self-contained project unit.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-004-ac1">
+        Given spec-ids "auth" and "payments", their specs MUST reside at
+        specs/auth/spec.xml and specs/payments/spec.xml respectively, with no
+        cross-folder references.
+        <trace>REQ-F011</trace>
+      </criterion>
+      <criterion id="fr-rf-004-ac2">
+        Each spec folder MUST contain its own details/ subdirectory. Detail files
+        MUST NOT reference requirements from other spec folders.
+        <trace>REQ-F011</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-005">
+    <title>Initial Mode — Formalize From Scratch</title>
+    <description>
+      When REFINER_INPUT type is "initial", refiner MUST formalize the entire
+      design doc into a new spec.xml v1 and details/ files.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-005-ac1">
+        Given a design doc with type: initial and 10 functional requirements,
+        refiner MUST produce a spec.xml with spec_version: 1 and detail files
+        covering all 10 requirements.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-rf-005-ac2">
+        Every requirement in the REFINER_INPUT MUST appear as a &lt;requirement&gt;
+        element in one of the detail files, with at least one acceptance criterion.
+        <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-rf-005-ac3">
+        Every acceptance criterion MUST have a &lt;trace&gt; element referencing the
+        source requirement ID from the design doc.
+        <trace>REQ-F012</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-006">
+    <title>Iteration Mode — Delta Application</title>
+    <description>
+      When REFINER_INPUT type is "iteration" and a Delta section with content exists,
+      refiner MUST apply ADDED/MODIFIED/REMOVED operations to the existing spec.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-006-ac1">
+        ADDED items MUST result in new &lt;requirement&gt; elements added to the
+        appropriate detail file, with new acceptance criteria and traces.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-006-ac2">
+        MODIFIED items MUST update the matching &lt;requirement&gt; element in place.
+        The requirement's description, title, and acceptance criteria MUST reflect
+        the modification.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-006-ac3">
+        REMOVED items MUST delete the matching &lt;requirement&gt; element from its
+        detail file. If a detail file becomes empty, the file MUST be deleted and
+        its reference removed from spec.xml.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-006-ac4">
+        Requirements NOT mentioned in the Delta MUST remain unchanged in the
+        output spec.
+        <trace>REQ-F013</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-007">
+    <title>Replace Mode — Full Rewrite</title>
+    <description>
+      When REFINER_INPUT type is "iteration" and the Delta section is absent
+      (replaced by full requirements), refiner MUST formalize from scratch as
+      v(N+1), superseding the previous version.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-007-ac1">
+        Given type: iteration, base_version: 2, and no "### Delta" heading in the
+        REFINER_INPUT, refiner MUST produce spec.xml v3 from scratch.
+        <trace>REQ-F014</trace>
+      </criterion>
+      <criterion id="fr-rf-007-ac2">
+        The supersedes field MUST be set to "&lt;spec-id&gt;:v&lt;base_version&gt;".
+        <trace>REQ-F014</trace>
+      </criterion>
+      <criterion id="fr-rf-007-ac3">
+        All detail files from the previous version MUST be replaced (not merged)
+        with detail files derived from the new full requirements.
+        <trace>REQ-F014</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-008">
+    <title>Merged Spec Validation</title>
+    <description>
+      After applying delta or producing a new spec, refiner MUST validate that the
+      resulting spec has no internal contradictions before writing output.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-008-ac1">
+        Given a delta that ADDs a requirement contradicting an existing unchanged
+        requirement, refiner MUST block and produce a refiner-report.md.
+        <trace>REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-rf-008-ac2">
+        Given a delta that MODIFIEs a requirement into contradiction with another
+        requirement, refiner MUST block.
+        <trace>REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-rf-008-ac3">
+        Given a delta that REMOVEs a requirement depended on by another requirement
+        still in the spec, refiner MUST block with a "dependency broken" issue.
+        <trace>REQ-F015</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-009">
+    <title>Empty Delta Detection (Strategy 3)</title>
+    <description>
+      When REFINER_INPUT type is "iteration" and a "### Delta" heading exists but
+      contains no ADDED/MODIFIED/REMOVED items, refiner MUST block. An empty delta
+      is an ambiguous signal — neither a clear no-op nor a clear replace.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-009-ac1">
+        Given a design doc with type: iteration, base_version: 2, and a "### Delta"
+        heading followed by no items (empty or whitespace-only), refiner MUST block.
+        <trace>REQ-F008, REQ-F014</trace>
+      </criterion>
+      <criterion id="fr-rf-009-ac2">
+        The refiner-report.md MUST state the issue as "ambiguous delta: ### Delta
+        heading present but no ADDED/MODIFIED/REMOVED items" and recommend either
+        removing the heading (for replace) or adding delta items (for iteration).
+        <trace>REQ-F009</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
