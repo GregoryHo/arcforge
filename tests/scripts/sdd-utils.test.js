@@ -996,6 +996,140 @@ describe('validateSpecHeader — renamed validation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateSpecHeader — delta placement consistency
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader — delta placement consistency', () => {
+  let tmpDir;
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-delta-'));
+    const designDir = path.join(tmpDir, 'docs/plans/test/2026-05-10');
+    fs.mkdirSync(designDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(designDir, 'design.md'),
+      '# Test\n\nContent for valid design doc over fifty characters so substantive.',
+    );
+  });
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  function makeV2Parsed(overrides = {}) {
+    return {
+      spec_id: 'test',
+      spec_version: 2,
+      status: 'active',
+      title: 'Test',
+      description: 'Test spec',
+      design_path: 'docs/plans/test/2026-05-10/design.md',
+      design_iteration: '2026-05-10',
+      supersedes: 'test:v1',
+      scope: { includes: [{ id: 'x', description: 'y' }], excludes: [] },
+      delta: {
+        version: '2',
+        iteration: '2026-05-10',
+        added: [{ ref: 'fr-x-001', text: 'New' }],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+      ...overrides,
+    };
+  }
+
+  it('flags missing delta for v2+ as ERROR', () => {
+    const parsed = makeV2Parsed({ delta: null });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const deltaErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'delta',
+    );
+    expect(deltaErrors.length).toBeGreaterThan(0);
+  });
+
+  it('does not require delta for v1 specs', () => {
+    const parsed = makeV2Parsed({
+      spec_version: 1,
+      supersedes: null,
+      delta: null,
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const deltaPresenceErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'delta',
+    );
+    expect(deltaPresenceErrors).toHaveLength(0);
+  });
+
+  it('flags delta.version mismatch with spec_version as ERROR', () => {
+    const parsed = makeV2Parsed({
+      delta: {
+        version: '3', // mismatched
+        iteration: '2026-05-10',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ level: 'ERROR', field: 'delta/version' }),
+      ]),
+    );
+  });
+
+  it('flags delta.iteration mismatch with design_iteration as ERROR', () => {
+    const parsed = makeV2Parsed({
+      delta: {
+        version: '2',
+        iteration: '2026-06-01', // mismatched
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ level: 'ERROR', field: 'delta/iteration' }),
+      ]),
+    );
+  });
+
+  it('accepts delta with version and iteration matching', () => {
+    const parsed = makeV2Parsed();
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const deltaErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field.startsWith('delta'),
+    );
+    expect(deltaErrors).toHaveLength(0);
+  });
+
+  it('accepts delta.iteration with suffix (matching design_iteration exactly)', () => {
+    // Compare as strings — suffix like "-v2" is allowed as long as both match
+    const parsed = makeV2Parsed({
+      design_iteration: '2026-04-16-v2',
+      delta: {
+        version: '2',
+        iteration: '2026-04-16-v2',
+        added: [],
+        modified: [],
+        removed: [],
+        renamed: [],
+      },
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    // Only assert on delta-related errors. design_iteration format may fail
+    // a separate regex check — see "Known Adjacent Issue".
+    const deltaErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field.startsWith('delta'),
+    );
+    expect(deltaErrors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // parseSpecHeader integration with real artifacts
 // ---------------------------------------------------------------------------
 
