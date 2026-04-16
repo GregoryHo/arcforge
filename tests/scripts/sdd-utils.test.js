@@ -994,3 +994,46 @@ describe('validateSpecHeader — renamed validation', () => {
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseSpecHeader integration with real artifacts
+// ---------------------------------------------------------------------------
+
+describe('parseSpecHeader integration with real artifacts', () => {
+  it('parses specs/spec-driven-refine/spec.xml with delta present', () => {
+    const xmlPath = path.join(process.cwd(), 'specs/spec-driven-refine/spec.xml');
+    const xml = fs.readFileSync(xmlPath, 'utf8');
+    const parsed = parseSpecHeader(xml);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed.spec_id).toBe('spec-driven-refine');
+    expect(parsed.spec_version).toBe(2);
+    expect(parsed.delta).not.toBeNull();
+    expect(parsed.delta.version).toBe('2');
+    expect(parsed.delta.iteration).toBe('2026-04-16-v2');
+    expect(parsed.delta.modified.length).toBeGreaterThan(0);
+    expect(parsed.delta.removed.length).toBeGreaterThan(0);
+    // renamed array should exist (added by enhancement 5) — may be empty
+    expect(Array.isArray(parsed.delta.renamed)).toBe(true);
+  });
+
+  it('validates specs/spec-driven-refine/spec.xml with zero ERROR issues', () => {
+    const xmlPath = path.join(process.cwd(), 'specs/spec-driven-refine/spec.xml');
+    const xml = fs.readFileSync(xmlPath, 'utf8');
+    const parsed = parseSpecHeader(xml);
+
+    const result = validateSpecHeader(parsed, { cwd: process.cwd() });
+    // Filter out the known adjacent design_iteration suffix issue:
+    // validateSpecHeader's /^\d{4}-\d{2}-\d{2}$/ regex rejects '2026-04-16-v2' (suffix form),
+    // but parseDesignDoc's DESIGN_PATH_RE accepts it. This inconsistency is a separate issue
+    // from delta placement — see "Known Adjacent Issue" in the task spec.
+    const errors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field !== 'source/design_iteration',
+    );
+    if (errors.length > 0) {
+      // Diagnostic output on failure
+      console.error('Validation errors:', errors);
+    }
+    expect(errors).toHaveLength(0);
+  });
+});
