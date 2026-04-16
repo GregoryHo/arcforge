@@ -87,6 +87,29 @@ Every `<requirement>` in a detail file requires:
 | `<criterion id="...">` | Each criterion MUST have a unique `id` attribute |
 | `<trace>` inside criterion | References the source requirement (e.g., `REQ-F010`); MUST be present |
 
+### Criterion Text — BDD Pattern
+
+Criterion text MUST follow a Given/When/Then pattern expressed in natural language:
+
+- **Given** a precondition or state
+- **when** an actor performs an action
+- **then** the system MUST / SHOULD / MAY produce an expected outcome
+
+Example:
+
+```xml
+<criterion id="fr-bs-001-ac1">
+    Given a specs/ directory containing auth/spec.xml and payments/spec.xml,
+    when brainstorming starts elicitation,
+    then the system MUST present both spec_ids to the user before proceeding.
+    <trace>REQ-F001</trace>
+</criterion>
+```
+
+Free-form prose is acceptable as long as the Given/When/Then structure is
+identifiable. No sub-elements are required — this is a writing convention,
+not a schema rule.
+
 ---
 
 ## Requirement Language (RFC 2119)
