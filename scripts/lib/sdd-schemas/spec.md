@@ -20,7 +20,7 @@ All seven fields are required. Missing any field is ERROR.
 | `title` | string | human-readable name for the spec |
 | `description` | string | strategic purpose — why this spec exists (see Description Field below) |
 | `source/design_path` | string | valid file path to the design doc that produced this version |
-| `source/design_iteration` | date | YYYY-MM-DD; iteration date extracted from the design doc's directory name |
+| `source/design_iteration` | identifier | ISO date prefix (YYYY-MM-DD) + optional `-`-separated suffix; mirrors the design doc folder name (see [Raw Source Identifier Format](#design_iteration--raw-source-identifier-format)) |
 
 ### Conditionally-Required Field
 
@@ -56,6 +56,46 @@ Bad:
 
 Rule of thumb: if the description can be replaced by reading `scope/includes`,
 it is not a purpose — rewrite it.
+
+### `design_iteration` — Raw Source Identifier Format
+
+`design_iteration` is a mirror of the design doc folder name. It is a
+**human-chosen identifier for a raw source artifact**, not a pure date.
+
+**Format contract** (validated):
+- MUST start with an ISO date in YYYY-MM-DD form
+- MAY include an optional suffix, separated from the date by a single `-`
+- Suffix content is unconstrained — humans choose what is meaningful
+
+**Examples of valid identifiers:**
+
+| Identifier | Meaning |
+|---|---|
+| `2026-04-16` | First (or only) iteration on that date |
+| `2026-04-16-v2` | Second same-date iteration, numeric disambiguator |
+| `2026-04-16-rework` | Same-date iteration, descriptive disambiguator |
+| `2026-04-16-oauth-pivot` | Intent-tagged iteration |
+
+**Examples of invalid identifiers (ERROR):**
+
+| Identifier | Reason |
+|---|---|
+| `april-16` | No ISO date prefix |
+| `2026-04-116` | Malformed date |
+| `v2-2026-04-16` | Date not at start (breaks lexicographic ordering) |
+| `2026-04-16v2` | Missing `-` between date and suffix |
+
+**Why this shape:**
+Raw sources are human-authored artifacts (Karpathy three-layer model, R1 —
+immutable). The human chooses the identifier. Schema validates only what
+it needs for ordering and provenance (the date prefix); suffix semantics
+are a human convention outside schema scope.
+
+**Ordering note:** Lexicographic comparison of identifiers correctly
+orders across different dates (`2026-04-16-*` < `2026-04-17-*`). Within
+the same date, ordering is best-effort (`2026-04-16-v2` < `2026-04-16-v3`
+happens to work; `2026-04-16-rework` vs `2026-04-16-v2` depends on
+character codes). Treat same-date ordering as advisory, not authoritative.
 
 ---
 
@@ -404,7 +444,7 @@ This is a WARNING, not an ERROR. The spec is structurally valid and the pipeline
 | `source/design_path` present | Deterministic | ERROR |
 | `source/design_path` points to an existing file | Deterministic | ERROR |
 | `source/design_iteration` present | Deterministic | ERROR |
-| `source/design_iteration` matches YYYY-MM-DD format | Deterministic | ERROR |
+| `source/design_iteration` starts with YYYY-MM-DD (optional suffix allowed) | Deterministic | ERROR |
 | `supersedes` present when spec_version > 1 | Deterministic | ERROR |
 | `supersedes` matches `<spec-id>:v<N>` format | Deterministic | ERROR |
 | `scope/includes` present | Deterministic | ERROR |
