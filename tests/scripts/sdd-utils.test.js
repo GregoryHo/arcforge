@@ -1160,13 +1160,7 @@ describe('parseSpecHeader integration with real artifacts', () => {
     const parsed = parseSpecHeader(xml);
 
     const result = validateSpecHeader(parsed, { cwd: process.cwd() });
-    // Filter out the known adjacent design_iteration suffix issue:
-    // validateSpecHeader's /^\d{4}-\d{2}-\d{2}$/ regex rejects '2026-04-16-v2' (suffix form),
-    // but parseDesignDoc's DESIGN_PATH_RE accepts it. This inconsistency is a separate issue
-    // from delta placement — see "Known Adjacent Issue" in the task spec.
-    const errors = result.issues.filter(
-      (i) => i.level === 'ERROR' && i.field !== 'source/design_iteration',
-    );
+    const errors = result.issues.filter((i) => i.level === 'ERROR');
     if (errors.length > 0) {
       // Diagnostic output on failure
       console.error('Validation errors:', errors);
