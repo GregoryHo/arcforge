@@ -134,7 +134,7 @@ ${PROJECT_ROOT}
 
 ## Max Turns
 
-20
+40
 
 ## Assertions
 
@@ -150,19 +150,35 @@ mixed
 
 After the agent completes, locate the final written `specs/auth/spec.xml` content (search the transcript for the last Write or Edit targeting `specs/auth/spec.xml`).
 
-Assertion 1 (iteration correctness): Check that the spec.xml contains ALL of these:
-- `<spec_version>2</spec_version>` (exactly value 2)
-- `<supersedes>auth:v1</supersedes>` (exact format)
-- A `<delta>` element that is placed INSIDE `<overview>...</overview>` (not outside as sibling)
-- The `<delta>` element contains at least one `<added>` or `<modified>` child whose `ref` attribute references an OAuth-related requirement (in id or text, mentions oauth/OAuth/Google/GitHub)
+Assertion 1 (iteration correctness): Evaluate the FOUR sub-conditions below MECHANICALLY against the final spec.xml content. Do NOT reason abductively, do NOT revise mid-evaluation. Complete the full checklist, then produce the score on the last line.
 
-ALL four conditions must hold for this assertion to pass. Score 1.0 or 0.0.
+Sub-conditions (all must hold — score is 1 only if all four are true):
+
+(a) `<spec_version>2</spec_version>` appears literally (the value is exactly `2`, no whitespace variation that changes the value).
+
+(b) `<supersedes>auth:v1</supersedes>` appears literally (exact text `auth:v1` — reject `auth-v1`, `auth:1`, `v1`, etc).
+
+(c) A `<delta>` element exists, AND the byte-offset of the `<delta` opening tag is strictly between the byte-offset of the `<overview>` opening tag and the matching `</overview>` closing tag. If the `<delta>` opens BEFORE `<overview>` opens, or AFTER `</overview>` closes, this sub-condition is FALSE. Checking by eye is fine; the structural relationship is what matters.
+
+(d) Inside the `<delta>` element, there is at least one `<added ref="...">` OR `<modified ref="...">` element whose `ref` attribute value matches an OAuth-related requirement. "OAuth-related" means the ref either (i) contains the substring `oauth` (case-insensitive) in the id, OR (ii) points to a requirement whose title or description in detail files mentions OAuth, Google, or GitHub authentication.
+
+Required output format (the grader MUST emit these lines, in order, before the final score — this is a forcing function to prevent mid-evaluation contradiction):
+
+```
+(a) spec_version=2 present: YES|NO
+(b) supersedes=auth:v1 present: YES|NO
+(c) <delta> inside <overview>: YES|NO
+(d) <added>/<modified> OAuth ref: YES|NO
+Final: 1.0 if all four YES, else 0.0
+```
+
+If you catch yourself writing a sentence like "wait, let me check again" — STOP, re-read the spec.xml content from scratch, and restart the checklist. Do NOT submit a score that contradicts your own evidence.
 
 Assertion 2 (preservation): Check the detail files still contain requirements with ids `fr-auth-001`, `fr-auth-002`, and `fr-auth-003`. If any are deleted or their ids changed, fail. If a rename delta was used correctly, that's OK (the id still exists under the new name). Score 1.0 or 0.0.
 
 ## Trials
 
-5
+10
 
 ## Version
 
