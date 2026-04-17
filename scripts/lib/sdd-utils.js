@@ -143,8 +143,10 @@ function validateDesignDoc(parsed) {
   return { valid, issues };
 }
 
-// Regex to match YYYY-MM-DD date format.
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Regex for design iteration identifier: ISO date prefix + optional human-chosen suffix.
+// Valid: 2026-04-16, 2026-04-16-v2, 2026-04-16-rework, 2026-04-16-oauth-pivot
+// Invalid: april-16, 2026-04-116, v2-2026-04-16, 2026-04-16v2 (missing dash before suffix)
+const DATE_RE = /^\d{4}-\d{2}-\d{2}(-.+)?$/;
 
 // Regex to match supersedes format: <id>:v<n>
 const SUPERSEDES_RE = /^[a-z0-9-]+:v\d+$/;
@@ -396,13 +398,15 @@ function validateSpecHeader(parsed, options = {}) {
     }
   }
 
-  // design_iteration must be YYYY-MM-DD.
-  if (parsed.design_iteration && !DATE_RE.test(parsed.design_iteration)) {
-    issues.push({
-      level: 'ERROR',
-      field: 'source/design_iteration',
-      message: `design_iteration must be in YYYY-MM-DD format, got: ${parsed.design_iteration}.`,
-    });
+  // design_iteration must start with YYYY-MM-DD (optional suffix after a "-" separator).
+  if (parsed.design_iteration !== null && parsed.design_iteration !== undefined) {
+    if (!DATE_RE.test(parsed.design_iteration)) {
+      issues.push({
+        level: 'ERROR',
+        field: 'source/design_iteration',
+        message: `design_iteration must start with YYYY-MM-DD and may include an optional "-"-separated suffix (e.g., "2026-04-16" or "2026-04-16-v2"), got: ${parsed.design_iteration}.`,
+      });
+    }
   }
 
   // supersedes required for spec_version > 1.
