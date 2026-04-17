@@ -233,6 +233,42 @@
     </acceptance_criteria>
   </requirement>
 
+  <requirement id="fr-cc-if-006">
+    <title>Validation Toolkit API Self-Documentation</title>
+    <description>
+      The exported function signatures of scripts/lib/sdd-utils.js
+      (parseDesignDoc, validateDesignDoc, parseSpecHeader,
+      validateSpecHeader) reveal the expected input/output schemas
+      through their destructuring patterns and return types. This
+      exposure is intentional — it makes the validation toolkit
+      self-documenting for both human maintainers and LLM agents
+      exploring the codebase. Any consumer reading the module can
+      infer schema requirements (spec_id, spec_version, supersedes,
+      delta structure, etc.) without reading sdd-schemas/ files.
+      This property has testing-methodology implications documented
+      in nfr-003.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-006-ac1">
+        A consumer (human or LLM agent) reading scripts/lib/sdd-utils.js
+        MUST be able to identify the expected fields of a spec identity
+        header (spec_id, spec_version, supersedes, delta structure,
+        added/modified/removed/renamed children) from the parseSpecHeader
+        return destructuring alone, without consulting any external
+        documentation.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-006-ac2">
+        When sdd-utils.js function signatures change (adding, removing,
+        or renaming returned fields), the format contracts in
+        scripts/lib/sdd-schemas/ MUST be updated in the same iteration.
+        The two layers describe the same underlying schema — sdd-utils
+        enforces it, sdd-schemas documents it. Drift between them is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
   <!-- ═══════════════ Per-Stage Validation Pattern ═══════════════ -->
 
   <requirement id="fr-cc-val-001">
@@ -356,6 +392,49 @@
         No pipeline operation MUST require network access, a running server,
         or a database connection.
         <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="nfr-003">
+    <title>Skill Adherence Evaluation Methodology</title>
+    <description>
+      SDD pipeline skills (arc-brainstorming, arc-refining, arc-planning)
+      cannot be reliably evaluated via A/B comparison (baseline vs
+      treatment) on format-correctness output. The self-documenting
+      nature of sdd-utils.js (fr-cc-if-006) means a competent baseline
+      agent can infer the correct output format by reading the module,
+      closing the delta between baseline and treatment. This property
+      was empirically confirmed during the 2026-04-17 eval session
+      against Claude Sonnet 4.x and Opus 4.x models.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-003-ac1">
+        A/B evaluation of SDD pipeline skills measuring "does treatment
+        produce correct spec.xml format?" WILL yield delta near zero
+        with current-generation LLM agents. This is a consequence of
+        model capability combined with fr-cc-if-006, not a skill
+        deficiency. Eval designers MUST NOT interpret zero delta here
+        as "skill adds no value."
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-003-ac2">
+        The preferred eval form for SDD pipeline skills is single-condition
+        agent evaluation (pass@k on treatment trials only), measuring
+        reliability across k trials rather than behavioral delta against
+        a non-discriminative baseline. SHIP threshold: pass rate &gt;= 80%
+        across k &gt;= 5 trials after accounting for harness noise
+        (grader failures, max_turns truncation).
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-003-ac3">
+        Behaviors that CAN be discriminatively A/B tested for these skills
+        are those NOT inferable from sdd-utils.js source alone — examples
+        include: DAG completion gate blocking behavior (fr-pl-007),
+        refiner-report.md production on contradiction (fr-rf-001), error
+        recovery ordering, block-vs-proceed decisions. These remain
+        candidates for focused A/B eval when discrimination is required.
+        <trace>REQ-N001</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
