@@ -475,7 +475,7 @@ describe('validateSpecHeader', () => {
       title: 'Auth System',
       description: 'desc',
       design_path: 'docs/plans/auth/2026-04-01/design.md',
-      design_iteration: 'April 2026',
+      design_iteration: 'april-16',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
       delta: null,
@@ -1172,5 +1172,76 @@ describe('parseSpecHeader integration with real artifacts', () => {
       console.error('Validation errors:', errors);
     }
     expect(errors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpecHeader — design_iteration identifier format
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader — design_iteration identifier format', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-iter-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  function makeValidV1Parsed(iteration) {
+    const designDir = path.join(tmpDir, 'docs/plans/auth', iteration);
+    fs.mkdirSync(designDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(designDir, 'design.md'),
+      'Substantive design content over fifty characters to pass.',
+    );
+    return {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'active',
+      title: 'Auth',
+      description: 'Auth spec',
+      design_path: `docs/plans/auth/${iteration}/design.md`,
+      design_iteration: iteration,
+      supersedes: null,
+      scope: { includes: [{ id: 'x', description: 'y' }], excludes: [] },
+      delta: null,
+    };
+  }
+
+  it.each([
+    '2026-04-16',
+    '2026-04-16-v2',
+    '2026-04-16-v10',
+    '2026-04-16-rework',
+    '2026-04-16-oauth-pivot',
+    '2026-04-16-post-review-round-3',
+  ])('accepts valid iteration identifier: %s', (iteration) => {
+    const parsed = makeValidV1Parsed(iteration);
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const iterErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'source/design_iteration',
+    );
+    expect(iterErrors).toHaveLength(0);
+  });
+
+  it.each([
+    'april-16',
+    '2026-04-116',
+    'v2-2026-04-16',
+    '2026-04-16v2',
+    '2026-4-16',
+    '2026-04',
+    '',
+  ])('rejects invalid iteration identifier: %s', (iteration) => {
+    const parsed = makeValidV1Parsed('2026-04-16');
+    parsed.design_iteration = iteration;
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const iterErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'source/design_iteration',
+    );
+    expect(iterErrors.length).toBeGreaterThan(0);
   });
 });
