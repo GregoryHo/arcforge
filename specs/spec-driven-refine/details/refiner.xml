@@ -75,7 +75,11 @@
       </criterion>
       <criterion id="fr-rf-003-ac3">
         The source element MUST contain design_path pointing to the exact design
-        doc file and design_iteration matching the YYYY-MM-DD iteration date.
+        doc file and design_iteration matching the design doc folder name.
+        The folder name MUST start with an ISO date (YYYY-MM-DD) and MAY include
+        a "-"-separated human-chosen suffix (e.g., "2026-04-16-v2" for same-date
+        sequential iterations, "2026-04-16-oauth-pivot" for intent-tagged
+        iterations). The suffix is a human convention, not a schema constraint.
         <trace>REQ-F010</trace>
       </criterion>
       <criterion id="fr-rf-003-ac4">
