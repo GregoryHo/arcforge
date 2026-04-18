@@ -32,10 +32,11 @@ const {
   listSpecDagPaths,
   syncAllSpecs,
   rebootAllSpecs,
+  readArcforgeMarker,
 } = require('./lib/coordinator');
-const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
+const { schemaToYaml, exampleToYaml, example, schema, objectToYaml } = require('./lib/dag-schema');
 const { getWorktreePath } = require('./lib/worktree-paths');
-const { parseDagYaml, stringifyDagYaml } = require('./lib/yaml-parser');
+const { parseDagYaml } = require('./lib/yaml-parser');
 
 /**
  * Resolve the spec id for a CLI invocation.
@@ -55,20 +56,18 @@ const { parseDagYaml, stringifyDagYaml } = require('./lib/yaml-parser');
 function resolveSpecId(projectRoot, explicitFlag) {
   if (explicitFlag) return explicitFlag;
 
-  const markerPath = path.join(projectRoot, '.arcforge-epic');
-  if (fs.existsSync(markerPath)) {
-    try {
-      const data = parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
-      if (data.spec_id) return data.spec_id;
-    } catch {
-      // corrupt marker — fall through to specs/ probe
-    }
-  }
+  const marker = readArcforgeMarker(projectRoot);
+  if (marker?.spec_id) return marker.spec_id;
 
   const candidates = listSpecDagPaths(projectRoot).map((s) => s.specId);
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
   return { ambiguous: true, candidates };
+}
+
+/** Discriminator for the ambiguous-spec result from resolveSpecId. */
+function isAmbiguousSpec(spec) {
+  return typeof spec === 'object' && spec !== null && spec.ambiguous === true;
 }
 
 /**
@@ -92,22 +91,38 @@ function requireSpecId(spec, commandName) {
 }
 
 /**
- * Reverse-lookup: find which specs contain a given epic id.
+ * Build a reverse index { epicId → [specId...] } by reading each
+ * `specs/*\/dag.yaml` exactly once. Callers that need the lookup in a
+ * loop (e.g. backfillMarkers iterating worktrees) use this; a one-shot
+ * single-epic lookup uses findSpecsByEpic.
+ * @returns {Map<string, string[]>}
+ */
+function buildEpicSpecIndex(projectRoot) {
+  const index = new Map();
+  for (const { specId, dagPath } of listSpecDagPaths(projectRoot)) {
+    let dag;
+    try {
+      dag = parseDagYaml(fs.readFileSync(dagPath, 'utf8'));
+    } catch {
+      continue;
+    }
+    for (const epic of dag.epics || []) {
+      const bucket = index.get(epic.id) || [];
+      bucket.push(specId);
+      index.set(epic.id, bucket);
+    }
+  }
+  return index;
+}
+
+/**
+ * Reverse-lookup: find which specs contain a given epic id. One-shot
+ * variant; reuses buildEpicSpecIndex internally so the two call sites
+ * agree on semantics.
  * @returns {string[]} spec ids that contain the epic
  */
 function findSpecsByEpic(projectRoot, epicId) {
-  const matches = [];
-  for (const { specId, dagPath } of listSpecDagPaths(projectRoot)) {
-    try {
-      const dag = parseDagYaml(fs.readFileSync(dagPath, 'utf8'));
-      if (dag.epics?.some((e) => e.id === epicId)) {
-        matches.push(specId);
-      }
-    } catch {
-      // skip unreadable dag
-    }
-  }
-  return matches;
+  return buildEpicSpecIndex(projectRoot).get(epicId) || [];
 }
 
 /**
@@ -188,6 +203,10 @@ function backfillMarkers(projectRoot, { apply, explicitSpecId } = {}) {
     if (line.startsWith('worktree ')) paths.push(line.slice(9));
   }
 
+  // Build { epicId: [specId, ...] } once up front so per-worktree lookups
+  // are O(1) instead of O(specs) × O(worktrees).
+  const epicToSpecs = buildEpicSpecIndex(projectRoot);
+
   for (const wt of paths) {
     const markerPath = path.join(wt, '.arcforge-epic');
     if (!fs.existsSync(markerPath)) continue;
@@ -212,7 +231,7 @@ function backfillMarkers(projectRoot, { apply, explicitSpecId } = {}) {
 
     let targetSpec = explicitSpecId;
     if (!targetSpec) {
-      const matches = findSpecsByEpic(projectRoot, marker.epic);
+      const matches = epicToSpecs.get(marker.epic) || [];
       if (matches.length === 1) {
         targetSpec = matches[0];
       } else if (matches.length === 0) {
@@ -232,7 +251,10 @@ function backfillMarkers(projectRoot, { apply, explicitSpecId } = {}) {
 
     if (apply) {
       marker.spec_id = targetSpec;
-      fs.writeFileSync(markerPath, stringifyDagYaml(marker));
+      // objectToYaml matches the serializer used by coordinator.expandWorktrees
+      // when the marker is first written — stringifyDagYaml would crash here,
+      // it expects the { epics: [...] } DAG shape.
+      fs.writeFileSync(markerPath, objectToYaml(marker));
     }
     result.updated.push(`${markerPath} → spec_id: ${targetSpec}`);
   }
@@ -423,7 +445,7 @@ async function main() {
         const spec = resolveSpecId(projectRoot, specFlag);
         // Multi-spec base with no flag → aggregate. Single spec / worktree /
         // explicit flag → flat single-spec output (backwards compatible).
-        if (typeof spec === 'object' && spec && spec.ambiguous) {
+        if (isAmbiguousSpec(spec)) {
           const out = { specs: {} };
           for (const specId of spec.candidates) {
             const c = new Coordinator(projectRoot, specId);
@@ -560,7 +582,7 @@ async function main() {
       case 'sync': {
         const spec = resolveSpecId(projectRoot, specFlag);
         // Ambiguous base → aggregate across specs via syncAllSpecs.
-        if (typeof spec === 'object' && spec && spec.ambiguous) {
+        if (isAmbiguousSpec(spec)) {
           output(syncAllSpecs(projectRoot), asJson);
           break;
         }
@@ -575,7 +597,7 @@ async function main() {
 
       case 'reboot': {
         const spec = resolveSpecId(projectRoot, specFlag);
-        if (typeof spec === 'object' && spec && spec.ambiguous) {
+        if (isAmbiguousSpec(spec)) {
           output(rebootAllSpecs(projectRoot), asJson);
           break;
         }

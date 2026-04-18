@@ -102,6 +102,29 @@ describe('CLI multi-spec UX', () => {
     expect(parsed.totals.remaining_count).toBe(0); // no features → 0
   });
 
+  test('backfill-markers --apply writes spec_id into the marker without crashing', () => {
+    writeSpec(root, 'spec-a', ['epic-a1']);
+    const wtPath = path.join(root, '..', `apply-wt-${path.basename(root)}`);
+    execFileSync('git', ['worktree', 'add', wtPath, '-b', 'apply-branch'], { cwd: root });
+    fs.writeFileSync(path.join(wtPath, '.arcforge-epic'), objectToYaml({ epic: 'epic-a1' }));
+
+    try {
+      const { stdout } = runCli(root, ['backfill-markers', '--apply', '--json']);
+      const parsed = JSON.parse(stdout);
+      expect(parsed.dryRun).toBe(false);
+      expect(parsed.updated.length).toBe(1);
+
+      const markerAfter = require('../../scripts/lib/yaml-parser').parseDagYaml(
+        fs.readFileSync(path.join(wtPath, '.arcforge-epic'), 'utf8'),
+      );
+      expect(markerAfter.spec_id).toBe('spec-a');
+      expect(markerAfter.epic).toBe('epic-a1');
+    } finally {
+      fs.rmSync(wtPath, { recursive: true, force: true });
+      execFileSync('git', ['worktree', 'prune'], { cwd: root });
+    }
+  });
+
   test('backfill-markers reports markers with no spec_id as needing update', () => {
     writeSpec(root, 'spec-a', ['epic-a1']);
     // Simulate a legacy worktree by creating a checkout branch and marker.

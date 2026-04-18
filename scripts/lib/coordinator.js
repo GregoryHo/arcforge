@@ -23,6 +23,30 @@ const EXPAND_LOCK_TIMEOUT = 30000; // git worktree add + fs ops
 const MERGE_LOCK_TIMEOUT = 60000; // git merge can be slow on large repos
 
 /**
+ * Read the `.arcforge-epic` marker from a directory, returning the parsed
+ * object or null if the file is missing / unreadable. The marker schema
+ * carries at least `{ epic, spec_id, base_worktree, base_branch, local }`
+ * when authored by `expandWorktrees`.
+ *
+ * Shared by `Coordinator.dagPath`, `Coordinator._inferEpicIdFromWorktree`,
+ * and `cli.resolveSpecId` — the worktree marker is the single source of
+ * truth linking a checkout back to its spec-id, so all three callers
+ * must stay in lockstep on how they parse it.
+ *
+ * @param {string} dir - Directory containing the marker (typically projectRoot).
+ * @returns {Object|null} parsed marker or null
+ */
+function readArcforgeMarker(dir) {
+  const markerPath = path.join(dir, '.arcforge-epic');
+  if (!fs.existsSync(markerPath)) return null;
+  try {
+    return parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Coordinator class - manages DAG operations for a single spec
  *
  * Each Coordinator instance is scoped to exactly one spec. The dag.yaml
@@ -50,7 +74,9 @@ class Coordinator {
    * Lazy dag.yaml path. Resolves on first access and caches the result.
    * Resolution priority:
    *   1. Explicit specId from constructor → `specs/<specId>/dag.yaml`
-   *   2. `.arcforge-epic` marker in projectRoot → spec_id field
+   *   2. `.arcforge-epic` marker in projectRoot → spec_id field (also
+   *      populates this.specId as a side-effect so subsequent reads of
+   *      `coord.specId` return the inferred value)
    *   3. Throw with migration guidance.
    *
    * Kept lazy so pure utilities (_findBaseWorktree, _isInWorktree,
@@ -58,26 +84,18 @@ class Coordinator {
    */
   get dagPath() {
     if (this._dagPath !== null) return this._dagPath;
-    this._dagPath = this._resolveDagPath();
+    if (!this.specId) {
+      const marker = readArcforgeMarker(this.projectRoot);
+      if (marker?.spec_id) this.specId = marker.spec_id;
+    }
+    if (!this.specId) {
+      throw new Error(
+        'Cannot resolve dag.yaml path: no specId provided and .arcforge-epic has no spec_id. ' +
+          'Pass specId explicitly, run from a v2 worktree, or run `arcforge backfill-markers` on legacy worktrees.',
+      );
+    }
+    this._dagPath = path.join(this.projectRoot, 'specs', this.specId, 'dag.yaml');
     return this._dagPath;
-  }
-
-  _resolveDagPath() {
-    if (this.specId) {
-      return path.join(this.projectRoot, 'specs', this.specId, 'dag.yaml');
-    }
-    const markerPath = path.join(this.projectRoot, '.arcforge-epic');
-    if (fs.existsSync(markerPath)) {
-      const data = parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
-      if (data.spec_id) {
-        this.specId = data.spec_id;
-        return path.join(this.projectRoot, 'specs', data.spec_id, 'dag.yaml');
-      }
-    }
-    throw new Error(
-      'Cannot resolve dag.yaml path: no specId provided and .arcforge-epic has no spec_id. ' +
-        'Pass specId explicitly, run from a v2 worktree, or run `arcforge backfill-markers` on legacy worktrees.',
-    );
   }
 
   /**
@@ -802,17 +820,11 @@ class Coordinator {
   }
 
   _inferEpicIdFromWorktree() {
-    const marker = path.join(this.projectRoot, '.arcforge-epic');
-    if (!fs.existsSync(marker)) {
-      return null;
-    }
-    const content = fs.readFileSync(marker, 'utf8');
-    const data = parseDagYaml(content);
+    const data = readArcforgeMarker(this.projectRoot);
+    if (!data) return null;
     // Side-effect: cache spec_id so any subsequent dagPath access
     // doesn't re-read the marker file.
-    if (data.spec_id && !this.specId) {
-      this.specId = data.spec_id;
-    }
+    if (data.spec_id && !this.specId) this.specId = data.spec_id;
     return data.epic || null;
   }
 
@@ -955,15 +967,8 @@ class Coordinator {
 }
 
 // ==================== Cross-spec module-level operations ====================
-//
-// These aggregate across every `specs/<id>/dag.yaml` in the project. They
-// intentionally do not live on a Coordinator instance because a Coordinator
-// is scoped to exactly one spec — its instance _dagTransaction reads
-// `this.dagPath`, which a multi-spec operation cannot honour.
-//
-// Concurrency: a single project-level withLock covers the whole iteration,
-// so cross-spec reads and writes never interleave with in-flight single-spec
-// transactions on any member spec.
+// Module-level, not instance, because a Coordinator is scoped to one spec.
+// A single project-level withLock covers the whole iteration.
 
 /**
  * List every `specs/<id>/dag.yaml` that currently exists in the project.
@@ -1072,4 +1077,10 @@ function rebootAllSpecs(projectRoot) {
   return { specs, totals };
 }
 
-module.exports = { Coordinator, listSpecDagPaths, syncAllSpecs, rebootAllSpecs };
+module.exports = {
+  Coordinator,
+  listSpecDagPaths,
+  syncAllSpecs,
+  rebootAllSpecs,
+  readArcforgeMarker,
+};
