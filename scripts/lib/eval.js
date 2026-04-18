@@ -145,7 +145,12 @@ function parseScenario(filePath, projectRoot) {
   // model grader.
   const assertions = (sections.assertions || [])
     .filter((line) => line.match(/^-\s*\[[^\]]*\]/))
-    .map((line) => line.replace(/^-\s*\[[ xX]*\]\s*/, '').replace(/^-\s+/, '').trim());
+    .map((line) =>
+      line
+        .replace(/^-\s*\[[ xX]*\]\s*/, '')
+        .replace(/^-\s+/, '')
+        .trim(),
+    );
 
   const section = (key) => (sections[key] || []).join('\n').trim();
   const trialsRaw = section('trials');

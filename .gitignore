@@ -42,3 +42,6 @@ __pycache__/
 
 skills/*-workspace/
 hooks/.claude/
+
+# Implementation task lists — contributor-only, ephemeral (per .claude/rules/dev-context.md)
+docs/tasks/

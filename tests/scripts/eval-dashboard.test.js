@@ -18,7 +18,7 @@ function writeScenario(dir, filename, content) {
 function writeResult(dir, scenarioName, runId, condition, results) {
   const runDir = path.join(dir, RESULTS_DIR, scenarioName, runId);
   fs.mkdirSync(runDir, { recursive: true });
-  const jsonl = results.map((r) => JSON.stringify(r)).join('\n') + '\n';
+  const jsonl = `${results.map((r) => JSON.stringify(r)).join('\n')}\n`;
   fs.writeFileSync(path.join(runDir, `${condition}.jsonl`), jsonl);
 }
 
@@ -310,6 +310,7 @@ describe('dashboard', () => {
           'Test plugin behavior.',
           '',
           '## Plugin Dir',
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder for harness substitution
           '${PROJECT_ROOT}/.claude-plugin',
           '',
           '## Max Turns',

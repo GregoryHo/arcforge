@@ -26,7 +26,6 @@ const {
   createSessionCounter,
   ensureDir,
   output,
-  log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const {
