@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>demo-spec</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <supersedes/>
+    <source>
+      <design_path>docs/plans/demo-spec/2026-04-17/design.md</design_path>
+      <design_iteration>2026-04-17</design_iteration>
+    </source>
+    <title>Demo Spec — Parse / Format / Integrate</title>
+    <description>
+      A minimal per-spec SDD v2 fixture used by end-to-end pipeline integration tests.
+      The fixture describes three epics that together implement a tiny number
+      parser + formatter pair plus an integration layer. The domain content is
+      intentionally trivial — the purpose of this spec is to exercise the
+      per-spec artifact layout (specs/&lt;spec-id&gt;/...) and the downstream
+      execution skills that consume it.
+    </description>
+    <scope>
+      <includes>
+        <feature id="epic-parser">Number parsing primitives (int + float)</feature>
+        <feature id="epic-formatter">Number formatting primitives (single + list)</feature>
+        <feature id="epic-integration">Round-trip wiring and CLI entry</feature>
+      </includes>
+      <excludes>
+        <reason>Any real-world parsing (locales, scientific notation, BigInt)</reason>
+        <reason>Any streaming / async behavior</reason>
+      </excludes>
+    </scope>
+
+    <delta version="1" iteration="2026-04-17">
+      <added ref="fr-parser-001">parseInteger primitive</added>
+      <added ref="fr-parser-002">parseFloat primitive</added>
+      <added ref="fr-formatter-001">formatNumber primitive</added>
+      <added ref="fr-formatter-002">formatList using formatNumber</added>
+      <added ref="fr-integration-001">roundTrip parse+format pipeline</added>
+      <added ref="fr-integration-002">CLI entry exposing roundTrip</added>
+    </delta>
+  </overview>
+
+  <cross_cutting>
+    <constraint id="cc-001">
+      <title>Zero External Dependencies</title>
+      <description>Node.js standard library only — matches arcforge project norm.</description>
+    </constraint>
+  </cross_cutting>
+
+  <details>
+    <detail_file path="details/core.xml" />
+  </details>
+</spec>

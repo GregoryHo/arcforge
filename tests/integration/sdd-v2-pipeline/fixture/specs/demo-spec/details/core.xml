@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="core">
+  <title>Demo Spec — Core Requirements</title>
+  <consumes>
+    <artifact>specs/demo-spec/spec.xml</artifact>
+  </consumes>
+  <produces>
+    <artifact>specs/demo-spec/dag.yaml</artifact>
+    <artifact>specs/demo-spec/epics/**/epic.md</artifact>
+    <artifact>specs/demo-spec/epics/**/features/*.md</artifact>
+  </produces>
+
+  <requirement id="fr-parser-001">
+    <title>parseInteger Primitive</title>
+    <description>
+      Expose parseInteger(input) that returns an integer when input is a numeric
+      string, otherwise null. No exceptions; null signals "not parseable".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-parser-001-ac1">
+        Given input "42", parseInteger MUST return the number 42.
+        <trace>REQ-001</trace>
+      </criterion>
+      <criterion id="fr-parser-001-ac2">
+        Given input "abc", parseInteger MUST return null (no throw).
+        <trace>REQ-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-parser-002">
+    <title>parseFloat Primitive</title>
+    <description>
+      Expose parseFloat(input) that returns a finite number when input is a
+      numeric string (including decimals), otherwise null. Independent of
+      parseInteger — must not depend on parser/int.js.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-parser-002-ac1">
+        Given input "3.14", parseFloat MUST return the number 3.14.
+        <trace>REQ-002</trace>
+      </criterion>
+      <criterion id="fr-parser-002-ac2">
+        Given input "NaN" or non-numeric, parseFloat MUST return null.
+        <trace>REQ-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-formatter-001">
+    <title>formatNumber Primitive</title>
+    <description>
+      Expose formatNumber(n) that returns a string representation of n with
+      a leading "#" prefix (e.g., formatNumber(42) === "#42"). Null-safe:
+      formatNumber(null) returns "#null".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-formatter-001-ac1">
+        Given number 42, formatNumber MUST return the string "#42".
+        <trace>REQ-003</trace>
+      </criterion>
+      <criterion id="fr-formatter-001-ac2">
+        Given null, formatNumber MUST return the string "#null".
+        <trace>REQ-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-formatter-002">
+    <title>formatList Uses formatNumber</title>
+    <description>
+      Expose formatList(arr) that joins formatNumber results with ", ".
+      Depends on fr-formatter-001: MUST import and call formatNumber rather
+      than reimplementing the "#" prefix logic.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-formatter-002-ac1">
+        Given [1, 2, 3], formatList MUST return "#1, #2, #3".
+        <trace>REQ-004</trace>
+      </criterion>
+      <criterion id="fr-formatter-002-ac2">
+        Given [], formatList MUST return the empty string "".
+        <trace>REQ-004</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-integration-001">
+    <title>roundTrip Pipeline</title>
+    <description>
+      Expose roundTrip(input) that parses input as an integer, falling back
+      to float, then formats the result via formatNumber. Integrates both
+      parser and formatter epics.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-integration-001-ac1">
+        Given "7", roundTrip MUST return "#7".
+        <trace>REQ-005</trace>
+      </criterion>
+      <criterion id="fr-integration-001-ac2">
+        Given "not-a-number", roundTrip MUST return "#null".
+        <trace>REQ-005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-integration-002">
+    <title>CLI Entry Exposing roundTrip</title>
+    <description>
+      Expose src/cli.js such that `node src/cli.js &lt;arg&gt;` prints the
+      roundTrip result followed by a newline.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-integration-002-ac1">
+        Running `node src/cli.js 42` MUST print "#42\n" to stdout.
+        <trace>REQ-006</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
