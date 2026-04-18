@@ -109,10 +109,12 @@ Task tool (general-purpose): "Fix issue C in file Z"
 When `dag.yaml` exists (from `/arc-planning`), use this structured workflow.
 If you don't have a DAG, skip to **Without DAG: Independent Failures** below.
 
-### Step 1: Read dag.yaml
+### Step 1: Read the per-spec dag.yaml
+
+Identify the spec you are working within (from the worktree's `.arcforge-epic` marker or the `--spec-id` argument passed by the lead), then:
 
 ```bash
-cat dag.yaml
+cat specs/<spec-id>/dag.yaml
 ```
 
 Parse the structure to understand:
@@ -195,7 +197,7 @@ For each feature in the parallel group, dispatch a separate subagent:
 ```
 For each feature in Group 1:
     Use Task tool with subagent_type=general-purpose
-    Prompt: "Implement feature <feature-id> from epics/<epic>/<feature>.md"
+    Prompt: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
     Run in parallel (all at once)
 
 Wait for all to complete

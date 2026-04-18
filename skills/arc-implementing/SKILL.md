@@ -10,9 +10,9 @@ description: Use when orchestrating large project implementation in a worktree
 Orchestrator for large projects. Automatically expands epic → features → tasks → execution.
 
 **Use when:**
-- project has dag.yaml
-- in a worktree session
-- epic.md or features/*.md present
+- project has `specs/<spec-id>/dag.yaml`
+- in a worktree session (`.arcforge-epic` marker carries both epic and spec_id)
+- `specs/<spec-id>/epics/<epic-id>/epic.md` or `specs/<spec-id>/epics/<epic-id>/features/*.md` present
 
 **Do not use when:**
 - small projects (use writing-tasks + agent-driven directly)
@@ -25,8 +25,8 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 ## Trigger
 
 - in a worktree session
-- `.arcforge-epic` marker exists
-- or `epic.md` / `features/*.md` present
+- `.arcforge-epic` marker exists (supplies both `epic` and `spec_id`)
+- or `specs/<spec-id>/epics/<epic-id>/epic.md` / `specs/<spec-id>/epics/<epic-id>/features/*.md` present
 
 ## The Process
 
@@ -37,12 +37,12 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
    - If ready: continue to Phase 1.
 3. Phase 1: Epic → Features.
    - Call `arc-writing-tasks`
-   - Input: `epic.md`
-   - Output: features list (may already exist in `features/*.md`)
+   - Input: `specs/<spec-id>/epics/<epic-id>/epic.md`
+   - Output: features list (may already exist in `specs/<spec-id>/epics/<epic-id>/features/*.md`)
 4. Phase 2: Per Feature.
    - 2a: Feature → Tasks.
      - Call `arc-writing-tasks`
-     - Input: `feature.md`
+     - Input: `specs/<spec-id>/epics/<epic-id>/features/<feature>.md`
      - Output: `docs/tasks/<feature>-tasks.md`
      - Quality gate: If tasks are vague or missing tests/commands, STOP and re-run `arc-writing-tasks` to refine. **Max 2 refinement cycles** — if still vague, escalate to human.
    - 2b: Execute Tasks.
@@ -57,8 +57,8 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 | Phase | Skill | Input | Output |
 |-------|-------|-------|--------|
 | 0 | arc-coordinating | worktree | sync + blocked status |
-| 1 | arc-writing-tasks | epic.md | features breakdown |
-| 2a | arc-writing-tasks | feature.md | tasks file |
+| 1 | arc-writing-tasks | `specs/<spec-id>/epics/<epic-id>/epic.md` | features breakdown |
+| 2a | arc-writing-tasks | `specs/<spec-id>/epics/<epic-id>/features/<feature>.md` | tasks file |
 | 2b | arc-agent-driven | tasks file | completed code |
 | 2b | arc-dispatching-parallel | (via arc-agent-driven, if review finds multiple issues) | parallel fixes |
 | End | arc-finishing-epic | completed epic | merge decision |

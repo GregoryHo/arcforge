@@ -1,6 +1,6 @@
 ---
 name: arc-dispatching-teammates
-description: Use when dag.yaml has 2+ epics in a ready state, the user is staying at their keyboard to monitor (not walking away), and the context is epic-level parallel work where arc-looping's unattended mode is a wrong fit. Use when the user mentions agent teams or teammates in the context of multi-epic work, asks what to do after arc-planning produces multiple ready epics, or is in an arcforge session where epic-level parallelism has arisen and the lead can stay present. For walk-away overnight execution, use arc-looping instead.
+description: Use when specs/<spec-id>/dag.yaml has 2+ epics in a ready state, the user is staying at their keyboard to monitor (not walking away), and the context is epic-level parallel work where arc-looping's unattended mode is a wrong fit. Use when the user mentions agent teams or teammates in the context of multi-epic work, asks what to do after arc-planning produces multiple ready epics, or is in an arcforge session where epic-level parallelism has arisen and the lead can stay present. For walk-away overnight execution, use arc-looping instead.
 ---
 
 # arc-dispatching-teammates
@@ -19,18 +19,19 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 | 2+ ready epics, lead walking away ("overnight", "going to bed") | arc-looping `--pattern dag` |
 | 1 ready epic | arc-coordinating expand + arc-implementing |
 | Feature-level parallelism inside one worktree | arc-dispatching-parallel |
-| No `dag.yaml` | arc-planning first |
+| No `specs/<spec-id>/dag.yaml` | arc-planning first |
 
 **The boundary vs arc-looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still arc-looping.
 
 **REQUIRED BACKGROUND:** arc-using (injected at SessionStart).
-**REQUIRED PRECEDENT:** arc-planning must have produced `dag.yaml`.
+**REQUIRED PRECEDENT:** arc-planning must have produced `specs/<spec-id>/dag.yaml`.
 
 ## Preconditions
 
 1. **2+ ready epics** — `arcforge status --json` shows epics with `status: pending`, `worktree: null`, deps completed. If < 2, skill does not apply.
-2. **Agent tool supports `team_name` and `name`.** If dispatch errors with "unknown parameter team_name", report blocked.
-3. **Lead is in project root**, not a worktree. Move to base worktree if `.arcforge-epic` is in cwd.
+2. **Single spec.** Cross-spec ready epics → report blocked, user picks with `--spec-id <id>`.
+3. **Agent tool supports `team_name` and `name`.** If dispatch errors with "unknown parameter team_name", report blocked.
+4. **Lead is in project root**, not a worktree. Move to base worktree if `.arcforge-epic` is in cwd.
 
 Precondition failure = hard fail. Do not silently fall back to arc-looping or manual juggling.
 
@@ -53,7 +54,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 6. **Acceptance check (per teammate completion) — delegate, do NOT inline.** The lead dispatches two subagents with fresh context; the lead does NOT locate code or run tests itself. When a teammate reports done:
 
-   - **Spec compliance** — `Agent(subagent_type='arcforge:spec-reviewer')` with the epic's `epic.md` and referenced `features/*.md` attached. It independently locates every acceptance criterion in the merged dev branch and returns PASS/FAIL with file:line evidence.
+   - **Spec compliance** — `Agent(subagent_type='arcforge:spec-reviewer')` with `specs/<spec-id>/epics/<epic-id>/epic.md` and its `features/*.md` attached (name `<spec-id>` in the prompt). It locates every acceptance criterion in the merged dev branch and returns PASS/FAIL with file:line evidence.
    - **Fresh-eyes verification** — `Agent(subagent_type='arcforge:verifier')` with the project test command. It runs tests from an empty context and returns raw output.
 
    Both PASS → accept. Either FAIL → Step 7 **unless** the FAIL is a spec defect (spec references wrong file/path, not an impl gap) — see `references/acceptance-and-retry.md` override-accept protocol. **Subagents ARE the gate** — running either check inline defeats the purpose. The lead's job is to READ the reports and decide, not execute the checks.
@@ -160,9 +161,7 @@ Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). 
 ⚠️ Teammate dispatch: blocked
 - Issue: <precondition that failed, e.g. only 1 ready epic, Agent team_name unsupported>
 - Checked: <exact command or tool invocation>
-- Action: <specific remediation — e.g. use arc-coordinating for 1 epic,
-  enable agent teammates per Claude Code release notes, or fall back to
-  arc-looping if unattended is acceptable>
+- Action: <remediation — e.g. arc-coordinating for 1 epic, enable teammates, or fall back to arc-looping>
 ```
 
 ## After This Skill
