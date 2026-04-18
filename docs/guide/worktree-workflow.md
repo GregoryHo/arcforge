@@ -23,11 +23,14 @@ same project coexist without collisions.
 | `.arcforge/worktrees` | Fixed directory name           | `.arcforge/worktrees` |
 | `<project>` | `path.basename(projectRoot)`, sanitized   | `arcforge`         |
 | `<hash>`   | First 6 hex chars of `sha256(projectRoot)` | `3f2a91`          |
-| `<epic>`   | Epic id from `dag.yaml`                    | `epic-001`         |
+| `<epic>`   | Epic id from `specs/<spec-id>/dag.yaml`    | `epic-001`         |
 
 **Why the hash?** Two clones of the same repo in different directories must
-not collide. The hash is computed from the absolute project path, normalized
-to strip trailing slashes, so `/foo/bar` and `/foo/bar/` are equivalent.
+not collide, and two distinct specs within the same repo must not produce
+the same worktree path when they share an epic id. The hash is computed
+from `sha256(absoluteProjectPath + specId)` so both axes of collision are
+covered without changing the visible `<project>-<hash>-<epic>` naming
+scheme.
 
 **Why the sanitized project name?** Human readability when listing worktrees.
 Non-alphanumeric characters are collapsed to a single hyphen; trailing/
@@ -45,10 +48,11 @@ arcforge status --json   # returns epic.worktree.path absolutely
 
 Each worktree contains a single YAML file named `.arcforge-epic` at its root.
 This file is the coupling between the worktree checkout and the base
-`dag.yaml`:
+`specs/<spec-id>/dag.yaml`:
 
 ```yaml
-epic: epic-001                   # Must match an id in dag.yaml
+epic: epic-001                   # Must match an id in the per-spec dag.yaml
+spec_id: spec-driven-refine      # Identifies which specs/<id>/dag.yaml to reconnect to
 base_worktree: /Users/alice/arcforge   # Absolute path to the base checkout
 base_branch: main                # The branch expand was launched from
 local:
@@ -75,13 +79,14 @@ Worktrees are removed via `arcforge cleanup` (or `arc-coordinating cleanup`),
 which delegates to `git worktree remove <absolute-path>`.
 
 - The helper-computed path is always the source of truth — the coordinator
-  resolves it via `getWorktreePath(projectRoot, epicId)` before calling git.
+  resolves it via `getWorktreePath(projectRoot, specId, epicId)` before
+  calling git.
 - If git's own worktree registry still holds a stale entry after removal,
   the coordinator force-removes the directory.
 - Cleanup does **not** delete the epic branch — that is the agent's choice
   via `arc-finishing-epic`.
-- After cleanup the epic's `worktree` field in `dag.yaml` is cleared to
-  `null`.
+- After cleanup the epic's `worktree` field in `specs/<spec-id>/dag.yaml`
+  is cleared to `null`.
 
 ## 概念總覽 / Concept Overview
 
@@ -240,7 +245,7 @@ off marker files). Either delete it with `git worktree remove` and re-run
 `arcforge expand`, or recreate the marker manually by copying from another
 worktree — but the correct fix is always to use the CLI.
 
-### `dag.yaml` says `worktree: epic-001` but the directory doesn't exist
+### `specs/<spec-id>/dag.yaml` says `worktree: epic-001` but the directory doesn't exist
 The stored value is the epic id, not the path. The absolute path is
 re-derived at read time. If the directory really is gone (e.g. you deleted
 it by hand), run `git worktree prune` and `arcforge cleanup <epic-id>` to
