@@ -59,6 +59,9 @@ def test_arc_looping_has_state_tracking():
     # Must reference dag.yaml as input
     assert "dag.yaml" in text
 
+    # SDD v2: must cite the per-spec dag.yaml path
+    assert "specs/<spec-id>/dag.yaml" in text
+
 
 def test_arc_looping_has_monitoring():
     """Test skill documents how to monitor running loops."""

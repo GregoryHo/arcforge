@@ -54,3 +54,14 @@ def test_arc_dispatching_parallel_contains_required_sections():
 
     # Must have "Without DAG" section
     assert "Without DAG" in text
+
+
+def test_arc_dispatching_parallel_uses_per_spec_paths():
+    """SDD v2: Step 1 reads specs/<spec-id>/dag.yaml; Step 5 prompt uses per-spec epic path."""
+    text = _read_skill()
+
+    # Step 1 cats specs/<spec-id>/dag.yaml
+    assert "cat specs/<spec-id>/dag.yaml" in text
+
+    # Step 5 subagent prompt names the per-spec feature path
+    assert "specs/<spec-id>/epics/<epic>/features/<feature>.md" in text

@@ -152,6 +152,20 @@ def test_arc_dispatching_teammates_references_related_skills():
     assert "arc-finishing-epic" in text
 
 
+def test_arc_dispatching_teammates_is_single_spec_in_phase_1():
+    """SDD v2: dispatch is single-spec only; cross-spec epics report blocked."""
+    text = _read_skill()
+
+    # Description + preconditions cite per-spec dag.yaml
+    assert "specs/<spec-id>/dag.yaml" in text
+
+    # Precondition requires single-spec ready set
+    assert "Single spec" in text or "single spec" in text
+
+    # Spec-reviewer dispatch attaches per-spec epic.md
+    assert "specs/<spec-id>/epics/<epic-id>/epic.md" in text
+
+
 def test_arc_dispatching_teammates_word_count_within_tier():
     """Test SKILL.md stays within the Comprehensive tier soft guidance."""
     text = _read_skill()

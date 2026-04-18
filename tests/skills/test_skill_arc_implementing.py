@@ -54,3 +54,14 @@ def test_arc_implementing_contains_required_sections():
 
     # Must reference skills it delegates to
     assert "skills" in text.lower() or "delegate" in text.lower()
+
+
+def test_arc_implementing_uses_per_spec_paths():
+    """SDD v2: precondition and inputs must name specs/<spec-id>/..."""
+    text = _read_skill()
+
+    # Precondition mentions specs/<spec-id>/dag.yaml
+    assert "specs/<spec-id>/dag.yaml" in text
+
+    # Phase inputs reference specs/<spec-id>/epics/...
+    assert "specs/<spec-id>/epics" in text
