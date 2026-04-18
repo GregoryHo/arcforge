@@ -16,6 +16,14 @@
 #   specs/demo-spec/dag.yaml
 #   specs/demo-spec/epics/
 #
+# Reproducibility constraints. The fixture's DAG shape (3 epics, 6 features,
+# diamond deps) is load-bearing — downstream test scripts hardcode assertions
+# against specific IDs like fr-parser-001 and epic-integration. The prompts
+# below pin every such ID and dependency so regeneration produces a STABLE
+# DAG shape that the existing tests can still pass against. Removing these
+# constraints would let arc-planning rename epics / reorder features on a
+# whim and break every downstream test.
+#
 # Usage:
 #   ./regenerate-fixture.sh           # diff only, print apply command
 #   ./regenerate-fixture.sh --apply   # copy results back into fixture/
@@ -35,9 +43,14 @@ WORK_DIR="/tmp/arcforge-regen/$TIMESTAMP"
 REFINE_LOG="$WORK_DIR/refine.log"
 PLAN_LOG="$WORK_DIR/plan.log"
 
+DESIGN_REL="docs/plans/demo-spec/2026-04-17/design.md"
+
 APPLY=false
 for arg in "$@"; do
-    [ "$arg" = "--apply" ] && APPLY=true
+    case "$arg" in
+        --apply) APPLY=true ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
 done
 
 echo "=== SDD v2 Fixture Regeneration ==="
@@ -56,18 +69,25 @@ mkdir -p "$WORK_DIR"
 # ---------------------------------------------------------------------------
 echo ">>> Stage 1: Scaffolding work directory..."
 
+if [ ! -f "$FIXTURE_DIR/$DESIGN_REL" ]; then
+    echo "  FATAL: design seed not found at $FIXTURE_DIR/$DESIGN_REL"
+    exit 1
+fi
+
+# Seed the work dir with the design doc + package.json only. Don't pre-create
+# specs/ — that's exactly what arc-refining and arc-planning produce.
 cp -R "$FIXTURE_DIR/docs" "$WORK_DIR/"
 cp "$FIXTURE_DIR/package.json" "$WORK_DIR/"
 
-# Symlink arcforge scripts so arc-refining's sdd-utils validation finds them.
-# sdd-utils.js uses only node: builtins, so the symlink is safe across paths.
+# Symlink arcforge scripts so arc-refining's sdd-utils module resolves.
+# sdd-utils.js uses only node: builtins, so the symlink works across paths.
 ln -s "$ARCFORGE_ROOT/scripts" "$WORK_DIR/scripts"
 
 cd "$WORK_DIR"
 git init --quiet
 git config user.email 'regen@arcforge.local'
 git config user.name 'arcforge regen'
-git add . && git commit --quiet -m "regen baseline"
+git add . && git commit --quiet -m "regen baseline: design seed"
 
 mkdir -p .claude
 cat > .claude/settings.local.json <<'SETTINGS'
@@ -86,13 +106,22 @@ SETTINGS
 echo "  Done — working directory at $WORK_DIR"
 
 # ---------------------------------------------------------------------------
-# Stage 2: arc-refining (design.md → spec.xml + details/)
+# Stage 2: arc-refining (design.md -> spec.xml + details/)
 # ---------------------------------------------------------------------------
 echo ""
-echo ">>> Stage 2: arc-refining (design → spec)..."
+echo ">>> Stage 2: arc-refining (design -> spec)..."
 echo "    Log: $REFINE_LOG"
 
-REFINE_PROMPT="Run arc-refining for spec-id 'demo-spec'. The design doc is at docs/plans/demo-spec/2026-04-17/design.md. This is a headless regeneration run — do NOT ask any clarifying questions; make all necessary assumptions and proceed directly. Produce specs/demo-spec/spec.xml and specs/demo-spec/details/core.xml. Treat this as an initial spec (spec_version 1, no supersedes, delta version 1 iteration 2026-04-17 listing all requirements as added)."
+REFINE_PROMPT="Run arc-refining for spec-id 'demo-spec'. The design doc is at $DESIGN_REL. This is a headless regeneration run — do NOT ask any clarifying questions; make all necessary assumptions and proceed directly.
+
+Write the results to specs/demo-spec/spec.xml and specs/demo-spec/details/core.xml.
+
+Pin these values exactly (do not rename, reorder, or substitute):
+- spec_id: demo-spec
+- design_path reference inside spec.xml <source>: $DESIGN_REL
+- Six requirement IDs, exactly these: fr-parser-001, fr-parser-002, fr-formatter-001, fr-formatter-002, fr-integration-001, fr-integration-002
+
+Version: treat as v1 initial spec (spec_version 1, empty supersedes, delta version 1 iteration 2026-04-17 listing all six requirements as added)."
 
 REFINE_TIMEOUT="${SDD_REGEN_REFINE_TIMEOUT:-600}"
 timeout --kill-after=30 "$REFINE_TIMEOUT" \
@@ -112,22 +141,56 @@ timeout --kill-after=30 "$REFINE_TIMEOUT" \
         echo "  WARN: claude -p exited with status $EXIT_STATUS — checking for output..."
     }
 
-if [ ! -f "$WORK_DIR/specs/demo-spec/spec.xml" ]; then
-    echo "  FAIL: arc-refining did not produce specs/demo-spec/spec.xml"
-    echo "  First 30 lines of log:"
-    head -30 "$REFINE_LOG" | sed 's/^/    /' || true
+# Validate arc-refining output — file presence + spec_id pin preserved.
+REFINE_FAILED=0
+for f in "specs/demo-spec/spec.xml" "specs/demo-spec/details/core.xml"; do
+    if [ -f "$WORK_DIR/$f" ]; then
+        echo "  [OK] $f"
+    else
+        echo "  [MISSING] $f"
+        REFINE_FAILED=$((REFINE_FAILED+1))
+    fi
+done
+
+if [ -f "$WORK_DIR/specs/demo-spec/spec.xml" ]; then
+    if grep -q "demo-spec" "$WORK_DIR/specs/demo-spec/spec.xml"; then
+        echo "  [OK] spec.xml contains demo-spec"
+    else
+        echo "  [FAIL] spec.xml does not contain demo-spec"
+        REFINE_FAILED=$((REFINE_FAILED+1))
+    fi
+fi
+
+if [ "$REFINE_FAILED" -gt 0 ]; then
+    echo ""
+    echo "FATAL: arc-refining produced $REFINE_FAILED missing/invalid file(s)."
+    echo "Log: $REFINE_LOG"
     exit 1
 fi
-echo "  spec.xml produced."
+
+git add . && git commit --quiet -m "regen: arc-refining output"
+echo "  spec.xml + details/core.xml produced and committed."
 
 # ---------------------------------------------------------------------------
-# Stage 3: arc-planning (spec.xml → dag.yaml + epics/)
+# Stage 3: arc-planning (spec.xml -> dag.yaml + epics/)
 # ---------------------------------------------------------------------------
 echo ""
-echo ">>> Stage 3: arc-planning (spec → dag + epics)..."
+echo ">>> Stage 3: arc-planning (spec -> dag + epics)..."
 echo "    Log: $PLAN_LOG"
 
-PLAN_PROMPT="Run arc-planning for spec-id 'demo-spec'. specs/demo-spec/spec.xml already exists. This is a headless regeneration run — do NOT ask any questions; work directly from the spec and produce specs/demo-spec/dag.yaml plus the epics/ directory (epics/epic-parser/, epics/epic-formatter/, epics/epic-integration/ with their epic.md and features/ files)."
+PLAN_PROMPT="Run arc-planning for spec-id 'demo-spec'. specs/demo-spec/spec.xml already exists. This is a headless regeneration run — do NOT ask any questions; work directly from the spec and produce specs/demo-spec/dag.yaml plus the epics/ directory.
+
+Pin the DAG shape exactly (these constraints make the fixture reproducible — downstream tests assert against these IDs):
+
+- Three epics, exactly these IDs: epic-parser, epic-formatter, epic-integration
+- epic-parser — no epic-level deps; contains fr-parser-001 and fr-parser-002; features are INDEPENDENT (no intra-epic deps between them)
+- epic-formatter — no epic-level deps; contains fr-formatter-001 and fr-formatter-002; fr-formatter-002 depends on fr-formatter-001
+- epic-integration — depends on epic-parser AND epic-formatter at the epic level; contains fr-integration-001 and fr-integration-002
+
+Produce:
+- specs/demo-spec/dag.yaml (with the above shape)
+- specs/demo-spec/epics/<epic-id>/epic.md for each of the three epics
+- specs/demo-spec/epics/<epic-id>/features/<feature-id>.md for each of the six features"
 
 PLAN_TIMEOUT="${SDD_REGEN_PLAN_TIMEOUT:-600}"
 timeout --kill-after=30 "$PLAN_TIMEOUT" \
@@ -147,13 +210,50 @@ timeout --kill-after=30 "$PLAN_TIMEOUT" \
         echo "  WARN: claude -p exited with status $EXIT_STATUS — checking for output..."
     }
 
-if [ ! -f "$WORK_DIR/specs/demo-spec/dag.yaml" ]; then
-    echo "  FAIL: arc-planning did not produce specs/demo-spec/dag.yaml"
-    echo "  First 30 lines of log:"
-    head -30 "$PLAN_LOG" | sed 's/^/    /' || true
+# Validate arc-planning output — the 10 expected files + epic refs in dag.yaml.
+PLAN_FAILED=0
+REQUIRED_FILES=(
+    "specs/demo-spec/dag.yaml"
+    "specs/demo-spec/epics/epic-parser/epic.md"
+    "specs/demo-spec/epics/epic-formatter/epic.md"
+    "specs/demo-spec/epics/epic-integration/epic.md"
+    "specs/demo-spec/epics/epic-parser/features/fr-parser-001.md"
+    "specs/demo-spec/epics/epic-parser/features/fr-parser-002.md"
+    "specs/demo-spec/epics/epic-formatter/features/fr-formatter-001.md"
+    "specs/demo-spec/epics/epic-formatter/features/fr-formatter-002.md"
+    "specs/demo-spec/epics/epic-integration/features/fr-integration-001.md"
+    "specs/demo-spec/epics/epic-integration/features/fr-integration-002.md"
+)
+
+for f in "${REQUIRED_FILES[@]}"; do
+    if [ -f "$WORK_DIR/$f" ]; then
+        echo "  [OK] $f"
+    else
+        echo "  [MISSING] $f"
+        PLAN_FAILED=$((PLAN_FAILED+1))
+    fi
+done
+
+if [ -f "$WORK_DIR/specs/demo-spec/dag.yaml" ]; then
+    for epic_id in epic-parser epic-formatter epic-integration; do
+        if grep -q "$epic_id" "$WORK_DIR/specs/demo-spec/dag.yaml"; then
+            echo "  [OK] dag.yaml references $epic_id"
+        else
+            echo "  [MISSING] dag.yaml does not reference $epic_id"
+            PLAN_FAILED=$((PLAN_FAILED+1))
+        fi
+    done
+fi
+
+if [ "$PLAN_FAILED" -gt 0 ]; then
+    echo ""
+    echo "FATAL: arc-planning produced $PLAN_FAILED missing/invalid file(s)."
+    echo "Log: $PLAN_LOG"
     exit 1
 fi
-echo "  dag.yaml + epics/ produced."
+
+git add . && git commit --quiet -m "regen: arc-planning output"
+echo "  dag.yaml + epics/ produced and committed."
 
 # ---------------------------------------------------------------------------
 # Stage 4: diff generated output against current fixture
@@ -184,9 +284,14 @@ echo ""
 
 if $APPLY; then
     echo ">>> Stage 5: Applying generated output to fixture (--apply)..."
+    # rsync --delete handles the case where regen produces fewer files than
+    # the current fixture has (e.g., an epic was removed). Plain cp would
+    # leave orphan files behind.
     rsync -a --delete "$WORK_DIR/specs/demo-spec/" "$FIXTURE_DIR/specs/demo-spec/"
     echo "  Fixture updated. Review with 'git diff', then:"
-    echo "    git add tests/integration/sdd-v2-pipeline/fixture/specs/"
+    echo "    ARCFORGE_ROOT=\$PWD bash tests/integration/sdd-v2-pipeline/run-all.sh"
+    echo "  If tests pass, commit:"
+    echo "    git add tests/integration/sdd-v2-pipeline/fixture/"
     echo "    git commit -m 'chore(tests): regenerate SDD v2 pipeline fixture'"
 else
     echo ">>> Stage 5: Review and apply manually"
@@ -199,7 +304,7 @@ else
     echo "  Or re-run with --apply to copy automatically."
     echo ""
     echo "  After applying, review the diff and commit:"
-    echo "    git add tests/integration/sdd-v2-pipeline/fixture/specs/"
+    echo "    git add tests/integration/sdd-v2-pipeline/fixture/"
     echo "    git commit -m 'chore(tests): regenerate SDD v2 pipeline fixture'"
 fi
 

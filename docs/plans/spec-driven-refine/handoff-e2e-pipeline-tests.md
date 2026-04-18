@@ -368,20 +368,39 @@ These were considered and set aside this session, but a fresh session might reac
 
 ## 11 · Phase C completion record
 
-**Branch:** `claude/elegant-mcnulty-f143a9` (cherry-picked Phase B from
-`claude/brave-maxwell-1cb5a8`, then added Phase C on top)
+Phase C landed via a two-step sequence on `feature/spec-driven-refine`:
 
-**Commits added this session:**
-```
-a6b3719 test(integration): add fixture regeneration script (Phase C)
-c3c3a95 test(integration): add SDD v2 downstream e2e pipeline tests (Phase B)   [cherry-pick]
-7f9d202 docs(plans): record Phase A completion — arc-looping 5/5 PASS             [cherry-pick]
-```
+1. **Initial merge from `claude/elegant-mcnulty-f143a9`** (commits `7f9d202`
+   Phase A docs, `c3c3a95` Phase B, `a6b3719` Phase C code, `63a8d43` Phase
+   C docs). Merged as fast-forward. At the time this read like the complete
+   Phase C deliverable, but post-merge review against a sibling teammate
+   branch (`claude/brave-maxwell-1cb5a8`) revealed that the original Phase C
+   script had weak reproducibility guarantees.
 
-### Phase C — regenerate-fixture.sh
+2. **Follow-up refactor** that rewrote `regenerate-fixture.sh` to fuse the
+   best engineering from both teammate worktrees. The result is the current
+   script; it supersedes the version shipped in `a6b3719`.
+
+### Why the follow-up was needed
+
+The fixture's DAG shape (3 epics, 6 features, diamond deps) is load-bearing
+— downstream tests hardcode assertions against specific IDs like
+`fr-parser-001` and `epic-integration`. If regeneration produces a
+different DAG shape, the downstream tests break. The `elegant-mcnulty`
+version's prompts said "work directly from spec" and "treat as initial
+spec (spec_version 1)" — both of which let `arc-planning` freely rename
+epics, reorder features, or mint different IDs on each run. The
+`brave-maxwell` version pinned every requirement ID, epic ID, and
+dependency explicitly, but never committed its work.
+
+The fused rewrite pins all the IDs and deps (from `brave-maxwell`'s
+prompts) while keeping `elegant-mcnulty`'s `scripts/` symlink,
+`rsync --delete` apply, and `diff -r` full-tree diff.
+
+### Current Phase C design
 
 `tests/integration/sdd-v2-pipeline/regenerate-fixture.sh` implements the
-fixture regeneration mechanism with a clear layering principle:
+regeneration with a clear layering principle:
 
 ```
 design.md           ← human-managed seed (never regenerated)
@@ -391,21 +410,31 @@ dag.yaml / epics/   ← arc-planning output  (regenerable)
 
 Key implementation decisions:
 - **No arc-brainstorming re-run** — design.md is the fixed seed.
+- **Pinned IDs in prompts** — the six `fr-*-NNN` requirement IDs, three
+  epic IDs, and feature/epic-level dependencies are all spelled out in
+  the prompts so regeneration produces a reproducible DAG shape that
+  existing downstream tests still pass against.
 - **scripts/ symlink** — work dir symlinks `$ARCFORGE_ROOT/scripts` so
   arc-refining's `require('./scripts/lib/sdd-utils')` resolves correctly.
 - **Headless-safe prompts** — both refining and planning prompts say
   "headless regeneration run — do NOT ask questions; make assumptions"
   to bypass the clarifying-question discipline (known headless-incompatible
   pattern documented in section 9.6).
-- **--apply flag** — copies result back to fixture/; default is diff-only
-  so human can review before applying. Never auto-commits.
-- **Timeout env vars** — `SDD_REGEN_REFINE_TIMEOUT` + `SDD_REGEN_PLAN_TIMEOUT`
-  (default 600s each).
+- **Stage-gated commits** — one commit after `arc-refining`, another after
+  `arc-planning`, so `git log` in the work dir tells you which stage
+  produced which output (useful when diagnosing a bad regen).
+- **Strict validation per stage** — every expected file is checked, plus
+  structural asserts (spec.xml contains `demo-spec`, dag.yaml references
+  each of the three epic IDs). Failures abort before the diff stage.
+- **--apply uses `rsync -a --delete`** — correctly handles the case where
+  regeneration produces fewer files than the current fixture.
+- **Timeout env vars** — `SDD_REGEN_REFINE_TIMEOUT` +
+  `SDD_REGEN_PLAN_TIMEOUT` (default 600s each).
 
 ### All phases complete
 
-Phase A, B, and C are all done. The integration test suite covers all 5
-downstream skills plus has a regeneration path. Next steps if any:
-- Merge `claude/elegant-mcnulty-f143a9` → `feature/spec-driven-refine`
+Phase A, B, and C are all done and merged. The integration test suite
+covers all 5 downstream skills plus has a regeneration path. Next steps
+if any:
 - Run Phase A/B tests manually on the current fixture to confirm green
 - Run `regenerate-fixture.sh --apply` after any upstream skill schema change
