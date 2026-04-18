@@ -2,10 +2,10 @@
 
 ## Scope
 
-workflow
+agent
 
 ## Target
-SDD v2 downstream discard-path sync guard: when the user wants to discard an in-progress epic, the agent's shell script must guard the sync step on the presence of `.arcforge-epic` (the v2 marker), NOT on a legacy root `dag.yaml`. The v2 layout has no root dag.yaml in a worktree.
+Regression guard: given a v2 worktree marker + "discard this epic" request, a bare agent writes a discard script whose sync step guards on `.arcforge-epic` presence (not root `dag.yaml`). Kept as a regression guard — if this drops below 100%, the v2 layout has stopped being self-explanatory to a bare agent and the marker schema needs revisiting. Treatment-vs-baseline showed no delta at max_turns=15 (both pass at ceiling), so this is not a useful skill-eval scenario.
 
 ## Scenario
 
