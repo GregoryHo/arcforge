@@ -9,13 +9,11 @@ arc-agent-driven executes a task list by spawning a **fresh subagent per task** 
 
 ## Scenario
 
-Execute the tasks defined in `docs/tasks/three-utilities-tasks.md`. There are 3 tasks. Each task is independent (no ordering dependency). Each task must run in isolation. Do NOT inline any of the task work in your own turns — dispatch each task as a separate isolated subagent.
-
-When all three tasks are done, report "all-tasks-complete" and stop.
+Execute the tasks defined in `docs/tasks/three-utilities-tasks.md`. When the tasks are all done, report "all-tasks-complete" and stop.
 
 ## Context
 
-The task file lists 3 small, independent utility-creation tasks. Each requires an isolated subagent so task state (tool-call history, context) cannot leak across tasks. This is the core guarantee of arc-agent-driven.
+The task file lists 3 small, independent utility-creation tasks in an arcforge-style tasks document. Use whatever arcforge-toolkit approach you consider appropriate for executing a prepared task list. You have Read, Write, Edit, Bash, Task, and other standard tools.
 
 ## Setup
 
@@ -63,7 +61,7 @@ mixed
 
 ## Grader Config
 
-The behavioral `[tool_count] Task >= 3` assertion is the discriminator — it requires the agent to spawn at least three subagents via the Task tool. A baseline agent without arc-agent-driven's discipline will typically inline the Write calls and skip the subagent delegation. Text assertions confirm the actual code was produced and the completion marker was emitted.
+The behavioral `[tool_count] Task >= 3` assertion is the sole discriminator — it requires the agent to spawn at least three Task subagents. A baseline agent without arc-agent-driven's per-task-subagent discipline will typically inline the Write calls itself to save turns; a treatment agent that has the skill loaded should recognise this as a task-list-execution situation and dispatch one subagent per task. Text assertions confirm the end-state (files exist, completion marker emitted) so the agent can't "pass" by doing nothing.
 
 ## Trials
 

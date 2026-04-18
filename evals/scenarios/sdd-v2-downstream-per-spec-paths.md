@@ -2,10 +2,10 @@
 
 ## Scope
 
-workflow
+agent
 
 ## Target
-SDD v2 downstream per-spec path reading: agent inside a worktree with `.arcforge-epic` (carrying spec_id) must read per-spec epic artifacts at `specs/<spec-id>/epics/<epic-id>/epic.md`, not v1 root-level decoys at `epics/<epic-id>/epic.md`.
+Regression guard: the `.arcforge-epic` marker's `spec_id` field remains self-describing enough that a bare agent can locate per-spec epic artifacts without skill teaching. If this scenario ever fails, the marker schema or fixture shape has regressed — the per-spec layout has stopped being self-explanatory from the marker alone.
 
 ## Scenario
 

@@ -72,7 +72,7 @@ All three assertions grade the single returned bash code block. The agent must r
 
 ## Trials
 
-3
+5
 
 ## Version
 

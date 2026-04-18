@@ -44,7 +44,7 @@ ${PROJECT_ROOT}
 
 ## Max Turns
 
-8
+15
 
 ## Assertions
 

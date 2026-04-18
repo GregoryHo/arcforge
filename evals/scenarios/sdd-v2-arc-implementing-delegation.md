@@ -9,11 +9,11 @@ arc-implementing is an **orchestrator** — when asked to implement a feature in
 
 ## Scenario
 
-You are in an arcforge worktree. The epic has one feature (`feat-parser`) defined in `specs/demo/epics/epic-a/features/feat-parser.md`. Implement this feature.
+You are in an arcforge worktree. The epic has one feature (`feat-parser`) defined in `specs/demo/epics/epic-a/features/feat-parser.md`. Do the right thing to make progress on this feature — use whatever arcforge-toolkit approach you consider appropriate. When you reach a natural stopping point, summarise what you did.
 
 ## Context
 
-This is a v2 arcforge worktree. Feature-level implementation is orchestrated through arc-implementing's Phase 2a (break feature into tasks via arc-writing-tasks) before Phase 2b (execute tasks). DO NOT write implementation code until a tasks file exists. Produce the tasks file first; then you may stop — do not implement code, just confirm the tasks file path.
+This is a v2 arcforge worktree. You have access to standard tools (Read, Write, Edit, Bash, Task, etc.). Use your judgement on how to approach feature work in an arcforge project.
 
 ## Setup
 
@@ -56,22 +56,24 @@ ${PROJECT_ROOT}
 
 ## Max Turns
 
-12
+15
 
 ## Assertions
 
-- [ ] The agent produces a tasks file at `docs/tasks/feat-parser-tasks.md` (or a near-equivalent path under `docs/tasks/`) containing at least 2 numbered tasks with exact code and test commands.
-- [ ] The agent's final response explicitly references the tasks file it created (path or filename), confirming the delegation happened.
-- [tool_not_called] Write:src/parser.js
-- [tool_not_called] Edit:src/parser.js
+- [tool_called] Write:docs/tasks
+- [tool_count] Task >= 1
 
 ## Grader
 
-mixed
+behavioral
 
 ## Grader Config
 
-Text assertions check the agent's final textual confirmation and the tasks file content. Behavioral assertions ensure the agent did NOT jump straight to writing implementation code. A passing treatment agent decomposes the feature into a tasks file first; a baseline agent typically goes straight to writing `src/parser.js`.
+Pure behavioral — no text judgment. Two independent positive signals:
+- Did the agent produce a tasks breakdown at `docs/tasks/` (arc-writing-tasks delegation)?
+- Did the agent spawn at least one Task subagent (arc-agent-driven execution)?
+
+Both together reflect the arc-implementing → arc-writing-tasks → arc-agent-driven orchestration chain the skill teaches. A baseline agent without that orchestration knowledge typically writes `src/parser.js` directly without creating a tasks file or spawning subagents.
 
 ## Trials
 

@@ -13,7 +13,7 @@ I'm at the base of this arcforge project. I have time to monitor — please disp
 
 ## Context
 
-Multi-epic parallel dispatch with a human lead present maps to arc-dispatching-teammates. Cross-spec dispatch is an open question (deferred in SDD v2); the skill's precondition #2 requires single-spec dispatch. If ready epics span multiple specs, the agent must report blocked and ask the user to choose.
+You're in the base checkout of an arcforge project. `arcforge status --json` shows the current DAG state. Use whatever arcforge-toolkit approach is appropriate for multi-epic parallel dispatch with a human lead present.
 
 ## Setup
 
@@ -58,7 +58,7 @@ ${PROJECT_ROOT}
 
 ## Max Turns
 
-8
+12
 
 ## Assertions
 

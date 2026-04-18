@@ -2,10 +2,10 @@
 
 ## Scope
 
-workflow
+agent
 
 ## Target
-arc-dispatching-parallel groups features into parallel waves based on dependency independence. Features with outstanding dependencies MUST wait; independent features go in the same wave.
+Regression guard: given a feature DAG with mixed dependencies, an agent can correctly partition features into parallel-now vs must-wait groups using the `depends_on` structure. This is generic dependency-graph reasoning; baseline and treatment both pass at ceiling in piloting. Kept as a regression guard — if this ever drops below 100%, the agent's basic DAG comprehension has regressed.
 
 ## Scenario
 

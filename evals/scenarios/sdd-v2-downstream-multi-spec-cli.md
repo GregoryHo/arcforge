@@ -65,7 +65,7 @@ ${PROJECT_ROOT}
 
 - [ ] The agent's final answer identifies exactly two ready epic IDs: `epic-auth-login` and `epic-billing-charge`.
 - [ ] The agent's final answer does NOT include `epic-auth-mfa` (which depends on `epic-auth-login` and is therefore not ready).
-- [tool_called] Bash:arcforge status
+- [tool_called] Bash:cli.js status
 - [tool_not_called] Bash:cat dag.yaml
 
 ## Grader
