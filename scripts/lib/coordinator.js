@@ -23,16 +23,61 @@ const EXPAND_LOCK_TIMEOUT = 30000; // git worktree add + fs ops
 const MERGE_LOCK_TIMEOUT = 60000; // git merge can be slow on large repos
 
 /**
- * Coordinator class - manages DAG operations
+ * Coordinator class - manages DAG operations for a single spec
+ *
+ * Each Coordinator instance is scoped to exactly one spec. The dag.yaml
+ * path is lazy-resolved on first access via priority: explicit specId →
+ * `.arcforge-epic` marker in cwd → throw with actionable message.
+ *
+ * Cross-spec aggregations (multi-spec sync / reboot) are module-level
+ * functions (syncAllSpecs, rebootAllSpecs) rather than instance methods,
+ * because they deliberately do not belong to a single-spec scope.
  */
 class Coordinator {
   /**
    * @param {string} projectRoot - Project root directory
+   * @param {string|null} [specId=null] - Spec id. When null, resolved lazily
+   *   from `.arcforge-epic` marker on first dagPath/DAG access.
    */
-  constructor(projectRoot) {
+  constructor(projectRoot, specId = null) {
     this.projectRoot = path.resolve(projectRoot);
-    this.dagPath = path.join(this.projectRoot, 'dag.yaml');
+    this.specId = specId;
+    this._dagPath = null; // lazy — resolved on first access
     this._dag = null;
+  }
+
+  /**
+   * Lazy dag.yaml path. Resolves on first access and caches the result.
+   * Resolution priority:
+   *   1. Explicit specId from constructor → `specs/<specId>/dag.yaml`
+   *   2. `.arcforge-epic` marker in projectRoot → spec_id field
+   *   3. Throw with migration guidance.
+   *
+   * Kept lazy so pure utilities (_findBaseWorktree, _isInWorktree,
+   * multi-spec CLI probes) that never touch the DAG don't force a throw.
+   */
+  get dagPath() {
+    if (this._dagPath !== null) return this._dagPath;
+    this._dagPath = this._resolveDagPath();
+    return this._dagPath;
+  }
+
+  _resolveDagPath() {
+    if (this.specId) {
+      return path.join(this.projectRoot, 'specs', this.specId, 'dag.yaml');
+    }
+    const markerPath = path.join(this.projectRoot, '.arcforge-epic');
+    if (fs.existsSync(markerPath)) {
+      const data = parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
+      if (data.spec_id) {
+        this.specId = data.spec_id;
+        return path.join(this.projectRoot, 'specs', data.spec_id, 'dag.yaml');
+      }
+    }
+    throw new Error(
+      'Cannot resolve dag.yaml path: no specId provided and .arcforge-epic has no spec_id. ' +
+        'Pass specId explicitly, run from a v2 worktree, or run `arcforge backfill-markers` on legacy worktrees.',
+    );
   }
 
   /**
@@ -256,15 +301,17 @@ class Coordinator {
             continue;
           }
 
-          const worktreePath = getWorktreePath(this.projectRoot, epic.id);
+          const worktreePath = getWorktreePath(this.projectRoot, this.specId, epic.id);
           const result = this._runGit(['worktree', 'add', worktreePath, '-b', epic.id]);
           if (result.exitCode !== 0) {
             throw new Error(`Failed to create worktree for ${epic.id}: ${result.stderr.trim()}`);
           }
 
-          // Create .arcforge-epic marker
+          // Create .arcforge-epic marker (spec_id lets sync/merge reconnect
+          // the worktree to the correct per-spec dag.yaml at the base.)
           const epicData = {
             epic: epic.id,
+            spec_id: this.specId,
             base_worktree: this.projectRoot,
             base_branch: this._currentBranch(),
             local: {
@@ -342,9 +389,10 @@ class Coordinator {
       throw new Error('Base worktree not found via git worktree list');
     }
 
-    // If not in base, delegate to base coordinator
+    // If not in base, delegate to base coordinator (inherit specId so
+    // the base-side load targets the correct per-spec dag.yaml).
     if (basePath !== this.projectRoot) {
-      const baseCoord = new Coordinator(basePath);
+      const baseCoord = new Coordinator(basePath, this.specId);
       return baseCoord._mergeEpicsInBase(baseBranch, resolvedEpicIds);
     }
 
@@ -583,7 +631,7 @@ class Coordinator {
     const basePath = this._findBaseWorktree();
     if (!basePath) return false;
 
-    const baseCoord = new Coordinator(basePath);
+    const baseCoord = new Coordinator(basePath, this.specId);
 
     return this._dagTransaction(() => {
       let updated = false;
@@ -608,7 +656,7 @@ class Coordinator {
     const result = new SyncResult({ epic_id: epicFile.epic });
 
     if (direction === 'from_base' || direction === 'both') {
-      const baseCoord = new Coordinator(basePath);
+      const baseCoord = new Coordinator(basePath, this.specId);
       const dagEpic = baseCoord.dag.getEpic(epicFile.epic);
       if (dagEpic) {
         epicFile.synced = {
@@ -625,7 +673,7 @@ class Coordinator {
     }
 
     if (direction === 'to_base' || direction === 'both') {
-      const baseCoord = new Coordinator(basePath);
+      const baseCoord = new Coordinator(basePath, this.specId);
       const local = epicFile.local || {};
       if (local.status) {
         const validStatus = normalizeStatus(local.status);
@@ -744,9 +792,10 @@ class Coordinator {
     if (path.isAbsolute(worktreeValue)) {
       return worktreeValue;
     }
-    // epic-id (no separators) → derive via helper.
+    // epic-id (no separators) → derive via helper. The hash now folds
+    // specId in so same-epic-id across specs produces distinct paths.
     if (!worktreeValue.includes('/') && !worktreeValue.includes(path.sep)) {
-      return getWorktreePath(this.projectRoot, worktreeValue);
+      return getWorktreePath(this.projectRoot, this.specId, worktreeValue);
     }
     // Legacy relative path (pre-migration fixture) — resolve against project root.
     return path.join(this.projectRoot, worktreeValue);
@@ -759,6 +808,11 @@ class Coordinator {
     }
     const content = fs.readFileSync(marker, 'utf8');
     const data = parseDagYaml(content);
+    // Side-effect: cache spec_id so any subsequent dagPath access
+    // doesn't re-read the marker file.
+    if (data.spec_id && !this.specId) {
+      this.specId = data.spec_id;
+    }
     return data.epic || null;
   }
 
@@ -900,4 +954,122 @@ class Coordinator {
   }
 }
 
-module.exports = { Coordinator };
+// ==================== Cross-spec module-level operations ====================
+//
+// These aggregate across every `specs/<id>/dag.yaml` in the project. They
+// intentionally do not live on a Coordinator instance because a Coordinator
+// is scoped to exactly one spec — its instance _dagTransaction reads
+// `this.dagPath`, which a multi-spec operation cannot honour.
+//
+// Concurrency: a single project-level withLock covers the whole iteration,
+// so cross-spec reads and writes never interleave with in-flight single-spec
+// transactions on any member spec.
+
+/**
+ * List every `specs/<id>/dag.yaml` that currently exists in the project.
+ * @param {string} projectRoot
+ * @returns {Array<{specId: string, dagPath: string}>}
+ */
+function listSpecDagPaths(projectRoot) {
+  const specsRoot = path.join(projectRoot, 'specs');
+  if (!fs.existsSync(specsRoot)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(specsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dagPath = path.join(specsRoot, entry.name, 'dag.yaml');
+    if (fs.existsSync(dagPath)) {
+      out.push({ specId: entry.name, dagPath });
+    }
+  }
+  return out;
+}
+
+/**
+ * Aggregate base-side sync across every spec in the project. Each member
+ * spec's dag.yaml is scanned for epics whose worktree markers advertise a
+ * newer status; matches are pulled into the dag.
+ *
+ * @param {string} projectRoot
+ * @returns {{ specs: Object<string, SyncResult> }} Per-spec results keyed by spec id.
+ */
+function syncAllSpecs(projectRoot) {
+  return withLock(projectRoot, () => {
+    const specs = {};
+    for (const { specId, dagPath } of listSpecDagPaths(projectRoot)) {
+      try {
+        specs[specId] = _syncSpecDagInline(projectRoot, specId, dagPath);
+      } catch (err) {
+        specs[specId] = { error: err.message };
+      }
+    }
+    return { specs };
+  });
+}
+
+// Inline single-spec sync — matches Coordinator.prototype._syncBase but
+// without _dagTransaction's nested withLock. Reached only from
+// syncAllSpecs, which already holds the project-level lock; calling the
+// instance method here would deadlock (file-based locks are not
+// re-entrant).
+function _syncSpecDagInline(projectRoot, specId, dagPath) {
+  const original = fs.readFileSync(dagPath, 'utf8');
+  const dag = DAG.fromObject(parseDagYaml(original));
+  const coord = new Coordinator(projectRoot, specId);
+  const updates = [];
+  let scanned = 0;
+
+  for (const epic of dag.epics) {
+    if (!epic.worktree) continue;
+    const worktreePath = coord._resolveWorktreePath(epic.worktree);
+    const markerPath = path.join(worktreePath, '.arcforge-epic');
+    if (!fs.existsSync(markerPath)) continue;
+
+    const epicData = parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
+    const local = epicData.local || {};
+    if (local.status) {
+      const validStatus = normalizeStatus(local.status);
+      const oldStatus = epic.status;
+      if (validStatus !== oldStatus) {
+        epic.status = validStatus;
+        updates.push({
+          epic: epicData.epic,
+          old_status: oldStatus,
+          new_status: validStatus,
+        });
+      }
+    }
+    scanned++;
+  }
+
+  const newContent = stringifyDagYaml(dag.toObject());
+  if (newContent !== original) {
+    fs.writeFileSync(dagPath, newContent);
+  }
+  return { scanned, updates };
+}
+
+/**
+ * Aggregate reboot context across every spec in the project.
+ *
+ * @param {string} projectRoot
+ * @returns {{ specs: Object<string, Object>, totals: Object }}
+ */
+function rebootAllSpecs(projectRoot) {
+  const specs = {};
+  const totals = { completed_count: 0, remaining_count: 0, blocked_count: 0 };
+  for (const { specId } of listSpecDagPaths(projectRoot)) {
+    const coord = new Coordinator(projectRoot, specId);
+    try {
+      const ctx = coord.rebootContext();
+      specs[specId] = ctx;
+      totals.completed_count += ctx.completed_count;
+      totals.remaining_count += ctx.remaining_count;
+      totals.blocked_count += ctx.blocked_count;
+    } catch (err) {
+      specs[specId] = { error: err.message };
+    }
+  }
+  return { specs, totals };
+}
+
+module.exports = { Coordinator, listSpecDagPaths, syncAllSpecs, rebootAllSpecs };

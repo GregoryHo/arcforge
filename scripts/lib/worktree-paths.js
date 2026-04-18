@@ -54,12 +54,17 @@ function sanitizeProjectName(name) {
 }
 
 /**
- * Return the first 6 hex chars of sha256(absolutePath), normalizing any
- * trailing separator so /foo and /foo/ produce the same hash.
+ * Return the first 6 hex chars of sha256(absolutePath[:specId]),
+ * normalizing any trailing separator so /foo and /foo/ produce the same
+ * hash. When specId is provided, it is folded into the hash input so
+ * the same epic id across different specs produces different worktree
+ * paths without changing the directory-name regex.
+ *
  * @param {string} absolutePath
+ * @param {string|null} [specId]
  * @returns {string}
  */
-function hashRepoPath(absolutePath) {
+function hashRepoPath(absolutePath, specId = null) {
   if (typeof absolutePath !== 'string') {
     throw new TypeError('hashRepoPath requires a string');
   }
@@ -67,23 +72,34 @@ function hashRepoPath(absolutePath) {
     throw new Error(`hashRepoPath requires an absolute path, got: ${absolutePath}`);
   }
   const normalized = stripTrailingSlash(absolutePath);
-  return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, HASH_LENGTH);
+  const input = specId ? `${normalized}\u0000${specId}` : normalized;
+  return crypto.createHash('sha256').update(input).digest('hex').slice(0, HASH_LENGTH);
 }
 
 /**
- * Compose the worktree path for a given project + epic.
+ * Compose the worktree path for a given project + spec + epic.
+ *
+ * The spec id is folded into the 6-char hash rather than exposed as a
+ * separate directory-name segment, so WORKTREE_NAME_RE stays stable
+ * (existing parsers keep working). Distinct specs with the same epic
+ * id still produce distinct paths because the hash input differs.
  *
  * @param {string} projectRoot - Absolute path to the repository root.
+ * @param {string|null} specId - Spec identifier (null falls back to
+ *   legacy single-spec hash; useful for pre-migration call sites).
  * @param {string} epicId - Epic identifier (e.g. "epic-001").
  * @param {string} [homeDir] - Override for the home directory (for tests).
  * @returns {string} Absolute worktree path.
  */
-function getWorktreePath(projectRoot, epicId, homeDir) {
+function getWorktreePath(projectRoot, specId, epicId, homeDir) {
   if (typeof projectRoot !== 'string' || !projectRoot) {
     throw new TypeError('getWorktreePath requires a non-empty projectRoot string');
   }
   if (!path.isAbsolute(projectRoot)) {
     throw new Error(`getWorktreePath requires an absolute projectRoot, got: ${projectRoot}`);
+  }
+  if (specId !== null && (typeof specId !== 'string' || !specId.trim())) {
+    throw new TypeError('getWorktreePath requires a non-empty specId string or null');
   }
   if (typeof epicId !== 'string' || !epicId.trim()) {
     throw new TypeError('getWorktreePath requires a non-empty epicId string');
@@ -91,7 +107,7 @@ function getWorktreePath(projectRoot, epicId, homeDir) {
 
   const normalizedRoot = stripTrailingSlash(projectRoot);
   const projectName = sanitizeProjectName(path.basename(normalizedRoot));
-  const hash = hashRepoPath(normalizedRoot);
+  const hash = hashRepoPath(normalizedRoot, specId);
   const dirName = `${projectName}-${hash}-${epicId}`;
   return path.join(getWorktreeRoot(homeDir), dirName);
 }
