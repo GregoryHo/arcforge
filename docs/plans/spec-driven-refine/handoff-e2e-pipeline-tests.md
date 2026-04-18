@@ -272,6 +272,41 @@ After the fresh agent reads this file and proposes a fixture shape, approve/modi
 
 ---
 
+## 9.6 · Upstream eval state after new scenarios (Task 1/2/3 this session)
+
+Two new upstream scenarios added to close the zero-coverage gap on
+arc-brainstorming and arc-planning, and the iteration-reliability rerun
+was extended.
+
+| Scenario | Scope | Verdict | Detail |
+|---|---|---|---|
+| `arc-brainstorming-gamma-mode-structure` (new) | workflow | regression guard | Baseline 3/3, treatment 3/3 — bare agents produce `## Context` + `## Change Intent` structure from fixture path cues alone. Keep as a guard: if this drops below 100%, gamma mode is no longer inferable. |
+| `arc-planning-delta-scoped-sprint` (new) | workflow | **NEEDS WORK** (delta −0.07, partial skill effect) | A1+A2 (archive old DAG): baseline 2/3, treatment 3/3 — skill reliably teaches archive discipline. A3+A4 (include delta refs) + A5 (exclude non-delta refs): baseline 3/3, treatment 1/3 — **treatment sometimes archives correctly then writes wrong DAG content**, ignoring delta scope or missing new refs. Skill's sprint-model teaching is partial — investigate why treatment's content quality degrades. |
+| `arc-refining-iteration-reliability` rerun | agent | recent 5/5 PASS, pooled 21/23 = 91% NEEDS WORK | Trajectory is up; pool is dragged by pre-parser-fix history. To reach SHIP threshold of ~95%+ pooled, need either ~20 more consecutive PASS trials or a benchmark-archival step. |
+
+### Task 3 outcome: iteration-delta catastrophic outlier is not a regression
+
+The iteration-delta treatment trial that failed all 7 assertions had the
+agent asking a clarifying question ("Should `oauth_provider` be a separate
+requirement or folded into the OAuth Login requirement?") instead of
+producing the spec. This is arc-refining's own discipline (SKILL.md line 24:
+"iterative refinement — ask 2-3 clarifying questions per iteration") firing
+correctly in a headless environment where no human can answer. The agent
+waits until max_turns and produces no output.
+
+**Implication**: iteration-delta scenario is **headless-incompatible** with
+arc-refining's skill design. Either:
+- Modify scenario Context to "no clarifying questions — make reasonable
+  assumptions", which forces the agent past the skill's discipline (but
+  masks real skill behaviour)
+- Accept this scenario as "runs only in interactive mode" and not count
+  its verdict against SHIP-readiness
+- Rewrite arc-refining to detect headless context and skip clarifying
+  questions (biggest skill change, probably too far)
+
+Leaving unchanged for now; documented here so the pattern isn't
+rediscovered.
+
 ## 9.5 · Upstream eval state after parser-fix rerun
 
 All three upstream evals were rerun after the parser bug fix. Verdicts
