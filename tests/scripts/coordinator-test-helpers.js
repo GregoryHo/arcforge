@@ -6,6 +6,9 @@ const { execFileSync } = require('node:child_process');
 const { stringifyDagYaml, parseDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
 
+/** Spec id used by default fixtures — tests pass this to Coordinator. */
+const DEFAULT_SPEC_ID = 'test-spec';
+
 /**
  * Run a git command in the given directory. Returns stdout.
  */
@@ -14,14 +17,17 @@ function runGit(args, cwd) {
 }
 
 /**
- * Create a temporary git repo with a dag.yaml containing two pending epics.
+ * Create a temporary git repo with a per-spec dag.yaml containing two
+ * pending epics at `specs/<specId>/dag.yaml`.
+ *
  * @param {Object} [options]
  * @param {string} [options.prefix] - tmpdir prefix (default: 'arcforge-test-')
+ * @param {string} [options.specId] - spec id (default: 'test-spec')
  * @param {string[]} [options.createBranches] - epic IDs to create as branches with commits
  * @returns {string} Absolute path to the repo root
  */
 function setupRepo(options = {}) {
-  const { prefix = 'arcforge-test-', createBranches = [] } = options;
+  const { prefix = 'arcforge-test-', createBranches = [], specId = DEFAULT_SPEC_ID } = options;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 
   runGit(['init', '-q', '-b', 'main'], root);
@@ -36,7 +42,7 @@ function setupRepo(options = {}) {
       {
         id: 'epic-a',
         name: 'Epic A',
-        spec_path: 'specs/epic-a.md',
+        spec_path: `specs/${specId}/epics/epic-a/epic.md`,
         status: TaskStatus.PENDING,
         worktree: null,
         depends_on: [],
@@ -45,7 +51,7 @@ function setupRepo(options = {}) {
       {
         id: 'epic-b',
         name: 'Epic B',
-        spec_path: 'specs/epic-b.md',
+        spec_path: `specs/${specId}/epics/epic-b/epic.md`,
         status: TaskStatus.PENDING,
         worktree: null,
         depends_on: [],
@@ -54,7 +60,9 @@ function setupRepo(options = {}) {
     ],
     blocked: [],
   };
-  fs.writeFileSync(path.join(root, 'dag.yaml'), stringifyDagYaml(dagData));
+  const dagDir = path.join(root, 'specs', specId);
+  fs.mkdirSync(dagDir, { recursive: true });
+  fs.writeFileSync(path.join(dagDir, 'dag.yaml'), stringifyDagYaml(dagData));
 
   for (const id of createBranches) {
     runGit(['checkout', '-q', '-b', id], root);
@@ -69,9 +77,11 @@ function setupRepo(options = {}) {
 
 /**
  * Read and parse dag.yaml from disk.
+ * @param {string} root - repo root
+ * @param {string} [specId] - spec id (default: 'test-spec')
  */
-function readDagFromDisk(root) {
-  const content = fs.readFileSync(path.join(root, 'dag.yaml'), 'utf8');
+function readDagFromDisk(root, specId = DEFAULT_SPEC_ID) {
+  const content = fs.readFileSync(path.join(root, 'specs', specId, 'dag.yaml'), 'utf8');
   return parseDagYaml(content);
 }
 
@@ -95,4 +105,4 @@ function cleanupWorktrees(root) {
   }
 }
 
-module.exports = { runGit, setupRepo, readDagFromDisk, cleanupWorktrees };
+module.exports = { runGit, setupRepo, readDagFromDisk, cleanupWorktrees, DEFAULT_SPEC_ID };
