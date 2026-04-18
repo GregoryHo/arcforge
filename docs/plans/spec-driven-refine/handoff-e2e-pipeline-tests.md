@@ -272,6 +272,24 @@ After the fresh agent reads this file and proposes a fixture shape, approve/modi
 
 ---
 
+## 9.5 · Upstream eval state after parser-fix rerun
+
+All three upstream evals were rerun after the parser bug fix. Verdicts
+did NOT improve in aggregate — the fix made grading more honest, not
+more passing.
+
+| Eval | Verdict | Latest k=3 trials | Interpretation |
+|---|---|---|---|
+| `arc-refining-calls-sdd-utils` | **SHIP** | baseline 3/3, treatment 3/3 | Non-discriminative — both conditions at ceiling. Treat as regression guard, not skill signal. |
+| `arc-refining-iteration-delta` | **BLOCKED** | baseline 3/3, treatment 2/3 (1 catastrophic: A1-A7 all ✗) | Real regression outlier in treatment. Investigate the failed trial's transcript; may need scenario redesign or k=10 to tell noise from signal. |
+| `arc-refining-iteration-reliability` | **NEEDS WORK** (89% over 18 pooled trials) | latest 3/3 PASS | Trajectory is up. A few more k=3 reruns should push the pooled pass rate past SHIP threshold without scenario changes. |
+
+**arc-brainstorming eval coverage: zero.**
+**arc-planning direct eval coverage: zero** (only indirectly via arc-refining's sdd-utils call).
+
+These two upstream gaps are the biggest "bug could ship and hit a user"
+risks right now.
+
 ## 10 · If the new session wants to change course
 
 These are the questions worth reconsidering with a fresh mind:
