@@ -428,8 +428,8 @@ Key implementation decisions:
   each of the three epic IDs). Failures abort before the diff stage.
 - **--apply uses `rsync -a --delete`** — correctly handles the case where
   regeneration produces fewer files than the current fixture.
-- **Timeout env vars** — `SDD_REGEN_REFINE_TIMEOUT` +
-  `SDD_REGEN_PLAN_TIMEOUT` (default 600s each).
+- **Timeout env vars** — `SDD_V2_REGEN_REFINE_TIMEOUT` +
+  `SDD_V2_REGEN_PLAN_TIMEOUT` (default 600s each).
 
 ### All phases complete
 

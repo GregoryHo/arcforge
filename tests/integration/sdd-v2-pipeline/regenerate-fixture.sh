@@ -1,36 +1,20 @@
 #!/usr/bin/env bash
-# regenerate-fixture.sh — Regenerate the SDD v2 pipeline fixture from its design seed.
+# regenerate-fixture.sh — Rebuild specs/demo-spec/spec.xml, details/, dag.yaml
+# and epics/ from the design.md seed via arc-refining + arc-planning.
 #
-# Rebuilds the structured downstream artifacts (spec.xml, details/, dag.yaml,
-# epics/) by re-running arc-refining and arc-planning against the existing
-# design.md. Shows a diff against the current fixture so you can review before
-# applying.
-#
-# NEVER re-runs arc-brainstorming. design.md is the human-managed seed.
-# Upstream design decisions are managed by humans; downstream structured
-# outputs are regenerable from that fixed seed.
-#
-# Regenerated outputs (only these):
-#   specs/demo-spec/spec.xml
-#   specs/demo-spec/details/
-#   specs/demo-spec/dag.yaml
-#   specs/demo-spec/epics/
-#
-# Reproducibility constraints. The fixture's DAG shape (3 epics, 6 features,
-# diamond deps) is load-bearing — downstream test scripts hardcode assertions
-# against specific IDs like fr-parser-001 and epic-integration. The prompts
-# below pin every such ID and dependency so regeneration produces a STABLE
-# DAG shape that the existing tests can still pass against. Removing these
-# constraints would let arc-planning rename epics / reorder features on a
-# whim and break every downstream test.
+# design.md is human-managed and never regenerated. The prompts below pin
+# every requirement ID, epic ID, and dependency so regeneration produces
+# a stable DAG shape — downstream tests assert against these IDs. See
+# docs/plans/spec-driven-refine/handoff-e2e-pipeline-tests.md §11 for the
+# full rationale.
 #
 # Usage:
 #   ./regenerate-fixture.sh           # diff only, print apply command
 #   ./regenerate-fixture.sh --apply   # copy results back into fixture/
 #
 # Env overrides:
-#   SDD_REGEN_REFINE_TIMEOUT   arc-refining timeout in seconds (default 600)
-#   SDD_REGEN_PLAN_TIMEOUT     arc-planning timeout in seconds (default 600)
+#   SDD_V2_REGEN_REFINE_TIMEOUT   arc-refining timeout in seconds (default 600)
+#   SDD_V2_REGEN_PLAN_TIMEOUT     arc-planning timeout in seconds (default 600)
 
 set -euo pipefail
 
@@ -123,7 +107,7 @@ Pin these values exactly (do not rename, reorder, or substitute):
 
 Version: treat as v1 initial spec (spec_version 1, empty supersedes, delta version 1 iteration 2026-04-17 listing all six requirements as added)."
 
-REFINE_TIMEOUT="${SDD_REGEN_REFINE_TIMEOUT:-600}"
+REFINE_TIMEOUT="${SDD_V2_REGEN_REFINE_TIMEOUT:-600}"
 timeout --kill-after=30 "$REFINE_TIMEOUT" \
     claude -p "$REFINE_PROMPT" \
         --plugin-dir "$ARCFORGE_ROOT" \
@@ -135,7 +119,7 @@ timeout --kill-after=30 "$REFINE_TIMEOUT" \
         EXIT_STATUS=$?
         if [ "$EXIT_STATUS" -eq 124 ]; then
             echo "  ERROR: arc-refining timed out after ${REFINE_TIMEOUT}s"
-            echo "  Increase SDD_REGEN_REFINE_TIMEOUT or check $REFINE_LOG"
+            echo "  Increase SDD_V2_REGEN_REFINE_TIMEOUT or check $REFINE_LOG"
             exit 1
         fi
         echo "  WARN: claude -p exited with status $EXIT_STATUS — checking for output..."
@@ -192,7 +176,7 @@ Produce:
 - specs/demo-spec/epics/<epic-id>/epic.md for each of the three epics
 - specs/demo-spec/epics/<epic-id>/features/<feature-id>.md for each of the six features"
 
-PLAN_TIMEOUT="${SDD_REGEN_PLAN_TIMEOUT:-600}"
+PLAN_TIMEOUT="${SDD_V2_REGEN_PLAN_TIMEOUT:-600}"
 timeout --kill-after=30 "$PLAN_TIMEOUT" \
     claude -p "$PLAN_PROMPT" \
         --plugin-dir "$ARCFORGE_ROOT" \
@@ -204,7 +188,7 @@ timeout --kill-after=30 "$PLAN_TIMEOUT" \
         EXIT_STATUS=$?
         if [ "$EXIT_STATUS" -eq 124 ]; then
             echo "  ERROR: arc-planning timed out after ${PLAN_TIMEOUT}s"
-            echo "  Increase SDD_REGEN_PLAN_TIMEOUT or check $PLAN_LOG"
+            echo "  Increase SDD_V2_REGEN_PLAN_TIMEOUT or check $PLAN_LOG"
             exit 1
         fi
         echo "  WARN: claude -p exited with status $EXIT_STATUS — checking for output..."
@@ -235,14 +219,14 @@ for f in "${REQUIRED_FILES[@]}"; do
 done
 
 if [ -f "$WORK_DIR/specs/demo-spec/dag.yaml" ]; then
-    for epic_id in epic-parser epic-formatter epic-integration; do
-        if grep -q "$epic_id" "$WORK_DIR/specs/demo-spec/dag.yaml"; then
-            echo "  [OK] dag.yaml references $epic_id"
-        else
-            echo "  [MISSING] dag.yaml does not reference $epic_id"
-            PLAN_FAILED=$((PLAN_FAILED+1))
-        fi
-    done
+    EPIC_HITS=$(grep -cE 'epic-parser|epic-formatter|epic-integration' \
+        "$WORK_DIR/specs/demo-spec/dag.yaml" || echo 0)
+    if [ "$EPIC_HITS" -ge 3 ]; then
+        echo "  [OK] dag.yaml references all three epics ($EPIC_HITS hits)"
+    else
+        echo "  [MISSING] dag.yaml missing one or more epic IDs (only $EPIC_HITS hits)"
+        PLAN_FAILED=$((PLAN_FAILED+1))
+    fi
 fi
 
 if [ "$PLAN_FAILED" -gt 0 ]; then

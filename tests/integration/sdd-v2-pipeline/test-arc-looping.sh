@@ -13,16 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=./test-helpers.sh
 source "$SCRIPT_DIR/test-helpers.sh"
 
-TIMESTAMP=$(date +%s)
-TRIAL_BASE="/tmp/arcforge-tests/$TIMESTAMP/sdd-v2-pipeline/arc-looping"
-PROJECT_DIR="$TRIAL_BASE/project"
-LOG_FILE="$TRIAL_BASE/claude-output.json"
-mkdir -p "$TRIAL_BASE"
-
-echo "=== SDD v2 Pipeline — arc-looping (DAG pattern) ==="
-echo "Trial dir:  $TRIAL_BASE"
-echo "Plugin dir: $ARCFORGE_ROOT"
-echo ""
+setup_trial_dir "arc-looping"
 
 echo ">>> Scaffolding fixture into trial dir..."
 "$SCRIPT_DIR/fixture/scaffold.sh" "$PROJECT_DIR"
@@ -34,17 +25,7 @@ cd "$PROJECT_DIR"
 PROMPT="You have a per-spec DAG at specs/demo-spec/dag.yaml with three epics (epic-parser, epic-formatter, epic-integration — the last depends on both roots). Use the arc-looping skill to run this DAG unattended with the DAG pattern. Cap the run at 3 iterations (--max-runs 3) so the test completes quickly. Invoke the arcforge loop CLI directly; do not try to do the work by hand. Do not use the sequential pattern."
 
 TIMEOUT_SECONDS="${SDD_V2_LOOPING_TIMEOUT:-1200}"
-timeout --kill-after=30 "$TIMEOUT_SECONDS" \
-    claude -p "$PROMPT" \
-        --plugin-dir "$ARCFORGE_ROOT" \
-        --dangerously-skip-permissions \
-        --output-format stream-json \
-        --verbose \
-    > "$LOG_FILE" 2>&1 \
-    || {
-        echo "(claude -p exited non-zero; first 20 lines of log:)"
-        head -20 "$LOG_FILE" | sed 's/^/    /' || true
-    }
+run_claude_p "$PROMPT" "$TIMEOUT_SECONDS" "$LOG_FILE"
 
 echo ""
 echo ">>> Assertions (against project: $PROJECT_DIR)"

@@ -2,12 +2,21 @@
 # Helpers for SDD v2 pipeline e2e tests.
 #
 # Source this file from each test-*.sh. It re-exports the shared bash
-# assertions from tests/integration/claude-code/test-helpers.sh and adds
-# four SDD-v2-specific helpers:
-#   - assert_file_exists <path> <test_name>
-#   - assert_file_contains <path> <pattern> <test_name>
-#   - assert_json_field <json_path> <jq_expr> <expected> <test_name>
-#   - extract_tool_calls <stream_json_log>  (writes matching lines to stdout)
+# assertions from tests/integration/claude-code/test-helpers.sh and adds:
+#
+#   Trial-dir setup:
+#     setup_trial_dir <name>           sets TRIAL_BASE, PROJECT_DIR, LOG_FILE
+#     cleanup_trial_worktree <path>    rm -rf a worktree if it exists
+#
+#   claude -p wrapper:
+#     run_claude_p <prompt> <timeout_seconds> <log_file> [extra_claude_args...]
+#
+#   Assertions:
+#     assert_file_exists <path> [test_name]
+#     assert_file_contains <path> <pattern> [test_name]
+#     assert_json_field <json> <jq_expr> <expected> [test_name]
+#     assert_json_predicate <json> <jq_expr> [test_name]
+#     extract_tool_calls <stream_json_log>      (prints lines to stdout)
 
 SDD_V2_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARCFORGE_ROOT="${ARCFORGE_ROOT:-$(cd "$SDD_V2_HELPERS_DIR/../../.." && pwd)}"
@@ -15,6 +24,56 @@ export ARCFORGE_ROOT
 
 # shellcheck source=/dev/null
 source "$ARCFORGE_ROOT/tests/integration/claude-code/test-helpers.sh"
+
+# setup_trial_dir — claim an isolated /tmp trial directory for a test run.
+# Sets globals: TRIAL_BASE, PROJECT_DIR, LOG_FILE. Prints a banner.
+setup_trial_dir() {
+    local name="$1"
+    local timestamp
+    timestamp=$(date +%s)
+    TRIAL_BASE="/tmp/arcforge-tests/$timestamp/sdd-v2-pipeline/$name"
+    PROJECT_DIR="$TRIAL_BASE/project"
+    LOG_FILE="$TRIAL_BASE/claude-output.json"
+    mkdir -p "$TRIAL_BASE"
+    echo "=== SDD v2 Pipeline — $name ==="
+    echo "Trial dir:  $TRIAL_BASE"
+    echo "Plugin dir: $ARCFORGE_ROOT"
+    echo ""
+}
+
+# run_claude_p — spawn `claude -p` for a test with the SDD-v2 standard flags
+# (--plugin-dir, --dangerously-skip-permissions, --output-format stream-json,
+# --verbose) under a timeout. On non-zero exit, dump the first 20 log lines
+# so the real error becomes visible (stream-json is not human-readable).
+# Extra args after <log_file> are passed through to claude (e.g. --max-turns).
+# Always returns 0 so callers can proceed to artifact-based assertions.
+run_claude_p() {
+    local prompt="$1"
+    local timeout_seconds="$2"
+    local log_file="$3"
+    shift 3
+    timeout --kill-after=30 "$timeout_seconds" \
+        claude -p "$prompt" \
+            --plugin-dir "$ARCFORGE_ROOT" \
+            --dangerously-skip-permissions \
+            --output-format stream-json \
+            --verbose \
+            "$@" \
+        > "$log_file" 2>&1 \
+        || {
+            echo "(claude -p exited non-zero; first 20 lines of log:)"
+            head -20 "$log_file" | sed 's/^/    /' || true
+        }
+    return 0
+}
+
+# cleanup_trial_worktree — remove a worktree directory created by arcforge
+# expand during a test. Tests typically call this only on success, leaving
+# the worktree in place on failure so the user can inspect it.
+cleanup_trial_worktree() {
+    local wt="$1"
+    [ -n "$wt" ] && [ -d "$wt" ] && rm -rf "$wt" || true
+}
 
 assert_file_exists() {
     local file_path="$1"
@@ -127,6 +186,9 @@ extract_tool_calls() {
         "$log_path" 2>/dev/null
 }
 
+export -f setup_trial_dir
+export -f run_claude_p
+export -f cleanup_trial_worktree
 export -f assert_file_exists
 export -f assert_file_contains
 export -f assert_json_field

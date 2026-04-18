@@ -18,16 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=./test-helpers.sh
 source "$SCRIPT_DIR/test-helpers.sh"
 
-TIMESTAMP=$(date +%s)
-TRIAL_BASE="/tmp/arcforge-tests/$TIMESTAMP/sdd-v2-pipeline/arc-dispatching-teammates"
-PROJECT_DIR="$TRIAL_BASE/project"
-LOG_FILE="$TRIAL_BASE/claude-output.json"
-mkdir -p "$TRIAL_BASE"
-
-echo "=== SDD v2 Pipeline — arc-dispatching-teammates ==="
-echo "Trial dir:  $TRIAL_BASE"
-echo "Plugin dir: $ARCFORGE_ROOT"
-echo ""
+setup_trial_dir "arc-dispatching-teammates"
 
 echo ">>> Scaffolding fixture into trial dir..."
 "$SCRIPT_DIR/fixture/scaffold.sh" "$PROJECT_DIR"
@@ -50,18 +41,7 @@ PROMPT="You are at the project root for a demo-spec project. The specs/demo-spec
 # 10-minute ceiling. We only need to see TeamCreate + Agent dispatch, not
 # full teammate execution. Cap turns to avoid expensive runaway.
 TIMEOUT_SECONDS="${SDD_V2_TEAMMATES_TIMEOUT:-600}"
-timeout --kill-after=30 "$TIMEOUT_SECONDS" \
-    claude -p "$PROMPT" \
-        --plugin-dir "$ARCFORGE_ROOT" \
-        --dangerously-skip-permissions \
-        --output-format stream-json \
-        --verbose \
-        --max-turns 25 \
-    > "$LOG_FILE" 2>&1 \
-    || {
-        echo "(claude -p exited non-zero; first 20 lines of log:)"
-        head -20 "$LOG_FILE" | sed 's/^/    /' || true
-    }
+run_claude_p "$PROMPT" "$TIMEOUT_SECONDS" "$LOG_FILE" --max-turns 25
 
 echo ""
 echo ">>> Assertions (against project: $PROJECT_DIR)"

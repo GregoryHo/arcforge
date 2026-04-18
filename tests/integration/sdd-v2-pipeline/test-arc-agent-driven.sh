@@ -13,16 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=./test-helpers.sh
 source "$SCRIPT_DIR/test-helpers.sh"
 
-TIMESTAMP=$(date +%s)
-TRIAL_BASE="/tmp/arcforge-tests/$TIMESTAMP/sdd-v2-pipeline/arc-agent-driven"
-PROJECT_DIR="$TRIAL_BASE/project"
-LOG_FILE="$TRIAL_BASE/claude-output.json"
-mkdir -p "$TRIAL_BASE"
-
-echo "=== SDD v2 Pipeline — arc-agent-driven ==="
-echo "Trial dir:  $TRIAL_BASE"
-echo "Plugin dir: $ARCFORGE_ROOT"
-echo ""
+setup_trial_dir "arc-agent-driven"
 
 echo ">>> Scaffolding fixture into trial dir..."
 "$SCRIPT_DIR/fixture/scaffold.sh" "$PROJECT_DIR"
@@ -81,17 +72,7 @@ PROMPT="You are inside an arcforge worktree for the epic-formatter epic. A task 
 
 # 15-minute ceiling for arc-agent-driven with a single 2-task list.
 TIMEOUT_SECONDS="${SDD_V2_AGENT_DRIVEN_TIMEOUT:-900}"
-timeout --kill-after=30 "$TIMEOUT_SECONDS" \
-    claude -p "$PROMPT" \
-        --plugin-dir "$ARCFORGE_ROOT" \
-        --dangerously-skip-permissions \
-        --output-format stream-json \
-        --verbose \
-    > "$LOG_FILE" 2>&1 \
-    || {
-        echo "(claude -p exited non-zero; first 20 lines of log:)"
-        head -20 "$LOG_FILE" | sed 's/^/    /' || true
-    }
+run_claude_p "$PROMPT" "$TIMEOUT_SECONDS" "$LOG_FILE"
 
 echo ""
 echo ">>> Assertions (against worktree: $WORKTREE_PATH)"
@@ -125,4 +106,7 @@ echo ""
 echo "=== arc-agent-driven test: $FAILED failure(s) ==="
 echo "Log: $LOG_FILE"
 echo "Worktree: $WORKTREE_PATH"
+
+[ "$FAILED" -eq 0 ] && cleanup_trial_worktree "$WORKTREE_PATH"
+
 exit $FAILED

@@ -87,13 +87,13 @@ structured outputs are regenerable from that fixed seed.
 
 - arc-implementing: default 25 min (`SDD_V2_IMPLEMENTING_TIMEOUT`)
 - arc-looping: default 20 min (`SDD_V2_LOOPING_TIMEOUT`)
-- regenerate-fixture arc-refining: default 10 min (`SDD_REGEN_REFINE_TIMEOUT`)
-- regenerate-fixture arc-planning: default 10 min (`SDD_REGEN_PLAN_TIMEOUT`)
+- regenerate-fixture arc-refining: default 10 min (`SDD_V2_REGEN_REFINE_TIMEOUT`)
+- regenerate-fixture arc-planning: default 10 min (`SDD_V2_REGEN_PLAN_TIMEOUT`)
 
 Override via env vars when debugging:
 ```bash
 SDD_V2_LOOPING_TIMEOUT=300 bash test-arc-looping.sh
-SDD_REGEN_REFINE_TIMEOUT=300 bash regenerate-fixture.sh
+SDD_V2_REGEN_REFINE_TIMEOUT=300 bash regenerate-fixture.sh
 ```
 
 ## Why not in npm test
