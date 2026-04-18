@@ -363,3 +363,49 @@ These are the questions worth reconsidering with a fresh mind:
 - Is it worth teaching the eval harness to parse `claude -p` stream-json directly, so we don't need a separate bash integration runner?
 
 These were considered and set aside this session, but a fresh session might reach different conclusions — that's fine.
+
+---
+
+## 11 · Phase C completion record
+
+**Branch:** `claude/elegant-mcnulty-f143a9` (cherry-picked Phase B from
+`claude/brave-maxwell-1cb5a8`, then added Phase C on top)
+
+**Commits added this session:**
+```
+a6b3719 test(integration): add fixture regeneration script (Phase C)
+c3c3a95 test(integration): add SDD v2 downstream e2e pipeline tests (Phase B)   [cherry-pick]
+7f9d202 docs(plans): record Phase A completion — arc-looping 5/5 PASS             [cherry-pick]
+```
+
+### Phase C — regenerate-fixture.sh
+
+`tests/integration/sdd-v2-pipeline/regenerate-fixture.sh` implements the
+fixture regeneration mechanism with a clear layering principle:
+
+```
+design.md           ← human-managed seed (never regenerated)
+spec.xml / details/ ← arc-refining output  (regenerable)
+dag.yaml / epics/   ← arc-planning output  (regenerable)
+```
+
+Key implementation decisions:
+- **No arc-brainstorming re-run** — design.md is the fixed seed.
+- **scripts/ symlink** — work dir symlinks `$ARCFORGE_ROOT/scripts` so
+  arc-refining's `require('./scripts/lib/sdd-utils')` resolves correctly.
+- **Headless-safe prompts** — both refining and planning prompts say
+  "headless regeneration run — do NOT ask questions; make assumptions"
+  to bypass the clarifying-question discipline (known headless-incompatible
+  pattern documented in section 9.6).
+- **--apply flag** — copies result back to fixture/; default is diff-only
+  so human can review before applying. Never auto-commits.
+- **Timeout env vars** — `SDD_REGEN_REFINE_TIMEOUT` + `SDD_REGEN_PLAN_TIMEOUT`
+  (default 600s each).
+
+### All phases complete
+
+Phase A, B, and C are all done. The integration test suite covers all 5
+downstream skills plus has a regeneration path. Next steps if any:
+- Merge `claude/elegant-mcnulty-f143a9` → `feature/spec-driven-refine`
+- Run Phase A/B tests manually on the current fixture to confirm green
+- Run `regenerate-fixture.sh --apply` after any upstream skill schema change
