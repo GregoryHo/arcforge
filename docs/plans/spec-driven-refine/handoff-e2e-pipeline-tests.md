@@ -325,6 +325,36 @@ more passing.
 These two upstream gaps are the biggest "bug could ship and hit a user"
 risks right now.
 
+## 9.7 · Phase A completion — both e2e tests PASS (this session)
+
+Phase A ran both integration tests end-to-end. Results:
+
+| Test | Assertions | Result | Commit |
+|---|---|---|---|
+| `test-arc-implementing.sh` | 9/9 PASS | ✓ | `5d4a447` |
+| `test-arc-looping.sh` | 5/5 PASS | ✓ | `5d4a447` |
+
+**arc-looping detail** (background task `bds9pt2xe`, exit code 0):
+
+```
+[PASS] loop state file created at project root
+[PASS] loop state records pattern=dag
+[PASS] loop advanced at least one iteration
+[PASS] loop status is a known value
+[PASS] arcforge loop CLI invoked with --pattern dag
+=== arc-looping test: 0 failure(s) ===
+```
+
+The session hit rate limit (HTTP 429) at the exact moment the arc-looping
+notification arrived — result was never processed interactively. Recorded here
+retroactively by the next session from the background task output file at
+`/private/tmp/claude-501/.../tasks/bds9pt2xe.output`.
+
+**Phase A is complete.** Next step is Phase B: add tests for
+`arc-agent-driven`, `arc-dispatching-parallel`, and `arc-dispatching-teammates`.
+
+---
+
 ## 10 · If the new session wants to change course
 
 These are the questions worth reconsidering with a fresh mind:
