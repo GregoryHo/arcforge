@@ -61,19 +61,19 @@ ${PROJECT_ROOT}
 ## Assertions
 
 - [tool_called] Write:docs/tasks
-- [tool_count] Task >= 1
+- [tool_count] Agent >= 1
 
 ## Grader
 
-behavioral
+mixed
 
 ## Grader Config
 
 Pure behavioral — no text judgment. Two independent positive signals:
 - Did the agent produce a tasks breakdown at `docs/tasks/` (arc-writing-tasks delegation)?
-- Did the agent spawn at least one Task subagent (arc-agent-driven execution)?
+- Did the agent spawn at least one Agent subagent to execute the tasks (arc-agent-driven execution)?
 
-Both together reflect the arc-implementing → arc-writing-tasks → arc-agent-driven orchestration chain the skill teaches. A baseline agent without that orchestration knowledge typically writes `src/parser.js` directly without creating a tasks file or spawning subagents.
+Both together reflect the arc-implementing → arc-writing-tasks → arc-agent-driven orchestration chain the skill teaches. A baseline agent without that orchestration knowledge typically writes `src/parser.js` directly without creating a tasks file or spawning subagents. Grader is `mixed` — with only behavioral assertions and zero text assertions, the mixed path falls through to pure behavioral grading (the eval harness does not recognise `behavioral` as a standalone grader name).
 
 ## Trials
 

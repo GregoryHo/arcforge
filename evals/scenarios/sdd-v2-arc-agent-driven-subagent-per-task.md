@@ -2,10 +2,12 @@
 
 ## Scope
 
-workflow
+agent
 
 ## Target
-arc-agent-driven executes a task list by spawning a **fresh subagent per task** (isolated context prevents cross-task pollution). The agent must invoke the Task / Agent tool per task, not inline the work in its own turn stream.
+Regression guard: for 3 clearly independent task-list items, a bare agent spawns at least one Agent subagent per task rather than inlining all Write calls. Piloting showed baseline and treatment both parallelise at ~3 Agent calls — Claude's native instinct for independent tasks already matches the arc-agent-driven discipline in this scenario shape. Kept as a regression guard: if this ever drops below `Agent >= 3`, Claude's native parallelism for independent tasks has regressed.
+
+A workflow-scope A/B that actually pressure-tests arc-agent-driven's discipline would need non-trivially-dependent tasks or a sufficiently large task count that batching becomes tempting — both are future work.
 
 ## Scenario
 
@@ -51,7 +53,7 @@ ${PROJECT_ROOT}
 
 ## Assertions
 
-- [tool_count] Task >= 3
+- [tool_count] Agent >= 3
 - [ ] At the end, `src/trim.js`, `src/upper.js`, and `src/reverse.js` all exist with the specified exported functions.
 - [ ] The agent's final response includes the phrase `all-tasks-complete`.
 
