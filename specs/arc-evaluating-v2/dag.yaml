@@ -92,7 +92,7 @@ epics:
         source_requirement: fr-ag-003
   - id: cli-subcommands
     name: New CLI Subcommands — preflight / lint / audit
-    status: pending
+    status: completed
     spec_path: specs/arc-evaluating-v2/epics/cli-subcommands/epic.md
     worktree: null
     depends_on:
@@ -100,22 +100,22 @@ epics:
     features:
       - id: cli-001
         name: arc eval preflight subcommand
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cli-001
       - id: cli-002
         name: arc eval lint subcommand
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cli-002
       - id: cli-003
         name: arc eval audit subcommand
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cli-003
   - id: grader-blind
     name: Blind Comparator Auto-Trigger
-    status: pending
+    status: completed
     spec_path: specs/arc-evaluating-v2/epics/grader-blind/epic.md
     worktree: null
     depends_on:
@@ -123,12 +123,12 @@ epics:
     features:
       - id: gr-005
         name: Blind-comparator auto-trigger rule
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-gr-005
   - id: dashboard
     name: Dashboard Consolidation and UI Redesign
-    status: pending
+    status: completed
     spec_path: specs/arc-evaluating-v2/epics/dashboard/epic.md
     worktree: null
     depends_on:
@@ -137,24 +137,24 @@ epics:
     features:
       - id: dash-001
         name: Two-tab layout (Outputs, Benchmark)
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-dash-001
       - id: dash-002
         name: Auto-saving feedback textbox per eval
-        status: pending
+        status: completed
         depends_on:
           - dash-001
         source_requirement: fr-dash-002
       - id: dash-003
         name: Keyboard navigation between trials
-        status: pending
+        status: completed
         depends_on:
           - dash-001
         source_requirement: fr-dash-003
       - id: dash-004
         name: Retain SSE real-time monitoring
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-dash-004
   - id: skill-body
