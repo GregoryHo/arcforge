@@ -360,6 +360,62 @@ function verdictFromDeltaCI(baseline, treatment, fallbackThresholds) {
   return verdictFromDelta(computeDelta(baseline, treatment), fallbackThresholds);
 }
 
+/**
+ * Compute mean of an array of values, ignoring nulls.
+ * Returns null when all values are null or array is empty.
+ * @param {(number|null)[]} values - Array of numeric or null values
+ * @returns {number|null} Mean of non-null values, or null
+ */
+function meanOrNull(values) {
+  const valid = values.filter((v) => v !== null && v !== undefined);
+  if (valid.length === 0) return null;
+  return valid.reduce((a, b) => a + b, 0) / valid.length;
+}
+
+/**
+ * Compute per-metric deltas (duration_ms, input_tokens, output_tokens)
+ * between baseline and treatment trial arrays.
+ * Ignores null values when computing means.
+ * Flags cost regression when treatmentMean > 2 * baselineMean (and baselineMean > 0).
+ *
+ * @param {import('./eval').TrialResult[]} baseline - Baseline trial results
+ * @param {import('./eval').TrialResult[]} treatment - Treatment trial results
+ * @returns {{
+ *   durationDelta: number|null,
+ *   inputTokensDelta: number|null,
+ *   outputTokensDelta: number|null,
+ *   baselineMeans: { duration_ms: number|null, input_tokens: number|null, output_tokens: number|null },
+ *   treatmentMeans: { duration_ms: number|null, input_tokens: number|null, output_tokens: number|null },
+ *   durationRegression: boolean,
+ *   inputTokensRegression: boolean,
+ *   outputTokensRegression: boolean,
+ * }}
+ */
+function computeMetricDeltas(baseline, treatment) {
+  const pick = (results, key) => results.map((r) => r[key] ?? null);
+
+  const bDuration = meanOrNull(pick(baseline, 'duration_ms'));
+  const tDuration = meanOrNull(pick(treatment, 'duration_ms'));
+  const bInput = meanOrNull(pick(baseline, 'input_tokens'));
+  const tInput = meanOrNull(pick(treatment, 'input_tokens'));
+  const bOutput = meanOrNull(pick(baseline, 'output_tokens'));
+  const tOutput = meanOrNull(pick(treatment, 'output_tokens'));
+
+  const delta = (b, t) => (b !== null && t !== null ? t - b : null);
+  const isRegression = (b, t) => b !== null && t !== null && b > 0 && t > 2 * b;
+
+  return {
+    durationDelta: delta(bDuration, tDuration),
+    inputTokensDelta: delta(bInput, tInput),
+    outputTokensDelta: delta(bOutput, tOutput),
+    baselineMeans: { duration_ms: bDuration, input_tokens: bInput, output_tokens: bOutput },
+    treatmentMeans: { duration_ms: tDuration, input_tokens: tInput, output_tokens: tOutput },
+    durationRegression: isRegression(bDuration, tDuration),
+    inputTokensRegression: isRegression(bInput, tInput),
+    outputTokensRegression: isRegression(bOutput, tOutput),
+  };
+}
+
 module.exports = {
   passAtK,
   passAllK,
@@ -385,4 +441,6 @@ module.exports = {
   SHIP_CI_TARGET,
   NEEDS_WORK_THRESHOLD,
   CV_THRESHOLD,
+  meanOrNull,
+  computeMetricDeltas,
 };

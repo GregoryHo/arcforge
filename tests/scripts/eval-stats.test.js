@@ -17,6 +17,8 @@ const {
   verdictFromCI,
   getVerdict,
   baselineVarianceWarning,
+  meanOrNull,
+  computeMetricDeltas,
 } = require('../../scripts/lib/eval-stats');
 
 function makeResult(overrides = {}) {
@@ -512,5 +514,109 @@ describe('getVerdict', () => {
     ];
     // Without useCi, uses rate-based: 80% = NEEDS WORK
     expect(getVerdict(results)).toBe('NEEDS WORK');
+  });
+});
+
+// ── fr-gr-002: meanOrNull ─────────────────────────────────────
+
+describe('meanOrNull', () => {
+  test('returns mean of non-null values', () => {
+    expect(meanOrNull([100, 200, 300])).toBe(200);
+  });
+
+  test('ignores null values', () => {
+    expect(meanOrNull([100, null, 200])).toBe(150);
+  });
+
+  test('returns null when all values are null', () => {
+    expect(meanOrNull([null, null])).toBeNull();
+  });
+
+  test('returns null for empty array', () => {
+    expect(meanOrNull([])).toBeNull();
+  });
+
+  test('handles single non-null value', () => {
+    expect(meanOrNull([42])).toBe(42);
+  });
+});
+
+// ── fr-gr-002: computeMetricDeltas ───────────────────────────
+
+describe('computeMetricDeltas', () => {
+  function makeResults(vals) {
+    return vals.map((v, i) => ({
+      eval: 'test',
+      trial: i + 1,
+      k: vals.length,
+      passed: true,
+      grader: 'code',
+      score: 1,
+      ...v,
+    }));
+  }
+
+  test('computes duration delta when both have values', () => {
+    const baseline = makeResults([{ duration_ms: 1000 }, { duration_ms: 2000 }]);
+    const treatment = makeResults([{ duration_ms: 3000 }, { duration_ms: 4000 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.durationDelta).toBe(2000); // 3500 - 1500
+  });
+
+  test('computes input_tokens delta', () => {
+    const baseline = makeResults([{ input_tokens: 100 }, { input_tokens: 200 }]);
+    const treatment = makeResults([{ input_tokens: 400 }, { input_tokens: 600 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.inputTokensDelta).toBe(350); // 500 - 150
+  });
+
+  test('computes output_tokens delta', () => {
+    const baseline = makeResults([{ output_tokens: 50 }, { output_tokens: 100 }]);
+    const treatment = makeResults([{ output_tokens: 50 }, { output_tokens: 150 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.outputTokensDelta).toBe(25); // 100 - 75
+  });
+
+  test('returns null delta when baseline has only null values', () => {
+    const baseline = makeResults([{ duration_ms: null }, { duration_ms: null }]);
+    const treatment = makeResults([{ duration_ms: 3000 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.durationDelta).toBeNull();
+  });
+
+  test('includes baseline and treatment means', () => {
+    const baseline = makeResults([{ duration_ms: 1000 }]);
+    const treatment = makeResults([{ duration_ms: 2000 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.baselineMeans.duration_ms).toBe(1000);
+    expect(deltas.treatmentMeans.duration_ms).toBe(2000);
+  });
+
+  test('flags cost regression when treatment is more than 2x baseline', () => {
+    const baseline = makeResults([{ input_tokens: 100 }]);
+    const treatment = makeResults([{ input_tokens: 250 }]); // 2.5x baseline
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.inputTokensRegression).toBe(true);
+  });
+
+  test('does not flag regression when treatment is less than 2x baseline', () => {
+    const baseline = makeResults([{ input_tokens: 100 }]);
+    const treatment = makeResults([{ input_tokens: 190 }]); // 1.9x baseline
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.inputTokensRegression).toBe(false);
+  });
+
+  test('does not flag regression when baseline is 0', () => {
+    const baseline = makeResults([{ input_tokens: 0 }]);
+    const treatment = makeResults([{ input_tokens: 1000 }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.inputTokensRegression).toBe(false);
+  });
+
+  test('does not flag regression when delta is null', () => {
+    const baseline = makeResults([{ input_tokens: null }]);
+    const treatment = makeResults([{ input_tokens: null }]);
+    const deltas = computeMetricDeltas(baseline, treatment);
+    expect(deltas.inputTokensRegression).toBe(false);
   });
 });
