@@ -229,7 +229,8 @@ describe('dashboard', () => {
       const data = result.json();
 
       expect(data.delta).toBe(0.75);
-      expect(data.verdict).toBe('IMPROVED');
+      // k=2 per condition is below the k>=5 threshold — verdict is INSUFFICIENT_DATA
+      expect(data.verdict).toBe('INSUFFICIENT_DATA');
       expect(data.baseline.stats.avg).toBe(0.25);
       expect(data.treatment.stats.avg).toBe(1.0);
     });

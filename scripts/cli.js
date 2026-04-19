@@ -592,6 +592,8 @@ async function main() {
           const ciStr = deltaCi && showCI ? ` CI[${deltaCi.lower}, ${deltaCi.upper}]` : '';
           console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}${ciStr}`);
           console.log(`${label}Verdict:   ${verdict}`);
+          const remediation = eval_.verdictMessage(verdict);
+          if (remediation) console.log(`${label}Remediation: ${remediation}`);
           const warning = eval_.confidenceWarning(baseline) || eval_.confidenceWarning(treatment);
           if (warning) console.log(`${label}${warning}`);
         };
