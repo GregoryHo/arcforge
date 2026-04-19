@@ -461,13 +461,15 @@ function gradeWithModel(result, scenario, projectRoot) {
 /**
  * Compare baseline vs treatment results using the eval-analyzer agent.
  * Reads skills/arc-evaluating/agents/eval-analyzer.md as the comparison methodology.
- * Returns qualitative analysis based on harness-computed metrics.
+ * Returns qualitative post-hoc analysis based on harness-computed metrics.
+ * The agent does not determine the verdict — the harness does that deterministically.
+ * If the agent returns a "recommendation" field, it is dropped with a warning.
  * @param {import('./eval').EvalScenario} scenario - Eval scenario
  * @param {import('./eval').TrialResult[]} baseline - Baseline results
  * @param {import('./eval').TrialResult[]} treatment - Treatment results
  * @param {string} projectRoot - Project root directory
  * @param {Object} metrics - Pre-computed metrics from compareResults
- * @returns {{ analysis: string, recommendation: string, improvements?: string[], regressions?: string[], limitations?: string[] }|null}
+ * @returns {{ analysis: string, delta_explanation?: string, weak_assertions_patterns?: string[], variance_notes?: string[], improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
   const rawDef = loadAgentDef(
@@ -517,7 +519,137 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
 
   if (exitCode !== 0) return null;
 
-  return extractJsonObject(stdout, ['analysis']);
+  const parsed = extractJsonObject(stdout, ['analysis']);
+  if (!parsed) return null;
+
+  // Drop any recommendation field the agent may have emitted — verdict authority
+  // is exclusively with the harness (deterministic computation), not the agent.
+  if (Object.hasOwn(parsed, 'recommendation')) {
+    process.stderr.write(
+      'Warning: eval-analyzer returned a "recommendation" field — dropping it. Verdict comes from the harness.\n',
+    );
+    const { recommendation: _dropped, ...rest } = parsed;
+    return rest;
+  }
+
+  return parsed;
+}
+
+// Forbidden strings that must never appear in the blind comparator payload.
+const BLIND_COMPARATOR_FORBIDDEN = ['baseline', 'treatment', 'with_skill', 'without_skill'];
+
+/**
+ * Build a comparison prompt for the blind comparator, stripping all identifying labels.
+ * The prompt must not contain any of BLIND_COMPARATOR_FORBIDDEN strings or the skill name.
+ * @param {string} taskPrompt - The original task prompt given to both conditions
+ * @param {string} outputA - Anonymized output for label A
+ * @param {string} outputB - Anonymized output for label B
+ * @param {string} agentDef - Loaded agent definition text
+ * @returns {string} Prompt safe to send to the blind comparator
+ */
+function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
+  return [
+    ...(agentDef ? [agentDef, ''] : []),
+    '## Comparison Task',
+    '',
+    '### Original Task Prompt',
+    taskPrompt,
+    '',
+    '### Output A',
+    '```',
+    outputA,
+    '```',
+    '',
+    '### Output B',
+    '```',
+    outputB,
+    '```',
+    '',
+    'Derive a rubric from the task prompt, score each output, and respond with the required JSON only.',
+  ].join('\n');
+}
+
+/**
+ * Run the eval-blind-comparator agent on two outputs.
+ * Randomly shuffles (baseline, treatment) → (A, B) to prevent label bias,
+ * then maps A/B back to original labels after parsing the response.
+ *
+ * The prompt sent to the agent is stripped of all identifying strings:
+ * "baseline", "treatment", "with_skill", "without_skill", and the skill name.
+ *
+ * NOTE: This function introduces the plumbing for blind comparison.
+ * Auto-triggering it from the grader pipeline is wired in the grader-blind epic.
+ *
+ * @param {string} taskPrompt - The original task prompt given to both conditions
+ * @param {string} baselineOutput - Output from the baseline (control) condition
+ * @param {string} treatmentOutput - Output from the treatment (modified) condition
+ * @param {string} projectRoot - Project root directory
+ * @param {string} [skillName] - Skill name to strip from the prompt (optional)
+ * @returns {{ winner_original_label: 'baseline'|'treatment'|'tie', reasoning: string, rubric: Array<{criterion: string, weight: number}>, score_baseline: number, score_treatment: number }|null}
+ */
+function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, projectRoot, skillName) {
+  const agentDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-blind-comparator.md'),
+  );
+
+  // Randomly assign baseline/treatment to A/B.
+  const baselineIsA = Math.random() < 0.5;
+  const outputA = baselineIsA ? baselineOutput : treatmentOutput;
+  const outputB = baselineIsA ? treatmentOutput : baselineOutput;
+
+  // Sanitize task prompt: strip forbidden strings and skill name.
+  const forbidden = skillName
+    ? [...BLIND_COMPARATOR_FORBIDDEN, skillName]
+    : BLIND_COMPARATOR_FORBIDDEN;
+
+  function sanitize(text) {
+    let result = text || '';
+    for (const word of forbidden) {
+      // Case-insensitive replacement with [redacted]
+      result = result.replace(new RegExp(word, 'gi'), '[redacted]');
+    }
+    return result;
+  }
+
+  const safePrompt = buildBlindComparatorPrompt(
+    sanitize(taskPrompt),
+    sanitize(outputA),
+    sanitize(outputB),
+    agentDef,
+  );
+
+  const { stdout, exitCode } = execCommand(
+    'claude',
+    ['-p', '--output-format', 'text', '--no-session-persistence'],
+    {
+      input: safePrompt,
+      cwd: projectRoot,
+      timeout: 120000,
+    },
+  );
+
+  if (exitCode !== 0) return null;
+
+  const parsed = extractJsonObject(stdout, ['winner']);
+  if (!parsed) return null;
+
+  const winner = parsed.winner; // 'A', 'B', or 'tie'
+  let winnerOriginalLabel;
+  if (winner === 'tie') {
+    winnerOriginalLabel = 'tie';
+  } else if (winner === 'A') {
+    winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
+  } else {
+    winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
+  }
+
+  return {
+    winner_original_label: winnerOriginalLabel,
+    reasoning: parsed.reasoning || '',
+    rubric: parsed.rubric || [],
+    score_baseline: baselineIsA ? (parsed.score_a ?? 0) : (parsed.score_b ?? 0),
+    score_treatment: baselineIsA ? (parsed.score_b ?? 0) : (parsed.score_a ?? 0),
+  };
 }
 
 /**
@@ -811,6 +943,9 @@ module.exports = {
   captureTrialArtifacts,
   gradeWithModel,
   compareWithModel,
+  runBlindComparator,
+  buildBlindComparatorPrompt,
+  BLIND_COMPARATOR_FORBIDDEN,
   gradeWithHuman,
   snapScore,
   validateGraderResponse,

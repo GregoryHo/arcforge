@@ -60,7 +60,14 @@ def test_eval_analyzer_doc_requests_analysis_over_per_assertion_math():
     text = _read("skills/arc-evaluating/agents/eval-analyzer.md")
     lower = text.lower()
 
+    # Analyzer documents analysis fields (no verdict authority).
     assert '"analysis"' in text
-    assert '"recommendation"' in text
+    # New output schema: analytical fields only — no recommendation or verdict.
+    assert '"recommendation"' not in text, (
+        "eval-analyzer must not include a recommendation field (verdict authority stripped)"
+    )
+    assert '"delta_explanation"' in text
+    assert '"weak_assertions_patterns"' in text
+    assert '"variance_notes"' in text
     assert '"per_assertion"' not in text
     assert "regression" in lower or "improvement" in lower
