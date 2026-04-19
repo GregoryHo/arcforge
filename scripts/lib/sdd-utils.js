@@ -459,7 +459,9 @@ function validateSpecHeader(parsed, options = {}) {
     return { valid: false, issues };
   }
 
-  // Required fields check.
+  // Required fields check. Empty/whitespace-only strings count as missing —
+  // parseSpecHeader returns "" (trimmed) for <title></title> etc., so a
+  // null-only check would let malformed identity headers pass.
   const requiredFields = [
     ['spec_version', 'spec_version'],
     ['status', 'status'],
@@ -468,7 +470,10 @@ function validateSpecHeader(parsed, options = {}) {
     ['design_iteration', 'source/design_iteration'],
   ];
   for (const [key, field] of requiredFields) {
-    if (parsed[key] === null || parsed[key] === undefined) {
+    const value = parsed[key];
+    const isMissing =
+      value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+    if (isMissing) {
       issues.push({
         level: 'ERROR',
         field,
@@ -550,6 +555,23 @@ function validateSpecHeader(parsed, options = {}) {
       field: 'deltas',
       message: `spec_version ${parsed.spec_version} must include at least one <delta> element. v1 specs have no delta; v2+ specs accumulate one per iteration.`,
     });
+  }
+
+  // (a.1) Every delta's version must be a non-negative integer string.
+  // Catches malformed attributes like `version="abc"` or `version="3.0"`
+  // that would otherwise slip through: the ordering loop below skips
+  // single-delta specs (i starts at 1), and the latest-version equality
+  // check at (c) explicitly guards on !Number.isNaN. Without this,
+  // <delta version="abc"> in a single-delta spec passes cleanly.
+  for (const [idx, d] of deltas.entries()) {
+    const raw = d.version;
+    if (typeof raw !== 'string' || !/^\d+$/.test(raw)) {
+      issues.push({
+        level: 'ERROR',
+        field: `deltas[${idx}]/version`,
+        message: `<delta version="${raw ?? ''}"> must be a non-negative integer (got ${JSON.stringify(raw)}).`,
+      });
+    }
   }
 
   // (b) Strictly ascending by version. Catches both wrong order and duplicates.

@@ -461,6 +461,33 @@ describe('validateSpecHeader', () => {
     expect(fields).toContain('source/design_iteration');
   });
 
+  it('flags empty-string required fields (Codex #3106859044)', () => {
+    // parseSpecHeader returns "" (trimmed empty string) for <title></title>,
+    // <status></status>, etc. The required-field check must treat
+    // whitespace-only strings as missing, not just null/undefined. Without
+    // this, the validator advertised as "single source of truth" in CHANGELOG
+    // silently accepts malformed identity headers.
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: '',
+      title: '   ',
+      description: 'desc',
+      design_path: '',
+      design_iteration: '',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      deltas: [],
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const fields = result.issues.filter((i) => i.level === 'ERROR').map((i) => i.field);
+    expect(fields).toContain('status');
+    expect(fields).toContain('title');
+    expect(fields).toContain('source/design_path');
+    expect(fields).toContain('source/design_iteration');
+  });
+
   it('flags non-positive spec_version (0)', () => {
     const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
     fs.mkdirSync(path.dirname(designPath), { recursive: true });
@@ -1171,6 +1198,30 @@ describe('validateSpecHeader — delta placement consistency', () => {
       (i) => i.level === 'ERROR' && i.field.startsWith('delta'),
     );
     expect(deltaErrors).toHaveLength(0);
+  });
+
+  it('flags non-numeric delta.version in single-delta spec (Codex #3106859045)', () => {
+    // With only one delta, the ascending-order loop (i=1) never runs, and
+    // the latest-version equality check explicitly skipped !Number.isNaN
+    // values — so <delta version="abc"> passed validation cleanly. The
+    // validator must reject non-numeric version strings up front.
+    const parsed = makeV2Parsed({
+      deltas: [
+        {
+          version: 'abc',
+          iteration: '2026-05-10',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const versionErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && /deltas\[0\]\/version|deltas\/latest\/version/.test(i.field),
+    );
+    expect(versionErrors.length).toBeGreaterThan(0);
   });
 
   it('accepts delta.iteration with suffix (matching design_iteration exactly)', () => {

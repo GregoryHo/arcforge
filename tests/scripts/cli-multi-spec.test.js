@@ -110,10 +110,12 @@ describe('CLI multi-spec UX', () => {
     expect(exitCode).not.toBe(0); // merge still exits non-zero for missing-completed-epic
   });
 
-  test('sync --direction in multi-spec mode errors out (not silent aggregate)', () => {
-    // Codex P2: ambiguous-spec branch called syncAllSpecs immediately, skipping
-    // --direction parsing/validation. `arcforge sync --direction from-base`
-    // must fail loudly in multi-spec mode, not silently aggregate.
+  test('sync --direction from-base in multi-spec mode errors out (not silent aggregate)', () => {
+    // Codex P2 #3106674263: ambiguous-spec branch called syncAllSpecs
+    // immediately, skipping --direction parsing/validation.
+    // `arcforge sync --direction from-base` must fail loudly in multi-spec
+    // mode, not silently aggregate — from-base/to-base/both are data-moving
+    // directions and have no cross-spec semantics.
     writeSpec(root, 'spec-a', ['epic-a1']);
     writeSpec(root, 'spec-b', ['epic-b1']);
     const { exitCode, stderr } = runCli(root, ['sync', '--direction', 'from-base'], {
@@ -121,6 +123,20 @@ describe('CLI multi-spec UX', () => {
     });
     expect(exitCode).not.toBe(0);
     expect(stderr).toMatch(/direction|--spec-id/);
+  });
+
+  test('sync --direction scan in multi-spec mode succeeds (equivalent to no flag)', () => {
+    // Codex P2 #3106859042: the previous --direction guard was too broad
+    // and rejected `scan` too. `scan` is the valid base-mode direction
+    // (coord.sync auto-detects `'scan'` in base checkouts) and the multi-
+    // spec aggregate IS effectively a cross-spec scan. `--direction scan`
+    // must pass through, not error.
+    writeSpec(root, 'spec-a', ['epic-a1']);
+    writeSpec(root, 'spec-b', ['epic-b1']);
+    const { stdout } = runCli(root, ['sync', '--direction', 'scan', '--json']);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty('specs');
+    expect(Object.keys(parsed.specs).sort()).toEqual(['spec-a', 'spec-b']);
   });
 
   test('reboot with two specs returns per-spec + totals', () => {

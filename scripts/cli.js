@@ -487,12 +487,14 @@ async function main() {
 
       case 'sync': {
         const spec = resolveSpecId(projectRoot, specFlag);
-        // Reject --direction in multi-spec aggregate mode — single-spec sync
-        // rejects invalid directions loudly, and silently succeeding here
-        // would hide invocation mistakes and break automation.
-        if (isAmbiguousSpec(spec) && args.options.direction) {
+        // Reject data-moving --direction values in multi-spec aggregate mode.
+        // `scan` is the valid base-mode direction (coord.sync auto-detects
+        // it in base checkouts) and the multi-spec aggregate is effectively
+        // a cross-spec scan, so let it through as a no-op. Only
+        // from-base/to-base/both need a single-spec context to resolve.
+        if (isAmbiguousSpec(spec) && args.options.direction && args.options.direction !== 'scan') {
           console.error(
-            'Error: --direction is not valid when syncing all specs. Pass --spec-id <id> to target one spec.',
+            `Error: --direction ${args.options.direction} is not valid when syncing all specs. Pass --spec-id <id> to target one spec, or use --direction scan (or omit) for a multi-spec scan.`,
           );
           process.exit(1);
         }
