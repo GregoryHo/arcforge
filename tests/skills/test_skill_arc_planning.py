@@ -112,37 +112,113 @@ def test_arc_planning_delta_scoped_planning():
     assert has_scope_logic, "Skill must document delta-scoped planning logic"
 
 
-def test_arc_planning_removed_requirements_no_epics():
-    """Skill must state removed requirements do NOT generate epics (fr-pl-001-ac2)."""
+def test_arc_planning_removed_generates_teardown_epic():
+    """Per D4 (2026-04-19 realignment), <removed> generates a teardown epic — not a skip (fr-pl-001-ac2)."""
     text = _read_skill()
 
-    # Must mention removed requirements
-    has_removed_rule = (
-        "removed" in text.lower()
-        and (
-            "no epic" in text.lower()
-            or "skip" in text.lower()
-            or "do not generate" in text.lower()
-            or "not generate" in text.lower()
-        )
+    # Must explicitly map <removed> to teardown work
+    has_teardown = (
+        "teardown" in text.lower()
+        and "removed" in text.lower()
     )
-    assert has_removed_rule, "Skill must state removed requirements do not generate epics"
+    assert has_teardown, "Skill must map <removed> to a teardown epic (per D4)"
 
 
-def test_arc_planning_dag_completion_gate():
-    """Skill must document DAG completion gate before building (fr-pl-007)."""
+def test_arc_planning_renamed_generates_refactor_epic():
+    """Per D4 (2026-04-19 realignment), <renamed> generates a mechanical refactor epic."""
     text = _read_skill()
 
-    # Must mention completion gate or complete current sprint
-    has_gate = (
-        "completion gate" in text.lower()
-        or "complete current sprint" in text.lower()
-        or "incomplete" in text.lower()
+    has_refactor = (
+        "renamed" in text.lower()
+        and ("refactor" in text.lower() or "grep" in text.lower() or "ref_new" in text.lower())
     )
-    assert has_gate, "Skill must document DAG completion gate"
+    assert has_refactor, "Skill must map <renamed> to a mechanical refactor epic (per D4)"
 
-    # Must cover the three cases: no dag → proceed, all completed → archive, any incomplete → block
-    assert "archive" in text.lower(), "Skill must document archiving when all epics are completed"
+
+def test_arc_planning_pure_teardown_sprint_legal():
+    """Per D8, a delta with only <removed> children is a legal sprint."""
+    text = _read_skill()
+
+    # Some signal that a removed-only sprint is acceptable
+    has_pure_teardown = (
+        "pure-teardown" in text.lower()
+        or "pure teardown" in text.lower()
+        or ("only <removed>" in text and "legal" in text.lower())
+        or "deprecation sprint" in text.lower()
+        or "compliance teardown" in text.lower()
+        or "legacy cleanup" in text.lower()
+    )
+    assert has_pure_teardown, (
+        "Skill must state that a delta with only <removed> children is a legal sprint (D8)"
+    )
+
+
+def test_arc_planning_no_completion_gate():
+    """Per D2 (2026-04-19 realignment), the DAG completion gate moved to refiner.
+    Planner is a pure function with no gate.
+    """
+    text = _read_skill()
+
+    # Must explicitly disclaim the gate (so a future contributor doesn't reintroduce it)
+    has_no_gate_statement = (
+        "no gate" in text.lower()
+        or "without a gate" in text.lower()
+        or ("gate" in text.lower() and "refiner" in text.lower() and "lives in" in text.lower())
+        or ("gate" in text.lower() and "fr-rf-012" in text)
+    )
+    assert has_no_gate_statement, (
+        "Planner skill must state the completion gate lives in arc-refining, not here (per D2)"
+    )
+
+
+def test_arc_planning_no_archive():
+    """Per D1 (2026-04-19 realignment), planner overwrites dag.yaml — never archives."""
+    text = _read_skill()
+
+    # No mv-to-archive command should remain (the old `dag.yaml.archive.$(date)` snippet)
+    assert "dag.yaml.archive" not in text, (
+        "Planner must not archive — no `dag.yaml.archive` filename should appear (per D1)"
+    )
+
+    # Must explicitly say "overwrite" or "never archive" so a contributor doesn't reintroduce it
+    has_overwrite_statement = (
+        "overwrite" in text.lower()
+        and ("never archive" in text.lower() or "no archive" in text.lower() or "must overwrite" in text.lower())
+    )
+    assert has_overwrite_statement, (
+        "Skill must explicitly state overwrite-not-archive (per D1)"
+    )
+
+
+def test_arc_planning_pure_function_framing():
+    """Per D2/D5, planner is framed as a pure function (spec + delta) → (dag.yaml + epics/)."""
+    text = _read_skill()
+
+    has_pure_function = (
+        "pure function" in text.lower()
+        and "(spec" in text.lower()
+        and "dag.yaml" in text.lower()
+    )
+    assert has_pure_function, (
+        "Skill must frame planner as pure function (spec + delta) → (dag.yaml + epics/)"
+    )
+
+
+def test_arc_planning_uses_latest_delta_in_snippet():
+    """Per Phase 2 sdd-utils refactor, the inline node snippet must read parsed.latest_delta
+    (or parsed.deltas), not the removed parsed.delta property.
+    """
+    text = _read_skill()
+
+    # The broken old API must not appear
+    assert "parsed.delta." not in text, (
+        "Skill must not reference the removed parsed.delta API — use parsed.latest_delta or parsed.deltas"
+    )
+
+    # The new API must be referenced
+    assert "latest_delta" in text or "parsed.deltas" in text, (
+        "Skill must reference the new parsed.latest_delta or parsed.deltas API"
+    )
 
 
 def test_arc_planning_per_spec_output_path():

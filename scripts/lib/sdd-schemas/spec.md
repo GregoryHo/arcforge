@@ -176,11 +176,11 @@ Bad:
 
 ---
 
-## Delta Element (fr-sd-005, iteration specs)
+## Delta Elements (fr-sd-005, iteration specs)
 
-When the refiner updates an existing spec (spec_version > 1), it writes a `<delta>` element as the **last child of `<overview>`**. The delta records what changed in this version.
+`<overview>` contains 0..N `<delta>` children, ordered ascending by `version`. Each `<delta>` records what changed in one version of the spec. The refiner **appends** a new `<delta>` each iteration — it MUST NOT overwrite, modify, or remove prior deltas. The spec accumulates the full iteration history inside itself: a reader opens `spec.xml` and sees v1 → v(N) evolution without consulting git.
 
-Placement is deliberate: `<delta>` is identity metadata, not separate content. It is tightly coupled to `<spec_version>`, `<supersedes>`, and `<source/design_iteration>` — all of which live in `<overview>`. `delta.version` MUST match `spec_version`; `delta.iteration` MUST match `source/design_iteration`.
+Placement is deliberate: each `<delta>` is identity metadata, not separate content. It is tightly coupled to `<spec_version>`, `<supersedes>`, and `<source/design_iteration>` — all of which live in `<overview>`. The **last** `<delta>` (highest `version`) is the current sprint's delta — its `version` MUST match `spec_version`, its `iteration` MUST match `source/design_iteration`. Earlier `<delta>` elements (lower versions) are historical record, frozen at the moment they were written.
 
 ```xml
 <delta version="N" iteration="YYYY-MM-DD">
@@ -198,21 +198,32 @@ Placement is deliberate: `<delta>` is identity metadata, not separate content. I
 
 | Attribute / Element | Rule |
 |---|---|
-| `version` | MUST match the new `spec_version` |
-| `iteration` | MUST match the new `source/design_iteration` |
+| `version` | MUST match the new `spec_version` for the **last** `<delta>`. Earlier deltas keep their original (lower) version values |
+| `iteration` | MUST match the new `source/design_iteration` for the **last** `<delta>`. Earlier deltas keep their original iteration values |
 | `<added ref="...">` | ref MUST correspond to a real requirement id in a detail file |
 | `<modified ref="...">` | ref MUST correspond to a real requirement id |
-| `<removed ref="...">` | ref MUST correspond to a requirement id that existed in the prior version; MUST contain a `<reason>` child element |
-| `<removed>/<reason>` | MUST be present; explains why the requirement was removed |
-| `<removed>/<migration>` | Optional; explains how existing consumers transition. Omit when no migration path exists |
-| `<renamed ref_old="..." ref_new="...">` | `ref_old` MUST correspond to a requirement id in the previous version; `ref_new` MUST correspond to a requirement id in the current detail files |
+| `<removed ref="...">` | ref MUST correspond to a requirement id that existed in a prior version; MUST contain a `<reason>` child element |
+| `<removed>/<reason>` | MUST be present. Read by the implementer LLM as teardown guidance — it informs how aggressively to strip code (e.g., security removal → strict, deprecation → leave shim) |
+| `<removed>/<migration>` | Optional. Read by the implementer LLM to transition existing consumers. Omit when no migration path exists |
+| `<renamed ref_old="..." ref_new="...">` | `ref_old` MUST correspond to a requirement id in a prior version; `ref_new` MUST correspond to a requirement id in the current detail files. **Body unchanged** — semantic changes use `<removed>` + `<added>`, not `<renamed>` |
 | `<renamed>/<reason>` | Optional; clean renames need no justification |
 
-For v1 specs: no `<delta>` element. Its absence signals "plan all requirements."
+### Every delta child generates an epic
 
-The planner reads the latest `<delta>` to scope its sprint — only requirements listed in the delta are planned. For v1, the planner plans all requirements (no delta = full scope).
+Planner's rule: each child of the **current sprint's `<delta>`** (the last delta, where `version == spec_version`) generates exactly one epic. The four child element types map to four epic semantics:
 
-Renamed requirements are NOT planned as new work — the planner treats them as existing requirements with updated identifiers.
+| Delta child | Epic semantics |
+|---|---|
+| `<added ref="X">` | Implement new requirement X |
+| `<modified ref="X">` | Update existing implementation of X to match changed behavior |
+| `<removed ref="X">` | Teardown — implementer LLM greps for X and removes tied code; `<reason>` and optional `<migration>` inform teardown approach |
+| `<renamed ref_old="X" ref_new="Y">` | Mechanical refactor — grep + replace refs from X to Y; body unchanged |
+
+A `<delta>` containing only `<removed>` children is a legitimate sprint (deprecation, compliance teardown, legacy cleanup). The planner does not inspect the *shape* of a delta — it only enforces per-child correctness.
+
+For v1 specs: no `<delta>` element anywhere in `<overview>`. Its absence signals "plan all requirements" to the planner.
+
+For v2+ specs: planner reads the `<delta>` whose `version == current spec_version` for sprint scope. Earlier deltas are historical context for human readers — the planner ignores them.
 
 For backward compatibility, `sdd-utils.js` accepts two legacy `<removed>` formats:
 - Self-closing `<removed ref="x" />` — parsed with empty reason (validator flags this as ERROR)
@@ -321,7 +332,67 @@ No `<supersedes>` — this is v1. No `<delta>` — planner plans all requirement
 </spec>
 ```
 
-`supersedes` is set to `auth-system:v1`. The `<delta>` tells the planner to plan only `fr-as-007`, `fr-as-008`, and `fr-as-002` — the two new OAuth requirements plus the modified email verification requirement.
+`supersedes` is set to `auth-system:v1`. The `<delta>` tells the planner to plan only `fr-as-007`, `fr-as-008`, and `fr-as-002` — the two new OAuth requirements plus the modified email verification requirement. When this spec iterates to v3, the v2 `<delta>` is preserved verbatim and a new v3 `<delta>` is appended (see next example).
+
+---
+
+### Valid v3+ — auth-system with accumulated deltas
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>auth-system</spec_id>
+    <spec_version>3</spec_version>
+    <status>active</status>
+    <supersedes>auth-system:v2</supersedes>
+    <source>
+      <design_path>docs/plans/auth-system/2026-06-01/design.md</design_path>
+      <design_iteration>2026-06-01</design_iteration>
+    </source>
+    <title>User Authentication System</title>
+    <description>
+      Builds on v2 by adding device-trust scoring and removing the legacy
+      session-token endpoint. OAuth and JWT flows are unchanged.
+    </description>
+    <scope>
+      <includes>
+        <feature id="registration">Email and password registration with bcrypt hashing</feature>
+        <feature id="login">JWT issuance with 15-minute access tokens and 30-day refresh cookies</feature>
+        <feature id="oauth-google">Google OAuth 2.0 login flow</feature>
+        <feature id="oauth-github">GitHub OAuth 2.0 login flow</feature>
+        <feature id="device-trust">Device-trust scoring on each login</feature>
+      </includes>
+      <excludes>
+        <reason>Multi-factor authentication — not in scope for this iteration</reason>
+      </excludes>
+    </scope>
+    <delta version="2" iteration="2026-05-10">
+      <added ref="fr-as-007" />
+      <added ref="fr-as-008" />
+      <modified ref="fr-as-002" />
+    </delta>
+    <delta version="3" iteration="2026-06-01">
+      <added ref="fr-as-009" />
+      <removed ref="fr-as-001">
+        <reason>Legacy session-token endpoint replaced by JWT in v1; clients have migrated</reason>
+      </removed>
+      <renamed ref_old="fr-as-002" ref_new="fr-auth-verify-001">
+        <reason>Renamed for consistency with new fr-auth-* domain prefix</reason>
+      </renamed>
+    </delta>
+  </overview>
+
+  <details>
+    <detail_file path="details/auth-core.xml" />
+    <detail_file path="details/auth-flows.xml" />
+    <detail_file path="details/auth-oauth.xml" />
+    <detail_file path="details/auth-device.xml" />
+  </details>
+</spec>
+```
+
+The v2 `<delta>` is preserved verbatim from the prior version — the refiner copied it from v2's spec.xml without modification. The v3 `<delta>` is the new one the refiner appended this sprint. Planner reads only the v3 delta (because `version == current spec_version`); v2's delta is historical record for human readers. Note the v3 delta exercises all four child types (`<added>`, `<modified>` not present here, `<removed>` with reason, `<renamed>` with reason) — the planner will emit one epic per child.
 
 ---
 
@@ -449,8 +520,12 @@ This is a WARNING, not an ERROR. The spec is structurally valid and the pipeline
 | `supersedes` matches `<spec-id>:v<N>` format | Deterministic | ERROR |
 | `scope/includes` present | Deterministic | ERROR |
 | `scope/includes` contains at least one `<feature>` | Deterministic | WARNING |
-| `delta/version` matches `spec_version` (when delta present) | Deterministic | ERROR |
-| `delta/iteration` matches `design_iteration` (when delta present) | Deterministic | ERROR |
+| `<delta>` children ordered ascending by `version` | Deterministic | ERROR |
+| `<delta>` `version` attributes are unique within `<overview>` | Deterministic | ERROR |
+| Last `<delta>`'s `version` equals current `spec_version` (when any delta present) | Deterministic | ERROR |
+| Last `<delta>`'s `iteration` equals current `source/design_iteration` (when any delta present) | Deterministic | ERROR |
+| Each `<removed ref="X">` includes a `<reason>` child | Deterministic | ERROR |
+| Each `<renamed>` has both `ref_old` and `ref_new` attributes | Deterministic | ERROR |
 | All `<detail_file>` paths resolve to existing files | Deterministic | ERROR |
 | Each `<requirement>` has unique `id` across all detail files | Deterministic | ERROR |
 | Each `<criterion>` has `id` attribute | Deterministic | ERROR |

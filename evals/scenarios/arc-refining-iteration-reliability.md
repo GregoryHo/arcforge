@@ -6,7 +6,7 @@ agent
 
 ## Target
 
-skills/arc-refining/SKILL.md — reliability of Path B iteration output (delta metadata, supersedes, version increment)
+skills/arc-refining/SKILL.md — reliability of iteration-on-prior-spec output: accumulating delta metadata, supersedes, version increment (per the 2026-04-19 SDD v2 realignment; the prior "Path B" label has been removed)
 
 ## Scenario
 

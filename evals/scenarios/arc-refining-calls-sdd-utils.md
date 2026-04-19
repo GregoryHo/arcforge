@@ -14,7 +14,7 @@ Refine the design doc at `docs/plans/auth/2026-05-10/design.md` into a structure
 
 ## Context
 
-This is a Path A (new spec) scenario — no existing `specs/auth/spec.xml`. The project has a validation toolkit at `scripts/lib/sdd-utils.js` and schema guidance at `scripts/lib/sdd-schemas/`. The validation toolkit exports:
+This is a no-prior-spec scenario — no existing `specs/auth/spec.xml`, so the refiner produces a v1 spec from the design doc (per the 2026-04-19 SDD v2 realignment, D5 — there is no "Path A"/"initial" mode label, just one refiner behavior with conditional fields based on filesystem state). The project has a validation toolkit at `scripts/lib/sdd-utils.js` and schema guidance at `scripts/lib/sdd-schemas/`. The validation toolkit exports:
 
 - `parseDesignDoc(filePath)` + `validateDesignDoc(parsed)` for input validation (checks the design doc has required structure)
 - `parseSpecHeader(xmlContent)` + `validateSpecHeader(parsed)` for output validation (checks the produced spec.xml identity header is valid)

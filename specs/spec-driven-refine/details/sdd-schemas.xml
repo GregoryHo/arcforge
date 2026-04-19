@@ -24,36 +24,39 @@
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-sd-001-ac2">
-        The schema MUST specify mode detection rule: specs/&lt;spec-id&gt;/spec.xml
-        exists = iteration mode; does not exist = initial mode. Mode is
-        derived from filesystem state, not from design doc content.
+        The schema MUST specify that filesystem state determines which
+        conditional sections the refiner expects: specs/&lt;spec-id&gt;/spec.xml
+        exists → expect Context + Change Intent; does not exist → expect prose
+        with problem/solution/requirements/scope. This is a single-behavior
+        filesystem check, not a mode selector.
         <trace>REQ-F003, REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-sd-002">
-    <title>Design Doc Schema — Path A Structure (Initial)</title>
+    <title>Design Doc Schema — Structure When No Prior Spec Exists</title>
     <description>
-      The schema MUST define the minimum content requirements for a Path A
-      (new spec) design doc.
+      The schema MUST define the minimum content requirements for a design
+      doc produced when no prior spec exists for the target spec-id.
     </description>
     <acceptance_criteria>
       <criterion id="fr-sd-002-ac1">
-        The schema MUST specify Path A minimum content as: problem description
-        or motivation, proposed solution or architecture, identifiable
-        requirements (in prose), and scope declaration (includes/excludes).
-        No fixed section headings required — the refiner extracts from prose.
+        The schema MUST specify minimum content for this case as: problem
+        description or motivation, proposed solution or architecture,
+        identifiable requirements (in prose), and scope declaration
+        (includes/excludes). No fixed section headings required — the
+        refiner extracts from prose.
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-sd-002-ac2">
-        The schema MUST include a valid Path A example showing a complete
-        design doc with all minimum content elements identifiable.
+        The schema MUST include a valid example showing a complete design
+        doc with all minimum content elements identifiable.
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-sd-002-ac3">
-        The schema MUST include an invalid Path A example: an empty or stub
-        design doc (e.g., only "TODO: fill in later"), with error message:
+        The schema MUST include an invalid example: an empty or stub design
+        doc (e.g., only "TODO: fill in later"), with error message:
         "design doc has no substantive content".
         <trace>REQ-F008</trace>
       </criterion>
@@ -61,17 +64,16 @@
   </requirement>
 
   <requirement id="fr-sd-003">
-    <title>Design Doc Schema — Path B Structure (Gamma Mode)</title>
+    <title>Design Doc Schema — Structure When Prior Spec Exists</title>
     <description>
-      The schema MUST define the required sections for a Path B (iteration)
-      design doc in gamma mode.
+      The schema MUST define the required sections for a design doc produced
+      when a prior spec exists for the target spec-id.
     </description>
     <acceptance_criteria>
       <criterion id="fr-sd-003-ac1">
-        The schema MUST specify two required sections for gamma mode:
-        Context (current spec state summary, 2-3 sentences, spec version
-        reference) and Change Intent (what is changing and why). Missing
-        either section is ERROR.
+        The schema MUST specify two required sections: Context (current spec
+        state summary, 2-3 sentences, spec version reference) and Change
+        Intent (what is changing and why). Missing either section is ERROR.
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-sd-003-ac2">
@@ -81,17 +83,23 @@
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-sd-003-ac3">
-        The schema MUST include a valid Path B example showing a gamma mode
-        design doc with Context, Change Intent, and Architecture Impact
-        sections.
+        The schema MUST include a valid example with Context, Change Intent,
+        and Architecture Impact sections.
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-sd-003-ac4">
-        The schema MUST include invalid Path B examples: (1) missing Context
+        The schema MUST include invalid examples: (1) missing Context
         section with error "iteration design doc missing required Context
         section", (2) missing Change Intent section with error "iteration
         design doc missing required Change Intent section".
         <trace>REQ-F005, REQ-F008</trace>
+      </criterion>
+      <criterion id="fr-sd-003-ac5">
+        The schema MUST forbid pre-authored structured delta sections (no
+        explicit ADDED/MODIFIED/REMOVED lists in the design doc). The LLM
+        refiner derives the delta from narrative intent; the design doc
+        carries only human-authored narrative.
+        <trace>REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -105,17 +113,19 @@
     <acceptance_criteria>
       <criterion id="fr-sd-004-ac1">
         The validation summary MUST list these deterministic checks: file
-        existence (ERROR if missing, both paths), substantive content
-        (ERROR if empty/stub, both paths), Context section heading present
-        (ERROR if missing, Path B only), Change Intent section heading
-        present (ERROR if missing, Path B only), stale iteration date
-        (WARNING if date &lt;= spec's design_iteration, Path B only).
+        existence (ERROR if missing, always), substantive content (ERROR if
+        empty/stub, always), Context section heading present (ERROR if
+        missing, when prior spec exists), Change Intent section heading
+        present (ERROR if missing, when prior spec exists), stale iteration
+        date (WARNING if date &lt;= spec's design_iteration, when prior spec
+        exists).
         <trace>REQ-F003, REQ-F005, REQ-F026</trace>
       </criterion>
       <criterion id="fr-sd-004-ac2">
         The validation summary MUST list these LLM judgment checks:
-        requirements identifiable in prose (ERROR if none found, Path A
-        only), scope declared (ERROR if missing, Path A only).
+        requirements identifiable in prose (ERROR if none found, when no
+        prior spec exists), scope declared (ERROR if missing, when no
+        prior spec exists).
         <trace>REQ-F003</trace>
       </criterion>
     </acceptance_criteria>
@@ -237,7 +247,7 @@
       </criterion>
       <criterion id="fr-sd-008-ac3">
         validateDesignDoc deterministic checks: file exists (ERROR),
-        content not empty/stub (ERROR), for iteration mode: Context
+        content not empty/stub (ERROR), when prior spec exists: Context
         heading present (ERROR), Change Intent heading present (ERROR),
         iteration date not stale vs spec's design_iteration (WARNING).
         <trace>REQ-F003, REQ-F005, REQ-F026</trace>

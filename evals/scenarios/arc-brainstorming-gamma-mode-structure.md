@@ -5,7 +5,7 @@
 workflow
 
 ## Target
-arc-brainstorming Path B (gamma mode): when iterating on an existing spec with a user-provided change request, the skill guides the agent to produce a design doc that follows gamma mode structure — a `## Context` section naming the prior spec + a `## Change Intent` section describing what changes. This structure is load-bearing for arc-refining's iteration-mode validation downstream.
+arc-brainstorming iteration-design-doc structure (per 2026-04-19 SDD v2 realignment, D5): when iterating on an existing spec with a user-provided change request, the skill guides the agent to produce a design doc that contains the required iteration sections — a `## Context` section naming the prior spec + a `## Change Intent` section describing what changes. This structure is load-bearing for arc-refining's downstream validation when a prior spec exists. The prior "Path A / Path B / gamma mode" labels have been removed; this is one brainstorming behavior with context-sensitive output keyed on filesystem state (presence of `specs/<spec-id>/spec.xml`).
 
 ## Scenario
 
@@ -92,7 +92,7 @@ mixed
 
 ## Grader Config
 
-Behavioral assertion confirms the agent wrote under `docs/plans/auth/` (not, for example, `specs/auth/design-v2.md` or root `design.md`). Text assertions check for the gamma-mode structural markers (`## Context`, `## Change Intent`) that arc-refining's iteration mode depends on. A baseline agent without the arc-brainstorming skill may produce a document that lacks those section headers or writes to a non-canonical path.
+Behavioral assertion confirms the agent wrote under `docs/plans/auth/` (not, for example, `specs/auth/design-v2.md` or root `design.md`). Text assertions check for the iteration-design-doc structural markers (`## Context`, `## Change Intent`) that arc-refining depends on when a prior spec exists. A baseline agent without the arc-brainstorming skill may produce a document that lacks those section headers or writes to a non-canonical path.
 
 ## Trials
 

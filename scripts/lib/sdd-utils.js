@@ -7,6 +7,8 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseDagYaml } = require('./yaml-parser');
+const { DAG, TaskStatus } = require('./models');
 
 // Regex to extract spec_id and iteration date from canonical design doc path.
 // Matches: .../docs/plans/<spec-id>/<YYYY-MM-DD>[optional-suffix]/design.md
@@ -154,16 +156,22 @@ const SUPERSEDES_RE = /^[a-z0-9-]+:v\d+$/;
 /**
  * Parse a spec XML string and return a structured header object.
  *
+ * The `<overview>` element may contain 0..N `<delta>` children, accumulated
+ * across spec iterations (wiki-style). Returned `deltas` are ordered ascending
+ * by `version`. `latest_delta` is the last delta (highest version) or null
+ * when no deltas are present (v1 specs).
+ *
  * @param {string} specXmlContent - Raw XML string from spec.xml.
  * @returns {{ spec_id: string, spec_version: number, status: string, title: string,
  *   description: string, design_path: string, design_iteration: string,
  *   supersedes: string|null,
  *   scope: { includes: Array<{id: string, description: string}>, excludes: string[] },
- *   delta: { version: string, iteration: string,
+ *   deltas: Array<{ version: string, iteration: string,
  *     added: Array<{ref: string, text: string}>,
  *     modified: Array<{ref: string, text: string}>,
  *     removed: Array<{ref: string, reason: string, migration: string, text: string}>,
- *     renamed: Array<{ref_old: string, ref_new: string, reason: string}> } | null } | null}
+ *     renamed: Array<{ref_old: string, ref_new: string, reason: string}> }>,
+ *   latest_delta: object|null } | null}
  */
 function parseSpecHeader(specXmlContent) {
   if (!specXmlContent || typeof specXmlContent !== 'string') {
@@ -227,100 +235,18 @@ function parseSpecHeader(specXmlContent) {
     }
   }
 
-  // Extract delta (optional).
-  const deltaMatch = /<delta\s+([^>]*)>([\s\S]*?)<\/delta>/.exec(overview);
-  let delta = null;
-  if (deltaMatch) {
-    const attrsStr = deltaMatch[1];
-    const deltaBody = deltaMatch[2];
-
-    const versionAttr = /version="([^"]*)"/.exec(attrsStr);
-    const iterationAttr = /iteration="([^"]*)"/.exec(attrsStr);
-
-    function parseDeltaItems(tag) {
-      const re = new RegExp(`<${tag}\\s+ref="([^"]*)"[^>]*>([^<]*)</${tag}>`, 'g');
-      return [...deltaBody.matchAll(re)].map((m) => ({ ref: m[1], text: m[2].trim() }));
-    }
-
-    // Parse <removed> entries — three supported formats:
-    //   1. Self-closing:  <removed ref="x" />
-    //   2. Text content: <removed ref="x">Free text explanation</removed>
-    //   3. Structured:   <removed ref="x"><reason>...</reason><migration>...</migration></removed>
-    // Returns entries with { ref, reason, migration, text } for all formats.
-    function parseRemovedItems() {
-      const results = [];
-      // Format 1: self-closing.
-      const selfCloseRe = /<removed\s+ref="([^"]*)"[^>]*\/>/g;
-      for (const m of deltaBody.matchAll(selfCloseRe)) {
-        results.push({ ref: m[1], reason: '', migration: '', text: '' });
-      }
-      // Formats 2 & 3: open/close tag.
-      const openCloseRe = /<removed\s+ref="([^"]*)"[^>]*>([\s\S]*?)<\/removed>/g;
-      for (const m of deltaBody.matchAll(openCloseRe)) {
-        const ref = m[1];
-        const inner = m[2];
-        const reasonMatch = /<reason>([^<]*)<\/reason>/.exec(inner);
-        const migrationMatch = /<migration>([^<]*)<\/migration>/.exec(inner);
-        if (reasonMatch || migrationMatch) {
-          // Format 3: structured sub-elements.
-          results.push({
-            ref,
-            reason: reasonMatch ? reasonMatch[1].trim() : '',
-            migration: migrationMatch ? migrationMatch[1].trim() : '',
-            text: '',
-          });
-        } else {
-          // Format 2: legacy free text — use as reason for backward compat.
-          const text = inner.trim();
-          results.push({ ref, reason: text, migration: '', text });
-        }
-      }
-      return results;
-    }
-
-    // Parse <renamed> entries:
-    //   Self-closing: <renamed ref_old="x" ref_new="y" />
-    //   With reason:  <renamed ref_old="x" ref_new="y"><reason>...</reason></renamed>
-    function parseRenamedItems() {
-      const results = [];
-      // Self-closing renamed.
-      const selfCloseRe = /<renamed\s+([^>]*?)\/>/g;
-      for (const m of deltaBody.matchAll(selfCloseRe)) {
-        const attrs = m[1];
-        const refOldMatch = /ref_old="([^"]*)"/.exec(attrs);
-        const refNewMatch = /ref_new="([^"]*)"/.exec(attrs);
-        results.push({
-          ref_old: refOldMatch ? refOldMatch[1] : '',
-          ref_new: refNewMatch ? refNewMatch[1] : '',
-          reason: '',
-        });
-      }
-      // Open/close renamed with optional <reason>.
-      const openCloseRe = /<renamed\s+([^>]*)>([\s\S]*?)<\/renamed>/g;
-      for (const m of deltaBody.matchAll(openCloseRe)) {
-        const attrs = m[1];
-        const inner = m[2];
-        const refOldMatch = /ref_old="([^"]*)"/.exec(attrs);
-        const refNewMatch = /ref_new="([^"]*)"/.exec(attrs);
-        const reasonMatch = /<reason>([^<]*)<\/reason>/.exec(inner);
-        results.push({
-          ref_old: refOldMatch ? refOldMatch[1] : '',
-          ref_new: refNewMatch ? refNewMatch[1] : '',
-          reason: reasonMatch ? reasonMatch[1].trim() : '',
-        });
-      }
-      return results;
-    }
-
-    delta = {
-      version: versionAttr ? versionAttr[1] : null,
-      iteration: iterationAttr ? iterationAttr[1] : null,
-      added: parseDeltaItems('added'),
-      modified: parseDeltaItems('modified'),
-      removed: parseRemovedItems(),
-      renamed: parseRenamedItems(),
-    };
+  // Extract all <delta> blocks from <overview> in source order. Each
+  // iteration appends one; refiner never overwrites prior deltas. We do
+  // NOT sort here — validateSpecHeader needs source order to detect
+  // ordering violations. `latest_delta` is the last in source, which equals
+  // the highest-version delta in any well-formed spec.
+  const deltas = [];
+  const deltaRe = /<delta\s+([^>]*)>([\s\S]*?)<\/delta>/g;
+  for (const dm of overview.matchAll(deltaRe)) {
+    deltas.push(parseSingleDelta(dm[1], dm[2]));
   }
+
+  const latest_delta = deltas.length > 0 ? deltas[deltas.length - 1] : null;
 
   return {
     spec_id,
@@ -332,7 +258,104 @@ function parseSpecHeader(specXmlContent) {
     design_iteration,
     supersedes,
     scope,
-    delta,
+    deltas,
+    latest_delta,
+  };
+}
+
+// Parse the body of a single <delta attrs>body</delta> into the structured
+// shape used elsewhere in this module. Pulled out so parseSpecHeader can call
+// it once per delta block found in <overview>.
+function parseSingleDelta(attrsStr, deltaBody) {
+  const versionAttr = attrsStr.match(/version="([^"]*)"/);
+  const iterationAttr = attrsStr.match(/iteration="([^"]*)"/);
+
+  // Parse <added>/<modified> entries. Supports both shapes the schema
+  // documents:
+  //   Self-closing:  <added ref="x" />
+  //   Text content:  <added ref="x">Short description</added>
+  function parseDeltaItems(tag) {
+    const results = [];
+    const selfCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"[^>]*\\/>`, 'g');
+    for (const m of deltaBody.matchAll(selfCloseRe)) {
+      results.push({ ref: m[1], text: '' });
+    }
+    const openCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"[^>]*>([^<]*)</${tag}>`, 'g');
+    for (const m of deltaBody.matchAll(openCloseRe)) {
+      results.push({ ref: m[1], text: m[2].trim() });
+    }
+    return results;
+  }
+
+  // Parse <removed> entries — three supported formats:
+  //   1. Self-closing:  <removed ref="x" />
+  //   2. Text content: <removed ref="x">Free text explanation</removed>
+  //   3. Structured:   <removed ref="x"><reason>...</reason><migration>...</migration></removed>
+  // Returns entries with { ref, reason, migration, text } for all formats.
+  function parseRemovedItems() {
+    const results = [];
+    const selfCloseRe = /<removed\s+ref="([^"]*)"[^>]*\/>/g;
+    for (const m of deltaBody.matchAll(selfCloseRe)) {
+      results.push({ ref: m[1], reason: '', migration: '', text: '' });
+    }
+    const openCloseRe = /<removed\s+ref="([^"]*)"[^>]*>([\s\S]*?)<\/removed>/g;
+    for (const m of deltaBody.matchAll(openCloseRe)) {
+      const ref = m[1];
+      const inner = m[2];
+      const reasonMatch = inner.match(/<reason>([^<]*)<\/reason>/);
+      const migrationMatch = inner.match(/<migration>([^<]*)<\/migration>/);
+      if (reasonMatch || migrationMatch) {
+        results.push({
+          ref,
+          reason: reasonMatch ? reasonMatch[1].trim() : '',
+          migration: migrationMatch ? migrationMatch[1].trim() : '',
+          text: '',
+        });
+      } else {
+        const text = inner.trim();
+        results.push({ ref, reason: text, migration: '', text });
+      }
+    }
+    return results;
+  }
+
+  // Parse <renamed> entries (self-closing or open/close with optional <reason>).
+  function parseRenamedItems() {
+    const results = [];
+    const selfCloseRe = /<renamed\s+([^>]*?)\/>/g;
+    for (const m of deltaBody.matchAll(selfCloseRe)) {
+      const attrs = m[1];
+      const refOldMatch = attrs.match(/ref_old="([^"]*)"/);
+      const refNewMatch = attrs.match(/ref_new="([^"]*)"/);
+      results.push({
+        ref_old: refOldMatch ? refOldMatch[1] : '',
+        ref_new: refNewMatch ? refNewMatch[1] : '',
+        reason: '',
+      });
+    }
+    const openCloseRe = /<renamed\s+([^>]*)>([\s\S]*?)<\/renamed>/g;
+    for (const m of deltaBody.matchAll(openCloseRe)) {
+      const attrs = m[1];
+      const inner = m[2];
+      const refOldMatch = attrs.match(/ref_old="([^"]*)"/);
+      const refNewMatch = attrs.match(/ref_new="([^"]*)"/);
+      const reasonMatch = inner.match(/<reason>([^<]*)<\/reason>/);
+      results.push({
+        ref_old: refOldMatch ? refOldMatch[1] : '',
+        ref_new: refNewMatch ? refNewMatch[1] : '',
+        reason: reasonMatch ? reasonMatch[1].trim() : '',
+      });
+    }
+    return results;
+  }
+
+  return {
+    version: versionAttr ? versionAttr[1] : null,
+    iteration: iterationAttr ? iterationAttr[1] : null,
+    added: parseDeltaItems('added'),
+    modified: parseDeltaItems('modified'),
+    removed: parseRemovedItems(),
+    renamed: parseRenamedItems(),
   };
 }
 
@@ -435,66 +458,86 @@ function validateSpecHeader(parsed, options = {}) {
     });
   }
 
-  // Delta required for v2+ (v1 has no delta by design — absence signals "plan all")
-  if (parsed.spec_version > 1 && !parsed.delta) {
+  // Multi-delta rules. <overview> may contain 0..N <delta> children; refiner
+  // appends one per iteration and never overwrites prior deltas. The last
+  // delta is the current sprint's; earlier deltas are historical record.
+
+  const deltas = parsed.deltas || [];
+
+  // (a) v2+ requires at least one <delta>. v1 has none by design.
+  if (parsed.spec_version > 1 && deltas.length === 0) {
     issues.push({
       level: 'ERROR',
-      field: 'delta',
-      message: `spec_version ${parsed.spec_version} must include a <delta> element recording what changed. v1 specs have no delta; v2+ specs must.`,
+      field: 'deltas',
+      message: `spec_version ${parsed.spec_version} must include at least one <delta> element. v1 specs have no delta; v2+ specs accumulate one per iteration.`,
     });
   }
 
-  // delta.version (string from XML attribute) must match spec_version (number)
-  if (parsed.delta && parsed.spec_version !== null && parsed.spec_version !== undefined) {
-    const deltaVersionNum = Number.parseInt(parsed.delta.version, 10);
-    if (!Number.isNaN(deltaVersionNum) && deltaVersionNum !== parsed.spec_version) {
+  // (b) Strictly ascending by version. Catches both wrong order and duplicates.
+  for (let i = 1; i < deltas.length; i++) {
+    const prevVer = Number.parseInt(deltas[i - 1].version, 10);
+    const currVer = Number.parseInt(deltas[i].version, 10);
+    if (Number.isNaN(prevVer) || Number.isNaN(currVer) || currVer <= prevVer) {
       issues.push({
         level: 'ERROR',
-        field: 'delta/version',
-        message: `delta version "${parsed.delta.version}" must match spec_version ${parsed.spec_version}`,
+        field: 'deltas/order',
+        message: `<delta> children must be ordered ascending by unique version. Found "${deltas[i - 1].version}" before "${deltas[i].version}".`,
       });
     }
   }
 
-  // delta.iteration must match source/design_iteration (delta applies to this iteration)
-  if (parsed.delta && parsed.design_iteration) {
-    if (parsed.delta.iteration !== parsed.design_iteration) {
+  // (c) Last delta's version must equal current spec_version.
+  if (deltas.length > 0 && parsed.spec_version !== null && parsed.spec_version !== undefined) {
+    const last = deltas[deltas.length - 1];
+    const lastVer = Number.parseInt(last.version, 10);
+    if (!Number.isNaN(lastVer) && lastVer !== parsed.spec_version) {
       issues.push({
         level: 'ERROR',
-        field: 'delta/iteration',
-        message: `delta iteration "${parsed.delta.iteration}" must match source/design_iteration "${parsed.design_iteration}"`,
+        field: 'deltas/latest/version',
+        message: `Last <delta> version "${last.version}" must equal current spec_version ${parsed.spec_version}. Earlier deltas keep their original (lower) version values.`,
       });
     }
   }
 
-  // Each removed entry MUST include a reason (Enhancement 3).
-  if (parsed.delta?.removed) {
-    for (const rem of parsed.delta.removed) {
+  // (d) Last delta's iteration must equal current source/design_iteration.
+  // Earlier deltas keep their original iteration values — not checked here.
+  if (deltas.length > 0 && parsed.design_iteration) {
+    const last = deltas[deltas.length - 1];
+    if (last.iteration !== parsed.design_iteration) {
+      issues.push({
+        level: 'ERROR',
+        field: 'deltas/latest/iteration',
+        message: `Last <delta> iteration "${last.iteration}" must equal source/design_iteration "${parsed.design_iteration}".`,
+      });
+    }
+  }
+
+  // (e) Per-child correctness: applies to every delta (historical and current).
+  // A spec with malformed historical entries is malformed — the validator
+  // reports it so it can be repaired.
+  for (const d of deltas) {
+    for (const rem of d.removed || []) {
       if (!rem.reason && !rem.text) {
         issues.push({
           level: 'ERROR',
-          field: 'delta/removed',
-          message: `removed requirement '${rem.ref}' MUST include a <reason> explaining why the requirement was removed.`,
+          field: 'deltas/removed',
+          message: `removed requirement '${rem.ref}' (delta v${d.version}) MUST include a <reason> explaining why the requirement was removed.`,
         });
       }
     }
-  }
-
-  // Each renamed entry MUST have both ref_old and ref_new (Enhancement 5).
-  if (parsed.delta?.renamed) {
-    for (const ren of parsed.delta.renamed) {
+    for (const ren of d.renamed || []) {
       if (!ren.ref_old) {
         issues.push({
           level: 'ERROR',
-          field: 'delta/renamed',
-          message: `renamed entry is missing ref_old — both ref_old and ref_new are required.`,
+          field: 'deltas/renamed',
+          message: `renamed entry (delta v${d.version}) is missing ref_old — both ref_old and ref_new are required.`,
         });
       }
       if (!ren.ref_new) {
         issues.push({
           level: 'ERROR',
-          field: 'delta/renamed',
-          message: `renamed entry is missing ref_new — both ref_old and ref_new are required.`,
+          field: 'deltas/renamed',
+          message: `renamed entry (delta v${d.version}) is missing ref_new — both ref_old and ref_new are required.`,
         });
       }
     }
@@ -504,4 +547,44 @@ function validateSpecHeader(parsed, options = {}) {
   return { valid, issues };
 }
 
-module.exports = { parseDesignDoc, validateDesignDoc, parseSpecHeader, validateSpecHeader };
+/**
+ * Check completion status of a sprint's dag.yaml.
+ *
+ * Used by the refiner's DAG completion gate (per fr-rf-012) to decide whether
+ * to allow a new iteration. Returns null when the file does not exist — refiner
+ * treats that as "no prior sprint to be incomplete; proceed".
+ *
+ * @param {string} dagYamlPath - Path to the dag.yaml file (typically
+ *   `specs/<spec-id>/dag.yaml`).
+ * @returns {{ total: number, completed: number, incomplete: number,
+ *   incompleteEpics: Array<{id: string, status: string}> } | null} Null if
+ *   the file does not exist; otherwise counts plus the incomplete epic list.
+ */
+function checkDagStatus(dagYamlPath) {
+  if (!fs.existsSync(dagYamlPath)) {
+    return null;
+  }
+  const content = fs.readFileSync(dagYamlPath, 'utf8');
+  const dag = DAG.fromObject(parseDagYaml(content));
+
+  const total = dag.epics.length;
+  const completedEpics = dag.epics.filter((e) => e.status === TaskStatus.COMPLETED);
+  const incompleteList = dag.epics
+    .filter((e) => e.status !== TaskStatus.COMPLETED)
+    .map((e) => ({ id: e.id, status: e.status }));
+
+  return {
+    total,
+    completed: completedEpics.length,
+    incomplete: incompleteList.length,
+    incompleteEpics: incompleteList,
+  };
+}
+
+module.exports = {
+  parseDesignDoc,
+  validateDesignDoc,
+  parseSpecHeader,
+  validateSpecHeader,
+  checkDagStatus,
+};

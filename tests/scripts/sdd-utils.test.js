@@ -371,11 +371,12 @@ describe('parseSpecHeader', () => {
     expect(result.spec_version).toBe(2);
     expect(result.supersedes).toBe('auth:v1');
     expect(result.scope.includes).toHaveLength(2);
-    expect(result.delta).not.toBeNull();
-    expect(result.delta.version).toBe('2');
-    expect(result.delta.added).toHaveLength(1);
-    expect(result.delta.modified).toHaveLength(1);
-    expect(result.delta.removed).toHaveLength(0);
+    expect(result.deltas).toHaveLength(1);
+    expect(result.latest_delta).not.toBeNull();
+    expect(result.latest_delta.version).toBe('2');
+    expect(result.latest_delta.added).toHaveLength(1);
+    expect(result.latest_delta.modified).toHaveLength(1);
+    expect(result.latest_delta.removed).toHaveLength(0);
   });
 });
 
@@ -412,7 +413,7 @@ describe('validateSpecHeader', () => {
       design_iteration: null,
       supersedes: null,
       scope: { includes: [], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -437,7 +438,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-01',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -456,7 +457,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-01',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -478,7 +479,7 @@ describe('validateSpecHeader', () => {
       design_iteration: 'april-16',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -502,7 +503,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-16',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -524,7 +525,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-16',
       supersedes: 'auth-v1',
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
@@ -546,7 +547,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-01',
       supersedes: null,
       scope: { includes: [], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -568,7 +569,7 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-01',
       supersedes: null,
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -589,14 +590,16 @@ describe('validateSpecHeader', () => {
       design_iteration: '2026-04-16',
       supersedes: 'auth:v1',
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [{ ref: 'fr-oauth-001', text: 'OAuth support' }],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [{ ref: 'fr-oauth-001', text: 'OAuth support' }],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
     };
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -627,10 +630,10 @@ describe('parseSpecHeader — removed element formats', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.removed).toHaveLength(1);
-    expect(result.delta.removed[0].ref).toBe('fr-login-legacy');
-    expect(result.delta.removed[0].reason).toBe('');
-    expect(result.delta.removed[0].text).toBe('');
+    expect(result.latest_delta.removed).toHaveLength(1);
+    expect(result.latest_delta.removed[0].ref).toBe('fr-login-legacy');
+    expect(result.latest_delta.removed[0].reason).toBe('');
+    expect(result.latest_delta.removed[0].text).toBe('');
   });
 
   it('parses old-format removed (text content) — text preserved, reason set to text', () => {
@@ -651,11 +654,11 @@ describe('parseSpecHeader — removed element formats', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.removed).toHaveLength(1);
-    expect(result.delta.removed[0].ref).toBe('fr-password-reset');
-    expect(result.delta.removed[0].text).toBe('Replaced by OAuth flow');
-    expect(result.delta.removed[0].reason).toBe('Replaced by OAuth flow');
-    expect(result.delta.removed[0].migration).toBe('');
+    expect(result.latest_delta.removed).toHaveLength(1);
+    expect(result.latest_delta.removed[0].ref).toBe('fr-password-reset');
+    expect(result.latest_delta.removed[0].text).toBe('Replaced by OAuth flow');
+    expect(result.latest_delta.removed[0].reason).toBe('Replaced by OAuth flow');
+    expect(result.latest_delta.removed[0].migration).toBe('');
   });
 
   it('parses new-format removed (structured reason + migration)', () => {
@@ -679,8 +682,8 @@ describe('parseSpecHeader — removed element formats', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.removed).toHaveLength(1);
-    const rem = result.delta.removed[0];
+    expect(result.latest_delta.removed).toHaveLength(1);
+    const rem = result.latest_delta.removed[0];
     expect(rem.ref).toBe('fr-legacy-session');
     expect(rem.reason).toBe('Session tokens replaced by JWT — no stateful sessions needed');
     expect(rem.migration).toBe(
@@ -708,8 +711,8 @@ describe('parseSpecHeader — removed element formats', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.removed).toHaveLength(1);
-    const rem = result.delta.removed[0];
+    expect(result.latest_delta.removed).toHaveLength(1);
+    const rem = result.latest_delta.removed[0];
     expect(rem.ref).toBe('fr-debug-endpoint');
     expect(rem.reason).toBe('Debug endpoint removed for security — no migration path exists');
     expect(rem.migration).toBe('');
@@ -745,53 +748,59 @@ describe('validateSpecHeader — removed reason validation', () => {
       design_iteration: '2026-04-16',
       supersedes: 'auth:v1',
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
       ...overrides,
     };
   }
 
   it('flags removed entry with no reason and no text as ERROR on delta/removed', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [{ ref: 'fr-legacy-001', reason: '', text: '', migration: '' }],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [{ ref: 'fr-legacy-001', reason: '', text: '', migration: '' }],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
-    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/removed');
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'deltas/removed');
     expect(err).toBeDefined();
     expect(err.message).toMatch(/reason/i);
   });
 
   it('passes removed entry with reason set via new structured format', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [
-          {
-            ref: 'fr-legacy-001',
-            reason: 'Session tokens replaced by JWT',
-            text: '',
-            migration: '',
-          },
-        ],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [
+            {
+              ref: 'fr-legacy-001',
+              reason: 'Session tokens replaced by JWT',
+              text: '',
+              migration: '',
+            },
+          ],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -800,21 +809,23 @@ describe('validateSpecHeader — removed reason validation', () => {
 
   it('passes removed entry with reason from legacy text content', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [
-          {
-            ref: 'fr-password-reset',
-            reason: 'Replaced by OAuth flow',
-            text: 'Replaced by OAuth flow',
-            migration: '',
-          },
-        ],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [
+            {
+              ref: 'fr-password-reset',
+              reason: 'Replaced by OAuth flow',
+              text: 'Replaced by OAuth flow',
+              migration: '',
+            },
+          ],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -847,8 +858,8 @@ describe('parseSpecHeader — renamed element', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.renamed).toHaveLength(1);
-    const ren = result.delta.renamed[0];
+    expect(result.latest_delta.renamed).toHaveLength(1);
+    const ren = result.latest_delta.renamed[0];
     expect(ren.ref_old).toBe('fr-auth-001');
     expect(ren.ref_new).toBe('fr-jwt-001');
     expect(ren.reason).toBe('Renamed to reflect broader scope after OAuth iteration');
@@ -872,8 +883,8 @@ describe('parseSpecHeader — renamed element', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.renamed).toHaveLength(1);
-    const ren = result.delta.renamed[0];
+    expect(result.latest_delta.renamed).toHaveLength(1);
+    const ren = result.latest_delta.renamed[0];
     expect(ren.ref_old).toBe('fr-login-001');
     expect(ren.ref_new).toBe('fr-auth-login-001');
     expect(ren.reason).toBe('');
@@ -897,7 +908,7 @@ describe('parseSpecHeader — renamed element', () => {
       </delta>
     </overview></spec>`;
     const result = parseSpecHeader(xml);
-    expect(result.delta.renamed).toHaveLength(0);
+    expect(result.latest_delta.renamed).toHaveLength(0);
   });
 });
 
@@ -930,64 +941,72 @@ describe('validateSpecHeader — renamed validation', () => {
       design_iteration: '2026-04-16',
       supersedes: 'auth:v1',
       scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
       ...overrides,
     };
   }
 
   it('flags renamed entry with missing ref_old as ERROR on delta/renamed', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [{ ref_old: '', ref_new: 'fr-jwt-001', reason: '' }],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [{ ref_old: '', ref_new: 'fr-jwt-001', reason: '' }],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
-    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/renamed');
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'deltas/renamed');
     expect(err).toBeDefined();
     expect(err.message).toMatch(/ref_old/i);
   });
 
   it('flags renamed entry with missing ref_new as ERROR on delta/renamed', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [{ ref_old: 'fr-auth-001', ref_new: '', reason: '' }],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [{ ref_old: 'fr-auth-001', ref_new: '', reason: '' }],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(false);
-    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'delta/renamed');
+    const err = result.issues.find((i) => i.level === 'ERROR' && i.field === 'deltas/renamed');
     expect(err).toBeDefined();
     expect(err.message).toMatch(/ref_new/i);
   });
 
   it('passes valid renamed entry with both refs present', () => {
     const parsed = baseParsed({
-      delta: {
-        version: '2',
-        iteration: '2026-04-16',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [{ ref_old: 'fr-auth-001', ref_new: 'fr-jwt-001', reason: '' }],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [{ ref_old: 'fr-auth-001', ref_new: 'fr-jwt-001', reason: '' }],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.valid).toBe(true);
@@ -1032,22 +1051,24 @@ describe('validateSpecHeader — delta placement consistency', () => {
       design_iteration: '2026-05-10',
       supersedes: 'test:v1',
       scope: { includes: [{ id: 'x', description: 'y' }], excludes: [] },
-      delta: {
-        version: '2',
-        iteration: '2026-05-10',
-        added: [{ ref: 'fr-x-001', text: 'New' }],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-05-10',
+          added: [{ ref: 'fr-x-001', text: 'New' }],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
       ...overrides,
     };
   }
 
   it('flags missing delta for v2+ as ERROR', () => {
-    const parsed = makeV2Parsed({ delta: null });
+    const parsed = makeV2Parsed({ deltas: [] });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
-    const deltaErrors = result.issues.filter((i) => i.level === 'ERROR' && i.field === 'delta');
+    const deltaErrors = result.issues.filter((i) => i.level === 'ERROR' && i.field === 'deltas');
     expect(deltaErrors.length).toBeGreaterThan(0);
   });
 
@@ -1055,47 +1076,53 @@ describe('validateSpecHeader — delta placement consistency', () => {
     const parsed = makeV2Parsed({
       spec_version: 1,
       supersedes: null,
-      delta: null,
+      deltas: [],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     const deltaPresenceErrors = result.issues.filter(
-      (i) => i.level === 'ERROR' && i.field === 'delta',
+      (i) => i.level === 'ERROR' && i.field === 'deltas',
     );
     expect(deltaPresenceErrors).toHaveLength(0);
   });
 
   it('flags delta.version mismatch with spec_version as ERROR', () => {
     const parsed = makeV2Parsed({
-      delta: {
-        version: '3', // mismatched
-        iteration: '2026-05-10',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '3', // mismatched
+          iteration: '2026-05-10',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.issues).toEqual(
-      expect.arrayContaining([expect.objectContaining({ level: 'ERROR', field: 'delta/version' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ level: 'ERROR', field: 'deltas/latest/version' }),
+      ]),
     );
   });
 
   it('flags delta.iteration mismatch with design_iteration as ERROR', () => {
     const parsed = makeV2Parsed({
-      delta: {
-        version: '2',
-        iteration: '2026-06-01', // mismatched
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-06-01', // mismatched
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     expect(result.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ level: 'ERROR', field: 'delta/iteration' }),
+        expect.objectContaining({ level: 'ERROR', field: 'deltas/latest/iteration' }),
       ]),
     );
   });
@@ -1113,14 +1140,16 @@ describe('validateSpecHeader — delta placement consistency', () => {
     // Compare as strings — suffix like "-v2" is allowed as long as both match
     const parsed = makeV2Parsed({
       design_iteration: '2026-04-16-v2',
-      delta: {
-        version: '2',
-        iteration: '2026-04-16-v2',
-        added: [],
-        modified: [],
-        removed: [],
-        renamed: [],
-      },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16-v2',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
     });
     const result = validateSpecHeader(parsed, { cwd: tmpDir });
     // Only assert on delta-related errors. design_iteration format may fail
@@ -1145,13 +1174,13 @@ describe('parseSpecHeader integration with real artifacts', () => {
     expect(parsed).not.toBeNull();
     expect(parsed.spec_id).toBe('spec-driven-refine');
     expect(parsed.spec_version).toBe(2);
-    expect(parsed.delta).not.toBeNull();
-    expect(parsed.delta.version).toBe('2');
-    expect(parsed.delta.iteration).toBe('2026-04-16-v2');
-    expect(parsed.delta.modified.length).toBeGreaterThan(0);
-    expect(parsed.delta.removed.length).toBeGreaterThan(0);
+    expect(parsed.latest_delta).not.toBeNull();
+    expect(parsed.latest_delta.version).toBe('2');
+    expect(parsed.latest_delta.iteration).toBe('2026-04-16-v2');
+    expect(parsed.latest_delta.modified.length).toBeGreaterThan(0);
+    expect(parsed.latest_delta.removed.length).toBeGreaterThan(0);
     // renamed array should exist (added by enhancement 5) — may be empty
-    expect(Array.isArray(parsed.delta.renamed)).toBe(true);
+    expect(Array.isArray(parsed.latest_delta.renamed)).toBe(true);
   });
 
   it('validates specs/spec-driven-refine/spec.xml with zero ERROR issues', () => {
@@ -1201,7 +1230,7 @@ describe('validateSpecHeader — design_iteration identifier format', () => {
       design_iteration: iteration,
       supersedes: null,
       scope: { includes: [{ id: 'x', description: 'y' }], excludes: [] },
-      delta: null,
+      deltas: [],
     };
   }
 
@@ -1237,5 +1266,371 @@ describe('validateSpecHeader — design_iteration identifier format', () => {
       (i) => i.level === 'ERROR' && i.field === 'source/design_iteration',
     );
     expect(iterErrors.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseSpecHeader — multi-delta accumulation (Phase 2 SDD v2 realignment)
+// ---------------------------------------------------------------------------
+
+describe('parseSpecHeader — multi-delta accumulation', () => {
+  it('returns empty deltas array for v1 spec (no <delta> elements)', () => {
+    const result = parseSpecHeader(V1_XML);
+    expect(result.deltas).toEqual([]);
+    expect(result.latest_delta).toBeNull();
+  });
+
+  it('returns deltas array of length 1 for v2 spec (one <delta>)', () => {
+    const result = parseSpecHeader(V2_XML);
+    expect(result.deltas).toHaveLength(1);
+    expect(result.latest_delta).toBe(result.deltas[0]);
+    expect(result.latest_delta.version).toBe('2');
+  });
+
+  it('parses v3 spec with v2 + v3 deltas accumulated', () => {
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>3</spec_version>
+      <status>active</status>
+      <supersedes>auth:v2</supersedes>
+      <title>Auth System</title>
+      <description>Auth v3</description>
+      <source>
+        <design_path>docs/plans/auth/2026-06-01/design.md</design_path>
+        <design_iteration>2026-06-01</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="2" iteration="2026-04-16">
+        <added ref="fr-oauth-001" />
+        <modified ref="fr-login-001" />
+      </delta>
+      <delta version="3" iteration="2026-06-01">
+        <added ref="fr-device-001" />
+        <removed ref="fr-legacy-001">
+          <reason>Replaced in v3 by device-trust scoring</reason>
+        </removed>
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.deltas).toHaveLength(2);
+    expect(result.deltas[0].version).toBe('2');
+    expect(result.deltas[1].version).toBe('3');
+    expect(result.latest_delta.version).toBe('3');
+    expect(result.latest_delta.added[0].ref).toBe('fr-device-001');
+    expect(result.latest_delta.removed[0].ref).toBe('fr-legacy-001');
+    // v2 delta is preserved verbatim
+    expect(result.deltas[0].added[0].ref).toBe('fr-oauth-001');
+    expect(result.deltas[0].modified[0].ref).toBe('fr-login-001');
+  });
+
+  it('preserves source order of <delta> children (does not sort)', () => {
+    // Out-of-order deltas: v3 appears before v2 in source.
+    // parseSpecHeader keeps source order so the validator can flag the violation.
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>3</spec_version>
+      <status>active</status>
+      <supersedes>auth:v2</supersedes>
+      <title>Auth System</title>
+      <description>Auth v3</description>
+      <source>
+        <design_path>docs/plans/auth/2026-06-01/design.md</design_path>
+        <design_iteration>2026-06-01</design_iteration>
+      </source>
+      <scope><includes><feature id="login">User login</feature></includes></scope>
+      <delta version="3" iteration="2026-06-01">
+        <added ref="fr-device-001" />
+      </delta>
+      <delta version="2" iteration="2026-04-16">
+        <added ref="fr-oauth-001" />
+      </delta>
+    </overview></spec>`;
+    const result = parseSpecHeader(xml);
+    expect(result.deltas[0].version).toBe('3');
+    expect(result.deltas[1].version).toBe('2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpecHeader — multi-delta rules (Phase 2 SDD v2 realignment)
+// ---------------------------------------------------------------------------
+
+describe('validateSpecHeader — multi-delta rules', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-multi-delta-'));
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-06-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeV3Parsed(overrides = {}) {
+    return {
+      spec_id: 'auth',
+      spec_version: 3,
+      status: 'active',
+      title: 'Auth',
+      description: 'Auth v3',
+      design_path: 'docs/plans/auth/2026-06-01/design.md',
+      design_iteration: '2026-06-01',
+      supersedes: 'auth:v2',
+      scope: { includes: [{ id: 'login', description: 'login' }], excludes: [] },
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [{ ref: 'fr-oauth-001', text: '' }],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+        {
+          version: '3',
+          iteration: '2026-06-01',
+          added: [{ ref: 'fr-device-001', text: '' }],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  it('passes v3 spec with two correctly ordered deltas', () => {
+    const parsed = makeV3Parsed();
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const errors = result.issues.filter((i) => i.level === 'ERROR');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('flags out-of-order deltas as ERROR on deltas/order', () => {
+    const parsed = makeV3Parsed({
+      deltas: [
+        {
+          version: '3',
+          iteration: '2026-06-01',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const orderErrs = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'deltas/order',
+    );
+    expect(orderErrs.length).toBeGreaterThan(0);
+  });
+
+  it('flags duplicate delta versions as ERROR on deltas/order', () => {
+    const parsed = makeV3Parsed({
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+        {
+          version: '2',
+          iteration: '2026-05-10',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+        {
+          version: '3',
+          iteration: '2026-06-01',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const orderErrs = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'deltas/order',
+    );
+    expect(orderErrs.length).toBeGreaterThan(0);
+  });
+
+  it('does NOT validate earlier deltas iteration against current design_iteration', () => {
+    // v2's iteration "2026-04-16" differs from current design_iteration "2026-06-01" —
+    // this is correct (historical record). Only the LAST delta's iteration is checked.
+    const parsed = makeV3Parsed();
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const iterErrs = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field.startsWith('deltas') && i.field.includes('iteration'),
+    );
+    expect(iterErrs).toHaveLength(0);
+  });
+
+  it('flags last delta version mismatch (v3 spec but last delta is v2)', () => {
+    const parsed = makeV3Parsed({
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const verErrs = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'deltas/latest/version',
+    );
+    expect(verErrs.length).toBeGreaterThan(0);
+  });
+
+  it('flags malformed historical delta (removed without reason in v2 delta of v3 spec)', () => {
+    const parsed = makeV3Parsed({
+      deltas: [
+        {
+          version: '2',
+          iteration: '2026-04-16',
+          added: [],
+          modified: [],
+          removed: [{ ref: 'fr-old-001', reason: '', text: '', migration: '' }],
+          renamed: [],
+        },
+        {
+          version: '3',
+          iteration: '2026-06-01',
+          added: [],
+          modified: [],
+          removed: [],
+          renamed: [],
+        },
+      ],
+    });
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    const remErrs = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'deltas/removed',
+    );
+    expect(remErrs.length).toBeGreaterThan(0);
+    expect(remErrs[0].message).toMatch(/v2/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkDagStatus — refiner gate helper (Phase 2 SDD v2 realignment, fr-rf-012)
+// ---------------------------------------------------------------------------
+
+const { checkDagStatus } = require('../../scripts/lib/sdd-utils');
+
+describe('checkDagStatus', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-dag-status-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns null when dag.yaml does not exist', () => {
+    const result = checkDagStatus(path.join(tmpDir, 'specs/auth/dag.yaml'));
+    expect(result).toBeNull();
+  });
+
+  it('returns all-completed counts for a fully completed sprint', () => {
+    const dagPath = path.join(tmpDir, 'specs/auth/dag.yaml');
+    fs.mkdirSync(path.dirname(dagPath), { recursive: true });
+    fs.writeFileSync(
+      dagPath,
+      [
+        'epics:',
+        '  - id: epic-a',
+        '    name: Epic A',
+        '    status: completed',
+        '    spec_path: specs/auth/epics/epic-a/epic.md',
+        '    depends_on: []',
+        '    features: []',
+        '  - id: epic-b',
+        '    name: Epic B',
+        '    status: completed',
+        '    spec_path: specs/auth/epics/epic-b/epic.md',
+        '    depends_on: []',
+        '    features: []',
+        '',
+      ].join('\n'),
+    );
+    const result = checkDagStatus(dagPath);
+    expect(result.total).toBe(2);
+    expect(result.completed).toBe(2);
+    expect(result.incomplete).toBe(0);
+    expect(result.incompleteEpics).toEqual([]);
+  });
+
+  it('returns incomplete list with id and status when any epic is not completed', () => {
+    const dagPath = path.join(tmpDir, 'specs/auth/dag.yaml');
+    fs.mkdirSync(path.dirname(dagPath), { recursive: true });
+    fs.writeFileSync(
+      dagPath,
+      [
+        'epics:',
+        '  - id: epic-a',
+        '    name: Epic A',
+        '    status: completed',
+        '    spec_path: specs/auth/epics/epic-a/epic.md',
+        '    depends_on: []',
+        '    features: []',
+        '  - id: epic-b',
+        '    name: Epic B',
+        '    status: in_progress',
+        '    spec_path: specs/auth/epics/epic-b/epic.md',
+        '    depends_on: []',
+        '    features: []',
+        '  - id: epic-c',
+        '    name: Epic C',
+        '    status: pending',
+        '    spec_path: specs/auth/epics/epic-c/epic.md',
+        '    depends_on: []',
+        '    features: []',
+        '',
+      ].join('\n'),
+    );
+    const result = checkDagStatus(dagPath);
+    expect(result.total).toBe(3);
+    expect(result.completed).toBe(1);
+    expect(result.incomplete).toBe(2);
+    expect(result.incompleteEpics).toEqual([
+      { id: 'epic-b', status: 'in_progress' },
+      { id: 'epic-c', status: 'pending' },
+    ]);
+  });
+
+  it('returns zero counts for a dag.yaml with no epics', () => {
+    const dagPath = path.join(tmpDir, 'specs/auth/dag.yaml');
+    fs.mkdirSync(path.dirname(dagPath), { recursive: true });
+    fs.writeFileSync(dagPath, 'epics: []\n');
+    const result = checkDagStatus(dagPath);
+    expect(result.total).toBe(0);
+    expect(result.completed).toBe(0);
+    expect(result.incomplete).toBe(0);
+    expect(result.incompleteEpics).toEqual([]);
   });
 });

@@ -7,11 +7,19 @@ description: Use when breaking down a structured spec into an executable DAG, wh
 
 ## Overview
 
-Convert a spec into an executable DAG with epic/feature breakdown. The DAG is a derived view — it is rebuilt from scratch each sprint, not incrementally maintained. Maintain strict 1:1 mapping for full traceability from spec requirements to implementation tasks.
+Convert a spec into an executable DAG with epic/feature breakdown. The DAG is a derived view, rebuilt from scratch each sprint, never archived. The planner is a **pure function**:
+
+```
+(spec + delta) → (dag.yaml + epics/)
+```
+
+No state preservation. No archive. No gate. No side effects beyond the output paths. The DAG is disposable per sprint — historical traceability lives in the spec's accumulated `<delta>` elements and in `docs/plans/<spec-id>/<iteration>/design.md` folders, not in archived DAGs.
 
 **R2 Unidirectional:** Planner MUST NOT write to `specs/<spec-id>/spec.xml` or `specs/<spec-id>/details/`. Its only output paths are `specs/<spec-id>/dag.yaml` and `specs/<spec-id>/epics/`.
 
 **Three-Layer Rule:** Planner MUST NOT read the design doc. It works from the spec only. The spec's `<delta>` metadata provides planning scope, making design doc access unnecessary (three-layer model: design doc → spec → DAG).
+
+**No gate here.** The DAG completion gate that prevents iterating on an incomplete sprint lives in `arc-refining`, not here. By the time the planner runs, the refiner has already certified the prior sprint is complete (or this is v1). Planner trusts that and overwrites.
 
 ## When NOT to Use
 
@@ -24,9 +32,9 @@ If the user has not provided a spec-id, scan `specs/` to present available targe
 
 Once you have the spec-id, all inputs come from `specs/<spec-id>/spec.xml` and the `specs/<spec-id>/details/` directory.
 
-## Phase 1 — Input Validation
+## Phase 1 — Input Validation and Scope Extraction
 
-Before any decomposition, validate the spec programmatically using sdd-utils:
+Validate the spec programmatically using sdd-utils, and extract the current sprint's scope from the latest `<delta>`:
 
 ```bash
 node -e "
@@ -36,61 +44,47 @@ node -e "
   const parsed = parseSpecHeader(xml);
   const result = validateSpecHeader(parsed);
   console.log(JSON.stringify(result, null, 2));
-  if (parsed && parsed.delta) {
-    const scope = [
-      ...parsed.delta.added.map(x => x.ref),
-      ...parsed.delta.modified.map(x => x.ref),
-    ];
-    console.log('Delta scope (added + modified):', scope);
-    console.log('Renamed (use ref_new):', parsed.delta.renamed.map(x => x.ref_new));
-    console.log('Removed (skip — no epic generated):', parsed.delta.removed.map(x => x.ref));
+  if (parsed && parsed.latest_delta) {
+    const d = parsed.latest_delta;
+    console.log('Sprint version:', d.version, 'iteration:', d.iteration);
+    console.log('Added (implement epics):', d.added.map(x => x.ref));
+    console.log('Modified (update epics):', d.modified.map(x => x.ref));
+    console.log('Removed (teardown epics):', d.removed.map(x => x.ref));
+    console.log('Renamed (mechanical refactor epics):', d.renamed.map(x => x.ref_old + '→' + x.ref_new));
   } else if (parsed) {
-    console.log('No delta — v1 spec. Plan all requirements.');
+    console.log('No delta — v1 spec. Plan all requirements in detail files.');
   }
 "
 ```
 
-- If `valid` is `false` and any issue has `level: "ERROR"` — **BLOCK**. Remediation: "Run refiner to produce a spec first." Do not proceed.
+- If `valid` is `false` and any issue has `level: 'ERROR'` — **BLOCK**. Remediation: "Run refiner to produce a spec first." Do not proceed.
 - If `valid` is `false` with only WARNINGs (e.g., broken `design_path`) — proceed but surface the warnings.
 - If `valid` is `true` — proceed.
 
-## Phase 2 — DAG Completion Gate
+The scope-extraction snippet uses `parsed.latest_delta` (the highest-version delta — equivalent to the last child of `<overview>`). Earlier `<delta>` elements are historical record of prior sprints; the planner ignores them.
 
-Before building a new DAG, check whether an existing one has incomplete work:
+## Phase 2 — Determine Planning Scope
 
-1. **`specs/<spec-id>/dag.yaml` does not exist** → proceed normally (first sprint for this spec).
+The DAG is rebuilt from scratch each sprint. Scope depends on whether a `<delta>` element exists in `spec.xml`:
 
-2. **`specs/<spec-id>/dag.yaml` exists and all epics are `"completed"`** → archive the existing dag.yaml:
-   ```bash
-   mv specs/<spec-id>/dag.yaml specs/<spec-id>/dag.yaml.archive.$(date +%Y-%m-%d)
-   ```
-   Then proceed with new planning round.
+### v1 spec (no delta anywhere in `<overview>`)
 
-3. **`specs/<spec-id>/dag.yaml` exists and any epic is NOT `"completed"`** → **BLOCK**:
-   > ⚠️ Complete current sprint before iterating. N of M epics still incomplete.
+Plan all requirements from all detail files in `specs/<spec-id>/details/`. Every `<requirement>` becomes a feature.
 
-   Do not write anything. Return control to the user.
+### v2+ spec (one or more `<delta>` elements)
 
-## Phase 3 — Determine Planning Scope (Sprint Model)
+Read `parsed.latest_delta` — the delta whose `version` equals the current `spec_version`. Every child of that delta generates exactly one epic:
 
-The DAG is a derived view, rebuilt from scratch each sprint. Scope depends on whether a `<delta>` element exists in spec.xml:
+| Delta child | Epic semantics | source_requirement |
+|---|---|---|
+| `<added ref="X">` | Implement new requirement X | `X` (new in current detail files) |
+| `<modified ref="X">` | Update existing implementation of X to match changed behavior | `X` (still in current detail files, definition changed) |
+| `<removed ref="X"><reason>...</reason></removed>` | **Teardown epic.** Implementer LLM greps the codebase for X and removes tied code. The `<reason>` and optional `<migration>` from the delta inform teardown approach (security removal → strict; deprecation with consumers → leave shim). X no longer exists in current detail files; the epic references it as a removed id. | `X` (removed — flag the epic as a teardown epic so implementer skips spec lookup and works from delta context) |
+| `<renamed ref_old="X" ref_new="Y">` | **Mechanical refactor epic.** Grep + replace refs from X to Y across the codebase. Body unchanged — semantic changes are forbidden in `<renamed>`. | `Y` (the new id; Y exists in current detail files) |
 
-### v1 spec (no delta)
+### Pure-teardown sprint is legal (D8)
 
-Plan all requirements from all detail files in `specs/<spec-id>/details/`.
-
-### v2+ spec (delta present)
-
-Scope = requirements in `added` + `modified` only:
-
-```
-planning scope = [...parsed.delta.added, ...parsed.delta.modified].map(x => x.ref)
-```
-
-- **Added requirements** (`<added ref="...">`) — generate epics normally.
-- **Modified requirements** (`<modified ref="...">`) — generate epics for the updated behavior.
-- **Removed requirements** (`<removed ref="...">`) — skip. Do NOT generate an epic.
-- **Renamed requirements** (`<renamed ref_old="..." ref_new="...">`) — use `ref_new` as the feature's `source_requirement`. The requirement still exists under its new id; the rename is a semantic change, not a removal.
+A `<delta>` containing only `<removed>` children — a deprecation sprint, compliance teardown, or legacy cleanup — is a legitimate sprint. The planner does NOT inspect the *shape* of a delta (no "must contain at least one `<added>`" check). It enforces per-child correctness only. Emit teardown epics and proceed.
 
 ## Mapping Rules
 
@@ -100,11 +94,11 @@ planning scope = [...parsed.delta.added, ...parsed.delta.modified].map(x => x.re
 | `<requirement>` | Feature | 1:1 strict |
 | `<dependency ref>` | `depends_on` | Auto-derive |
 
-Each `<requirement>` maps to exactly one feature. The feature's `source_requirement` field MUST reference the spec requirement ID.
+Each `<requirement>` maps to exactly one feature. The feature's `source_requirement` field MUST reference the spec requirement ID (or, for `<removed>` epics, the removed-id from the delta).
 
-## Phase 4 — Build DAG In Memory (Two-Pass Write)
+## Phase 3 — Build DAG In Memory (Two-Pass Write)
 
-Build the complete `dag.yaml` and all `epics/` **in memory** before writing any file to disk. This is the two-pass write pattern: build in memory → validate → write only if valid.
+Build the complete `dag.yaml` and all `epics/` **in memory** before writing any file to disk. Build → validate → write only if valid.
 
 ### Output Structure
 
@@ -139,7 +133,9 @@ specs/<spec-id>/
 - [ ] Returns 401 on invalid credentials
 ```
 
-### dag.yaml structure
+### Overwrite, never archive
+
+If `specs/<spec-id>/dag.yaml` already exists, planner MUST overwrite it. Planner MUST NOT write any archive sibling file (no date-suffixed copy, no `.bak`, no `archive/` subdirectory) and MUST NOT move the previous `dag.yaml` to a backup location with `mv`. Previous epic statuses MUST NOT carry over — every epic in the new DAG starts in `"pending"`. The git history of `dag.yaml` is the only retroactive trace of prior DAGs; arcforge does not treat git as part of its contract but does not prevent inspection.
 
 ## Infrastructure Commands
 
@@ -188,22 +184,22 @@ epics:
 
 All epics start in `"pending"` status. Previous statuses MUST NOT carry over — the DAG is always built fresh.
 
-## Phase 5 — Output Validation
+## Phase 4 — Output Validation
 
 Before writing to disk, validate the in-memory DAG:
 
-- [ ] Every `<detail>` in the scope maps to ≥1 epic
+- [ ] Every `<detail>` covered by the sprint scope maps to ≥1 epic
 - [ ] Every requirement in scope maps to exactly 1 feature with a valid `source_requirement`
 - [ ] All required fields present: `id`, `status`, `source_requirement` per feature
 - [ ] No circular dependencies — if a cycle is found, STOP and ask user
 - [ ] All `depends_on` references point to existing epic/feature IDs within the DAG
-- [ ] All `source_requirement` values correspond to real requirement IDs in `specs/<spec-id>/details/`
+- [ ] All `source_requirement` values either correspond to real requirement IDs in `specs/<spec-id>/details/` (added/modified/renamed cases) or reference an id from the delta's `<removed>` (teardown case)
 
 If validation finds ERRORs, report all findings with remediation and **do not write any files**.
 
 ## Done Signal
 
-A planning round is done when all epics in `specs/<spec-id>/dag.yaml` are in `"completed"` status. This means the current sprint is fully implemented and the DAG is archivable (see Phase 2 — archive on next run).
+A planning round is done when all epics in `specs/<spec-id>/dag.yaml` are in `"completed"` status. This means the current sprint is fully implemented. The next refiner run will see all epics completed and unblock the next iteration. The next planner run will overwrite this DAG without preserving any prior state.
 
 ## Commit Requirements
 
@@ -224,8 +220,8 @@ Hand off to `/arc-coordinating` (multi-epic projects requiring worktree isolatio
 
 ✅ Planner complete
 - spec-id: `<spec-id>`
-- sprint scope: delta (added: N, modified: N) | all requirements (v1)
-- Epics: N
+- sprint scope: delta v`<N>` (added: N, modified: N, removed: N, renamed: N) | all requirements (v1)
+- Epics: N (overwrote prior dag.yaml; no archive written)
 - Features: N
 - DAG validated: no cycles
 - Output: `specs/<spec-id>/dag.yaml` + epics/ (committed)
@@ -235,9 +231,11 @@ Hand off to `/arc-coordinating` (multi-epic projects requiring worktree isolatio
 
 ⚠️ Planner blocked
 - spec-id: `<spec-id>`
-- reason: [invalid spec header | incomplete sprint | circular dependency | output validation errors]
+- reason: [invalid spec header | circular dependency | output validation errors]
 - details: [specific error or cycle]
-- action: [remediation — e.g., run refiner | complete current sprint | resolve cycle]
+- action: [remediation — e.g., run refiner | resolve cycle]
+
+Note: planner does not block on incomplete prior sprints. That gate lives in `arc-refining` (per fr-rf-012). If you find yourself wanting to add a completion gate here, instead fix the refiner — it should never have allowed iteration to v(N+1) while v(N)'s sprint was still running.
 
 ## Red Flags — Stop
 
@@ -245,5 +243,7 @@ Hand off to `/arc-coordinating` (multi-epic projects requiring worktree isolatio
 - "Let implementer figure it out"
 - "Close enough mapping"
 - "I'll read the design doc for context"
+- "I'll archive the old dag.yaml just in case"
+- "I'll add a gate so we don't overwrite an in-progress DAG"
 
-**Cycles must be resolved by user, not guessed. Planner reads spec only.**
+**Cycles must be resolved by user, not guessed. Planner reads spec only. No archive. No gate.**

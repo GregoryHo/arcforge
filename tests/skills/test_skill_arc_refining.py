@@ -85,16 +85,36 @@ def test_arc_refining_sdd_utils_output_validation():
     assert "validateSpecHeader" in text
 
 
-def test_arc_refining_filesystem_mode_detection():
-    """Skill must detect mode from filesystem, not explicit parameter (fr-rf-005, fr-rf-009)."""
+def test_arc_refining_filesystem_behavior_detection():
+    """Skill must detect behavior from filesystem state, not from a mode parameter
+    (fr-rf-005, fr-rf-009; D5 — no Path A/B/γ/initial/iteration mode labels).
+    """
     text = _read_skill()
 
-    # Both modes must be documented
-    assert "iteration mode" in text.lower()
-    assert "initial mode" in text.lower()
-
-    # Mode detection must reference spec.xml existence
+    # Detection must reference spec.xml existence (the filesystem signal)
     assert "spec.xml" in text
+
+    # Both contexts must be documented as filesystem states, not mode labels
+    has_no_prior = (
+        "no prior spec" in text.lower()
+        or "first formalization" in text.lower()
+        or "specs/<spec-id>/spec.xml" in text and "does not exist" in text.lower()
+    )
+    has_prior = (
+        "prior spec exists" in text.lower()
+        or "iteration on prior spec" in text.lower()
+        or "prior spec" in text.lower()
+    )
+    assert has_no_prior, "Skill must describe the no-prior-spec context"
+    assert has_prior, "Skill must describe the prior-spec context"
+
+    # The deprecated mode labels must be GONE (D5 realignment)
+    # Use word-boundary checks so we don't false-trigger on harmless phrases.
+    import re
+    assert not re.search(r"\bPath A\b", text), "Path A label removed per D5"
+    assert not re.search(r"\bPath B\b", text), "Path B label removed per D5"
+    assert "gamma mode" not in text.lower(), "gamma mode label removed per D5"
+    assert "γ mode" not in text, "γ mode label removed per D5"
 
 
 def test_arc_refining_two_pass_write():
@@ -115,11 +135,82 @@ def test_arc_refining_delta_metadata():
     assert "last child" in text.lower() or "last child of" in text.lower() or "<overview>" in text
 
 
-def test_arc_refining_refiner_report():
-    """Skill must document block behavior and refiner-report.md (fr-rf-002)."""
+def test_arc_refining_no_refiner_report_artifact():
+    """Per D6 (2026-04-19 realignment), refiner block writes NO files.
+    Any mention of refiner-report.md must be in a negation context.
+    """
     text = _read_skill()
 
-    assert "refiner-report.md" in text
+    # The skill may mention refiner-report.md only to negate it (e.g., "No refiner-report.md")
+    # The forbidden pattern: a positive instruction to PRODUCE the file.
+    forbidden = [
+        "produce a refiner-report",
+        "write a refiner-report",
+        "writes a refiner-report",
+        "writes refiner-report.md",
+        "produce refiner-report.md",
+    ]
+    for f in forbidden:
+        assert f not in text.lower(), (
+            f"Skill must not instruct producing a refiner-report (found: {f!r}) — D6 forbids any block-time artifact"
+        )
+
+    # Skill MUST explicitly state block behavior is terminal-only / no files
+    has_terminal_only = (
+        "terminal-only" in text.lower()
+        or "no files" in text.lower()
+        or "writes nothing" in text.lower()
+        or "write no files" in text.lower()
+        or "no refiner-report" in text.lower()
+    )
+    assert has_terminal_only, (
+        "Skill must explicitly document terminal-only block behavior (no report file written)"
+    )
+
+
+def test_arc_refining_dag_completion_gate():
+    """Per D2 (2026-04-19 realignment), refiner owns the DAG completion gate (fr-rf-012)."""
+    text = _read_skill()
+
+    # Must invoke checkDagStatus or document the gate behavior
+    has_gate = (
+        "checkDagStatus" in text
+        or "dag completion gate" in text.lower()
+        or "complete current sprint before iterating" in text.lower()
+    )
+    assert has_gate, "Skill must document the DAG completion gate (per D2/fr-rf-012)"
+
+
+def test_arc_refining_no_escape_hatch():
+    """Per D7 (2026-04-19 realignment), there is no escape hatch from the gate."""
+    text = _read_skill()
+
+    has_escape_hatch_disclaimer = (
+        "no escape hatch" in text.lower()
+        or "no --force" in text.lower()
+        or "no force flag" in text.lower()
+        or "no `--force`" in text.lower()
+    )
+    assert has_escape_hatch_disclaimer, (
+        "Skill must explicitly state there is no escape hatch (no --force, no abandoned status)"
+    )
+
+
+def test_arc_refining_delta_accumulation():
+    """Per D3 (2026-04-19 realignment), refiner appends new <delta> and preserves prior deltas verbatim."""
+    text = _read_skill()
+
+    # Must mention preserving prior deltas (not overwriting)
+    has_preserve = (
+        "preserve every prior" in text.lower()
+        or "preserve all prior" in text.lower()
+        or "verbatim" in text.lower()
+        or "never overwrite" in text.lower()
+        or ("append" in text.lower() and "prior" in text.lower())
+    )
+    assert has_preserve, (
+        "Skill must document that prior <delta> elements are preserved verbatim (per D3)"
+    )
 
 
 def test_arc_refining_supersedes():

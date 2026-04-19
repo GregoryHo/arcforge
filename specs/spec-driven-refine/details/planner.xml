@@ -11,14 +11,17 @@
   </produces>
 
   <requirement id="fr-pl-001">
-    <title>Sprint Model — Build Fresh DAG Scoped to Delta</title>
+    <title>Sprint Model — Pure Function, Overwrite DAG Each Sprint</title>
     <description>
-      Planner MUST build dag.yaml and epics/ from scratch each time. The
-      scope is determined by the spec's delta metadata: if a &lt;delta&gt; element
-      exists for the current spec_version, planner plans only the requirements
-      referenced in that delta. If no delta exists (v1), planner plans all
-      requirements. DAG is a derived view (like Karpathy's index.md) — it
-      is rebuilt, not incrementally maintained.
+      Planner is a pure function (spec + delta) → (dag.yaml + epics/). It
+      MUST build dag.yaml and epics/ from scratch each time and MUST overwrite
+      any existing DAG artifacts without archiving. The scope is determined
+      by the spec's &lt;delta&gt; element whose version equals the current
+      spec_version. For v1 (no &lt;delta&gt; anywhere in &lt;overview&gt;),
+      planner plans all requirements currently in detail files. DAG is a
+      disposable derived view — historical traceability lives in the spec's
+      accumulated &lt;delta&gt; elements and in design doc iteration folders,
+      not in archived DAGs.
     </description>
     <acceptance_criteria>
       <criterion id="fr-pl-001-ac1">
@@ -28,15 +31,25 @@
         <trace>REQ-F017</trace>
       </criterion>
       <criterion id="fr-pl-001-ac2">
-        When a &lt;delta&gt; is present for the current spec_version, planner
-        MUST produce a dag.yaml covering only the requirements referenced
-        in that delta (added and modified). Removed requirements do not
-        generate epics.
+        When one or more &lt;delta&gt; elements are present, planner MUST
+        select the &lt;delta&gt; whose version attribute equals the current
+        spec_version. Every child of that &lt;delta&gt; MUST generate an epic:
+        &lt;added&gt; → implement the new requirement; &lt;modified&gt; →
+        update the existing requirement's implementation; &lt;removed&gt; →
+        teardown epic that references the removed ref (implementer LLM greps
+        and removes tied code); &lt;renamed&gt; → mechanical code-side refactor
+        epic that updates references from ref_old to ref_new. Prior
+        &lt;delta&gt; elements (version != current spec_version) are historical
+        record; planner MUST NOT use them for scope.
         <trace>REQ-F017</trace>
       </criterion>
       <criterion id="fr-pl-001-ac3">
-        If a previous dag.yaml exists, planner MUST archive or replace it.
-        Previous epic statuses MUST NOT carry over.
+        If a previous dag.yaml exists, planner MUST overwrite it. Planner
+        MUST NOT write any archive file (e.g., dag.yaml.archive.YYYY-MM-DD)
+        or move the previous dag.yaml to a backup location. Previous epic
+        statuses MUST NOT carry over. Historical DAG state, if needed by a
+        reader, lives in git history of dag.yaml — arcforge does not treat
+        git as part of its contract but does not prevent inspection.
         <trace>REQ-F017</trace>
       </criterion>
       <criterion id="fr-pl-001-ac4">
@@ -45,32 +58,19 @@
         feature breakdown.
         <trace>REQ-F017</trace>
       </criterion>
-    </acceptance_criteria>
-  </requirement>
-
-  <requirement id="fr-pl-007">
-    <title>DAG Completion Gate</title>
-    <description>
-      Before building a new DAG, planner MUST check whether an existing
-      dag.yaml has incomplete work. This prevents overlapping sprints —
-      the pipeline is sequential, complete v(N) before iterating to v(N+1).
-    </description>
-    <acceptance_criteria>
-      <criterion id="fr-pl-007-ac1">
-        If no dag.yaml exists at specs/&lt;spec-id&gt;/dag.yaml, planner MUST
-        proceed normally.
+      <criterion id="fr-pl-001-ac5">
+        A &lt;delta&gt; containing only &lt;removed&gt; children (pure teardown
+        sprint) MUST be accepted as a legal sprint scope. Planner MUST NOT
+        block or warn based on the composition of a &lt;delta&gt; element —
+        only per-child correctness is enforced.
         <trace>REQ-F017</trace>
       </criterion>
-      <criterion id="fr-pl-007-ac2">
-        If dag.yaml exists and all epics are in "completed" status, planner
-        MUST archive the existing dag.yaml and proceed with new planning.
-        <trace>REQ-F023</trace>
-      </criterion>
-      <criterion id="fr-pl-007-ac3">
-        If dag.yaml exists and any epic is NOT in "completed" status,
-        planner MUST block with message: "Complete current sprint before
-        iterating. N of M epics still incomplete."
-        <trace>REQ-F023</trace>
+      <criterion id="fr-pl-001-ac6">
+        Planner MUST NOT implement any completion gate, archive mechanism,
+        or state-preservation logic. These responsibilities belong upstream
+        (refiner, per fr-rf-012). Planner is a pure function with no state
+        beyond its output paths.
+        <trace>REQ-F017</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -124,7 +124,8 @@
     <description>
       A planning round is considered "done" when all epics in the DAG are
       in "completed" status. This is the signal that the current spec has
-      been fully implemented and the DAG can be archived.
+      been fully implemented — the next sprint's refiner is unblocked and
+      the next planner run will overwrite this DAG.
     </description>
     <acceptance_criteria>
       <criterion id="fr-pl-004-ac1">

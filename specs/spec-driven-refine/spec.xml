@@ -19,12 +19,12 @@
     </description>
     <scope>
       <includes>
-        <feature id="stage-1-brainstorming">Path A/B routing, design doc structure (full and gamma mode), output validation</feature>
-        <feature id="stage-2-refiner">Filesystem-detected mode, blocking report, identity header, delta metadata output, input/output validation</feature>
-        <feature id="stage-3-planner">Sprint model (always build from scratch), delta-scoped planning, DAG completion gate, 1:1 mapping, done signal, input/output validation</feature>
+        <feature id="stage-1-brainstorming">Scan existing specs, confirm spec target, produce design doc with context-sensitive sections (prose when no prior spec; Context + Change Intent when prior spec exists), output validation</feature>
+        <feature id="stage-2-refiner">One behavior with conditional fields based on filesystem state, wiki-style accumulating delta output, DAG completion gate upstream of iteration, R3 block via terminal (no persistent artifact), input/output validation</feature>
+        <feature id="stage-3-planner">Pure function (spec + delta) → (dag.yaml + epics/), overwrite DAG each sprint (no archive, no state preservation, no gate), delta-scoped planning with epic generation for added/modified/removed/renamed, 1:1 mapping, done signal, input/output validation</feature>
         <feature id="cross-cutting-rules">R1 (human consent), R2 (unidirectional), R3 (block on contradictions)</feature>
         <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec)</feature>
-        <feature id="spec-identity-header">XML schema for spec self-identification, versioning, and delta metadata</feature>
+        <feature id="spec-identity-header">XML schema for spec self-identification, versioning, and wiki-style accumulating delta metadata</feature>
         <feature id="interface-contracts">Design Doc and Spec Identity Header format contracts — sdd-schemas/ (guidance) + sdd-utils.js (validation toolkit)</feature>
         <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, and deterministic/semantic split</feature>
       </includes>
@@ -35,17 +35,27 @@
     </scope>
 
     <delta version="2" iteration="2026-04-16-v2">
-      <modified ref="fr-bs-003">Remove REFINER_INPUT from Path A output</modified>
-      <modified ref="fr-bs-005">Remove structured Delta from Path B, gamma mode with natural language Change Intent</modified>
-      <removed ref="fr-bs-007">Change Type Derivation — replaced by output validation (fr-bs-007 repurposed)</removed>
-      <modified ref="fr-rf-005">Consolidate initial/iteration modes into single requirement</modified>
-      <removed ref="fr-rf-006">Separate iteration mode — merged into fr-rf-005</removed>
-      <added ref="fr-rf-011">Delta metadata output — refiner writes delta element to spec overview</added>
-      <modified ref="fr-pl-001">Scope planning to delta requirements, not all requirements</modified>
-      <added ref="fr-pl-007">DAG completion gate — block if incomplete dag.yaml exists</added>
-      <removed ref="fr-cc-003">Stale lint design-newer-than-spec — replaced by per-stage validation</removed>
-      <removed ref="fr-cc-004">Stale lint unrefined-design — replaced by per-stage validation</removed>
-      <removed ref="fr-cc-005">Stale lint unplanned-spec — replaced by per-stage validation</removed>
+      <modified ref="fr-bs-003">Remove REFINER_INPUT from the output format used when no prior spec exists</modified>
+      <modified ref="fr-bs-005">Remove structured Delta from the output format used when prior spec exists; use natural-language Change Intent only</modified>
+      <removed ref="fr-bs-007">
+        <reason>Change Type Derivation — replaced by output validation (fr-bs-007 repurposed)</reason>
+      </removed>
+      <modified ref="fr-rf-005">Consolidate the single refiner behavior, removing "initial vs iteration" mode language</modified>
+      <removed ref="fr-rf-006">
+        <reason>Separate iteration mode — merged into fr-rf-005 (one behavior, not two modes)</reason>
+      </removed>
+      <added ref="fr-rf-011">Delta metadata output — refiner writes delta element to spec overview (accumulates wiki-style per 2026-04-19 realignment, see [[arcforge-decision-sdd-v2-pipeline-realignment]])</added>
+      <added ref="fr-rf-012">DAG completion gate — refiner blocks new iteration if prior sprint has incomplete epics (introduced in 2026-04-19 realignment; gate moved here from planner.fr-pl-007 which was removed)</added>
+      <modified ref="fr-pl-001">Planner as pure function — overwrite DAG each sprint, scope by delta matching current spec_version, all four delta children generate epics, no archive, no state preservation, no gate (gate moved to refiner)</modified>
+      <removed ref="fr-cc-003">
+        <reason>Stale lint design-newer-than-spec — replaced by per-stage validation</reason>
+      </removed>
+      <removed ref="fr-cc-004">
+        <reason>Stale lint unrefined-design — replaced by per-stage validation</reason>
+      </removed>
+      <removed ref="fr-cc-005">
+        <reason>Stale lint unplanned-spec — replaced by per-stage validation</reason>
+      </removed>
       <modified ref="fr-cc-if-004">Clarify sdd-utils.js as validation toolkit, not merge engine</modified>
       <modified ref="fr-cc-if-005">Add three-layer rationale for planner not reading design doc</modified>
     </delta>

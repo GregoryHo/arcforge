@@ -3,54 +3,48 @@
   <title>Stage 2 — Refiner (Formalize)</title>
   <consumes>
     <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (complete design doc)</artifact>
-    <artifact>specs/&lt;spec-id&gt;/spec.xml (iteration mode only)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (when a prior spec exists)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml (when a prior spec exists, for completion gate check per fr-rf-012)</artifact>
   </consumes>
   <produces>
     <artifact>specs/&lt;spec-id&gt;/spec.xml</artifact>
     <artifact>specs/&lt;spec-id&gt;/details/*.xml</artifact>
-    <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md (on block only)</artifact>
   </produces>
 
   <requirement id="fr-rf-001">
-    <title>Block on Design Contradictions</title>
+    <title>Block on Design Contradictions (R3)</title>
     <description>
-      Refiner MUST block when the design doc contains contradictory requirements,
-      per Rule R3 (Block on Contradictions).
+      Refiner MUST block when the design doc contains contradictory requirements
+      or when the design doc's Change Intent contradicts the prior spec, per
+      Rule R3 (Block on Contradictions). Blocks are transient: refiner prints a
+      detailed error message to terminal and exits non-zero. No artifact is
+      written on block — no spec.xml, no details/, no report file. Retry
+      semantics are clean: fix the design doc, re-run refiner.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-001-ac1">
         Given a design doc where REQ-A requires "sessions expire after 15 minutes"
-        and REQ-B requires "sessions never expire", refiner MUST block and produce
-        a refiner-report.md.
+        and REQ-B requires "sessions never expire", refiner MUST print the
+        contradiction to terminal with specific requirement IDs and exit non-zero.
         <trace>REQ-F008</trace>
       </criterion>
       <criterion id="fr-rf-001-ac2">
-        When blocked, refiner MUST NOT produce or update any spec.xml or details/ files.
+        When blocked, refiner MUST NOT write or modify any file — not spec.xml,
+        not details/, not any report file. Nothing persists across the blocked
+        invocation.
         <trace>REQ-F008</trace>
       </criterion>
-    </acceptance_criteria>
-  </requirement>
-
-  <requirement id="fr-rf-002">
-    <title>Rejection Report</title>
-    <description>
-      When refiner blocks, the rejection report MUST be stored alongside the
-      rejected design doc at docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md.
-    </description>
-    <acceptance_criteria>
-      <criterion id="fr-rf-002-ac1">
-        The refiner-report.md MUST be at the same directory level as the rejected
-        design.md (e.g., docs/plans/my-feature/2026-04-16/refiner-report.md).
+      <criterion id="fr-rf-001-ac3">
+        Refiner MUST NOT write any refiner-report.md or equivalent persistent
+        artifact on block. The only output channels on block are terminal
+        (stderr) and the process exit code.
         <trace>REQ-F009</trace>
       </criterion>
-      <criterion id="fr-rf-002-ac2">
-        The report MUST list each contradiction, missing acceptance criterion, and
-        broken dependency with specific requirement IDs.
-        <trace>REQ-F009</trace>
-      </criterion>
-      <criterion id="fr-rf-002-ac3">
-        The report MUST include a Recommendations section with a specific suggestion
-        for resolving each listed issue.
+      <criterion id="fr-rf-001-ac4">
+        Terminal output on block MUST list each detected issue (contradiction,
+        missing acceptance criterion, broken dependency) with the specific
+        requirement ID(s) involved, and MUST include a Recommendations section
+        with a concrete suggestion for resolving each listed issue.
         <trace>REQ-F009</trace>
       </criterion>
     </acceptance_criteria>
@@ -144,40 +138,122 @@
       </criterion>
       <criterion id="fr-rf-005-ac4">
         A complete rewrite (aggressive iteration where the Change Intent
-        replaces everything) MUST be handled as iteration — the refiner
-        determines this from the design doc's intent, not from a declared
-        mode. No separate "replace mode" exists.
+        replaces everything) MUST be handled by the same behavior — the
+        refiner does not switch to a "replace" code path. The design doc's
+        Change Intent drives what gets added/modified/removed/renamed; the
+        refiner emits a correspondingly large &lt;delta&gt;. No mode labels,
+        no separate behavior — just one refiner that produces whatever
+        delta the situation requires.
         <trace>REQ-F012, REQ-F013</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-rf-011">
-    <title>Delta Metadata Output</title>
+    <title>Delta Metadata Output — Wiki-Style Accumulation</title>
     <description>
-      When updating an existing spec, refiner MUST write a &lt;delta&gt; element
-      in the spec's &lt;overview&gt; recording what changed in this version. This
-      metadata stays within the spec (wiki layer) so the planner can determine
-      planning scope without reading the design doc (raw source layer).
+      When updating an existing spec, refiner MUST append a new &lt;delta&gt;
+      element to the spec's &lt;overview&gt; recording what changed in this
+      version. Refiner MUST NOT overwrite, modify, or remove prior &lt;delta&gt;
+      elements — they are historical record. &lt;overview&gt; accumulates all
+      &lt;delta&gt; children ordered ascending by version, producing a
+      self-contained iteration history inside the spec (wiki-style, per
+      Karpathy three-layer model). This metadata stays within the spec (wiki
+      layer) so the planner can determine planning scope without reading the
+      design doc (raw source layer).
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-011-ac1">
-        The delta element MUST include: version (matching new spec_version),
-        iteration (matching design_iteration), and child elements for each
-        change: &lt;added ref="req-id" /&gt;, &lt;modified ref="req-id" /&gt;,
-        &lt;removed ref="req-id" /&gt;.
+        A new &lt;delta&gt; element MUST include: version (matching the new
+        spec_version), iteration (matching the new design_iteration), and
+        child elements for each change. Supported child elements are
+        &lt;added ref="req-id" /&gt;, &lt;modified ref="req-id" /&gt;,
+        &lt;removed ref="req-id"&gt;&lt;reason&gt;...&lt;/reason&gt;&lt;/removed&gt;
+        (reason required; optional &lt;migration&gt; child), and
+        &lt;renamed ref_old="..." ref_new="..."&gt; (optional &lt;reason&gt;;
+        body unchanged — semantic changes use removed+added, not renamed).
         <trace>REQ-F013</trace>
       </criterion>
       <criterion id="fr-rf-011-ac2">
         For a new spec (no prior version), no delta element is written.
-        Absence of delta signals "plan all requirements."
+        Absence of any &lt;delta&gt; in &lt;overview&gt; signals "plan all
+        requirements" to the planner.
         <trace>REQ-F012</trace>
       </criterion>
       <criterion id="fr-rf-011-ac3">
-        Every requirement ID referenced in the delta MUST correspond to
-        an actual requirement in the spec's detail files (for added/modified)
-        or to a requirement that existed in the previous version (for removed).
+        Every requirement ID referenced in the new delta MUST correspond to
+        an actual requirement in the spec's detail files (for added/modified/
+        renamed.ref_new) or to a requirement that existed in a prior version
+        (for removed.ref and renamed.ref_old).
         <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-011-ac4">
+        Refiner MUST preserve all prior &lt;delta&gt; elements verbatim when
+        writing the new spec. The new &lt;delta&gt; is appended as the last
+        child of &lt;overview&gt;. The resulting sequence MUST be ordered
+        ascending by version. Refiner MUST NOT merge, deduplicate, or rewrite
+        historical deltas.
+        <trace>REQ-F013</trace>
+      </criterion>
+      <criterion id="fr-rf-011-ac5">
+        The new delta's version attribute MUST equal the new spec_version.
+        The new delta's iteration attribute MUST equal the new design_iteration.
+        Mismatch is ERROR.
+        <trace>REQ-F013</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-012">
+    <title>DAG Completion Gate (Upstream of New Iteration)</title>
+    <description>
+      Before producing a new spec version (one that would append a &lt;delta&gt;
+      and increment spec_version), refiner MUST check the current
+      specs/&lt;spec-id&gt;/dag.yaml for sprint completion. This gate lives in
+      refiner, not planner, so that inconsistent wiki-layer state ("spec at
+      v(N+1) while prior sprint's DAG is still incomplete") never arises. If
+      the gate blocks, nothing downstream moves — spec stays at v(N), DAG
+      stays at v(N)'s execution state, user completes the work or abandons
+      the entire spec, then the refiner may run cleanly.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-012-ac1">
+        When no prior spec.xml exists, refiner MUST NOT perform the gate check
+        (there is no prior sprint to be incomplete). Refiner proceeds as v1
+        formalization.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-rf-012-ac2">
+        When a prior spec.xml exists AND no dag.yaml exists at
+        specs/&lt;spec-id&gt;/dag.yaml, refiner MUST proceed. This is a legal
+        state (user refined without planning yet).
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-rf-012-ac3">
+        When a prior spec.xml exists AND dag.yaml exists AND all epics in
+        dag.yaml are in "completed" status, refiner MUST proceed with the
+        new iteration.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-rf-012-ac4">
+        When a prior spec.xml exists AND dag.yaml exists AND any epic is NOT
+        in "completed" status, refiner MUST BLOCK. It MUST print to terminal:
+        the number of incomplete epics, the specific epic IDs and their
+        statuses, and the message "Complete current sprint before iterating."
+        Refiner MUST exit non-zero. No spec file is written, no &lt;delta&gt;
+        is added, nothing changes on disk. No refiner-report.md is written.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-rf-012-ac5">
+        Refiner MUST NOT implement any escape hatch for the gate — no
+        --force flag, no environment variable override, no "abandoned" epic
+        status that bypasses the check. The only legitimate paths forward
+        when blocked are: (a) the user completes the remaining epics, or
+        (b) the user abandons the entire spec by deleting
+        specs/&lt;spec-id&gt;/ (which is a filesystem action outside
+        refiner's scope). Partial abandonment is rejected by design because
+        it would pollute dag.yaml status semantics.
+        <trace>REQ-F023</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -216,7 +292,9 @@
     <acceptance_criteria>
       <criterion id="fr-rf-008-ac1">
         Given an update that adds a requirement contradicting an existing
-        requirement, refiner MUST block and produce a refiner-report.md.
+        requirement, refiner MUST block per fr-rf-001 (terminal output,
+        non-zero exit, no files written). The contradiction MUST be
+        described in terminal output with specific requirement IDs.
         <trace>REQ-F015</trace>
       </criterion>
       <criterion id="fr-rf-008-ac2">
@@ -248,25 +326,28 @@
         <trace>REQ-F008</trace>
       </criterion>
       <criterion id="fr-rf-009-ac2">
-        Refiner MUST determine mode from filesystem state: if
-        specs/&lt;spec-id&gt;/spec.xml exists → iteration mode (read existing spec
-        + design doc, update spec). If not → initial mode (read design doc,
-        create spec from scratch).
+        Refiner MUST check filesystem state to decide whether version-dependent
+        fields are produced: if specs/&lt;spec-id&gt;/spec.xml exists → read
+        existing spec + design doc, produce updated spec with incremented
+        spec_version, supersedes, and a new &lt;delta&gt;. If not → read design
+        doc, produce new spec with spec_version=1, no supersedes, no delta.
+        This is a single behavior with conditional fields, not two modes.
         <trace>REQ-F012, REQ-F013</trace>
       </criterion>
       <criterion id="fr-rf-009-ac3">
-        For iteration mode, refiner MUST validate the design doc has gamma
-        mode structure: Context section (with spec version reference) and
-        Change Intent section present. Missing required sections is ERROR
-        with remediation: "Iteration design doc must have Context and Change
-        Intent sections — re-run brainstorming with Path B."
+        When a prior spec exists, refiner MUST validate that the design doc
+        has the required sections for an iteration design doc: Context
+        section (with spec version reference) and Change Intent section
+        present. Missing required sections is ERROR with remediation: "When a
+        prior spec exists, the design doc must include Context and Change
+        Intent sections — re-run brainstorming with the prior spec in scope."
         <trace>REQ-F005, REQ-F008</trace>
       </criterion>
       <criterion id="fr-rf-009-ac4">
-        For iteration mode, if the design doc's date folder is older than or
-        equal to the spec's recorded design_iteration, refiner MUST produce
-        WARNING: "design iteration &lt;date&gt; is not newer than spec source
-        &lt;spec-date&gt; — this may be a stale design doc."
+        When a prior spec exists, if the design doc's date folder is older
+        than or equal to the spec's recorded design_iteration, refiner MUST
+        produce WARNING: "design iteration &lt;date&gt; is not newer than
+        spec source &lt;spec-date&gt; — this may be a stale design doc."
         <trace>REQ-F026</trace>
       </criterion>
     </acceptance_criteria>

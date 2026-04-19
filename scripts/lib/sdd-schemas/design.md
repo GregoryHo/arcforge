@@ -15,20 +15,20 @@ docs/plans/<spec-id>/<YYYY-MM-DD>/design.md
 - `spec-id` — kebab-case identifier derived from the directory name
 - iteration date — derived from the `<YYYY-MM-DD>` directory name
 
-**Mode detection rule:** check the filesystem, not the design doc.
+**Structure detection rule:** check the filesystem, not the design doc.
 
-| Filesystem State | Mode |
+| Filesystem State | Expected design doc structure |
 |---|---|
-| `specs/<spec-id>/spec.xml` exists | Iteration (Path B) |
-| `specs/<spec-id>/spec.xml` does not exist | Initial (Path A) |
+| `specs/<spec-id>/spec.xml` exists | Context + Change Intent sections (iteration on prior spec) |
+| `specs/<spec-id>/spec.xml` does not exist | Prose with problem / solution / requirements / scope |
 
-Mode is determined at runtime from filesystem state. The design doc does not declare its mode.
+The refiner runs the same behavior in both cases and fills in version-dependent fields (spec_version, supersedes, delta) based on filesystem state. The design doc does not declare its shape — the filesystem determines which sections the refiner expects.
 
 ---
 
-## Path A — Initial Design Doc (fr-sd-002)
+## When No Prior Spec Exists (fr-sd-002)
 
-Used when no existing spec exists for this `spec-id`.
+Used when no existing `specs/<spec-id>/spec.xml` exists for this `spec-id`.
 
 ### Minimum Content
 
@@ -88,9 +88,9 @@ TODO: fill in later
 
 ---
 
-## Path B — Iteration Design Doc / Gamma Mode (fr-sd-003)
+## When Prior Spec Exists (fr-sd-003)
 
-Used when `specs/<spec-id>/spec.xml` exists. The refiner reads this doc alongside the existing spec to determine what changed — the doc describes intent, the refiner does the diff.
+Used when `specs/<spec-id>/spec.xml` exists. The refiner reads this doc alongside the existing spec to determine what changed — the doc describes intent in natural language, and the refiner derives the structured `<delta>` itself.
 
 ### Required Sections
 
@@ -103,6 +103,10 @@ Both sections are required. Missing either is ERROR.
 ### Recommended Section
 
 **Architecture Impact** — how the changes interact with existing design. Optional for simple changes; recommended for cross-cutting changes.
+
+### Forbidden
+
+The design doc MUST NOT contain a pre-authored structured delta section (no explicit ADDED / MODIFIED / REMOVED / RENAMED lists). The refiner derives the delta from narrative intent — the design doc carries only human-authored narrative.
 
 ### Valid Example
 
@@ -171,7 +175,7 @@ Reference: specs/auth-system/spec.xml v1
 
 ## Validation Summary (fr-sd-004)
 
-| Check | Type | Severity | Path A | Path B |
+| Check | Type | Severity | No Prior Spec | Prior Spec Exists |
 |---|---|---|---|---|
 | File exists at canonical path | Deterministic | ERROR | yes | yes |
 | Substantive content (not empty or stub) | Deterministic | ERROR | yes | yes |

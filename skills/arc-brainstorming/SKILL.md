@@ -19,17 +19,23 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 
 ## Phase 0: Scan and Route
 
-**Before any elicitation, scan specs/ for existing spec_ids.**
+**Before any elicitation, scan `specs/` for existing spec_ids.**
 
 1. List all directories under `specs/` that contain a `spec.xml`
 2. If any exist, present them to the user: `Found existing specs: auth, payments, ...`
-3. Ask the user to confirm the path — do NOT auto-detect:
-   - If an existing spec matches: `"Iterating on <spec-id> (v<N> active)? [Path B]"`
-   - If this is a new topic: `"New topic — proposed spec-id: <suggestion>. OK? [Path A]"`
+3. Ask the user to confirm the target — do NOT auto-detect:
+   - If an existing spec matches: `"Iterating on <spec-id> (v<N> active)?"`
+   - If this is a new topic: `"New topic — proposed spec-id: <suggestion>. OK?"`
 
-**The user's explicit confirmation determines the path. Never infer it.**
+**The user's explicit confirmation determines whether the design doc carries new-topic prose or iteration-context content. Never infer it.**
 
-## Path A — New Spec
+The downstream refiner detects context from the filesystem (presence or absence of `specs/<spec-id>/spec.xml`). Brainstorming has one behavior with context-sensitive output — it does not invoke a separate code path or "mode".
+
+---
+
+## When No Prior Spec Exists — New Spec
+
+This branch fires when the user confirms a new topic and no `specs/<spec-id>/spec.xml` exists for the chosen spec-id.
 
 ### Phase 1: Understanding
 
@@ -72,14 +78,14 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 - Cover: problem, solution, requirements, scope, architecture, error handling
 - Be ready to go back and clarify
 
-**Path A design doc must contain all four elements:**
+**The design doc must contain all four elements:**
 
 1. **Problem description / motivation** — what problem this solves and why
 2. **Proposed solution / architecture** — key design decisions
 3. **Identifiable requirements** — things the system must do, in prose (not stubs)
 4. **Scope declaration** — what is included and what is explicitly excluded
 
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the Path A contract.
+**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the contract for "no prior spec" docs.
 
 ### Phase 3 Output
 
@@ -98,7 +104,9 @@ Write to: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md`
 
 ---
 
-## Path B — Iteration on Existing Spec
+## When Prior Spec Exists — Iterating on a Spec
+
+This branch fires when the user confirms iteration on an existing spec-id and `specs/<spec-id>/spec.xml` already exists.
 
 ### Phase 1: Load Existing State
 
@@ -108,7 +116,7 @@ Before asking the user anything:
 2. Read all previous design iterations under `docs/plans/<spec-id>/*/design.md` — understand the evolution history
 3. Summarize the current state briefly to the user so they have shared context
 
-### Phase 2: Elicit the Delta
+### Phase 2: Elicit the Change Intent
 
 Ask the user what is changing and why — one question at a time.
 
@@ -116,9 +124,9 @@ Use 2-Action Rule: Save research findings to `docs/research/<topic>.md` after ev
 
 Apply YAGNI ruthlessly: only capture what the user explicitly states is changing.
 
-### Phase 3: Gamma Mode Output
+### Phase 3 Output
 
-Path B produces a design doc in gamma mode. The refiner reads this doc alongside `specs/<spec-id>/spec.xml` to determine what changed.
+The design doc carries a Context summary plus a natural-language Change Intent. The downstream refiner reads this alongside `specs/<spec-id>/spec.xml` and **derives the structured `<delta>` itself** — the design doc carries human-authored narrative, never a pre-authored ADDED/MODIFIED/REMOVED list.
 
 **Required sections (ERROR if missing):**
 
@@ -135,7 +143,7 @@ Reference: specs/<spec-id>/spec.xml v<N>
 ```
 ## Change Intent
 
-<What is changing and why. This is the primary signal for the refiner.>
+<What is changing and why. Natural prose. The refiner derives the delta from this.>
 ```
 
 **Recommended section (optional for simple changes):**
@@ -147,12 +155,15 @@ Reference: specs/<spec-id>/spec.xml v<N>
 <How changes interact with existing design. Omit for simple isolated changes.>
 ```
 
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the Path B gamma mode contract.
+**Forbidden:** No pre-authored structured delta section. Do not write a `## Added / Modified / Removed` list — the refiner derives the delta itself per the realigned pipeline (per `[[arcforge-decision-sdd-v2-pipeline-realignment]]` D3).
+
+**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the contract for "prior spec exists" docs.
 
 Validate before writing to disk:
 
 - Context section present (with spec version reference)
 - Change Intent section present
+- No pre-authored structured delta section
 
 **ERROR on any missing required section — do not write until resolved.**
 
@@ -194,7 +205,7 @@ Always route to `/arc-refining` next:
 
 `/arc-refining` → `/arc-planning` → `/arc-coordinating`
 
-The refiner reads the complete design doc — no structured summary section is needed.
+The refiner reads the complete design doc — no structured summary section is needed. The refiner also runs the DAG completion gate before producing a new iteration spec, so if a prior sprint is incomplete it will block.
 
 ---
 
@@ -209,7 +220,8 @@ Stop immediately if you catch yourself thinking:
 5. "Ask all questions at once for efficiency"
 6. "This is obvious, no need to explore"
 7. "Just one more feature won't hurt"
-8. "I can tell from context it's Path A" — always ask
+8. "I can tell from context whether this is new or iteration" — always ask
+9. "I'll write a quick ADDED/MODIFIED list to make it easier for the refiner" — forbidden; refiner derives the delta
 
 ## Common Rationalizations
 
@@ -222,7 +234,8 @@ Stop immediately if you catch yourself thinking:
 | "Batch questions for efficiency" | Overwhelms user, misses context |
 | "Requirements are obvious" | Edge cases lurk in obviousness |
 | "Better to have it" | Scope creep starts here |
-| "Looks like Path A from context" | Must confirm explicitly with user |
+| "Looks like an iteration from context" | Must confirm explicitly with user |
+| "I'll pre-author the delta to save the refiner work" | Forbidden — refiner is the diff authority |
 
 ## Key Principles
 
@@ -232,7 +245,7 @@ Stop immediately if you catch yourself thinking:
 - Explore alternatives — Always propose 2-3 approaches before settling
 - Incremental validation — Present design in sections, validate each
 - Be flexible — Go back and clarify when something doesn't make sense
-- Explicit routing — Always confirm Path A or Path B with the user
+- Explicit routing — Always confirm new-topic vs iteration with the user
 
 ## Stage Completion Format
 

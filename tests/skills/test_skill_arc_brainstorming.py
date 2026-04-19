@@ -86,7 +86,12 @@ def test_arc_brainstorming_has_one_question_rule():
 
 
 def test_arc_brainstorming_has_sdd_pipeline_features():
-    """Test skill has SDD pipeline v2 features (replaces old REFINER_INPUT test)."""
+    """Test skill has SDD pipeline v2 features (replaces old REFINER_INPUT test).
+
+    Per D5 (2026-04-19 realignment), the Path A / Path B / γ mode labels are
+    removed. Brainstorming uses filesystem-state framing instead — "no prior
+    spec exists" / "prior spec exists".
+    """
     text = _read_skill()
 
     # 2-Action Rule (arcforge specific)
@@ -95,9 +100,21 @@ def test_arc_brainstorming_has_sdd_pipeline_features():
     # Must NOT have REFINER_INPUT (removed in v2)
     assert "REFINER_INPUT" not in text
 
-    # Path A and Path B routing must be explicit
-    assert "Path A" in text
-    assert "Path B" in text
+    # Mode labels removed per D5 realignment — use filesystem-state framing
+    import re
+    assert not re.search(r"\bPath A\b", text), "Path A label removed per D5"
+    assert not re.search(r"\bPath B\b", text), "Path B label removed per D5"
+    assert "gamma mode" not in text.lower(), "gamma mode label removed per D5"
+
+    # New framing required
+    has_no_prior_section = (
+        "no prior spec" in text.lower() or "no prior spec exists" in text.lower()
+    )
+    has_prior_section = (
+        "prior spec exists" in text.lower() or "iterating on a spec" in text.lower()
+    )
+    assert has_no_prior_section, "Skill must use 'no prior spec exists' framing (per D5)"
+    assert has_prior_section, "Skill must use 'prior spec exists' framing (per D5)"
 
     # Completion formats
     assert "✅" in text
@@ -119,35 +136,65 @@ def test_arc_brainstorming_has_phase_zero_scanning():
     assert has_scanning, "Skill must document spec/ directory scanning"
 
 
-def test_arc_brainstorming_has_explicit_path_routing():
-    """Test skill requires explicit user confirmation for path choice (fr-bs-002)."""
+def test_arc_brainstorming_has_explicit_routing_confirmation():
+    """Test skill requires explicit user confirmation about new-vs-iteration target (fr-bs-002).
+
+    Per D5 (2026-04-19 realignment), no Path A/B labels. Routing is now framed
+    as "is this a new spec or iteration on an existing one?" with the user
+    confirming the target spec-id.
+    """
     text = _read_skill()
 
-    # Explicit confirmation requirement
-    assert "Path A" in text
-    assert "Path B" in text
+    # Must mention scanning specs/ for existing spec_ids (Phase 0 behavior)
+    assert "specs/" in text or "scan" in text.lower()
 
     # Must require user confirmation (not auto-detect)
     has_confirmation = (
-        "confirm" in text.lower()
-        or "explicit" in text.lower()
-        or "must not auto" in text.lower()
-        or "user confirms" in text.lower()
-        or "ask" in text.lower()
+        "user confirms" in text.lower()
+        or "user's explicit confirmation" in text.lower()
+        or "confirm the target" in text.lower()
+        or "do not auto-detect" in text.lower()
+        or "do NOT auto-detect" in text
+        or "never infer" in text.lower()
     )
-    assert has_confirmation, "Skill must require explicit user confirmation for path choice"
+    assert has_confirmation, (
+        "Skill must require explicit user confirmation for new-vs-iteration target choice"
+    )
 
 
-def test_arc_brainstorming_has_gamma_mode_sections():
-    """Test skill documents gamma mode for Path B (fr-bs-005)."""
+def test_arc_brainstorming_has_iteration_design_doc_sections():
+    """Test skill documents Context + Change Intent sections for iteration design docs (fr-bs-005).
+
+    Renamed from has_gamma_mode_sections — per D5 there is no 'gamma mode',
+    just the iteration design doc structure when a prior spec exists.
+    """
     text = _read_skill()
 
-    # Gamma mode section names
+    # Required sections for iteration design docs
     assert "Context" in text
     assert "Change Intent" in text
 
     # Architecture Impact is optional but should be mentioned
     assert "Architecture Impact" in text or "architecture impact" in text.lower()
+
+
+def test_arc_brainstorming_forbids_pre_authored_delta():
+    """Test skill explicitly forbids pre-authored ADDED/MODIFIED/REMOVED lists (fr-bs-005-ac4, D3).
+
+    The refiner derives the delta from narrative intent. The design doc carries
+    only human-authored prose.
+    """
+    text = _read_skill()
+
+    has_forbidden_statement = (
+        "no pre-authored" in text.lower()
+        or "must not contain a pre-authored" in text.lower()
+        or "do not write a" in text.lower() and "added / modified / removed" in text.lower()
+        or "forbidden" in text.lower() and "delta" in text.lower()
+    )
+    assert has_forbidden_statement, (
+        "Skill must forbid pre-authored ADDED/MODIFIED/REMOVED lists (refiner derives the delta)"
+    )
 
 
 def test_arc_brainstorming_has_per_spec_output_path():

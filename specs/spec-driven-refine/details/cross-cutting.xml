@@ -33,10 +33,10 @@
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-002-ac1">
-        Refiner MUST NOT write to any file under docs/plans/. Its only output
-        paths are specs/&lt;spec-id&gt;/ (on success) and
-        docs/plans/&lt;spec-id&gt;/&lt;date&gt;/refiner-report.md (on block; this is a
-        report alongside the design, not a modification of it).
+        Refiner MUST NOT write to any file under docs/plans/. Its only
+        output path on success is specs/&lt;spec-id&gt;/. On block, refiner
+        writes no files anywhere — the error is reported to terminal and
+        refiner exits non-zero (per fr-rf-001-ac3).
         <trace>REQ-F025</trace>
       </criterion>
       <criterion id="fr-cc-002-ac2">
@@ -56,7 +56,10 @@
       The design doc is the complete output of brainstorming and the complete
       input to the refiner. The refiner consumes the entire design doc — no
       special section or structured summary is needed. This contract defines
-      the design doc structure for Path A (new spec) and Path B (iteration).
+      the design doc structure with context-sensitive sections: when no prior
+      spec exists, the doc carries full problem/solution/requirements/scope in
+      prose; when a prior spec exists, the doc carries Context + Change Intent.
+      There are no modes — one design doc structure with conditional sections.
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-001-ac1">
@@ -66,23 +69,27 @@
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-cc-if-001-ac2">
-        Path A (new spec) design docs MUST contain substantive design content:
-        at minimum, a description of the problem, proposed solution, and
-        identifiable requirements (in prose). Empty or stub design docs are
-        ERROR.
+        When no prior spec exists for this spec-id, the design doc MUST
+        contain substantive design content: at minimum, a description of the
+        problem, proposed solution, and identifiable requirements (in prose).
+        Empty or stub design docs are ERROR.
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-cc-if-001-ac3">
-        Path B (iteration) design docs MUST follow gamma mode structure with
+        When a prior spec exists for this spec-id, the design doc MUST include
         at minimum: a Context section (summarizing current spec state with
         version reference) and a Change Intent section (describing what is
-        changing and why). Missing Context or Change Intent is ERROR.
+        changing and why). Missing Context or Change Intent is ERROR. A
+        pre-authored structured delta section (ADDED/MODIFIED/REMOVED lists)
+        MUST NOT appear — the refiner derives the delta from narrative intent.
         <trace>REQ-F005</trace>
       </criterion>
       <criterion id="fr-cc-if-001-ac4">
-        The refiner determines processing mode from filesystem state, not
-        from fields in the design doc: specs/&lt;spec-id&gt;/spec.xml exists =
-        iteration mode; does not exist = initial mode.
+        The refiner determines which conditional sections to expect from
+        filesystem state, not from fields in the design doc:
+        specs/&lt;spec-id&gt;/spec.xml exists → expect Context + Change Intent;
+        does not exist → expect prose with problem/solution/requirements/scope.
+        This is a single-behavior filesystem check, not a mode selector.
         <trace>REQ-F003, REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
@@ -202,14 +209,15 @@
       <criterion id="fr-cc-if-005-ac1">
         arc-brainstorming SKILL.md MUST read scripts/lib/sdd-schemas/design.md
         before producing the design doc, to ensure the output conforms to
-        the design doc contract (Path A or Path B gamma mode structure).
+        the design doc contract (conditional-section structure per fr-cc-if-001).
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-cc-if-005-ac2">
         arc-refining SKILL.md MUST invoke scripts/lib/sdd-utils.js
         validateDesignDoc() for deterministic input validation before any
         formalization. If valid is false with ERROR issues, refiner MUST
-        block and produce a refiner-report.md.
+        block per fr-rf-001-ac3 — print the issues to terminal, exit
+        non-zero, and write no files (no refiner-report.md, no spec.xml).
         <trace>REQ-F008</trace>
       </criterion>
       <criterion id="fr-cc-if-005-ac3">
@@ -430,10 +438,11 @@
       <criterion id="nfr-003-ac3">
         Behaviors that CAN be discriminatively A/B tested for these skills
         are those NOT inferable from sdd-utils.js source alone — examples
-        include: DAG completion gate blocking behavior (fr-pl-007),
-        refiner-report.md production on contradiction (fr-rf-001), error
-        recovery ordering, block-vs-proceed decisions. These remain
-        candidates for focused A/B eval when discrimination is required.
+        include: refiner DAG completion gate blocking behavior (fr-rf-012),
+        terminal block message structure on contradiction (fr-rf-001-ac4),
+        delta accumulation discipline (fr-rf-011-ac4), error recovery
+        ordering, block-vs-proceed decisions. These remain candidates for
+        focused A/B eval when discrimination is required.
         <trace>REQ-N001</trace>
       </criterion>
     </acceptance_criteria>
