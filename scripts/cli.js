@@ -844,7 +844,7 @@ async function main() {
             }
           }
         } else if (subcommand === 'dashboard') {
-          const { startServer } = require('./eval-dashboard');
+          const { startServer } = require('../skills/arc-evaluating/dashboard/eval-dashboard');
           const port = args.options.port ? parseInt(args.options.port, 10) : 3333;
           startServer(projectRoot, { port });
         } else {
