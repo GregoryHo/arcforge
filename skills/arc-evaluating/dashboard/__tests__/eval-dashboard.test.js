@@ -2,8 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { createRouter } = require('../../scripts/eval-dashboard');
-const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../scripts/lib/eval');
+const { createRouter } = require('../eval-dashboard');
+const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../../../scripts/lib/eval');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-dashboard-'));
@@ -229,7 +229,8 @@ describe('dashboard', () => {
       const data = result.json();
 
       expect(data.delta).toBe(0.75);
-      expect(data.verdict).toBe('IMPROVED');
+      // k=2 per condition is below the k>=5 threshold — verdict is INSUFFICIENT_DATA
+      expect(data.verdict).toBe('INSUFFICIENT_DATA');
       expect(data.baseline.stats.avg).toBe(0.25);
       expect(data.treatment.stats.avg).toBe(1.0);
     });

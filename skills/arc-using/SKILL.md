@@ -113,6 +113,7 @@ These skills activate **during any workflow** when the condition is met. They ar
 | Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
 | Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
 | User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` (audit mode) | Propose changes, never auto-modify without approval |
+| About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | No shipping claim without an eval run that does not return INSUFFICIENT_DATA |
 
 **The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
 

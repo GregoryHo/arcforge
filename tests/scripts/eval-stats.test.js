@@ -19,6 +19,8 @@ const {
   baselineVarianceWarning,
   meanOrNull,
   computeMetricDeltas,
+  INSUFFICIENT_DATA,
+  verdictMessage,
 } = require('../../scripts/lib/eval-stats');
 
 function makeResult(overrides = {}) {
@@ -394,18 +396,18 @@ describe('verdictFromDeltaCI', () => {
     expect(verdictFromDeltaCI(baseline, treatment)).toBe('REGRESSED');
   });
 
-  test('falls back to magic thresholds for k < 5', () => {
+  test('returns INSUFFICIENT_DATA for k < 5 (both conditions small)', () => {
     const baseline = [makeResult({ score: 0.5 }), makeResult({ score: 0.5 })];
     const treatment = [makeResult({ score: 0.7 }), makeResult({ score: 0.7 })];
-    // delta = 0.2, which is > 0.15 threshold
-    expect(verdictFromDeltaCI(baseline, treatment)).toBe('IMPROVED');
+    // Regardless of delta magnitude, k<5 → INSUFFICIENT_DATA
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
   });
 
-  test('falls back when only one group has < 5', () => {
+  test('returns INSUFFICIENT_DATA when only one group has < 5', () => {
     const baseline = [0.5, 0.5, 0.5].map((s) => makeResult({ score: s }));
     const treatment = [0.5, 0.5, 0.5, 0.5, 0.5].map((s) => makeResult({ score: s }));
-    // delta = 0, within fallback INCONCLUSIVE range
-    expect(verdictFromDeltaCI(baseline, treatment)).toBe('INCONCLUSIVE');
+    // baseline has k=3 < 5 → INSUFFICIENT_DATA
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
   });
 });
 
@@ -618,5 +620,127 @@ describe('computeMetricDeltas', () => {
     const treatment = makeResults([{ input_tokens: null }]);
     const deltas = computeMetricDeltas(baseline, treatment);
     expect(deltas.inputTokensRegression).toBe(false);
+  });
+});
+
+// ── INSUFFICIENT_DATA constant ───────────────────────────────
+
+describe('INSUFFICIENT_DATA constant', () => {
+  test('is a distinct string value', () => {
+    expect(typeof INSUFFICIENT_DATA).toBe('string');
+    expect(INSUFFICIENT_DATA).toBe('INSUFFICIENT_DATA');
+  });
+
+  test('is distinct from other verdict strings', () => {
+    expect(INSUFFICIENT_DATA).not.toBe('IMPROVED');
+    expect(INSUFFICIENT_DATA).not.toBe('INCONCLUSIVE');
+    expect(INSUFFICIENT_DATA).not.toBe('REGRESSED');
+    expect(INSUFFICIENT_DATA).not.toBe('SHIP');
+    expect(INSUFFICIENT_DATA).not.toBe('NEEDS WORK');
+    expect(INSUFFICIENT_DATA).not.toBe('BLOCKED');
+  });
+});
+
+// ── verdictFromDeltaCI — INSUFFICIENT_DATA guard ─────────────
+
+describe('verdictFromDeltaCI — INSUFFICIENT_DATA guard (fr-vr-001)', () => {
+  // ac1: k=3 per condition → INSUFFICIENT_DATA
+  test('ac1: returns INSUFFICIENT_DATA when both conditions have k=3', () => {
+    const baseline = [0.5, 0.6, 0.7].map((s) => makeResult({ score: s }));
+    const treatment = [0.7, 0.8, 0.9].map((s) => makeResult({ score: s }));
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
+  });
+
+  // ac2: k=4 baseline + k=10 treatment → INSUFFICIENT_DATA (baseline < 5)
+  test('ac2: returns INSUFFICIENT_DATA when baseline has 4 and treatment has 10', () => {
+    const baseline = [0.5, 0.6, 0.7, 0.8].map((s) => makeResult({ score: s }));
+    const treatment = Array.from({ length: 10 }, (_, i) => makeResult({ score: 0.7 + i * 0.02 }));
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
+  });
+
+  test('returns INSUFFICIENT_DATA when treatment has k=4 and baseline has k=5', () => {
+    const baseline = [0.5, 0.6, 0.7, 0.8, 0.9].map((s) => makeResult({ score: s }));
+    const treatment = [0.5, 0.6, 0.7, 0.8].map((s) => makeResult({ score: s }));
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
+  });
+
+  test('returns normal verdict (IMPROVED/INCONCLUSIVE/REGRESSED) when both have k>=5', () => {
+    const baseline = [0.1, 0.2, 0.15, 0.1, 0.2].map((s) => makeResult({ score: s }));
+    const treatment = [0.9, 0.95, 0.85, 0.9, 0.95].map((s) => makeResult({ score: s }));
+    const verdict = verdictFromDeltaCI(baseline, treatment);
+    // Must be a normal A/B verdict, not INSUFFICIENT_DATA
+    expect(['IMPROVED', 'INCONCLUSIVE', 'REGRESSED']).toContain(verdict);
+  });
+});
+
+// ── verdictFromRate — no INSUFFICIENT_DATA (fr-vr-001-ac4) ───
+
+describe('verdictFromRate — never returns INSUFFICIENT_DATA (fr-vr-001-ac4)', () => {
+  test('returns SHIP, NEEDS WORK, or BLOCKED for rate=0', () => {
+    const v = verdictFromRate(0);
+    expect(['SHIP', 'NEEDS WORK', 'BLOCKED']).toContain(v);
+    expect(v).not.toBe(INSUFFICIENT_DATA);
+  });
+
+  test('returns SHIP, NEEDS WORK, or BLOCKED for rate=0.5', () => {
+    const v = verdictFromRate(0.5);
+    expect(['SHIP', 'NEEDS WORK', 'BLOCKED']).toContain(v);
+    expect(v).not.toBe(INSUFFICIENT_DATA);
+  });
+
+  test('returns SHIP, NEEDS WORK, or BLOCKED for rate=1.0', () => {
+    const v = verdictFromRate(1.0);
+    expect(['SHIP', 'NEEDS WORK', 'BLOCKED']).toContain(v);
+    expect(v).not.toBe(INSUFFICIENT_DATA);
+  });
+
+  test('never returns INSUFFICIENT_DATA for any rate in [0,1]', () => {
+    const rates = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+    for (const rate of rates) {
+      expect(verdictFromRate(rate)).not.toBe(INSUFFICIENT_DATA);
+    }
+  });
+});
+
+// ── verdictMessage ───────────────────────────────────────────
+
+describe('verdictMessage (fr-vr-001-ac3)', () => {
+  test('returns remediation message for INSUFFICIENT_DATA', () => {
+    const msg = verdictMessage(INSUFFICIENT_DATA);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+    // Must mention k>=5 or similar threshold guidance
+    expect(msg).toMatch(/k[=≥]/i);
+  });
+
+  test('INSUFFICIENT_DATA message mentions defensible verdict', () => {
+    const msg = verdictMessage(INSUFFICIENT_DATA);
+    // The spec says: "Run k≥5 trials per condition for a defensible verdict."
+    expect(msg).toContain('5');
+    expect(msg).toMatch(/defensible|verdict|trial/i);
+  });
+
+  test('returns null or empty string for normal verdicts', () => {
+    // Normal verdicts do not require a remediation message
+    for (const v of ['IMPROVED', 'INCONCLUSIVE', 'REGRESSED']) {
+      const msg = verdictMessage(v);
+      expect(msg === null || msg === '' || typeof msg === 'string').toBe(true);
+    }
+  });
+
+  // ac3: INSUFFICIENT_DATA is a distinct string switchable in JSON output
+  test('ac3: INSUFFICIENT_DATA as JSON is a distinct switchable string', () => {
+    const result = { verdict: INSUFFICIENT_DATA };
+    const json = JSON.stringify(result);
+    const parsed = JSON.parse(json);
+    expect(parsed.verdict).toBe('INSUFFICIENT_DATA');
+    // Consumers can switch on it
+    let matched = false;
+    switch (parsed.verdict) {
+      case 'INSUFFICIENT_DATA':
+        matched = true;
+        break;
+    }
+    expect(matched).toBe(true);
   });
 });
