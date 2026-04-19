@@ -5,15 +5,25 @@ description: Use when breaking down a structured spec into an executable DAG, wh
 
 # Planner
 
+## Iron Law
+
+**PLANNER IS A PURE FUNCTION. DAG IS DISPOSABLE.**
+
+No state preservation. No archive. No gate. No reading the design doc. Overwrite `dag.yaml` every sprint — git history is the only retroactive trace. If you find yourself wanting to add state, an archive file, or a completion check, stop and surface the underlying need to the user instead.
+
+**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/spec.md` before building any `dag.yaml` — you need to know the `<delta>` element structure (multi-delta accumulation, four child types with epic semantics) to correctly extract sprint scope from the current `spec_version`'s delta.
+
+**Authoritative decisions:** Planner's pure-function framing, no-archive rule, no-gate rule, and four-delta-child-to-epic mapping all derive from `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
+
 ## Overview
 
-Convert a spec into an executable DAG with epic/feature breakdown. The DAG is a derived view, rebuilt from scratch each sprint, never archived. The planner is a **pure function**:
+Convert a spec into an executable DAG with epic/feature breakdown. The DAG is a derived view, rebuilt from scratch each sprint, never archived:
 
 ```
 (spec + delta) → (dag.yaml + epics/)
 ```
 
-No state preservation. No archive. No gate. No side effects beyond the output paths. The DAG is disposable per sprint — historical traceability lives in the spec's accumulated `<delta>` elements and in `docs/plans/<spec-id>/<iteration>/design.md` folders, not in archived DAGs.
+The DAG is disposable per sprint — historical traceability lives in the spec's accumulated `<delta>` elements and in `docs/plans/<spec-id>/<iteration>/design.md` folders, not in archived DAGs.
 
 **R2 Unidirectional:** Planner MUST NOT write to `specs/<spec-id>/spec.xml` or `specs/<spec-id>/details/`. Its only output paths are `specs/<spec-id>/dag.yaml` and `specs/<spec-id>/epics/`.
 

@@ -5,11 +5,21 @@ description: Use when converting design documents to structured specs, when spec
 
 # Refiner
 
+## Iron Law
+
+**SPEC IS THE WIKI — PRESERVE EVERY PRIOR DELTA. NEVER WRITE ON BLOCK.**
+
+No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. Block = terminal output + non-zero exit + zero filesystem state. If you find yourself wanting to trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
+
+**REQUIRED BACKGROUND:**
+- `scripts/lib/sdd-schemas/spec.md` — read before producing any spec.xml; covers identity header + multi-delta accumulation rules.
+- `references/spec-structure.md` — field tables for identity header, per-spec directory layout, detail-file requirement rules. Load when about to write files in Phase 5.
+
+**Authoritative decisions:** The DAG completion gate (in refiner, not planner), wiki-style delta accumulation, terminal-only block behavior, and no-escape-hatch rule all derive from `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
+
 ## Overview
 
 Transform design documents into structured XML specifications. The spec becomes Source of Truth — downstream skills read it directly, never the design doc. The refiner is the central transformation: raw source (design.md) → live contract (spec.xml).
-
-**REQUIRED BACKGROUND:** `scripts/lib/sdd-schemas/spec.md` — read before producing any spec.xml to understand the required identity header structure and the multi-delta accumulation rules.
 
 ## When NOT to Use
 
@@ -116,21 +126,9 @@ Ask at least 2–3 clarifying questions based on gaps or ambiguities found.
 
 Build the complete `spec.xml` and all `specs/<spec-id>/details/*.xml` **in memory** before writing any file to disk. This is the two-pass write pattern: build in memory → validate → write atomically only if valid.
 
-### Identity Header (always required)
+**Before drafting, load `references/spec-structure.md`** for the identity header field table, per-spec directory layout, detail-file requirement rules, and the "unchanged requirements" rule. Those field-level tables moved out of this SKILL.md — they are reference material, not decision logic. The schema authority is still `scripts/lib/sdd-schemas/spec.md` (what `validateSpecHeader` enforces).
 
-Read `scripts/lib/sdd-schemas/spec.md` for the full field reference. Every `specs/<spec-id>/spec.xml` must have an `<overview>` identity header with:
-
-| Field | Rule |
-|---|---|
-| `spec_id` | kebab-case; MUST match the folder name under `specs/` |
-| `spec_version` | starts at 1 for first formalization; increments for each iteration |
-| `status` | always `"active"` |
-| `title` | human-readable name |
-| `description` | strategic purpose — WHY this spec exists, not a scope summary |
-| `source/design_path` | path to the exact design doc file |
-| `source/design_iteration` | ISO date prefix (YYYY-MM-DD) matching the design doc folder |
-| `supersedes` | required for v2+; format: `<spec-id>:v<previous-version>` |
-| `scope` | `<includes>` with `<feature id="...">` elements; `<excludes>` recommended |
+The decision-logic rules below stay in SKILL.md because they are load-bearing behavior (wiki-style delta accumulation, version increment semantics on iteration).
 
 ### Version Increment (when prior spec exists)
 
@@ -174,32 +172,7 @@ For the first formalization (no prior spec): no `<delta>` element. Its absence s
 
 For v2+: the new delta is appended after the prior delta(s). The resulting sequence MUST be ordered ascending by `version`. Both `parsed.deltas` (full array) and `parsed.latest_delta` (highest version) are exposed by `parseSpecHeader` for downstream consumers.
 
-### Per-Spec Directory Structure
-
-```
-specs/
-└── <spec-id>/
-    ├── spec.xml              # identity header + accumulated <delta> elements + details index
-    └── details/
-        ├── feature-a.xml
-        └── feature-b.xml
-```
-
-Each `specs/<spec-id>/` folder is self-contained. Detail files MUST NOT reference requirements from other spec folders.
-
-### Detail File Requirements
-
-Each `<requirement>` in a detail file must have:
-- `id` attribute — unique across all detail files; format `fr-<domain>-NNN`
-- `<title>` — short name
-- `<description>` — what the system must do
-- `<acceptance_criteria>` — at least one `<criterion>` with a `<trace>` element
-
-Criterion text MUST follow Given/When/Then pattern. Use RFC 2119 keywords (MUST/SHALL/SHOULD/MAY).
-
-### Unchanged Requirements (when prior spec exists)
-
-Requirements NOT affected by the design doc's Change Intent MUST remain unchanged in the output. Only ADDED / MODIFIED / REMOVED / RENAMED requirements change.
+Per-spec directory structure, detail-file requirement rules, and the "unchanged requirements" rule live in `references/spec-structure.md`.
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 

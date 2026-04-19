@@ -11,6 +11,10 @@ description: Use when exploring ideas before implementation or when user wants t
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
+**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing any design doc — it defines the conditional-section contract the refiner will consume (prose for "no prior spec" docs; Context + Change Intent for "prior spec exists" docs). Same schema, both branches.
+
+**Authoritative decisions:** SDD v2 pipeline behavior (including the forbidden pre-authored delta section) is set by `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
+
 ## When NOT to Use
 
 - Requirements are already clear and documented
@@ -85,8 +89,6 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 3. **Identifiable requirements** — things the system must do, in prose (not stubs)
 4. **Scope declaration** — what is included and what is explicitly excluded
 
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the contract for "no prior spec" docs.
-
 ### Phase 3 Output
 
 Validate before writing to disk:
@@ -156,8 +158,6 @@ Reference: specs/<spec-id>/spec.xml v<N>
 ```
 
 **Forbidden:** No pre-authored structured delta section. Do not write a `## Added / Modified / Removed` list — the refiner derives the delta itself per the realigned pipeline (per `[[arcforge-decision-sdd-v2-pipeline-realignment]]` D3).
-
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing the design doc to ensure the output conforms to the contract for "prior spec exists" docs.
 
 Validate before writing to disk:
 
