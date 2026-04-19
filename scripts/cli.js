@@ -885,6 +885,25 @@ async function main() {
             deltaCi: eval_.ciForDelta(result.baseline, result.treatment),
             verdict: eval_.verdictFromDeltaCI(result.baseline, result.treatment),
           });
+
+          // fr-gr-005: blind-comparator auto-trigger
+          const { runBlindAutoTrigger } = require('./lib/eval-blind-autotrigger');
+          const skillFile = args.options['skill-file'] || scenario.target;
+          const skillName = skillFile ? path.basename(skillFile, '.md') : undefined;
+          const blindResult = runBlindAutoTrigger(scenario, result.baseline, result.treatment, projectRoot, {
+            runId,
+            skillName,
+          });
+          if (!blindResult.skipped) {
+            const pr = blindResult.preferenceRate;
+            const total = pr.total;
+            console.log('\nBlind preference signal (supplementary — not a verdict):');
+            console.log(`  treatment: ${pr.treatment}/${total}`);
+            console.log(`  baseline:  ${pr.baseline}/${total}`);
+            console.log(`  tie:       ${pr.tie}/${total}`);
+          } else if (blindResult.skipNote) {
+            console.log(`\n${blindResult.skipNote}`);
+          }
         } else if (subcommand === 'compare') {
           const name = args.positional[1];
           if (!name) {
