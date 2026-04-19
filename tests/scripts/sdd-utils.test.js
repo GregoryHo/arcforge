@@ -488,6 +488,58 @@ describe('validateSpecHeader', () => {
     expect(fields).toContain('source/design_iteration');
   });
 
+  it('rejects non-numeric spec_version like "2a" (Codex #3106887867)', () => {
+    // parseSpecHeader uses parseInt which coerces "2a" → 2. The validator
+    // then passes it as a valid positive integer. This must be caught —
+    // require the raw string to be strictly digits before conversion.
+    const xml = `<spec><overview>
+      <spec_id>auth</spec_id>
+      <spec_version>2a</spec_version>
+      <status>active</status>
+      <title>Auth</title>
+      <source>
+        <design_path>docs/plans/auth/2026-04-16/design.md</design_path>
+        <design_iteration>2026-04-16</design_iteration>
+      </source>
+      <scope><includes><feature id="x">y</feature></includes></scope>
+    </overview></spec>`;
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-16/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = parseSpecHeader(xml);
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const versionErrors = result.issues.filter(
+      (i) => i.level === 'ERROR' && i.field === 'spec_version',
+    );
+    expect(versionErrors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects status values outside the declared enum (Codex #3106887869)', () => {
+    // SPEC_HEADER_RULES declares status: enum (currently: "active"). The
+    // validator must enforce the allowed set — "draft" / "retired" etc.
+    // should not pass.
+    const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
+    fs.mkdirSync(path.dirname(designPath), { recursive: true });
+    fs.writeFileSync(designPath, '# Auth', 'utf8');
+    const parsed = {
+      spec_id: 'auth',
+      spec_version: 1,
+      status: 'draft',
+      title: 'Auth System',
+      description: 'desc',
+      design_path: 'docs/plans/auth/2026-04-01/design.md',
+      design_iteration: '2026-04-01',
+      supersedes: null,
+      scope: { includes: [{ id: 'login', description: 'User login' }], excludes: [] },
+      deltas: [],
+    };
+    const result = validateSpecHeader(parsed, { cwd: tmpDir });
+    expect(result.valid).toBe(false);
+    const statusErrors = result.issues.filter((i) => i.level === 'ERROR' && i.field === 'status');
+    expect(statusErrors.length).toBeGreaterThan(0);
+  });
+
   it('flags non-positive spec_version (0)', () => {
     const designPath = path.join(tmpDir, 'docs/plans/auth/2026-04-01/design.md');
     fs.mkdirSync(path.dirname(designPath), { recursive: true });

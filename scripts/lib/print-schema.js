@@ -129,15 +129,21 @@ function renderSpec(opts = {}) {
   lines.push('');
   lines.push('## Always-required fields (missing any → ERROR)');
   lines.push('');
+  const fmtType = (f) => {
+    if (Array.isArray(f.allowed)) {
+      return `${f.type} (allowed: ${JSON.stringify(f.allowed)})`;
+    }
+    return f.type;
+  };
   if (md) {
     lines.push('| Field | Type |');
     lines.push('|---|---|');
     for (const f of r.required_fields) {
-      lines.push(`| \`${f.field}\` | ${f.type} |`);
+      lines.push(`| \`${f.field}\` | ${fmtType(f)} |`);
     }
   } else {
     for (const f of r.required_fields) {
-      lines.push(`  ${f.field.padEnd(26)} ${f.type}`);
+      lines.push(`  ${f.field.padEnd(26)} ${fmtType(f)}`);
     }
   }
   lines.push('');

@@ -203,7 +203,7 @@ const SPEC_HEADER_RULES = Object.freeze({
   supersedes_regex: /^[a-z0-9-]+:v\d+$/,
   required_fields: [
     { key: 'spec_version', field: 'spec_version', type: 'positive integer' },
-    { key: 'status', field: 'status', type: 'enum (currently: "active")' },
+    { key: 'status', field: 'status', type: 'enum', allowed: ['active'] },
     { key: 'title', field: 'title', type: 'string' },
     { key: 'design_path', field: 'source/design_path', type: 'existing file path' },
     { key: 'design_iteration', field: 'source/design_iteration', type: 'YYYY-MM-DD[-suffix]' },
@@ -241,7 +241,9 @@ const SPEC_HEADER_RULES = Object.freeze({
  * when no deltas are present (v1 specs).
  *
  * @param {string} specXmlContent - Raw XML string from spec.xml.
- * @returns {{ spec_id: string, spec_version: number, status: string, title: string,
+ * @returns {{ spec_id: string, spec_version: number,
+ *   spec_version_raw: string|null,
+ *   status: string, title: string,
  *   description: string, design_path: string, design_iteration: string,
  *   supersedes: string|null,
  *   scope: { includes: Array<{id: string, description: string}>, excludes: string[] },
@@ -271,7 +273,18 @@ function parseSpecHeader(specXmlContent) {
   }
 
   const spec_id = extract('spec_id');
-  const spec_version = parseInt(extract('spec_version'), 10);
+  // Strict-digit match before conversion: parseInt silently coerces "2a" → 2
+  // and "2.5" → 2, letting malformed versions pass downstream checks. Require
+  // ^\d+$ before parseInt; surface NaN (not a coerced digit) for validator to
+  // flag. `spec_version_raw` is exposed so the validator can name the raw
+  // token in its error message rather than printing "got: NaN".
+  const specVersionRaw = extract('spec_version');
+  const spec_version =
+    typeof specVersionRaw === 'string' && specVersionRaw.length > 0
+      ? /^\d+$/.test(specVersionRaw)
+        ? parseInt(specVersionRaw, 10)
+        : NaN
+      : null;
   const status = extract('status');
   const title = extract('title');
   const description = extract('description');
@@ -330,6 +343,7 @@ function parseSpecHeader(specXmlContent) {
   return {
     spec_id,
     spec_version,
+    spec_version_raw: specVersionRaw,
     status,
     title,
     description,
@@ -482,13 +496,33 @@ function validateSpecHeader(parsed, options = {}) {
     }
   }
 
-  // spec_version must be a positive integer.
+  // spec_version must be a positive integer. parseSpecHeader surfaces NaN
+  // when the raw string isn't strictly digits, null when the tag is missing
+  // or empty (required-field check above catches null). NaN and sub-1
+  // integers fall through to here.
   if (parsed.spec_version !== null && parsed.spec_version !== undefined) {
     if (!Number.isInteger(parsed.spec_version) || parsed.spec_version < 1) {
+      const shown = JSON.stringify(parsed.spec_version_raw ?? parsed.spec_version);
       issues.push({
         level: 'ERROR',
         field: 'spec_version',
-        message: `spec_version must be a positive integer, got: ${parsed.spec_version}.`,
+        message: `spec_version must be a positive integer, got: ${shown}.`,
+      });
+    }
+  }
+
+  // Enum-constrained fields: check any required_fields entry with an `allowed`
+  // list against the parsed value. SPEC_HEADER_RULES is the single source of
+  // truth — adding a new enum value in one place propagates here.
+  for (const rule of SPEC_HEADER_RULES.required_fields) {
+    if (!rule.allowed) continue;
+    const value = parsed[rule.key];
+    if (typeof value !== 'string' || value.trim() === '') continue; // handled by required check
+    if (!rule.allowed.includes(value)) {
+      issues.push({
+        level: 'ERROR',
+        field: rule.field,
+        message: `${rule.field} must be one of ${JSON.stringify(rule.allowed)}, got: ${JSON.stringify(value)}.`,
       });
     }
   }

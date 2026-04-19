@@ -21,7 +21,7 @@ Canonical path: `specs/<spec-id>/spec.xml`
 | Field | Type |
 |---|---|
 | `spec_version` | positive integer |
-| `status` | enum (currently: "active") |
+| `status` | enum (allowed: ["active"]) |
 | `title` | string |
 | `source/design_path` | existing file path |
 | `source/design_iteration` | YYYY-MM-DD[-suffix] |
