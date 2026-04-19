@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="agent-lifecycle">
+  <title>Agent Rename, Scope Tightening, and New Blind Comparator</title>
+  <consumes>
+    <artifact>skills/arc-evaluating/agents/eval-comparator.md (prior prompt template, post-migration from fr-fs-001)</artifact>
+    <artifact>scripts/lib/eval.js + eval-graders.js (loadAgentDef call sites)</artifact>
+    <artifact>skills/arc-evaluating/SKILL.md + references/* (documentation to update)</artifact>
+  </consumes>
+  <produces>
+    <artifact>skills/arc-evaluating/agents/eval-analyzer.md (renamed + rescoped prompt template)</artifact>
+    <artifact>skills/arc-evaluating/agents/eval-blind-comparator.md (new prompt template)</artifact>
+    <artifact>scripts/lib/eval-graders.js with loadAgentDef paths updated to match</artifact>
+  </produces>
+
+  <requirement id="fr-ag-001">
+    <title>Rename eval-comparator to eval-analyzer</title>
+    <description>
+      The prompt template file currently at skills/arc-evaluating/agents/eval-comparator.md
+      (post fr-fs-001 migration) MUST be renamed to eval-analyzer.md. Every
+      loadAgentDef call site in scripts/lib/ and every documentation reference
+      in skills/arc-evaluating/SKILL.md + references/* MUST be updated to the
+      new name. The old name MUST NOT remain as a symlink, alias, or stub —
+      renaming is total.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ag-001-ac1">
+        After rename, skills/arc-evaluating/agents/eval-analyzer.md MUST exist
+        and skills/arc-evaluating/agents/eval-comparator.md MUST NOT exist.
+        <trace>fr-ag-001</trace>
+      </criterion>
+      <criterion id="fr-ag-001-ac2">
+        After rename, grep across the repository MUST return zero matches for
+        "eval-comparator" except in (a) CHANGELOG.md migration notes and
+        (b) historical benchmark JSON files under evals/benchmarks/.
+        <trace>fr-ag-001</trace>
+      </criterion>
+      <criterion id="fr-ag-001-ac3">
+        arc eval compare MUST run end-to-end after rename without ENOENT or
+        file-not-found errors related to the agent prompt.
+        <trace>fr-ag-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-ag-002">
+    <title>Strip Verdict Authority From eval-analyzer</title>
+    <description>
+      The eval-analyzer prompt template MUST NOT instruct the subagent to emit
+      verdicts of the form SHIP, NEEDS_WORK, BLOCKED, RUN_MORE_TRIALS,
+      INVESTIGATE, or INSUFFICIENT_DATA. Its scope is post-hoc analysis only:
+      why a delta appeared, which assertions are non-discriminative across
+      trials, variance hotspots, and qualitative observations. The verdict
+      decision MUST be computed deterministically by the harness from pass
+      rate and k (see fr-vr-001). If the agent's output accidentally contains
+      a recommendation field, the CLI MUST ignore it — verdict provenance is
+      harness, not agent.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ag-002-ac1">
+        The eval-analyzer.md prompt template MUST NOT contain instructions
+        asking the subagent to emit a verdict, recommendation, or SHIP-class
+        decision. A grep of the prompt text for "SHIP", "NEEDS_WORK",
+        "BLOCKED", "RUN_MORE", "INVESTIGATE", "INSUFFICIENT_DATA" as verdict
+        tokens MUST return zero matches.
+        <trace>fr-ag-002</trace>
+      </criterion>
+      <criterion id="fr-ag-002-ac2">
+        The arc eval compare CLI MUST obtain the verdict from the deterministic
+        harness computation. Any recommendation field appearing in the agent
+        response MUST be dropped or logged as a warning; it MUST NOT influence
+        the final verdict surfaced to the user.
+        <trace>fr-ag-002</trace>
+      </criterion>
+      <criterion id="fr-ag-002-ac3">
+        eval-analyzer output structure MUST include fields for
+        delta_explanation, weak_assertions_patterns, and variance_notes —
+        analytical content, not decisions.
+        <trace>fr-ag-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-ag-003">
+    <title>Introduce eval-blind-comparator Prompt Template</title>
+    <description>
+      A new prompt template eval-blind-comparator.md MUST be created at
+      skills/arc-evaluating/agents/eval-blind-comparator.md. It is loaded by
+      the harness via loadAgentDef and spawned via execCommand('claude', ...)
+      — same pattern as eval-grader and eval-analyzer. The template MUST
+      instruct the subagent to receive two anonymized outputs labeled A and B
+      plus the original prompt, generate a task-derived rubric, score each
+      output, and return winner / tie with structured reasoning. The harness
+      MUST shuffle baseline/treatment labels randomly per comparison pair and
+      restore the mapping after the agent responds. The template is invoked
+      per fr-gr-005 only when all assertions are model-graded.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-ag-003-ac1">
+        skills/arc-evaluating/agents/eval-blind-comparator.md MUST exist and
+        contain a prompt template that, when fed two outputs plus a prompt,
+        yields a JSON-parseable response matching the blind comparator schema
+        (winner, reasoning, rubric).
+        <trace>fr-ag-003</trace>
+      </criterion>
+      <criterion id="fr-ag-003-ac2">
+        The harness MUST randomize A/B label assignment per pair — across many
+        comparisons, the mapping from (baseline, treatment) to (A, B) MUST be
+        approximately uniform.
+        <trace>fr-ag-003</trace>
+      </criterion>
+      <criterion id="fr-ag-003-ac3">
+        The prompt sent to the blind-comparator subagent MUST NOT contain the
+        strings "baseline", "treatment", "with_skill", "without_skill", or
+        the skill name anywhere in the comparison payload.
+        <trace>fr-ag-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

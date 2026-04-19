@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>arc-evaluating-v2</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <source>
+      <design_path>docs/plans/arc-evaluating-v2/2026-04-19/design.md</design_path>
+      <design_iteration>2026-04-19</design_iteration>
+    </source>
+    <title>arc-evaluating v2 — preflight, analyzer, claim extraction, dashboard consolidation</title>
+    <description>
+      The v1 eval surface is statistically sound but physically scattered and operationally weak:
+      preflight is prose-only, eval-comparator layers LLM judgment on top of already-quantified
+      results, k=3 runs can produce SHIP without any confidence interval, graders cannot critique
+      their own assertions or surface blind spots, and the live dashboard lacks the post-hoc review
+      UX needed for iteration. v2 consolidates the eval surface into the skill folder (agents plus
+      dashboard), tightens the verdict layer by introducing INSUFFICIENT_DATA, automates scenario
+      validity through preflight/lint/audit CLIs, extends the grading pipeline with discovered-claim
+      and weak-assertion channels, and merges real-time monitoring with skill-creator-style post-hoc
+      review into a single dashboard. It also wires arc-evaluating into the arc-using Discipline
+      Skills routing table so the shipping gate is actively triggered rather than remembered.
+    </description>
+    <scope>
+      <includes>
+        <feature id="fr-fs-001">Folder consolidation: eval agents and dashboard move into skills/arc-evaluating/, with plugin.json registering nested agent paths so subagent_type dispatch still resolves</feature>
+        <feature id="fr-gr-001">Grader pipeline extensions: per-trial duration_ms and token counts, discovered_claims[] and weak_assertions[] fields on grading.json, and the trigger rule for blind comparator supplementation</feature>
+        <feature id="fr-cli-001">New CLI subcommands arc eval preflight, arc eval lint, arc eval audit — automating scenario validity, format checks, and cross-benchmark assertion auditing</feature>
+        <feature id="fr-ag-001">Agent lifecycle changes: rename eval-comparator to eval-analyzer and strip its verdict authority; add eval-blind-comparator for paired-preference rating</feature>
+        <feature id="fr-vr-001">Verdict tightening and routing integration: INSUFFICIENT_DATA when k&lt;5, and an arc-using Discipline Skills routing entry for arc-evaluating</feature>
+        <feature id="fr-dash-001">Dashboard consolidation and UI redesign: 2-tab layout, auto-saving feedback textboxes, arrow-key navigation, SSE real-time channel retained at the new skill-folder location</feature>
+        <feature id="fr-sb-001">SKILL.md body discipline: triggering-only description, 1800-word Comprehensive-tier body, progressive disclosure into new references files, Rationalization Table and Red Flags updated for v2, TDD-for-docs applied to the edit, pytest validators kept green</feature>
+      </includes>
+      <excludes>
+        <reason>Full opt-in --blind mode where paired preference becomes the primary verdict. Only the minimal supplementary signal ships in v2; the paradigm shift is deferred until the supplementary signal demonstrates value.</reason>
+        <reason>Static HTML export via a Python-based generate_review.py pipeline. arcforge stays on its Node.js SSE-first stack; the dashboard will keep real-time updates rather than emitting portable static bundles.</reason>
+        <reason>Train/test split for skill-description trigger optimization. If that capability is needed it belongs in a dedicated skill such as arc-tuning-descriptions, not inside arc-evaluating.</reason>
+        <reason>Restructuring of the three-scope evaluation taxonomy (skill / agent / workflow). The scope framework is preserved as-is; v2 changes the machinery within each scope but not the scopes themselves.</reason>
+        <reason>Migration of scripts/lib/eval*.js into the skill folder. The canonical-engine rule in .claude/rules/architecture.md wins; canonical library code stays in scripts/lib/ and skill-owned tooling stays in the skill folder.</reason>
+        <reason>Automated mutation of existing scenario files under evals/scenarios/. Those remain untouched by v2 and will only change if authors choose to adopt the new CLI subcommands.</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <details>
+    <detail_file path="details/folder-structure.xml" />
+    <detail_file path="details/grader-pipeline.xml" />
+    <detail_file path="details/cli-subcommands.xml" />
+    <detail_file path="details/agent-lifecycle.xml" />
+    <detail_file path="details/verdict-and-routing.xml" />
+    <detail_file path="details/dashboard.xml" />
+    <detail_file path="details/skill-body.xml" />
+  </details>
+</spec>

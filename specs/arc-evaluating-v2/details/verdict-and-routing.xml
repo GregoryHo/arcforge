@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="verdict-and-routing">
+  <title>Verdict Tightening and Discipline-Routing Integration</title>
+  <consumes>
+    <artifact>scripts/lib/eval-stats.js (verdict computation)</artifact>
+    <artifact>scripts/lib/eval.js (verdict gating)</artifact>
+    <artifact>skills/arc-using/SKILL.md (routing table — Discipline Skills section)</artifact>
+  </consumes>
+  <produces>
+    <artifact>scripts/lib/eval-stats.js updated with INSUFFICIENT_DATA verdict branch</artifact>
+    <artifact>skills/arc-using/SKILL.md updated with arc-evaluating row in Discipline Skills table</artifact>
+  </produces>
+
+  <requirement id="fr-vr-001">
+    <title>INSUFFICIENT_DATA Verdict When k &lt; 5</title>
+    <description>
+      The verdict layer MUST return INSUFFICIENT_DATA whenever the trial count
+      for either baseline or treatment in an A/B comparison is less than 5,
+      regardless of observed pass rate. The harness MUST NOT issue SHIP,
+      NEEDS_WORK, or BLOCKED verdicts on INSUFFICIENT_DATA runs. The verdict
+      MUST surface a clear remediation message: "Run k≥5 trials per condition
+      for a defensible verdict." This applies to arc eval ab only; arc eval
+      preflight is exempt per fr-cli-001-ac5 because it checks scenario
+      validity rather than shipping fitness.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-vr-001-ac1">
+        Given an arc eval ab run with k=3 per condition and any pass-rate delta,
+        the harness verdict MUST be INSUFFICIENT_DATA.
+        <trace>fr-vr-001</trace>
+      </criterion>
+      <criterion id="fr-vr-001-ac2">
+        Given an arc eval ab run with k=4 baseline and k=10 treatment, the
+        verdict MUST still be INSUFFICIENT_DATA — both conditions MUST meet k≥5.
+        <trace>fr-vr-001</trace>
+      </criterion>
+      <criterion id="fr-vr-001-ac3">
+        The INSUFFICIENT_DATA verdict MUST be a distinct enum value from SHIP /
+        NEEDS_WORK / BLOCKED in the JSON output. Downstream consumers MUST be
+        able to switch on it.
+        <trace>fr-vr-001</trace>
+      </criterion>
+      <criterion id="fr-vr-001-ac4">
+        Given an arc eval preflight run with k=2 or k=3, the output MUST remain
+        PASS or BLOCK — preflight MUST NOT emit INSUFFICIENT_DATA.
+        <trace>fr-vr-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-vr-002">
+    <title>arc-using Routing Table Integration</title>
+    <description>
+      skills/arc-using/SKILL.md MUST include arc-evaluating in the "Discipline
+      Skills — Conditional Triggers" table. The trigger condition SHALL be
+      "About to ship, merge, or mark complete a skill, agent, or workflow". The
+      Iron Law column MUST state "No shipping claim without an eval run that
+      does not return INSUFFICIENT_DATA". Because arc-evaluating then lives in
+      the routing table, the skill's discovery also changes from Meta to
+      Discipline; this is a conceptual relabel only.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-vr-002-ac1">
+        Given the spec is implemented, skills/arc-using/SKILL.md MUST contain a
+        row in the Discipline Skills table whose Skill column is "arc-evaluating".
+        <trace>fr-vr-002</trace>
+      </criterion>
+      <criterion id="fr-vr-002-ac2">
+        The routing row's Condition column MUST reference "ship", "merge", or
+        "mark complete" so the 1% rule triggers when the user is about to claim
+        skill completion.
+        <trace>fr-vr-002</trace>
+      </criterion>
+      <criterion id="fr-vr-002-ac3">
+        The routing row's Iron Law column MUST forbid shipping on an
+        INSUFFICIENT_DATA verdict, closing the loop with fr-vr-001.
+        <trace>fr-vr-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

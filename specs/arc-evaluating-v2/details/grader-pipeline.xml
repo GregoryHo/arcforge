@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="grader-pipeline">
+  <title>Grader Pipeline Extensions</title>
+  <consumes>
+    <artifact>scripts/lib/eval.js (trial orchestration)</artifact>
+    <artifact>scripts/lib/eval-graders.js (grading dispatch)</artifact>
+    <artifact>skills/arc-evaluating/agents/eval-grader.md (model grader prompt)</artifact>
+    <artifact>evals/scenarios/*.md (scenario definitions, read-only)</artifact>
+  </consumes>
+  <produces>
+    <artifact>evals/results/&lt;scenario&gt;/&lt;runId&gt;/results.jsonl (with new timing/token fields per trial)</artifact>
+    <artifact>evals/results/&lt;scenario&gt;/&lt;runId&gt;/grading.json (with new discovered_claims[] and weak_assertions[] fields)</artifact>
+    <artifact>arc eval compare output (with token/time delta columns)</artifact>
+  </produces>
+
+  <requirement id="fr-gr-001">
+    <title>Capture Per-Trial Timing and Token Metrics</title>
+    <description>
+      Every trial record in results.jsonl MUST include duration_ms (wall-clock),
+      input_tokens, and output_tokens. The harness SHALL capture these at the moment
+      the trial completes — this is the only point at which the subagent exit
+      notification carries token accounting. Missing any of the three MUST be
+      recorded as null (not omitted) so downstream aggregators can distinguish
+      "zero" from "not captured".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-gr-001-ac1">
+        Given any completed trial, its results.jsonl entry MUST contain the keys
+        duration_ms, input_tokens, output_tokens. A value of null is allowed; a
+        missing key is NOT.
+        <trace>fr-gr-001</trace>
+      </criterion>
+      <criterion id="fr-gr-001-ac2">
+        Given a trial that exits abnormally (timeout, crash), the harness MUST still
+        write the partial record with duration_ms measured and the token fields set
+        to null. The trial MUST still count toward k for verdict purposes.
+        <trace>fr-gr-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-gr-002">
+    <title>Surface Token and Duration Deltas in Benchmark Reports</title>
+    <description>
+      The arc eval compare and arc eval report outputs MUST expose aggregated
+      duration and token metrics alongside the pass-rate delta. For A/B runs, the
+      delta SHOULD be presented as treatment mean minus baseline mean for each of
+      duration_ms, input_tokens, output_tokens. This makes it visible when a skill
+      improves quality but doubles cost — a regression that pass rate alone cannot catch.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-gr-002-ac1">
+        Given a completed A/B run with timing and token data, arc eval compare MUST
+        print duration_ms delta, input_tokens delta, and output_tokens delta in its
+        summary section, in addition to assertion pass-rate delta.
+        <trace>fr-gr-002</trace>
+      </criterion>
+      <criterion id="fr-gr-002-ac2">
+        Given any delta in tokens or duration exceeding 100% (treatment doubles
+        baseline), the compare output MUST visually mark it (flag, warning symbol,
+        or equivalent) so the cost regression is not overlooked.
+        <trace>fr-gr-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-gr-003">
+    <title>discovered_claims[] Field in grading.json</title>
+    <description>
+      The eval-grader agent MUST populate a discovered_claims[] array on grading.json
+      for every trial. Each entry MUST have the shape { text, category, passed,
+      evidence } where category is one of "factual" | "process" | "quality".
+      Discovered claims are extracted from the output beyond the predefined
+      assertions. They MUST NOT count toward the pass rate used by the verdict
+      layer — they are advisory only, consumed downstream by arc eval audit.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-gr-003-ac1">
+        Given a model-graded trial, grading.json MUST contain a discovered_claims[]
+        array, possibly empty when the grader found no additional claims worth flagging.
+        <trace>fr-gr-003</trace>
+      </criterion>
+      <criterion id="fr-gr-003-ac2">
+        Given any discovered claim fails, the overall trial pass rate computed by
+        the harness MUST be unchanged relative to the same grading.json with an
+        empty discovered_claims[]. The pass rate depends only on the predefined
+        expectations.
+        <trace>fr-gr-003</trace>
+      </criterion>
+      <criterion id="fr-gr-003-ac3">
+        Each discovered claim entry MUST include the required keys text, category,
+        passed, evidence. Missing keys MUST fail grading.json schema lint.
+        <trace>fr-gr-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-gr-004">
+    <title>weak_assertions[] Field in grading.json</title>
+    <description>
+      The eval-grader agent MUST populate a weak_assertions[] array on grading.json
+      identifying predefined assertions the grader judges to be non-discriminative,
+      ambiguous, or unverifiable from the available evidence. Each entry MUST
+      reference the assertion id and include a "reason" explanation. These critiques
+      MUST NOT affect the current trial's verdict — they are aggregated cross-trial
+      by arc eval audit to suggest assertion improvements.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-gr-004-ac1">
+        Given a grading pass, grading.json MUST include a weak_assertions[] array
+        (possibly empty). Each entry MUST carry at minimum { assertion_id, reason }.
+        <trace>fr-gr-004</trace>
+      </criterion>
+      <criterion id="fr-gr-004-ac2">
+        Presence or absence of weak_assertions entries MUST NOT change the verdict
+        verdict computation — the same trial graded twice with identical expectation
+        scores but different weak_assertions MUST yield the same verdict.
+        <trace>fr-gr-004</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-gr-005">
+    <title>Blind-Comparator Auto-Trigger Rule</title>
+    <description>
+      The harness MUST auto-invoke the eval-blind-comparator as a supplementary
+      signal after the main A/B comparison if and only if ALL predefined assertions
+      in the scenario are model-graded. Mixed grading (any code-graded assertion
+      present) MUST suppress the blind run. Code-only scenarios MUST NOT invoke
+      blind — the signal adds no value when assertions are deterministic.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-gr-005-ac1">
+        Given a scenario whose assertions are all model-graded, arc eval ab MUST
+        invoke the blind-comparator after the main grading completes and attach
+        its preference-rate output to the report.
+        <trace>fr-gr-005</trace>
+      </criterion>
+      <criterion id="fr-gr-005-ac2">
+        Given a scenario that mixes code-graded and model-graded assertions, arc
+        eval ab MUST NOT invoke the blind-comparator. The report MUST still show
+        the main delta plus a note stating blind was skipped due to mixed grading.
+        <trace>fr-gr-005</trace>
+      </criterion>
+      <criterion id="fr-gr-005-ac3">
+        Given a scenario whose assertions are all code-graded, arc eval ab MUST
+        NOT invoke the blind-comparator. The report MUST NOT mention blind at all.
+        <trace>fr-gr-005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
