@@ -4,9 +4,7 @@
 #
 # design.md is human-managed and never regenerated. The prompts below pin
 # every requirement ID, epic ID, and dependency so regeneration produces
-# a stable DAG shape — downstream tests assert against these IDs. See
-# docs/plans/spec-driven-refine/handoff-e2e-pipeline-tests.md §11 for the
-# full rationale.
+# a stable DAG shape — downstream tests assert against these IDs.
 #
 # Usage:
 #   ./regenerate-fixture.sh           # diff only, print apply command

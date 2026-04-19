@@ -1,474 +1,344 @@
-# spec-driven-refine — Design
+# spec-driven-refine — 2026-04-16
 
-## Vision
+## Context (from spec v1)
 
-Convert arcforge's one-shot `brainstorming → refiner → planner` pipeline into an
-iterable Spec-Driven Development workflow. Design docs become immutable raw sources;
-specs become live contracts updated via delta integration; DAGs become derived views
-that preserve execution state. Three foundational rules govern the entire flow.
+Spec v1 formalized the SDD pipeline: three stages (brainstorming → refiner → planner),
+three rules (R1 Human Consent, R2 Unidirectional Flow, R3 Block on Contradictions),
+artifact layout, and spec identity header. It was refined from the initial design doc
+but diverged during the refine session — removing REFINER_INPUT, simplifying the planner
+to a sprint model, and adding interface contracts not present in the original design.
 
-## Architecture
+Reference: specs/spec-driven-refine/spec.xml v1
 
-### Three Foundational Rules
+## Change Intent
 
-| Rule | Statement |
-|---|---|
-| **R1 — Human Consent** | Raw source (design doc) changes require human consent or initiation |
-| **R2 — Unidirectional Flow** | Downstream artifacts cannot modify upstream artifacts |
-| **R3 — Block on Contradictions** | Downstream stage blocks when upstream has contradictions; does not pass through broken artifacts |
+This iteration aligns the spec with decisions made during the v1 refine session and
+a subsequent design review. The changes fall into three categories: confirming refine
+session decisions that the design doc didn't capture, adding new mechanisms discovered
+during review, and removing over-engineered concepts.
 
-### Three-Layer Model
+### 1. Remove REFINER_INPUT — Refiner Consumes Complete Design Doc
 
-Mapped from Karpathy's LLM Wiki three-layer architecture:
+**What changes:** Brainstorming no longer produces a structured REFINER_INPUT
+section. The refiner reads the design doc directly and extracts requirements
+itself — like wiki ingest reading a raw source.
 
-| Layer | Karpathy | arcforge SDD | Verb | Lifecycle |
-|---|---|---|---|---|
-| Raw Source | Articles, papers | Design doc | **Elicit** | Immutable per iteration; new iteration = new file |
-| Wiki | LLM-maintained markdown | Spec (XML) | **Formalize** | Mutable via delta integration; self-versioned |
-| Schema | CLAUDE.md / AGENTS.md | Skill routing + templates | — | Human + LLM co-evolve |
-| (derived) | index.md | DAG + epics | **Decompose** | Rebuildable; preserves execution state |
+**Why:** REFINER_INPUT was a redundant summary of the design doc's content. The
+design doc itself IS the structured output (Vision, Architecture, Components,
+etc., when no prior spec exists; Context + Change Intent when a prior spec
+exists). Removing the summary eliminates duplication and lets the refiner use
+the full context.
 
-Design docs are raw sources — human intent amplified by an LLM tool. The tool
-used (LLM vs word processor) does not change the artifact's status; the flow
-rules do.
+When a prior spec exists, the user describes changes in natural language in the
+design doc's `## Change Intent` section. The refiner compares the design doc
+against the existing `spec.xml` and derives the `<delta>` itself — the LLM does
+the diff, not the user. This avoids human-authored delta sections that drift
+from what the prose actually says.
 
-### Artifact Directory Layout
+### 2. One Refiner Behavior — No Modes
 
-```
-docs/plans/
-  <spec-id>/                      # topic folder (groups iterations)
-    <YYYY-MM-DD>/                 # iteration (immutable snapshot)
-      design.md                   # raw source
-      refiner-report.md           # only if refiner blocked this iteration
-    <YYYY-MM-DD>/
-      design.md
+**What changes:** Remove the entire notion of "modes" (initial, iteration, replace,
+Path A, Path B, gamma mode, γ mode). Refiner has one behavior: read the design
+doc, read the existing spec if one exists, write the new spec.
 
-specs/
-  <spec-id>/                      # complete project unit (one per spec)
-    spec.xml                      # live contract with identity header
-    details/
-      <capability>.xml
-    dag.yaml                      # execution plan (derived from spec)
-    epics/
-      <epic-id>/
-        epic.md
-        features/*.md
-```
+- If no prior spec → new spec has `spec_version=1`, no `<supersedes>`, no
+  `<delta>`.
+- If prior spec exists → new spec has `spec_version=prior+1`, `<supersedes>`
+  pointing to prior version, and a new `<delta>` element recording what changed.
 
-**Topic folder merge rule:** new iteration goes in same `<spec-id>/` folder only
-if it will supersede or amend the same spec. Merely "related" topics get their own
-folder.
+**Why:** In real software development, iteration is the norm, not the exception.
+Treating "initial" as a special mode creates artificial specialness and makes the
+pipeline look like it has branching logic when it has only conditional fields. The
+refiner doesn't switch modes — it runs the same process and fills in
+version-dependent fields based on filesystem state.
 
-### Spec Identity Header
+Design doc structure follows the same logic: `## Context` and `## Change Intent`
+sections become meaningful only when a prior spec exists (something to be in
+context of, something to change). When no prior spec exists, those sections
+are naturally absent — not "disabled", just not meaningful. The design doc
+schema does not prescribe separate "Path A" and "Path B" templates.
+
+This also eliminates "replace mode". A complete rewrite is just an aggressive
+iteration where the Change Intent replaces everything — the refiner handles it
+with the same code path.
+
+### 3. Planner: Sprint Model — Pure Function, Ephemeral DAG
+
+**What changes:** Planner is a pure function `(spec + delta) → (dag.yaml + epics/)`.
+It reads the current spec, plans the epics for the current iteration's scope, and
+**overwrites** any existing `dag.yaml` and `epics/` directory. No state preservation,
+no rework epics, no `source_spec_version` tracking, no archive of the old DAG, no
+completion gate.
+
+When a new sprint starts, the old `dag.yaml` is simply overwritten. The old
+content is not preserved in a file — it exists in git history if needed, but
+arcforge does not treat git as part of the spec contract. DAG is a truly
+disposable artifact: it exists to drive the current sprint's execution, and
+when the sprint ends the file's purpose ends.
+
+**Why:** DAG is a derived view (like Karpathy's index.md), not a living contract.
+"Rebuild = RAG" applies to the Spec layer (which is delta-integrated), not to the
+DAG layer. Delta processing for the DAG (the delta × epic state matrix from v1
+design) was over-engineered — the scenarios it handled (MODIFIED + in_progress
+epic) rarely occur because the pipeline is sequential.
+
+Historical traceability is owned by the spec (wiki layer) and the design doc
+iteration folders (raw source layer), not by the DAG. If a reader wants to know
+"what was planned in sprint v2", they consult `specs/<spec-id>/spec.xml`'s delta
+history and the matching `docs/plans/<spec-id>/<date>/design.md` — not an
+archived DAG.
+
+### 4. Spec Accumulates Delta Metadata (Wiki-Style)
+
+**What changes:** When the refiner writes a new spec version, it **appends** a new
+`<delta>` element to `<overview>` — it does not overwrite prior deltas. The spec
+accumulates the full iteration history inside itself. `<overview>` can contain
+zero (v1), one (v2), or many (v3+) `<delta>` children, ordered by `version`
+ascending.
 
 ```xml
 <overview>
-  <spec_id>example-feature</spec_id>
-  <spec_version>1</spec_version>
+  <spec_id>auth-system</spec_id>
+  <spec_version>3</spec_version>
   <status>active</status>
+  <supersedes>auth-system:v2</supersedes>
   <source>
-    <design_path>docs/plans/example-feature/2026-04-16/design.md</design_path>
-    <design_iteration>2026-04-16</design_iteration>
+    <design_path>docs/plans/auth-system/2026-06-01/design.md</design_path>
+    <design_iteration>2026-06-01</design_iteration>
   </source>
-  <scope>
-    <includes>
-      <feature id="f-xxx">description</feature>
-    </includes>
-    <excludes>
-      <reason>why excluded</reason>
-    </excludes>
-  </scope>
-  <supersedes>example-feature:v0</supersedes>
+  <title>...</title>
+  <description>...</description>
+  <scope>...</scope>
+
+  <delta version="2" iteration="2026-05-10">
+    <added ref="fr-as-007" />
+    <modified ref="fr-as-002" />
+  </delta>
+  <delta version="3" iteration="2026-06-01">
+    <added ref="fr-as-009" />
+    <removed ref="fr-as-001">
+      <reason>...</reason>
+    </removed>
+  </delta>
 </overview>
 ```
 
-## Components
+**Why:** Spec is a wiki (Karpathy three-layer model — the mutable delta-integrated
+layer). A wiki grows over time; it does not discard history when updated. If the
+spec discards prior deltas on each iteration, reading the spec no longer tells you
+"what happened" — it only tells you "what changed most recently". The full
+history becomes inaccessible without `git log`, which violates "spec is source
+of truth".
 
-### Stage 1: Brainstorming (Elicit) — SETTLED
+Accumulating deltas inside `<overview>` makes the spec self-contained: a reader
+can open `spec.xml` and see the complete iteration history of this spec. No
+external tooling required.
 
-**Entry flow:**
-1. Scan `specs/` for existing spec_ids
-2. Present findings to user — always confirm:
-   - Similar spec found → "Iterating on `<spec-id>` (v\<N\> active)?"
-   - No match → "New topic — proposed spec-id: `<suggestion>`. OK?"
-3. User confirms → Path A or Path B
+**Planner's rule:** The planner scopes its sprint by reading the `<delta>` whose
+`version` equals the current `<spec_version>`. All other delta elements are
+historical context for human readers — the planner ignores them. The planner must
+not read the design doc (R2: derived layer does not access raw source layer), so
+the delta metadata inside the spec is the only legal scope signal for the current
+sprint.
 
-**Path A — New Spec:**
+For v1 (no `<delta>` elements present), the planner plans all requirements
+currently in the detail files.
 
-| Aspect | Detail |
-|---|---|
-| Flow | Standard brainstorming Phase 1-3 (Understanding → Exploring → Presenting) |
-| spec_id | Derived from content at end of Phase 2 (scope clear); user confirms |
-| Output | `docs/plans/<spec-id>/<date>/design.md` |
-| REFINER_INPUT | `type: initial`, full requirements, scope declaration |
-| Commit | `docs: add <spec-id> design` |
+**Every delta child generates an epic.** The four delta children all represent
+version-change operations that require implementation work — the planner emits
+one epic per entry:
 
-**Path B — Iteration:**
+| Delta child | Epic semantics | Epic reference |
+|---|---|---|
+| `<added ref="X">` | Implement new requirement X | points at X in current detail files |
+| `<modified ref="X">` | Update existing implementation of X to match changed behavior | points at X in current detail files |
+| `<removed ref="X"><reason>...</reason></removed>` | Teardown — remove code tied to X. Implementer LLM greps codebase for X and removes; `<reason>` and optional `<migration>` inform teardown thoroughness (e.g., security reasons → strict, deprecation with consumers → transition code first) | references X, which no longer exists in detail files |
+| `<renamed ref_old="X" ref_new="Y">` | Mechanical code-side refactor — grep + replace refs from X to Y. **Body unchanged; id only**. Semantic changes must be expressed as `<removed>` + `<added>`, not as a renamed with modification. | points at Y in current detail files |
 
-| Aspect | Detail |
-|---|---|
-| Phase 1 | Read existing spec.xml + previous iteration(s) to understand current state |
-| Phase 2 | Explore delta only — what changes, why, interaction with existing scope |
-| Phase 3 | Present context summary + delta; confirm section by section |
-| Output | `docs/plans/<spec-id>/<date>/design.md` (γ mode) |
-| REFINER_INPUT | `type: iteration`, `base_version: <N>`, Delta (ADDED/MODIFIED/REMOVED) |
-| Commit | `docs: add <spec-id> iteration <date>` |
+arcforge does not inspect the *shape* of a delta — a delta with only `<removed>`
+entries is a legal sprint (deprecation, compliance teardown, legacy cleanup). The
+planner generates a sprint's worth of teardown epics and the downstream pipeline
+treats them like any other work.
 
-**Path B design doc structure (γ mode):**
+### 5. Refiner Gates New Iterations (Not Planner)
 
-```markdown
-# <spec-id> — Iteration <YYYY-MM-DD>
+**What changes:** The refiner — not the planner — is responsible for gating new
+iterations. Before producing a new spec version (one that would add a `<delta>`
+and increment `spec_version`), the refiner checks the current `specs/<spec-id>/dag.yaml`:
 
-## Context (from spec v<N>)
-<2-3 sentence summary of current spec scope>
-Reference: specs/<spec-id>/spec.xml v<N>
+- No prior spec → no gate (this is v1; there is nothing to be mid-sprint on).
+- Prior spec exists + no `dag.yaml` → proceed. Planner has not yet run for the
+  current spec version. This is a legal state (user refined but hasn't planned
+  yet).
+- Prior spec exists + `dag.yaml` with all epics `completed` → proceed. The
+  current sprint is done; the new iteration is allowed.
+- Prior spec exists + `dag.yaml` with any non-completed epic → **BLOCK**:
+  > Complete current sprint before iterating. N of M epics still incomplete.
 
-## Change Intent
-<Why this change, what changes, what doesn't change>
+The refiner reports the incomplete epics and aborts. No spec file is written,
+no `<delta>` is added, nothing changes on disk. The user finishes the current
+sprint (or explicitly aborts it by some other means) before re-running the
+refiner.
+
+**Why this belongs in the refiner, not the planner:**
+
+The gate question is "is the project ready to move to the next iteration?". That
+is an upstream concern — it applies before we generate the next iteration's
+contract (the new spec). If we let the refiner write v(N+1) and then have the
+planner refuse to build a DAG, we've already created an inconsistent state:
+`spec_version` says (N+1) but the prior sprint's DAG is still alive. The two
+layers are out of sync and the user is stuck cleaning up.
+
+Moving the gate upstream — into the refiner — means the inconsistency never
+happens. If the prior sprint is not done, nothing downstream moves. Spec stays
+at v(N), DAG stays at v(N)'s execution state, user completes the work, refiner
+runs cleanly next time.
+
+**Why this is consistent with "DAG is disposable":**
+
+Gating on DAG completion is not the same as treating the DAG as authoritative.
+The DAG is still disposable — it is used only as a **signal** of "is the current
+sprint done?". The refiner reads the DAG's completion counts to make a go/no-go
+decision; it does not use the DAG for anything else. After the refiner allows
+the iteration, the planner overwrites the DAG without hesitation. The gate and
+the overwrite are not in tension — they operate on the same artifact at
+different times for different purposes.
+
+**Block behavior (R3):** When the refiner blocks — whether on the DAG gate
+or on a contradiction between design doc and prior spec — it prints the error
+to terminal and exits non-zero. **No `refiner-report.md` or any other artifact
+is written anywhere.** Nothing persists across the blocked invocation. The user
+sees the message in the moment, fixes the design doc (or finishes the sprint,
+depending on the block reason), and re-runs the refiner. This keeps retry
+semantics clean — there is no stale report file to clean up, no half-written
+spec, no sticky state across invocations.
+
+**No escape hatch.** When the refiner blocks on the DAG gate, the user has
+exactly two paths forward: (a) complete the remaining epics in the current
+sprint, or (b) abandon the entire spec by deleting `specs/<spec-id>/` and
+starting a new one. There is no `--force` flag, no `abandoned` status value
+for epics, no partial-abandonment mechanism. Partial abandonment would
+pollute `dag.yaml`'s status semantics from "actual execution state" to "what
+the user wishes were the state" — a distinction that corrupts every
+downstream tool that reads DAG status. Full-spec abandonment is a human
+filesystem action (delete the directory), not an arcforge primitive —
+arcforge does not need to support it, because the filesystem does.
+
+### 6. sdd-utils.js = Validation Tools, Not Merge Engine
+
+**What changes:** Clarify sdd-utils.js as a validation and information toolkit. The
+LLM (refiner skill) directly manages spec content. sdd-utils.js provides deterministic
+checks before and after LLM writes.
+
+**Why:** OpenSpec uses a programmatic merge engine (LLM writes delta → code merges
+into full spec). arcforge's spec is nested XML across multiple files — programmatic
+merge would require an XML parser (violating zero-dependency) and complex multi-file
+logic. Instead, the LLM manages the spec directly (like maintaining a wiki page),
+and sdd-utils.js acts as audit LINT — validating structure, not authoring content.
+
+Validation API:
+- `validateSpecHeader(xml)` — identity header completeness
+- `validateDesignDoc(path)` — design doc structure
+- `validateRequirements(xml)` — AC and trace completeness
+- `validateDagIntegrity(yaml)` — no cycles, valid references
+
+Information API:
+- `parseSpecHeader(xml)` — extract version, scope, delta
+- `listSpecIds()` — scan specs/ directory
+- `checkDagStatus(yaml)` — completion counts for gate check
+
+### 7. Remove Stale Lint Skill
+
+**What changes:** Remove standalone stale-lint skill (was stale-lint.xml in v1 spec).
+Per-stage input/output validation replaces it.
+
+**Why:** Each stage validates its own inputs and outputs. A separate lint skill that
+scans for drift is redundant when the pipeline stages themselves enforce correctness
+at execution time. Stale lint was an external audit; per-stage validation is inline
+enforcement.
+
+### 8. Interface Contracts Are Implementation Detail
+
+**What changes:** The following v1 spec features are confirmed as implementation-level
+detail that the refiner was authorized to add during formalization:
+- Design Doc Contract (fr-cc-if-001)
+- Spec Identity Header Contract (fr-cc-if-002)
+- SDD Schemas guidance layer (fr-cc-if-003)
+- SDD Utils enforcement layer (fr-cc-if-004)
+- Skill Access Pattern (fr-cc-if-005)
+- Two-Pass Write Pattern (fr-cc-val-001)
+- Validation Report with Remediation (fr-cc-val-002)
+- Per-stage validation with three-tier severity (cc-003)
+
+**Why:** These don't change the pipeline's design intent (three-layer model, R1/R2/R3).
+They specify how quality is ensured — analogous to OpenSpec's Zod schemas, which exist
+in code but not in the proposal document.
 
 ## Architecture Impact
-<Only delta — how changes interact with existing design>
 
-## REFINER_INPUT
-spec_id: <spec-id>
-iteration: <YYYY-MM-DD>
-type: iteration
-base_version: <N>
-
-### Delta
-- ADDED: REQ-F010 — ...
-- MODIFIED: REQ-F003 — from ..., to ...
-- REMOVED: REQ-F005 — reason: ...
-
-### Constraints (new or modified)
-- CC-005: ...
-
-### Scope Changes
-added:
-  - feature-c: ...
-removed: []
-modified:
-  - feature-a: from ..., to ...
-```
-
-**Change type derived from delta content:**
-
-| Delta Content | Inferred Type |
-|---|---|
-| All ADDED | extend |
-| All MODIFIED | modify |
-| All REMOVED | reduce |
-| ADDED + REMOVED | restructure |
-| Entire spec replaced | replace |
-
-**Refiner rejection:** `<date>/refiner-report.md` stored alongside the rejected
-design. Human opens new iteration to fix. No override mechanism — resolve at source.
-
-**No lightweight amend path.** All changes go through the full pipeline.
-
-### Stage 2: Refining (Formalize) — SETTLED
-
-**Two modes:**
-
-| | Initial (Path A) | Iteration (Path B) |
-|---|---|---|
-| **Input** | design doc with `type: initial` | design doc with `type: iteration` + existing `specs/<spec-id>/spec.xml` |
-| **Validation** | Requirements non-contradictory; each req has testable AC; no ambiguous terms | Same + delta doesn't conflict with unchanged requirements; REMOVED doesn't break dependency chains |
-| **Block (R3)** | Contradictions / missing AC / circular dependencies | Same + delta conflicts with existing spec |
-| **Output** | New `specs/<spec-id>/spec.xml` v1 + `details/*.xml` | Updated spec.xml v(N+1) + updated details/ |
-| **spec_version** | `1` | `base_version + 1` |
-
-**Replace mode:** When design doc has `type: iteration` but no `### Delta` section
-(full REFINER_INPUT instead), refiner treats it as a complete rewrite. Produces
-spec v(N+1) from scratch, supersedes previous version. Used when user wants to
-redo an entire spec.
-
-**Refiner flow:**
+### Three-Layer Model Preserved
 
 ```
-Read design doc
-     │
-     ├── type: initial ──→ Formalize from scratch
-     │                      ├── Build <requirement> + <acceptance_criteria> + <trace>
-     │                      ├── Split by capability into details/*.xml
-     │                      └── Write identity header (v1, active)
-     │
-     └── type: iteration ──→ Read existing spec.xml
-                              ├── Has Delta section?
-                              │   ├── Yes → Apply delta:
-                              │   │    ADDED   → new <requirement> + details
-                              │   │    MODIFIED → update existing <requirement>
-                              │   │    REMOVED → remove <requirement> + clean details
-                              │   └── No  → Replace: formalize from scratch (like initial)
-                              ├── Validate merged/new spec has no contradictions
-                              ├── Bump spec_version
-                              ├── Update <source> to new design iteration
-                              ├── Update <scope>
-                              └── Set <supersedes> to previous version
+Raw Source (design doc) → Wiki (spec) → Derived (DAG)
+         R1: human consent   R2: unidirectional   planner only reads spec
 ```
 
-**Blocking report** (`<date>/refiner-report.md` alongside rejected design):
+Change #4 (accumulating delta metadata) keeps the spec self-contained — a reader
+never needs to cross into the raw source layer or dig through git to reconstruct
+iteration history. Change #5 (refiner gate) keeps the wiki layer internally
+consistent — we never produce a spec version that conflicts with an
+unfinished sprint.
 
-```markdown
-# Refiner Report — <spec-id> iteration <date>
+### Pipeline Flow Simplified
 
-## Status: BLOCKED
-
-## Issues
-
-### Contradictions
-- REQ-Fxxx vs REQ-Fyyy: [specific conflict description]
-
-### Missing Acceptance Criteria
-- REQ-Fxxx: no testable AC defined
-
-### Dependency Issues
-- REMOVED REQ-Fxxx is referenced by REQ-Fyyy (dependency broken)
-
-## Recommendations
-- [specific suggestion for each issue]
+Before (v1 design):
+```
+Brainstorm → design doc (with REFINER_INPUT)
+  → Refiner (initial/iteration/replace modes, reads REFINER_INPUT)
+  → Planner (delta processing matrix, rework epics)
 ```
 
-**Output artifacts:**
-
+After (v2):
 ```
-specs/<spec-id>/
-  spec.xml              ← current (refiner writes)
-  details/*.xml         ← current (refiner writes)
-```
-
-No CHANGELOG. History lives in `docs/plans/<spec-id>/` (design iterations).
-Previous spec versions live in git history.
-
-**Commit:** `feat(specs): formalize <spec-id> v<N>` or
-`feat(specs): update <spec-id> v<N-1> → v<N>`
-
-### Stage 3: Planning (Decompose) — SETTLED
-
-**Planner reads delta from the design doc via spec's source pointer:**
-
-```
-Read specs/<spec-id>/spec.xml
-  → follow <source><design_path>
-  → read design doc REFINER_INPUT
-  → type: initial → build DAG from scratch
-  → type: iteration + has Delta → incremental update
-  → type: iteration + no Delta (replace) → build DAG from scratch
+Brainstorm → design doc (single uniform structure)
+  → Refiner (check dag.yaml completion → read design doc + existing spec if any
+             → append new <delta>, bump spec_version, write spec)
+  → Planner (read spec + delta matching current spec_version
+             → overwrite dag.yaml + epics/ from scratch)
 ```
 
-**Two modes:**
+### Spec as Sprint Backlog
 
-| | Initial / Replace | Iteration (incremental) |
-|---|---|---|
-| **Input** | spec.xml | spec.xml + existing `specs/<spec-id>/dag.yaml` |
-| **Output** | New dag.yaml + `epics/` | Updated dag.yaml + new/modified epics |
-| **Tagging** | All epics: `source_spec_version: N` | New/changed epics: `source_spec_version: N` |
-
-**DAG lives inside the spec folder:** `specs/<spec-id>/dag.yaml` +
-`specs/<spec-id>/epics/`. Each spec is a self-contained project unit.
-
-**dag.yaml structure:**
-
-```yaml
-epics:
-  - id: capability-a
-    status: completed
-    source_requirement: fr-ca-001
-    source_spec_version: 1
-
-  - id: capability-c
-    status: pending
-    source_requirement: fr-cc-001
-    source_spec_version: 2
-
-  - id: capability-a-v2          # rework epic
-    status: pending
-    source_requirement: fr-ca-001
-    source_spec_version: 2
-    rework_of: capability-a       # traces back to original
-```
-
-No `spec_id` field needed — folder location is the scope.
-
-**Delta × epic state matrix:**
-
-| Delta | Epic: completed | Epic: in_progress | Epic: pending |
-|---|---|---|---|
-| **ADDED** | — (new epic) | — (new epic) | — (new epic) |
-| **MODIFIED** | New rework epic | **Block — ask human** | Update epic in place |
-| **REMOVED** | Mark `deprecated` | **Block — ask human** | Remove from DAG |
-
-**Planner blocking:** unlike refiner (which blocks on spec contradictions),
-planner blocks on **execution state conflicts** — specifically when an
-in_progress epic is affected by MODIFIED or REMOVED. Human decides:
-complete first, abort, or merge.
-
-**Diff report** (when blocking or when auto-applied changes need confirmation):
-
-```markdown
-# Planner Report — <spec-id> v<N>
-
-## Auto-applied
-- ADDED: epic capability-c (pending, spec_version: N)
-- REMOVED: epic capability-d (was pending, removed)
-- MODIFIED: capability-a → rework epic capability-a-v2
-
-## Needs Decision
-- MODIFIED: REQ-Fxxx → epic capability-b is IN_PROGRESS
-  1. Complete current work first, then rework
-  2. Abort current, create rework epic
-  3. Merge changes into current work
-```
-
-**"Done" signal:** all epics with `source_spec_version: N` are `completed`
-→ iteration N is done.
-
-**Commit:** `feat(dag): plan <spec-id> v<N>` or
-`feat(dag): update dag for <spec-id> v<N-1> → v<N>`
-
-## Data Flow
+Each spec version produces one DAG (sprint). When the sprint is complete, the
+refiner gate unblocks and the spec can iterate. Every `<delta>` ever written
+stays in the spec, so the spec itself records the full iteration history.
 
 ```
-            R1: human consent     R2: no upstream modification
-                    │                        │
-User ──→ Brainstorm ──→ Design doc ──→ Refiner ──→ Spec ──→ Planner ──→ DAG
-          (elicit)       (raw source)   (formalize)  (contract)  (decompose) (plan)
-              │               │              │            │            │
-              │          frozen after    blocks if     mutable     preserves
-              │            commit       contradictions  via delta   exec state
-              │               │         (R3)
-              │               │              │
-              │          if blocked:    refiner-report.md
-              │          new iteration  alongside design
-              │          (Path B)
-              └──────────────┘
+spec v1 → dag v1 → execute → complete
+spec v2 (adds <delta version=2>: +email) → dag v2 (email only) → execute → complete
+spec v3 (adds <delta version=3>: ~phone→SSO) → dag v3 (SSO only) → execute → complete
 ```
 
-Iteration loop: blocked → new design iteration → re-run refiner. Always through
-brainstorming (human elicits new intent), never by editing existing artifacts.
-
-## Error Handling
-
-| Error | Response | Rule |
-|---|---|---|
-| Refiner finds contradictions in design | Block, produce refiner-report.md, require new iteration | R3 |
-| Refiner delta conflicts with existing spec | Block, produce refiner-report.md | R3 |
-| Planner: MODIFIED/REMOVED hits in_progress epic | Block, produce planner report, human decides | R3 |
-| Design doc modified after spec produced | Stale lint flags; human decides whether to iterate | R1 |
-| Design folder exists but no spec | Stale lint flags: "unrefined design" | — |
-| Spec exists but no dag.yaml | Stale lint flags: "unplanned spec" | — |
-| spec_id collision (proposed name already exists) | Brainstorming asks: iterate existing or rename? | — |
-
-## Testing
-
-Will follow arc-tdd when implementation begins. Key test scenarios:
-
-**Stage 1 (Brainstorming):**
-- Path A: new spec_id → design doc at `docs/plans/<spec-id>/<date>/design.md` → `type: initial`
-- Path B: existing spec_id → design doc with `type: iteration` + delta
-- Path B replace: existing spec_id → design doc with `type: iteration` + no Delta section
-
-**Stage 2 (Refiner):**
-- Initial: design doc → spec.xml v1 with identity header + details/
-- Iteration (delta): design delta + existing spec → spec.xml v(N+1) with updated scope/supersedes
-- Iteration (replace): complete design + existing spec → spec.xml v(N+1) from scratch
-- Block: contradictory design → refiner-report.md produced → no spec.xml
-- Block (delta): delta conflicts with existing requirements → refiner-report.md
-
-**Stage 3 (Planner):**
-- Initial: spec.xml → dag.yaml + epics/ from scratch, all `source_spec_version: 1`
-- Iteration: delta ADDED → new epic with `source_spec_version: N`
-- Iteration: delta MODIFIED + completed epic → rework epic with `rework_of`
-- Iteration: delta REMOVED + pending epic → removed from DAG
-- Block: MODIFIED/REMOVED + in_progress epic → planner report → human decides
-- Done signal: all `source_spec_version: N` epics completed
-
-**Stale lint:**
-- Design newer than spec → flag
-- Design folder without spec → flag "unrefined design"
-- Spec without dag.yaml → flag "unplanned spec"
+At each arrow from "complete" to the next spec version, the refiner's DAG-completion
+gate confirms the prior sprint actually finished. At each arrow from "dag vN" to
+"execute", the old dag.yaml is overwritten by planner; there is no archive file.
+The per-sprint history lives in the spec's accumulated `<delta>` elements and in
+the per-iteration design doc folders.
 
 ## Considered and Rejected
 
 | Scenario | Decision | Rationale |
 |---|---|---|
-| Human override of refiner block | Not needed | Resolve by adding rationale in new iteration |
-| Lightweight amend path | Not needed | All changes through full pipeline |
-| Exploration-only brainstorming | Not needed | Non-pipeline docs are just docs, not SDD artifacts |
-| Spec rollback | Not needed | Rollback = new iteration (v3 reintroducing v1) |
-| Cross-spec dependencies | TBD later | Not day-1; design when multi-spec usage established |
-
----
-
-<!-- REFINER_INPUT_START -->
-
-## REFINER_INPUT
-
-spec_id: spec-driven-refine
-iteration: 2026-04-16
-type: initial
-
-### Functional Requirements
-
-**Stage 1 — Brainstorming:**
-- REQ-F001: Brainstorming scans `specs/` for existing spec_ids before starting
-- REQ-F002: Brainstorming routes to Path A (new) or Path B (iteration) based on user confirmation
-- REQ-F003: Path A produces design doc at `docs/plans/<spec-id>/<date>/design.md` with `type: initial` REFINER_INPUT
-- REQ-F004: Path B reads existing spec.xml and previous iterations before eliciting delta
-- REQ-F005: Path B produces design doc with `type: iteration`, `base_version`, and Delta section (ADDED/MODIFIED/REMOVED)
-- REQ-F006: spec_id is derived from content at end of Phase 2 and confirmed by user (Path A only)
-- REQ-F007: Change type is derived from delta content, not declared by user
-
-**Stage 2 — Refiner:**
-- REQ-F008: Refiner blocks when design doc contains contradictions (R3)
-- REQ-F009: Refiner rejection report stored at `<date>/refiner-report.md` alongside the rejected design
-- REQ-F010: Spec has identity header: spec_id, spec_version, status, source, scope, supersedes
-- REQ-F011: Multiple specs coexist in `specs/<spec-id>/` folders
-- REQ-F012: Initial mode: formalize from scratch → spec v1 + details/
-- REQ-F013: Iteration mode (delta): apply ADDED/MODIFIED/REMOVED to existing spec → v(N+1)
-- REQ-F014: Iteration mode (replace): no Delta section → formalize from scratch as v(N+1)
-- REQ-F015: Refiner validates merged spec has no contradictions before producing output
-
-**Stage 3 — Planner:**
-- REQ-F016: Planner reads delta info by following spec's `<source>` pointer to design doc
-- REQ-F017: Initial/replace mode: build dag.yaml + epics/ from scratch
-- REQ-F018: Iteration mode: ADDED → new epic; MODIFIED + completed → rework epic; REMOVED + pending → remove
-- REQ-F019: Planner blocks when MODIFIED/REMOVED affects in_progress epics; produces diff report
-- REQ-F020: Each epic tagged with `source_spec_version` for completion tracking
-- REQ-F021: Rework epics include `rework_of` field tracing back to original epic
-- REQ-F022: DAG + epics live inside `specs/<spec-id>/` (self-contained project unit)
-- REQ-F023: "Done" = all epics with `source_spec_version: N` are completed
-
-**Cross-cutting:**
-- REQ-F024: Design docs are immutable after commit; modifications require new iteration (R1)
-- REQ-F025: Downstream stages cannot modify upstream artifacts (R2)
-- REQ-F026: Stale lint: design newer than spec → flag
-- REQ-F027: Stale lint: design folder without spec → flag "unrefined design"
-- REQ-F028: Stale lint: spec without dag.yaml → flag "unplanned spec"
-
-### Non-Functional Requirements
-
-- REQ-N001: Pipeline works with existing arcforge CLI and skill infrastructure (no new runtime dependencies)
-- REQ-N002: All artifacts are file-based (YAML, XML, Markdown) — no database
-
-### Constraints
-
-- CC-001: Zero external dependencies (Node.js standard library only)
-- CC-002: Backward compatible with existing `specs/spec.xml` format (additive changes to XML schema only)
-
-### Scope
-
-includes:
-  - stage-1-brainstorming: Path A/B routing, design doc structure, REFINER_INPUT format
-  - stage-2-refiner: initial/iteration/replace modes, blocking report, identity header
-  - stage-3-planner: initial/iteration modes, delta processing, rework epics, done signal
-  - cross-cutting-rules: R1 (human consent), R2 (unidirectional), R3 (block on contradictions)
-  - artifact-layout: directory structure for designs, specs, DAG (per-spec)
-  - spec-identity-header: XML schema for spec self-identification
-  - stale-lint: detection of upstream/downstream drift + completeness checks
-
-excludes:
-  - implementation: no code changes in this design — skill and library modifications deferred
-  - cross-spec-dependencies: deferred until multi-spec usage is established
-
-<!-- REFINER_INPUT_END -->
+| Planner reads design doc for scope | Rejected | Violates three-layer model (derived reading raw source) |
+| Programmatic spec merge (OpenSpec style) | Rejected | XML multi-file merge requires parser, violates zero-dependency |
+| Separate mode for "replace" | Rejected | Replace is just aggressive iteration; refiner determines from intent |
+| Completion tracking in spec per-requirement | Rejected | Delta metadata + DAG gate are sufficient; per-requirement status adds complexity |
+| Same-day iteration collision | Noted | v1 design uses date as folder name; same-day iterations need disambiguator (e.g., -v2 suffix) — minor gap to address |
+| Archive old `dag.yaml` on iteration (e.g., `dag.yaml.archive.YYYY-MM-DD`) | Rejected | DAG is disposable. Historical traceability lives in the spec's accumulated `<delta>` elements and the design doc iteration folders, not in DAG archives. Overwrite is the clean semantic. |
+| DAG completion gate lives in planner | Rejected | Moving the gate to refiner prevents the inconsistent state "spec at v(N+1) but DAG still at v(N) incomplete". Refiner is the sprint entry point; if it blocks, nothing downstream moves. |
+| Initial / Iteration / Replace modes in refiner | Rejected | One refiner behavior, with conditional fields based on whether a prior spec exists. No mode labels, no Path A/B/γ terminology. Iteration is the norm, not a special case. |
+| Overwrite prior `<delta>` each iteration (single delta in spec) | Rejected | Spec is wiki — it accumulates. Discarding prior deltas means history is only recoverable via git log, violating "spec is source of truth". Every `<delta>` ever written stays in `<overview>`. |
+| `<modified>` reserved for AC wording, not behavior changes | Rejected | Every delta child represents version-change work. `<modified>` means "existing requirement's behavior changed and needs updating". Distinguishing wording-only from behavior-changing modifications is a distinction arcforge does not enforce — if the refiner writes `<modified>`, the planner emits an epic, and the implementer LLM decides scope from the requirement text. |
+| `--force` flag or `abandoned` epic status to bypass refiner gate | Rejected | Any escape hatch pollutes `dag.yaml` status semantics (from "actual execution state" to "user wishes"). The two legitimate paths — complete the sprint, or delete `specs/<spec-id>/` — are enforced by the gate and the filesystem respectively. No tooling addition needed. |
+| `refiner-report.md` or any persistent artifact on R3 block | Rejected | Refiner block is transient: terminal print + non-zero exit, no files written. Clean retry semantics, zero cross-call state. A sticky report file creates stale-file problems (when is it safe to delete?) for no upside. |
+| Disallow pure-teardown sprints (deltas with only `<removed>`) | Rejected | A sprint whose delta contains only `<removed>` entries is a legitimate iteration (deprecation, compliance-driven takedown, legacy cleanup). arcforge inspects per-entry correctness of a delta, never its shape. |
