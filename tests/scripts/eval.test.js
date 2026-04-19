@@ -361,14 +361,24 @@ MARKER
   // ── parseStreamJsonOutput ────────────────────────────────────
 
   describe('parseStreamJsonOutput', () => {
+    const nullUsage = { input_tokens: null, output_tokens: null, duration_ms: null };
+
     it('should return empty strings for empty input', () => {
       const result = parseStreamJsonOutput('');
-      expect(result).toEqual({ textResult: '', richTranscript: '' });
+      expect(result).toEqual({ textResult: '', richTranscript: '', usage: nullUsage });
     });
 
     it('should return empty strings for null/undefined', () => {
-      expect(parseStreamJsonOutput(null)).toEqual({ textResult: '', richTranscript: '' });
-      expect(parseStreamJsonOutput(undefined)).toEqual({ textResult: '', richTranscript: '' });
+      expect(parseStreamJsonOutput(null)).toEqual({
+        textResult: '',
+        richTranscript: '',
+        usage: nullUsage,
+      });
+      expect(parseStreamJsonOutput(undefined)).toEqual({
+        textResult: '',
+        richTranscript: '',
+        usage: nullUsage,
+      });
     });
 
     it('should extract text from assistant messages', () => {
@@ -2144,6 +2154,172 @@ Do something.
       expect(callArgs[1]).toContain('--max-turns');
       const mtIdx = callArgs[1].indexOf('--max-turns');
       expect(callArgs[1][mtIdx + 1]).toBe('20');
+    });
+  });
+
+  // ── fr-gr-001: timing and token metrics ─────────────────────
+
+  describe('fr-gr-001 — parseStreamJsonOutput yields usage', () => {
+    it('should return usage with input_tokens and output_tokens from result event', () => {
+      const input = JSON.stringify({
+        type: 'result',
+        result: 'Done',
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+        duration_ms: 1234,
+      });
+      const { textResult, usage } = parseStreamJsonOutput(input);
+      expect(textResult).toBe('Done');
+      expect(usage).toEqual({ input_tokens: 100, output_tokens: 50, duration_ms: 1234 });
+    });
+
+    it('should return usage with nulls when result event has no usage', () => {
+      const input = JSON.stringify({ type: 'result', result: 'Done' });
+      const { usage } = parseStreamJsonOutput(input);
+      expect(usage).toEqual({ input_tokens: null, output_tokens: null, duration_ms: null });
+    });
+
+    it('should return null usage fields when duration_ms is absent', () => {
+      const input = JSON.stringify({
+        type: 'result',
+        result: 'Done',
+        usage: { input_tokens: 42, output_tokens: 17 },
+      });
+      const { usage } = parseStreamJsonOutput(input);
+      expect(usage.input_tokens).toBe(42);
+      expect(usage.output_tokens).toBe(17);
+      expect(usage.duration_ms).toBeNull();
+    });
+
+    it('should return null usage when no result event is present', () => {
+      const input = JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'hello' }] },
+      });
+      const { usage } = parseStreamJsonOutput(input);
+      expect(usage).toEqual({ input_tokens: null, output_tokens: null, duration_ms: null });
+    });
+
+    it('should preserve backwards-compatible return shape (textResult and richTranscript still present)', () => {
+      const input = JSON.stringify({ type: 'result', result: 'Answer' });
+      const result = parseStreamJsonOutput(input);
+      expect(result).toHaveProperty('textResult');
+      expect(result).toHaveProperty('richTranscript');
+      expect(result).toHaveProperty('usage');
+    });
+  });
+
+  describe('fr-gr-001 — runTrial includes duration_ms, input_tokens, output_tokens', () => {
+    function makeStreamWithUsage({ inputTokens, outputTokens, durationMs } = {}) {
+      const resultEvent = { type: 'result', result: 'Done' };
+      if (inputTokens !== undefined || outputTokens !== undefined) {
+        resultEvent.usage = { input_tokens: inputTokens, output_tokens: outputTokens };
+      }
+      if (durationMs !== undefined) resultEvent.duration_ms = durationMs;
+      return [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify(resultEvent),
+      ].join('\n');
+    }
+
+    it('should include duration_ms, input_tokens, output_tokens on successful trial result', () => {
+      const scenario = {
+        name: 'tok-test',
+        scenario: 'Do it.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: '[]', stderr: '', exitCode: 0 }) // plugin list
+        .mockReturnValueOnce({
+          stdout: makeStreamWithUsage({ inputTokens: 200, outputTokens: 80, durationMs: 5000 }),
+          stderr: '',
+          exitCode: 0,
+        }); // claude trial
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: true });
+
+      expect(result).toHaveProperty('duration_ms');
+      expect(result).toHaveProperty('input_tokens');
+      expect(result).toHaveProperty('output_tokens');
+      expect(result.input_tokens).toBe(200);
+      expect(result.output_tokens).toBe(80);
+      expect(typeof result.duration_ms).toBe('number');
+    });
+
+    it('should use null for token fields when result event has no usage', () => {
+      const scenario = {
+        name: 'tok-null',
+        scenario: 'Do it.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: '[]', stderr: '', exitCode: 0 })
+        .mockReturnValueOnce({ stdout: makeStreamWithUsage(), stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: true });
+
+      expect(result).toHaveProperty('input_tokens', null);
+      expect(result).toHaveProperty('output_tokens', null);
+      expect(result).toHaveProperty('duration_ms');
+      expect(typeof result.duration_ms).toBe('number');
+    });
+
+    it('should include duration_ms, input_tokens: null, output_tokens: null on plugin-dir-missing infraError', () => {
+      const scenario = {
+        name: 'tok-infra',
+        scenario: 'Do it.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        pluginDir: '/does/not/exist',
+      };
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.infraError).toBe(true);
+      expect(result).toHaveProperty('duration_ms');
+      expect(result).toHaveProperty('input_tokens', null);
+      expect(result).toHaveProperty('output_tokens', null);
+    });
+
+    it('should include all three fields on no-output infraError', () => {
+      const scenario = {
+        name: 'tok-noout',
+        scenario: 'Do it.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      // Produce a result event with no assistant messages (triggers "No assistant output captured")
+      const emptyStream = JSON.stringify({
+        type: 'result',
+        result: '',
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+      mockUtils.execCommand
+        .mockReturnValueOnce({ stdout: '[]', stderr: '', exitCode: 0 })
+        .mockReturnValueOnce({ stdout: emptyStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: true });
+
+      expect(result).toHaveProperty('duration_ms');
+      expect(result).toHaveProperty('input_tokens');
+      expect(result).toHaveProperty('output_tokens');
     });
   });
 
