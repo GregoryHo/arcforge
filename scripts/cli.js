@@ -34,7 +34,7 @@ const {
   rebootAllSpecs,
   readArcforgeMarker,
 } = require('./lib/coordinator');
-const { schemaToYaml, exampleToYaml, example, schema, objectToYaml } = require('./lib/dag-schema');
+const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
 const { getWorktreePath } = require('./lib/worktree-paths');
 const { parseDagYaml } = require('./lib/yaml-parser');
 
@@ -92,9 +92,8 @@ function requireSpecId(spec, commandName) {
 
 /**
  * Build a reverse index { epicId → [specId...] } by reading each
- * `specs/*\/dag.yaml` exactly once. Callers that need the lookup in a
- * loop (e.g. backfillMarkers iterating worktrees) use this; a one-shot
- * single-epic lookup uses findSpecsByEpic.
+ * `specs/*\/dag.yaml` exactly once. One-shot single-epic lookup uses
+ * findSpecsByEpic; callers that need the index directly can call this.
  * @returns {Map<string, string[]>}
  */
 function buildEpicSpecIndex(projectRoot) {
@@ -174,107 +173,6 @@ function resolveMergeOrCleanupSpec(projectRoot, explicitFlag, positionalEpics, c
     `Error: Multiple specs found (${spec.candidates.join(', ')}). Rerun ${commandName} with --spec-id <id> or pass epic ids as positional args.`,
   );
   process.exit(1);
-}
-
-/**
- * Migration command: stamp `spec_id` onto legacy .arcforge-epic markers
- * that predate the per-spec schema. Scans git worktree list and for each
- * marker missing spec_id, reverse-looks-up the epic's containing spec.
- *
- * UX: default is dry-run; --apply writes. Ambiguous (epic appears in
- * multiple specs) is a hard error by default; --spec-id forces ambiguous
- * markers into the given spec.
- *
- * @param {string} projectRoot
- * @param {{ apply: boolean, explicitSpecId?: string }} options
- * @returns {{ scanned: number, updated: string[], skipped: string[], errors: Array<{path:string, reason:string}>, dryRun: boolean }}
- */
-function backfillMarkers(projectRoot, { apply, explicitSpecId } = {}) {
-  const { execFileSync } = require('node:child_process');
-  const result = {
-    scanned: 0,
-    updated: [],
-    skipped: [],
-    errors: [],
-    dryRun: !apply,
-  };
-
-  let worktreeList;
-  try {
-    worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-      cwd: projectRoot,
-      encoding: 'utf8',
-    });
-  } catch (err) {
-    console.error(`Error: failed to list git worktrees: ${err.message}`);
-    process.exit(1);
-  }
-
-  const paths = [];
-  for (const line of worktreeList.split('\n')) {
-    if (line.startsWith('worktree ')) paths.push(line.slice(9));
-  }
-
-  // Build { epicId: [specId, ...] } once up front so per-worktree lookups
-  // are O(1) instead of O(specs) × O(worktrees).
-  const epicToSpecs = buildEpicSpecIndex(projectRoot);
-
-  for (const wt of paths) {
-    const markerPath = path.join(wt, '.arcforge-epic');
-    if (!fs.existsSync(markerPath)) continue;
-    result.scanned++;
-
-    let marker;
-    try {
-      marker = parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
-    } catch (err) {
-      result.errors.push({ path: markerPath, reason: `unreadable: ${err.message}` });
-      continue;
-    }
-
-    if (marker.spec_id) {
-      result.skipped.push(markerPath);
-      continue;
-    }
-    if (!marker.epic) {
-      result.errors.push({ path: markerPath, reason: 'no epic field' });
-      continue;
-    }
-
-    let targetSpec = explicitSpecId;
-    if (!targetSpec) {
-      const matches = epicToSpecs.get(marker.epic) || [];
-      if (matches.length === 1) {
-        targetSpec = matches[0];
-      } else if (matches.length === 0) {
-        result.errors.push({
-          path: markerPath,
-          reason: `epic "${marker.epic}" not found in any spec`,
-        });
-        continue;
-      } else {
-        result.errors.push({
-          path: markerPath,
-          reason: `epic "${marker.epic}" exists in ${matches.length} specs: ${matches.join(', ')}. Rerun with --spec-id <id> to force.`,
-        });
-        continue;
-      }
-    }
-
-    if (apply) {
-      marker.spec_id = targetSpec;
-      // objectToYaml matches the serializer used by coordinator.expandWorktrees
-      // when the marker is first written — stringifyDagYaml would crash here,
-      // it expects the { epics: [...] } DAG shape.
-      fs.writeFileSync(markerPath, objectToYaml(marker));
-    }
-    result.updated.push(`${markerPath} → spec_id: ${targetSpec}`);
-  }
-
-  if (result.errors.length > 0) {
-    process.exitCode = 2;
-  }
-  return result;
 }
 
 // Parse command line arguments
@@ -388,10 +286,6 @@ COMMANDS:
   reboot [--spec-id <id>]
       Get context summary for starting a new session.
       Multi-spec (no flag) → aggregated { specs, totals }.
-
-  backfill-markers [--apply] [--spec-id <id>]
-      Stamp spec_id onto legacy .arcforge-epic markers that predate the
-      per-spec schema. Defaults to dry-run; --apply writes.
 
   schema [--json] [--example]
       Show dag.yaml schema.
@@ -625,17 +519,6 @@ async function main() {
         const resolved = requireSpecId(spec, 'reboot');
         const coord = new Coordinator(projectRoot, resolved);
         output(coord.rebootContext(), asJson);
-        break;
-      }
-
-      case 'backfill-markers': {
-        output(
-          backfillMarkers(projectRoot, {
-            apply: !!args.flags.apply,
-            explicitSpecId: specFlag,
-          }),
-          asJson,
-        );
         break;
       }
 

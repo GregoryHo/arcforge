@@ -55,9 +55,9 @@ describe('Coordinator constructor — lazy dagPath resolution', () => {
     expect(coord.dagPath).toBe(path.join(root, 'specs', 'spec-a', 'dag.yaml'));
   });
 
-  test('dagPath throws with migration guidance when no spec is resolvable', () => {
+  test('dagPath throws with actionable guidance when no spec is resolvable', () => {
     const coord = new Coordinator(root);
-    expect(() => coord.dagPath).toThrow(/backfill-markers|specId|spec_id/);
+    expect(() => coord.dagPath).toThrow(/--spec-id|specId|spec_id/);
   });
 
   test('dagPath reads spec_id from .arcforge-epic marker', () => {

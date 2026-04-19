@@ -96,7 +96,7 @@ class Coordinator {
     if (!this.specId) {
       throw new Error(
         'Cannot resolve dag.yaml path: no specId provided and .arcforge-epic has no spec_id. ' +
-          'Pass specId explicitly, run from a v2 worktree, or run `arcforge backfill-markers` on legacy worktrees.',
+          'Pass --spec-id <id> or run the command from inside a worktree that carries a spec_id marker.',
       );
     }
     this._dagPath = path.join(this.projectRoot, 'specs', this.specId, 'dag.yaml');

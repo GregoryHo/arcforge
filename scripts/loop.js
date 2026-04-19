@@ -439,6 +439,11 @@ function checkStopConditions(state, maxCost) {
 function tryCreateCoordinator(projectRoot, state, specId = null) {
   try {
     const coord = new Coordinator(projectRoot, specId);
+    // Force eager spec/DAG resolution inside this try so unresolved-spec
+    // errors from lazy `dagPath` / `dag` getters become a clean `no_dag`
+    // status instead of an uncaught throw later in the loop. Accessing
+    // `dag` covers both the specId check and DAG file readability.
+    const _probe = coord.dag;
     if (coord.syncEpicStatusesFromBase()) {
       console.log('[loop] Synced epic statuses from base DAG');
     }

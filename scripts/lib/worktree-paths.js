@@ -148,9 +148,6 @@ function parseWorktreePath(worktreePath) {
  * Slash is legal in Git branch names and groups related branches in CLI
  * output (`git branch` shows them clustered under the spec).
  *
- * No bare-epic fallback (v2.0.0 breaking) — pre-migration projects go
- * through `arcforge backfill-markers`.
- *
  * @param {string} specId - Spec identifier; must be non-empty.
  * @param {string} epicId - Epic identifier; must be non-empty.
  * @returns {string} Branch name (e.g. "spec-driven-refine/epic-001").
