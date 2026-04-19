@@ -430,10 +430,20 @@ function checkStopConditions(state, maxCost) {
 
 /**
  * Try to create a Coordinator, returning null on failure.
+ *
+ * @param {string} projectRoot
+ * @param {Object} state
+ * @param {string|null} [specId] - spec id (CLI `arcforge loop` resolves
+ *   this up front and passes it through loopOptions.specId).
  */
-function tryCreateCoordinator(projectRoot, state) {
+function tryCreateCoordinator(projectRoot, state, specId = null) {
   try {
-    const coord = new Coordinator(projectRoot);
+    const coord = new Coordinator(projectRoot, specId);
+    // Force eager spec/DAG resolution inside this try so unresolved-spec
+    // errors from lazy `dagPath` / `dag` getters become a clean `no_dag`
+    // status instead of an uncaught throw later in the loop. Accessing
+    // `dag` covers both the specId check and DAG file readability.
+    const _probe = coord.dag;
     if (coord.syncEpicStatusesFromBase()) {
       console.log('[loop] Synced epic statuses from base DAG');
     }
@@ -478,7 +488,7 @@ function runSequential(options) {
       break;
     }
 
-    const coord = tryCreateCoordinator(projectRoot, state);
+    const coord = tryCreateCoordinator(projectRoot, state, options.specId);
     if (!coord) break;
 
     const task = coord.nextTask(epicScope);
@@ -523,7 +533,7 @@ async function runDag(options) {
       break;
     }
 
-    const coord = tryCreateCoordinator(projectRoot, state);
+    const coord = tryCreateCoordinator(projectRoot, state, options.specId);
     if (!coord) break;
 
     // Try parallel tasks first

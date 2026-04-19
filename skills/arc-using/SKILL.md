@@ -19,10 +19,10 @@ If no skill fits, proceed directly.
 
 ## Core Philosophy
 
-**File artifacts = truth**
-- `docs/plans/*-design.md` → Design documents
-- `specs/spec.xml` → Refined specifications
-- `dag.yaml` + `epics/` → Implementation plans
+**File artifacts = truth** (SDD pipeline v2 — per-spec layout)
+- `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` → Design documents
+- `specs/<spec-id>/spec.xml` + `specs/<spec-id>/details/*.xml` → Refined specifications
+- `specs/<spec-id>/dag.yaml` + `specs/<spec-id>/epics/` → Implementation plans
 - Isolated feature work → see Worktree Rule below
 
 **Session context = current workflow only**

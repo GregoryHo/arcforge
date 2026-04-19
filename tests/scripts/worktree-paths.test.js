@@ -7,6 +7,7 @@ const {
   hashRepoPath,
   getWorktreePath,
   parseWorktreePath,
+  getEpicBranchName,
 } = require('../../scripts/lib/worktree-paths');
 
 describe('getWorktreeRoot', () => {
@@ -64,55 +65,69 @@ describe('hashRepoPath', () => {
 describe('getWorktreePath', () => {
   it('composes <root>/<name>-<hash>-<epic>', () => {
     const projectRoot = '/Users/foo/projects/bar';
-    const result = getWorktreePath(projectRoot, 'epic-001');
+    const result = getWorktreePath(projectRoot, null, 'epic-001');
     const hash = hashRepoPath(projectRoot);
     const expected = path.join(getWorktreeRoot(), `bar-${hash}-epic-001`);
     expect(result).toBe(expected);
   });
 
   it('uses the basename of the project root as the <name> segment', () => {
-    const result = getWorktreePath('/Users/foo/projects/my-project', 'epic-42');
+    const result = getWorktreePath('/Users/foo/projects/my-project', null, 'epic-42');
     expect(path.basename(result)).toMatch(/^my-project-[0-9a-f]{6}-epic-42$/);
   });
 
   it('strips a trailing slash from the project root before hashing', () => {
-    const withSlash = getWorktreePath('/Users/foo/projects/bar/', 'epic-001');
-    const withoutSlash = getWorktreePath('/Users/foo/projects/bar', 'epic-001');
+    const withSlash = getWorktreePath('/Users/foo/projects/bar/', null, 'epic-001');
+    const withoutSlash = getWorktreePath('/Users/foo/projects/bar', null, 'epic-001');
     expect(withSlash).toBe(withoutSlash);
   });
 
   it('sanitizes project names containing spaces', () => {
-    const result = getWorktreePath('/Users/foo/my project', 'epic-001');
+    const result = getWorktreePath('/Users/foo/my project', null, 'epic-001');
     const base = path.basename(result);
     expect(base).not.toMatch(/ /);
     expect(base).toMatch(/^my-project-[0-9a-f]{6}-epic-001$/);
   });
 
   it('handles CJK project names', () => {
-    const result = getWorktreePath('/Users/foo/项目', 'epic-001');
+    const result = getWorktreePath('/Users/foo/项目', null, 'epic-001');
     const base = path.basename(result);
     expect(base).toMatch(/-[0-9a-f]{6}-epic-001$/);
   });
 
   it('honors a custom home directory override', () => {
-    const result = getWorktreePath('/Users/foo/projects/bar', 'epic-001', '/custom/home');
+    const result = getWorktreePath('/Users/foo/projects/bar', null, 'epic-001', '/custom/home');
     expect(result.startsWith('/custom/home/.arcforge/worktrees/')).toBe(true);
   });
 
   it('rejects a missing epic id', () => {
-    expect(() => getWorktreePath('/Users/foo/bar', '')).toThrow();
-    expect(() => getWorktreePath('/Users/foo/bar', null)).toThrow();
+    expect(() => getWorktreePath('/Users/foo/bar', null, '')).toThrow();
+    expect(() => getWorktreePath('/Users/foo/bar', null, null)).toThrow();
   });
 
   it('rejects a relative project root', () => {
-    expect(() => getWorktreePath('foo/bar', 'epic-001')).toThrow(/absolute/i);
+    expect(() => getWorktreePath('foo/bar', null, 'epic-001')).toThrow(/absolute/i);
+  });
+
+  it('same epic id across distinct specs produces distinct paths', () => {
+    const root = '/Users/foo/projects/bar';
+    const pathA = getWorktreePath(root, 'spec-a', 'epic-001');
+    const pathB = getWorktreePath(root, 'spec-b', 'epic-001');
+    expect(pathA).not.toBe(pathB);
+  });
+
+  it('null specId reproduces the pre-migration single-spec hash', () => {
+    const root = '/Users/foo/projects/bar';
+    const legacy = getWorktreePath(root, null, 'epic-001');
+    const hash = hashRepoPath(root);
+    expect(path.basename(legacy)).toBe(`bar-${hash}-epic-001`);
   });
 });
 
 describe('parseWorktreePath', () => {
   it('extracts project, hash, and epic components', () => {
     const projectRoot = '/Users/foo/projects/bar';
-    const wt = getWorktreePath(projectRoot, 'epic-001');
+    const wt = getWorktreePath(projectRoot, null, 'epic-001');
     const parsed = parseWorktreePath(wt);
     expect(parsed.project).toBe('bar');
     expect(parsed.hash).toBe(hashRepoPath(projectRoot));
@@ -121,7 +136,7 @@ describe('parseWorktreePath', () => {
 
   it('handles epic ids containing hyphens', () => {
     const projectRoot = '/Users/foo/projects/bar';
-    const wt = getWorktreePath(projectRoot, 'epic-001-auth-flow');
+    const wt = getWorktreePath(projectRoot, null, 'epic-001-auth-flow');
     const parsed = parseWorktreePath(wt);
     expect(parsed.epic).toBe('epic-001-auth-flow');
     expect(parsed.hash).toBe(hashRepoPath(projectRoot));
@@ -129,7 +144,7 @@ describe('parseWorktreePath', () => {
 
   it('handles project names containing hyphens', () => {
     const projectRoot = '/Users/foo/projects/my-awesome-app';
-    const wt = getWorktreePath(projectRoot, 'epic-001');
+    const wt = getWorktreePath(projectRoot, null, 'epic-001');
     const parsed = parseWorktreePath(wt);
     expect(parsed.project).toBe('my-awesome-app');
     expect(parsed.epic).toBe('epic-001');
@@ -137,7 +152,7 @@ describe('parseWorktreePath', () => {
 
   it('accepts absolute path with trailing slash', () => {
     const projectRoot = '/Users/foo/projects/bar';
-    const wt = `${getWorktreePath(projectRoot, 'epic-001')}/`;
+    const wt = `${getWorktreePath(projectRoot, null, 'epic-001')}/`;
     const parsed = parseWorktreePath(wt);
     expect(parsed.epic).toBe('epic-001');
   });
@@ -149,5 +164,23 @@ describe('parseWorktreePath', () => {
   it('returns null when basename does not match the expected pattern', () => {
     const bad = path.join(getWorktreeRoot(), 'nope');
     expect(parseWorktreePath(bad)).toBeNull();
+  });
+});
+
+describe('getEpicBranchName', () => {
+  it('composes branch name as <specId>/<epicId> so two specs can share an epic id', () => {
+    expect(getEpicBranchName('spec-a', 'epic-1')).toBe('spec-a/epic-1');
+    expect(getEpicBranchName('spec-b', 'epic-1')).toBe('spec-b/epic-1');
+    expect(getEpicBranchName('spec-a', 'epic-1')).not.toBe(getEpicBranchName('spec-b', 'epic-1'));
+  });
+
+  it('requires a non-empty specId (v2.0.0 breaking — no bare-epic fallback)', () => {
+    expect(() => getEpicBranchName(null, 'epic-1')).toThrow(/specId/);
+    expect(() => getEpicBranchName('', 'epic-1')).toThrow(/specId/);
+  });
+
+  it('requires a non-empty epicId', () => {
+    expect(() => getEpicBranchName('spec-a', null)).toThrow(/epicId/);
+    expect(() => getEpicBranchName('spec-a', '')).toThrow(/epicId/);
   });
 });

@@ -155,9 +155,11 @@ Wait for exact confirmation.
 
 If confirmed:
 ```bash
-# Update DAG and sync BEFORE destroying the worktree
-# (worktree removal deletes local dag.yaml, making later sync impossible)
-if [ -f dag.yaml ]; then
+# Update DAG and sync BEFORE destroying the worktree.
+# The per-spec dag.yaml lives in the base worktree (specs/<spec-id>/dag.yaml);
+# the current worktree carries only the .arcforge-epic marker, which the
+# coordinator uses to reconnect to that dag and push local status back.
+if [ -f .arcforge-epic ]; then
   node "${SKILL_ROOT}/scripts/finish-epic.js" block <epic-name> "Cancelled by user"
   node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 fi

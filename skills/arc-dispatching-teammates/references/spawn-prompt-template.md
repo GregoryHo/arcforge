@@ -27,13 +27,16 @@ run it, don't ask me."
 
 Per teammate, the lead fills in:
 
-- `<epic-id>` — the epic identifier from dag.yaml
+- `<spec-id>` — the spec identifier (the parent directory under `specs/`)
+- `<epic-id>` — the epic identifier from `specs/<spec-id>/dag.yaml`
 - `<absolute-worktree-path>` — read from `arcforge status --json` after expand
 
 ## Template (verbatim — copy/paste and substitute)
 
 ```
-You are teammate worker-<epic-id> implementing epic <epic-id>.
+You are teammate worker-<epic-id> implementing epic <epic-id> from spec <spec-id>
+(i.e., the DAG at `specs/<spec-id>/dag.yaml` and the spec artifacts at
+`specs/<spec-id>/epics/<epic-id>/`).
 
 ## Your Authority
 

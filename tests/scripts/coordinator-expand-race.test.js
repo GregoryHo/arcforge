@@ -2,7 +2,12 @@ const fs = require('node:fs');
 
 const { Coordinator } = require('../../scripts/lib/coordinator');
 const { TaskStatus } = require('../../scripts/lib/models');
-const { setupRepo, readDagFromDisk, cleanupWorktrees } = require('./coordinator-test-helpers');
+const {
+  setupRepo,
+  readDagFromDisk,
+  cleanupWorktrees,
+  DEFAULT_SPEC_ID,
+} = require('./coordinator-test-helpers');
 
 // Regression guard for the expand-path read-modify-write race.
 // Two processes expanding different epics concurrently would each load
@@ -23,8 +28,8 @@ describe('Coordinator expand concurrency', () => {
   test('concurrent expands preserve both epic worktree assignments', () => {
     // Two Coordinator instances representing two teammate processes
     // that both loaded the dag before either wrote back.
-    const coordA = new Coordinator(root);
-    const coordB = new Coordinator(root);
+    const coordA = new Coordinator(root, DEFAULT_SPEC_ID);
+    const coordB = new Coordinator(root, DEFAULT_SPEC_ID);
 
     // Force lazy load — both see all epics pending with no worktree.
     expect(coordA.dag.epics.find((e) => e.id === 'epic-a').worktree).toBeNull();
@@ -55,7 +60,7 @@ describe('Coordinator expand concurrency', () => {
   });
 
   test('single expand still updates status correctly', () => {
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
     const finalDag = readDagFromDisk(root);

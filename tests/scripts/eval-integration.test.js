@@ -326,7 +326,7 @@ describe('runSkillEval A/B flow', () => {
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
 
     const callOrder = [];
-    mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
+    mockUtils.execCommand.mockImplementation((cmd, _cmdArgs, opts) => {
       if (cmd === 'claude') {
         const hasSkill = (opts.input || '').includes('SKILL_MARKER');
         callOrder.push(hasSkill ? 'treatment' : 'baseline');
@@ -382,7 +382,7 @@ describe('runSkillEval A/B flow', () => {
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
 
     const callOrder = [];
-    mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
+    mockUtils.execCommand.mockImplementation((cmd, _cmdArgs, opts) => {
       if (cmd === 'claude') {
         const hasSkill = (opts.input || '').includes('SKILL_MARKER');
         callOrder.push(hasSkill ? 'treatment' : 'baseline');

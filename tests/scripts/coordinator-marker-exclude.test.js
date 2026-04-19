@@ -3,7 +3,12 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const { Coordinator } = require('../../scripts/lib/coordinator');
-const { setupRepo, runGit, cleanupWorktrees } = require('./coordinator-test-helpers');
+const {
+  setupRepo,
+  runGit,
+  cleanupWorktrees,
+  DEFAULT_SPEC_ID,
+} = require('./coordinator-test-helpers');
 
 // Regression guard for the `.arcforge-epic` marker leaking into git
 // commit history. The fix adds `.arcforge-epic` to the main repo's
@@ -23,7 +28,7 @@ describe('arcforge marker git-exclude', () => {
   });
 
   test('expand writes .arcforge-epic exclude to main repo info/exclude', () => {
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
     const excludePath = path.join(root, '.git', 'info', 'exclude');
@@ -33,7 +38,7 @@ describe('arcforge marker git-exclude', () => {
   });
 
   test('git status in the linked worktree does not show the marker', () => {
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
     // The linked worktree is outside the project dir (~/.arcforge/worktrees/...)
@@ -64,7 +69,7 @@ describe('arcforge marker git-exclude', () => {
   });
 
   test('exclude rule is idempotent across multiple expands', () => {
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
     coord.expandWorktrees({ epicId: 'epic-b' });
 
@@ -79,7 +84,7 @@ describe('arcforge marker git-exclude', () => {
     const excludePath = path.join(root, '.git', 'info', 'exclude');
     fs.writeFileSync(excludePath, '# user rules\n*.log\nnode_modules/\n');
 
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
     const content = fs.readFileSync(excludePath, 'utf8');
@@ -91,7 +96,7 @@ describe('arcforge marker git-exclude', () => {
   test('git add -A in worktree does not stage the marker', () => {
     // This is the real-world scenario — an arc-implementing teammate
     // running blanket `git add -A` during a TDD commit cycle.
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.expandWorktrees({ epicId: 'epic-a' });
 
     const epic = coord.dag.epics.find((e) => e.id === 'epic-a');

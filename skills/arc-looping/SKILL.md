@@ -61,7 +61,7 @@ node scripts/loop.js --pattern dag --max-runs 20
 
 ### Before Starting
 
-1. **DAG must exist** — run `arc-planning` first to create `dag.yaml`
+1. **DAG must exist** — run `arc-planning` first to create `specs/<spec-id>/dag.yaml`. In multi-spec repos, pass `--spec-id <id>` to the loop; cross-spec loops are not supported.
 2. **Verify baseline** — run `npm test` to confirm clean state
 3. **Choose pattern** — sequential for safety, DAG for throughput
 4. **Set limits** — `--max-runs` and `--max-cost` to bound execution
@@ -70,9 +70,9 @@ node scripts/loop.js --pattern dag --max-runs 20
 
 **Run loops from the project root**, not from inside a worktree.
 
-If you are in a worktree (`.arcforge-epic` exists), the loop auto-detects the epic and scopes to it. But running from project root with `--pattern dag` is the correct approach for multi-epic execution — it handles parallelism internally via `parallelTasks()`.
+If you are in a worktree (`.arcforge-epic` exists), the loop auto-detects both the epic and the spec from the marker (`spec_id` field) and scopes to that spec's `dag.yaml`. But running from project root with `--pattern dag` is the correct approach for multi-epic execution — it handles parallelism internally via `parallelTasks()`.
 
-**Never run separate loops in separate worktrees.** Each worktree has its own `dag.yaml` copy — multiple loops will pick up the same tasks and do duplicate work.
+**Never run separate loops in separate worktrees.** Each worktree's marker points back to its base spec's `dag.yaml`, so multiple loops against the same spec will pick up the same tasks and do duplicate work.
 
 For scoped single-epic execution, use `--epic`:
 ```bash
@@ -83,7 +83,7 @@ node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
 
 Each iteration:
 ```
-1. Read dag.yaml → find next task (via coordinator)
+1. Read specs/<spec-id>/dag.yaml → find next task (via coordinator)
 2. Build prompt with task context
 3. Spawn: claude -p < prompt
 4. On success: coordinator.completeTask(taskId)
@@ -160,7 +160,7 @@ node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
 
 **If loop is failing:**
 1. Check `.arcforge-loop.json` errors — are they the same error repeating?
-2. Check `dag.yaml` — are blocked tasks preventing progress?
+2. Check `specs/<spec-id>/dag.yaml` — are blocked tasks preventing progress?
 3. Run `npm test` — is the project in a broken state?
 4. Check git log — are commits being made correctly?
 

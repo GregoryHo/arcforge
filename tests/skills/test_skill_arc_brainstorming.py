@@ -38,6 +38,17 @@ def test_arc_brainstorming_frontmatter_and_rules():
     assert "⚠️" in text
 
 
+def test_arc_brainstorming_frontmatter_no_hardcoded_paths():
+    """Description must not contain hardcoded file paths (fr-cc-006)."""
+    text = _read_skill()
+    front = _parse_frontmatter(text)
+    description = front.get("description", "")
+
+    # Must not contain literal path patterns
+    assert "specs/" not in description
+    assert "docs/plans" not in description
+    assert "spec.xml" not in description
+
 
 def test_arc_brainstorming_contains_2_action_rule():
     text = _read_skill()
@@ -74,16 +85,188 @@ def test_arc_brainstorming_has_one_question_rule():
     assert "one question at a time" in text.lower() or "one question per message" in text.lower()
 
 
-def test_arc_brainstorming_has_arcforge_features():
-    """Test skill has arcforge specific features."""
+def test_arc_brainstorming_has_sdd_pipeline_features():
+    """Test skill has SDD pipeline v2 features (replaces old REFINER_INPUT test).
+
+    Per D5 (2026-04-19 realignment), the Path A / Path B / γ mode labels are
+    removed. Brainstorming uses filesystem-state framing instead — "no prior
+    spec exists" / "prior spec exists".
+    """
     text = _read_skill()
 
     # 2-Action Rule (arcforge specific)
     assert "2-Action Rule" in text or "2-Action" in text
 
-    # REFINER_INPUT template
-    assert "REFINER_INPUT" in text
+    # Must NOT have REFINER_INPUT (removed in v2)
+    assert "REFINER_INPUT" not in text
+
+    # Mode labels removed per D5 realignment — use filesystem-state framing
+    import re
+    assert not re.search(r"\bPath A\b", text), "Path A label removed per D5"
+    assert not re.search(r"\bPath B\b", text), "Path B label removed per D5"
+    assert "gamma mode" not in text.lower(), "gamma mode label removed per D5"
+
+    # New framing required
+    has_no_prior_section = (
+        "no prior spec" in text.lower() or "no prior spec exists" in text.lower()
+    )
+    has_prior_section = (
+        "prior spec exists" in text.lower() or "iterating on a spec" in text.lower()
+    )
+    assert has_no_prior_section, "Skill must use 'no prior spec exists' framing (per D5)"
+    assert has_prior_section, "Skill must use 'prior spec exists' framing (per D5)"
 
     # Completion formats
     assert "✅" in text
     assert "⚠️" in text
+
+
+def test_arc_brainstorming_has_phase_zero_scanning():
+    """Test skill documents Phase 0 spec scanning (fr-bs-001)."""
+    text = _read_skill()
+
+    # Phase 0 or spec scanning must be present
+    # Accept any of these as evidence of scanning behavior
+    has_scanning = (
+        "Phase 0" in text
+        or "scan" in text.lower()
+        or "Scan" in text
+        or "specs/" in text
+    )
+    assert has_scanning, "Skill must document spec/ directory scanning"
+
+
+def test_arc_brainstorming_has_explicit_routing_confirmation():
+    """Test skill requires explicit user confirmation about new-vs-iteration target (fr-bs-002).
+
+    Per D5 (2026-04-19 realignment), no Path A/B labels. Routing is now framed
+    as "is this a new spec or iteration on an existing one?" with the user
+    confirming the target spec-id.
+    """
+    text = _read_skill()
+
+    # Must mention scanning specs/ for existing spec_ids (Phase 0 behavior)
+    assert "specs/" in text or "scan" in text.lower()
+
+    # Must require user confirmation (not auto-detect)
+    has_confirmation = (
+        "user confirms" in text.lower()
+        or "user's explicit confirmation" in text.lower()
+        or "confirm the target" in text.lower()
+        or "do not auto-detect" in text.lower()
+        or "do NOT auto-detect" in text
+        or "never infer" in text.lower()
+    )
+    assert has_confirmation, (
+        "Skill must require explicit user confirmation for new-vs-iteration target choice"
+    )
+
+
+def test_arc_brainstorming_references_print_schema_cli():
+    """Test skill delegates schema to print-schema.js instead of embedding templates.
+
+    Per fr-sd-011 (schema access via CLI), the skill MUST reference
+    scripts/lib/print-schema.js as the canonical way to obtain the
+    design-doc schema, and MUST NOT embed hand-authored section templates.
+    Replaces the old has_iteration_design_doc_sections test which asserted
+    the existence of hand-authored templates — those are exactly what we
+    want NOT to exist anymore.
+    """
+    text = _read_skill()
+
+    # Skill must point at the CLI, not embed schema content.
+    assert "print-schema.js" in text, (
+        "Skill must reference scripts/lib/print-schema.js as the schema source"
+    )
+
+    # Skill must still describe the behavior (Context + Change Intent are named
+    # in prose) so the reader knows what to expect — but NOT as code-block templates.
+    assert "Context" in text
+    assert "Change Intent" in text
+
+    # Specifically forbid the template that caused the 2026-04-19 bug.
+    assert "## Context (from spec v" not in text, (
+        "Skill must not embed the `## Context (from spec v<N>)` template — "
+        "schema content belongs in scripts/lib/sdd-utils.js (DESIGN_DOC_RULES)."
+    )
+
+
+def test_arc_brainstorming_forbids_pre_authored_delta():
+    """Test skill explicitly forbids pre-authored ADDED/MODIFIED/REMOVED lists (fr-bs-005-ac4, D3).
+
+    The refiner derives the delta from narrative intent. The design doc carries
+    only human-authored prose.
+    """
+    text = _read_skill()
+
+    has_forbidden_statement = (
+        "no pre-authored" in text.lower()
+        or "must not contain a pre-authored" in text.lower()
+        or "do not write a" in text.lower() and "added / modified / removed" in text.lower()
+        or "forbidden" in text.lower() and "delta" in text.lower()
+    )
+    assert has_forbidden_statement, (
+        "Skill must forbid pre-authored ADDED/MODIFIED/REMOVED lists (refiner derives the delta)"
+    )
+
+
+def test_arc_brainstorming_has_per_spec_output_path():
+    """Test skill uses new per-spec output path convention (fr-bs-003)."""
+    text = _read_skill()
+
+    # New path convention: docs/plans/<spec-id>/<YYYY-MM-DD>/design.md
+    # Must have both the nested structure clue and docs/plans
+    assert "docs/plans" in text
+
+    # Should reference spec-id-based directory or date-based directory
+    has_nested_path = (
+        "<spec-id>" in text
+        or "spec-id" in text
+        or "YYYY-MM-DD" in text
+    )
+    assert has_nested_path, "Skill must document the per-spec output path convention"
+
+
+def test_arc_brainstorming_has_same_day_iteration_ux():
+    """Test skill describes same-day iteration suffix UX."""
+    text = _read_skill()
+
+    # Same-day iteration guidance
+    has_suffix_guidance = (
+        "-v2" in text
+        or "suffix" in text.lower()
+        or "same-day" in text.lower()
+        or "already exists" in text.lower()
+        or "folder exists" in text.lower()
+    )
+    assert has_suffix_guidance, "Skill must describe same-day iteration suffix UX"
+
+
+def test_arc_brainstorming_references_sdd_schema():
+    """Test skill references sdd-schemas/design.md (fr-cc-if-005-ac1)."""
+    text = _read_skill()
+
+    # Must reference the design schema
+    assert "sdd-schemas" in text or "design.md" in text or "scripts/lib/sdd-schemas" in text
+
+
+def test_arc_brainstorming_has_output_validation():
+    """Test skill documents output validation before writing (fr-bs-007)."""
+    text = _read_skill()
+
+    # Validation must be documented
+    has_validation = (
+        "validat" in text.lower()
+        or "validate" in text.lower()
+        or "Validate" in text
+        or "ERROR" in text
+    )
+    assert has_validation, "Skill must document output validation step"
+
+
+def test_arc_brainstorming_routes_to_arc_refining():
+    """Test skill routes to /arc-refining as next step."""
+    text = _read_skill()
+
+    # Must reference arc-refining as next step
+    assert "/arc-refining" in text or "arc-refining" in text

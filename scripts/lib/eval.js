@@ -136,9 +136,21 @@ function parseScenario(filePath, projectRoot) {
   const nameMatch = content.match(/^#\s+Eval:\s*(.+)/m);
   const name = nameMatch ? nameMatch[1].trim() : path.basename(filePath, '.md');
 
+  // Assertion bullets can be markdown checkboxes (`- [ ]` / `- [x]`) for text
+  // assertions OR behavioral forms like `- [tool_called] Bash:cmd`. Strip ONLY
+  // the markdown checkbox shell; leave behavioral `[tool_*]` prefixes intact so
+  // downstream parseBehavioralAssertion can recognise them. An earlier strip
+  // pattern `[ x\w_]*` was greedy enough to eat `tool_called` too, which caused
+  // behavioral assertions to be silently reclassified as text and routed to the
+  // model grader.
   const assertions = (sections.assertions || [])
-    .filter((line) => line.match(/^-\s*\[[ x\w_]*\]/))
-    .map((line) => line.replace(/^-\s*\[[ x\w_]*\]\s*/, '').trim());
+    .filter((line) => line.match(/^-\s*\[[^\]]*\]/))
+    .map((line) =>
+      line
+        .replace(/^-\s*\[[ xX]*\]\s*/, '')
+        .replace(/^-\s+/, '')
+        .trim(),
+    );
 
   const section = (key) => (sections[key] || []).join('\n').trim();
   const trialsRaw = section('trials');

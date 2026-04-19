@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "description": "Skill-based workflow engine for AI coding agents: planning, TDD, worktree orchestration, and session learning",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "author": {
     "name": "Gregory Ho"
   },

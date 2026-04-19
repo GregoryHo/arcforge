@@ -1,0 +1,58 @@
+epics:
+  - id: epic-parser
+    name: Parser Primitives
+    status: pending
+    spec_path: epics/epic-parser/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: fr-parser-001
+        name: parseInteger Primitive
+        status: pending
+        depends_on: []
+        source_requirement: fr-parser-001
+      - id: fr-parser-002
+        name: parseFloat Primitive
+        status: pending
+        depends_on: []
+        source_requirement: fr-parser-002
+
+  - id: epic-formatter
+    name: Formatter Primitives
+    status: pending
+    spec_path: epics/epic-formatter/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: fr-formatter-001
+        name: formatNumber Primitive
+        status: pending
+        depends_on: []
+        source_requirement: fr-formatter-001
+      - id: fr-formatter-002
+        name: formatList Uses formatNumber
+        status: pending
+        depends_on:
+          - fr-formatter-001
+        source_requirement: fr-formatter-002
+
+  - id: epic-integration
+    name: Integration And CLI
+    status: pending
+    spec_path: epics/epic-integration/epic.md
+    worktree: null
+    depends_on:
+      - epic-parser
+      - epic-formatter
+    features:
+      - id: fr-integration-001
+        name: roundTrip Pipeline
+        status: pending
+        depends_on: []
+        source_requirement: fr-integration-001
+      - id: fr-integration-002
+        name: CLI Entry Exposing roundTrip
+        status: pending
+        depends_on:
+          - fr-integration-001
+        source_requirement: fr-integration-002

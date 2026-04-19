@@ -54,6 +54,9 @@ def test_arc_coordinating_contains_required_sections():
     # Must reference dag.yaml
     assert "dag.yaml" in text.lower()
 
+    # SDD v2: must cite the per-spec layout, not a root-level dag.yaml
+    assert "specs/<spec-id>/dag.yaml" in text
+
     # Must reference skill root and coordinator script (Node.js CLI)
     assert "SKILL_ROOT" in text
     assert "scripts/coordinator.js" in text

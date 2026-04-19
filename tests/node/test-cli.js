@@ -17,9 +17,11 @@ const CLI_PATH = path.join(SCRIPT_DIR, 'cli.js');
 
 console.log('Testing cli.js...\n');
 
-// Create temporary test directory
+// Create temporary test directory with per-spec DAG layout
 const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-cli-test-'));
-const dagPath = path.join(testDir, 'dag.yaml');
+const TEST_SPEC_ID = 'test-spec';
+const dagDir = path.join(testDir, 'specs', TEST_SPEC_ID);
+const dagPath = path.join(dagDir, 'dag.yaml');
 
 // Helper to run CLI commands
 function runCli(args, options = {}) {
@@ -84,8 +86,9 @@ function createTestDag() {
         status: pending
         depends_on: []
 `;
+  fs.mkdirSync(dagDir, { recursive: true });
   fs.writeFileSync(dagPath, dag);
-  execFileSync('git', ['add', 'dag.yaml'], { cwd: testDir, stdio: 'pipe' });
+  execFileSync('git', ['add', '-A'], { cwd: testDir, stdio: 'pipe' });
   execFileSync('git', ['commit', '-m', 'init'], { cwd: testDir, stdio: 'pipe' });
 }
 

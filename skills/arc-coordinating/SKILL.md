@@ -1,6 +1,6 @@
 ---
 name: arc-coordinating
-description: Use when managing worktrees for multi-epic projects, when dag.yaml exists, or when coordinating parallel development
+description: Use when managing worktrees for multi-epic projects, when specs/<spec-id>/dag.yaml exists, or when coordinating parallel development
 ---
 
 # Coordinator
@@ -20,7 +20,7 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 
 **If already in a worktree:** Use arc-implementing, except for `merge` (allowed).
 
-**DAG requirement:** `dag.yaml` must exist and be committed before running coordinator commands.
+**DAG requirement:** `specs/<spec-id>/dag.yaml` must exist and be committed before running coordinator commands. In base-side sessions with multiple specs, commands that cannot aggregate (`next`, `parallel`, `expand`, `loop`) require `--spec-id <id>`; `merge` / `cleanup` accept positional epic ids as disambiguator.
 
 ## Commands
 

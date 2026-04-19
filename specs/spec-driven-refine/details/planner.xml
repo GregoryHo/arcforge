@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="planner">
+  <title>Stage 3 — Planner (Decompose)</title>
+  <consumes>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (current spec)</artifact>
+  </consumes>
+  <produces>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml</artifact>
+    <artifact>specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/epic.md</artifact>
+    <artifact>specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/features/*.md</artifact>
+  </produces>
+
+  <requirement id="fr-pl-001">
+    <title>Sprint Model — Pure Function, Overwrite DAG Each Sprint</title>
+    <description>
+      Planner is a pure function (spec + delta) → (dag.yaml + epics/). It
+      MUST build dag.yaml and epics/ from scratch each time and MUST overwrite
+      any existing DAG artifacts without archiving. The scope is determined
+      by the spec's &lt;delta&gt; element whose version equals the current
+      spec_version. For v1 (no &lt;delta&gt; anywhere in &lt;overview&gt;),
+      planner plans all requirements currently in detail files. DAG is a
+      disposable derived view — historical traceability lives in the spec's
+      accumulated &lt;delta&gt; elements and in design doc iteration folders,
+      not in archived DAGs.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-001-ac1">
+        When no &lt;delta&gt; is present in spec.xml (v1), planner MUST produce
+        a dag.yaml with epics covering all requirements in the spec. All
+        epics start in "pending" status.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac2">
+        When one or more &lt;delta&gt; elements are present, planner MUST
+        select the &lt;delta&gt; whose version attribute equals the current
+        spec_version. Every child of that &lt;delta&gt; MUST generate an epic:
+        &lt;added&gt; → implement the new requirement; &lt;modified&gt; →
+        update the existing requirement's implementation; &lt;removed&gt; →
+        teardown epic that references the removed ref (implementer LLM greps
+        and removes tied code); &lt;renamed&gt; → mechanical code-side refactor
+        epic that updates references from ref_old to ref_new. Prior
+        &lt;delta&gt; elements (version != current spec_version) are historical
+        record; planner MUST NOT use them for scope.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac3">
+        If a previous dag.yaml exists, planner MUST overwrite it. Planner
+        MUST NOT write any archive file (e.g., dag.yaml.archive.YYYY-MM-DD)
+        or move the previous dag.yaml to a backup location. Previous epic
+        statuses MUST NOT carry over. Historical DAG state, if needed by a
+        reader, lives in git history of dag.yaml — arcforge does not treat
+        git as part of its contract but does not prevent inspection.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac4">
+        For each epic in dag.yaml, planner MUST produce an
+        epics/&lt;epic-id&gt;/epic.md with at minimum: title, description, and
+        feature breakdown.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac5">
+        A &lt;delta&gt; containing only &lt;removed&gt; children (pure teardown
+        sprint) MUST be accepted as a legal sprint scope. Planner MUST NOT
+        block or warn based on the composition of a &lt;delta&gt; element —
+        only per-child correctness is enforced.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-001-ac6">
+        Planner MUST NOT implement any completion gate, archive mechanism,
+        or state-preservation logic. These responsibilities belong upstream
+        (refiner, per fr-rf-012). Planner is a pure function with no state
+        beyond its output paths.
+        <trace>REQ-F017</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-002">
+    <title>1:1 Mapping for Traceability</title>
+    <description>
+      Planner MUST maintain strict mapping between spec structure and DAG
+      structure for full traceability.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-002-ac1">
+        Each &lt;detail&gt; in spec.xml MUST map to at least one epic. A large
+        detail MAY be split into multiple epics.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-002-ac2">
+        Each &lt;requirement&gt; MUST map to exactly one feature. The feature's
+        source_requirement field MUST reference the spec requirement ID.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-002-ac3">
+        Dependencies between requirements (&lt;dependency ref&gt;) MUST be
+        translated to depends_on relationships between features/epics.
+        <trace>REQ-F017</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-003">
+    <title>Self-Contained Project Unit</title>
+    <description>
+      DAG and epics MUST live inside the spec folder. Each specs/&lt;spec-id&gt;/
+      is a self-contained project unit with all artifacts needed for execution.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-003-ac1">
+        dag.yaml MUST be written to specs/&lt;spec-id&gt;/dag.yaml, not to the
+        project root or any other location.
+        <trace>REQ-F022</trace>
+      </criterion>
+      <criterion id="fr-pl-003-ac2">
+        Epic folders MUST be at specs/&lt;spec-id&gt;/epics/&lt;epic-id&gt;/.
+        <trace>REQ-F022</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-004">
+    <title>Done Signal</title>
+    <description>
+      A planning round is considered "done" when all epics in the DAG are
+      in "completed" status. This is the signal that the current spec has
+      been fully implemented — the next sprint's refiner is unblocked and
+      the next planner run will overwrite this DAG.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-004-ac1">
+        Given a dag.yaml with 5 epics and all 5 in "completed" status,
+        the planning round MUST be considered done.
+        <trace>REQ-F023</trace>
+      </criterion>
+      <criterion id="fr-pl-004-ac2">
+        Given a dag.yaml with 5 epics and 1 still "pending", the planning
+        round MUST NOT be considered done.
+        <trace>REQ-F023</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-005">
+    <title>Input Validation — Spec Format</title>
+    <description>
+      Before any decomposition, planner MUST validate its input: the spec.xml
+      identity header per fr-cc-if-002. All validation runs before any output
+      is produced.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-005-ac1">
+        Planner MUST verify specs/&lt;spec-id&gt;/spec.xml exists and its identity
+        header conforms to fr-cc-if-002. Missing spec or invalid header is
+        ERROR with remediation: "Run refiner to produce a spec first."
+        <trace>REQ-F016</trace>
+      </criterion>
+      <criterion id="fr-pl-005-ac2">
+        Planner MUST verify source/design_path in the spec header points to
+        an existing file. Broken pointer is WARNING (not blocking — the spec
+        itself is valid, but provenance tracing is broken).
+        <trace>REQ-F016</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-pl-006">
+    <title>Output Validation — DAG Integrity</title>
+    <description>
+      Planner MUST follow the two-pass write pattern (fr-cc-val-001): build
+      the complete dag.yaml and epics/ in memory, validate structural
+      integrity, then write to disk only if validation passes.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-pl-006-ac1">
+        Every epic in the built dag.yaml MUST have: id (string), status
+        ("pending"), source_requirement (string referencing a spec
+        requirement). Missing fields are ERROR.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-006-ac2">
+        No circular dependencies allowed. If the dependency graph contains
+        a cycle, planner MUST report the cycle and block.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-006-ac3">
+        All depends_on references MUST point to existing epic/feature IDs
+        within the same DAG. Broken references are ERROR.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-pl-006-ac4">
+        If output validation finds ERRORs, planner MUST report all findings
+        and MUST NOT write dag.yaml or epics/ to disk.
+        <trace>REQ-F017</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

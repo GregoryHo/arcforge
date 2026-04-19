@@ -1,0 +1,9 @@
+{
+  "name": "sdd-v2-pipeline-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Per-spec fixture for SDD v2 downstream e2e pipeline tests. Copied into a trial dir by scaffold.sh; not consumed directly.",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}

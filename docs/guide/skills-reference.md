@@ -88,14 +88,15 @@ arcforge's 32 skills are organized into 7 categories:
 **When to use:** When exploring ideas before implementation or when user says "let's build X".
 
 **Key workflow:**
-1. Understand context — check project state, ask questions one at a time
-2. Explore approaches — propose 2-3 options with trade-offs, apply YAGNI
-3. Present design — 200-300 word sections, confirm each with user
-4. Write design doc to `docs/plans/YYYY-MM-DD-<topic>-design.md`
-5. Route to next skill (refining for complex, writing-tasks for simple)
+1. Phase 0 Scan and Route — list `specs/<spec-id>/` directories; user confirms new topic vs. iterating on existing spec-id
+2. Understand context — check project state, ask questions one at a time
+3. Explore approaches — propose 2-3 options with trade-offs, apply YAGNI
+4. Present design — 200-300 word sections, confirm each with user
+5. Write design doc to `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` (prose for new topic; Context + Change Intent for iteration). Design doc MUST NOT carry a pre-authored delta — refiner is the delta authority.
+6. Route to next skill (refining → planning → coordinating)
 
 **Artifacts:**
-- Output: `docs/plans/YYYY-MM-DD-<topic>-design.md` (with REFINER_INPUT section)
+- Output: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md`
 - Intermediate: `docs/research/<topic>.md` (2-Action Rule saves)
 
 **Related:** nothing required --> **arc-brainstorming** --> arc-refining (complex) or arc-writing-tasks (simple)
@@ -109,15 +110,16 @@ arcforge's 32 skills are organized into 7 categories:
 **When to use:** When converting design documents to structured specs, when spec quality is below threshold, or when requirements need formal acceptance criteria.
 
 **Key workflow:**
-1. Verify design doc has REFINER_INPUT section and functional requirements
-2. Draft spec.xml from design document
-3. Iterate with 2-3 clarifying questions per round until checklist complete
-4. Self-validate (unique IDs, valid references, trace to source)
-5. Commit specs to git
+1. Validate design doc via `parseDesignDoc` + `validateDesignDoc` from `scripts/lib/sdd-utils.js`
+2. DAG completion gate (when prior spec exists): block if any epic in `specs/<spec-id>/dag.yaml` is not `completed`
+3. Detect context from filesystem: `specs/<spec-id>/spec.xml` exists → iteration (expect Context + Change Intent sections); missing → v1 formalization (expect prose)
+4. Two-pass write: build spec in memory, validate via `parseSpecHeader` + `validateSpecHeader`, atomic write only if zero ERRORs
+5. Append new `<delta>` as last child of `<overview>`; preserve every prior `<delta>` verbatim
+6. Commit specs to git
 
 **Artifacts:**
-- Input: `docs/plans/*-design.md` (from arc-brainstorming)
-- Output: `specs/spec.xml`, `specs/details/*.xml`
+- Input: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` (from arc-brainstorming)
+- Output: `specs/<spec-id>/spec.xml`, `specs/<spec-id>/details/*.xml`
 
 **Related:** arc-brainstorming --> **arc-refining** --> arc-planning
 
@@ -148,18 +150,19 @@ arcforge's 32 skills are organized into 7 categories:
 
 **Purpose:** Convert specs into an executable DAG with epic/feature breakdown and strict 1:1 traceability.
 
-**When to use:** When breaking down specifications, when specs/spec.xml exists, or when planning epic and feature structure.
+**When to use:** When breaking down specifications, when `specs/<spec-id>/spec.xml` exists, or when planning epic and feature structure.
 
 **Key workflow:**
-1. Verify `specs/spec.xml` and `specs/details/` exist (else route to arc-refining)
-2. Map details to epics (1:1), requirements to features (1:1 strict)
-3. Auto-derive dependencies from spec references
-4. Self-validate (no cycles, all references valid)
-5. Commit `dag.yaml` and `epics/` to git
+1. Verify `specs/<spec-id>/spec.xml` and `specs/<spec-id>/details/` exist (else route to arc-refining)
+2. Extract sprint scope via `parsed.latest_delta` (v2+ spec) or all requirements (v1 spec)
+3. Map each delta child to one epic: `<added>` implement, `<modified>` update, `<removed>` teardown, `<renamed>` mechanical refactor
+4. Self-validate (no cycles, all references valid, pure function — no design doc read, no archive)
+5. Overwrite `specs/<spec-id>/dag.yaml` — previous statuses MUST NOT carry over; every epic starts `pending`
+6. Commit `specs/<spec-id>/dag.yaml` and `specs/<spec-id>/epics/` to git
 
 **Artifacts:**
-- Input: `specs/spec.xml`, `specs/details/*.xml`
-- Output: `dag.yaml`, `epics/<epic-name>/epic.md`, `epics/<epic-name>/features/*.md`
+- Input: `specs/<spec-id>/spec.xml`, `specs/<spec-id>/details/*.xml`
+- Output: `specs/<spec-id>/dag.yaml`, `specs/<spec-id>/epics/<epic-name>/epic.md`, `specs/<spec-id>/epics/<epic-name>/features/*.md`
 
 **Related:** arc-refining --> **arc-planning** --> arc-coordinating or arc-implementing
 
@@ -227,7 +230,7 @@ arcforge's 32 skills are organized into 7 categories:
 5. Phase 3: Move to next feature or finish epic
 
 **Artifacts:**
-- Input: `dag.yaml`, `epic.md`, `features/*.md`
+- Input: `specs/<spec-id>/dag.yaml`, `specs/<spec-id>/epics/<epic-name>/epic.md`, `specs/<spec-id>/epics/<epic-name>/features/*.md`
 - Output: completed code via delegated skills
 
 **Related:** arc-planning + arc-coordinating --> **arc-implementing** --> arc-finishing-epic
@@ -248,7 +251,7 @@ arcforge's 32 skills are organized into 7 categories:
 5. If conflicts found: tasks were not truly independent — resolve manually
 
 **Artifacts:**
-- Input: `dag.yaml` (DAG-based) or list of independent failures (without DAG)
+- Input: `specs/<spec-id>/dag.yaml` (DAG-based) or list of independent failures (without DAG)
 - Output: parallel fixes integrated, test suite passing
 
 **Related:** arc-planning --> **arc-dispatching-parallel** --> arc-implementing
@@ -261,7 +264,7 @@ arcforge's 32 skills are organized into 7 categories:
 
 **Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between `arc-coordinating` (single-epic interactive) and `arc-looping` (multi-epic unattended).
 
-**When to use:** When `dag.yaml` has 2+ epics in a ready state AND the user is staying at the keyboard to monitor (not walking away). The discriminator against `arc-looping` is **attendance, not risk** — a risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still `arc-looping`.
+**When to use:** When `specs/<spec-id>/dag.yaml` has 2+ epics in a ready state AND the user is staying at the keyboard to monitor (not walking away). The discriminator against `arc-looping` is **attendance, not risk** — a risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still `arc-looping`.
 
 **Key workflow:**
 1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
@@ -274,7 +277,7 @@ arcforge's 32 skills are organized into 7 categories:
 8. **Wrap up** when all epics reach terminal state: emit Final Report with per-epic subagent evidence, cleanup accepted worktrees, shut down remaining teammates, `TeamDelete`
 
 **Artifacts:**
-- Input: `dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
+- Input: `specs/<spec-id>/dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
 - Output: per-epic worktrees at `~/.arcforge/worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
 - Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
 
@@ -299,7 +302,7 @@ arcforge's 32 skills are organized into 7 categories:
 6. Stop on: all complete, max-runs hit, cost limit, stall detected, or retry storm
 
 **Artifacts:**
-- Input: `dag.yaml` (required, must be committed)
+- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
 **Related:** arc-planning --> **arc-looping** --> arc-finishing or arc-finishing-epic
@@ -383,7 +386,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** CLI-based worktree lifecycle management and cross-session coordination via Node.js.
 
-**When to use:** When managing worktrees for multi-epic projects, when dag.yaml exists, or when coordinating parallel development.
+**When to use:** When managing worktrees for multi-epic projects, when `specs/<spec-id>/dag.yaml` exists, or when coordinating parallel development.
 
 **Key workflow:**
 1. Set SKILL_ROOT from skill loader header
@@ -391,7 +394,7 @@ Rule in `skills/arc-using/SKILL.md`.
 3. Commands: expand, merge, status, cleanup, sync, next, parallel, block, reboot
 
 **Artifacts:**
-- Input: `dag.yaml` (required, must be committed)
+- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
 - Output: worktrees created/merged, DAG status updated
 
 **Related:** arc-planning --> **arc-coordinating** --> arc-implementing

@@ -27,9 +27,153 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { Coordinator } = require('./lib/coordinator');
+const {
+  Coordinator,
+  listSpecDagPaths,
+  syncAllSpecs,
+  rebootAllSpecs,
+  readArcforgeMarker,
+} = require('./lib/coordinator');
 const { schemaToYaml, exampleToYaml, example, schema } = require('./lib/dag-schema');
 const { getWorktreePath } = require('./lib/worktree-paths');
+const { parseDagYaml } = require('./lib/yaml-parser');
+
+/**
+ * Resolve the spec id for a CLI invocation.
+ *
+ * Priority:
+ *   1. Explicit --spec-id flag.
+ *   2. `.arcforge-epic` marker in cwd (worktree wins — always scopes to
+ *      the marker's spec_id).
+ *   3. Single spec in `specs/*\/dag.yaml` → that spec.
+ *   4. Multiple specs → return ambiguity signal; caller decides whether
+ *      to aggregate or error-require-flag.
+ *
+ * @param {string} projectRoot
+ * @param {string|undefined} explicitFlag - value of --spec-id
+ * @returns {string|null|{ambiguous: true, candidates: string[]}}
+ */
+function resolveSpecId(projectRoot, explicitFlag) {
+  if (explicitFlag) return explicitFlag;
+
+  const marker = readArcforgeMarker(projectRoot);
+  if (marker?.spec_id) return marker.spec_id;
+
+  const candidates = listSpecDagPaths(projectRoot).map((s) => s.specId);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  return { ambiguous: true, candidates };
+}
+
+/** Discriminator for the ambiguous-spec result from resolveSpecId. */
+function isAmbiguousSpec(spec) {
+  return typeof spec === 'object' && spec !== null && spec.ambiguous === true;
+}
+
+/**
+ * Error out with a clear message when --spec-id is required. Used by
+ * commands that cannot aggregate (next, parallel, expand, loop) and by
+ * the error branches of merge / cleanup when no --epic was provided.
+ */
+function requireSpecId(spec, commandName) {
+  if (typeof spec === 'string') return spec;
+  if (spec === null) {
+    console.error(
+      `Error: No spec found. ${commandName} needs either a --spec-id flag or a populated specs/*/dag.yaml.`,
+    );
+    process.exit(1);
+  }
+  // ambiguous
+  console.error(
+    `Error: Multiple specs found (${spec.candidates.join(', ')}). Rerun ${commandName} with --spec-id <id>.`,
+  );
+  process.exit(1);
+}
+
+/**
+ * Build a reverse index { epicId → [specId...] } by reading each
+ * `specs/*\/dag.yaml` exactly once. One-shot single-epic lookup uses
+ * findSpecsByEpic; callers that need the index directly can call this.
+ * @returns {Map<string, string[]>}
+ */
+function buildEpicSpecIndex(projectRoot) {
+  const index = new Map();
+  for (const { specId, dagPath } of listSpecDagPaths(projectRoot)) {
+    let dag;
+    try {
+      dag = parseDagYaml(fs.readFileSync(dagPath, 'utf8'));
+    } catch {
+      continue;
+    }
+    for (const epic of dag.epics || []) {
+      const bucket = index.get(epic.id) || [];
+      bucket.push(specId);
+      index.set(epic.id, bucket);
+    }
+  }
+  return index;
+}
+
+/**
+ * Reverse-lookup: find which specs contain a given epic id. One-shot
+ * variant; reuses buildEpicSpecIndex internally so the two call sites
+ * agree on semantics.
+ * @returns {string[]} spec ids that contain the epic
+ */
+function findSpecsByEpic(projectRoot, epicId) {
+  return buildEpicSpecIndex(projectRoot).get(epicId) || [];
+}
+
+/**
+ * Resolve spec for merge / cleanup. These commands accept --spec-id OR
+ * positional epic ids — an epic id uniquely identifies its parent spec
+ * in most deployments, so we can reverse-look-up rather than forcing
+ * the flag.
+ */
+function resolveMergeOrCleanupSpec(projectRoot, explicitFlag, positionalEpics, commandName) {
+  const spec = resolveSpecId(projectRoot, explicitFlag);
+  if (typeof spec === 'string') return spec;
+  if (spec === null) {
+    console.error(
+      `Error: No spec found. ${commandName} needs either a --spec-id flag or a populated specs/*/dag.yaml.`,
+    );
+    process.exit(1);
+  }
+  // Ambiguous — try to narrow via positional epic ids.
+  // Must INTERSECT: a valid parent spec contains ALL positional epics, not any.
+  // Union would report false ambiguity when a unique epic id pins the spec and
+  // a shared epic id happens to also live elsewhere.
+  if (positionalEpics && positionalEpics.length > 0) {
+    const perEpicMatches = positionalEpics.map((id) => new Set(findSpecsByEpic(projectRoot, id)));
+    const missing = positionalEpics.filter((_id, i) => perEpicMatches[i].size === 0);
+    if (missing.length > 0) {
+      console.error(
+        `Error: Epic(s) ${missing.join(', ')} not found in any spec. Pass --spec-id to be explicit.`,
+      );
+      process.exit(1);
+    }
+    const intersection = perEpicMatches.reduce((acc, s) => {
+      const next = new Set();
+      for (const x of acc) if (s.has(x)) next.add(x);
+      return next;
+    });
+    if (intersection.size === 1) return [...intersection][0];
+    if (intersection.size === 0) {
+      console.error(
+        `Error: Epic(s) ${positionalEpics.join(', ')} do not share a single spec. Pass --spec-id to disambiguate.`,
+      );
+      process.exit(1);
+    }
+    console.error(
+      `Error: Epic(s) ${positionalEpics.join(', ')} span multiple specs (${[...intersection].join(', ')}). Pass --spec-id to disambiguate.`,
+    );
+    process.exit(1);
+  }
+  console.error(
+    `Error: Multiple specs found (${spec.candidates.join(', ')}). Rerun ${commandName} with --spec-id <id> or pass epic ids as positional args.`,
+  );
+  process.exit(1);
+}
 
 // Parse command line arguments
 function parseArgs(args) {
@@ -91,51 +235,64 @@ arcforge CLI - DAG management for skill-based agent workflows
 USAGE:
   node scripts/cli.js <command> [options]
 
+SPEC RESOLUTION:
+  Most commands operate on one spec's dag.yaml. The spec id is resolved in order:
+    1. --spec-id <id>
+    2. .arcforge-epic marker in cwd (inside a worktree)
+    3. The only spec in specs/*/dag.yaml
+  With 2+ specs and no flag, commands either aggregate (status, sync, reboot)
+  or require --spec-id (next, parallel, expand, loop). Merge/cleanup also
+  accept positional epic ids and reverse-look-up the owning spec.
+
 COMMANDS:
-  status [--blocked] [--json]
+  status [--blocked] [--json] [--spec-id <id>]
       Show status of all epics and blocked items.
       --blocked    Show only blocked items
       --json       Output as JSON
+      Multi-spec (no flag) → aggregated { specs: { <id>: {...} } }.
 
-  next
+  next [--spec-id <id>]
       Get the next task to work on.
 
-  complete <task_id>
+  complete <task_id> [--spec-id <id>]
       Mark a task as completed.
 
-  block <task_id> <reason>
+  block <task_id> <reason> [--spec-id <id>]
       Mark a task as blocked with a reason.
 
-  parallel
+  parallel [--spec-id <id>]
       List all epics that can be worked on in parallel.
 
-  expand [--epic <id>] [--project-setup] [--verify] [--verify-cmd "..."]
+  expand [--epic <id>] [--spec-id <id>] [--project-setup] [--verify] [--verify-cmd "..."]
       Create git worktrees for ready epics at ~/.arcforge/worktrees/.
       --epic           Expand only the named epic (single-epic mode)
       --project-setup  Auto-detect and run installer (npm/pip/cargo/go)
       --verify         Run tests after creation
       --verify-cmd     Custom test command (default: auto-detect)
 
-  merge [epic_ids...] [--base branch]
-      Merge completed epics to base branch.
+  merge [epic_ids...] [--base branch] [--spec-id <id>]
+      Merge completed epics to base branch. Without --spec-id, positional
+      epic ids are reverse-looked-up across specs.
       --base           Target branch (default: current)
 
-  cleanup [epic_ids...]
+  cleanup [epic_ids...] [--spec-id <id>]
       Remove worktrees for completed epics.
 
-  sync [--direction from-base|to-base|both|scan]
+  sync [--direction from-base|to-base|both|scan] [--spec-id <id>]
       Synchronize state between worktree and base DAG.
       --direction      Sync direction (auto-detected if omitted)
+      Multi-spec (no flag) → aggregated { specs: { <id>: {...} } }.
 
-  reboot
+  reboot [--spec-id <id>]
       Get context summary for starting a new session.
+      Multi-spec (no flag) → aggregated { specs, totals }.
 
   schema [--json] [--example]
       Show dag.yaml schema.
       --json       Output schema as JSON
       --example    Show complete example
 
-  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>]
+  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>] [--spec-id <id>]
       Run autonomous cross-session execution loop.
       --pattern    Execution pattern: sequential (default) or dag
       --epic       Scope loop to a single epic (auto-detected in worktrees)
@@ -187,16 +344,31 @@ async function main() {
   const asJson = args.flags.json || false;
 
   try {
+    const specFlag = args.options['spec-id'];
+
     switch (args.command) {
       case 'status': {
-        const coord = new Coordinator(projectRoot);
-        const status = coord.status({ blockedOnly: args.flags.blocked });
-        output(status, asJson);
+        const spec = resolveSpecId(projectRoot, specFlag);
+        // Multi-spec base with no flag → aggregate. Single spec / worktree /
+        // explicit flag → flat single-spec output (backwards compatible).
+        if (isAmbiguousSpec(spec)) {
+          const out = { specs: {} };
+          for (const specId of spec.candidates) {
+            const c = new Coordinator(projectRoot, specId);
+            out.specs[specId] = c.status({ blockedOnly: args.flags.blocked });
+          }
+          output(out, asJson);
+          break;
+        }
+        const resolved = requireSpecId(spec, 'status');
+        const coord = new Coordinator(projectRoot, resolved);
+        output(coord.status({ blockedOnly: args.flags.blocked }), asJson);
         break;
       }
 
       case 'next': {
-        const coord = new Coordinator(projectRoot);
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'next');
+        const coord = new Coordinator(projectRoot, resolved);
         const task = coord.nextTask();
         if (task) {
           output(
@@ -218,7 +390,8 @@ async function main() {
           console.error('Error: task_id required');
           process.exit(1);
         }
-        const coord = new Coordinator(projectRoot);
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'complete');
+        const coord = new Coordinator(projectRoot, resolved);
         coord.completeTask(args.positional[0]);
         output({ success: true, task_id: args.positional[0] }, asJson);
         break;
@@ -229,14 +402,16 @@ async function main() {
           console.error('Error: task_id and reason required');
           process.exit(1);
         }
-        const coord = new Coordinator(projectRoot);
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'block');
+        const coord = new Coordinator(projectRoot, resolved);
         coord.blockTask(args.positional[0], args.positional[1]);
         output({ success: true, task_id: args.positional[0] }, asJson);
         break;
       }
 
       case 'parallel': {
-        const coord = new Coordinator(projectRoot);
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'parallel');
+        const coord = new Coordinator(projectRoot, resolved);
         const tasks = coord.parallelTasks();
         output(
           {
@@ -249,7 +424,8 @@ async function main() {
       }
 
       case 'expand': {
-        const coord = new Coordinator(projectRoot);
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'expand');
+        const coord = new Coordinator(projectRoot, resolved);
         const verifyCmd = args.options['verify-cmd'];
         const created = coord.expandWorktrees({
           epicId: args.options.epic,
@@ -263,7 +439,7 @@ async function main() {
             epics: created.map((e) => ({
               id: e.id,
               worktree: e.worktree,
-              path: getWorktreePath(projectRoot, e.id),
+              path: getWorktreePath(projectRoot, coord.specId, e.id),
             })),
           },
           asJson,
@@ -272,7 +448,8 @@ async function main() {
       }
 
       case 'merge': {
-        const coord = new Coordinator(projectRoot);
+        const resolved = resolveMergeOrCleanupSpec(projectRoot, specFlag, args.positional, 'merge');
+        const coord = new Coordinator(projectRoot, resolved);
         const merged = coord.mergeEpics({
           baseBranch: args.options.base,
           epicIds: args.positional.length > 0 ? args.positional : undefined,
@@ -288,7 +465,13 @@ async function main() {
       }
 
       case 'cleanup': {
-        const coord = new Coordinator(projectRoot);
+        const resolved = resolveMergeOrCleanupSpec(
+          projectRoot,
+          specFlag,
+          args.positional,
+          'cleanup',
+        );
+        const coord = new Coordinator(projectRoot, resolved);
         const removed = coord.cleanupWorktrees({
           epicIds: args.positional.length > 0 ? args.positional : undefined,
         });
@@ -303,21 +486,41 @@ async function main() {
       }
 
       case 'sync': {
-        const coord = new Coordinator(projectRoot);
-        // Convert direction format (from-base -> from_base)
-        let direction = args.options.direction;
-        if (direction) {
-          direction = direction.replace(/-/g, '_');
+        const spec = resolveSpecId(projectRoot, specFlag);
+        // Reject data-moving --direction values in multi-spec aggregate mode.
+        // `scan` is the valid base-mode direction (coord.sync auto-detects
+        // it in base checkouts) and the multi-spec aggregate is effectively
+        // a cross-spec scan, so let it through as a no-op. Only
+        // from-base/to-base/both need a single-spec context to resolve.
+        if (isAmbiguousSpec(spec) && args.options.direction && args.options.direction !== 'scan') {
+          console.error(
+            `Error: --direction ${args.options.direction} is not valid when syncing all specs. Pass --spec-id <id> to target one spec, or use --direction scan (or omit) for a multi-spec scan.`,
+          );
+          process.exit(1);
         }
+        // Ambiguous base → aggregate across specs via syncAllSpecs.
+        if (isAmbiguousSpec(spec)) {
+          output(syncAllSpecs(projectRoot), asJson);
+          break;
+        }
+        const resolved = requireSpecId(spec, 'sync');
+        const coord = new Coordinator(projectRoot, resolved);
+        let direction = args.options.direction;
+        if (direction) direction = direction.replace(/-/g, '_');
         const result = coord.sync({ direction });
         output(result.toObject ? result.toObject() : result, asJson);
         break;
       }
 
       case 'reboot': {
-        const coord = new Coordinator(projectRoot);
-        const context = coord.rebootContext();
-        output(context, asJson);
+        const spec = resolveSpecId(projectRoot, specFlag);
+        if (isAmbiguousSpec(spec)) {
+          output(rebootAllSpecs(projectRoot), asJson);
+          break;
+        }
+        const resolved = requireSpecId(spec, 'reboot');
+        const coord = new Coordinator(projectRoot, resolved);
+        output(coord.rebootContext(), asJson);
         break;
       }
 
@@ -672,6 +875,7 @@ async function main() {
       }
 
       case 'loop': {
+        const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'loop');
         const { runSequential, runDag } = require('./loop');
         const pattern = args.options.pattern || 'sequential';
         const maxRuns = args.options['max-runs'] ? parseInt(args.options['max-runs'], 10) : 50;
@@ -683,7 +887,7 @@ async function main() {
         }
 
         const epic = args.options.epic || null;
-        const loopOptions = { pattern, maxRuns, maxCost, epic, projectRoot };
+        const loopOptions = { pattern, maxRuns, maxCost, epic, projectRoot, specId: resolved };
         if (pattern === 'dag') {
           runDag(loopOptions);
         } else {

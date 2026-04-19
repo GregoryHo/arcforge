@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="cross-cutting">
+  <title>Cross-Cutting Rules, Interface Contracts, and Non-Functional Requirements</title>
+
+  <!-- ═══════════════ Foundational Rules ═══════════════ -->
+
+  <requirement id="fr-cc-001">
+    <title>R1 — Human Consent for Raw Source</title>
+    <description>
+      Design docs (raw source) MUST NOT be created or modified without human
+      consent or initiation. The LLM assists in elicitation but the human
+      controls when a design doc is committed.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-001-ac1">
+        A design doc MUST NOT be written to disk until the user explicitly confirms
+        the content (e.g., "looks good", "commit it", section-by-section approval).
+        <trace>REQ-F024</trace>
+      </criterion>
+      <criterion id="fr-cc-001-ac2">
+        After a design doc is committed, it MUST NOT be modified. Any change
+        requires a new iteration (new date folder, new design.md).
+        <trace>REQ-F024</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-002">
+    <title>R2 — Unidirectional Flow</title>
+    <description>
+      Downstream stages MUST NOT modify upstream artifacts. Refiner cannot modify
+      design docs; planner cannot modify spec.xml.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-002-ac1">
+        Refiner MUST NOT write to any file under docs/plans/. Its only
+        output path on success is specs/&lt;spec-id&gt;/. On block, refiner
+        writes no files anywhere — the error is reported to terminal and
+        refiner exits non-zero (per fr-rf-001-ac3).
+        <trace>REQ-F025</trace>
+      </criterion>
+      <criterion id="fr-cc-002-ac2">
+        Planner MUST NOT write to specs/&lt;spec-id&gt;/spec.xml or
+        specs/&lt;spec-id&gt;/details/. Its only output paths are
+        specs/&lt;spec-id&gt;/dag.yaml and specs/&lt;spec-id&gt;/epics/.
+        <trace>REQ-F025</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Pipeline Interface Contracts ═══════════════ -->
+
+  <requirement id="fr-cc-if-001">
+    <title>Design Doc Contract</title>
+    <description>
+      The design doc is the complete output of brainstorming and the complete
+      input to the refiner. The refiner consumes the entire design doc — no
+      special section or structured summary is needed. This contract defines
+      the design doc structure with context-sensitive sections: when no prior
+      spec exists, the doc carries full problem/solution/requirements/scope in
+      prose; when a prior spec exists, the doc carries Context + Change Intent.
+      There are no modes — one design doc structure with conditional sections.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-001-ac1">
+        Design docs MUST be located at docs/plans/&lt;spec-id&gt;/&lt;YYYY-MM-DD&gt;/design.md.
+        The spec-id is derived from the directory name. The iteration date is
+        derived from the date directory name.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-cc-if-001-ac2">
+        When no prior spec exists for this spec-id, the design doc MUST
+        contain substantive design content: at minimum, a description of the
+        problem, proposed solution, and identifiable requirements (in prose).
+        Empty or stub design docs are ERROR.
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-cc-if-001-ac3">
+        When a prior spec exists for this spec-id, the design doc MUST include
+        at minimum: a Context section (summarizing current spec state with
+        version reference) and a Change Intent section (describing what is
+        changing and why). Missing Context or Change Intent is ERROR. A
+        pre-authored structured delta section (ADDED/MODIFIED/REMOVED lists)
+        MUST NOT appear — the refiner derives the delta from narrative intent.
+        <trace>REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-cc-if-001-ac4">
+        The refiner determines which conditional sections to expect from
+        filesystem state, not from fields in the design doc:
+        specs/&lt;spec-id&gt;/spec.xml exists → expect Context + Change Intent;
+        does not exist → expect prose with problem/solution/requirements/scope.
+        This is a single-behavior filesystem check, not a mode selector.
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-002">
+    <title>Spec Identity Header Contract</title>
+    <description>
+      The spec.xml identity header is the interface contract between refiner
+      (producer) and planner (consumer). This is the single source of truth
+      for the header format.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-002-ac1">
+        Identity header MUST contain: spec_id (string), spec_version (positive
+        integer), status ("active"), source/design_path (valid file path),
+        source/design_iteration (YYYY-MM-DD). Missing fields are ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-002-ac2">
+        source/design_path MUST point to an existing design doc file. A path
+        pointing to a non-existent file is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-002-ac3">
+        scope MUST list included features with IDs and excluded items with
+        reasons. Empty scope is WARNING.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-002-ac4">
+        When spec_version > 1, supersedes MUST be set to
+        "&lt;spec-id&gt;:v&lt;previous-version&gt;". Missing supersedes for v2+ is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Contract Implementation Mechanism ═══════════════ -->
+
+  <requirement id="fr-cc-if-003">
+    <title>SDD Schemas (Guidance Layer)</title>
+    <description>
+      Each pipeline artifact MUST have a corresponding schema file in
+      scripts/lib/sdd-schemas/ that serves as the format guide for LLMs.
+      Schema files are the guidance layer — they tell the LLM what format
+      to produce. They live in scripts/lib/ (shared infrastructure) so any
+      skill can read them without cross-skill coupling. Full schema content
+      definitions are in details/sdd-schemas.xml (fr-sd-001 through fr-sd-007).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-003-ac1">
+        scripts/lib/sdd-schemas/design.md MUST exist and conform to the
+        design doc schema definition (fr-sd-001 through fr-sd-004).
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-cc-if-003-ac2">
+        scripts/lib/sdd-schemas/spec.md MUST exist and conform to the
+        spec identity header schema definition (fr-sd-005 through fr-sd-007).
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-003-ac3">
+        Schema files are the guidance layer only. They MUST NOT be the
+        enforcement mechanism — enforcement is delegated to sdd-utils.js
+        (fr-cc-if-004).
+        <trace>REQ-F008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-004">
+    <title>SDD Utils (Validation Toolkit)</title>
+    <description>
+      Deterministic validation and information checks MUST be implemented in
+      scripts/lib/sdd-utils.js. This module is a validation toolkit — it
+      validates structure and provides information, but does NOT merge or
+      author spec content (the LLM manages spec content directly, like
+      maintaining a wiki page). Full API definitions are in
+      details/sdd-schemas.xml (fr-sd-008, fr-sd-009). LLM judgment is
+      reserved for semantic checks (contradictions, ambiguity).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-004-ac1">
+        sdd-utils.js MUST export the design doc validator API defined in
+        fr-sd-008 (parseDesignDoc, validateDesignDoc).
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-cc-if-004-ac2">
+        sdd-utils.js MUST export the spec header validator API defined in
+        fr-sd-009 (parseSpecHeader, validateSpecHeader).
+        <trace>REQ-F010, REQ-F016</trace>
+      </criterion>
+      <criterion id="fr-cc-if-004-ac3">
+        Semantic checks NOT implemented by this module (delegated to LLM):
+        contradiction detection between requirements, ambiguity assessment,
+        scope completeness judgment.
+        <trace>REQ-F008, REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-cc-if-004-ac4">
+        When a schema file (fr-cc-if-003) and sdd-utils.js disagree on
+        what is valid, sdd-utils.js wins. Schema files guide production;
+        sdd-utils.js enforces correctness.
+        <trace>REQ-F003, REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-005">
+    <title>Skill Access Pattern</title>
+    <description>
+      Each pipeline skill accesses the contract through two layers:
+      scripts/lib/sdd-schemas/ for format guidance (what to produce) and
+      scripts/lib/sdd-utils.js for programmatic validation (is it correct).
+      Both layers are shared infrastructure. No skill reads another skill's
+      files.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-005-ac1">
+        arc-brainstorming SKILL.md MUST invoke scripts/lib/print-schema.js
+        (with target "design") before producing the design doc, to obtain
+        the canonical schema derived from DESIGN_DOC_RULES. The skill MUST
+        NOT embed a structural template for the design doc — structural
+        content is schema, and schema has a single source (fr-sd-010,
+        fr-sd-011).
+        <trace>REQ-F003</trace>
+      </criterion>
+      <criterion id="fr-cc-if-005-ac2">
+        arc-refining SKILL.md MUST invoke scripts/lib/sdd-utils.js
+        validateDesignDoc() for deterministic input validation before any
+        formalization. If valid is false with ERROR issues, refiner MUST
+        block per fr-rf-001-ac3 — print the issues to terminal, exit
+        non-zero, and write no files (no refiner-report.md, no spec.xml).
+        <trace>REQ-F008</trace>
+      </criterion>
+      <criterion id="fr-cc-if-005-ac3">
+        arc-refining SKILL.md MUST invoke scripts/lib/print-schema.js
+        (with target "spec") when producing spec.xml, and MUST invoke
+        scripts/lib/sdd-utils.js validateSpecHeader() for deterministic
+        output validation. If valid is false, refiner MUST NOT write any
+        files. The skill MUST NOT embed a structural template for the
+        spec header — structural content comes from the CLI and the
+        exported SPEC_HEADER_RULES constant.
+        <trace>REQ-F010, REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-cc-if-005-ac4">
+        arc-planning SKILL.md MUST invoke scripts/lib/sdd-utils.js
+        validateSpecHeader() for spec.xml input validation before any
+        decomposition. Planner MUST NOT read the design doc — it works
+        from the spec only. Rationale: the three-layer model requires
+        that the derived layer (DAG) reads only from the wiki layer
+        (spec), never from the raw source layer (design doc). The spec's
+        &lt;delta&gt; metadata provides the planning scope that would
+        otherwise require reading the design doc.
+        <trace>REQ-F016</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-006">
+    <title>Validation Toolkit API Self-Documentation</title>
+    <description>
+      The exported function signatures of scripts/lib/sdd-utils.js
+      (parseDesignDoc, validateDesignDoc, parseSpecHeader,
+      validateSpecHeader) reveal the expected input/output schemas
+      through their destructuring patterns and return types. This
+      exposure is intentional — it makes the validation toolkit
+      self-documenting for both human maintainers and LLM agents
+      exploring the codebase. Any consumer reading the module can
+      infer schema requirements (spec_id, spec_version, supersedes,
+      delta structure, etc.) without reading sdd-schemas/ files.
+      This property has testing-methodology implications documented
+      in nfr-003.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-006-ac1">
+        A consumer (human or LLM agent) reading scripts/lib/sdd-utils.js
+        MUST be able to identify the expected fields of a spec identity
+        header (spec_id, spec_version, supersedes, delta structure,
+        added/modified/removed/renamed children) from the parseSpecHeader
+        return destructuring alone, without consulting any external
+        documentation.
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-cc-if-006-ac2">
+        When sdd-utils.js function signatures change (adding, removing,
+        or renaming returned fields), the format contracts in
+        scripts/lib/sdd-schemas/ MUST be updated in the same iteration.
+        The two layers describe the same underlying schema — sdd-utils
+        enforces it, sdd-schemas documents it. Drift between them is ERROR.
+        <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Per-Stage Validation Pattern ═══════════════ -->
+
+  <requirement id="fr-cc-val-001">
+    <title>Two-Pass Write Pattern</title>
+    <description>
+      Stages that produce file artifacts (refiner, planner) MUST follow the
+      two-pass write pattern: (1) build output in memory, (2) validate output
+      against the relevant interface contract, (3) write to disk only if
+      validation passes. This prevents partially written or invalid artifacts
+      from reaching the filesystem.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-val-001-ac1">
+        Refiner MUST NOT write spec.xml or details/ files until the complete
+        output has been built in memory and validated against fr-cc-if-002.
+        <trace>REQ-F012, REQ-F015</trace>
+      </criterion>
+      <criterion id="fr-cc-val-001-ac2">
+        Planner MUST NOT write dag.yaml or epics/ until the complete output
+        has been built in memory and validated for structural integrity.
+        <trace>REQ-F017</trace>
+      </criterion>
+      <criterion id="fr-cc-val-001-ac3">
+        When output validation fails, the stage MUST report all ERROR findings
+        with remediation guidance and produce no output files.
+        <trace>REQ-F008, REQ-F015</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-val-002">
+    <title>Validation Report with Remediation</title>
+    <description>
+      When a stage blocks due to validation failure, the report MUST include
+      not just what failed but how to fix it. This follows OpenSpec's enriched
+      error message pattern.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-val-002-ac1">
+        Each ERROR finding MUST include: the specific field or section that
+        failed, the expected format (referencing the interface contract), and
+        a concrete remediation suggestion.
+        <trace>REQ-F009</trace>
+      </criterion>
+      <criterion id="fr-cc-val-002-ac2">
+        WARNING findings MUST be reported to the user but MUST NOT block the
+        stage from producing output.
+        <trace>REQ-F015</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Skill Descriptions ═══════════════ -->
+
+  <requirement id="fr-cc-006">
+    <title>Path-Agnostic Skill Descriptions</title>
+    <description>
+      Pipeline skill descriptions (frontmatter) MUST NOT hardcode artifact paths.
+      Triggering conditions MUST describe intent and context, not file locations.
+      The user provides the spec-id or target via their prompt.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-006-ac1">
+        arc-brainstorming, arc-refining, and arc-planning descriptions MUST NOT
+        contain literal paths like "specs/spec.xml" or "specs/&lt;spec-id&gt;/spec.xml".
+        They MUST describe triggering conditions in terms of user intent (e.g.,
+        "when converting design documents to structured specs").
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="fr-cc-006-ac2">
+        Each pipeline skill MUST accept a spec-id from the user's prompt as the
+        primary routing input. The skill resolves the spec-id to the correct
+        artifact paths internally.
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="fr-cc-006-ac3">
+        When the user does not provide a spec-id, the skill MUST scan specs/ and
+        docs/plans/ to present available targets and ask the user to choose.
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Non-Functional Requirements ═══════════════ -->
+
+  <requirement id="nfr-001">
+    <title>Existing Infrastructure Compatibility</title>
+    <description>
+      The SDD pipeline MUST work with arcforge's existing CLI and skill
+      infrastructure. No new runtime dependencies.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-001-ac1">
+        All pipeline operations MUST be invocable via existing arcforge skill
+        mechanism (arc-brainstorming, arc-refining, arc-planning) or their
+        updated versions.
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-001-ac2">
+        No new npm packages MUST be added to package.json dependencies.
+        devDependencies are exempt.
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="nfr-002">
+    <title>File-Based Artifacts</title>
+    <description>
+      All artifacts MUST be file-based (YAML, XML, Markdown). No database,
+      no server, no external state store.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-002-ac1">
+        Pipeline state MUST be fully derivable from files on disk. Running
+        `ls` and `cat` on the specs/ and docs/plans/ directories MUST be
+        sufficient to determine the complete pipeline state.
+        <trace>REQ-N002</trace>
+      </criterion>
+      <criterion id="nfr-002-ac2">
+        No pipeline operation MUST require network access, a running server,
+        or a database connection.
+        <trace>REQ-N002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="nfr-003">
+    <title>Skill Adherence Evaluation Methodology</title>
+    <description>
+      SDD pipeline skills (arc-brainstorming, arc-refining, arc-planning)
+      cannot be reliably evaluated via A/B comparison (baseline vs
+      treatment) on format-correctness output. The self-documenting
+      nature of sdd-utils.js (fr-cc-if-006) means a competent baseline
+      agent can infer the correct output format by reading the module,
+      closing the delta between baseline and treatment. This property
+      was empirically confirmed during the 2026-04-17 eval session
+      against Claude Sonnet 4.x and Opus 4.x models.
+    </description>
+    <acceptance_criteria>
+      <criterion id="nfr-003-ac1">
+        A/B evaluation of SDD pipeline skills MAY yield delta near zero
+        on specific eval shapes — notably, iteration-happy-path cases
+        where a valid prior spec.xml is pre-staged in the sandbox and
+        the baseline agent can mimic its schema. This is a consequence
+        of model capability combined with fr-cc-if-006, not a skill
+        deficiency. The 2026-04-19 eval session empirically confirmed
+        this zero-delta pattern on arc-refining v2-iteration-happy-path
+        (with v1 fixture pre-staged) while SIMULTANEOUSLY finding large
+        positive deltas on first-formalization and scope-discipline evals
+        (arc-refining v1-first-formalization: +62 pts; arc-planning
+        v1-plan-all-requirements: +29 pts; arc-brainstorming
+        pressure-skip-exploration: +80 pts). Eval designers MUST NOT
+        interpret a specific zero-delta case as "skill adds no value"
+        and MUST NOT generalize it to all SDD evals.
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-003-ac2">
+        The preferred eval form for SDD pipeline skills is single-condition
+        agent evaluation (pass@k on treatment trials only), measuring
+        reliability across k trials rather than behavioral delta against
+        a non-discriminative baseline. SHIP threshold: pass rate &gt;= 80%
+        across k &gt;= 5 trials after accounting for harness noise
+        (grader failures, max_turns truncation).
+        <trace>REQ-N001</trace>
+      </criterion>
+      <criterion id="nfr-003-ac3">
+        Behaviors that CAN be discriminatively A/B tested for these skills
+        are those NOT inferable from sdd-utils.js source alone — examples
+        include: refiner DAG completion gate blocking behavior (fr-rf-012),
+        terminal block message structure on contradiction (fr-rf-001-ac4),
+        delta accumulation discipline (fr-rf-011-ac4), error recovery
+        ordering, block-vs-proceed decisions. These remain candidates for
+        focused A/B eval when discrimination is required.
+        <trace>REQ-N001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

@@ -52,3 +52,16 @@ def test_arc_finishing_epic_contains_required_sections():
 
     # Sync scoped to Option 2 only
     assert "After Option 2" in text
+
+
+def test_arc_finishing_epic_discard_uses_marker_guard():
+    """SDD v2: discard-path sync guard predicates on .arcforge-epic marker.
+
+    The root-level `dag.yaml` predicate (`if [ -f dag.yaml ]`) was removed
+    because the DAG now lives at specs/<spec-id>/dag.yaml in the base —
+    the current worktree only has the marker, which the coordinator uses
+    to reconnect.
+    """
+    text = _read_skill()
+    assert "if [ -f .arcforge-epic ]" in text
+    assert "if [ -f dag.yaml ]" not in text

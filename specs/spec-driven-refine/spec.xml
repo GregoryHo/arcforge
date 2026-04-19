@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>spec-driven-refine</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <source>
+      <design_path>docs/plans/spec-driven-refine/2026-04-16/design.md</design_path>
+      <design_iteration>2026-04-16</design_iteration>
+    </source>
+    <title>Spec-Driven Development Pipeline</title>
+    <description>
+      Convert arcforge's one-shot brainstorming-refiner-planner pipeline into an
+      iterable Spec-Driven Development workflow. Design docs become immutable raw
+      sources; specs become live contracts updated via delta integration; DAGs become
+      derived views that preserve execution state. Three foundational rules (R1 Human
+      Consent, R2 Unidirectional Flow, R3 Block on Contradictions) govern the entire flow.
+    </description>
+    <scope>
+      <includes>
+        <feature id="stage-1-brainstorming">Scan existing specs, confirm spec target, produce design doc with context-sensitive sections (prose when no prior spec; Context + Change Intent when prior spec exists), output validation</feature>
+        <feature id="stage-2-refiner">One behavior with conditional fields based on filesystem state, wiki-style accumulating delta output, DAG completion gate upstream of iteration, R3 block via terminal (no persistent artifact), input/output validation</feature>
+        <feature id="stage-3-planner">Pure function (spec + delta) → (dag.yaml + epics/), overwrite DAG each sprint (no archive, no state preservation, no gate), delta-scoped planning with epic generation for added/modified/removed/renamed, 1:1 mapping, done signal, input/output validation</feature>
+        <feature id="cross-cutting-rules">R1 (human consent), R2 (unidirectional), R3 (block on contradictions)</feature>
+        <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec)</feature>
+        <feature id="spec-identity-header">XML schema for spec self-identification, versioning, and wiki-style accumulating delta metadata</feature>
+        <feature id="interface-contracts">Design Doc and Spec Identity Header format contracts — sdd-schemas/ (guidance) + sdd-utils.js (validation toolkit)</feature>
+        <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, and deterministic/semantic split</feature>
+      </includes>
+      <excludes>
+        <reason>Cross-spec dependencies — deferred until multi-spec usage is established</reason>
+        <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <cross_cutting>
+    <constraint id="cc-001">
+      <title>Zero External Dependencies</title>
+      <description>Node.js standard library only. No npm runtime dependencies.</description>
+    </constraint>
+    <constraint id="cc-003">
+      <title>Three-Tier Validation Severity</title>
+      <description>
+        All per-stage validation uses three severity levels: ERROR (blocks stage,
+        no output produced), WARNING (continues but alerts user), INFO (informational).
+        A stage is "valid" when it has zero ERRORs.
+      </description>
+    </constraint>
+    <constraint id="cc-004">
+      <title>Self-Contained Stage Input</title>
+      <description>
+        Each pipeline stage receives a self-contained input: the complete design
+        doc for refiner, the complete spec.xml for planner. Stages MUST NOT rely
+        on implicit context from prior conversation or session state.
+      </description>
+    </constraint>
+  </cross_cutting>
+
+  <details>
+    <detail_file path="details/brainstorming.xml" />
+    <detail_file path="details/refiner.xml" />
+    <detail_file path="details/planner.xml" />
+    <detail_file path="details/cross-cutting.xml" />
+    <detail_file path="details/sdd-schemas.xml" />
+  </details>
+</spec>

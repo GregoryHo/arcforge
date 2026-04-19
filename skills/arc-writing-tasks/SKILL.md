@@ -135,3 +135,16 @@ Expected: PASS
 - Tasks longer than 5 minutes
 
 **Vague = break down further.**
+
+## After This Skill
+
+Hand off to one of:
+
+- **`arc-agent-driven`** — automated execution, fresh subagent per task.
+  Best for walk-away batch runs where each task is well-scoped.
+- **`arc-executing-tasks`** — human-in-the-loop mode with checkpoint
+  prompts between tasks. Best when the task list carries judgment
+  calls or when you want to review each step.
+
+Both read `docs/tasks/<name>-tasks.md` as input. The task file itself
+says which one to use; default to `arc-agent-driven`.

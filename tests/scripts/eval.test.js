@@ -239,6 +239,31 @@ Do something.
       expect(scenario.version).toBe('2');
     });
 
+    it('should preserve [tool_called] prefix on behavioral assertions', () => {
+      // Regression: an earlier strip regex ate `[tool_called]` along with
+      // markdown checkboxes, silently rerouting behavioral assertions to
+      // the model grader. Behavioral prefixes MUST reach parseBehavioralAssertion.
+      const content = `# Eval: behavioral
+## Scenario
+Do stuff.
+## Assertions
+- [ ] text one
+- [tool_called] Bash:npm test
+- [tool_not_called] Bash:rm -rf
+- [tool_before] Bash:npm install < Bash:npm test
+- [x] already-checked text
+`;
+      const filePath = writeScenario(tempDir, 'behavioral.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.assertions).toHaveLength(5);
+      expect(scenario.assertions[0]).toBe('text one');
+      expect(scenario.assertions[1]).toBe('[tool_called] Bash:npm test');
+      expect(scenario.assertions[2]).toBe('[tool_not_called] Bash:rm -rf');
+      expect(scenario.assertions[3]).toBe('[tool_before] Bash:npm install < Bash:npm test');
+      expect(scenario.assertions[4]).toBe('already-checked text');
+    });
+
     it('should default version to undefined when missing', () => {
       const content = '# Eval: no-version\n\n## Scenario\nJust a task.\n';
       const filePath = writeScenario(tempDir, 'no-version.md', content);

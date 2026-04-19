@@ -4,7 +4,7 @@ const path = require('node:path');
 const { Coordinator } = require('../../scripts/lib/coordinator');
 const { parseDagYaml, stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
-const { setupRepo, readDagFromDisk } = require('./coordinator-test-helpers');
+const { setupRepo, readDagFromDisk, DEFAULT_SPEC_ID } = require('./coordinator-test-helpers');
 
 // Regression guard for a read-modify-write race in the dag merge path.
 // Two processes merging different epics concurrently could both load a
@@ -29,8 +29,8 @@ describe('Coordinator merge concurrency', () => {
     // Two Coordinator instances pointing at the same project — each
     // represents a separate teammate *process* that has already done
     // its `_loadDag` before the other started saving.
-    const coordA = new Coordinator(root);
-    const coordB = new Coordinator(root);
+    const coordA = new Coordinator(root, DEFAULT_SPEC_ID);
+    const coordB = new Coordinator(root, DEFAULT_SPEC_ID);
 
     // Force the lazy load on both BEFORE either mutates. This is the
     // critical setup for the race: both hold an in-memory snapshot
@@ -75,7 +75,7 @@ describe('Coordinator merge concurrency', () => {
   test('single merge still updates status correctly', () => {
     // Sanity check — the transaction wrapper does not break the
     // non-concurrent happy path via the public API.
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.mergeEpics({ epicIds: ['epic-a'] });
 
     const finalDag = readDagFromDisk(root);
@@ -94,6 +94,7 @@ describe('Coordinator merge concurrency', () => {
     const { objectToYaml } = require('../../scripts/lib/dag-schema');
     const markerData = {
       epic: 'epic-a',
+      spec_id: DEFAULT_SPEC_ID,
       base_worktree: root,
       base_branch: 'main',
       local: {
@@ -105,12 +106,13 @@ describe('Coordinator merge concurrency', () => {
     fs.writeFileSync(path.join(worktreePath, '.arcforge-epic'), objectToYaml(markerData));
 
     // Point the DAG's worktree field to our mock worktree
-    const dagContent = fs.readFileSync(path.join(root, 'dag.yaml'), 'utf8');
+    const dagPath = path.join(root, 'specs', DEFAULT_SPEC_ID, 'dag.yaml');
+    const dagContent = fs.readFileSync(dagPath, 'utf8');
     const dagData = parseDagYaml(dagContent);
     dagData.epics.find((e) => e.id === 'epic-a').worktree = worktreePath;
-    fs.writeFileSync(path.join(root, 'dag.yaml'), stringifyDagYaml(dagData));
+    fs.writeFileSync(dagPath, stringifyDagYaml(dagData));
 
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     coord.mergeEpics({ epicIds: ['epic-a'] });
 
     // Read the marker back — local.status should now be 'completed'
@@ -123,7 +125,7 @@ describe('Coordinator merge concurrency', () => {
   test('merge with no matching epics returns empty array', () => {
     // Calling mergeEpics() without epicIds filters to status=completed;
     // in our fixture none are completed yet, so nothing merges.
-    const coord = new Coordinator(root);
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
     const result = coord.mergeEpics({});
     expect(result).toEqual([]);
 
