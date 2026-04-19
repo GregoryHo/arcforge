@@ -1,5 +1,5 @@
 ---
-name: eval-comparator
+name: eval-analyzer
 description: |
   Use this agent when baseline and treatment eval results already exist and need qualitative interpretation. Examples: <example>Context: Both baseline and treatment eval runs are complete. user: "Compare the TDD skill eval results — baseline vs with-skill" assistant: "I'll dispatch the eval-comparator to interpret the A/B results, highlight improvements or regressions, and recommend next action." <commentary>The eval-comparator explains what changed using metrics already computed by the harness.</commentary></example> <example>Context: Two workflow approaches have been evaluated and need comparison. user: "Which workflow produced better outcomes — the agent-driven or manual approach?" assistant: "Dispatching eval-comparator to analyze the provided A/B metrics and summarize the likely causes of the difference." <commentary>Workflow comparisons need structured interpretation, not invented statistics.</commentary></example>
 model: sonnet

@@ -2,8 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { createRouter } = require('../../scripts/eval-dashboard');
-const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../scripts/lib/eval');
+const { createRouter } = require('../eval-dashboard');
+const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../../../scripts/lib/eval');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-dashboard-'));

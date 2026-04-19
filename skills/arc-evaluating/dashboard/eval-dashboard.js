@@ -10,9 +10,9 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const eval_ = require('./lib/eval');
-const stats = require('./lib/eval-stats');
-const { classifyAssertions } = require('./lib/eval-graders');
+const eval_ = require('../../../scripts/lib/eval');
+const stats = require('../../../scripts/lib/eval-stats');
+const { classifyAssertions } = require('../../../scripts/lib/eval-graders');
 
 // ── SSE Client Management ────────────────────────────────────
 

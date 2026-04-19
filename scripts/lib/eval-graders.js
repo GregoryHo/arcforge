@@ -365,7 +365,9 @@ function numberTranscriptBlocks(output) {
  * @returns {import('./eval').TrialResult} New result with grade
  */
 function gradeWithModel(result, scenario, projectRoot) {
-  const agentDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-grader.md'));
+  const agentDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-grader.md'),
+  );
 
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const artifacts = captureTrialArtifacts(result.trialDir);
@@ -457,8 +459,8 @@ function gradeWithModel(result, scenario, projectRoot) {
 }
 
 /**
- * Compare baseline vs treatment results using the eval-comparator agent.
- * Reads agents/eval-comparator.md as the comparison methodology.
+ * Compare baseline vs treatment results using the eval-analyzer agent.
+ * Reads skills/arc-evaluating/agents/eval-analyzer.md as the comparison methodology.
  * Returns qualitative analysis based on harness-computed metrics.
  * @param {import('./eval').EvalScenario} scenario - Eval scenario
  * @param {import('./eval').TrialResult[]} baseline - Baseline results
@@ -468,7 +470,9 @@ function gradeWithModel(result, scenario, projectRoot) {
  * @returns {{ analysis: string, recommendation: string, improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
-  const rawDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
+  const rawDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-analyzer.md'),
+  );
   if (!rawDef) return null;
   const agentDef = rawDef
     .replace(/\{IMPROVED_THRESHOLD\}/g, String(DELTA_IMPROVED_THRESHOLD))
