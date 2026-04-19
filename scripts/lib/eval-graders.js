@@ -12,6 +12,9 @@ const path = require('node:path');
 const { execCommand } = require('./utils');
 const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD, round2 } = require('./eval-stats');
 
+// Mirror of eval.js constants to avoid circular imports
+const GRADING_RESULTS_DIR = path.join('evals', 'results');
+
 // Cache agent definitions to avoid repeated disk reads during batch grading.
 // Key: absolute path, Value: file content with frontmatter stripped (empty string if missing).
 const agentDefCache = new Map();
@@ -353,6 +356,93 @@ function numberTranscriptBlocks(output) {
 }
 
 /**
+ * Compute the path to grading.json for a specific trial result.
+ * @param {import('./eval').TrialResult} result - Trial result
+ * @param {string} projectRoot - Project root directory
+ * @returns {string} Absolute path to grading.json
+ */
+function getGradingPath(result, projectRoot) {
+  const evalName = result.eval || '';
+  const scenarioName = evalName
+    .replace(/-(baseline|treatment)$/, '')
+    .replace(/[^a-zA-Z0-9-]/g, '-');
+  const runId =
+    result.runId ||
+    (result.timestamp ? result.timestamp.slice(0, 10).replace(/-/g, '') : 'unknown');
+  return path.join(
+    projectRoot,
+    GRADING_RESULTS_DIR,
+    scenarioName,
+    runId,
+    'grading',
+    `trial-${result.trial}.json`,
+  );
+}
+
+/** Required keys for discovered_claims entries */
+const CLAIM_REQUIRED_KEYS = ['text', 'category', 'passed', 'evidence'];
+
+/** Required keys for weak_assertions entries */
+const WEAK_ASSERTION_REQUIRED_KEYS = ['assertion_id', 'reason'];
+
+/**
+ * Validate an array of claim/assertion entries, warning on missing required keys.
+ * Never crashes — returns the original array (possibly with invalid entries).
+ * @param {any[]} entries - Array of objects from grader response
+ * @param {string[]} requiredKeys - Keys each entry must have
+ * @param {string} fieldName - Field name for warning messages
+ * @returns {Object[]} Entries that are valid objects (non-objects filtered out)
+ */
+function validateGraderEntries(entries, requiredKeys, fieldName) {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const missing = requiredKeys.filter((k) => !Object.hasOwn(entry, k));
+    if (missing.length > 0) {
+      process.stderr.write(`Warning: ${fieldName} entry missing keys: ${missing.join(', ')}\n`);
+    }
+    return true; // include even if keys missing — just warn
+  });
+}
+
+/**
+ * Write grading.json for a model-graded trial.
+ * Contains discovered_claims and weak_assertions from the grader response.
+ * Also records trial identity and score for traceability.
+ * @param {import('./eval').TrialResult} result - Trial result (before grading)
+ * @param {Object} gradeData - Grader response data
+ * @param {Object} validated - Validated scores from validateGraderResponse
+ * @param {string} projectRoot - Project root directory
+ */
+function writeGradingJson(result, gradeData, validated, projectRoot) {
+  try {
+    const gradingPath = getGradingPath(result, projectRoot);
+    fs.mkdirSync(path.dirname(gradingPath), { recursive: true });
+    const rawClaims = validateGraderEntries(
+      gradeData.discovered_claims,
+      CLAIM_REQUIRED_KEYS,
+      'discovered_claims',
+    );
+    const rawWeak = validateGraderEntries(
+      gradeData.weak_assertions,
+      WEAK_ASSERTION_REQUIRED_KEYS,
+      'weak_assertions',
+    );
+    const grading = {
+      eval: result.eval,
+      trial: result.trial,
+      score: validated.overall,
+      passed: validated.passed,
+      discovered_claims: rawClaims,
+      weak_assertions: rawWeak,
+    };
+    fs.writeFileSync(gradingPath, JSON.stringify(grading, null, 2));
+  } catch {
+    /* grading.json write failure must never crash a trial */
+  }
+}
+
+/**
  * Grade a trial result using the eval-grader agent (LLM-as-judge).
  * Spawns a Claude session with the rubric and trial output, then
  * parses the structured grade report for per-assertion scores.
@@ -446,6 +536,8 @@ function gradeWithModel(result, scenario, projectRoot) {
       }
       continue;
     }
+
+    writeGradingJson(result, grade, validated, projectRoot);
 
     return {
       ...result,
@@ -820,4 +912,5 @@ module.exports = {
   gradeBehavioralAssertion,
   gradeAllBehavioral,
   gradeWithMixed,
+  getGradingPath,
 };

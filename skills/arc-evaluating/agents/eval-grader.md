@@ -87,7 +87,14 @@ When used by `arc eval run` (automated batch grading), respond with ONLY a JSON 
   ],
   "blockRefs": [[2, 3], [4], []],
   "overall": 0.67,
-  "passed": false
+  "passed": false,
+  "discovered_claims": [
+    { "text": "Agent used incremental commits", "category": "process", "passed": true, "evidence": "Three commits observed in transcript" },
+    { "text": "Output matches expected format", "category": "factual", "passed": false, "evidence": "JSON keys differ from spec" }
+  ],
+  "weak_assertions": [
+    { "assertion_id": 2, "reason": "Assertion is non-discriminative — all agents pass this trivially" }
+  ]
 }
 ```
 
@@ -96,5 +103,13 @@ When used by `arc eval run` (automated batch grading), respond with ONLY a JSON 
 - `blockRefs`: for each assertion, list the `[Block N]` numbers from the output that contain the evidence (empty array if no specific block)
 - `overall`: optional convenience field
 - `passed`: optional convenience field
+- `discovered_claims`: optional array of additional claims observed in the output that are not part of the rubric assertions. Each entry must have:
+  - `text`: short description of the observed behavior or fact
+  - `category`: one of `"factual"`, `"process"`, or `"quality"`
+  - `passed`: whether the observed claim holds (boolean)
+  - `evidence`: brief evidence note pointing to output or artifact
+- `weak_assertions`: optional array identifying predefined assertions that you find non-discriminative or unverifiable. Each entry must have:
+  - `assertion_id`: 1-based index of the assertion in the rubric
+  - `reason`: brief explanation of why the assertion is weak or unverifiable
 
-The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode. The harness recomputes `overall` and `passed`, so the assertion scores are the authoritative output.
+The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode. The harness recomputes `overall` and `passed`, so the assertion scores are the authoritative output. `discovered_claims` and `weak_assertions` are stored for analysis but do NOT affect the computed score or pass/fail verdict.
