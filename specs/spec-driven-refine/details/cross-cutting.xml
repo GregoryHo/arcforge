@@ -207,9 +207,12 @@
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-005-ac1">
-        arc-brainstorming SKILL.md MUST read scripts/lib/sdd-schemas/design.md
-        before producing the design doc, to ensure the output conforms to
-        the design doc contract (conditional-section structure per fr-cc-if-001).
+        arc-brainstorming SKILL.md MUST invoke scripts/lib/print-schema.js
+        (with target "design") before producing the design doc, to obtain
+        the canonical schema derived from DESIGN_DOC_RULES. The skill MUST
+        NOT embed a structural template for the design doc — structural
+        content is schema, and schema has a single source (fr-sd-010,
+        fr-sd-011).
         <trace>REQ-F003</trace>
       </criterion>
       <criterion id="fr-cc-if-005-ac2">
@@ -221,10 +224,13 @@
         <trace>REQ-F008</trace>
       </criterion>
       <criterion id="fr-cc-if-005-ac3">
-        arc-refining SKILL.md MUST read scripts/lib/sdd-schemas/spec.md
-        when producing spec.xml, and invoke scripts/lib/sdd-utils.js
-        validateSpecHeader() for deterministic output validation. If valid
-        is false, refiner MUST NOT write any files.
+        arc-refining SKILL.md MUST invoke scripts/lib/print-schema.js
+        (with target "spec") when producing spec.xml, and MUST invoke
+        scripts/lib/sdd-utils.js validateSpecHeader() for deterministic
+        output validation. If valid is false, refiner MUST NOT write any
+        files. The skill MUST NOT embed a structural template for the
+        spec header — structural content comes from the CLI and the
+        exported SPEC_HEADER_RULES constant.
         <trace>REQ-F010, REQ-F015</trace>
       </criterion>
       <criterion id="fr-cc-if-005-ac4">
@@ -418,12 +424,20 @@
     </description>
     <acceptance_criteria>
       <criterion id="nfr-003-ac1">
-        A/B evaluation of SDD pipeline skills measuring "does treatment
-        produce correct spec.xml format?" WILL yield delta near zero
-        with current-generation LLM agents. This is a consequence of
-        model capability combined with fr-cc-if-006, not a skill
-        deficiency. Eval designers MUST NOT interpret zero delta here
-        as "skill adds no value."
+        A/B evaluation of SDD pipeline skills MAY yield delta near zero
+        on specific eval shapes — notably, iteration-happy-path cases
+        where a valid prior spec.xml is pre-staged in the sandbox and
+        the baseline agent can mimic its schema. This is a consequence
+        of model capability combined with fr-cc-if-006, not a skill
+        deficiency. The 2026-04-19 eval session empirically confirmed
+        this zero-delta pattern on arc-refining v2-iteration-happy-path
+        (with v1 fixture pre-staged) while SIMULTANEOUSLY finding large
+        positive deltas on first-formalization and scope-discipline evals
+        (arc-refining v1-first-formalization: +62 pts; arc-planning
+        v1-plan-all-requirements: +29 pts; arc-brainstorming
+        pressure-skip-exploration: +80 pts). Eval designers MUST NOT
+        interpret a specific zero-delta case as "skill adds no value"
+        and MUST NOT generalize it to all SDD evals.
         <trace>REQ-N001</trace>
       </criterion>
       <criterion id="nfr-003-ac2">

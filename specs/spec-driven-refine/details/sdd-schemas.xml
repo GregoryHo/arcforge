@@ -10,10 +10,15 @@
   <!-- ═══════════════ Design Doc Schema ═══════════════ -->
 
   <requirement id="fr-sd-001">
-    <title>Design Doc Schema — Location and Metadata</title>
+    <title>Design Doc Schema — Location and Filesystem-Determined Shape</title>
     <description>
-      scripts/lib/sdd-schemas/design.md MUST define how the refiner locates
-      and identifies design docs, and how mode is determined.
+      The design-doc schema MUST define (a) where design docs live, (b) how
+      their identity (spec-id, iteration) is derived from the path, and (c)
+      which conditional sections apply based on filesystem state. Per the
+      "no modes" decision in design.md §2, the schema is single-behavior —
+      a filesystem check drives the expected conditional sections; there is
+      no mode selector. The schema rules live in scripts/lib/sdd-utils.js
+      as the exported DESIGN_DOC_RULES constant (see fr-sd-010).
     </description>
     <acceptance_criteria>
       <criterion id="fr-sd-001-ac1">
@@ -29,6 +34,16 @@
         exists → expect Context + Change Intent; does not exist → expect prose
         with problem/solution/requirements/scope. This is a single-behavior
         filesystem check, not a mode selector.
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-001-ac3">
+        Section heading detection MUST tolerate trailing suffix text on the
+        heading line (e.g., "## Context (from spec v1)", "## Context — 2026-04-19")
+        while rejecting prefix words like "## Contextual Factors". The regex
+        form is anchored with a word boundary after the keyword and accepts
+        any non-newline content to end-of-line (equivalent to
+        /^#+\s+Context\b[^\n]*$/im for Context, same shape for Change Intent).
+        The explicit pattern lives in DESIGN_DOC_RULES.section_regex.
         <trace>REQ-F003, REQ-F005</trace>
       </criterion>
     </acceptance_criteria>
@@ -232,11 +247,14 @@
     <acceptance_criteria>
       <criterion id="fr-sd-008-ac1">
         MUST export parseDesignDoc(filePath: string) that returns
-        {spec_id, iteration, mode, hasContext, hasChangeIntent} derived
-        from the file path and content. Returns null if file not found.
-        spec_id and iteration are extracted from the directory path, not
-        from file content. mode is determined by checking filesystem for
-        specs/&lt;spec_id&gt;/spec.xml existence.
+        {spec_id, iteration, hasPriorSpec, hasContext, hasChangeIntent,
+        hasSubstantiveContent, specDesignIteration} derived from the file
+        path and content. Returns null if file not found. spec_id and
+        iteration are extracted from the directory path, not from file
+        content. hasPriorSpec is a plain filesystem fact (does
+        specs/&lt;spec_id&gt;/spec.xml exist?) — it is NOT a "mode" and the
+        return type MUST NOT expose a "mode" field, per design.md §2 and
+        fr-bs-002.
         <trace>REQ-F003, REQ-F005</trace>
       </criterion>
       <criterion id="fr-sd-008-ac2">
@@ -283,6 +301,96 @@
         present when spec_version &gt; 1 (ERROR), supersedes format matches
         "&lt;spec-id&gt;:v&lt;N&gt;" (ERROR), empty scope includes (WARNING).
         <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ Schema Source-of-Truth and Access Pattern ═══════════════ -->
+
+  <requirement id="fr-sd-010">
+    <title>Schema Rules Are Exported Constants (Single SoT)</title>
+    <description>
+      Design-doc and spec-header schema rules MUST live as exported constants
+      in scripts/lib/sdd-utils.js (DESIGN_DOC_RULES and SPEC_HEADER_RULES).
+      Validators (parseDesignDoc, validateDesignDoc, parseSpecHeader,
+      validateSpecHeader) MUST consume these constants — not duplicate the
+      rules as regex literals inside the function bodies. Downstream
+      consumers (skills, tests, the print-schema CLI) MUST read from these
+      exports rather than redescribing the schema in hand-authored text.
+
+      This is the structural defense against the drift that produced the
+      2026-04-19 "Context heading" bug: the skill said one thing, the
+      schema doc said a second, and the validator regex enforced a third.
+      With rules centralized, validators and documentation are guaranteed
+      to agree by construction.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-010-ac1">
+        scripts/lib/sdd-utils.js MUST export a frozen DESIGN_DOC_RULES
+        object containing: canonical_path, path_regex, substantive_min_chars,
+        section_regex (with Context and ChangeIntent entries),
+        iteration.required_sections, iteration.recommended_sections,
+        iteration.forbidden_section_keywords, initial.required_prose_elements.
+        <trace>REQ-F003, REQ-F005</trace>
+      </criterion>
+      <criterion id="fr-sd-010-ac2">
+        scripts/lib/sdd-utils.js MUST export a frozen SPEC_HEADER_RULES
+        object containing: canonical_path, design_iteration_regex,
+        supersedes_regex, required_fields, conditional_fields, scope,
+        delta (with placement, ordering, last_delta_invariants, and
+        child_element_rules).
+        <trace>REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-010-ac3">
+        Validator functions (parseDesignDoc, validateDesignDoc,
+        parseSpecHeader, validateSpecHeader) MUST reference the exported
+        rule constants for regexes and thresholds. Duplicating a rule as a
+        local regex literal inside a function body is ERROR and
+        constitutes drift risk.
+        <trace>REQ-F003, REQ-F005, REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-011">
+    <title>Schema Access Pattern — print-schema CLI</title>
+    <description>
+      Skills and agents that need to know an SDD artifact's schema MUST
+      obtain it by invoking scripts/lib/print-schema.js, not by reading
+      hand-authored markdown or by copying templates into SKILL.md bodies.
+      The CLI reads directly from the exported rule constants
+      (fr-sd-010), so there is exactly one source of truth and the output
+      cannot drift from the validator's behavior.
+
+      This requirement exists because hand-authored schema copies in
+      skills produced the 2026-04-19 "Context heading" bug. Skills MUST
+      NOT embed structural templates; they link to the CLI instead.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-011-ac1">
+        scripts/lib/print-schema.js MUST exist and accept two targets
+        (design, spec) plus a --json flag. Default output is
+        human-readable text. --json emits the raw rule object with
+        RegExp values encoded as &lt;regex&gt;pattern&lt;/regex&gt; strings.
+        <trace>REQ-F003, REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-011-ac2">
+        print-schema.js MUST derive its output from the exported
+        DESIGN_DOC_RULES and SPEC_HEADER_RULES constants in
+        sdd-utils.js. It MUST NOT hand-author schema content.
+        <trace>REQ-F003, REQ-F010</trace>
+      </criterion>
+      <criterion id="fr-sd-011-ac3">
+        arc-brainstorming, arc-refining, and any other SDD-pipeline skill
+        MUST reference print-schema.js (e.g., "run `node
+        scripts/lib/print-schema.js design`") as the canonical way to get
+        the schema. SDD skills MUST NOT embed structural code-block
+        templates that duplicate schema content; REQUIRED BACKGROUND
+        links to print-schema.js instead. Skills also MUST NOT reference
+        hand-authored markdown in scripts/lib/sdd-schemas/ as schema
+        sources of truth (those files are deprecated pointers to the CLI
+        and constants).
+        <trace>REQ-F003, REQ-F005, REQ-F010</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

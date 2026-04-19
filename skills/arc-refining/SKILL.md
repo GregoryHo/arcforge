@@ -12,8 +12,8 @@ description: Use when converting design documents to structured specs, when spec
 No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. Block = terminal output + non-zero exit + zero filesystem state. If you find yourself wanting to trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
 
 **REQUIRED BACKGROUND:**
-- `scripts/lib/sdd-schemas/spec.md` — read before producing any spec.xml; covers identity header + multi-delta accumulation rules.
-- `references/spec-structure.md` — field tables for identity header, per-spec directory layout, detail-file requirement rules. Load when about to write files in Phase 5.
+- Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec` before producing any spec.xml — it prints the canonical identity-header schema (required fields, supersedes format, delta-element rules) directly from `scripts/lib/sdd-utils.js`'s `SPEC_HEADER_RULES`. This is the single source of truth — no templates, no hand-authored examples, no drift.
+- `references/spec-structure.md` — supplementary field tables for per-spec directory layout and detail-file requirement rules. Load when about to write files in Phase 5.
 
 ## Overview
 

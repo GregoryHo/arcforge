@@ -11,7 +11,7 @@ description: Use when exploring ideas before implementation or when user wants t
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing any design doc — it defines the conditional-section contract the refiner will consume (prose for "no prior spec" docs; Context + Change Intent for "prior spec exists" docs). Same schema, both branches.
+**REQUIRED BACKGROUND:** Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` before producing any design doc — it prints the canonical schema (required/forbidden sections, heading regexes, enforcement authority) directly from `scripts/lib/sdd-utils.js`'s rule constants. The same schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply — this is not a "mode" switch.
 
 ## When NOT to Use
 
@@ -128,40 +128,19 @@ Apply YAGNI ruthlessly: only capture what the user explicitly states is changing
 
 The design doc carries a Context summary plus a natural-language Change Intent. The downstream refiner reads this alongside `specs/<spec-id>/spec.xml` and **derives the structured `<delta>` itself** — the design doc carries human-authored narrative, never a pre-authored ADDED/MODIFIED/REMOVED list.
 
-**Required sections (ERROR if missing):**
+**Get the current schema (required reading before writing):**
 
-**Context** — 2-3 sentences summarizing the current spec scope, plus a reference to the spec version:
-```
-## Context (from spec v<N>)
-
-<2-3 sentence summary of what the spec currently covers>
-
-Reference: specs/<spec-id>/spec.xml v<N>
+```bash
+node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design
 ```
 
-**Change Intent** — what is changing and why (primary input for the refiner):
-```
-## Change Intent
+This prints the canonical design-doc schema — required sections, forbidden sections, heading regexes, and enforcement authority. This is the single source of truth; do NOT reconstruct the schema from memory, and do NOT copy schema content into this skill. The rules live in `scripts/lib/sdd-utils.js` (`DESIGN_DOC_RULES`) and the validator (`validateDesignDoc`) enforces them. If this skill and the validator ever disagree, the validator wins.
 
-<What is changing and why. Natural prose. The refiner derives the delta from this.>
-```
+**Validate before writing to disk:**
 
-**Recommended section (optional for simple changes):**
-
-**Architecture Impact** — how the changes interact with existing design:
-```
-## Architecture Impact
-
-<How changes interact with existing design. Omit for simple isolated changes.>
-```
-
-**Forbidden:** No pre-authored structured delta section. Do not write a `## Added / Modified / Removed` list — the refiner derives the delta itself from your Change Intent prose.
-
-Validate before writing to disk:
-
-- Context section present (with spec version reference)
+- Context section present (matching the regex printed by `print-schema.js`)
 - Change Intent section present
-- No pre-authored structured delta section
+- No pre-authored structured delta section (Added/Modified/Removed/Renamed/Delta)
 
 **ERROR on any missing required section — do not write until resolved.**
 

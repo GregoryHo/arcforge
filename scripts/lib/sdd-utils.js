@@ -2,7 +2,10 @@
  * sdd-utils.js — Spec-Driven Development utility functions.
  *
  * Provides deterministic validation helpers for design docs and spec headers.
- * Implements the rules defined in scripts/lib/sdd-schemas/design.md.
+ * The schema rules live HERE as exported constants (DESIGN_DOC_RULES and
+ * SPEC_HEADER_RULES). Validators, tests, and the print-schema CLI all read
+ * from those constants — there is exactly one source of truth and it is
+ * the code, not hand-authored markdown. See fr-sd-010 / fr-sd-011.
  */
 
 const fs = require('node:fs');
@@ -10,19 +13,56 @@ const path = require('node:path');
 const { parseDagYaml } = require('./yaml-parser');
 const { DAG, TaskStatus } = require('./models');
 
-// Regex to extract spec_id and iteration date from canonical design doc path.
-// Matches: .../docs/plans/<spec-id>/<YYYY-MM-DD>[optional-suffix]/design.md
-const DESIGN_PATH_RE = /docs\/plans\/([^/]+)\/(\d{4}-\d{2}-\d{2}(?:-[^/]+)?)\/design\.md$/;
-
-// Minimum non-heading character count for substantive content.
-const MIN_SUBSTANTIVE_CHARS = 50;
+// -----------------------------------------------------------------------------
+// DESIGN_DOC_RULES — single source of truth for design-doc schema.
+// -----------------------------------------------------------------------------
+// parseDesignDoc + validateDesignDoc read from this object; print-schema.js
+// imports it to produce human-readable or JSON schema output. Any new rule for
+// design docs is added HERE — never in hand-authored markdown or skill templates.
+// Drift between this object and downstream consumers is caught by the
+// schema-consistency tests (see tests/scripts/sdd-utils.test.js).
+const DESIGN_DOC_RULES = Object.freeze({
+  canonical_path: 'docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/design.md',
+  // Matches: .../docs/plans/<spec-id>/<YYYY-MM-DD>[optional-suffix]/design.md
+  path_regex: /docs\/plans\/([^/]+)\/(\d{4}-\d{2}-\d{2}(?:-[^/]+)?)\/design\.md$/,
+  substantive_min_chars: 50,
+  // Section heading detection. Word-boundary after the keyword so "## Context
+  // (from spec v1)" and "## Context — 2026-04-19" both match, while a prefix
+  // word like "## Contextual Factors" does not.
+  section_regex: {
+    Context: /^#+\s+Context\b[^\n]*$/im,
+    ChangeIntent: /^#+\s+Change\s+Intent\b[^\n]*$/im,
+  },
+  // When specs/<spec-id>/spec.xml exists (hasPriorSpec), the iteration shape applies.
+  iteration: {
+    description:
+      'When a prior spec exists, the design doc carries Context + Change Intent sections. Refiner derives the <delta> from narrative; no pre-authored diff section is permitted.',
+    required_sections: ['Context', 'Change Intent'],
+    recommended_sections: ['Architecture Impact'],
+    forbidden_section_keywords: ['Added', 'Modified', 'Removed', 'Renamed', 'Delta'],
+  },
+  // When no prior spec.xml exists, the initial shape applies.
+  initial: {
+    description:
+      'When no prior spec exists, the design doc carries prose covering problem, solution, requirements, and scope. No mandatory section headings — refiner extracts from prose.',
+    required_prose_elements: [
+      'problem / motivation',
+      'proposed solution / architecture',
+      'identifiable requirements (in prose)',
+      'scope declaration (includes + excludes)',
+    ],
+  },
+  // One behavior, filesystem-determined. There are no "modes" in the refiner —
+  // the shape of the expected content is conditional on prior-spec presence.
+  shape_is_mode: false,
+});
 
 /**
  * Parse a design doc at filePath and return structured metadata.
  *
  * @param {string} filePath - Absolute or relative path to the design.md file.
  * @param {{ cwd?: string }} [options]
- * @returns {{ spec_id: string, iteration: string, mode: 'initial'|'iteration',
+ * @returns {{ spec_id: string, iteration: string, hasPriorSpec: boolean,
  *   hasContext: boolean, hasChangeIntent: boolean,
  *   hasSubstantiveContent: boolean, specDesignIteration: string|null } | null}
  */
@@ -36,7 +76,7 @@ function parseDesignDoc(filePath, options = {}) {
 
   // Normalize backslashes for cross-platform matching.
   const normalizedPath = filePath.replace(/\\/g, '/');
-  const match = DESIGN_PATH_RE.exec(normalizedPath);
+  const match = normalizedPath.match(DESIGN_DOC_RULES.path_regex);
   if (!match) {
     return null;
   }
@@ -44,15 +84,17 @@ function parseDesignDoc(filePath, options = {}) {
   const spec_id = match[1];
   const iteration = match[2];
 
-  // Mode detection: filesystem check for specs/<spec-id>/spec.xml.
+  // Filesystem state — does a prior spec.xml already exist for this spec-id?
+  // This is a single filesystem fact, not a "mode" selector.
   const specXmlPath = path.join(cwd, 'specs', spec_id, 'spec.xml');
-  const mode = fs.existsSync(specXmlPath) ? 'iteration' : 'initial';
+  const hasPriorSpec = fs.existsSync(specXmlPath);
 
   const content = fs.readFileSync(filePath, 'utf8');
 
-  // Detect required headings (case-insensitive, any heading level).
-  const hasContext = /^#+\s+Context\s*$/im.test(content);
-  const hasChangeIntent = /^#+\s+Change\s+Intent\s*$/im.test(content);
+  // Heading detection via the schema's section_regex (tolerates trailing suffix
+  // text like "(from spec v1)" while rejecting prefix words like "Contextual").
+  const hasContext = DESIGN_DOC_RULES.section_regex.Context.test(content);
+  const hasChangeIntent = DESIGN_DOC_RULES.section_regex.ChangeIntent.test(content);
 
   // Substantive content: strip heading lines, check remaining non-whitespace length.
   const nonHeadingContent = content
@@ -60,14 +102,14 @@ function parseDesignDoc(filePath, options = {}) {
     .filter((line) => !/^#+\s/.test(line))
     .join('\n');
   const hasSubstantiveContent =
-    nonHeadingContent.replace(/\s+/g, '').length >= MIN_SUBSTANTIVE_CHARS;
+    nonHeadingContent.replace(/\s+/g, '').length >= DESIGN_DOC_RULES.substantive_min_chars;
 
-  // In iteration mode, read design_iteration from spec.xml.
+  // When a prior spec exists, read its recorded design_iteration for stale-date check.
   let specDesignIteration = null;
-  if (mode === 'iteration') {
+  if (hasPriorSpec) {
     try {
       const specXmlContent = fs.readFileSync(specXmlPath, 'utf8');
-      const diMatch = /<design_iteration>([^<]+)<\/design_iteration>/.exec(specXmlContent);
+      const diMatch = specXmlContent.match(/<design_iteration>([^<]+)<\/design_iteration>/);
       if (diMatch) {
         specDesignIteration = diMatch[1].trim();
       }
@@ -79,7 +121,7 @@ function parseDesignDoc(filePath, options = {}) {
   return {
     spec_id,
     iteration,
-    mode,
+    hasPriorSpec,
     hasContext,
     hasChangeIntent,
     hasSubstantiveContent,
@@ -114,7 +156,7 @@ function validateDesignDoc(parsed) {
     });
   }
 
-  if (parsed.mode === 'iteration') {
+  if (parsed.hasPriorSpec) {
     if (!parsed.hasContext) {
       issues.push({
         level: 'ERROR',
@@ -145,13 +187,50 @@ function validateDesignDoc(parsed) {
   return { valid, issues };
 }
 
-// Regex for design iteration identifier: ISO date prefix + optional human-chosen suffix.
-// Valid: 2026-04-16, 2026-04-16-v2, 2026-04-16-rework, 2026-04-16-oauth-pivot
-// Invalid: april-16, 2026-04-116, v2-2026-04-16, 2026-04-16v2 (missing dash before suffix)
-const DATE_RE = /^\d{4}-\d{2}-\d{2}(-.+)?$/;
-
-// Regex to match supersedes format: <id>:v<n>
-const SUPERSEDES_RE = /^[a-z0-9-]+:v\d+$/;
+// -----------------------------------------------------------------------------
+// SPEC_HEADER_RULES — single source of truth for spec.xml identity-header schema.
+// -----------------------------------------------------------------------------
+// parseSpecHeader + validateSpecHeader read from this object; print-schema.js
+// imports it to render the spec schema for humans and LLMs. Any new rule goes
+// HERE — never in hand-authored markdown or skill templates.
+const SPEC_HEADER_RULES = Object.freeze({
+  canonical_path: 'specs/<spec-id>/spec.xml',
+  // Design iteration identifier: ISO date prefix + optional human-chosen suffix.
+  // Valid:   2026-04-16, 2026-04-16-v2, 2026-04-16-rework, 2026-04-16-oauth-pivot
+  // Invalid: april-16, 2026-04-116, v2-2026-04-16, 2026-04-16v2 (missing dash)
+  design_iteration_regex: /^\d{4}-\d{2}-\d{2}(-.+)?$/,
+  // supersedes format for v2+: <spec-id>:v<N>
+  supersedes_regex: /^[a-z0-9-]+:v\d+$/,
+  required_fields: [
+    { key: 'spec_version', field: 'spec_version', type: 'positive integer' },
+    { key: 'status', field: 'status', type: 'enum (currently: "active")' },
+    { key: 'title', field: 'title', type: 'string' },
+    { key: 'design_path', field: 'source/design_path', type: 'existing file path' },
+    { key: 'design_iteration', field: 'source/design_iteration', type: 'YYYY-MM-DD[-suffix]' },
+  ],
+  conditional_fields: [{ key: 'supersedes', when: 'spec_version > 1', format: '<spec-id>:v<N>' }],
+  scope: {
+    includes: 'required; list of <feature id="..."> elements (empty = WARNING)',
+    excludes: 'recommended; list of <reason> elements',
+  },
+  delta: {
+    required_when: 'spec_version > 1',
+    placement: 'children of <overview>, appended each iteration, never overwritten',
+    ordering: 'ascending by version attribute, strictly unique',
+    last_delta_invariants: {
+      version: 'MUST equal current spec_version',
+      iteration: 'MUST equal current source/design_iteration',
+    },
+    child_element_rules: {
+      added: 'ref MUST correspond to a current <requirement id>',
+      modified: 'ref MUST correspond to a current <requirement id>',
+      removed:
+        'ref refers to a now-deleted requirement; MUST include <reason> child; optional <migration>',
+      renamed:
+        'MUST have both ref_old and ref_new attributes; body unchanged (semantic changes use removed+added)',
+    },
+  },
+});
 
 /**
  * Parse a spec XML string and return a structured header object.
@@ -423,7 +502,7 @@ function validateSpecHeader(parsed, options = {}) {
 
   // design_iteration must start with YYYY-MM-DD (optional suffix after a "-" separator).
   if (parsed.design_iteration !== null && parsed.design_iteration !== undefined) {
-    if (!DATE_RE.test(parsed.design_iteration)) {
+    if (!SPEC_HEADER_RULES.design_iteration_regex.test(parsed.design_iteration)) {
       issues.push({
         level: 'ERROR',
         field: 'source/design_iteration',
@@ -440,7 +519,7 @@ function validateSpecHeader(parsed, options = {}) {
         field: 'supersedes',
         message: `supersedes is required for spec_version > 1 (version ${parsed.spec_version}).`,
       });
-    } else if (!SUPERSEDES_RE.test(parsed.supersedes)) {
+    } else if (!SPEC_HEADER_RULES.supersedes_regex.test(parsed.supersedes)) {
       issues.push({
         level: 'ERROR',
         field: 'supersedes',
@@ -582,6 +661,11 @@ function checkDagStatus(dagYamlPath) {
 }
 
 module.exports = {
+  // Schema rule constants — SoT for downstream schema consumers (print-schema.js,
+  // tests). Exported so drift between code and docs is impossible by construction.
+  DESIGN_DOC_RULES,
+  SPEC_HEADER_RULES,
+  // Parsers / validators.
   parseDesignDoc,
   validateDesignDoc,
   parseSpecHeader,

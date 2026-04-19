@@ -3,11 +3,18 @@ const path = require('node:path');
 const os = require('node:os');
 
 const {
+  DESIGN_DOC_RULES,
+  SPEC_HEADER_RULES,
   parseDesignDoc,
   validateDesignDoc,
   parseSpecHeader,
   validateSpecHeader,
 } = require('../../scripts/lib/sdd-utils');
+const {
+  renderDesignHuman,
+  renderSpecHuman,
+  jsonifyRules,
+} = require('../../scripts/lib/print-schema');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,17 +82,17 @@ describe('parseDesignDoc', () => {
     expect(result.iteration).toBe('2026-03-15');
   });
 
-  it('detects initial mode when specs/<spec-id>/spec.xml does not exist', () => {
+  it('returns hasPriorSpec=false when specs/<spec-id>/spec.xml does not exist', () => {
     const filePath = writeFile(
       tmpDir,
       'docs/plans/auth-system/2026-03-15/design.md',
       SUBSTANTIVE_CONTENT,
     );
     const result = parseDesignDoc(filePath, { cwd: tmpDir });
-    expect(result.mode).toBe('initial');
+    expect(result.hasPriorSpec).toBe(false);
   });
 
-  it('detects iteration mode when specs/<spec-id>/spec.xml exists', () => {
+  it('returns hasPriorSpec=true when specs/<spec-id>/spec.xml exists', () => {
     const filePath = writeFile(
       tmpDir,
       'docs/plans/auth-system/2026-03-15/design.md',
@@ -97,7 +104,7 @@ describe('parseDesignDoc', () => {
       '<spec><overview><design_iteration>2026-01-01</design_iteration></overview></spec>',
     );
     const result = parseDesignDoc(filePath, { cwd: tmpDir });
-    expect(result.mode).toBe('iteration');
+    expect(result.hasPriorSpec).toBe(true);
   });
 
   it('detects Context heading (case-insensitive, any heading level)', () => {
@@ -127,6 +134,36 @@ describe('parseDesignDoc', () => {
     const content = '# Title\n\n## Context\n\nSome context here.\n';
     const filePath = writeFile(tmpDir, 'docs/plans/auth-system/2026-03-15/design.md', content);
     const result = parseDesignDoc(filePath, { cwd: tmpDir });
+    expect(result.hasChangeIntent).toBe(false);
+  });
+
+  // The 2026-04-19 "Context heading" bug: the skill template instructed
+  // "## Context (from spec v1)" but the validator regex rejected anything
+  // after the keyword. These tests lock in the wider match form that
+  // tolerates a suffix while still rejecting prefix-word collisions.
+  it('accepts Context heading with parenthetical suffix (## Context (from spec v1))', () => {
+    const content =
+      '# Title\n\n## Context (from spec v1)\n\nBody text long enough to be substantive content for a design doc.\n\n## Change Intent\n\nSome intent.\n';
+    const filePath = writeFile(tmpDir, 'docs/plans/auth-system/2026-03-15/design.md', content);
+    const result = parseDesignDoc(filePath, { cwd: tmpDir });
+    expect(result.hasContext).toBe(true);
+  });
+
+  it('accepts Context heading with em-dash suffix (## Context — 2026-04-19)', () => {
+    const content =
+      '# Title\n\n## Context — 2026-04-19\n\nBody text long enough to be substantive content for a design doc.\n\n## Change Intent — OAuth\n\nSome intent.\n';
+    const filePath = writeFile(tmpDir, 'docs/plans/auth-system/2026-03-15/design.md', content);
+    const result = parseDesignDoc(filePath, { cwd: tmpDir });
+    expect(result.hasContext).toBe(true);
+    expect(result.hasChangeIntent).toBe(true);
+  });
+
+  it('rejects prefix-word collisions (## Contextual Factors, ## Change Intentions)', () => {
+    const content =
+      '# Title\n\n## Contextual Factors\n\nPrefix-word heading body text content.\n\n## Change Intentions\n\nSuffix heading body text content.\n';
+    const filePath = writeFile(tmpDir, 'docs/plans/auth-system/2026-03-15/design.md', content);
+    const result = parseDesignDoc(filePath, { cwd: tmpDir });
+    expect(result.hasContext).toBe(false);
     expect(result.hasChangeIntent).toBe(false);
   });
 
@@ -196,7 +233,7 @@ describe('validateDesignDoc', () => {
     const parsed = {
       spec_id: 'auth-system',
       iteration: '2026-03-15',
-      mode: 'initial',
+      hasPriorSpec: false,
       hasContext: false,
       hasChangeIntent: false,
       hasSubstantiveContent: false,
@@ -208,11 +245,11 @@ describe('validateDesignDoc', () => {
     expect(err).toBeDefined();
   });
 
-  it('passes a valid initial mode doc with substantive content', () => {
+  it('passes a valid doc without a prior spec (new-spec case)', () => {
     const parsed = {
       spec_id: 'auth-system',
       iteration: '2026-03-15',
-      mode: 'initial',
+      hasPriorSpec: false,
       hasContext: false,
       hasChangeIntent: false,
       hasSubstantiveContent: true,
@@ -223,11 +260,11 @@ describe('validateDesignDoc', () => {
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
   });
 
-  it('requires Context heading in iteration mode (ERROR, field: Context)', () => {
+  it('requires Context heading when a prior spec exists (ERROR, field: Context)', () => {
     const parsed = {
       spec_id: 'auth-system',
       iteration: '2026-03-15',
-      mode: 'iteration',
+      hasPriorSpec: true,
       hasContext: false,
       hasChangeIntent: true,
       hasSubstantiveContent: true,
@@ -239,11 +276,11 @@ describe('validateDesignDoc', () => {
     expect(err).toBeDefined();
   });
 
-  it('requires Change Intent heading in iteration mode (ERROR, field: Change Intent)', () => {
+  it('requires Change Intent heading when a prior spec exists (ERROR, field: Change Intent)', () => {
     const parsed = {
       spec_id: 'auth-system',
       iteration: '2026-03-15',
-      mode: 'iteration',
+      hasPriorSpec: true,
       hasContext: true,
       hasChangeIntent: false,
       hasSubstantiveContent: true,
@@ -260,7 +297,7 @@ describe('validateDesignDoc', () => {
       spec_id: 'auth-system',
       // iteration <= specDesignIteration triggers WARNING
       iteration: '2026-01-10',
-      mode: 'iteration',
+      hasPriorSpec: true,
       hasContext: true,
       hasChangeIntent: true,
       hasSubstantiveContent: true,
@@ -272,11 +309,11 @@ describe('validateDesignDoc', () => {
     expect(warn).toBeDefined();
   });
 
-  it('passes a valid iteration mode doc with both required headings', () => {
+  it('passes a valid iteration doc (prior spec + both required headings)', () => {
     const parsed = {
       spec_id: 'auth-system',
       iteration: '2026-03-15',
-      mode: 'iteration',
+      hasPriorSpec: true,
       hasContext: true,
       hasChangeIntent: true,
       hasSubstantiveContent: true,
@@ -1595,5 +1632,86 @@ describe('checkDagStatus', () => {
     expect(result.completed).toBe(0);
     expect(result.incomplete).toBe(0);
     expect(result.incompleteEpics).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schema SoT + drift-detection tests (fr-sd-010, fr-sd-011)
+// ---------------------------------------------------------------------------
+//
+// These tests lock in the structural invariant that prevents the class of bug
+// found on 2026-04-19: skill template said "## Context (from spec v1)" but
+// validator rejected it. The fix is to have validators consume exported rule
+// constants, and to have the print-schema CLI derive its output from the same
+// constants. These tests verify that structure.
+
+describe('schema SoT invariants', () => {
+  it('exports a frozen DESIGN_DOC_RULES with all fr-sd-010-ac1 required keys', () => {
+    expect(Object.isFrozen(DESIGN_DOC_RULES)).toBe(true);
+    expect(DESIGN_DOC_RULES.canonical_path).toBeTruthy();
+    expect(DESIGN_DOC_RULES.path_regex).toBeInstanceOf(RegExp);
+    expect(DESIGN_DOC_RULES.substantive_min_chars).toBeGreaterThan(0);
+    expect(DESIGN_DOC_RULES.section_regex.Context).toBeInstanceOf(RegExp);
+    expect(DESIGN_DOC_RULES.section_regex.ChangeIntent).toBeInstanceOf(RegExp);
+    expect(Array.isArray(DESIGN_DOC_RULES.iteration.required_sections)).toBe(true);
+    expect(Array.isArray(DESIGN_DOC_RULES.iteration.forbidden_section_keywords)).toBe(true);
+    expect(Array.isArray(DESIGN_DOC_RULES.initial.required_prose_elements)).toBe(true);
+  });
+
+  it('exports a frozen SPEC_HEADER_RULES with all fr-sd-010-ac2 required keys', () => {
+    expect(Object.isFrozen(SPEC_HEADER_RULES)).toBe(true);
+    expect(SPEC_HEADER_RULES.design_iteration_regex).toBeInstanceOf(RegExp);
+    expect(SPEC_HEADER_RULES.supersedes_regex).toBeInstanceOf(RegExp);
+    expect(Array.isArray(SPEC_HEADER_RULES.required_fields)).toBe(true);
+    expect(SPEC_HEADER_RULES.delta.last_delta_invariants.version).toBeTruthy();
+    expect(SPEC_HEADER_RULES.delta.child_element_rules.added).toBeTruthy();
+  });
+
+  it('validator rejects a doc whose section heading does not match DESIGN_DOC_RULES.section_regex.Context', () => {
+    // This test locks in the invariant that the validator and the exported
+    // regex are the same thing. If someone ever reintroduces a local regex
+    // literal inside parseDesignDoc, mutating DESIGN_DOC_RULES.section_regex
+    // here would stop affecting the validator and this test would flag it.
+    const bad =
+      '# Title\n\n## Contextual\n\nSome body content long enough to pass substantive check.\n\n## Change Intent\n\nBody.\n';
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdd-schema-sot-'));
+    try {
+      const filePath = writeFile(tmpDir, 'docs/plans/auth-system/2026-03-15/design.md', bad);
+      writeFile(tmpDir, 'specs/auth-system/spec.xml', '<spec><overview/></spec>');
+      const parsed = parseDesignDoc(filePath, { cwd: tmpDir });
+      expect(parsed.hasContext).toBe(false);
+      // Confirm the rule's regex agrees when tested directly on the same string
+      expect(DESIGN_DOC_RULES.section_regex.Context.test(bad)).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('print-schema CLI drift detection', () => {
+  // Per fr-sd-011-ac2, print-schema derives all output from the exported
+  // rule constants. These tests verify that the output contains the actual
+  // regex sources from the rules — a hand-authored template would not.
+  it('design human-readable output embeds the actual Context regex source', () => {
+    const out = renderDesignHuman();
+    expect(out).toContain(DESIGN_DOC_RULES.section_regex.Context.source);
+    expect(out).toContain(DESIGN_DOC_RULES.section_regex.ChangeIntent.source);
+    expect(out).toContain(DESIGN_DOC_RULES.path_regex.source);
+    expect(out).toContain(String(DESIGN_DOC_RULES.substantive_min_chars));
+  });
+
+  it('spec human-readable output embeds the actual design_iteration regex source', () => {
+    const out = renderSpecHuman();
+    expect(out).toContain(SPEC_HEADER_RULES.design_iteration_regex.source);
+    expect(out).toContain(SPEC_HEADER_RULES.supersedes_regex.source);
+  });
+
+  it('jsonifyRules encodes RegExp values as <regex>...</regex> strings', () => {
+    const out = jsonifyRules(DESIGN_DOC_RULES);
+    expect(typeof out.path_regex).toBe('string');
+    expect(out.path_regex.startsWith('<regex>')).toBe(true);
+    expect(out.path_regex.endsWith('</regex>')).toBe(true);
+    // Round-trip: the encoded string must contain the actual regex source.
+    expect(out.path_regex).toContain(DESIGN_DOC_RULES.path_regex.source);
   });
 });

@@ -162,20 +162,33 @@ def test_arc_brainstorming_has_explicit_routing_confirmation():
     )
 
 
-def test_arc_brainstorming_has_iteration_design_doc_sections():
-    """Test skill documents Context + Change Intent sections for iteration design docs (fr-bs-005).
+def test_arc_brainstorming_references_print_schema_cli():
+    """Test skill delegates schema to print-schema.js instead of embedding templates.
 
-    Renamed from has_gamma_mode_sections — per D5 there is no 'gamma mode',
-    just the iteration design doc structure when a prior spec exists.
+    Per fr-sd-011 (schema access via CLI), the skill MUST reference
+    scripts/lib/print-schema.js as the canonical way to obtain the
+    design-doc schema, and MUST NOT embed hand-authored section templates.
+    Replaces the old has_iteration_design_doc_sections test which asserted
+    the existence of hand-authored templates — those are exactly what we
+    want NOT to exist anymore.
     """
     text = _read_skill()
 
-    # Required sections for iteration design docs
+    # Skill must point at the CLI, not embed schema content.
+    assert "print-schema.js" in text, (
+        "Skill must reference scripts/lib/print-schema.js as the schema source"
+    )
+
+    # Skill must still describe the behavior (Context + Change Intent are named
+    # in prose) so the reader knows what to expect — but NOT as code-block templates.
     assert "Context" in text
     assert "Change Intent" in text
 
-    # Architecture Impact is optional but should be mentioned
-    assert "Architecture Impact" in text or "architecture impact" in text.lower()
+    # Specifically forbid the template that caused the 2026-04-19 bug.
+    assert "## Context (from spec v" not in text, (
+        "Skill must not embed the `## Context (from spec v<N>)` template — "
+        "schema content belongs in scripts/lib/sdd-utils.js (DESIGN_DOC_RULES)."
+    )
 
 
 def test_arc_brainstorming_forbids_pre_authored_delta():
