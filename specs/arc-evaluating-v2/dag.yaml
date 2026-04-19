@@ -78,7 +78,7 @@ epics:
       - folder-structure
     features:
       - id: ag-001
-        name: Rename eval-comparator to eval-analyzer
+        name: Complete rename to eval-analyzer
         status: pending
         source_requirement: fr-ag-001
         depends_on: []

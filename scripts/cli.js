@@ -796,7 +796,7 @@ async function main() {
 
           console.log(`A/B Comparison: ${name}`);
           if (scenario && scenario.grader !== 'code') {
-            console.log('(Using eval-comparator agent for qualitative analysis...)\n');
+            console.log('(Using eval-analyzer agent for qualitative analysis...)\n');
           }
           const comparison = eval_.compareResults(
             scenario || { grader: 'code' },
@@ -816,7 +816,25 @@ async function main() {
           if (comparison.baselineWarning) console.log(`  ${comparison.baselineWarning}`);
           if (comparison.modelAnalysis) {
             console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
-            console.log(`  Recommendation: ${comparison.modelAnalysis.recommendation || ''}`);
+            if (comparison.modelAnalysis.delta_explanation) {
+              console.log(`  Delta Explanation: ${comparison.modelAnalysis.delta_explanation}`);
+            }
+            if (
+              comparison.modelAnalysis.weak_assertions_patterns &&
+              comparison.modelAnalysis.weak_assertions_patterns.length > 0
+            ) {
+              console.log(
+                `  Weak Assertions: ${comparison.modelAnalysis.weak_assertions_patterns.join('; ')}`,
+              );
+            }
+            if (
+              comparison.modelAnalysis.variance_notes &&
+              comparison.modelAnalysis.variance_notes.length > 0
+            ) {
+              console.log(
+                `  Variance Notes: ${comparison.modelAnalysis.variance_notes.join('; ')}`,
+              );
+            }
           }
         } else if (subcommand === 'report') {
           const benchmark = eval_.generateBenchmark(projectRoot);

@@ -237,7 +237,7 @@
       tests/skills/test_skill_arc_evaluating.py and
       tests/skills/test_eval_agents_contract.py MUST continue to pass after
       v2 changes. Because fr-fs-001 moves agent files into the skill folder
-      and fr-ag-001 renames eval-comparator, test_eval_agents_contract.py
+      and fr-ag-001 completes the agent rename, test_eval_agents_contract.py
       likely needs path and name updates. Those updates are in scope; making
       the tests pass by deletion or disablement is forbidden.
     </description>

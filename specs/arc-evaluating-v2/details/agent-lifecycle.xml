@@ -2,7 +2,7 @@
 <detail id="agent-lifecycle">
   <title>Agent Rename, Scope Tightening, and New Blind Comparator</title>
   <consumes>
-    <artifact>skills/arc-evaluating/agents/eval-comparator.md (prior prompt template, post-migration from fr-fs-001)</artifact>
+    <artifact>skills/arc-evaluating/agents/eval-analyzer.md (post-rename from fr-fs-001 migration)</artifact>
     <artifact>scripts/lib/eval.js + eval-graders.js (loadAgentDef call sites)</artifact>
     <artifact>skills/arc-evaluating/SKILL.md + references/* (documentation to update)</artifact>
   </consumes>
@@ -13,24 +13,25 @@
   </produces>
 
   <requirement id="fr-ag-001">
-    <title>Rename eval-comparator to eval-analyzer</title>
+    <title>Complete the rename to eval-analyzer</title>
     <description>
-      The prompt template file currently at skills/arc-evaluating/agents/eval-comparator.md
-      (post fr-fs-001 migration) MUST be renamed to eval-analyzer.md. Every
-      loadAgentDef call site in scripts/lib/ and every documentation reference
-      in skills/arc-evaluating/SKILL.md + references/* MUST be updated to the
-      new name. The old name MUST NOT remain as a symlink, alias, or stub —
-      renaming is total.
+      The prompt template file at skills/arc-evaluating/agents/eval-analyzer.md
+      (migrated from the v1 agent file in fr-fs-001) MUST have all residual
+      references to the old v1 name removed from its body, description, and
+      surrounding documentation. Every loadAgentDef call site in scripts/lib/
+      and every documentation reference in skills/arc-evaluating/SKILL.md +
+      references/* MUST use the new name. No alias or stub referencing the
+      old v1 name may remain anywhere in the repository.
     </description>
     <acceptance_criteria>
       <criterion id="fr-ag-001-ac1">
-        After rename, skills/arc-evaluating/agents/eval-analyzer.md MUST exist
-        and skills/arc-evaluating/agents/eval-comparator.md MUST NOT exist.
+        After rename, skills/arc-evaluating/agents/eval-analyzer.md MUST exist.
+        No agent file using the prior v1 name MUST NOT exist in the repo.
         <trace>fr-ag-001</trace>
       </criterion>
       <criterion id="fr-ag-001-ac2">
         After rename, grep across the repository MUST return zero matches for
-        "eval-comparator" except in (a) CHANGELOG.md migration notes and
+        the old v1 agent name except in (a) CHANGELOG.md migration notes and
         (b) historical benchmark JSON files under evals/benchmarks/.
         <trace>fr-ag-001</trace>
       </criterion>
@@ -58,7 +59,7 @@
     <acceptance_criteria>
       <criterion id="fr-ag-002-ac1">
         The eval-analyzer.md prompt template MUST NOT contain instructions
-        asking the subagent to emit a verdict, recommendation, or SHIP-class
+        asking the subagent to emit a verdict, recommendation, or shipping-class
         decision. A grep of the prompt text for "SHIP", "NEEDS_WORK",
         "BLOCKED", "RUN_MORE", "INVESTIGATE", "INSUFFICIENT_DATA" as verdict
         tokens MUST return zero matches.

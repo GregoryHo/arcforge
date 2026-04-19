@@ -23,7 +23,7 @@ arc eval dashboard [--port N]                          # Start live dashboard (d
 - `--since` filters results by date — useful after scenario changes to exclude old data.
 - `--model` specifies which LLM to use for trial execution (not grading). Results are tagged with the model for later filtering and cross-model comparison.
 - For skill scope, `--skill-file` is required. For workflow scope, it is not needed.
-- `eval compare` auto-routes: code-graded → programmatic delta, model-graded → eval-comparator agent analysis.
+- `eval compare` auto-routes: code-graded → programmatic delta, model-graded → eval-analyzer agent analysis.
 - `eval dashboard` starts a live web dashboard at http://localhost:3333 for visual eval monitoring.
 
 ## Metrics
@@ -70,9 +70,10 @@ evals/
 | Agent | Role | Used By |
 |-------|------|---------|
 | **eval-grader** | Grade individual eval outputs against rubrics | `arc eval run` (automated, model-graded scenarios) + manual dispatch |
-| **eval-comparator** | Compare A/B results for skill/workflow evals | `arc eval compare` (automated, model/human-graded scenarios) + manual dispatch |
+| **eval-analyzer** | Post-hoc qualitative analysis of A/B results | `arc eval compare` (automated, model/human-graded scenarios) + manual dispatch |
+| **eval-blind-comparator** | Anonymized paired-preference rating of A/B outputs | Manual dispatch (auto-trigger wired in grader-blind epic) |
 
-**Important:** Numeric comparison is programmatic. The harness computes averages, `delta`, confidence intervals, and verdicts directly from saved results. `eval-comparator` adds **qualitative** analysis for model/human-graded A/B results; it does not replace the programmatic numeric verdict.
+**Important:** Numeric comparison is programmatic. The harness computes averages, `delta`, confidence intervals, and verdicts directly from saved results. `eval-analyzer` adds **qualitative** analysis for model/human-graded A/B results; it does not replace the programmatic numeric verdict.
 
 ## Scenario Template
 
