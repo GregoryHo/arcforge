@@ -92,6 +92,38 @@ describe('CLI multi-spec UX', () => {
     expect(parsed.id).toBe('epic-b1');
   });
 
+  test('merge resolves by intersection when positional epics narrow to one spec', () => {
+    // Codex P2: resolveMergeOrCleanupSpec must INTERSECT matches across epic
+    // ids, not union. `epic-only-a` lives only in spec-a; `epic-shared` in
+    // both. The command should resolve to spec-a, not fail as ambiguous.
+    writeSpec(root, 'spec-a', ['epic-only-a', 'epic-shared']);
+    writeSpec(root, 'spec-b', ['epic-shared']);
+    // We don't need a real merge — trigger resolution by invoking merge with
+    // the two positional epic ids. If resolution picks spec-b (wrong) or
+    // errors as ambiguous, the test fails. "No completed epics" is an
+    // expected downstream error — merge body runs only after resolution.
+    const { exitCode, stderr } = runCli(root, ['merge', 'epic-only-a', 'epic-shared'], {
+      expectFailure: true,
+    });
+    // Accepted outcome: resolution succeeded to spec-a (merge then fails on
+    // "epic-only-a not completed" or similar — NOT on "span multiple specs").
+    expect(stderr).not.toMatch(/span multiple specs/);
+    expect(exitCode).not.toBe(0); // merge still exits non-zero for missing-completed-epic
+  });
+
+  test('sync --direction in multi-spec mode errors out (not silent aggregate)', () => {
+    // Codex P2: ambiguous-spec branch called syncAllSpecs immediately, skipping
+    // --direction parsing/validation. `arcforge sync --direction from-base`
+    // must fail loudly in multi-spec mode, not silently aggregate.
+    writeSpec(root, 'spec-a', ['epic-a1']);
+    writeSpec(root, 'spec-b', ['epic-b1']);
+    const { exitCode, stderr } = runCli(root, ['sync', '--direction', 'from-base'], {
+      expectFailure: true,
+    });
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toMatch(/direction|--spec-id/);
+  });
+
   test('reboot with two specs returns per-spec + totals', () => {
     writeSpec(root, 'spec-a', ['epic-a1']);
     writeSpec(root, 'spec-b', ['epic-b1']);

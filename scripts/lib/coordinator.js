@@ -15,7 +15,12 @@ const { parseDagYaml, stringifyDagYaml } = require('./yaml-parser');
 const { withLock } = require('./locking');
 const { getDefaultTestCommand, getDefaultInstallCommand } = require('./package-manager');
 const { objectToYaml, normalizeStatus } = require('./dag-schema');
-const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
+const {
+  getWorktreeRoot,
+  getWorktreePath,
+  parseWorktreePath,
+  getEpicBranchName,
+} = require('./worktree-paths');
 
 // Lock timeouts for DAG transactions that include slow git operations.
 // Default withLock timeout is 5s; these accommodate heavier workloads.
@@ -320,7 +325,8 @@ class Coordinator {
           }
 
           const worktreePath = getWorktreePath(this.projectRoot, this.specId, epic.id);
-          const result = this._runGit(['worktree', 'add', worktreePath, '-b', epic.id]);
+          const branchName = getEpicBranchName(this.specId, epic.id);
+          const result = this._runGit(['worktree', 'add', worktreePath, '-b', branchName]);
           if (result.exitCode !== 0) {
             throw new Error(`Failed to create worktree for ${epic.id}: ${result.stderr.trim()}`);
           }
@@ -446,10 +452,11 @@ class Coordinator {
 
         const merged = [];
         for (const epic of epics) {
+          const branchName = getEpicBranchName(this.specId, epic.id);
           const result = this._runGit([
             'merge',
             '--no-ff',
-            epic.id,
+            branchName,
             '-m',
             `feat: integrate ${epic.id} epic`,
           ]);

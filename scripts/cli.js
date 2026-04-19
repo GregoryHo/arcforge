@@ -141,20 +141,32 @@ function resolveMergeOrCleanupSpec(projectRoot, explicitFlag, positionalEpics, c
     process.exit(1);
   }
   // Ambiguous — try to narrow via positional epic ids.
+  // Must INTERSECT: a valid parent spec contains ALL positional epics, not any.
+  // Union would report false ambiguity when a unique epic id pins the spec and
+  // a shared epic id happens to also live elsewhere.
   if (positionalEpics && positionalEpics.length > 0) {
-    const allMatches = new Set();
-    for (const epicId of positionalEpics) {
-      for (const s of findSpecsByEpic(projectRoot, epicId)) allMatches.add(s);
-    }
-    if (allMatches.size === 1) return [...allMatches][0];
-    if (allMatches.size === 0) {
+    const perEpicMatches = positionalEpics.map((id) => new Set(findSpecsByEpic(projectRoot, id)));
+    const missing = positionalEpics.filter((_id, i) => perEpicMatches[i].size === 0);
+    if (missing.length > 0) {
       console.error(
-        `Error: Epic(s) ${positionalEpics.join(', ')} not found in any spec. Pass --spec-id to be explicit.`,
+        `Error: Epic(s) ${missing.join(', ')} not found in any spec. Pass --spec-id to be explicit.`,
+      );
+      process.exit(1);
+    }
+    const intersection = perEpicMatches.reduce((acc, s) => {
+      const next = new Set();
+      for (const x of acc) if (s.has(x)) next.add(x);
+      return next;
+    });
+    if (intersection.size === 1) return [...intersection][0];
+    if (intersection.size === 0) {
+      console.error(
+        `Error: Epic(s) ${positionalEpics.join(', ')} do not share a single spec. Pass --spec-id to disambiguate.`,
       );
       process.exit(1);
     }
     console.error(
-      `Error: Epic(s) ${positionalEpics.join(', ')} span multiple specs (${[...allMatches].join(', ')}). Pass --spec-id to disambiguate.`,
+      `Error: Epic(s) ${positionalEpics.join(', ')} span multiple specs (${[...intersection].join(', ')}). Pass --spec-id to disambiguate.`,
     );
     process.exit(1);
   }
@@ -581,6 +593,15 @@ async function main() {
 
       case 'sync': {
         const spec = resolveSpecId(projectRoot, specFlag);
+        // Reject --direction in multi-spec aggregate mode — single-spec sync
+        // rejects invalid directions loudly, and silently succeeding here
+        // would hide invocation mistakes and break automation.
+        if (isAmbiguousSpec(spec) && args.options.direction) {
+          console.error(
+            'Error: --direction is not valid when syncing all specs. Pass --spec-id <id> to target one spec.',
+          );
+          process.exit(1);
+        }
         // Ambiguous base → aggregate across specs via syncAllSpecs.
         if (isAmbiguousSpec(spec)) {
           output(syncAllSpecs(projectRoot), asJson);

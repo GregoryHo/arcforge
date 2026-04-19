@@ -7,6 +7,7 @@ const {
   hashRepoPath,
   getWorktreePath,
   parseWorktreePath,
+  getEpicBranchName,
 } = require('../../scripts/lib/worktree-paths');
 
 describe('getWorktreeRoot', () => {
@@ -163,5 +164,23 @@ describe('parseWorktreePath', () => {
   it('returns null when basename does not match the expected pattern', () => {
     const bad = path.join(getWorktreeRoot(), 'nope');
     expect(parseWorktreePath(bad)).toBeNull();
+  });
+});
+
+describe('getEpicBranchName', () => {
+  it('composes branch name as <specId>/<epicId> so two specs can share an epic id', () => {
+    expect(getEpicBranchName('spec-a', 'epic-1')).toBe('spec-a/epic-1');
+    expect(getEpicBranchName('spec-b', 'epic-1')).toBe('spec-b/epic-1');
+    expect(getEpicBranchName('spec-a', 'epic-1')).not.toBe(getEpicBranchName('spec-b', 'epic-1'));
+  });
+
+  it('requires a non-empty specId (v2.0.0 breaking — no bare-epic fallback)', () => {
+    expect(() => getEpicBranchName(null, 'epic-1')).toThrow(/specId/);
+    expect(() => getEpicBranchName('', 'epic-1')).toThrow(/specId/);
+  });
+
+  it('requires a non-empty epicId', () => {
+    expect(() => getEpicBranchName('spec-a', null)).toThrow(/epicId/);
+    expect(() => getEpicBranchName('spec-a', '')).toThrow(/epicId/);
   });
 });

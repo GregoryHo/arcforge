@@ -5,6 +5,7 @@ const { execFileSync } = require('node:child_process');
 
 const { stringifyDagYaml, parseDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
+const { getEpicBranchName } = require('../../scripts/lib/worktree-paths');
 
 /** Spec id used by default fixtures — tests pass this to Coordinator. */
 const DEFAULT_SPEC_ID = 'test-spec';
@@ -65,7 +66,12 @@ function setupRepo(options = {}) {
   fs.writeFileSync(path.join(dagDir, 'dag.yaml'), stringifyDagYaml(dagData));
 
   for (const id of createBranches) {
-    runGit(['checkout', '-q', '-b', id], root);
+    // v2.0.0: epic branches are spec-scoped via getEpicBranchName to allow
+    // the same epic id across different specs. Tests build branches here
+    // (rather than via expandWorktrees) to exercise merge in isolation, but
+    // the branch name still has to match what the production code expects.
+    const branchName = getEpicBranchName(specId, id);
+    runGit(['checkout', '-q', '-b', branchName], root);
     fs.writeFileSync(path.join(root, `${id}.txt`), `${id} content\n`);
     runGit(['add', `${id}.txt`], root);
     runGit(['commit', '-q', '-m', `feat: ${id}`], root);

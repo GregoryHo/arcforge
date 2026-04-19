@@ -157,4 +157,51 @@ describe('Coordinator — cross-spec worktree path isolation', () => {
     const coordB = new Coordinator(root, 'spec-b');
     expect(coordA._resolveWorktreePath('epic-1')).not.toBe(coordB._resolveWorktreePath('epic-1'));
   });
+
+  test('expand uses spec-scoped branch name so same epic id across specs does not collide', () => {
+    // Regression guard for Codex P1: branch name `-b <epic>` was global → second
+    // expand across specs with overlapping epic ids failed. v2.0.0 scopes the
+    // branch to `<spec-id>/<epic-id>`.
+    writeSpec(root, 'spec-a', [simpleEpic('shared-epic')]);
+    writeSpec(root, 'spec-b', [simpleEpic('shared-epic')]);
+
+    // Minimal git init so `git worktree add -b` can succeed.
+    const { execFileSync } = require('node:child_process');
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 't@x'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 'T'], { cwd: root });
+    fs.writeFileSync(path.join(root, 'README.md'), 'x');
+    execFileSync('git', ['add', 'README.md'], { cwd: root });
+    execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: root });
+
+    const coordA = new Coordinator(root, 'spec-a');
+    const coordB = new Coordinator(root, 'spec-b');
+
+    try {
+      const createdA = coordA.expandWorktrees();
+      const createdB = coordB.expandWorktrees();
+      expect(createdA.map((e) => e.id)).toEqual(['shared-epic']);
+      expect(createdB.map((e) => e.id)).toEqual(['shared-epic']);
+      // Both worktrees exist without branch collision.
+      const branches = execFileSync('git', ['branch', '--list'], { cwd: root, encoding: 'utf8' });
+      expect(branches).toMatch(/spec-a\/shared-epic/);
+      expect(branches).toMatch(/spec-b\/shared-epic/);
+    } finally {
+      // Clean up created worktrees to avoid leaking ~/.arcforge/worktrees/ dirs.
+      try {
+        const list = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+          cwd: root,
+          encoding: 'utf8',
+        });
+        for (const line of list.split('\n')) {
+          if (!line.startsWith('worktree ')) continue;
+          const p = line.slice(9);
+          if (p !== root && fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
+        }
+        execFileSync('git', ['worktree', 'prune'], { cwd: root });
+      } catch {
+        /* best-effort */
+      }
+    }
+  });
 });

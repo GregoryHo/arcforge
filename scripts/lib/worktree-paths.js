@@ -140,6 +140,31 @@ function parseWorktreePath(worktreePath) {
   return { project: match[1], hash: match[2], epic: match[3] };
 }
 
+/**
+ * Compose the local git branch name for an epic worktree, scoped by spec.
+ *
+ * v2.0.0+ scopes epic branches as `<specId>/<epicId>` so the same epic id
+ * can exist in two different specs without `git worktree add -b` colliding.
+ * Slash is legal in Git branch names and groups related branches in CLI
+ * output (`git branch` shows them clustered under the spec).
+ *
+ * No bare-epic fallback (v2.0.0 breaking) — pre-migration projects go
+ * through `arcforge backfill-markers`.
+ *
+ * @param {string} specId - Spec identifier; must be non-empty.
+ * @param {string} epicId - Epic identifier; must be non-empty.
+ * @returns {string} Branch name (e.g. "spec-driven-refine/epic-001").
+ */
+function getEpicBranchName(specId, epicId) {
+  if (typeof specId !== 'string' || !specId.trim()) {
+    throw new TypeError('getEpicBranchName requires a non-empty specId string');
+  }
+  if (typeof epicId !== 'string' || !epicId.trim()) {
+    throw new TypeError('getEpicBranchName requires a non-empty epicId string');
+  }
+  return `${specId}/${epicId}`;
+}
+
 module.exports = {
   ARCFORGE_HOME_NAME,
   WORKTREE_SUBDIR,
@@ -147,4 +172,5 @@ module.exports = {
   hashRepoPath,
   getWorktreePath,
   parseWorktreePath,
+  getEpicBranchName,
 };
