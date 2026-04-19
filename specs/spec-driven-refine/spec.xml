@@ -2,12 +2,11 @@
 <spec>
   <overview>
     <spec_id>spec-driven-refine</spec_id>
-    <spec_version>2</spec_version>
+    <spec_version>1</spec_version>
     <status>active</status>
-    <supersedes>spec-driven-refine:v1</supersedes>
     <source>
-      <design_path>docs/plans/spec-driven-refine/2026-04-16-v2/design.md</design_path>
-      <design_iteration>2026-04-16-v2</design_iteration>
+      <design_path>docs/plans/spec-driven-refine/2026-04-16/design.md</design_path>
+      <design_iteration>2026-04-16</design_iteration>
     </source>
     <title>Spec-Driven Development Pipeline</title>
     <description>
@@ -33,32 +32,6 @@
         <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
       </excludes>
     </scope>
-
-    <delta version="2" iteration="2026-04-16-v2">
-      <modified ref="fr-bs-003">Remove REFINER_INPUT from the output format used when no prior spec exists</modified>
-      <modified ref="fr-bs-005">Remove structured Delta from the output format used when prior spec exists; use natural-language Change Intent only</modified>
-      <removed ref="fr-bs-007">
-        <reason>Change Type Derivation — replaced by output validation (fr-bs-007 repurposed)</reason>
-      </removed>
-      <modified ref="fr-rf-005">Consolidate the single refiner behavior, removing "initial vs iteration" mode language</modified>
-      <removed ref="fr-rf-006">
-        <reason>Separate iteration mode — merged into fr-rf-005 (one behavior, not two modes)</reason>
-      </removed>
-      <added ref="fr-rf-011">Delta metadata output — refiner writes delta element to spec overview (accumulates wiki-style per 2026-04-19 realignment, see [[arcforge-decision-sdd-v2-pipeline-realignment]])</added>
-      <added ref="fr-rf-012">DAG completion gate — refiner blocks new iteration if prior sprint has incomplete epics (introduced in 2026-04-19 realignment; gate moved here from planner.fr-pl-007 which was removed)</added>
-      <modified ref="fr-pl-001">Planner as pure function — overwrite DAG each sprint, scope by delta matching current spec_version, all four delta children generate epics, no archive, no state preservation, no gate (gate moved to refiner)</modified>
-      <removed ref="fr-cc-003">
-        <reason>Stale lint design-newer-than-spec — replaced by per-stage validation</reason>
-      </removed>
-      <removed ref="fr-cc-004">
-        <reason>Stale lint unrefined-design — replaced by per-stage validation</reason>
-      </removed>
-      <removed ref="fr-cc-005">
-        <reason>Stale lint unplanned-spec — replaced by per-stage validation</reason>
-      </removed>
-      <modified ref="fr-cc-if-004">Clarify sdd-utils.js as validation toolkit, not merge engine</modified>
-      <modified ref="fr-cc-if-005">Add three-layer rationale for planner not reading design doc</modified>
-    </delta>
   </overview>
 
   <cross_cutting>
