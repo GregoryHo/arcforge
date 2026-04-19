@@ -2,7 +2,7 @@
 <detail id="folder-structure">
   <title>Folder Consolidation</title>
   <consumes>
-    <artifact>agents/eval-grader.md, agents/eval-comparator.md (current project-root agent prompt templates)</artifact>
+    <artifact>agents/eval-grader.md, agents/eval-analyzer.md (current project-root agent prompt templates)</artifact>
     <artifact>scripts/eval-dashboard.js, scripts/eval-dashboard-ui.html (current dashboard files)</artifact>
     <artifact>scripts/lib/eval.js, scripts/lib/eval-stats.js, scripts/lib/eval-graders.js (canonical engine, non-migrated)</artifact>
     <artifact>scripts/lib/eval-graders.js — loadAgentDef() call sites that currently read from project-root agents/</artifact>
@@ -16,7 +16,7 @@
   <requirement id="fr-fs-001">
     <title>Co-locate Eval Agent Prompt Templates Inside the Skill Folder</title>
     <description>
-      The eval-grader, eval-analyzer (renamed from eval-comparator), and the new
+      The eval-grader, eval-analyzer (renamed from eval-analyzer), and the new
       eval-blind-comparator agent prompt templates MUST live under
       skills/arc-evaluating/agents/. The harness already loads these files as
       prompt templates via loadAgentDef() and execCommand('claude', ...) — it
@@ -32,14 +32,14 @@
       <criterion id="fr-fs-001-ac1">
         After migration, skills/arc-evaluating/agents/eval-grader.md,
         eval-analyzer.md, and eval-blind-comparator.md MUST exist. The old
-        project-root paths agents/eval-grader.md and agents/eval-comparator.md
+        project-root paths agents/eval-grader.md and agents/eval-analyzer.md
         MUST NOT exist.
         <trace>fr-fs-001</trace>
       </criterion>
       <criterion id="fr-fs-001-ac2">
         scripts/lib/eval-graders.js MUST read the prompt templates via the new
         skill-folder paths. A grep for "agents/eval-grader.md" or
-        "agents/eval-comparator.md" in scripts/lib/ MUST return zero matches
+        "agents/eval-analyzer.md" in scripts/lib/ MUST return zero matches
         after migration.
         <trace>fr-fs-001</trace>
       </criterion>

@@ -157,6 +157,7 @@ Full catalog (23 entries): `skills/arc-evaluating/references/common-mistakes-cat
 | Agent | Role |
 |-------|------|
 | **eval-grader** | Grade individual trial outputs against rubrics (model-graded scenarios) |
-| **eval-comparator** | Qualitative A/B analysis for model/human-graded results |
+| **eval-analyzer** | Post-hoc qualitative A/B analysis for model/human-graded results |
+| **eval-blind-comparator** | Anonymized paired-preference rating of A/B outputs |
 
 Numeric comparison (delta, CI, verdict) is programmatic — computed by the harness. These agents add qualitative analysis, not numeric computation.

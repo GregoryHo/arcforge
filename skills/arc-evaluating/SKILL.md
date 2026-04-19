@@ -219,6 +219,6 @@ Top mistakes that waste the most eval runs. Full catalog (23 entries) in `refere
 - **arc-evaluating** results inform whether to SHIP or iterate
 - Track benchmarks over time in `evals/benchmarks/latest.json`
 
-**Numeric vs qualitative analysis:** Numeric comparison (delta, CI, verdict) is programmatic — the harness computes it. The `eval-comparator` agent adds qualitative analysis for model/human-graded A/B results; it does not replace the programmatic verdict.
+**Numeric vs qualitative analysis:** Numeric comparison (delta, CI, verdict) is programmatic — the harness computes it. The `eval-analyzer` agent adds qualitative analysis for model/human-graded A/B results; it does not replace the programmatic verdict.
 
 **Reference files:** `references/cli-and-metrics.md` (CLI commands, metrics, storage, scenario template, agents), `references/grading-and-execution.md` (environment, isolation, graders, tracking), `references/common-mistakes-catalog.md` (full 23-entry mistake catalog)

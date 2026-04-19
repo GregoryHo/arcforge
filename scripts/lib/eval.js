@@ -996,7 +996,7 @@ function ensureEvalsDir(projectRoot) {
 /**
  * Compare baseline vs treatment results, routing by grader type.
  * Code-graded scenarios get fast programmatic delta.
- * Model/human-graded scenarios also get eval-comparator agent analysis.
+ * Model/human-graded scenarios also get eval-analyzer agent analysis.
  * @param {EvalScenario} scenario - Eval scenario
  * @param {TrialResult[]} baseline - Baseline results
  * @param {TrialResult[]} treatment - Treatment results
