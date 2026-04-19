@@ -596,6 +596,41 @@ async function main() {
           if (remediation) console.log(`${label}Remediation: ${remediation}`);
           const warning = eval_.confidenceWarning(baseline) || eval_.confidenceWarning(treatment);
           if (warning) console.log(`${label}${warning}`);
+
+          // Token and duration deltas (fr-gr-002)
+          const metricDeltas = eval_.computeMetricDeltas(baseline, treatment);
+          const fmtMetricDelta = (name, delta, bMean, tMean, regression) => {
+            if (delta === null) return null;
+            const sign = delta > 0 ? '+' : '';
+            const bStr = bMean !== null ? bMean.toFixed(0) : 'n/a';
+            const tStr = tMean !== null ? tMean.toFixed(0) : 'n/a';
+            const flag = regression ? ' [!] COST REGRESSION' : '';
+            return `${label}${name}: ${sign}${delta.toFixed(0)} (baseline: ${bStr}, treatment: ${tStr})${flag}`;
+          };
+          const durationLine = fmtMetricDelta(
+            'Duration (ms)',
+            metricDeltas.durationDelta,
+            metricDeltas.baselineMeans.duration_ms,
+            metricDeltas.treatmentMeans.duration_ms,
+            metricDeltas.durationRegression,
+          );
+          const inputLine = fmtMetricDelta(
+            'Input tokens',
+            metricDeltas.inputTokensDelta,
+            metricDeltas.baselineMeans.input_tokens,
+            metricDeltas.treatmentMeans.input_tokens,
+            metricDeltas.inputTokensRegression,
+          );
+          const outputLine = fmtMetricDelta(
+            'Output tokens',
+            metricDeltas.outputTokensDelta,
+            metricDeltas.baselineMeans.output_tokens,
+            metricDeltas.treatmentMeans.output_tokens,
+            metricDeltas.outputTokensRegression,
+          );
+          if (durationLine) console.log(durationLine);
+          if (inputLine) console.log(inputLine);
+          if (outputLine) console.log(outputLine);
         };
 
         if (subcommand === 'list') {
