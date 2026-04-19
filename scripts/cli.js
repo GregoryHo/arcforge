@@ -17,10 +17,13 @@
  *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N] [--model <name>] [--no-isolate] [--plugin-dir <path>] [--max-turns N]
+ *   eval preflight <name>            Run baseline trials to check scenario discriminability
+ *   eval lint <name>                 Validate scenario file structure
  *   eval report [name] [--model <name>]       Show eval benchmark report
  *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
+ *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
@@ -304,12 +307,15 @@ COMMANDS:
       --no-isolate   Run without isolation (default: isolated)
       --plugin-dir   Plugin directory for semi-isolated mode
       --max-turns    Max turns for Claude CLI (overrides scenario)
-  eval ab <name> [--skill-file path] A/B skill/workflow eval
+  eval preflight <name>              Run baseline trials to check scenario discriminability
+  eval lint <name>                   Validate scenario file (sections, assertion shape)
+  eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
       --plugin-dir   Plugin directory for treatment trials
       --max-turns    Max turns for treatment trials (overrides scenario)
   eval compare <name>                Compare A/B results
   eval report [name]                 Benchmark report
   eval history                       List benchmark snapshots
+  eval audit [--top N]               Audit grading history for promotion/retirement candidates
   eval dashboard [--port N]          Live web dashboard (default: 3333)
 
   research dashboard [--results path] [--config path] [--port N]
@@ -707,8 +713,116 @@ async function main() {
             .slice(-k);
           const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
           console.log(`Verdict: ${eval_.getVerdict(results, verdictOpts)}`);
+        } else if (subcommand === 'preflight') {
+          const scenarioName = args.positional[1];
+          if (!scenarioName) {
+            console.error('Error: eval preflight requires a scenario name');
+            process.exit(1);
+          }
+          const { runPreflight } = require('./lib/eval-preflight');
+          const model = args.options.model;
+
+          // Resolve scenario for trial execution
+          const scenario = eval_.findScenario(scenarioName, projectRoot);
+          if (!scenario) {
+            console.error(`Error: scenario "${scenarioName}" not found`);
+            process.exit(1);
+          }
+
+          console.log(`Running preflight for "${scenarioName}"...`);
+          const runId = generateRunId();
+
+          const stubRunTrial = (t, totalK) =>
+            eval_.runTrial(scenario, t, totalK, {
+              projectRoot,
+              model,
+              runId,
+              isolated: true,
+            });
+          const stubGrade = (result, _t) =>
+            eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+
+          const outcome = runPreflight(scenarioName, projectRoot, {
+            runTrial: stubRunTrial,
+            gradeResult: stubGrade,
+          });
+
+          console.log(`Verdict: ${outcome.verdict}`);
+          console.log(`Reason:  ${outcome.reason}`);
+          console.log(`Hash:    ${outcome.scenario_hash}`);
+          if (outcome.verdict === 'BLOCK') {
+            process.exit(1);
+          }
+        } else if (subcommand === 'lint') {
+          const scenarioName = args.positional[1];
+          if (!scenarioName) {
+            console.error('Error: eval lint requires a scenario name');
+            process.exit(1);
+          }
+          const { lintScenario, formatDiagnostics } = require('./lib/eval-lint');
+
+          const scenarioFile = path.join(projectRoot, 'evals', 'scenarios', `${scenarioName}.md`);
+          if (!fs.existsSync(scenarioFile)) {
+            console.error(`Error: scenario file not found: ${scenarioFile}`);
+            process.exit(1);
+          }
+
+          const diagnostics = lintScenario(scenarioFile);
+          if (diagnostics.length === 0) {
+            console.log(`${scenarioName}: ok`);
+          } else {
+            for (const line of formatDiagnostics(diagnostics)) {
+              console.error(line);
+            }
+            process.exit(1);
+          }
+        } else if (subcommand === 'audit') {
+          const { runAudit } = require('./lib/eval-audit');
+          const topN = args.options.top ? parseInt(args.options.top, 10) : 10;
+
+          const result = runAudit(projectRoot);
+          console.log(`Eval Audit — ${result.trialCount} graded trials\n`);
+
+          if (result.promotionCandidates.length === 0 && result.retirementCandidates.length === 0) {
+            console.log(
+              'No candidates found. Run more evals with model grading to accumulate data.',
+            );
+          } else {
+            const promo = result.promotionCandidates.slice(0, topN);
+            if (promo.length > 0) {
+              console.log('## Promotion Candidates (frequent + failing claims)');
+              for (const c of promo) {
+                console.log(
+                  `  [${c.hash}] freq=${c.frequency} fail_rate=${(c.failure_rate * 100).toFixed(0)}% score=${c.score.toFixed(1)}`,
+                );
+                console.log(`    "${c.text}"`);
+                console.log(`    scenarios: ${c.scenarios.join(', ')}`);
+              }
+              console.log('');
+            }
+
+            const retire = result.retirementCandidates.slice(0, topN);
+            if (retire.length > 0) {
+              console.log('## Retirement Candidates (repeatedly weak assertions)');
+              for (const c of retire) {
+                console.log(
+                  `  ${c.assertion_id} [${c.hash}] freq=${c.frequency} across ${c.scenario_count} scenario(s)`,
+                );
+                console.log(`    scenarios: ${c.scenarios.join(', ')}`);
+              }
+            }
+          }
         } else if (subcommand === 'ab') {
           const scenario = requireScenario(args.positional[1], 'ab');
+
+          // Preflight gate: require a PASS preflight before running A/B eval
+          const { checkPreflightGate } = require('./lib/eval-preflight');
+          const gateError = checkPreflightGate(scenario.name, projectRoot);
+          if (gateError) {
+            console.error(`Error: ${gateError}`);
+            process.exit(1);
+          }
+
           const k = parseK(scenario, true);
           const interleave = !!args.flags.interleave;
           const pluginDir = args.options['plugin-dir'];
@@ -903,7 +1017,9 @@ async function main() {
           const port = args.options.port ? parseInt(args.options.port, 10) : 3333;
           startServer(projectRoot, { port });
         } else {
-          console.error('Usage: arc eval [list|run|ab|compare|report|history|dashboard]');
+          console.error(
+            'Usage: arc eval [list|run|preflight|lint|ab|compare|report|history|audit|dashboard]',
+          );
           process.exit(1);
         }
         break;
