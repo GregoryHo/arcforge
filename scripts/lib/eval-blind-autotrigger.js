@@ -107,8 +107,7 @@ function runBlindAutoTrigger(scenario, baseline, treatment, projectRoot, opts = 
     // Skip with a note
     return {
       skipped: true,
-      skipNote:
-        'Blind comparator skipped: scenario mixes code-graded and model-graded assertions.',
+      skipNote: 'Blind comparator skipped: scenario mixes code-graded and model-graded assertions.',
     };
   }
 

@@ -286,14 +286,7 @@ describe('blind result persistence', () => {
 
     saveBlindResults(scenarioName, runId, preferences, tempDir);
 
-    const expectedPath = path.join(
-      tempDir,
-      'evals',
-      'results',
-      scenarioName,
-      runId,
-      'blind.json',
-    );
+    const expectedPath = path.join(tempDir, 'evals', 'results', scenarioName, runId, 'blind.json');
     expect(fs.existsSync(expectedPath)).toBe(true);
   });
 });

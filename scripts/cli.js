@@ -890,10 +890,16 @@ async function main() {
           const { runBlindAutoTrigger } = require('./lib/eval-blind-autotrigger');
           const skillFile = args.options['skill-file'] || scenario.target;
           const skillName = skillFile ? path.basename(skillFile, '.md') : undefined;
-          const blindResult = runBlindAutoTrigger(scenario, result.baseline, result.treatment, projectRoot, {
-            runId,
-            skillName,
-          });
+          const blindResult = runBlindAutoTrigger(
+            scenario,
+            result.baseline,
+            result.treatment,
+            projectRoot,
+            {
+              runId,
+              skillName,
+            },
+          );
           if (!blindResult.skipped) {
             const pr = blindResult.preferenceRate;
             const total = pr.total;

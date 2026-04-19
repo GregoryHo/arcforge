@@ -78,4 +78,59 @@ Results stored in `evals/results/` as JSONL (gitignored):
 {"eval": "skill-tdd-compliance", "trial": 1, "k": 5, "passed": true, "grader": "model", "score": 1.0, "timestamp": "2026-03-17T10:00:00Z"}
 ```
 
-See `references/cli-and-metrics.md` for storage layout and metric formulas.
+See **REQUIRED BACKGROUND:** references/cli-and-metrics.md for storage layout and metric formulas.
+
+## Grader Output Schemas
+
+The eval-grader agent populates two additional fields in the grading output beyond the standard `scores` and `overall`. These fields accumulate into the audit corpus and drive the promotion/retirement workflow (see **REQUIRED BACKGROUND:** references/audit-workflow.md).
+
+### discovered_claims[]
+
+Behaviors observed during grading that the grader identified as noteworthy — patterns the agent exhibited that may warrant canonicalization into the skill body. Each entry:
+
+```json
+{
+  "text": "Agent explicitly checked whether baseline scenario had discriminative traps before proceeding",
+  "category": "process",
+  "passed": true,
+  "evidence": "Line 42 of transcript: 'I need to verify the scenario has a trap...' — agent paused to validate scenario design"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | Human-readable description of the observed behavior |
+| `category` | enum | One of `factual`, `process`, `quality` |
+| `passed` | boolean | Whether the observed behavior matched expectations |
+| `evidence` | string | Verbatim quote or reference to transcript supporting the claim |
+
+**Category definitions:**
+- `factual` — The claim is about a verifiable fact (a file exists, a value was computed correctly, an output matches a known correct answer).
+- `process` — The claim is about how the agent went about the task (methodology, sequencing, decision-making steps).
+- `quality` — The claim is about the caliber of the output (clarity, completeness, correctness of reasoning, depth of analysis).
+
+Promotion candidates for `arc eval audit` come from `discovered_claims` entries where `passed: true` appears consistently across multiple trials. An agent cannot self-promote a discovered claim — human arbitration is required (see references/audit-workflow.md).
+
+### weak_assertions[]
+
+Assertions flagged during grading as poorly specified, ambiguous, or non-discriminative. These are signals that the assertion itself needs redesign, independent of whether the agent passed or failed. Each entry:
+
+```json
+{
+  "assertion_id": "A2",
+  "reason": "Assertion checks that 'output is clear' without specifying what clarity means in this context — any output could be argued to satisfy this"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `assertion_id` | string | Label matching the assertion in the scenario (e.g., `A1`, `A2`, or the assertion text) |
+| `reason` | string | Explanation of why the assertion is weak — what makes it ambiguous, non-discriminative, or unverifiable |
+
+Common reasons for weak assertions:
+- Circular: assertion restates the task description without specifying what a passing response looks like
+- Ambiguous scope: assertion could be satisfied by vastly different outputs depending on interpretation
+- Competence proxy: assertion tests generic agent competence rather than skill-specific behavior
+- Format proxy: assertion checks structure (valid JSON, required fields) but not semantic quality
+
+A high rate of `weak_assertions` across trials indicates the scenario needs redesign. Retirement candidates for `arc eval audit` surface when the same assertion consistently appears in `weak_assertions` across 3+ trials.
