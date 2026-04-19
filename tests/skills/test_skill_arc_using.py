@@ -51,6 +51,21 @@ def test_arc_using_has_flowchart():
     assert "```dot" in content or "digraph" in content
 
 
+def test_arc_using_routing_table_has_arc_evaluating_row():
+    """Test the routing table includes arc-evaluating as a discipline skill (fr-vr-002)."""
+    skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
+    content = skill_path.read_text()
+
+    # The row must appear in the Discipline Skills routing table
+    assert "arc-evaluating" in content
+
+    # The Iron Law must mention INSUFFICIENT_DATA
+    assert "INSUFFICIENT_DATA" in content
+
+    # The condition must mention shipping/merging/completing
+    assert "ship" in content.lower() or "merge" in content.lower() or "complete" in content.lower()
+
+
 def test_arc_using_file_artifacts_are_per_spec():
     """SDD v2: the "File artifacts = truth" block must name per-spec paths.
 
