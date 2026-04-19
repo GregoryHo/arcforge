@@ -13,6 +13,7 @@ const path = require('node:path');
 const eval_ = require('../../../scripts/lib/eval');
 const stats = require('../../../scripts/lib/eval-stats');
 const { classifyAssertions } = require('../../../scripts/lib/eval-graders');
+const { sanitizeFilename } = require('../../../scripts/lib/utils');
 
 // ── SSE Client Management ────────────────────────────────────
 
@@ -284,6 +285,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   const delta = stats.computeDelta(baseline, treatment);
   const deltaCi = stats.ciForDelta(baseline, treatment);
   const verdict = stats.verdictFromDeltaCI(baseline, treatment);
+  const metricDeltas = stats.computeMetricDeltas(baseline, treatment);
 
   sendJson(res, {
     scenario: scenarioName,
@@ -292,6 +294,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
     delta: stats.round2(delta),
     deltaCi,
     verdict,
+    metricDeltas,
   });
 }
 
@@ -357,6 +360,83 @@ function handleApiScenario(res, projectRoot, name) {
   });
 }
 
+// ── Feedback Handlers ─────────────────────────────────────────
+
+/**
+ * Validate that scenario and runId are safe path components.
+ * Returns an error message if invalid, null if valid.
+ * @param {string} scenario
+ * @param {string} runId
+ * @returns {string|null}
+ */
+function validateFeedbackComponents(scenario, runId) {
+  if (!scenario || !runId) return 'Missing required fields: scenario and runId';
+  try {
+    sanitizeFilename(scenario);
+    sanitizeFilename(runId);
+  } catch (err) {
+    return err.message;
+  }
+  return null;
+}
+
+function feedbackFilePath(projectRoot, scenario, runId) {
+  return path.join(projectRoot, eval_.RESULTS_DIR, scenario, runId, 'feedback.json');
+}
+
+function handleGetFeedback(res, projectRoot, query) {
+  const { scenario, runId } = query;
+  const err = validateFeedbackComponents(scenario, runId);
+  if (err) return sendError(res, 400, err);
+
+  const fPath = feedbackFilePath(projectRoot, scenario, runId);
+  if (!fs.existsSync(fPath)) return sendJson(res, {});
+
+  try {
+    sendJson(res, JSON.parse(fs.readFileSync(fPath, 'utf8')));
+  } catch {
+    sendJson(res, {});
+  }
+}
+
+function handlePostFeedback(req, res, projectRoot) {
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', () => {
+    let body;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch {
+      return sendError(res, 400, 'Invalid JSON body');
+    }
+
+    const { scenario, runId, trialId, feedback } = body;
+    if (!trialId || feedback === undefined) {
+      return sendError(res, 400, 'Missing required fields: trialId and feedback');
+    }
+
+    const err = validateFeedbackComponents(scenario, runId);
+    if (err) return sendError(res, 400, err);
+
+    const fPath = feedbackFilePath(projectRoot, scenario, runId);
+    const dir = path.dirname(fPath);
+    fs.mkdirSync(dir, { recursive: true });
+
+    let existing = {};
+    if (fs.existsSync(fPath)) {
+      try {
+        existing = JSON.parse(fs.readFileSync(fPath, 'utf8'));
+      } catch {
+        existing = {};
+      }
+    }
+    existing[trialId] = feedback;
+    existing.last_saved = new Date().toISOString();
+    fs.writeFileSync(fPath, JSON.stringify(existing, null, 2));
+    sendJson(res, { ok: true });
+  });
+}
+
 // ── Router ────────────────────────────────────────────────────
 
 function createRouter(projectRoot, cachedHtml) {
@@ -364,6 +444,7 @@ function createRouter(projectRoot, cachedHtml) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathname = url.pathname;
     const query = Object.fromEntries(url.searchParams);
+    const method = req.method || 'GET';
 
     if (pathname === '/' || pathname === '/index.html') {
       return sendHtml(res, cachedHtml);
@@ -392,6 +473,11 @@ function createRouter(projectRoot, cachedHtml) {
     }
 
     if (pathname === '/api/transcript') return handleApiTranscript(res, projectRoot, query);
+
+    if (pathname === '/feedback') {
+      if (method === 'POST') return handlePostFeedback(req, res, projectRoot);
+      return handleGetFeedback(res, projectRoot, query);
+    }
 
     sendError(res, 404, 'Not found');
   };
@@ -435,4 +521,4 @@ function startServer(projectRoot, options = {}) {
   process.on('SIGTERM', shutdown);
 }
 
-module.exports = { startServer, createRouter, handleApiTranscript };
+module.exports = { startServer, createRouter, handleApiTranscript, sseClients, addSseClient };
