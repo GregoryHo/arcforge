@@ -13,8 +13,6 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 
 **REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/design.md` before producing any design doc — it defines the conditional-section contract the refiner will consume (prose for "no prior spec" docs; Context + Change Intent for "prior spec exists" docs). Same schema, both branches.
 
-**Authoritative decisions:** SDD v2 pipeline behavior (including the forbidden pre-authored delta section) is set by `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
-
 ## When NOT to Use
 
 - Requirements are already clear and documented
@@ -157,7 +155,7 @@ Reference: specs/<spec-id>/spec.xml v<N>
 <How changes interact with existing design. Omit for simple isolated changes.>
 ```
 
-**Forbidden:** No pre-authored structured delta section. Do not write a `## Added / Modified / Removed` list — the refiner derives the delta itself per the realigned pipeline (per `[[arcforge-decision-sdd-v2-pipeline-realignment]]` D3).
+**Forbidden:** No pre-authored structured delta section. Do not write a `## Added / Modified / Removed` list — the refiner derives the delta itself from your Change Intent prose.
 
 Validate before writing to disk:
 

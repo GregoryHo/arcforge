@@ -15,8 +15,6 @@ No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No 
 - `scripts/lib/sdd-schemas/spec.md` — read before producing any spec.xml; covers identity header + multi-delta accumulation rules.
 - `references/spec-structure.md` — field tables for identity header, per-spec directory layout, detail-file requirement rules. Load when about to write files in Phase 5.
 
-**Authoritative decisions:** The DAG completion gate (in refiner, not planner), wiki-style delta accumulation, terminal-only block behavior, and no-escape-hatch rule all derive from `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
-
 ## Overview
 
 Transform design documents into structured XML specifications. The spec becomes Source of Truth — downstream skills read it directly, never the design doc. The refiner is the central transformation: raw source (design.md) → live contract (spec.xml).
@@ -71,7 +69,7 @@ Three outcomes:
 2. **All epics in `"completed"` status** → proceed with the new iteration.
 3. **Any epic NOT in `"completed"` status** → **BLOCK**. Print the incomplete epic list to terminal, print "Complete current sprint before iterating.", exit non-zero. Write no files (no `spec.xml`, no `details/`, no report).
 
-### No escape hatch (fr-rf-012-ac5)
+### No escape hatch
 
 When the gate blocks, the user has exactly two paths forward:
 
@@ -126,9 +124,7 @@ Ask at least 2–3 clarifying questions based on gaps or ambiguities found.
 
 Build the complete `spec.xml` and all `specs/<spec-id>/details/*.xml` **in memory** before writing any file to disk. This is the two-pass write pattern: build in memory → validate → write atomically only if valid.
 
-**Before drafting, load `references/spec-structure.md`** for the identity header field table, per-spec directory layout, detail-file requirement rules, and the "unchanged requirements" rule. Those field-level tables moved out of this SKILL.md — they are reference material, not decision logic. The schema authority is still `scripts/lib/sdd-schemas/spec.md` (what `validateSpecHeader` enforces).
-
-The decision-logic rules below stay in SKILL.md because they are load-bearing behavior (wiki-style delta accumulation, version increment semantics on iteration).
+Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
 
 ### Version Increment (when prior spec exists)
 
@@ -171,8 +167,6 @@ Rules for the **new** (current sprint's) delta:
 For the first formalization (no prior spec): no `<delta>` element. Its absence signals "plan all requirements" to the planner.
 
 For v2+: the new delta is appended after the prior delta(s). The resulting sequence MUST be ordered ascending by `version`. Both `parsed.deltas` (full array) and `parsed.latest_delta` (highest version) are exposed by `parseSpecHeader` for downstream consumers.
-
-Per-spec directory structure, detail-file requirement rules, and the "unchanged requirements" rule live in `references/spec-structure.md`.
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 

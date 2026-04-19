@@ -29,11 +29,7 @@ Every `specs/<spec-id>/spec.xml` must have an `<overview>` identity header with:
 | `supersedes` | required for v2+; format: `<spec-id>:v<previous-version>` |
 | `scope` | `<includes>` with `<feature id="...">` elements; `<excludes>` recommended |
 
-### Version Increment (when prior spec exists)
-
-- `spec_version` = previous version + 1
-- `supersedes` = `<spec-id>:v<previous-version>`
-- `source/design_path` and `source/design_iteration` point to the NEW design doc
+Version-increment semantics on iteration (spec_version bump, supersedes format, where source/* points) are **decision logic** and live in `arc-refining/SKILL.md` Phase 5, not here.
 
 ---
 
@@ -73,10 +69,4 @@ Requirements NOT affected by the design doc's Change Intent MUST remain unchange
 
 ## Authoritative source
 
-Anything this reference says is subordinate to:
-
-1. `scripts/lib/sdd-schemas/spec.md` — the canonical schema doc, enforced by `validateSpecHeader` in `sdd-utils.js`.
-2. `specs/spec-driven-refine/details/refiner.xml` — the requirements this refiner satisfies.
-3. `[[arcforge-decision-sdd-v2-pipeline-realignment]]` — the authoritative decision record for pipeline behavior.
-
-If this reference contradicts any of the three, fix this reference.
+Anything this reference says is subordinate to `scripts/lib/sdd-schemas/spec.md` — the canonical schema doc enforced by `validateSpecHeader` in `sdd-utils.js`. If this file and the schema disagree, the schema wins.

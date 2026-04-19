@@ -13,8 +13,6 @@ No state preservation. No archive. No gate. No reading the design doc. Overwrite
 
 **REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/spec.md` before building any `dag.yaml` — you need to know the `<delta>` element structure (multi-delta accumulation, four child types with epic semantics) to correctly extract sprint scope from the current `spec_version`'s delta.
 
-**Authoritative decisions:** Planner's pure-function framing, no-archive rule, no-gate rule, and four-delta-child-to-epic mapping all derive from `[[arcforge-decision-sdd-v2-pipeline-realignment]]` in the Obsidian vault. Refer there when a trade-off question arises that this skill doesn't answer.
-
 ## Overview
 
 Convert a spec into an executable DAG with epic/feature breakdown. The DAG is a derived view, rebuilt from scratch each sprint, never archived:
@@ -92,7 +90,7 @@ Read `parsed.latest_delta` — the delta whose `version` equals the current `spe
 | `<removed ref="X"><reason>...</reason></removed>` | **Teardown epic.** Implementer LLM greps the codebase for X and removes tied code. The `<reason>` and optional `<migration>` from the delta inform teardown approach (security removal → strict; deprecation with consumers → leave shim). X no longer exists in current detail files; the epic references it as a removed id. | `X` (removed — flag the epic as a teardown epic so implementer skips spec lookup and works from delta context) |
 | `<renamed ref_old="X" ref_new="Y">` | **Mechanical refactor epic.** Grep + replace refs from X to Y across the codebase. Body unchanged — semantic changes are forbidden in `<renamed>`. | `Y` (the new id; Y exists in current detail files) |
 
-### Pure-teardown sprint is legal (D8)
+### Pure-teardown sprint is legal
 
 A `<delta>` containing only `<removed>` children — a deprecation sprint, compliance teardown, or legacy cleanup — is a legitimate sprint. The planner does NOT inspect the *shape* of a delta (no "must contain at least one `<added>`" check). It enforces per-child correctness only. Emit teardown epics and proceed.
 
