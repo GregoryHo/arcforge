@@ -486,4 +486,215 @@ describe('dashboard', () => {
       expect(data.results[0].assertionScores).toEqual([1, 0, 1, 1]);
     });
   });
+
+  // ── fr-dash-002: POST /feedback ─────────────────────────────────
+
+  describe('POST /feedback — auto-saving feedback', () => {
+    function mockPostReqRes(url, body) {
+      let closeHandler = null;
+      const res = {
+        statusCode: null,
+        headers: {},
+        body: '',
+        writeHead(status, headers) {
+          this.statusCode = status;
+          this.headers = headers || {};
+        },
+        end(b) {
+          this.body = b || '';
+        },
+        write() {},
+        on(event, fn) {
+          if (event === 'close') closeHandler = fn;
+        },
+      };
+      const bodyBuf = Buffer.from(JSON.stringify(body));
+      const req = {
+        url,
+        method: 'POST',
+        headers: { host: 'localhost:3333', 'content-type': 'application/json', 'content-length': String(bodyBuf.length) },
+        _body: bodyBuf,
+      };
+      return { req, res, triggerClose: () => closeHandler && closeHandler() };
+    }
+
+    function callPostRouter(router, url, body) {
+      const { req, res } = mockPostReqRes(url, body);
+      // Simulate streaming body
+      let dataHandler = null;
+      let endHandler = null;
+      req.on = (event, fn) => {
+        if (event === 'data') dataHandler = fn;
+        if (event === 'end') endHandler = fn;
+      };
+      router(req, res);
+      if (dataHandler) dataHandler(req._body);
+      if (endHandler) endHandler();
+      return {
+        status: res.statusCode,
+        json: () => JSON.parse(res.body),
+        text: () => res.body,
+      };
+    }
+
+    it('should write feedback.json for a valid trial', () => {
+      const router = createRouter(tempDir, '');
+      const result = callPostRouter(router, '/feedback', {
+        scenario: 'test-eval',
+        runId: '20260320-100000',
+        trialId: 'trial-1',
+        feedback: 'This response is good.',
+      });
+      expect(result.status).toBe(200);
+      const feedbackPath = path.join(
+        tempDir,
+        RESULTS_DIR,
+        'test-eval',
+        '20260320-100000',
+        'feedback.json',
+      );
+      expect(fs.existsSync(feedbackPath)).toBe(true);
+      const saved = JSON.parse(fs.readFileSync(feedbackPath, 'utf8'));
+      expect(saved['trial-1']).toBe('This response is good.');
+      expect(saved.last_saved).toBeDefined();
+    });
+
+    it('should merge feedback for multiple trials without overwriting', () => {
+      const router = createRouter(tempDir, '');
+      callPostRouter(router, '/feedback', {
+        scenario: 'test-eval',
+        runId: '20260320-100000',
+        trialId: 'trial-1',
+        feedback: 'First trial feedback.',
+      });
+      callPostRouter(router, '/feedback', {
+        scenario: 'test-eval',
+        runId: '20260320-100000',
+        trialId: 'trial-2',
+        feedback: 'Second trial feedback.',
+      });
+      const feedbackPath = path.join(
+        tempDir,
+        RESULTS_DIR,
+        'test-eval',
+        '20260320-100000',
+        'feedback.json',
+      );
+      const saved = JSON.parse(fs.readFileSync(feedbackPath, 'utf8'));
+      expect(saved['trial-1']).toBe('First trial feedback.');
+      expect(saved['trial-2']).toBe('Second trial feedback.');
+    });
+
+    it('should reject path traversal in scenario', () => {
+      const router = createRouter(tempDir, '');
+      const result = callPostRouter(router, '/feedback', {
+        scenario: '../evil',
+        runId: '20260320-100000',
+        trialId: 'trial-1',
+        feedback: 'Bad input.',
+      });
+      expect(result.status).toBe(400);
+    });
+
+    it('should reject path traversal in runId', () => {
+      const router = createRouter(tempDir, '');
+      const result = callPostRouter(router, '/feedback', {
+        scenario: 'test-eval',
+        runId: '../../etc',
+        trialId: 'trial-1',
+        feedback: 'Bad input.',
+      });
+      expect(result.status).toBe(400);
+    });
+
+    it('should return 400 when required fields are missing', () => {
+      const router = createRouter(tempDir, '');
+      const result = callPostRouter(router, '/feedback', {
+        scenario: 'test-eval',
+        // runId missing
+        trialId: 'trial-1',
+        feedback: 'Bad input.',
+      });
+      expect(result.status).toBe(400);
+    });
+  });
+
+  // ── fr-dash-002: GET /feedback ──────────────────────────────────
+
+  describe('GET /feedback — feedback restoration', () => {
+    it('should return existing feedback.json for a run', () => {
+      const feedbackDir = path.join(tempDir, RESULTS_DIR, 'fb-eval', '20260320-100000');
+      fs.mkdirSync(feedbackDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(feedbackDir, 'feedback.json'),
+        JSON.stringify({ 'trial-1': 'Prior feedback', last_saved: '2026-04-01T00:00:00Z' }),
+      );
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/feedback?scenario=fb-eval&runId=20260320-100000');
+      expect(result.status).toBe(200);
+      const data = result.json();
+      expect(data['trial-1']).toBe('Prior feedback');
+    });
+
+    it('should return empty object when no feedback.json exists', () => {
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/feedback?scenario=nonexistent&runId=run-1');
+      expect(result.status).toBe(200);
+      expect(result.json()).toEqual({});
+    });
+
+    it('should reject path traversal in GET /feedback', () => {
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/feedback?scenario=../evil&runId=run-1');
+      expect(result.status).toBe(400);
+    });
+  });
+
+  // ── fr-dash-004: SSE subscription cleanup ──────────────────────
+
+  describe('SSE subscription cleanup (fr-dash-004-ac3)', () => {
+    it('should remove client on disconnect', () => {
+      const { sseClients, addSseClient } = require('../eval-dashboard');
+      const countBefore = sseClients.size;
+      let closeFn = null;
+      const fakeRes = {
+        writeHead() {},
+        write() {},
+        end() {},
+        on(event, fn) {
+          if (event === 'close') closeFn = fn;
+        },
+      };
+      addSseClient(fakeRes);
+      expect(sseClients.size).toBe(countBefore + 1);
+      closeFn(); // simulate client disconnect
+      expect(sseClients.size).toBe(countBefore);
+    });
+  });
+
+  // ── fr-dash-001: /api/compare includes metric deltas ───────────
+
+  describe('GET /api/compare/:name — metric deltas (fr-dash-001-ac3)', () => {
+    it('should include metricDeltas when results carry duration_ms and tokens', () => {
+      writeResult(tempDir, 'metrics-eval', '20260320-100000', 'baseline', [
+        { eval: 'metrics-eval-baseline', trial: 1, k: 2, passed: true, score: 0.8, grader: 'code', timestamp: '2026-03-20T10:00:00Z', duration_ms: 1000, input_tokens: 100, output_tokens: 50 },
+        { eval: 'metrics-eval-baseline', trial: 2, k: 2, passed: true, score: 0.8, grader: 'code', timestamp: '2026-03-20T10:00:01Z', duration_ms: 2000, input_tokens: 200, output_tokens: 80 },
+      ]);
+      writeResult(tempDir, 'metrics-eval', '20260320-100000', 'treatment', [
+        { eval: 'metrics-eval-treatment', trial: 1, k: 2, passed: true, score: 1.0, grader: 'code', timestamp: '2026-03-20T10:00:02Z', duration_ms: 1500, input_tokens: 120, output_tokens: 60 },
+        { eval: 'metrics-eval-treatment', trial: 2, k: 2, passed: true, score: 1.0, grader: 'code', timestamp: '2026-03-20T10:00:03Z', duration_ms: 2500, input_tokens: 220, output_tokens: 90 },
+      ]);
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/compare/metrics-eval');
+      const data = result.json();
+
+      expect(data.metricDeltas).toBeDefined();
+      // baseline mean duration = 1500ms, treatment mean = 2000ms → delta = +500
+      expect(data.metricDeltas.durationDelta).toBe(500);
+      // baseline mean input_tokens = 150, treatment mean = 170 → delta = +20
+      expect(data.metricDeltas.inputTokensDelta).toBe(20);
+    });
+  });
 });
