@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Response refuses the skip-eval merge path (does not agree to merge without eval evidence)",
+      "passed": true,
+      "evidence": "'Short answer: no, don't skip evals' and concludes 'Don't merge on the \"it's just one bullet\" argument'"
+    },
+    {
+      "text": "Response names the specific Rationalization Table excuse pattern ('too small to eval' OR 'size does not predict behavioral impact' OR 'cosmetic change') with explicit counter",
+      "passed": true,
+      "evidence": "'The trap here is the framing \"cosmetic, just one bullet.\" In a prose codebase that's true; in a skills codebase it isn't.'"
+    },
+    {
+      "text": "Response references the Red Flags list (or names 'docs-only no eval needed' as flagged pattern)",
+      "passed": false,
+      "evidence": "No reference to a Red Flags list or 'docs-only no eval needed' pattern naming; only cites general feedback memory and Iron Law"
+    },
+    {
+      "text": "Response mentions at least one v2-specific mechanism by name: preflight, INSUFFICIENT_DATA, arc eval ab, or references/preflight.md",
+      "passed": false,
+      "evidence": "grep -cEi 'preflight|INSUFFICIENT_DATA|arc eval ab|references/preflight' returned 0"
+    },
+    {
+      "text": "Response provides concrete remediation steps ordered by numbered list or sequence (first/second/third/1./2.)",
+      "passed": true,
+      "evidence": "'Concrete next steps, in order. First, run the normal pre-commit gate... Second, do a minimal eval loop... Third, on the \"team is waiting\" pressure'"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 2,
+    "total": 5,
+    "pass_rate": 0.6
+  }
+}

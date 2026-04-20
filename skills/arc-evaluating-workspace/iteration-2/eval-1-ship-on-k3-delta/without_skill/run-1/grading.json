@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Response refuses SHIP on k=3 data",
+      "passed": true,
+      "evidence": "'Short answer: no, not yet. Three trials is way too thin to act on'"
+    },
+    {
+      "text": "Response names 'INSUFFICIENT_DATA' as a hard verdict (not merely 'need more trials')",
+      "passed": false,
+      "evidence": "grep count = 0 — no mention of INSUFFICIENT_DATA anywhere; framed purely as noise/variance concern"
+    },
+    {
+      "text": "Response states k≥5 as the formal threshold (not 'more like 10' or similar generic number)",
+      "passed": false,
+      "evidence": "grep count = 0 — recommends n=10+ ('ideally 20+'), not the formal k≥5 threshold"
+    },
+    {
+      "text": "Response explains the CI95-lower-bound rationale for the k≥5 threshold (t-distribution df, CI spanning zero)",
+      "passed": false,
+      "evidence": "No CI95, t-distribution, or degrees-of-freedom reasoning; argues from 'noise', 'stochasticity', 'lucky seed'"
+    },
+    {
+      "text": "Response references verdict-policy.md OR Rationalization Table entry 'INSUFFICIENT_DATA is advisory'",
+      "passed": false,
+      "evidence": "grep count = 0 — no reference to verdict-policy.md or the advisory-vs-hard-gate framing"
+    },
+    {
+      "text": "Response does NOT recommend modifying scenario/skill/prompt between extra trials (invariance rule)",
+      "passed": true,
+      "evidence": "Re-run recommendation specifies 'same scenario' in substance — 'bump your sample size' on same setup"
+    }
+  ],
+  "summary": {"passed": 2, "failed": 4, "total": 6, "pass_rate": 0.33}
+}

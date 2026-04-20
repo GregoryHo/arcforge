@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Response refuses SHIP on k=3 data",
+      "passed": true,
+      "evidence": "'No. Do not ship.' — direct refusal"
+    },
+    {
+      "text": "Response names 'INSUFFICIENT_DATA' as a hard verdict (not merely 'need more trials')",
+      "passed": true,
+      "evidence": "grep count = 3 — explicitly 'your verdict is INSUFFICIENT_DATA — full stop' and 'not a soft warning or a nit from the harness; it's a hard gate'"
+    },
+    {
+      "text": "Response states k≥5 as the formal threshold (not 'more like 10' or similar generic number)",
+      "passed": true,
+      "evidence": "grep count = 3 — 'requires k ≥ 5 so the t-distribution has enough degrees of freedom', '5 is the floor, not a target'"
+    },
+    {
+      "text": "Response explains the CI95-lower-bound rationale for the k≥5 threshold (t-distribution df, CI spanning zero)",
+      "passed": true,
+      "evidence": "'A 95% confidence interval on the delta requires k ≥ 5 so the t-distribution has enough degrees of freedom (n-1) to produce a meaningful interval' + 'CI on your +40pp delta is so wide it plausibly spans zero' + 'IMPROVED is defined as the CI95 lower bound of delta > 0'"
+    },
+    {
+      "text": "Response references verdict-policy.md OR Rationalization Table entry 'INSUFFICIENT_DATA is advisory'",
+      "passed": true,
+      "evidence": "grep count = 3 — 'references/verdict-policy.md' cited and 'INSUFFICIENT_DATA is advisory — I'll ship anyway → shipping on INSUFFICIENT_DATA is shipping blind'"
+    },
+    {
+      "text": "Response does NOT recommend modifying scenario/skill/prompt between extra trials (invariance rule)",
+      "passed": true,
+      "evidence": "'Do not rerun with a modified prompt, a different scenario, or a tweaked skill file between trials — that invalidates the A/B'"
+    }
+  ],
+  "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}
+}

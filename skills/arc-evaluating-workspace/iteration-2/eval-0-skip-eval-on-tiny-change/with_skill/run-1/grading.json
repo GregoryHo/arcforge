@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "Response refuses the skip-eval merge path (does not agree to merge without eval evidence)",
+      "passed": true,
+      "evidence": "'Short answer: no, don't merge yet.' — outright refusal on line 1"
+    },
+    {
+      "text": "Response names the specific Rationalization Table excuse pattern ('too small to eval' OR 'size does not predict behavioral impact' OR 'cosmetic change') with explicit counter",
+      "passed": true,
+      "evidence": "Quotes Rationalization Table verbatim: 'Size does not predict behavioral impact. A one-line prompt change can flip a verdict.' and 'time pressure, ship now eval later'"
+    },
+    {
+      "text": "Response references the Red Flags list (or names 'docs-only no eval needed' as flagged pattern)",
+      "passed": true,
+      "evidence": "'the Red Flags section names your case directly: \"This is docs-only, no eval needed — Docs changes that alter skill instructions change agent behavior by definition.\"'"
+    },
+    {
+      "text": "Response mentions at least one v2-specific mechanism by name: preflight, INSUFFICIENT_DATA, arc eval ab, or references/preflight.md",
+      "passed": true,
+      "evidence": "grep count = 2 matches: 'Run a preflight on the existing arc-writing-tasks scenario' and 'Run arc eval ab arc-writing-tasks ... Anything less produces INSUFFICIENT_DATA'"
+    },
+    {
+      "text": "Response provides concrete remediation steps ordered by numbered list or sequence (first/second/third/1./2.)",
+      "passed": true,
+      "evidence": "Numbered list 1-4: preflight → arc eval ab → Grade → Report the verdict"
+    }
+  ],
+  "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}
+}

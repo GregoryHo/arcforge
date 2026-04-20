@@ -1,0 +1,353 @@
+{
+  "metadata": {
+    "skill_name": "arc-evaluating-v2",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-04-20T08:23:53Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 29.5,
+        "tokens": 38463,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response refuses the skip-eval merge path (does not agree to merge without eval evidence)",
+          "passed": true,
+          "evidence": "'Short answer: no, don't merge yet.' \u2014 outright refusal on line 1"
+        },
+        {
+          "text": "Response names the specific Rationalization Table excuse pattern ('too small to eval' OR 'size does not predict behavioral impact' OR 'cosmetic change') with explicit counter",
+          "passed": true,
+          "evidence": "Quotes Rationalization Table verbatim: 'Size does not predict behavioral impact. A one-line prompt change can flip a verdict.' and 'time pressure, ship now eval later'"
+        },
+        {
+          "text": "Response references the Red Flags list (or names 'docs-only no eval needed' as flagged pattern)",
+          "passed": true,
+          "evidence": "'the Red Flags section names your case directly: \"This is docs-only, no eval needed \u2014 Docs changes that alter skill instructions change agent behavior by definition.\"'"
+        },
+        {
+          "text": "Response mentions at least one v2-specific mechanism by name: preflight, INSUFFICIENT_DATA, arc eval ab, or references/preflight.md",
+          "passed": true,
+          "evidence": "grep count = 2 matches: 'Run a preflight on the existing arc-writing-tasks scenario' and 'Run arc eval ab arc-writing-tasks ... Anything less produces INSUFFICIENT_DATA'"
+        },
+        {
+          "text": "Response provides concrete remediation steps ordered by numbered list or sequence (first/second/third/1./2.)",
+          "passed": true,
+          "evidence": "Numbered list 1-4: preflight \u2192 arc eval ab \u2192 Grade \u2192 Report the verdict"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 27.4,
+        "tokens": 41000,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response refuses SHIP on k=3 data",
+          "passed": true,
+          "evidence": "'No. Do not ship.' \u2014 direct refusal"
+        },
+        {
+          "text": "Response names 'INSUFFICIENT_DATA' as a hard verdict (not merely 'need more trials')",
+          "passed": true,
+          "evidence": "grep count = 3 \u2014 explicitly 'your verdict is INSUFFICIENT_DATA \u2014 full stop' and 'not a soft warning or a nit from the harness; it's a hard gate'"
+        },
+        {
+          "text": "Response states k\u22655 as the formal threshold (not 'more like 10' or similar generic number)",
+          "passed": true,
+          "evidence": "grep count = 3 \u2014 'requires k \u2265 5 so the t-distribution has enough degrees of freedom', '5 is the floor, not a target'"
+        },
+        {
+          "text": "Response explains the CI95-lower-bound rationale for the k\u22655 threshold (t-distribution df, CI spanning zero)",
+          "passed": true,
+          "evidence": "'A 95% confidence interval on the delta requires k \u2265 5 so the t-distribution has enough degrees of freedom (n-1) to produce a meaningful interval' + 'CI on your +40pp delta is so wide it plausibly spans zero' + 'IMPROVED is defined as the CI95 lower bound of delta > 0'"
+        },
+        {
+          "text": "Response references verdict-policy.md OR Rationalization Table entry 'INSUFFICIENT_DATA is advisory'",
+          "passed": true,
+          "evidence": "grep count = 3 \u2014 'references/verdict-policy.md' cited and 'INSUFFICIENT_DATA is advisory \u2014 I'll ship anyway \u2192 shipping on INSUFFICIENT_DATA is shipping blind'"
+        },
+        {
+          "text": "Response does NOT recommend modifying scenario/skill/prompt between extra trials (invariance rule)",
+          "passed": true,
+          "evidence": "'Do not rerun with a modified prompt, a different scenario, or a tweaked skill file between trials \u2014 that invalidates the A/B'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 7,
+        "failed": 0,
+        "total": 7,
+        "time_seconds": 47.9,
+        "tokens": 43610,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response recommends paired runs (with-skill vs without-skill) at k\u22655",
+          "passed": true,
+          "evidence": "'k=5 baseline and k=5 treatment by default for a code grader (k=10 each for model)'"
+        },
+        {
+          "text": "Response mentions preflight OR baseline-ceiling check as a scenario-validity step",
+          "passed": true,
+          "evidence": "grep count = 3 \u2014 'Run arc eval preflight <name> \u2014 if the baseline hits \u22650.8 on the ceiling, the scenario isn't discriminative' (explicit preflight + ceiling)"
+        },
+        {
+          "text": "Response mentions answer leakage / prompt leaking the skill's keywords ('hypothesis', 'reproduce', 'root cause')",
+          "passed": true,
+          "evidence": "grep count = 1 \u2014 'does your prompt leak the debugging pattern (words like \"hypothesis,\" \"reproduce,\" \"root cause\")? If so, the baseline will mimic the skill without reading it. Strip those words.'"
+        },
+        {
+          "text": "Response names 'discriminative trap' or 'bait' as scenario design element (not just 'failure mode')",
+          "passed": true,
+          "evidence": "grep count = 5 \u2014 'Design the scenario around a discriminative trap, not a generic bug', 'craft a scenario containing bait: a plausible-but-wrong fix... true root cause one layer deeper'"
+        },
+        {
+          "text": "Response prescribes grader-type matching to assertion nature (code for deterministic, model for judgment)",
+          "passed": true,
+          "evidence": "Full paragraph 'Match grader to assertion nature' \u2014 code grader for 'fixes line 47 of foo.js' (deterministic), model grader for 'demonstrated hypothesis-testing reasoning' (judgment)"
+        },
+        {
+          "text": "Response starts with scope alignment (skill vs agent vs workflow eval)",
+          "passed": true,
+          "evidence": "Opens with 'Start with scope alignment before anything else... That is a skill eval \u2014 prompt varies (skill present vs absent), not environment'"
+        },
+        {
+          "text": "Response recommends one-behavior-per-scenario (prefer 3-5 narrow scenarios over one overloaded)",
+          "passed": true,
+          "evidence": "'Prefer 3-5 narrow scenarios, each isolating one behavior, over one overloaded scenario.'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 21.8,
+        "tokens": 24210,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response refuses the skip-eval merge path (does not agree to merge without eval evidence)",
+          "passed": true,
+          "evidence": "'Short answer: no, don't skip evals' and concludes 'Don't merge on the \"it's just one bullet\" argument'"
+        },
+        {
+          "text": "Response names the specific Rationalization Table excuse pattern ('too small to eval' OR 'size does not predict behavioral impact' OR 'cosmetic change') with explicit counter",
+          "passed": true,
+          "evidence": "'The trap here is the framing \"cosmetic, just one bullet.\" In a prose codebase that's true; in a skills codebase it isn't.'"
+        },
+        {
+          "text": "Response references the Red Flags list (or names 'docs-only no eval needed' as flagged pattern)",
+          "passed": false,
+          "evidence": "No reference to a Red Flags list or 'docs-only no eval needed' pattern naming; only cites general feedback memory and Iron Law"
+        },
+        {
+          "text": "Response mentions at least one v2-specific mechanism by name: preflight, INSUFFICIENT_DATA, arc eval ab, or references/preflight.md",
+          "passed": false,
+          "evidence": "grep -cEi 'preflight|INSUFFICIENT_DATA|arc eval ab|references/preflight' returned 0"
+        },
+        {
+          "text": "Response provides concrete remediation steps ordered by numbered list or sequence (first/second/third/1./2.)",
+          "passed": true,
+          "evidence": "'Concrete next steps, in order. First, run the normal pre-commit gate... Second, do a minimal eval loop... Third, on the \"team is waiting\" pressure'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.33,
+        "passed": 2,
+        "failed": 4,
+        "total": 6,
+        "time_seconds": 17.1,
+        "tokens": 24007,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response refuses SHIP on k=3 data",
+          "passed": true,
+          "evidence": "'Short answer: no, not yet. Three trials is way too thin to act on'"
+        },
+        {
+          "text": "Response names 'INSUFFICIENT_DATA' as a hard verdict (not merely 'need more trials')",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 no mention of INSUFFICIENT_DATA anywhere; framed purely as noise/variance concern"
+        },
+        {
+          "text": "Response states k\u22655 as the formal threshold (not 'more like 10' or similar generic number)",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 recommends n=10+ ('ideally 20+'), not the formal k\u22655 threshold"
+        },
+        {
+          "text": "Response explains the CI95-lower-bound rationale for the k\u22655 threshold (t-distribution df, CI spanning zero)",
+          "passed": false,
+          "evidence": "No CI95, t-distribution, or degrees-of-freedom reasoning; argues from 'noise', 'stochasticity', 'lucky seed'"
+        },
+        {
+          "text": "Response references verdict-policy.md OR Rationalization Table entry 'INSUFFICIENT_DATA is advisory'",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 no reference to verdict-policy.md or the advisory-vs-hard-gate framing"
+        },
+        {
+          "text": "Response does NOT recommend modifying scenario/skill/prompt between extra trials (invariance rule)",
+          "passed": true,
+          "evidence": "Re-run recommendation specifies 'same scenario' in substance \u2014 'bump your sample size' on same setup"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.14,
+        "passed": 1,
+        "failed": 6,
+        "total": 7,
+        "time_seconds": 27.9,
+        "tokens": 24516,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Response recommends paired runs (with-skill vs without-skill) at k\u22655",
+          "passed": true,
+          "evidence": "'Run both arms multiple times per scenario (N=5+)' and 'paired runs with identical starting conditions'"
+        },
+        {
+          "text": "Response mentions preflight OR baseline-ceiling check as a scenario-validity step",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 no preflight, no ceiling check, no discriminativeness validation step"
+        },
+        {
+          "text": "Response mentions answer leakage / prompt leaking the skill's keywords ('hypothesis', 'reproduce', 'root cause')",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 zero awareness of prompt-word leakage as a confound"
+        },
+        {
+          "text": "Response names 'discriminative trap' or 'bait' as scenario design element (not just 'failure mode')",
+          "passed": false,
+          "evidence": "grep count = 0 \u2014 uses 'failure mode' / 'curate bugs' but no trap/bait framing"
+        },
+        {
+          "text": "Response prescribes grader-type matching to assertion nature (code for deterministic, model for judgment)",
+          "passed": false,
+          "evidence": "Mentions 'grep-able or LLM-judge prompt' in passing but no prescription matching grader type to assertion kind"
+        },
+        {
+          "text": "Response starts with scope alignment (skill vs agent vs workflow eval)",
+          "passed": false,
+          "evidence": "Goes directly to mechanics ('paired runs with identical starting conditions'); no scope-target sentence"
+        },
+        {
+          "text": "Response recommends one-behavior-per-scenario (prefer 3-5 narrow scenarios over one overloaded)",
+          "passed": false,
+          "evidence": "Suggests 'Curate 5-10 such scenarios' but no one-behavior-per-scenario principle; scenarios defined broadly by bug type"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 34.9333,
+        "stddev": 11.2784,
+        "min": 27.4,
+        "max": 47.9
+      },
+      "tokens": {
+        "mean": 41024.3333,
+        "stddev": 2573.5863,
+        "min": 38463,
+        "max": 43610
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.3567,
+        "stddev": 0.2312,
+        "min": 0.14,
+        "max": 0.6
+      },
+      "time_seconds": {
+        "mean": 22.2667,
+        "stddev": 5.4151,
+        "min": 17.1,
+        "max": 27.9
+      },
+      "tokens": {
+        "mean": 24244.3333,
+        "stddev": 256.231,
+        "min": 24007,
+        "max": 24516
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.64",
+      "time_seconds": "+12.7",
+      "tokens": "+16780"
+    }
+  },
+  "notes": []
+}
