@@ -400,6 +400,24 @@ function renderOutputsTrials() {
     h('a',{onclick:()=>renderOutputsRuns(scenario)},scenario),
     h('span',null,' / '+runId)
   ));
+  // Condition toggle (baseline <-> treatment for A/B runs). Shown before the
+  // empty-trials early return so users can still switch conditions when the
+  // currently selected condition has no trials loaded yet.
+  if (condition === 'baseline' || condition === 'treatment') {
+    const condRow = h('div',{style:'margin-bottom:10px;font-size:13px;display:flex;gap:6px;align-items:center'});
+    condRow.appendChild(h('span',{style:'color:var(--text2)'},'Condition:'));
+    ['baseline','treatment'].forEach((cond) => {
+      const active = cond === condition;
+      const btn = h('button',{
+        className:'trial-nav-btn',
+        style: active ? 'background:var(--accent);color:#000;font-weight:600' : '',
+      });
+      btn.textContent = cond;
+      btn.onclick = () => { if (cond !== condition) navigateOutputsToTrials(scenario, runId, cond); };
+      condRow.appendChild(btn);
+    });
+    content.appendChild(condRow);
+  }
   if (trials.length===0) { content.appendChild(h('div',{className:'empty'},'No trials in this run')); return; }
   const trial = trials[trialIdx];
   const trialId = 'trial-'+trial.trial;
@@ -610,9 +628,10 @@ function buildMetricDeltasView(md) {
   const section = h('div',{className:'metric-deltas'},
     h('div',{className:'metric-deltas-title'},'Resource Deltas (Treatment vs Baseline)')
   );
-  function metricRow(name,baseline,treatment,delta,isRegression) {
+  function metricRow(name,baseline,treatment,delta,isRegression,deltaFmt) {
     let deltaCls='metric-delta';
-    let deltaStr=delta==null?'-':(delta>0?'+':'')+Math.round(delta).toString();
+    const fmt = deltaFmt || ((n) => Math.round(n).toString());
+    let deltaStr = delta==null ? '-' : (delta>0?'+':'') + fmt(delta);
     if (delta!=null) {
       if (isRegression) deltaCls+=' metric-delta-regression';
       else if (delta>0) deltaCls+=' metric-delta-positive';
@@ -632,9 +651,11 @@ function buildMetricDeltasView(md) {
     h('span',{style:'min-width:80px'},'Delta')
   ));
   const bm=md.baselineMeans||{}; const tm=md.treatmentMeans||{};
-  section.appendChild(metricRow('Duration',fmtMs(bm.duration_ms),fmtMs(tm.duration_ms),md.durationDelta,md.durationRegression));
-  section.appendChild(metricRow('Input Tokens',fmtNum(bm.input_tokens),fmtNum(tm.input_tokens),md.inputTokensDelta,md.inputTokensRegression));
-  section.appendChild(metricRow('Output Tokens',fmtNum(bm.output_tokens),fmtNum(tm.output_tokens),md.outputTokensDelta,md.outputTokensRegression));
+  const fmtSecondsDelta = (n) => (n/1000).toFixed(2)+'s';
+  const fmtTokenDelta = (n) => Math.round(n).toLocaleString();
+  section.appendChild(metricRow('Duration',fmtMs(bm.duration_ms),fmtMs(tm.duration_ms),md.durationDelta,md.durationRegression,fmtSecondsDelta));
+  section.appendChild(metricRow('Input Tokens',fmtNum(bm.input_tokens),fmtNum(tm.input_tokens),md.inputTokensDelta,md.inputTokensRegression,fmtTokenDelta));
+  section.appendChild(metricRow('Output Tokens',fmtNum(bm.output_tokens),fmtNum(tm.output_tokens),md.outputTokensDelta,md.outputTokensRegression,fmtTokenDelta));
   return section;
 }
 
