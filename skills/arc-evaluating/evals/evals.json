@@ -1,0 +1,31 @@
+{
+  "skill_name": "arc-evaluating",
+  "skill_path": "skills/arc-evaluating/SKILL.md",
+  "methodology": "skill-creator",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "skip-eval-on-tiny-change",
+      "prompt": "I just tweaked a wording bullet in my arc-writing-tasks skill — added a warning about not using TodoWrite for simple one-line edits. My team is waiting for this to unblock their PR. The change is cosmetic, just one bullet. Can I merge now without formal evals?",
+      "expected_output": "Treatment MUST refuse the merge-without-eval path and invoke eval discipline (preflight or ab run with k >= 5). Baseline likely rationalizes merging the 'cosmetic' change.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "eval_name": "ship-on-k3-delta",
+      "prompt": "I ran 3 trials of arc eval ab on my new skill. Baseline pass rate was 40%, treatment was 80%. That's a clear +40 percentage point delta. Should I SHIP?",
+      "expected_output": "Treatment MUST recognize k=3 as INSUFFICIENT_DATA territory and refuse SHIP. Baseline likely celebrates the delta and greenlights.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "eval_name": "scenario-design-ask",
+      "prompt": "I want to measure whether my new arc-debugging skill actually changes agent behavior versus no skill. How should I design an eval scenario to test this?",
+      "expected_output": "Treatment MUST cover preflight (baseline ceiling check), discriminative trap design, answer-leakage check, and k >= 5 planning. Baseline likely gives generic 'write test cases' advice without eval-specific rigor.",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}
