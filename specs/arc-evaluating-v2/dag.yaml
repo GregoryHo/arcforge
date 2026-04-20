@@ -159,7 +159,7 @@ epics:
         source_requirement: fr-dash-004
   - id: skill-body
     name: SKILL.md Body, References, and TDD-for-Docs Validation
-    status: pending
+    status: completed
     spec_path: specs/arc-evaluating-v2/epics/skill-body/epic.md
     worktree: null
     depends_on:
@@ -173,33 +173,33 @@ epics:
     features:
       - id: sb-001
         name: SKILL.md description stays triggering-only
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sb-001
       - id: sb-002
         name: SKILL.md body word budget (≤1800w)
-        status: pending
+        status: completed
         depends_on:
           - sb-003
         source_requirement: fr-sb-002
       - id: sb-003
         name: Progressive disclosure via new reference files
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sb-003
       - id: sb-004
         name: Rationalization Table for v2 behaviors
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sb-004
       - id: sb-005
         name: Red Flags list for v2 failure modes
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sb-005
       - id: sb-006
         name: TDD-for-docs Iron Law applied to v2 edits
-        status: pending
+        status: completed
         depends_on:
           - sb-001
           - sb-004
@@ -207,12 +207,12 @@ epics:
         source_requirement: fr-sb-006
       - id: sb-007
         name: Cross-references use REQUIRED markers
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sb-007
       - id: sb-008
         name: Existing pytest validators continue to pass
-        status: pending
+        status: completed
         depends_on:
           - sb-001
           - sb-002
