@@ -16,7 +16,7 @@
   <requirement id="fr-fs-001">
     <title>Co-locate Eval Agent Prompt Templates Inside the Skill Folder</title>
     <description>
-      The eval-grader, eval-analyzer (renamed from eval-analyzer), and the new
+      The eval-grader, eval-analyzer (renamed from eval-comparator), and the new
       eval-blind-comparator agent prompt templates MUST live under
       skills/arc-evaluating/agents/. The harness already loads these files as
       prompt templates via loadAgentDef() and execCommand('claude', ...) — it

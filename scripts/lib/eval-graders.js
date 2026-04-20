@@ -669,8 +669,8 @@ function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
  * The prompt sent to the agent is stripped of all identifying strings:
  * "baseline", "treatment", "with_skill", "without_skill", and the skill name.
  *
- * NOTE: This function introduces the plumbing for blind comparison.
- * Auto-triggering it from the grader pipeline is wired in the grader-blind epic.
+ * Auto-triggering from the grader pipeline is wired in ./eval-blind-autotrigger.js
+ * per fr-gr-005 (all-model-graded scenarios only).
  *
  * @param {string} taskPrompt - The original task prompt given to both conditions
  * @param {string} baselineOutput - Output from the baseline (control) condition
