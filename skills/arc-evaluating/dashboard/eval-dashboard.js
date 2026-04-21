@@ -326,7 +326,14 @@ function handleApiTranscript(res, projectRoot, query) {
   const resultsDir = path.resolve(projectRoot, eval_.RESULTS_DIR);
   const resolved = path.resolve(resultsDir, relPath);
 
-  if (!resolved.startsWith(resultsDir)) {
+  // Require a real path-segment boundary: bare equality with the dir,
+  // OR resolved must start with `resultsDir + path.sep`. A naive
+  // startsWith(resultsDir) lets sibling directories whose name shares
+  // the prefix (e.g. `evals/results2`, `evals/results.bak`) bypass the
+  // guard, exposing arbitrary files under the parent.
+  const isInside =
+    resolved === resultsDir || resolved.startsWith(resultsDir + path.sep);
+  if (!isInside) {
     return sendError(res, 403, 'Path traversal not allowed');
   }
   if (!fs.existsSync(resolved)) return sendError(res, 404, 'Transcript not found');

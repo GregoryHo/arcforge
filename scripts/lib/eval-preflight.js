@@ -98,6 +98,35 @@ function runPreflight(name, projectRoot, opts = {}) {
     results.push(graded);
   }
 
+  // Trials that errored out (infraError from runTrial, gradeError from
+  // gradeResult) are NOT signal — they mean we never actually exercised
+  // the scenario. Folding them into the pass-rate denominator as
+  // "ordinary failures" is fail-OPEN: a scenario whose baseline trials
+  // all infra-error to passed=false produces pass_rate=0%, which is
+  // below the ceiling, which yields a false PASS. Fail closed instead.
+  const errored = results.filter((r) => r.infraError || r.gradeError);
+  if (errored.length > 0) {
+    const verdict = 'BLOCK';
+    const reason =
+      `${errored.length}/${results.length} preflight trials errored ` +
+      `(infraError or gradeError) — no discriminability signal. ` +
+      `Fix the trial environment or grader before re-running preflight.`;
+    const record = {
+      scenario_hash: hash,
+      scenario_name: name,
+      pass_rate: null,
+      k: PREFLIGHT_K,
+      errored: errored.length,
+      verdict,
+      reason,
+      timestamp: new Date().toISOString(),
+    };
+    const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
+    fs.mkdirSync(preflightDir, { recursive: true });
+    fs.writeFileSync(path.join(preflightDir, `${hash}.json`), JSON.stringify(record, null, 2));
+    return record;
+  }
+
   const passed = results.filter((r) => r.passed).length;
   const pass_rate = results.length > 0 ? passed / results.length : 0;
 

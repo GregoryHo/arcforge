@@ -172,6 +172,60 @@ describe('runPreflight', () => {
     }).toThrow(/not found/i);
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  test('BLOCK: fails closed when any baseline trial errors (F9)', () => {
+    // Regression: errored trials (infraError / gradeError) used to be
+    // counted as passed=false → drove pass_rate down → produced false PASS.
+    // Now any errored trial in the preflight batch => BLOCK with explicit
+    // reason; pass_rate is null because there's no signal to compute.
+    const dir = makeTempDir();
+    writeScenario(dir, 'flaky-scenario', SCENARIO_CONTENT);
+
+    let call = 0;
+    const stubRunTrial = () => {
+      call++;
+      // First trial errors (infra failure), rest pass
+      if (call === 1) return { passed: false, infraError: true };
+      return { passed: true, score: 1.0 };
+    };
+    const stubGrade = (result) => result;
+
+    const outcome = runPreflight('flaky-scenario', dir, {
+      runTrial: stubRunTrial,
+      gradeResult: stubGrade,
+    });
+
+    expect(outcome.verdict).toBe('BLOCK');
+    expect(outcome.pass_rate).toBeNull();
+    expect(outcome.errored).toBeGreaterThan(0);
+    expect(outcome.reason).toMatch(/error/i);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('BLOCK: fails closed when grader errors (F9)', () => {
+    const dir = makeTempDir();
+    writeScenario(dir, 'grader-flaky', SCENARIO_CONTENT);
+
+    const stubRunTrial = () => ({ passed: false, score: 0 });
+    let call = 0;
+    const stubGrade = (result) => {
+      call++;
+      if (call === 1) return { ...result, gradeError: true };
+      return result;
+    };
+
+    const outcome = runPreflight('grader-flaky', dir, {
+      runTrial: stubRunTrial,
+      gradeResult: stubGrade,
+    });
+
+    expect(outcome.verdict).toBe('BLOCK');
+    expect(outcome.pass_rate).toBeNull();
+    expect(outcome.errored).toBeGreaterThan(0);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 // ── checkPreflightGate ───────────────────────────────────────────────────────

@@ -257,6 +257,25 @@ describe('dashboard', () => {
       expect(result.status).toBe(403);
     });
 
+    it('should reject sibling-prefix traversal even when names share prefix (F10)', () => {
+      // Regression: startsWith(resultsDir) used to accept paths under
+      // sibling directories whose name shared the prefix — e.g.
+      // /tmp/.../evals/results2 starts with /tmp/.../evals/results, so
+      // a request for ../results2/secret would have leaked. Fix requires
+      // a real path-segment boundary check (=== or + path.sep).
+      const evalsDir = path.join(tempDir, 'evals');
+      fs.mkdirSync(evalsDir, { recursive: true });
+      // Create a sibling whose name starts with "results" — this is the
+      // attack surface the prefix-only check was vulnerable to.
+      const siblingDir = path.join(evalsDir, 'results2');
+      fs.mkdirSync(siblingDir, { recursive: true });
+      fs.writeFileSync(path.join(siblingDir, 'secret.txt'), 'should not be readable');
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/transcript?path=../results2/secret.txt');
+      expect(result.status).toBe(403);
+    });
+
     it('should return 400 when path missing', () => {
       const router = createRouter(tempDir, '');
       const result = callRouter(router, '/api/transcript');
