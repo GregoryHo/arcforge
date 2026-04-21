@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Response recommends paired runs (with-skill vs without-skill) at k≥5",
+      "passed": true,
+      "evidence": "'k=5 baseline and k=5 treatment by default for a code grader (k=10 each for model)'"
+    },
+    {
+      "text": "Response mentions preflight OR baseline-ceiling check as a scenario-validity step",
+      "passed": true,
+      "evidence": "grep count = 3 — 'Run arc eval preflight <name> — if the baseline hits ≥0.8 on the ceiling, the scenario isn't discriminative' (explicit preflight + ceiling)"
+    },
+    {
+      "text": "Response mentions answer leakage / prompt leaking the skill's keywords ('hypothesis', 'reproduce', 'root cause')",
+      "passed": true,
+      "evidence": "grep count = 1 — 'does your prompt leak the debugging pattern (words like \"hypothesis,\" \"reproduce,\" \"root cause\")? If so, the baseline will mimic the skill without reading it. Strip those words.'"
+    },
+    {
+      "text": "Response names 'discriminative trap' or 'bait' as scenario design element (not just 'failure mode')",
+      "passed": true,
+      "evidence": "grep count = 5 — 'Design the scenario around a discriminative trap, not a generic bug', 'craft a scenario containing bait: a plausible-but-wrong fix... true root cause one layer deeper'"
+    },
+    {
+      "text": "Response prescribes grader-type matching to assertion nature (code for deterministic, model for judgment)",
+      "passed": true,
+      "evidence": "Full paragraph 'Match grader to assertion nature' — code grader for 'fixes line 47 of foo.js' (deterministic), model grader for 'demonstrated hypothesis-testing reasoning' (judgment)"
+    },
+    {
+      "text": "Response starts with scope alignment (skill vs agent vs workflow eval)",
+      "passed": true,
+      "evidence": "Opens with 'Start with scope alignment before anything else... That is a skill eval — prompt varies (skill present vs absent), not environment'"
+    },
+    {
+      "text": "Response recommends one-behavior-per-scenario (prefer 3-5 narrow scenarios over one overloaded)",
+      "passed": true,
+      "evidence": "'Prefer 3-5 narrow scenarios, each isolating one behavior, over one overloaded scenario.'"
+    }
+  ],
+  "summary": {"passed": 7, "failed": 0, "total": 7, "pass_rate": 1.0}
+}

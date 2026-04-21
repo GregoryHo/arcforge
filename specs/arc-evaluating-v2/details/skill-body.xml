@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="skill-body">
+  <title>SKILL.md Body, References, and TDD-for-Docs Validation</title>
+  <consumes>
+    <artifact>skills/arc-evaluating/SKILL.md (current body — 2082 words, Meta tier)</artifact>
+    <artifact>skills/arc-evaluating/references/cli-and-metrics.md, common-mistakes-catalog.md, grading-and-execution.md (current three reference docs)</artifact>
+    <artifact>tests/skills/test_skill_arc_evaluating.py, tests/skills/test_eval_agents_contract.py (existing pytest validators)</artifact>
+    <artifact>skills/arc-writing-skills/SKILL.md (methodology source — TDD Iron Law, frontmatter rules, word-count tiers)</artifact>
+  </consumes>
+  <produces>
+    <artifact>skills/arc-evaluating/SKILL.md updated for v2 routing/decision logic, body ≤ 1800 words (Comprehensive tier)</artifact>
+    <artifact>skills/arc-evaluating/references/preflight.md (new) — ceiling threshold, hash mechanics, PASS/BLOCK semantics</artifact>
+    <artifact>skills/arc-evaluating/references/verdict-policy.md (new) — INSUFFICIENT_DATA boundaries, k≥5 rationale, preflight exemption</artifact>
+    <artifact>skills/arc-evaluating/references/audit-workflow.md (new) — claim promotion and assertion retirement arbitration</artifact>
+    <artifact>skills/arc-evaluating/references/grading-and-execution.md updated — discovered_claims[] and weak_assertions[] schemas</artifact>
+    <artifact>Pressure-scenario artifacts (RED/GREEN/REFACTOR evidence) archived under skills/arc-evaluating-workspace/ per arc-writing-skills conventions</artifact>
+  </produces>
+
+  <requirement id="fr-sb-001">
+    <title>SKILL.md Description Stays Triggering-Only</title>
+    <description>
+      The v2 SKILL.md frontmatter description field MUST describe triggering
+      conditions only (start with "Use when...", third-person, specific
+      symptoms). It MUST NOT summarize the v2 workflow (preflight, analyzer,
+      audit, INSUFFICIENT_DATA, blind supplementary). Summarizing workflow
+      into the description creates a discovery shortcut where Claude follows
+      the summary and skips reading the full skill body — explicitly
+      warned against by skills/arc-writing-skills/SKILL.md. Total frontmatter
+      MUST remain ≤ 1024 characters.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-001-ac1">
+        The updated description MUST start with "Use when" and MUST NOT
+        contain verbs describing internal steps (run preflight, invoke
+        analyzer, aggregate audit, emit verdict). It lists triggering
+        conditions / symptoms only.
+        <trace>fr-sb-001</trace>
+      </criterion>
+      <criterion id="fr-sb-001-ac2">
+        The YAML frontmatter total length (name + description combined) MUST
+        be ≤ 1024 characters measured as raw bytes of the YAML block.
+        <trace>fr-sb-001</trace>
+      </criterion>
+      <criterion id="fr-sb-001-ac3">
+        The frontmatter MUST contain exactly two fields: name and description.
+        Any additional field (version, tags, model, agent, etc.) MUST be
+        absent.
+        <trace>fr-sb-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-002">
+    <title>SKILL.md Body Word Budget</title>
+    <description>
+      The v2 SKILL.md body (content after the YAML frontmatter, excluding
+      code fences) MUST NOT exceed 1800 words — the Comprehensive tier limit
+      from skills/arc-writing-skills. The current v1 body is 2082 words; v2
+      adds preflight, verdict policy, claim-extraction, and blind supplementary
+      concepts on top. Net size MUST be controlled by moving detail into
+      references/. Any content that is (a) detailed schemas, (b) extended
+      examples, (c) API tables, or (d) reference material applicable to
+      multiple skills MUST move to references/ rather than inflating the body.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-002-ac1">
+        `wc -w skills/arc-evaluating/SKILL.md` after v2 edits MUST return a
+        number ≤ 1800 (body + headings, excluding frontmatter).
+        <trace>fr-sb-002</trace>
+      </criterion>
+      <criterion id="fr-sb-002-ac2">
+        Given the v2 body exceeds 1800 words during drafting, the author MUST
+        extract content into references/ until the body is under budget. The
+        body MUST NOT be shipped at Meta tier (&gt; 1800) for a Discipline skill.
+        <trace>fr-sb-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-003">
+    <title>Progressive Disclosure via New References Files</title>
+    <description>
+      Three new reference files MUST be created and one existing file MUST be
+      extended, so the v2 body stays lean while the detail remains discoverable
+      on-demand. New files: references/preflight.md (ceiling threshold, hash
+      mechanics, PASS/BLOCK semantics, how preflight interacts with fr-vr-001
+      exemption), references/verdict-policy.md (verdict enum including
+      INSUFFICIENT_DATA, k thresholds, asymmetric delta thresholds), and
+      references/audit-workflow.md (claim promotion and retirement arbitration
+      procedure). Existing file references/grading-and-execution.md MUST be
+      extended with the discovered_claims[] and weak_assertions[] schema
+      documentation. SKILL.md MUST point at these files with clear loading
+      guidance (e.g., "See references/preflight.md for ceiling-threshold
+      mechanics.").
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-003-ac1">
+        skills/arc-evaluating/references/preflight.md, verdict-policy.md,
+        audit-workflow.md MUST exist. Each MUST be substantive (≥ 300 words)
+        and self-contained.
+        <trace>fr-sb-003</trace>
+      </criterion>
+      <criterion id="fr-sb-003-ac2">
+        skills/arc-evaluating/SKILL.md MUST reference each new file at least
+        once with loading guidance phrased to help the agent know WHEN to
+        read it (e.g., "when blocking on preflight ceiling", not just "see X").
+        <trace>fr-sb-003</trace>
+      </criterion>
+      <criterion id="fr-sb-003-ac3">
+        The existing references/grading-and-execution.md MUST contain schema
+        documentation for both discovered_claims[] and weak_assertions[]
+        arrays, matching the contract in fr-gr-003 and fr-gr-004.
+        <trace>fr-sb-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-004">
+    <title>Rationalization Table Updated for v2 Behaviors</title>
+    <description>
+      SKILL.md MUST include a Rationalization Table listing v2-specific excuses
+      and their counters, following the pattern from skills/arc-writing-skills
+      (discipline-skill bulletproofing). The table MUST at minimum cover the
+      following excuses: "this change is too small to eval", "time pressure,
+      ship now eval later", "preflight blocks, just skip it once", "k=4 is
+      close enough to 5", "INSUFFICIENT_DATA is advisory, I'll ship anyway",
+      "the grader raised weak_assertions but the pass rate is fine".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-004-ac1">
+        SKILL.md MUST contain a markdown table with columns "Excuse" and
+        "Reality" (or equivalent) listing at least six v2-specific
+        rationalizations with explicit counters.
+        <trace>fr-sb-004</trace>
+      </criterion>
+      <criterion id="fr-sb-004-ac2">
+        Each counter text MUST close the loophole (state what the agent MUST
+        do), not merely restate the Iron Law abstractly.
+        <trace>fr-sb-004</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-005">
+    <title>Red Flags List Updated for v2 Failure Modes</title>
+    <description>
+      SKILL.md MUST include a Red Flags list — thoughts that, when detected,
+      signal an imminent eval discipline failure. The list MUST cover v2-specific
+      failure modes at minimum: "I already manually tested, eval is redundant",
+      "this is docs-only, no eval needed", "the INSUFFICIENT_DATA banner is
+      just a warning", "I can promote the discovered claim on my own without
+      audit", "the blind comparator disagreed but assertions passed so it's
+      fine", "preflight is new, I'll skip it this time and backfill later".
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-005-ac1">
+        SKILL.md MUST contain a "Red Flags" section (or equivalent) with a
+        bullet list enumerating at least six v2-specific failure thoughts.
+        <trace>fr-sb-005</trace>
+      </criterion>
+      <criterion id="fr-sb-005-ac2">
+        The section MUST include a closing directive that every listed thought
+        means: stop, re-read the skill, do not proceed.
+        <trace>fr-sb-005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-006">
+    <title>TDD-for-Docs Iron Law on v2 Edits</title>
+    <description>
+      Per skills/arc-writing-skills Iron Law, the Iron Law "NO SKILL WITHOUT
+      A FAILING TEST FIRST" applies to EDITS of existing skills, not only
+      new skills. v2 SKILL.md edits MUST be preceded by pressure-scenario
+      evidence (RED phase) — a baseline subagent, WITHOUT the v2 skill edits,
+      fails to follow v2 discipline on realistic prompts (e.g., tries to ship
+      on k=3, skips preflight, treats INSUFFICIENT_DATA as advisory). The
+      v2 edits (GREEN phase) MUST address those observed rationalizations
+      verbatim. A REFACTOR phase MUST close new loopholes discovered in
+      post-edit runs. Evidence MUST be persisted under
+      skills/arc-evaluating-workspace/ per arc-writing-skills conventions,
+      NOT discarded or summarized away.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-006-ac1">
+        Before v2 SKILL.md is committed, a RED-phase pressure-scenario
+        artifact MUST exist under skills/arc-evaluating-workspace/iteration-1/
+        documenting at least three baseline violations (skipping preflight,
+        ignoring INSUFFICIENT_DATA, or equivalent) with verbatim subagent
+        rationalizations.
+        <trace>fr-sb-006</trace>
+      </criterion>
+      <criterion id="fr-sb-006-ac2">
+        After v2 SKILL.md is committed, a GREEN-phase artifact MUST exist
+        showing the same pressure scenarios re-run WITH the v2 skill,
+        demonstrating that the previously-failing subagent now complies.
+        <trace>fr-sb-006</trace>
+      </criterion>
+      <criterion id="fr-sb-006-ac3">
+        Any new rationalization observed in GREEN-phase runs MUST produce an
+        entry in the Rationalization Table (fr-sb-004), an entry in the Red
+        Flags list (fr-sb-005), or an explicit skill-body counter before the
+        spec is considered complete.
+        <trace>fr-sb-006</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-007">
+    <title>Cross-References Use REQUIRED Markers, Never @-File Syntax</title>
+    <description>
+      When SKILL.md or any references/*.md file refers to another arcforge
+      skill or rule, the reference MUST use the markers
+      "**REQUIRED BACKGROUND:**" or "**REQUIRED SUB-SKILL:**" (or read the
+      other skill via Skill tool at runtime). The at-sign file syntax
+      (@path/to/file) MUST NOT appear — it force-loads context immediately,
+      defeating progressive disclosure.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-007-ac1">
+        A grep of skills/arc-evaluating/**/*.md for the regex "@[a-zA-Z0-9/_-]+\.md"
+        MUST return zero matches after v2 edits.
+        <trace>fr-sb-007</trace>
+      </criterion>
+      <criterion id="fr-sb-007-ac2">
+        Any v2 skill reference to another arcforge skill (for example,
+        arc-writing-skills, arc-using, arc-tdd) MUST use the REQUIRED
+        BACKGROUND or REQUIRED SUB-SKILL marker syntax.
+        <trace>fr-sb-007</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sb-008">
+    <title>Existing pytest Validators Must Continue to Pass</title>
+    <description>
+      tests/skills/test_skill_arc_evaluating.py and
+      tests/skills/test_eval_agents_contract.py MUST continue to pass after
+      v2 changes. Because fr-fs-001 moves agent files into the skill folder
+      and fr-ag-001 completes the agent rename, test_eval_agents_contract.py
+      likely needs path and name updates. Those updates are in scope; making
+      the tests pass by deletion or disablement is forbidden.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sb-008-ac1">
+        After all v2 edits, `npm run test:skills` MUST exit 0 with the
+        updated test files passing.
+        <trace>fr-sb-008</trace>
+      </criterion>
+      <criterion id="fr-sb-008-ac2">
+        No existing assertion in test_skill_arc_evaluating.py or
+        test_eval_agents_contract.py MAY be removed or skipped to pass CI.
+        If an assertion no longer applies, it MUST be rewritten to cover
+        the v2 equivalent behavior, not deleted outright.
+        <trace>fr-sb-008</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

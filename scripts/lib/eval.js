@@ -43,6 +43,9 @@ const graders = require('./eval-graders');
  * @property {string} grader - Grader type used
  * @property {number} score - Score from 0.0 to 1.0
  * @property {string} timestamp - ISO timestamp
+ * @property {number|null} duration_ms - Wall-clock duration of the trial in ms (null if unavailable)
+ * @property {number|null} input_tokens - Input tokens used by the trial agent (null if unavailable)
+ * @property {number|null} output_tokens - Output tokens used by the trial agent (null if unavailable)
  * @property {string} [transcript] - Path to transcript file
  * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed
@@ -321,15 +324,22 @@ function buildIsolationSettings({ excludeClaudeMd = true } = {}) {
  * Parse stream-json output from `claude -p --output-format stream-json --verbose`.
  * Extracts assistant messages with tool calls to build a rich transcript
  * showing the full conversation flow (text + tool use in order).
+ * Also extracts usage metrics (tokens, duration) from the terminal result event.
  * @param {string} rawOutput - Raw JSONL output from stream-json
- * @returns {{ textResult: string, richTranscript: string }}
+ * @returns {{ textResult: string, richTranscript: string, usage: { input_tokens: number|null, output_tokens: number|null, duration_ms: number|null } }}
  */
 function parseStreamJsonOutput(rawOutput) {
-  if (!rawOutput) return { textResult: '', richTranscript: '' };
+  if (!rawOutput)
+    return {
+      textResult: '',
+      richTranscript: '',
+      usage: { input_tokens: null, output_tokens: null, duration_ms: null },
+    };
 
   const lines = rawOutput.split('\n').filter((l) => l.trim());
   const parts = [];
   let textResult = '';
+  const usage = { input_tokens: null, output_tokens: null, duration_ms: null };
 
   for (const line of lines) {
     let event;
@@ -350,10 +360,15 @@ function parseStreamJsonOutput(rawOutput) {
       }
     } else if (event.type === 'result') {
       textResult = event.result || '';
+      if (event.usage && typeof event.usage === 'object') {
+        usage.input_tokens = event.usage.input_tokens ?? null;
+        usage.output_tokens = event.usage.output_tokens ?? null;
+      }
+      usage.duration_ms = event.duration_ms ?? null;
     }
   }
 
-  return { textResult, richTranscript: parts.join('\n\n') };
+  return { textResult, richTranscript: parts.join('\n\n'), usage };
 }
 
 /**
@@ -465,6 +480,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       grader: scenario.grader,
       score: 0,
       timestamp,
+      duration_ms: null,
+      input_tokens: null,
+      output_tokens: null,
       error: `Plugin dir does not exist: ${pluginDir}`,
       infraError: true,
       ...(model ? { model } : {}),
@@ -524,12 +542,14 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
     console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
   }
+  const t0 = Date.now();
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
     cwd: trialDir,
     timeout: 300000,
     maxBuffer: CLAUDE_MAX_BUFFER,
   });
+  const wallDuration = Date.now() - t0;
   if (process.env.EVAL_DEBUG) {
     console.error(`[eval-debug] exitCode: ${result.exitCode}`);
     console.error(`[eval-debug] stdout length: ${(result.stdout || '').length}`);
@@ -540,7 +560,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // With stream-json, stdout may contain valid tool-use data even on non-zero exit
   // (e.g., max-turns reached). Try stdout first, fall back to stderr.
   const rawOutput = result.stdout || result.stderr || '';
-  const { textResult, richTranscript } = parseStreamJsonOutput(rawOutput);
+  const { textResult, richTranscript, usage } = parseStreamJsonOutput(rawOutput);
+  // Prefer the stream-json duration_ms if available; fall back to wall-clock.
+  const duration_ms = usage.duration_ms ?? wallDuration;
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
   const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
@@ -554,6 +576,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     grader: scenario.grader,
     score: 0,
     timestamp,
+    duration_ms,
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
     transcript,
     trialDir,
     ...(actions.length > 0 ? { actions } : {}),
@@ -996,7 +1021,7 @@ function ensureEvalsDir(projectRoot) {
 /**
  * Compare baseline vs treatment results, routing by grader type.
  * Code-graded scenarios get fast programmatic delta.
- * Model/human-graded scenarios also get eval-comparator agent analysis.
+ * Model/human-graded scenarios also get eval-analyzer agent analysis.
  * @param {EvalScenario} scenario - Eval scenario
  * @param {TrialResult[]} baseline - Baseline results
  * @param {TrialResult[]} treatment - Treatment results

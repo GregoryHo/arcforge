@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="folder-structure">
+  <title>Folder Consolidation</title>
+  <consumes>
+    <artifact>agents/eval-grader.md, agents/eval-analyzer.md (current project-root agent prompt templates)</artifact>
+    <artifact>scripts/eval-dashboard.js, scripts/eval-dashboard-ui.html (current dashboard files)</artifact>
+    <artifact>scripts/lib/eval.js, scripts/lib/eval-stats.js, scripts/lib/eval-graders.js (canonical engine, non-migrated)</artifact>
+    <artifact>scripts/lib/eval-graders.js — loadAgentDef() call sites that currently read from project-root agents/</artifact>
+  </consumes>
+  <produces>
+    <artifact>skills/arc-evaluating/agents/eval-grader.md, skills/arc-evaluating/agents/eval-analyzer.md, skills/arc-evaluating/agents/eval-blind-comparator.md</artifact>
+    <artifact>skills/arc-evaluating/dashboard/* (relocated dashboard assets)</artifact>
+    <artifact>scripts/lib/eval-graders.js with loadAgentDef paths pointing at skills/arc-evaluating/agents/</artifact>
+  </produces>
+
+  <requirement id="fr-fs-001">
+    <title>Co-locate Eval Agent Prompt Templates Inside the Skill Folder</title>
+    <description>
+      The eval-grader, eval-analyzer (renamed from eval-comparator), and the new
+      eval-blind-comparator agent prompt templates MUST live under
+      skills/arc-evaluating/agents/. The harness already loads these files as
+      prompt templates via loadAgentDef() and execCommand('claude', ...) — it
+      does NOT invoke them as registered subagents. Migration therefore requires
+      only: (a) physically moving the .md files, (b) updating the path arguments
+      inside scripts/lib/eval-graders.js's loadAgentDef calls, (c) deleting the
+      old project-root copies. No .claude-plugin/plugin.json changes are needed
+      and the default auto-discovery of the remaining project-root agents/
+      directory (implementer, debugger, planner, verifier, code-reviewer,
+      quality-reviewer, spec-reviewer, loop-operator) MUST NOT be disturbed.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-fs-001-ac1">
+        After migration, skills/arc-evaluating/agents/eval-grader.md,
+        eval-analyzer.md, and eval-blind-comparator.md MUST exist. The old
+        project-root paths agents/eval-grader.md and agents/eval-analyzer.md
+        MUST NOT exist.
+        <trace>fr-fs-001</trace>
+      </criterion>
+      <criterion id="fr-fs-001-ac2">
+        scripts/lib/eval-graders.js MUST read the prompt templates via the new
+        skill-folder paths. A grep for "agents/eval-grader.md" or
+        "agents/eval-analyzer.md" in scripts/lib/ MUST return zero matches
+        after migration.
+        <trace>fr-fs-001</trace>
+      </criterion>
+      <criterion id="fr-fs-001-ac3">
+        .claude-plugin/plugin.json MUST remain unchanged by this migration.
+        Other project-root agents (implementer, debugger, etc.) MUST continue
+        to appear in the subagent_type registry exactly as before.
+        <trace>fr-fs-001</trace>
+      </criterion>
+      <criterion id="fr-fs-001-ac4">
+        arc eval ab and arc eval run MUST succeed end-to-end after migration
+        on at least one existing scenario, proving the grader prompt is loaded
+        from the new location without regression.
+        <trace>fr-fs-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-fs-002">
+    <title>Relocate Dashboard Code Into the Skill Folder</title>
+    <description>
+      scripts/eval-dashboard.js and scripts/eval-dashboard-ui.html MUST move to
+      skills/arc-evaluating/dashboard/. The CLI entry point arc eval dashboard
+      MUST continue to work after the move — scripts/cli.js MAY update its
+      require() path, but the user-facing command SHALL NOT change. No
+      duplicated copies may remain at the old scripts/ location once the
+      migration is complete.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-fs-002-ac1">
+        After migration, arc eval dashboard MUST start the SSE server using
+        code located in skills/arc-evaluating/dashboard/ and scripts/eval-dashboard.*
+        MUST no longer exist on disk.
+        <trace>fr-fs-002</trace>
+      </criterion>
+      <criterion id="fr-fs-002-ac2">
+        After migration, existing dashboard tests (tests/scripts/eval-dashboard.test.js)
+        MUST either be relocated alongside the dashboard code or updated to
+        require() the new path. CI MUST pass.
+        <trace>fr-fs-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-fs-003">
+    <title>Preserve Canonical Engine Location</title>
+    <description>
+      scripts/lib/eval.js, scripts/lib/eval-stats.js, and scripts/lib/eval-graders.js
+      MUST remain at their current canonical location. They are the arcforge
+      core engine per .claude/rules/architecture.md and MUST NOT be moved into
+      the skill folder. Skill-owned tooling (agents, dashboard, references,
+      scenarios) and the canonical engine intentionally occupy different layers.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-fs-003-ac1">
+        After v2 migration, scripts/lib/eval.js, eval-stats.js, and
+        eval-graders.js MUST still exist at their original paths. No thin
+        re-export stub or relocation symlink MAY appear at
+        skills/arc-evaluating/scripts/.
+        <trace>fr-fs-003</trace>
+      </criterion>
+      <criterion id="fr-fs-003-ac2">
+        When skill-level tooling (new CLI subcommands, dashboard, agents)
+        needs engine functions, they MUST import from scripts/lib/ — duplicating
+        logic into the skill folder is forbidden.
+        <trace>fr-fs-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

@@ -10,9 +10,10 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const eval_ = require('./lib/eval');
-const stats = require('./lib/eval-stats');
-const { classifyAssertions } = require('./lib/eval-graders');
+const eval_ = require('../../../scripts/lib/eval');
+const stats = require('../../../scripts/lib/eval-stats');
+const { classifyAssertions } = require('../../../scripts/lib/eval-graders');
+const { sanitizeFilename } = require('../../../scripts/lib/utils');
 
 // ── SSE Client Management ────────────────────────────────────
 
@@ -85,9 +86,44 @@ function setupWatchers(projectRoot) {
   }
 
   const watchers = [];
+  let usingPolling = false;
+
+  // Polling fallback used when recursive fs.watch is unsupported (e.g.
+  // older Node on Linux without inotify aggregation). Walks resultsDir
+  // for *.jsonl files, adds new/changed paths to pendingFiles so the
+  // existing debounced processChanges() handles broadcast — preserves
+  // append-detection via fileSizes without duplicating that logic.
+  function pollResultsDir() {
+    const stack = [resultsDir];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      let entries;
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(full);
+        } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+          pendingFiles.add(path.relative(resultsDir, full));
+        }
+      }
+    }
+    if (pendingFiles.size > 0) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(processChanges, 500);
+    }
+  }
 
   function watchResultsDir() {
     if (!fs.existsSync(resultsDir)) return false;
+    // Already on polling fallback — don't keep re-trying the unsupported
+    // recursive watch. The existence-poll caller below uses our return
+    // value to decide whether to keep its retry interval alive.
+    if (usingPolling) return true;
     try {
       const w = fs.watch(resultsDir, { recursive: true }, (_event, filename) => {
         if (!filename) return;
@@ -98,8 +134,19 @@ function setupWatchers(projectRoot) {
       watchers.push(w);
       return true;
     } catch {
-      /* fs.watch may not support recursive on some platforms */
-      return false;
+      // Recursive fs.watch unsupported on this platform. Establish a
+      // polling fallback ONCE so SSE trial-complete events still fire,
+      // and return true so the existence-poll caller stops retrying
+      // (without this, we'd thrash retrying the unsupported recursive
+      // call forever — the original F13 bug).
+      console.warn(
+        '[eval-dashboard] recursive fs.watch unsupported on this platform; ' +
+          'falling back to polling (5s interval). Real-time updates will be slower.',
+      );
+      usingPolling = true;
+      const pollHandle = setInterval(pollResultsDir, 5000);
+      watchers.push({ close: () => clearInterval(pollHandle) });
+      return true;
     }
   }
 
@@ -284,6 +331,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   const delta = stats.computeDelta(baseline, treatment);
   const deltaCi = stats.ciForDelta(baseline, treatment);
   const verdict = stats.verdictFromDeltaCI(baseline, treatment);
+  const metricDeltas = stats.computeMetricDeltas(baseline, treatment);
 
   sendJson(res, {
     scenario: scenarioName,
@@ -292,6 +340,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
     delta: stats.round2(delta),
     deltaCi,
     verdict,
+    metricDeltas,
   });
 }
 
@@ -323,7 +372,14 @@ function handleApiTranscript(res, projectRoot, query) {
   const resultsDir = path.resolve(projectRoot, eval_.RESULTS_DIR);
   const resolved = path.resolve(resultsDir, relPath);
 
-  if (!resolved.startsWith(resultsDir)) {
+  // Require a real path-segment boundary: bare equality with the dir,
+  // OR resolved must start with `resultsDir + path.sep`. A naive
+  // startsWith(resultsDir) lets sibling directories whose name shares
+  // the prefix (e.g. `evals/results2`, `evals/results.bak`) bypass the
+  // guard, exposing arbitrary files under the parent.
+  const isInside =
+    resolved === resultsDir || resolved.startsWith(resultsDir + path.sep);
+  if (!isInside) {
     return sendError(res, 403, 'Path traversal not allowed');
   }
   if (!fs.existsSync(resolved)) return sendError(res, 404, 'Transcript not found');
@@ -357,6 +413,83 @@ function handleApiScenario(res, projectRoot, name) {
   });
 }
 
+// ── Feedback Handlers ─────────────────────────────────────────
+
+/**
+ * Validate that scenario and runId are safe path components.
+ * Returns an error message if invalid, null if valid.
+ * @param {string} scenario
+ * @param {string} runId
+ * @returns {string|null}
+ */
+function validateFeedbackComponents(scenario, runId) {
+  if (!scenario || !runId) return 'Missing required fields: scenario and runId';
+  try {
+    sanitizeFilename(scenario);
+    sanitizeFilename(runId);
+  } catch (err) {
+    return err.message;
+  }
+  return null;
+}
+
+function feedbackFilePath(projectRoot, scenario, runId) {
+  return path.join(projectRoot, eval_.RESULTS_DIR, scenario, runId, 'feedback.json');
+}
+
+function handleGetFeedback(res, projectRoot, query) {
+  const { scenario, runId } = query;
+  const err = validateFeedbackComponents(scenario, runId);
+  if (err) return sendError(res, 400, err);
+
+  const fPath = feedbackFilePath(projectRoot, scenario, runId);
+  if (!fs.existsSync(fPath)) return sendJson(res, {});
+
+  try {
+    sendJson(res, JSON.parse(fs.readFileSync(fPath, 'utf8')));
+  } catch {
+    sendJson(res, {});
+  }
+}
+
+function handlePostFeedback(req, res, projectRoot) {
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', () => {
+    let body;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch {
+      return sendError(res, 400, 'Invalid JSON body');
+    }
+
+    const { scenario, runId, trialId, feedback } = body;
+    if (!trialId || feedback === undefined) {
+      return sendError(res, 400, 'Missing required fields: trialId and feedback');
+    }
+
+    const err = validateFeedbackComponents(scenario, runId);
+    if (err) return sendError(res, 400, err);
+
+    const fPath = feedbackFilePath(projectRoot, scenario, runId);
+    const dir = path.dirname(fPath);
+    fs.mkdirSync(dir, { recursive: true });
+
+    let existing = {};
+    if (fs.existsSync(fPath)) {
+      try {
+        existing = JSON.parse(fs.readFileSync(fPath, 'utf8'));
+      } catch {
+        existing = {};
+      }
+    }
+    existing[trialId] = feedback;
+    existing.last_saved = new Date().toISOString();
+    fs.writeFileSync(fPath, JSON.stringify(existing, null, 2));
+    sendJson(res, { ok: true });
+  });
+}
+
 // ── Router ────────────────────────────────────────────────────
 
 function createRouter(projectRoot, cachedHtml) {
@@ -364,6 +497,7 @@ function createRouter(projectRoot, cachedHtml) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const pathname = url.pathname;
     const query = Object.fromEntries(url.searchParams);
+    const method = req.method || 'GET';
 
     if (pathname === '/' || pathname === '/index.html') {
       return sendHtml(res, cachedHtml);
@@ -392,6 +526,11 @@ function createRouter(projectRoot, cachedHtml) {
     }
 
     if (pathname === '/api/transcript') return handleApiTranscript(res, projectRoot, query);
+
+    if (pathname === '/feedback') {
+      if (method === 'POST') return handlePostFeedback(req, res, projectRoot);
+      return handleGetFeedback(res, projectRoot, query);
+    }
 
     sendError(res, 404, 'Not found');
   };
@@ -435,4 +574,11 @@ function startServer(projectRoot, options = {}) {
   process.on('SIGTERM', shutdown);
 }
 
-module.exports = { startServer, createRouter, handleApiTranscript };
+module.exports = {
+  startServer,
+  createRouter,
+  handleApiTranscript,
+  sseClients,
+  addSseClient,
+  setupWatchers,
+};

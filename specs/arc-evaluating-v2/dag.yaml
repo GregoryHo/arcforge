@@ -1,0 +1,224 @@
+epics:
+  - id: folder-structure
+    name: Folder Consolidation
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/folder-structure/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: fs-001
+        name: Co-locate eval agent prompt templates inside skill folder
+        status: completed
+        depends_on: []
+        source_requirement: fr-fs-001
+      - id: fs-002
+        name: Relocate dashboard code into skill folder
+        status: completed
+        depends_on: []
+        source_requirement: fr-fs-002
+      - id: fs-003
+        name: Preserve canonical engine location
+        status: completed
+        depends_on: []
+        source_requirement: fr-fs-003
+  - id: grader-trials
+    name: Grader Pipeline — Per-Trial Data and Claim Channels
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/grader-trials/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: gr-001
+        name: Capture per-trial timing and token metrics
+        status: completed
+        depends_on: []
+        source_requirement: fr-gr-001
+      - id: gr-002
+        name: Surface token and duration deltas in benchmark reports
+        status: completed
+        depends_on:
+          - gr-001
+        source_requirement: fr-gr-002
+      - id: gr-003
+        name: discovered_claims[] field in grading.json
+        status: completed
+        depends_on: []
+        source_requirement: fr-gr-003
+      - id: gr-004
+        name: weak_assertions[] field in grading.json
+        status: completed
+        depends_on: []
+        source_requirement: fr-gr-004
+  - id: verdict-and-routing
+    name: Verdict Tightening and Discipline Routing
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/verdict-and-routing/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: vr-001
+        name: INSUFFICIENT_DATA verdict when k<5
+        status: completed
+        depends_on: []
+        source_requirement: fr-vr-001
+      - id: vr-002
+        name: arc-using routing table integration
+        status: completed
+        depends_on: []
+        source_requirement: fr-vr-002
+  - id: agent-lifecycle
+    name: Agent Rename, Scope Tightening, and New Blind Comparator
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/agent-lifecycle/epic.md
+    worktree: null
+    depends_on:
+      - folder-structure
+    features:
+      - id: ag-001
+        name: Rename eval-comparator to eval-analyzer
+        status: completed
+        depends_on: []
+        source_requirement: fr-ag-001
+      - id: ag-002
+        name: Strip verdict authority from eval-analyzer
+        status: completed
+        depends_on:
+          - ag-001
+        source_requirement: fr-ag-002
+      - id: ag-003
+        name: Introduce eval-blind-comparator prompt template
+        status: completed
+        depends_on: []
+        source_requirement: fr-ag-003
+  - id: cli-subcommands
+    name: New CLI Subcommands — preflight / lint / audit
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/cli-subcommands/epic.md
+    worktree: null
+    depends_on:
+      - grader-trials
+    features:
+      - id: cli-001
+        name: arc eval preflight subcommand
+        status: completed
+        depends_on: []
+        source_requirement: fr-cli-001
+      - id: cli-002
+        name: arc eval lint subcommand
+        status: completed
+        depends_on: []
+        source_requirement: fr-cli-002
+      - id: cli-003
+        name: arc eval audit subcommand
+        status: completed
+        depends_on: []
+        source_requirement: fr-cli-003
+  - id: grader-blind
+    name: Blind Comparator Auto-Trigger
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/grader-blind/epic.md
+    worktree: null
+    depends_on:
+      - agent-lifecycle
+    features:
+      - id: gr-005
+        name: Blind-comparator auto-trigger rule
+        status: completed
+        depends_on: []
+        source_requirement: fr-gr-005
+  - id: dashboard
+    name: Dashboard Consolidation and UI Redesign
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/dashboard/epic.md
+    worktree: null
+    depends_on:
+      - folder-structure
+      - grader-trials
+    features:
+      - id: dash-001
+        name: Two-tab layout (Outputs, Benchmark)
+        status: completed
+        depends_on: []
+        source_requirement: fr-dash-001
+      - id: dash-002
+        name: Auto-saving feedback textbox per eval
+        status: completed
+        depends_on:
+          - dash-001
+        source_requirement: fr-dash-002
+      - id: dash-003
+        name: Keyboard navigation between trials
+        status: completed
+        depends_on:
+          - dash-001
+        source_requirement: fr-dash-003
+      - id: dash-004
+        name: Retain SSE real-time monitoring
+        status: completed
+        depends_on: []
+        source_requirement: fr-dash-004
+  - id: skill-body
+    name: SKILL.md Body, References, and TDD-for-Docs Validation
+    status: completed
+    spec_path: specs/arc-evaluating-v2/epics/skill-body/epic.md
+    worktree: null
+    depends_on:
+      - folder-structure
+      - grader-trials
+      - verdict-and-routing
+      - agent-lifecycle
+      - cli-subcommands
+      - grader-blind
+      - dashboard
+    features:
+      - id: sb-001
+        name: SKILL.md description stays triggering-only
+        status: completed
+        depends_on: []
+        source_requirement: fr-sb-001
+      - id: sb-002
+        name: SKILL.md body word budget (≤1800w)
+        status: completed
+        depends_on:
+          - sb-003
+        source_requirement: fr-sb-002
+      - id: sb-003
+        name: Progressive disclosure via new reference files
+        status: completed
+        depends_on: []
+        source_requirement: fr-sb-003
+      - id: sb-004
+        name: Rationalization Table for v2 behaviors
+        status: completed
+        depends_on: []
+        source_requirement: fr-sb-004
+      - id: sb-005
+        name: Red Flags list for v2 failure modes
+        status: completed
+        depends_on: []
+        source_requirement: fr-sb-005
+      - id: sb-006
+        name: TDD-for-docs Iron Law applied to v2 edits
+        status: completed
+        depends_on:
+          - sb-001
+          - sb-004
+          - sb-005
+        source_requirement: fr-sb-006
+      - id: sb-007
+        name: Cross-references use REQUIRED markers
+        status: completed
+        depends_on: []
+        source_requirement: fr-sb-007
+      - id: sb-008
+        name: Existing pytest validators continue to pass
+        status: completed
+        depends_on:
+          - sb-001
+          - sb-002
+          - sb-003
+          - sb-004
+          - sb-005
+          - sb-006
+          - sb-007
+        source_requirement: fr-sb-008

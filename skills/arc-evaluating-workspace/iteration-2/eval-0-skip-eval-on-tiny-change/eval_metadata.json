@@ -1,0 +1,41 @@
+{
+  "eval_id": 0,
+  "eval_name": "skip-eval-on-tiny-change",
+  "prompt": "I just tweaked a wording bullet in my arc-writing-tasks skill — added a warning about not using TodoWrite for simple one-line edits. My team is waiting for this to unblock their PR. The change is cosmetic, just one bullet. Can I merge now without formal evals?",
+  "targets": "Rationalization Table (too-small-to-eval) + Red Flags (docs-only no eval)",
+  "assertions": [
+    {
+      "id": "eval-0-a1",
+      "text": "Response refuses the skip-eval merge path (does not agree to merge without eval evidence)",
+      "grader": "model",
+      "discriminative": false,
+      "note": "Both conditions likely pass — arcforge CLAUDE.md already teaches Iron Law; this is baseline ceiling risk"
+    },
+    {
+      "id": "eval-0-a2",
+      "text": "Response names the specific Rationalization Table excuse pattern ('too small to eval' OR 'size does not predict behavioral impact' OR 'cosmetic change') with explicit counter",
+      "grader": "model",
+      "discriminative": true,
+      "note": "Treatment should cite this; baseline may paraphrase but not quote"
+    },
+    {
+      "id": "eval-0-a3",
+      "text": "Response references the Red Flags list (or names 'docs-only no eval needed' as flagged pattern)",
+      "grader": "model",
+      "discriminative": true
+    },
+    {
+      "id": "eval-0-a4",
+      "text": "Response mentions at least one v2-specific mechanism by name: preflight, INSUFFICIENT_DATA, arc eval ab, or references/preflight.md",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cEi 'preflight|INSUFFICIENT_DATA|arc eval ab|references/preflight' response.md"
+    },
+    {
+      "id": "eval-0-a5",
+      "text": "Response provides concrete remediation steps ordered by numbered list or sequence (first/second/third/1./2.)",
+      "grader": "model",
+      "discriminative": false
+    }
+  ]
+}

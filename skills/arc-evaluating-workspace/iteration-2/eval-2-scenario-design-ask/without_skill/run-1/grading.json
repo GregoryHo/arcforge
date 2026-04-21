@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Response recommends paired runs (with-skill vs without-skill) at k≥5",
+      "passed": true,
+      "evidence": "'Run both arms multiple times per scenario (N=5+)' and 'paired runs with identical starting conditions'"
+    },
+    {
+      "text": "Response mentions preflight OR baseline-ceiling check as a scenario-validity step",
+      "passed": false,
+      "evidence": "grep count = 0 — no preflight, no ceiling check, no discriminativeness validation step"
+    },
+    {
+      "text": "Response mentions answer leakage / prompt leaking the skill's keywords ('hypothesis', 'reproduce', 'root cause')",
+      "passed": false,
+      "evidence": "grep count = 0 — zero awareness of prompt-word leakage as a confound"
+    },
+    {
+      "text": "Response names 'discriminative trap' or 'bait' as scenario design element (not just 'failure mode')",
+      "passed": false,
+      "evidence": "grep count = 0 — uses 'failure mode' / 'curate bugs' but no trap/bait framing"
+    },
+    {
+      "text": "Response prescribes grader-type matching to assertion nature (code for deterministic, model for judgment)",
+      "passed": false,
+      "evidence": "Mentions 'grep-able or LLM-judge prompt' in passing but no prescription matching grader type to assertion kind"
+    },
+    {
+      "text": "Response starts with scope alignment (skill vs agent vs workflow eval)",
+      "passed": false,
+      "evidence": "Goes directly to mechanics ('paired runs with identical starting conditions'); no scope-target sentence"
+    },
+    {
+      "text": "Response recommends one-behavior-per-scenario (prefer 3-5 narrow scenarios over one overloaded)",
+      "passed": false,
+      "evidence": "Suggests 'Curate 5-10 such scenarios' but no one-behavior-per-scenario principle; scenarios defined broadly by bug type"
+    }
+  ],
+  "summary": {"passed": 1, "failed": 6, "total": 7, "pass_rate": 0.14}
+}

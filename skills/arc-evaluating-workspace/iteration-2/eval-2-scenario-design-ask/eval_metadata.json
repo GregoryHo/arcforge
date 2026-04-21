@@ -1,0 +1,55 @@
+{
+  "eval_id": 2,
+  "eval_name": "scenario-design-ask",
+  "prompt": "I want to measure whether my new arc-debugging skill actually changes agent behavior versus no skill. How should I design an eval scenario to test this?",
+  "targets": "Preflight + ceiling check + answer-leakage awareness + discriminative trap design + grader-type matching",
+  "assertions": [
+    {
+      "id": "eval-2-a1",
+      "text": "Response recommends paired runs (with-skill vs without-skill) at k≥5",
+      "grader": "model",
+      "discriminative": false,
+      "note": "Both likely cover this — standard A/B hygiene"
+    },
+    {
+      "id": "eval-2-a2",
+      "text": "Response mentions preflight OR baseline-ceiling check as a scenario-validity step",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cEi 'preflight|ceiling|baseline.*not.*discriminative' response.md"
+    },
+    {
+      "id": "eval-2-a3",
+      "text": "Response mentions answer leakage / prompt leaking the skill's keywords ('hypothesis', 'reproduce', 'root cause')",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cEi 'answer leakage|leak|strip those words|leaking' response.md"
+    },
+    {
+      "id": "eval-2-a4",
+      "text": "Response names 'discriminative trap' or 'bait' as scenario design element (not just 'failure mode')",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cEi 'discriminat|trap|bait' response.md"
+    },
+    {
+      "id": "eval-2-a5",
+      "text": "Response prescribes grader-type matching to assertion nature (code for deterministic, model for judgment)",
+      "grader": "model",
+      "discriminative": true
+    },
+    {
+      "id": "eval-2-a6",
+      "text": "Response starts with scope alignment (skill vs agent vs workflow eval)",
+      "grader": "model",
+      "discriminative": true,
+      "note": "Treatment should, baseline typically skips directly to mechanics"
+    },
+    {
+      "id": "eval-2-a7",
+      "text": "Response recommends one-behavior-per-scenario (prefer 3-5 narrow scenarios over one overloaded)",
+      "grader": "model",
+      "discriminative": true
+    }
+  ]
+}

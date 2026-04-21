@@ -9,8 +9,11 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand } = require('./utils');
+const { execCommand, sanitizeFilename } = require('./utils');
 const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD, round2 } = require('./eval-stats');
+
+// Mirror of eval.js constants to avoid circular imports
+const GRADING_RESULTS_DIR = path.join('evals', 'results');
 
 // Cache agent definitions to avoid repeated disk reads during batch grading.
 // Key: absolute path, Value: file content with frontmatter stripped (empty string if missing).
@@ -353,6 +356,96 @@ function numberTranscriptBlocks(output) {
 }
 
 /**
+ * Compute the path to grading.json for a specific trial result.
+ * @param {import('./eval').TrialResult} result - Trial result
+ * @param {string} projectRoot - Project root directory
+ * @returns {string} Absolute path to grading.json
+ */
+function getGradingPath(result, projectRoot) {
+  const evalName = result.eval || '';
+  // Mirror eval.js parseEvalName exactly so grading.json lands under the
+  // same scenario directory as the run JSONL. Diverging here (e.g. via an
+  // ad-hoc /[^a-zA-Z0-9-]/ replacement) splits grading artifacts from
+  // their run for any scenario containing characters like `_`.
+  const stripped = evalName.replace(/-(baseline|treatment)$/, '');
+  const scenarioName = stripped ? sanitizeFilename(stripped) : '';
+  const runId =
+    result.runId ||
+    (result.timestamp ? result.timestamp.slice(0, 10).replace(/-/g, '') : 'unknown');
+  return path.join(
+    projectRoot,
+    GRADING_RESULTS_DIR,
+    scenarioName,
+    runId,
+    'grading',
+    `trial-${result.trial}.json`,
+  );
+}
+
+/** Required keys for discovered_claims entries */
+const CLAIM_REQUIRED_KEYS = ['text', 'category', 'passed', 'evidence'];
+
+/** Required keys for weak_assertions entries */
+const WEAK_ASSERTION_REQUIRED_KEYS = ['assertion_id', 'reason'];
+
+/**
+ * Validate an array of claim/assertion entries, warning on missing required keys.
+ * Never crashes — returns the original array (possibly with invalid entries).
+ * @param {any[]} entries - Array of objects from grader response
+ * @param {string[]} requiredKeys - Keys each entry must have
+ * @param {string} fieldName - Field name for warning messages
+ * @returns {Object[]} Entries that are valid objects (non-objects filtered out)
+ */
+function validateGraderEntries(entries, requiredKeys, fieldName) {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const missing = requiredKeys.filter((k) => !Object.hasOwn(entry, k));
+    if (missing.length > 0) {
+      process.stderr.write(`Warning: ${fieldName} entry missing keys: ${missing.join(', ')}\n`);
+    }
+    return true; // include even if keys missing — just warn
+  });
+}
+
+/**
+ * Write grading.json for a model-graded trial.
+ * Contains discovered_claims and weak_assertions from the grader response.
+ * Also records trial identity and score for traceability.
+ * @param {import('./eval').TrialResult} result - Trial result (before grading)
+ * @param {Object} gradeData - Grader response data
+ * @param {Object} validated - Validated scores from validateGraderResponse
+ * @param {string} projectRoot - Project root directory
+ */
+function writeGradingJson(result, gradeData, validated, projectRoot) {
+  try {
+    const gradingPath = getGradingPath(result, projectRoot);
+    fs.mkdirSync(path.dirname(gradingPath), { recursive: true });
+    const rawClaims = validateGraderEntries(
+      gradeData.discovered_claims,
+      CLAIM_REQUIRED_KEYS,
+      'discovered_claims',
+    );
+    const rawWeak = validateGraderEntries(
+      gradeData.weak_assertions,
+      WEAK_ASSERTION_REQUIRED_KEYS,
+      'weak_assertions',
+    );
+    const grading = {
+      eval: result.eval,
+      trial: result.trial,
+      score: validated.overall,
+      passed: validated.passed,
+      discovered_claims: rawClaims,
+      weak_assertions: rawWeak,
+    };
+    fs.writeFileSync(gradingPath, JSON.stringify(grading, null, 2));
+  } catch {
+    /* grading.json write failure must never crash a trial */
+  }
+}
+
+/**
  * Grade a trial result using the eval-grader agent (LLM-as-judge).
  * Spawns a Claude session with the rubric and trial output, then
  * parses the structured grade report for per-assertion scores.
@@ -365,7 +458,9 @@ function numberTranscriptBlocks(output) {
  * @returns {import('./eval').TrialResult} New result with grade
  */
 function gradeWithModel(result, scenario, projectRoot) {
-  const agentDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-grader.md'));
+  const agentDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-grader.md'),
+  );
 
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const artifacts = captureTrialArtifacts(result.trialDir);
@@ -445,6 +540,8 @@ function gradeWithModel(result, scenario, projectRoot) {
       continue;
     }
 
+    writeGradingJson(result, grade, validated, projectRoot);
+
     return {
       ...result,
       passed: validated.passed,
@@ -457,18 +554,22 @@ function gradeWithModel(result, scenario, projectRoot) {
 }
 
 /**
- * Compare baseline vs treatment results using the eval-comparator agent.
- * Reads agents/eval-comparator.md as the comparison methodology.
- * Returns qualitative analysis based on harness-computed metrics.
+ * Compare baseline vs treatment results using the eval-analyzer agent.
+ * Reads skills/arc-evaluating/agents/eval-analyzer.md as the comparison methodology.
+ * Returns qualitative post-hoc analysis based on harness-computed metrics.
+ * The agent does not determine the verdict — the harness does that deterministically.
+ * If the agent returns a "recommendation" field, it is dropped with a warning.
  * @param {import('./eval').EvalScenario} scenario - Eval scenario
  * @param {import('./eval').TrialResult[]} baseline - Baseline results
  * @param {import('./eval').TrialResult[]} treatment - Treatment results
  * @param {string} projectRoot - Project root directory
  * @param {Object} metrics - Pre-computed metrics from compareResults
- * @returns {{ analysis: string, recommendation: string, improvements?: string[], regressions?: string[], limitations?: string[] }|null}
+ * @returns {{ analysis: string, delta_explanation?: string, weak_assertions_patterns?: string[], variance_notes?: string[], improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
-  const rawDef = loadAgentDef(path.join(projectRoot, 'agents', 'eval-comparator.md'));
+  const rawDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-analyzer.md'),
+  );
   if (!rawDef) return null;
   const agentDef = rawDef
     .replace(/\{IMPROVED_THRESHOLD\}/g, String(DELTA_IMPROVED_THRESHOLD))
@@ -513,7 +614,146 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
 
   if (exitCode !== 0) return null;
 
-  return extractJsonObject(stdout, ['analysis']);
+  const parsed = extractJsonObject(stdout, ['analysis']);
+  if (!parsed) return null;
+
+  // Drop any recommendation field the agent may have emitted — verdict authority
+  // is exclusively with the harness (deterministic computation), not the agent.
+  if (Object.hasOwn(parsed, 'recommendation')) {
+    process.stderr.write(
+      'Warning: eval-analyzer returned a "recommendation" field — dropping it. Verdict comes from the harness.\n',
+    );
+    const { recommendation: _dropped, ...rest } = parsed;
+    return rest;
+  }
+
+  return parsed;
+}
+
+// Forbidden strings that must never appear in the blind comparator payload.
+const BLIND_COMPARATOR_FORBIDDEN = ['baseline', 'treatment', 'with_skill', 'without_skill'];
+
+/**
+ * Build a comparison prompt for the blind comparator, stripping all identifying labels.
+ * The prompt must not contain any of BLIND_COMPARATOR_FORBIDDEN strings or the skill name.
+ * @param {string} taskPrompt - The original task prompt given to both conditions
+ * @param {string} outputA - Anonymized output for label A
+ * @param {string} outputB - Anonymized output for label B
+ * @param {string} agentDef - Loaded agent definition text
+ * @returns {string} Prompt safe to send to the blind comparator
+ */
+function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
+  return [
+    ...(agentDef ? [agentDef, ''] : []),
+    '## Comparison Task',
+    '',
+    '### Original Task Prompt',
+    taskPrompt,
+    '',
+    '### Output A',
+    '```',
+    outputA,
+    '```',
+    '',
+    '### Output B',
+    '```',
+    outputB,
+    '```',
+    '',
+    'Derive a rubric from the task prompt, score each output, and respond with the required JSON only.',
+  ].join('\n');
+}
+
+/**
+ * Run the eval-blind-comparator agent on two outputs.
+ * Randomly shuffles (baseline, treatment) → (A, B) to prevent label bias,
+ * then maps A/B back to original labels after parsing the response.
+ *
+ * The prompt sent to the agent is stripped of all identifying strings:
+ * "baseline", "treatment", "with_skill", "without_skill", and the skill name.
+ *
+ * Auto-triggering from the grader pipeline is wired in ./eval-blind-autotrigger.js
+ * per fr-gr-005 (all-model-graded scenarios only).
+ *
+ * @param {string} taskPrompt - The original task prompt given to both conditions
+ * @param {string} baselineOutput - Output from the baseline (control) condition
+ * @param {string} treatmentOutput - Output from the treatment (modified) condition
+ * @param {string} projectRoot - Project root directory
+ * @param {string} [skillName] - Skill name to strip from the prompt (optional)
+ * @returns {{ winner_original_label: 'baseline'|'treatment'|'tie', reasoning: string, rubric: Array<{criterion: string, weight: number}>, score_baseline: number, score_treatment: number }|null}
+ */
+function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, projectRoot, skillName) {
+  const agentDef = loadAgentDef(
+    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-blind-comparator.md'),
+  );
+
+  // Randomly assign baseline/treatment to A/B.
+  const baselineIsA = Math.random() < 0.5;
+  const outputA = baselineIsA ? baselineOutput : treatmentOutput;
+  const outputB = baselineIsA ? treatmentOutput : baselineOutput;
+
+  // Sanitize task prompt: strip forbidden strings and skill name.
+  const forbidden = skillName
+    ? [...BLIND_COMPARATOR_FORBIDDEN, skillName]
+    : BLIND_COMPARATOR_FORBIDDEN;
+
+  function sanitize(text) {
+    let result = text || '';
+    for (const word of forbidden) {
+      if (!word) continue;
+      // Escape regex metachars so user-provided skillName values
+      // like "skill+v2" or "arc-tdd[2]" don't crash RegExp construction.
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(escaped, 'gi'), '[redacted]');
+    }
+    return result;
+  }
+
+  const safePrompt = buildBlindComparatorPrompt(
+    sanitize(taskPrompt),
+    sanitize(outputA),
+    sanitize(outputB),
+    agentDef,
+  );
+
+  const { stdout, exitCode } = execCommand(
+    'claude',
+    ['-p', '--output-format', 'text', '--no-session-persistence'],
+    {
+      input: safePrompt,
+      cwd: projectRoot,
+      timeout: 120000,
+    },
+  );
+
+  if (exitCode !== 0) return null;
+
+  const parsed = extractJsonObject(stdout, ['winner']);
+  if (!parsed) return null;
+
+  const winner = parsed.winner; // expect 'A', 'B', or 'tie'
+  let winnerOriginalLabel;
+  if (winner === 'tie') {
+    winnerOriginalLabel = 'tie';
+  } else if (winner === 'A') {
+    winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
+  } else if (winner === 'B') {
+    winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
+  } else {
+    // Unknown / malformed winner value (e.g. lowercase 'b', 'baseline',
+    // whitespace-padded 'B '). Surface the failure rather than silently
+    // mapping it to a concrete baseline/treatment outcome — that would
+    // bias the supplementary preference signal.
+    return null;
+  }
+
+  return {
+    winner_original_label: winnerOriginalLabel,
+    reasoning: parsed.reasoning || '',
+    rubric: parsed.rubric || [],
+    score_baseline: baselineIsA ? (parsed.score_a ?? 0) : (parsed.score_b ?? 0),
+    score_treatment: baselineIsA ? (parsed.score_b ?? 0) : (parsed.score_a ?? 0),
+  };
 }
 
 /**
@@ -807,6 +1047,9 @@ module.exports = {
   captureTrialArtifacts,
   gradeWithModel,
   compareWithModel,
+  runBlindComparator,
+  buildBlindComparatorPrompt,
+  BLIND_COMPARATOR_FORBIDDEN,
   gradeWithHuman,
   snapScore,
   validateGraderResponse,
@@ -816,4 +1059,5 @@ module.exports = {
   gradeBehavioralAssertion,
   gradeAllBehavioral,
   gradeWithMixed,
+  getGradingPath,
 };

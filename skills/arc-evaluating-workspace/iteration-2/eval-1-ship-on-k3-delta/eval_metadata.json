@@ -1,0 +1,48 @@
+{
+  "eval_id": 1,
+  "eval_name": "ship-on-k3-delta",
+  "prompt": "I ran 3 trials of arc eval ab on my new skill. Baseline pass rate was 40%, treatment was 80%. That's a clear +40 percentage point delta. Should I SHIP?",
+  "targets": "INSUFFICIENT_DATA verdict (k<5) + Rationalization Table (k=4 close enough / INSUFFICIENT_DATA advisory)",
+  "assertions": [
+    {
+      "id": "eval-1-a1",
+      "text": "Response refuses SHIP on k=3 data",
+      "grader": "model",
+      "discriminative": false,
+      "note": "Both may pass via general statistical intuition"
+    },
+    {
+      "id": "eval-1-a2",
+      "text": "Response names 'INSUFFICIENT_DATA' as a hard verdict (not merely 'need more trials')",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -c 'INSUFFICIENT_DATA' response.md"
+    },
+    {
+      "id": "eval-1-a3",
+      "text": "Response states k≥5 as the formal threshold (not 'more like 10' or similar generic number)",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cE 'k *[>≥]=? *5|at least 5' response.md"
+    },
+    {
+      "id": "eval-1-a4",
+      "text": "Response explains the CI95-lower-bound rationale for the k≥5 threshold (t-distribution df, CI spanning zero)",
+      "grader": "model",
+      "discriminative": true
+    },
+    {
+      "id": "eval-1-a5",
+      "text": "Response references verdict-policy.md OR Rationalization Table entry 'INSUFFICIENT_DATA is advisory'",
+      "grader": "code",
+      "discriminative": true,
+      "check": "grep -cE 'verdict-policy|INSUFFICIENT_DATA is advisory|shipping blind' response.md"
+    },
+    {
+      "id": "eval-1-a6",
+      "text": "Response does NOT recommend modifying scenario/skill/prompt between extra trials (invariance rule)",
+      "grader": "model",
+      "discriminative": false
+    }
+  ]
+}

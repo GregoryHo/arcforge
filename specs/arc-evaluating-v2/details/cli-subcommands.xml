@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="cli-subcommands">
+  <title>New CLI Subcommands — preflight / lint / audit</title>
+  <consumes>
+    <artifact>evals/scenarios/*.md (scenario definitions)</artifact>
+    <artifact>evals/benchmarks/latest.json (historical benchmark data)</artifact>
+    <artifact>scripts/lib/eval.js (harness entry points)</artifact>
+  </consumes>
+  <produces>
+    <artifact>evals/preflight/&lt;scenario-hash&gt;.json (preflight pass/block records)</artifact>
+    <artifact>arc eval lint terminal output (validation errors + warnings)</artifact>
+    <artifact>arc eval audit terminal output (assertion promotion and retirement candidate lists)</artifact>
+  </produces>
+
+  <requirement id="fr-cli-001">
+    <title>arc eval preflight Subcommand</title>
+    <description>
+      A new arc eval preflight &lt;scenario&gt; subcommand MUST run 2–3 baseline pilot
+      trials against the scenario (no skill, no treatment), compute pass rate, and
+      record the result keyed by scenario hash. Outcomes: PASS when baseline pass
+      rate is below the ceiling threshold (0.8 by default); BLOCK when the ceiling
+      is reached, signaling the scenario is not discriminative. Subsequent arc
+      eval ab runs against the same scenario hash MUST require a prior PASS
+      preflight record; missing or stale records MUST block ab with a clear
+      remediation message. Scenario hash is computed deterministically from the
+      scenario file contents, so unchanged scenarios skip preflight transparently.
+      Preflight is exempt from the k≥5 verdict policy (fr-vr-001) because it
+      checks scenario validity, not shipping fitness — its output is PASS/BLOCK,
+      never SHIP/INSUFFICIENT_DATA.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cli-001-ac1">
+        Given a scenario that has never been preflighted, arc eval ab MUST refuse
+        to run and MUST print a message instructing the user to run
+        arc eval preflight first.
+        <trace>fr-cli-001</trace>
+      </criterion>
+      <criterion id="fr-cli-001-ac2">
+        Given a scenario whose baseline pass rate across 2–3 pilot trials is ≥ 0.8,
+        arc eval preflight MUST output BLOCK with a clear explanation (baseline
+        ceiling reached) and MUST persist the block record keyed by scenario hash.
+        <trace>fr-cli-001</trace>
+      </criterion>
+      <criterion id="fr-cli-001-ac3">
+        Given a previously preflighted scenario whose file contents are unchanged
+        (identical hash), arc eval ab MUST run without re-requiring preflight.
+        <trace>fr-cli-001</trace>
+      </criterion>
+      <criterion id="fr-cli-001-ac4">
+        Given a scenario edited after a prior preflight, the scenario hash MUST
+        differ and arc eval ab MUST refuse until preflight is re-run.
+        <trace>fr-cli-001</trace>
+      </criterion>
+      <criterion id="fr-cli-001-ac5">
+        arc eval preflight MUST NOT emit SHIP, NEEDS_WORK, BLOCKED, or
+        INSUFFICIENT_DATA verdicts. Its only outputs are PASS and BLOCK.
+        <trace>fr-cli-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cli-002">
+    <title>arc eval lint Subcommand</title>
+    <description>
+      A new arc eval lint &lt;scenario&gt; subcommand MUST validate a scenario file
+      against a JSON Schema covering required sections (Context, Setup, Grader
+      Config, Assertions), section format, assertion shape, and grader config
+      shape. Errors MUST be reported with file location and remediation. Lint
+      MUST exit non-zero on any schema violation.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cli-002-ac1">
+        Given a scenario with a well-formed structure, arc eval lint MUST exit 0
+        and print "ok".
+        <trace>fr-cli-002</trace>
+      </criterion>
+      <criterion id="fr-cli-002-ac2">
+        Given a scenario missing a required section such as "## Assertions", arc
+        eval lint MUST exit non-zero and print a diagnostic identifying the
+        missing section and the expected location.
+        <trace>fr-cli-002</trace>
+      </criterion>
+      <criterion id="fr-cli-002-ac3">
+        Given a scenario with an assertion entry that lacks a grader-type field,
+        arc eval lint MUST exit non-zero and report the specific assertion id.
+        <trace>fr-cli-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cli-003">
+    <title>arc eval audit Subcommand</title>
+    <description>
+      A new arc eval audit subcommand MUST aggregate discovered_claims[] and
+      weak_assertions[] across the entire benchmark history and emit two lists:
+      "promotion candidates" (claims that recur frequently and fail often —
+      candidates for elevation to formal assertions) and "retirement candidates"
+      (assertions repeatedly flagged as weak or non-discriminative). Output MUST
+      include frequency counts, originating scenarios, and a stable hash so the
+      same audit run is reproducible.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cli-003-ac1">
+        Given a benchmark history containing at least 10 graded trials across
+        multiple scenarios, arc eval audit MUST emit at least one promotion
+        candidate or one retirement candidate, each with frequency data.
+        <trace>fr-cli-003</trace>
+      </criterion>
+      <criterion id="fr-cli-003-ac2">
+        The promotion-candidate list MUST sort claims by descending frequency of
+        occurrence multiplied by failure rate, so high-impact candidates surface
+        first.
+        <trace>fr-cli-003</trace>
+      </criterion>
+      <criterion id="fr-cli-003-ac3">
+        arc eval audit MUST be read-only relative to scenarios and assertions —
+        it MUST NOT modify evals/scenarios/*.md files. Promotion and retirement
+        are human-arbitrated actions performed manually after reviewing the audit.
+        <trace>fr-cli-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

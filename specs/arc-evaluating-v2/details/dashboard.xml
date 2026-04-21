@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="dashboard">
+  <title>Dashboard Consolidation and UI Redesign</title>
+  <consumes>
+    <artifact>scripts/eval-dashboard.js (current SSE server)</artifact>
+    <artifact>scripts/eval-dashboard-ui.html (current single-pane UI)</artifact>
+    <artifact>skill-creator's eval-viewer/viewer.html (reference only, not imported)</artifact>
+    <artifact>evals/results/ (trial outputs read at render time)</artifact>
+  </consumes>
+  <produces>
+    <artifact>skills/arc-evaluating/dashboard/server.js (or equivalent entry point after migration)</artifact>
+    <artifact>skills/arc-evaluating/dashboard/ui.html with 2-tab layout, feedback textboxes, keyboard nav</artifact>
+    <artifact>evals/results/&lt;scenario&gt;/&lt;runId&gt;/feedback.json (auto-saved human notes)</artifact>
+  </produces>
+
+  <requirement id="fr-dash-001">
+    <title>Two-Tab Layout: Outputs and Benchmark</title>
+    <description>
+      The dashboard UI MUST present two top-level tabs: "Outputs" and "Benchmark".
+      Outputs shows one trial at a time with its prompt, the agent's output files
+      rendered inline, grading results, and (when present) a previous-iteration
+      side-by-side diff. Benchmark shows aggregate stats: pass rate (mean ±
+      stddev), delta, CI, token and duration deltas, and per-assertion breakdown.
+      Tab state MUST persist via URL fragment so a user can link a specific
+      tab / trial.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-dash-001-ac1">
+        Given the dashboard is open on a completed run, clicking the Outputs tab
+        MUST render one trial and clicking Benchmark MUST render aggregate stats
+        without a page reload.
+        <trace>fr-dash-001</trace>
+      </criterion>
+      <criterion id="fr-dash-001-ac2">
+        The active tab and active trial ID MUST be encoded in the URL (e.g.,
+        #tab=outputs&amp;trial=3) so copy-pasted URLs open the same view.
+        <trace>fr-dash-001</trace>
+      </criterion>
+      <criterion id="fr-dash-001-ac3">
+        The Benchmark tab MUST display token and duration deltas alongside
+        pass-rate delta (consuming the data surfaced per fr-gr-002).
+        <trace>fr-dash-001</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-dash-002">
+    <title>Auto-Saving Feedback Textbox per Eval</title>
+    <description>
+      The Outputs tab MUST include a textbox where the human reviewer can type
+      free-form feedback on the displayed trial. Changes MUST be auto-saved to
+      evals/results/&lt;scenario&gt;/&lt;runId&gt;/feedback.json within 2 seconds of
+      typing stopping. Reloading the page MUST restore the prior feedback. A
+      visible status indicator (e.g., "Saved" / "Saving…") SHOULD surface the
+      auto-save state.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-dash-002-ac1">
+        Given the user types in the feedback textbox and pauses for 2 seconds,
+        the content MUST be written to feedback.json at the canonical location
+        keyed by trial id.
+        <trace>fr-dash-002</trace>
+      </criterion>
+      <criterion id="fr-dash-002-ac2">
+        Given a trial has prior feedback in feedback.json, navigating to that
+        trial MUST pre-populate the textbox with the stored content.
+        <trace>fr-dash-002</trace>
+      </criterion>
+      <criterion id="fr-dash-002-ac3">
+        The UI MUST surface save state so the user is not left guessing whether
+        their input persisted. Minimum: a textual indicator that transitions
+        between "Saving…" and "Saved" within the save window.
+        <trace>fr-dash-002</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-dash-003">
+    <title>Keyboard Navigation Between Trials</title>
+    <description>
+      While the Outputs tab is active, pressing ArrowRight MUST advance to the
+      next trial and ArrowLeft MUST go to the previous. The keystrokes MUST NOT
+      consume focus when the user is typing in the feedback textbox. Tab order
+      MUST remain usable for screen readers; keyboard shortcuts are additive,
+      not exclusive.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-dash-003-ac1">
+        Given the Outputs tab is active and the cursor is outside any input, a
+        single ArrowRight press MUST render the next trial in sequence.
+        <trace>fr-dash-003</trace>
+      </criterion>
+      <criterion id="fr-dash-003-ac2">
+        Given the cursor is inside the feedback textbox, ArrowLeft / ArrowRight
+        MUST move the cursor within the text, NOT navigate trials.
+        <trace>fr-dash-003</trace>
+      </criterion>
+      <criterion id="fr-dash-003-ac3">
+        At the first or last trial respectively, ArrowLeft / ArrowRight MUST be
+        a no-op (no wrap-around, no error).
+        <trace>fr-dash-003</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-dash-004">
+    <title>Retain SSE Real-Time Monitoring</title>
+    <description>
+      The SSE channel from the current dashboard MUST be preserved in the
+      consolidated UI. While an eval run is in progress, in-flight trial
+      progress MUST appear on the Outputs tab without a page reload. The
+      real-time capability differentiates arcforge's dashboard from
+      skill-creator's static viewer and MUST NOT be lost in the consolidation.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-dash-004-ac1">
+        Given an arc eval ab run is in progress, the dashboard MUST display
+        newly completed trials within 5 seconds of their completion, without a
+        user action.
+        <trace>fr-dash-004</trace>
+      </criterion>
+      <criterion id="fr-dash-004-ac2">
+        The SSE endpoint (/events or equivalent) MUST remain at a stable URL
+        path after the file relocation, so any external tooling that polled the
+        prior dashboard continues to work.
+        <trace>fr-dash-004</trace>
+      </criterion>
+      <criterion id="fr-dash-004-ac3">
+        Given a client disconnects, the server MUST clean up the SSE subscription
+        and continue serving other connected clients without leaking memory.
+        <trace>fr-dash-004</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

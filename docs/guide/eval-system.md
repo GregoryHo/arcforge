@@ -79,7 +79,7 @@ Three grader types match three kinds of assertions. Match grader to assertion na
 ### Grader Mechanics
 
 - **Code grader**: Runs test command, checks exit code. `$TRIAL_DIR` available. Echo `A1:PASS` or `A1:FAIL:reason` for per-assertion results.
-- **Model grader**: Reads `agents/eval-grader.md` methodology. Scores each assertion 0.0-1.0. Uses trial artifacts as evidence.
+- **Model grader**: Reads `skills/arc-evaluating/agents/eval-grader.md` methodology. Scores each assertion 0.0-1.0. Uses trial artifacts as evidence.
 - **Human grader**: Presents output + checklist for manual review.
 
 ## Metrics
@@ -157,6 +157,7 @@ Full catalog (23 entries): `skills/arc-evaluating/references/common-mistakes-cat
 | Agent | Role |
 |-------|------|
 | **eval-grader** | Grade individual trial outputs against rubrics (model-graded scenarios) |
-| **eval-comparator** | Qualitative A/B analysis for model/human-graded results |
+| **eval-analyzer** | Post-hoc qualitative A/B analysis for model/human-graded results |
+| **eval-blind-comparator** | Anonymized paired-preference rating of A/B outputs |
 
 Numeric comparison (delta, CI, verdict) is programmatic — computed by the harness. These agents add qualitative analysis, not numeric computation.

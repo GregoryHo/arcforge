@@ -8,6 +8,16 @@
  */
 
 /**
+ * Verdict returned by verdictFromDeltaCI when either condition has fewer than
+ * 5 trials. This is a distinct string so downstream consumers can switch on it.
+ * JSON output will contain "INSUFFICIENT_DATA" as a literal string value.
+ *
+ * Remediation: see verdictMessage(INSUFFICIENT_DATA).
+ * @type {'INSUFFICIENT_DATA'}
+ */
+const INSUFFICIENT_DATA = 'INSUFFICIENT_DATA';
+
+/**
  * Asymmetric A/B delta thresholds (fallback for k < 5 where CI-based analysis
  * is not feasible). The asymmetry is intentional:
  *
@@ -340,24 +350,95 @@ function baselineVarianceWarning(results, precomputed, threshold) {
 }
 
 /**
- * Get A/B comparison verdict using CI when sample size is adequate, with
- * magic-threshold fallback for small samples.
+ * Get A/B comparison verdict using CI when sample size is adequate.
+ * Returns INSUFFICIENT_DATA when either condition has fewer than 5 trials —
+ * this guard fires BEFORE any CI or delta computation.
  * When both groups have >= 5 results, uses ciForDelta: IMPROVED if lower > 0,
- * REGRESSED if upper < 0, else INCONCLUSIVE. Falls back to verdictFromDelta
- * for smaller samples where CI is too wide to be informative.
+ * REGRESSED if upper < 0, else INCONCLUSIVE.
  * @param {import('./eval').TrialResult[]} baseline - Baseline results
  * @param {import('./eval').TrialResult[]} treatment - Treatment results
- * @param {Object} [fallbackThresholds] - Thresholds for small-sample fallback
- * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED'} Verdict
+ * @param {Object} [fallbackThresholds] - Unused (reserved for forward compatibility)
+ * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED' | 'INSUFFICIENT_DATA'} Verdict
  */
-function verdictFromDeltaCI(baseline, treatment, fallbackThresholds) {
-  if (baseline.length >= 5 && treatment.length >= 5) {
-    const ci = ciForDelta(baseline, treatment);
-    if (ci.lower > 0) return 'IMPROVED';
-    if (ci.upper < 0) return 'REGRESSED';
-    return 'INCONCLUSIVE';
+function verdictFromDeltaCI(baseline, treatment, _fallbackThresholds) {
+  // Early return: k<5 in either condition means the verdict is not defensible.
+  // This guard must precede all CI and delta computation.
+  if (baseline.length < 5 || treatment.length < 5) {
+    return INSUFFICIENT_DATA;
   }
-  return verdictFromDelta(computeDelta(baseline, treatment), fallbackThresholds);
+  const ci = ciForDelta(baseline, treatment);
+  if (ci.lower > 0) return 'IMPROVED';
+  if (ci.upper < 0) return 'REGRESSED';
+  return 'INCONCLUSIVE';
+}
+
+/**
+ * Return a user-visible remediation message for a verdict that requires action.
+ * Returns null for verdicts that have no remediation guidance.
+ * @param {string} verdict - Verdict string from verdictFromDeltaCI or similar
+ * @returns {string|null} Remediation message, or null if none applies
+ */
+function verdictMessage(verdict) {
+  if (verdict === INSUFFICIENT_DATA) {
+    return 'Run k\u22655 trials per condition for a defensible verdict.';
+  }
+  return null;
+}
+
+/**
+ * Compute mean of an array of values, ignoring nulls.
+ * Returns null when all values are null or array is empty.
+ * @param {(number|null)[]} values - Array of numeric or null values
+ * @returns {number|null} Mean of non-null values, or null
+ */
+function meanOrNull(values) {
+  const valid = values.filter((v) => v !== null && v !== undefined);
+  if (valid.length === 0) return null;
+  return valid.reduce((a, b) => a + b, 0) / valid.length;
+}
+
+/**
+ * Compute per-metric deltas (duration_ms, input_tokens, output_tokens)
+ * between baseline and treatment trial arrays.
+ * Ignores null values when computing means.
+ * Flags cost regression when treatmentMean > 2 * baselineMean (and baselineMean > 0).
+ *
+ * @param {import('./eval').TrialResult[]} baseline - Baseline trial results
+ * @param {import('./eval').TrialResult[]} treatment - Treatment trial results
+ * @returns {{
+ *   durationDelta: number|null,
+ *   inputTokensDelta: number|null,
+ *   outputTokensDelta: number|null,
+ *   baselineMeans: { duration_ms: number|null, input_tokens: number|null, output_tokens: number|null },
+ *   treatmentMeans: { duration_ms: number|null, input_tokens: number|null, output_tokens: number|null },
+ *   durationRegression: boolean,
+ *   inputTokensRegression: boolean,
+ *   outputTokensRegression: boolean,
+ * }}
+ */
+function computeMetricDeltas(baseline, treatment) {
+  const pick = (results, key) => results.map((r) => r[key] ?? null);
+
+  const bDuration = meanOrNull(pick(baseline, 'duration_ms'));
+  const tDuration = meanOrNull(pick(treatment, 'duration_ms'));
+  const bInput = meanOrNull(pick(baseline, 'input_tokens'));
+  const tInput = meanOrNull(pick(treatment, 'input_tokens'));
+  const bOutput = meanOrNull(pick(baseline, 'output_tokens'));
+  const tOutput = meanOrNull(pick(treatment, 'output_tokens'));
+
+  const delta = (b, t) => (b !== null && t !== null ? t - b : null);
+  const isRegression = (b, t) => b !== null && t !== null && b > 0 && t > 2 * b;
+
+  return {
+    durationDelta: delta(bDuration, tDuration),
+    inputTokensDelta: delta(bInput, tInput),
+    outputTokensDelta: delta(bOutput, tOutput),
+    baselineMeans: { duration_ms: bDuration, input_tokens: bInput, output_tokens: bOutput },
+    treatmentMeans: { duration_ms: tDuration, input_tokens: tInput, output_tokens: tOutput },
+    durationRegression: isRegression(bDuration, tDuration),
+    inputTokensRegression: isRegression(bInput, tInput),
+    outputTokensRegression: isRegression(bOutput, tOutput),
+  };
 }
 
 module.exports = {
@@ -385,4 +466,8 @@ module.exports = {
   SHIP_CI_TARGET,
   NEEDS_WORK_THRESHOLD,
   CV_THRESHOLD,
+  meanOrNull,
+  computeMetricDeltas,
+  INSUFFICIENT_DATA,
+  verdictMessage,
 };
