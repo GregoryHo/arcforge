@@ -745,6 +745,7 @@ async function main() {
           const outcome = runPreflight(scenarioName, projectRoot, {
             runTrial: stubRunTrial,
             gradeResult: stubGrade,
+            model,
           });
 
           console.log(`Verdict: ${outcome.verdict}`);
@@ -760,10 +761,14 @@ async function main() {
             process.exit(1);
           }
           const { lintScenario, formatDiagnostics } = require('./lib/eval-lint');
+          const { resolveScenarioFile } = require('./lib/eval-preflight');
 
-          const scenarioFile = path.join(projectRoot, 'evals', 'scenarios', `${scenarioName}.md`);
-          if (!fs.existsSync(scenarioFile)) {
-            console.error(`Error: scenario file not found: ${scenarioFile}`);
+          // Resolve by parsed `# Eval:` name (matching arc eval run/ab/preflight),
+          // not by literal filename — otherwise renamed scenarios that still pass
+          // `arc eval run` would falsely fail `arc eval lint` with "file not found".
+          const scenarioFile = resolveScenarioFile(scenarioName, projectRoot);
+          if (!scenarioFile) {
+            console.error(`Error: scenario "${scenarioName}" not found in evals/scenarios/`);
             process.exit(1);
           }
 
@@ -814,10 +819,13 @@ async function main() {
           }
         } else if (subcommand === 'ab') {
           const scenario = requireScenario(args.positional[1], 'ab');
+          const model = args.options.model;
 
-          // Preflight gate: require a PASS preflight before running A/B eval
+          // Preflight gate: require a PASS preflight for this (scenario, model)
+          // before running A/B eval. Gate is keyed by both — a PASS produced
+          // under one model does NOT unblock A/B runs on another model.
           const { checkPreflightGate } = require('./lib/eval-preflight');
-          const gateError = checkPreflightGate(scenario.name, projectRoot);
+          const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
           if (gateError) {
             console.error(`Error: ${gateError}`);
             process.exit(1);

@@ -13,6 +13,7 @@ const os = require('node:os');
 
 const {
   computeScenarioHash,
+  preflightFilename,
   runPreflight,
   checkPreflightGate,
   PREFLIGHT_DIR,
@@ -30,10 +31,11 @@ function writeScenario(dir, name, content) {
   return filePath;
 }
 
-function writePreflightFile(dir, hash, data) {
+function writePreflightFile(dir, hash, data, model) {
   const preflightDir = path.join(dir, PREFLIGHT_DIR);
   fs.mkdirSync(preflightDir, { recursive: true });
-  fs.writeFileSync(path.join(preflightDir, `${hash}.json`), JSON.stringify(data));
+  const filename = preflightFilename(hash, model);
+  fs.writeFileSync(path.join(preflightDir, filename), JSON.stringify(data));
 }
 
 const SCENARIO_CONTENT =
@@ -98,7 +100,7 @@ describe('runPreflight', () => {
     expect(outcome.scenario_hash).toBe(hash);
 
     // File must exist
-    const filePath = path.join(dir, PREFLIGHT_DIR, `${hash}.json`);
+    const filePath = path.join(dir, PREFLIGHT_DIR, preflightFilename(hash));
     expect(fs.existsSync(filePath)).toBe(true);
     const saved = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     expect(saved.verdict).toBe('PASS');
@@ -127,7 +129,7 @@ describe('runPreflight', () => {
     expect(outcome.pass_rate).toBeCloseTo(1.0, 5);
 
     const hash = computeScenarioHash(SCENARIO_CONTENT);
-    const filePath = path.join(dir, PREFLIGHT_DIR, `${hash}.json`);
+    const filePath = path.join(dir, PREFLIGHT_DIR, preflightFilename(hash));
     const saved = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     expect(saved.verdict).toBe('BLOCK');
 
@@ -359,5 +361,91 @@ describe('checkPreflightGate', () => {
     expect(result).toMatch(/unexpected verdict/i);
 
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('PASS for model A does NOT unblock A/B run for model B (F11)', () => {
+    // Regression: preflight cache used to be keyed by scenario hash only,
+    // so a PASS produced under one model would silently unblock A/B runs
+    // on a different model — even though baseline pass rate is
+    // model-dependent. Now the cache key includes model identity, and
+    // the gate verifies the record matches the requested model.
+    const dir = makeTempDir();
+    writeScenario(dir, 'my-scenario', SCENARIO_CONTENT);
+    const hash = computeScenarioHash(SCENARIO_CONTENT);
+
+    // Write a PASS preflight for model A
+    writePreflightFile(
+      dir,
+      hash,
+      {
+        verdict: 'PASS',
+        scenario_hash: hash,
+        scenario_name: 'my-scenario',
+        model: 'claude-sonnet-4-6',
+        pass_rate: 0.2,
+        k: 3,
+        timestamp: new Date().toISOString(),
+      },
+      'claude-sonnet-4-6',
+    );
+
+    // Same model — gate clears
+    const sameModel = checkPreflightGate('my-scenario', dir, { model: 'claude-sonnet-4-6' });
+    expect(sameModel).toBeNull();
+
+    // Different model — gate must NOT clear
+    const otherModel = checkPreflightGate('my-scenario', dir, { model: 'claude-opus-4-7' });
+    expect(typeof otherModel).toBe('string');
+    expect(otherModel).toMatch(/no preflight record/i);
+    expect(otherModel).toMatch(/claude-opus-4-7/);
+
+    // Default (no model) — also must NOT clear (default ≠ named model)
+    const noModel = checkPreflightGate('my-scenario', dir);
+    expect(typeof noModel).toBe('string');
+    expect(noModel).toMatch(/no preflight record/i);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('runPreflight writes per-model cache files and records the model (F11)', () => {
+    const dir = makeTempDir();
+    writeScenario(dir, 'my-scenario', SCENARIO_CONTENT);
+
+    const stubRunTrial = () => ({ passed: false, score: 0 });
+    const stubGrade = (r) => r;
+
+    const outcomeA = runPreflight('my-scenario', dir, {
+      runTrial: stubRunTrial,
+      gradeResult: stubGrade,
+      model: 'claude-sonnet-4-6',
+    });
+    const outcomeB = runPreflight('my-scenario', dir, {
+      runTrial: stubRunTrial,
+      gradeResult: stubGrade,
+      model: 'claude-opus-4-7',
+    });
+
+    expect(outcomeA.model).toBe('claude-sonnet-4-6');
+    expect(outcomeB.model).toBe('claude-opus-4-7');
+
+    const hash = computeScenarioHash(SCENARIO_CONTENT);
+    const fileA = path.join(dir, PREFLIGHT_DIR, preflightFilename(hash, 'claude-sonnet-4-6'));
+    const fileB = path.join(dir, PREFLIGHT_DIR, preflightFilename(hash, 'claude-opus-4-7'));
+
+    expect(fs.existsSync(fileA)).toBe(true);
+    expect(fs.existsSync(fileB)).toBe(true);
+    expect(fileA).not.toBe(fileB); // distinct filenames
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('preflightFilename sanitizes model names with shell-sensitive chars', () => {
+    // Defensive: model names may include slashes or other chars that
+    // could escape the preflight directory. Sanitization replaces them
+    // with underscores so the filename stays inside PREFLIGHT_DIR.
+    const hash = 'abcd1234';
+    const sanitized = preflightFilename(hash, 'vendor/model-name@latest');
+    expect(sanitized).not.toContain('/');
+    expect(sanitized).toMatch(/^abcd1234-[A-Za-z0-9._-]+\.json$/);
   });
 });

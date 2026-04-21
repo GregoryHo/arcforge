@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { createRouter } = require('../eval-dashboard');
+const { createRouter, setupWatchers } = require('../eval-dashboard');
 const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../../../scripts/lib/eval');
 
 function makeTempDir() {
@@ -714,6 +714,46 @@ describe('dashboard', () => {
       expect(data.metricDeltas.durationDelta).toBe(500);
       // baseline mean input_tokens = 150, treatment mean = 170 → delta = +20
       expect(data.metricDeltas.inputTokensDelta).toBe(20);
+    });
+  });
+
+  // ── F13: polling fallback when recursive fs.watch unsupported ───
+  describe('setupWatchers — recursive fs.watch fallback (F13)', () => {
+    it('does not thrash when fs.watch throws on recursive option', () => {
+      // Pre-create resultsDir so the watcher hits the recursive-watch
+      // path immediately (rather than the existence-poll path).
+      fs.mkdirSync(path.join(tempDir, RESULTS_DIR), { recursive: true });
+
+      // Force fs.watch to throw — simulates older Node on Linux without
+      // recursive-fs.watch support. Spy ONLY for this test.
+      const watchSpy = jest.spyOn(fs, 'watch').mockImplementation(() => {
+        throw new Error('recursive option not supported on this platform');
+      });
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      let watcher;
+      expect(() => {
+        watcher = setupWatchers(tempDir);
+      }).not.toThrow();
+
+      // Pre-fix bug: watchResultsDir would return false on throw,
+      // existence-poll would re-call it every 5s, each call would
+      // re-throw. The fix establishes polling fallback once and
+      // returns true so the existence-poll caller stops retrying.
+      // We assert that fs.watch was called at most a small bounded
+      // number of times (1 from initial call) — not infinitely.
+      expect(watchSpy).toHaveBeenCalledTimes(1);
+
+      // Warning should explain the fallback.
+      expect(warnSpy).toHaveBeenCalled();
+      const warningText = warnSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+      expect(warningText).toMatch(/recursive fs\.watch unsupported/i);
+      expect(warningText).toMatch(/polling/i);
+
+      // Clean up
+      watcher.close();
+      watchSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 });

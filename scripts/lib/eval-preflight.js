@@ -35,6 +35,26 @@ function computeScenarioHash(contents) {
 }
 
 /**
+ * Build the preflight cache filename for a (scenarioHash, model) pair.
+ * Baseline pass rate is model-dependent — a PASS produced under model A
+ * does not generalize to model B. Encoding the model in the filename
+ * keeps per-model preflight records distinct and prevents one model's
+ * PASS from silently unblocking A/B runs on another model.
+ *
+ * Pre-fix records used `${hash}.json` and will simply orphan after this
+ * change. Users re-run preflight once; no migration required.
+ *
+ * @param {string} hash - Scenario content hash from computeScenarioHash
+ * @param {string|undefined} model - Model identifier from --model, or
+ *   undefined if not specified (which means "harness default model")
+ * @returns {string} Filename like `${hash}-${modelKey}.json`
+ */
+function preflightFilename(hash, model) {
+  const modelKey = (model || 'default').replace(/[^A-Za-z0-9._-]/g, '_');
+  return `${hash}-${modelKey}.json`;
+}
+
+/**
  * Resolve the scenario file path by parsed `# Eval:` name (matching
  * findScenario / `arc eval run` / `arc eval ab` semantics), with fallback
  * to literal filename lookup. Returns null if no scenario matches either.
@@ -78,10 +98,13 @@ function resolveScenarioFile(name, projectRoot) {
  * @param {Object} opts - Dependency injection for testing
  * @param {Function} opts.runTrial - Function to run a single trial
  * @param {Function} opts.gradeResult - Function to grade a trial result
- * @returns {{ scenario_hash: string, scenario_name: string, pass_rate: number, k: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
+ * @param {string} [opts.model] - Model identifier; included in cache key so
+ *   per-model preflight records stay distinct (baseline pass rate is
+ *   model-dependent). Pass the same value the trials were actually run with.
+ * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, pass_rate: number|null, k: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
-  const { runTrial, gradeResult } = opts;
+  const { runTrial, gradeResult, model } = opts;
 
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
@@ -90,6 +113,7 @@ function runPreflight(name, projectRoot, opts = {}) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
+  const cacheFile = preflightFilename(hash, model);
 
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
@@ -114,6 +138,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     const record = {
       scenario_hash: hash,
       scenario_name: name,
+      model: model || null,
       pass_rate: null,
       k: PREFLIGHT_K,
       errored: errored.length,
@@ -123,7 +148,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     };
     const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
     fs.mkdirSync(preflightDir, { recursive: true });
-    fs.writeFileSync(path.join(preflightDir, `${hash}.json`), JSON.stringify(record, null, 2));
+    fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
     return record;
   }
 
@@ -139,6 +164,7 @@ function runPreflight(name, projectRoot, opts = {}) {
   const record = {
     scenario_hash: hash,
     scenario_name: name,
+    model: model || null,
     pass_rate,
     k: PREFLIGHT_K,
     verdict,
@@ -148,7 +174,7 @@ function runPreflight(name, projectRoot, opts = {}) {
 
   const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
   fs.mkdirSync(preflightDir, { recursive: true });
-  fs.writeFileSync(path.join(preflightDir, `${hash}.json`), JSON.stringify(record, null, 2));
+  fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
 
   return record;
 }
@@ -168,9 +194,15 @@ function runPreflight(name, projectRoot, opts = {}) {
  *
  * @param {string} name - Scenario name
  * @param {string} projectRoot - Project root directory
+ * @param {Object} [opts] - Options
+ * @param {string} [opts.model] - Model identifier the A/B run will use; the
+ *   gate verifies a preflight record exists for this exact model. Pass the
+ *   same value `arc eval ab` will pass to its trials.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
-function checkPreflightGate(name, projectRoot) {
+function checkPreflightGate(name, projectRoot, opts = {}) {
+  const { model } = opts;
+
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
     return `Scenario "${name}" not found in evals/scenarios/. Cannot check preflight gate.`;
@@ -178,13 +210,17 @@ function checkPreflightGate(name, projectRoot) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
+  const cacheFile = preflightFilename(hash, model);
 
-  const preflightFile = path.join(projectRoot, PREFLIGHT_DIR, `${hash}.json`);
+  const preflightFile = path.join(projectRoot, PREFLIGHT_DIR, cacheFile);
   if (!fs.existsSync(preflightFile)) {
+    const modelLabel = model || 'default';
+    const remediationFlag = model ? ` --model ${model}` : '';
     return (
-      `No preflight record found for scenario "${name}" (hash: ${hash}).\n` +
-      `Run: arc eval preflight ${name}\n` +
-      `Preflight ensures the baseline pass rate is below the ceiling threshold before A/B testing.`
+      `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}).\n` +
+      `Run: arc eval preflight ${name}${remediationFlag}\n` +
+      `Preflight is per-(scenario, model) — baseline pass rate is model-dependent, ` +
+      `so a PASS under one model does not unblock A/B runs on another.`
     );
   }
 
@@ -219,6 +255,13 @@ function checkPreflightGate(name, projectRoot) {
 
 module.exports = {
   computeScenarioHash,
+  preflightFilename,
+  // Exported so other CLI dispatchers (e.g. `arc eval lint`) share one
+  // resolver. Lookup-by-`# Eval:` name with filename fallback is the
+  // semantics `arc eval run` / `arc eval ab` already use; centralizing
+  // here keeps the lint command from re-implementing the broken
+  // hardcoded-filename pattern that F7 originally fixed.
+  resolveScenarioFile,
   runPreflight,
   checkPreflightGate,
   PREFLIGHT_DIR,

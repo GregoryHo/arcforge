@@ -86,9 +86,44 @@ function setupWatchers(projectRoot) {
   }
 
   const watchers = [];
+  let usingPolling = false;
+
+  // Polling fallback used when recursive fs.watch is unsupported (e.g.
+  // older Node on Linux without inotify aggregation). Walks resultsDir
+  // for *.jsonl files, adds new/changed paths to pendingFiles so the
+  // existing debounced processChanges() handles broadcast — preserves
+  // append-detection via fileSizes without duplicating that logic.
+  function pollResultsDir() {
+    const stack = [resultsDir];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      let entries;
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(full);
+        } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+          pendingFiles.add(path.relative(resultsDir, full));
+        }
+      }
+    }
+    if (pendingFiles.size > 0) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(processChanges, 500);
+    }
+  }
 
   function watchResultsDir() {
     if (!fs.existsSync(resultsDir)) return false;
+    // Already on polling fallback — don't keep re-trying the unsupported
+    // recursive watch. The existence-poll caller below uses our return
+    // value to decide whether to keep its retry interval alive.
+    if (usingPolling) return true;
     try {
       const w = fs.watch(resultsDir, { recursive: true }, (_event, filename) => {
         if (!filename) return;
@@ -99,8 +134,19 @@ function setupWatchers(projectRoot) {
       watchers.push(w);
       return true;
     } catch {
-      /* fs.watch may not support recursive on some platforms */
-      return false;
+      // Recursive fs.watch unsupported on this platform. Establish a
+      // polling fallback ONCE so SSE trial-complete events still fire,
+      // and return true so the existence-poll caller stops retrying
+      // (without this, we'd thrash retrying the unsupported recursive
+      // call forever — the original F13 bug).
+      console.warn(
+        '[eval-dashboard] recursive fs.watch unsupported on this platform; ' +
+          'falling back to polling (5s interval). Real-time updates will be slower.',
+      );
+      usingPolling = true;
+      const pollHandle = setInterval(pollResultsDir, 5000);
+      watchers.push({ close: () => clearInterval(pollHandle) });
+      return true;
     }
   }
 
@@ -528,4 +574,11 @@ function startServer(projectRoot, options = {}) {
   process.on('SIGTERM', shutdown);
 }
 
-module.exports = { startServer, createRouter, handleApiTranscript, sseClients, addSseClient };
+module.exports = {
+  startServer,
+  createRouter,
+  handleApiTranscript,
+  sseClients,
+  addSseClient,
+  setupWatchers,
+};
