@@ -169,6 +169,7 @@ function DayInLife({
     }
   }, "LOG \xB7 session_20260421.jsonl"), steps.map((s, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
+    className: "af-day-row",
     style: {
       display: 'grid',
       gridTemplateColumns: '80px 1fr',

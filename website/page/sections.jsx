@@ -73,7 +73,7 @@ function DayInLife({theme:t}) {
       <div data-af-reveal style={{background:t.card,border:`1px solid ${t.line}`,position:'relative',paddingTop:48}}>
         <div style={{position:'absolute',top:16,left:16,fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim}}>LOG · session_20260421.jsonl</div>
         {steps.map((s,i)=>(
-          <div key={i} style={{
+          <div key={i} className="af-day-row" style={{
             display:'grid',gridTemplateColumns:'80px 1fr',alignItems:'stretch',
             borderBottom: i<steps.length-1 ? `1px dashed ${t.line}` : 'none',
           }}>
