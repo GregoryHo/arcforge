@@ -1,4 +1,5 @@
 evals/results/
+evals/preflight/
 .eval-trials/
 # Project-local contributor skills — ignored by default (experimental/workspace).
 # Skills meant to ship in the repo are explicitly allowlisted below.
