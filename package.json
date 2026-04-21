@@ -39,9 +39,13 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "format:check": "biome format ."
+    "format:check": "biome format .",
+    "build:website": "babel website/page --out-dir website/page --presets=@babel/preset-react --extensions .jsx --out-file-extension .js"
   },
   "devDependencies": {
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-react": "^7.28.5",
     "@biomejs/biome": "^2.0.0",
     "jest": "^29.7.0"
   }
