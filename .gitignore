@@ -14,6 +14,7 @@ evals/preflight/
 
 # Local tooling
 docs/.claude/
+website/.claude/
 .venv/
 .env
 .env.*

@@ -1,0 +1,10 @@
+// Cloudflare Workers Builds config for the landing page.
+// Pure static site — no Worker script, just asset serving from website/.
+// The arcforge plugin tarball doesn't ship this (see package.json `files`).
+{
+  "name": "arcforge",
+  "compatibility_date": "2026-04-21",
+  "assets": {
+    "directory": "./website"
+  }
+}
