@@ -58,16 +58,26 @@ function loadBlindResults(scenarioName, runId, projectRoot) {
 
 /**
  * Compute preference rate counts from an array of blind decisions.
+ * `errors` counts pairs whose comparator call failed (winner_original_label
+ * is null). They are NOT folded into `tie` — that would silently inflate
+ * tie counts and distort the supplementary preference signal.
  * @param {Object[]} preferences - Per-pair blind decisions
- * @returns {{ treatment: number, baseline: number, tie: number, total: number }}
+ * @returns {{ treatment: number, baseline: number, tie: number, errors: number, total: number }}
  */
 function computePreferenceRate(preferences) {
-  const rate = { treatment: 0, baseline: 0, tie: 0, total: preferences.length };
+  const rate = {
+    treatment: 0,
+    baseline: 0,
+    tie: 0,
+    errors: 0,
+    total: preferences.length,
+  };
   for (const p of preferences) {
     const label = p.winner_original_label;
     if (label === 'treatment') rate.treatment++;
     else if (label === 'baseline') rate.baseline++;
-    else rate.tie++;
+    else if (label === 'tie') rate.tie++;
+    else rate.errors++;
   }
   return rate;
 }

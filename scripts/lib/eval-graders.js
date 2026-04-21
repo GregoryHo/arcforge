@@ -9,7 +9,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand } = require('./utils');
+const { execCommand, sanitizeFilename } = require('./utils');
 const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD, round2 } = require('./eval-stats');
 
 // Mirror of eval.js constants to avoid circular imports
@@ -363,9 +363,12 @@ function numberTranscriptBlocks(output) {
  */
 function getGradingPath(result, projectRoot) {
   const evalName = result.eval || '';
-  const scenarioName = evalName
-    .replace(/-(baseline|treatment)$/, '')
-    .replace(/[^a-zA-Z0-9-]/g, '-');
+  // Mirror eval.js parseEvalName exactly so grading.json lands under the
+  // same scenario directory as the run JSONL. Diverging here (e.g. via an
+  // ad-hoc /[^a-zA-Z0-9-]/ replacement) splits grading artifacts from
+  // their run for any scenario containing characters like `_`.
+  const stripped = evalName.replace(/-(baseline|treatment)$/, '');
+  const scenarioName = stripped ? sanitizeFilename(stripped) : '';
   const runId =
     result.runId ||
     (result.timestamp ? result.timestamp.slice(0, 10).replace(/-/g, '') : 'unknown');
@@ -697,8 +700,11 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
   function sanitize(text) {
     let result = text || '';
     for (const word of forbidden) {
-      // Case-insensitive replacement with [redacted]
-      result = result.replace(new RegExp(word, 'gi'), '[redacted]');
+      if (!word) continue;
+      // Escape regex metachars so user-provided skillName values
+      // like "skill+v2" or "arc-tdd[2]" don't crash RegExp construction.
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(escaped, 'gi'), '[redacted]');
     }
     return result;
   }
@@ -725,14 +731,20 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
   const parsed = extractJsonObject(stdout, ['winner']);
   if (!parsed) return null;
 
-  const winner = parsed.winner; // 'A', 'B', or 'tie'
+  const winner = parsed.winner; // expect 'A', 'B', or 'tie'
   let winnerOriginalLabel;
   if (winner === 'tie') {
     winnerOriginalLabel = 'tie';
   } else if (winner === 'A') {
     winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
-  } else {
+  } else if (winner === 'B') {
     winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
+  } else {
+    // Unknown / malformed winner value (e.g. lowercase 'b', 'baseline',
+    // whitespace-padded 'B '). Surface the failure rather than silently
+    // mapping it to a concrete baseline/treatment outcome — that would
+    // bias the supplementary preference signal.
+    return null;
   }
 
   return {

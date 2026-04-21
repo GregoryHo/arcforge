@@ -61,7 +61,13 @@ function parseScenarioStructure(content) {
       // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
       const bulletMatch = line.match(/^-\s*\[([^\]]*)\]\s*(.*)/);
       if (bulletMatch) {
-        const text = bulletMatch[2].trim();
+        const bracketContent = bulletMatch[1].trim();
+        const remainder = bulletMatch[2].trim();
+        // Behavioral markers like [tool_called] are prefix tokens that
+        // ASSERTION_ID_RE expects to find on the assertion text. Checkbox
+        // brackets ([ ], [x], [X]) are markdown plumbing and must be stripped.
+        const isBehavioralMarker = /^tool_\w+$/.test(bracketContent);
+        const text = isBehavioralMarker ? `[${bracketContent}] ${remainder}`.trim() : remainder;
         assertionLines.push({ text, line: lineNumber });
       }
     }

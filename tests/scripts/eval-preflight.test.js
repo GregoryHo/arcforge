@@ -258,4 +258,52 @@ describe('checkPreflightGate', () => {
 
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  test('resolves scenario by parsed "# Eval:" name even when filename differs', () => {
+    // Regression (F7): preflight used to hardcode evals/scenarios/<name>.md
+    // and would false-block scenarios whose filename has been renamed but
+    // whose `# Eval:` header still matches.
+    const dir = makeTempDir();
+    const header_name = 'renamed-scenario';
+    const file_stem = 'legacy-filename';
+    const contents = `# Eval: ${header_name}\n\n## Scope\nskill\n\n## Assertions\n- [ ] ok\n`;
+    writeScenario(dir, file_stem, contents);
+    const hash = computeScenarioHash(contents);
+    writePreflightFile(dir, hash, {
+      verdict: 'PASS',
+      scenario_hash: hash,
+      scenario_name: header_name,
+      pass_rate: 0.2,
+      k: 3,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = checkPreflightGate(header_name, dir);
+    expect(result).toBeNull();
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('rejects preflight files with unknown verdict values', () => {
+    // Regression (F8): the gate used to treat any verdict !== "BLOCK" as
+    // cleared, so a corrupted record with verdict: "BLOCKED" / "MAYBE" /
+    // missing field would silently bypass the gate.
+    const dir = makeTempDir();
+    writeScenario(dir, 'my-scenario', SCENARIO_CONTENT);
+    const hash = computeScenarioHash(SCENARIO_CONTENT);
+    writePreflightFile(dir, hash, {
+      verdict: 'BLOCKED', // typo / stale value — neither PASS nor BLOCK
+      scenario_hash: hash,
+      scenario_name: 'my-scenario',
+      pass_rate: 0.2,
+      k: 3,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = checkPreflightGate('my-scenario', dir);
+    expect(typeof result).toBe('string');
+    expect(result).toMatch(/unexpected verdict/i);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });

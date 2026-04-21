@@ -25,6 +25,8 @@ const {
   getGradingPath,
 } = require('../../scripts/lib/eval-graders');
 
+const { parseEvalName } = require('../../scripts/lib/eval');
+
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-graders-'));
 }
@@ -82,6 +84,25 @@ describe('eval-graders.js', () => {
   afterEach(() => {
     mockUtils.execCommand.mockClear();
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // ── F2 regression: getGradingPath agrees with parseEvalName ────────
+
+  describe('getGradingPath path normalization (F2)', () => {
+    it('uses the same scenario directory as parseEvalName for names with underscores', () => {
+      // Regression: getGradingPath used to apply
+      // .replace(/[^a-zA-Z0-9-]/g, '-') which converted "my_scenario"
+      // → "my-scenario", while parseEvalName preserved the underscore.
+      // Result: grading.json was written under a different directory
+      // than the run JSONL, splitting artifacts.
+      const result = makeTrialResult({ eval: 'my_scenario-baseline', runId: 'r1', trial: 1 });
+      const gradingPath = getGradingPath(result, '/root');
+      const { scenarioName } = parseEvalName('my_scenario-baseline');
+
+      // Grading path must include the same scenario directory parseEvalName
+      // produces — otherwise grading and run JSONL diverge.
+      expect(gradingPath.split(path.sep)).toContain(scenarioName);
+    });
   });
 
   // ── fr-gr-003: discovered_claims[] in grading.json ──────────

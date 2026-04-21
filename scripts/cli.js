@@ -907,6 +907,11 @@ async function main() {
             console.log(`  treatment: ${pr.treatment}/${total}`);
             console.log(`  baseline:  ${pr.baseline}/${total}`);
             console.log(`  tie:       ${pr.tie}/${total}`);
+            if (pr.errors > 0) {
+              console.log(
+                `  errors:    ${pr.errors}/${total} (comparator failures, not folded into ties)`,
+              );
+            }
           } else if (blindResult.skipNote) {
             console.log(`\n${blindResult.skipNote}`);
           }

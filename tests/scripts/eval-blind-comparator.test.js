@@ -236,6 +236,26 @@ describe('runBlindComparator — prompt sanitization', () => {
 
     expect(capturedInput).not.toContain('arc-tdd');
   });
+
+  it('does not crash when skill name contains regex metacharacters', () => {
+    // Regression: skill names with +, (, [, etc. previously threw
+    // SyntaxError inside RegExp construction in the sanitizer loop.
+    mockUtils.execCommand.mockImplementationOnce(() => ({
+      stdout: makeAgentResponse('A'),
+      stderr: '',
+      exitCode: 0,
+    }));
+
+    expect(() =>
+      runBlindComparator(
+        TASK_PROMPT,
+        'Output using arc-tdd+v2 skill',
+        'Output without arc-tdd+v2 skill',
+        '/fake/root',
+        'arc-tdd+v2',
+      ),
+    ).not.toThrow();
+  });
 });
 
 // ── runBlindComparator — winner label mapping ─────────────────────────────────
@@ -273,6 +293,20 @@ describe('runBlindComparator — winner label mapping', () => {
     const result = runBlindComparator(TASK_PROMPT, BASELINE_OUTPUT, TREATMENT_OUTPUT, '/fake/root');
     expect(result).not.toBeNull();
     expect(result.winner_original_label).toBe('tie');
+  });
+
+  it('returns null when agent returns an unrecognized winner value', () => {
+    // Regression (F4): malformed comparator output (lowercase 'b',
+    // 'baseline', whitespace-padded 'B ', etc.) used to be silently
+    // mapped as if winner === 'B', biasing results.
+    mockUtils.execCommand.mockReturnValueOnce({
+      stdout: makeAgentResponse('b'), // lowercase, not a valid label
+      stderr: '',
+      exitCode: 0,
+    });
+
+    const result = runBlindComparator(TASK_PROMPT, BASELINE_OUTPUT, TREATMENT_OUTPUT, '/fake/root');
+    expect(result).toBeNull();
   });
 
   it('includes reasoning and rubric in the result', () => {

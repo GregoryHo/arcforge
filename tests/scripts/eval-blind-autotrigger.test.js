@@ -23,6 +23,7 @@ const {
   runBlindAutoTrigger,
   saveBlindResults,
   loadBlindResults,
+  computePreferenceRate,
 } = require('../../scripts/lib/eval-blind-autotrigger');
 
 function makeTempDir() {
@@ -288,5 +289,39 @@ describe('blind result persistence', () => {
 
     const expectedPath = path.join(tempDir, 'evals', 'results', scenarioName, runId, 'blind.json');
     expect(fs.existsSync(expectedPath)).toBe(true);
+  });
+});
+
+// ── computePreferenceRate — error vs tie separation ──────────────────────────
+
+describe('computePreferenceRate — errors are not folded into ties (F5)', () => {
+  it('counts comparator failures (null label) under errors, not tie', () => {
+    const preferences = [
+      { pair: 1, winner_original_label: 'treatment' },
+      { pair: 2, winner_original_label: null }, // comparator failure
+      { pair: 3, winner_original_label: 'tie' },
+      { pair: 4, winner_original_label: null }, // comparator failure
+      { pair: 5, winner_original_label: 'baseline' },
+    ];
+
+    const rate = computePreferenceRate(preferences);
+
+    expect(rate.treatment).toBe(1);
+    expect(rate.baseline).toBe(1);
+    expect(rate.tie).toBe(1); // NOT 3 — only the explicit 'tie' label
+    expect(rate.errors).toBe(2);
+    expect(rate.total).toBe(5);
+  });
+
+  it('reports zero errors when all decisions succeeded', () => {
+    const preferences = [
+      { pair: 1, winner_original_label: 'tie' },
+      { pair: 2, winner_original_label: 'baseline' },
+    ];
+
+    const rate = computePreferenceRate(preferences);
+
+    expect(rate.errors).toBe(0);
+    expect(rate.tie).toBe(1);
   });
 });

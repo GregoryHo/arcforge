@@ -138,6 +138,41 @@ describe('lintScenario - well-formed', () => {
 
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  test('accepts behavioral assertions like "[tool_called] Bash:npm test"', () => {
+    // Regression: lint parser previously stripped the [tool_*] bracket
+    // when capturing assertion text, then ASSERTION_ID_RE rejected the
+    // bare remainder as missing an ID prefix.
+    const BEHAVIORAL = `# Eval: behavioral
+
+## Context
+ctx
+
+## Setup
+echo setup
+
+## Grader Config
+score it
+
+## Assertions
+- [tool_called] Bash:npm test
+- [tool_called] Skill:arc-finishing-epic
+
+## Scope
+skill
+
+## Grader
+model
+`;
+    const dir = makeTempDir();
+    const filePath = writeScenario(dir, 'behavioral', BEHAVIORAL);
+
+    const diagnostics = lintScenario(filePath);
+
+    expect(diagnostics).toHaveLength(0);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 // ── lintScenario: missing sections ───────────────────────────────────────────

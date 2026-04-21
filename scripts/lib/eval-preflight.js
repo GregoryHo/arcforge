@@ -13,6 +13,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { listScenarios, parseScenario } = require('./eval');
+
 /** Directory where preflight JSON files are stored */
 const PREFLIGHT_DIR = path.join('evals', 'preflight');
 
@@ -33,13 +35,27 @@ function computeScenarioHash(contents) {
 }
 
 /**
- * Resolve the scenario file path from evals/scenarios/<name>.md.
- * Returns null if the file does not exist.
- * @param {string} name - Scenario name (without .md extension)
+ * Resolve the scenario file path by parsed `# Eval:` name (matching
+ * findScenario / `arc eval run` / `arc eval ab` semantics), with fallback
+ * to literal filename lookup. Returns null if no scenario matches either.
+ *
+ * Resolving by parsed name (not filename) prevents preflight from falsely
+ * blocking scenarios whose filename has been renamed but whose `# Eval:`
+ * header still matches the requested name — the same lookup semantics
+ * used elsewhere in the eval CLI.
+ *
+ * @param {string} name - Scenario name (parsed `# Eval:` value, or filename stem)
  * @param {string} projectRoot - Project root directory
  * @returns {string|null} Absolute path to scenario file, or null
  */
 function resolveScenarioFile(name, projectRoot) {
+  for (const f of listScenarios(projectRoot)) {
+    const s = parseScenario(f, projectRoot);
+    if (s.name === name) return f;
+  }
+  // Fallback: legacy filename-based lookup, kept so preflighting a
+  // scenario by filename stem still works when the `# Eval:` header
+  // hasn't been authored yet.
   const filePath = path.join(projectRoot, 'evals', 'scenarios', `${name}.md`);
   return fs.existsSync(filePath) ? filePath : null;
 }
@@ -158,7 +174,17 @@ function checkPreflightGate(name, projectRoot) {
     );
   }
 
-  // verdict == PASS — cleared to proceed
+  // The gate must affirmatively see verdict === 'PASS'. Treating "anything
+  // not BLOCK" as cleared would let a corrupted or hand-edited preflight
+  // file (e.g. verdict: "BLOCKED" typo, "MAYBE", missing field) bypass the
+  // gate silently. Fail closed instead.
+  if (record.verdict !== 'PASS') {
+    return (
+      `Preflight record for "${name}" has unexpected verdict "${record.verdict}". ` +
+      `Re-run: arc eval preflight ${name}`
+    );
+  }
+
   return null;
 }
 
