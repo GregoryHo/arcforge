@@ -79,7 +79,7 @@ Three grader types match three kinds of assertions. Match grader to assertion na
 ### Grader Mechanics
 
 - **Code grader**: Runs test command, checks exit code. `$TRIAL_DIR` available. Echo `A1:PASS` or `A1:FAIL:reason` for per-assertion results.
-- **Model grader**: Reads `agents/eval-grader.md` methodology. Scores each assertion 0.0-1.0. Uses trial artifacts as evidence.
+- **Model grader**: Reads `skills/arc-evaluating/agents/eval-grader.md` methodology. Scores each assertion 0.0-1.0. Uses trial artifacts as evidence.
 - **Human grader**: Presents output + checklist for manual review.
 
 ## Metrics
