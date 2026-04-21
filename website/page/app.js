@@ -65,11 +65,12 @@ function App() {
         b.onclick = () => {
           row.querySelectorAll('button').forEach(x => x.classList.remove('on'));
           b.classList.add('on');
-          const next = {
-            ...cfg,
+          // Functional setState — effect runs once with empty deps, so `cfg`
+          // from the outer closure is stale after any prior tweak change.
+          setCfg(prev => ({
+            ...prev,
             [g]: b.dataset.v
-          };
-          setCfg(next);
+          }));
           try {
             window.parent.postMessage({
               type: '__edit_mode_set_keys',
