@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>arcforge — forge disciplined agents</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;600;700&family=Caveat:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+  :root { color-scheme: dark; }
+  html,body{margin:0;padding:0;background:#0b1220;min-height:100%;}
+  body{font-family:"JetBrains Mono", ui-monospace, monospace;}
+  * { box-sizing: border-box; }
+  a { color: inherit; }
+  [data-af-reveal]{opacity:1;transform:none;transition:opacity .8s ease,transform .8s ease;}
+  body.af-anim [data-af-reveal]{opacity:0;transform:translateY(20px);}
+  body.af-anim [data-af-reveal].af-in{opacity:1;transform:none;}
+  body.af-density-cozy section{padding-top:160px!important;padding-bottom:160px!important;}
+  body.af-density-compact section{padding-top:80px!important;padding-bottom:80px!important;}
+
+  /* tweaks panel */
+  #tweaks{position:fixed;bottom:24px;right:24px;z-index:9999;background:#111a2e;
+    border:1px solid #1f2a44;border-radius:6px;padding:16px 18px;width:240px;
+    font-family:"JetBrains Mono",monospace;font-size:11px;color:#e8ecf4;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
+  #tweaks.open{display:block;}
+  #tweaks h4{margin:0 0 14px 0;font-family:"Fraunces",serif;font-style:italic;font-size:16px;font-weight:400;color:#ff6a3d;letter-spacing:0;}
+  #tweaks label{display:block;margin-bottom:10px;letter-spacing:1.5;color:#6b7a96;}
+  #tweaks .row{display:flex;gap:6px;margin-top:6px;}
+  #tweaks button{flex:1;background:transparent;color:#9aa8c2;border:1px solid #1f2a44;padding:6px 8px;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:1.5;}
+  #tweaks button.on{background:#ff6a3d;color:#111;border-color:#ff6a3d;font-weight:700;}
+
+  /* responsive · tablet */
+  @media (max-width: 1024px) {
+    section { padding-left: 40px !important; padding-right: 40px !important; }
+    #hero { padding-left: 40px !important; padding-right: 40px !important; }
+    .af-hero-ticker { padding-left: 40px !important; padding-right: 40px !important; }
+    footer { padding-left: 40px !important; padding-right: 40px !important; }
+    .af-hero-h1 { font-size: 88px !important; }
+    .af-nav-links { gap: 18px !important; }
+  }
+
+  /* responsive · mobile */
+  @media (max-width: 768px) {
+    section { padding: 56px 16px !important; }
+    #hero { padding: 0 16px !important; min-height: auto !important; padding-bottom: 24px !important; }
+    .af-hero-ticker { position: static !important; padding: 16px 16px !important; font-size: 9px !important; gap: 8px !important; flex-wrap: wrap !important; margin-top: 32px !important; height: auto !important; }
+    footer { padding: 28px 16px !important; }
+    .af-footer { flex-direction: column !important; gap: 16px !important; }
+    .af-footer-links { gap: 20px !important; flex-wrap: wrap !important; }
+
+    /* nav */
+    .af-nav { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
+    .af-nav-links { gap: 12px 14px !important; flex-wrap: wrap !important; font-size: 10px !important; }
+
+    /* hero */
+    .af-hero-grid { grid-template-columns: 1fr !important; gap: 32px !important; padding-top: 24px !important; }
+    .af-hero-h1 { font-size: 56px !important; letter-spacing: -1.2px !important; }
+    .af-hero-schematic { min-height: auto !important; }
+
+    /* section h2 */
+    .af-section-h2 { font-size: 34px !important; letter-spacing: -0.6px !important; }
+
+    /* grids */
+    .af-grid-2col { grid-template-columns: 1fr !important; gap: 24px !important; }
+    .af-grid-3col { grid-template-columns: 1fr !important; gap: 16px !important; }
+    .af-skill-grid { grid-template-columns: 1fr !important; gap: 12px 20px !important; }
+
+    /* hooks rows */
+    .af-hooks-row { grid-template-columns: 1fr !important; gap: 4px !important; padding-left: 16px !important; padding-right: 16px !important; }
+
+    /* day in life */
+    .af-day-row { grid-template-columns: 60px 1fr !important; }
+  }
+</style>
+</head>
+<body class="af-theme-dark">
+<div id="tweaks">
+  <h4>Tweaks</h4>
+  <label>THEME<div class="row" data-g="theme"><button data-v="dark" class="on">Dark</button><button data-v="light">Light</button></div></label>
+  <label>ANIMATION<div class="row" data-g="anim"><button data-v="on" class="on">On</button><button data-v="off">Off</button></div></label>
+  <label>DENSITY<div class="row" data-g="density"><button data-v="compact">Tight</button><button data-v="normal" class="on">Normal</button><button data-v="cozy">Loose</button></div></label>
+</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+
+<script src="page/theme.js"></script>
+<script src="page/hero.js"></script>
+<script src="page/sdd.js"></script>
+<script src="page/sections.js"></script>
+<script src="page/app.js"></script>
+</body>
+</html>
