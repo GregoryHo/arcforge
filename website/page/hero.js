@@ -369,16 +369,16 @@ function HeroSchematic({
     d: "M0 20 H 500",
     stroke: t.ink,
     strokeWidth: "0.8"
-  })), ['brainstorm', 'refine', 'plan'].map((s, i) => /*#__PURE__*/React.createElement("g", {
+  })), ['brainstorm', 'refine', 'plan', 'coordinate'].map((s, i) => /*#__PURE__*/React.createElement("g", {
     key: s,
-    transform: `translate(${i * 170 + 40},35)`
+    transform: `translate(${i * 130 + 30},35)`
   }, /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("rect", {
-    x: "-55",
-    y: "-14",
-    width: "110",
-    height: "28",
+    x: "-48",
+    y: "-13",
+    width: "96",
+    height: "26",
     fill: t.bg,
     stroke: t.brass,
     strokeWidth: "1.2",
@@ -387,65 +387,120 @@ function HeroSchematic({
     y: "4",
     textAnchor: "middle",
     fill: t.ink,
-    fontSize: "11"
+    fontSize: "10"
   }, "arc-", s))), /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M95 35 L125 35 M265 35 L295 35",
-    stroke: t.ember,
-    strokeWidth: "1.4",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("polygon", {
-    points: "121,31 129,35 121,39",
-    fill: t.ember
-  }), /*#__PURE__*/React.createElement("polygon", {
-    points: "291,31 299,35 291,39",
-    fill: t.ember
-  })), /*#__PURE__*/React.createElement("text", {
+  }, [0, 1, 2].map(i => {
+    const x1 = i * 130 + 30 + 48;
+    const x2 = (i + 1) * 130 + 30 - 48;
+    return /*#__PURE__*/React.createElement("g", {
+      key: i
+    }, /*#__PURE__*/React.createElement("path", {
+      d: `M${x1 + 2} 35 L${x2 - 4} 35`,
+      stroke: t.ember,
+      strokeWidth: "1.4",
+      fill: "none"
+    }), /*#__PURE__*/React.createElement("polygon", {
+      points: `${x2 - 8},31 ${x2},35 ${x2 - 8},39`,
+      fill: t.ember
+    }));
+  }))), /*#__PURE__*/React.createElement("g", {
+    transform: "translate(60,490)",
+    fontFamily: "JetBrains Mono,monospace"
+  }, /*#__PURE__*/React.createElement("text", {
     x: "0",
-    y: "90",
+    y: "0",
     fill: t.dim,
     fontSize: "10",
     letterSpacing: "2"
-  }, "SDD \xB7 DOWNSTREAM"), /*#__PURE__*/React.createElement("g", {
+  }, "SESSION \xB7 LIFECYCLE"), /*#__PURE__*/React.createElement("text", {
+    x: "256",
+    y: "0",
+    fill: t.brass,
+    fontSize: "10",
+    fontStyle: "italic",
+    fontFamily: "Fraunces,serif"
+  }, "hooks fire at every gate"), /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M0 110 H 500",
+    d: "M0 20 H 500",
     stroke: t.ink,
     strokeWidth: "0.8"
-  })), ['implement', 'loop', 'dispatch'].map((s, i) => /*#__PURE__*/React.createElement("g", {
-    key: s,
-    transform: `translate(${i * 170 + 40},125)`
+  })), [{
+    name: 'SessionStart',
+    sub: 'inject-skills'
+  }, {
+    name: 'UserPrompt',
+    sub: 'arc-using routes'
+  }, {
+    name: 'Pre/Post Tool',
+    sub: 'observe · quality'
+  }, {
+    name: 'Stop',
+    sub: 'journal · compact'
+  }].map((o, i) => /*#__PURE__*/React.createElement("g", {
+    key: o.name,
+    transform: `translate(${i * 130 + 30},45)`
   }, /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("rect", {
-    x: "-55",
-    y: "-14",
-    width: "110",
-    height: "28",
+    x: "-56",
+    y: "-16",
+    width: "112",
+    height: "32",
     fill: t.bg,
     stroke: t.ember,
     strokeWidth: "1.2",
     rx: "3"
   })), /*#__PURE__*/React.createElement("text", {
-    y: "4",
+    y: "-3",
     textAnchor: "middle",
     fill: t.ink,
-    fontSize: "11"
-  }, "arc-", s))), /*#__PURE__*/React.createElement("g", {
+    fontSize: "10",
+    fontWeight: "600"
+  }, o.name), /*#__PURE__*/React.createElement("text", {
+    y: "10",
+    textAnchor: "middle",
+    fill: t.dim,
+    fontSize: "8",
+    fontStyle: "italic",
+    fontFamily: "Fraunces,serif"
+  }, o.sub))), /*#__PURE__*/React.createElement("g", {
+    filter: "url(#sk-hero)"
+  }, [0, 1, 2].map(i => {
+    const x1 = i * 130 + 30 + 56;
+    const x2 = (i + 1) * 130 + 30 - 56;
+    return /*#__PURE__*/React.createElement("g", {
+      key: i
+    }, /*#__PURE__*/React.createElement("path", {
+      d: `M${x1 + 2} 45 L${x2 - 4} 45`,
+      stroke: t.ember,
+      strokeWidth: "1.4",
+      fill: "none"
+    }), /*#__PURE__*/React.createElement("polygon", {
+      points: `${x2 - 8},41 ${x2},45 ${x2 - 8},49`,
+      fill: t.ember
+    }));
+  })), /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M95 125 L125 125 M265 125 L295 125",
-    stroke: t.ember,
-    strokeWidth: "1.4",
-    fill: "none"
+    d: "M290 61 Q 225 85 160 61",
+    stroke: t.brass,
+    strokeWidth: "1.2",
+    fill: "none",
+    strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement("polygon", {
-    points: "121,121 129,125 121,129",
-    fill: t.ember
-  }), /*#__PURE__*/React.createElement("polygon", {
-    points: "291,121 299,125 291,129",
-    fill: t.ember
-  }))), /*#__PURE__*/React.createElement("g", {
+    points: "164,57 156,61 164,65",
+    fill: t.brass
+  })), /*#__PURE__*/React.createElement("text", {
+    x: "225",
+    y: "90",
+    textAnchor: "middle",
+    fill: t.brass,
+    fontSize: "10",
+    fontStyle: "italic",
+    fontFamily: "Fraunces,serif"
+  }, "loops per prompt")), /*#__PURE__*/React.createElement("g", {
     fontFamily: "'Caveat',cursive",
     fontSize: "17",
     fill: t.brass
