@@ -124,43 +124,73 @@ function HeroSchematic({theme:t}) {
         })}
       </g>
 
-      {/* SDD flow below */}
+      {/* SDD upstream — 4 stations, correctly linear */}
       <g transform="translate(60,400)" fontFamily="JetBrains Mono,monospace">
         <text x="0" y="0" fill={t.dim} fontSize="10" letterSpacing="2">SDD · UPSTREAM</text>
         <g filter="url(#sk-hero)">
           <path d="M0 20 H 500" stroke={t.ink} strokeWidth="0.8"/>
         </g>
-        {['brainstorm','refine','plan'].map((s,i)=>(
-          <g key={s} transform={`translate(${i*170+40},35)`}>
+        {['brainstorm','refine','plan','coordinate'].map((s,i)=>(
+          <g key={s} transform={`translate(${i*130+30},35)`}>
             <g filter="url(#sk-hero)">
-              <rect x="-55" y="-14" width="110" height="28" fill={t.bg} stroke={t.brass} strokeWidth="1.2" rx="3"/>
+              <rect x="-48" y="-13" width="96" height="26" fill={t.bg} stroke={t.brass} strokeWidth="1.2" rx="3"/>
             </g>
-            <text y="4" textAnchor="middle" fill={t.ink} fontSize="11">arc-{s}</text>
+            <text y="4" textAnchor="middle" fill={t.ink} fontSize="10">arc-{s}</text>
           </g>
         ))}
         <g filter="url(#sk-hero)">
-          <path d="M95 35 L125 35 M265 35 L295 35" stroke={t.ember} strokeWidth="1.4" fill="none"/>
-          <polygon points="121,31 129,35 121,39" fill={t.ember}/>
-          <polygon points="291,31 299,35 291,39" fill={t.ember}/>
+          {[0,1,2].map(i=>{
+            const x1 = i*130 + 30 + 48;
+            const x2 = (i+1)*130 + 30 - 48;
+            return (
+              <g key={i}>
+                <path d={`M${x1+2} 35 L${x2-4} 35`} stroke={t.ember} strokeWidth="1.4" fill="none"/>
+                <polygon points={`${x2-8},31 ${x2},35 ${x2-8},39`} fill={t.ember}/>
+              </g>
+            );
+          })}
         </g>
+      </g>
 
-        <text x="0" y="90" fill={t.dim} fontSize="10" letterSpacing="2">SDD · DOWNSTREAM</text>
+      {/* Session lifecycle — how hooks fire across a session (distinct from SDD, complements the top-half agent/hook/skills-ring story) */}
+      <g transform="translate(60,490)" fontFamily="JetBrains Mono,monospace">
+        <text x="0" y="0" fill={t.dim} fontSize="10" letterSpacing="2">SESSION · LIFECYCLE</text>
+        <text x="256" y="0" fill={t.brass} fontSize="10" fontStyle="italic" fontFamily="Fraunces,serif">hooks fire at every gate</text>
         <g filter="url(#sk-hero)">
-          <path d="M0 110 H 500" stroke={t.ink} strokeWidth="0.8"/>
+          <path d="M0 20 H 500" stroke={t.ink} strokeWidth="0.8"/>
         </g>
-        {['implement','loop','dispatch'].map((s,i)=>(
-          <g key={s} transform={`translate(${i*170+40},125)`}>
+        {[
+          {name:'SessionStart',   sub:'inject-skills'},
+          {name:'UserPrompt',     sub:'arc-using routes'},
+          {name:'Pre/Post Tool',  sub:'observe · quality'},
+          {name:'Stop',           sub:'journal · compact'},
+        ].map((o,i)=>(
+          <g key={o.name} transform={`translate(${i*130+30},45)`}>
             <g filter="url(#sk-hero)">
-              <rect x="-55" y="-14" width="110" height="28" fill={t.bg} stroke={t.ember} strokeWidth="1.2" rx="3"/>
+              <rect x="-56" y="-16" width="112" height="32" fill={t.bg} stroke={t.ember} strokeWidth="1.2" rx="3"/>
             </g>
-            <text y="4" textAnchor="middle" fill={t.ink} fontSize="11">arc-{s}</text>
+            <text y="-3" textAnchor="middle" fill={t.ink} fontSize="10" fontWeight="600">{o.name}</text>
+            <text y="10" textAnchor="middle" fill={t.dim} fontSize="8" fontStyle="italic" fontFamily="Fraunces,serif">{o.sub}</text>
           </g>
         ))}
         <g filter="url(#sk-hero)">
-          <path d="M95 125 L125 125 M265 125 L295 125" stroke={t.ember} strokeWidth="1.4" fill="none"/>
-          <polygon points="121,121 129,125 121,129" fill={t.ember}/>
-          <polygon points="291,121 299,125 291,129" fill={t.ember}/>
+          {[0,1,2].map(i=>{
+            const x1 = i*130 + 30 + 56;
+            const x2 = (i+1)*130 + 30 - 56;
+            return (
+              <g key={i}>
+                <path d={`M${x1+2} 45 L${x2-4} 45`} stroke={t.ember} strokeWidth="1.4" fill="none"/>
+                <polygon points={`${x2-8},41 ${x2},45 ${x2-8},49`} fill={t.ember}/>
+              </g>
+            );
+          })}
         </g>
+        {/* inner loop: Pre/PostTool → UserPrompt — tool cycles repeat per prompt */}
+        <g filter="url(#sk-hero)">
+          <path d="M290 61 Q 225 85 160 61" stroke={t.brass} strokeWidth="1.2" fill="none" strokeDasharray="3 3"/>
+          <polygon points="164,57 156,61 164,65" fill={t.brass}/>
+        </g>
+        <text x="225" y="90" textAnchor="middle" fill={t.brass} fontSize="10" fontStyle="italic" fontFamily="Fraunces,serif">loops per prompt</text>
       </g>
 
       {/* annotation */}
