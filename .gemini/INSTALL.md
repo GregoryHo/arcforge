@@ -25,44 +25,13 @@ Enable agentic skills in Gemini CLI via native skill discovery.
 
 Gemini expects skill folders directly under `~/.gemini/skills/`, so each skill gets its own symlink.
 
-## Migrating from old paths
-
-If you previously cloned to `~/.gemini/arcforge`:
-
-1. Remove old symlinks (if any):
-   ```bash
-   rm -f ~/.gemini/skills/arcforge
-   ```
-
-2. Move the clone to the new location:
-   ```bash
-   mv ~/.gemini/arcforge ~/.agents/arcforge
-   ```
-
-3. Pull latest changes:
-   ```bash
-   cd ~/.agents/arcforge && git pull
-   ```
-
-4. Create per-skill symlinks:
-   ```bash
-   mkdir -p ~/.gemini/skills
-   for skill in ~/.agents/arcforge/skills/arc-*/; do
-     ln -sf "$skill" ~/.gemini/skills/
-   done
-   ```
-
-5. Remove the old bootstrap block from `~/.gemini/GEMINI.md` (if present).
-
-6. Restart Gemini CLI.
-
 ## Verify
 
 ```bash
 ls ~/.gemini/skills/arc-*
 ```
 
-You should see 24 symlinks, each pointing to a skill directory in `~/.agents/arcforge/skills/`.
+You should see one symlink per skill, each pointing to a directory in `~/.agents/arcforge/skills/`.
 
 ## Updating
 

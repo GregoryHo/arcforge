@@ -42,9 +42,18 @@ Codex scans `~/.agents/skills/` for skill directories at startup. Each directory
 
 The symlink `~/.agents/skills/arcforge` points into the cloned repo's `skills/` directory, making all arcforge skills visible to Codex without copying files. The `description` field in each skill's SKILL.md frontmatter tells Codex when to auto-activate the skill (e.g., `"Use when exploring ideas before implementation"`).
 
+> **Note:** The `~/.agents/arcforge` clone is shared with Gemini CLI. If you already installed arcforge for Gemini, skip step 1 and reuse the existing clone.
+
 ## Usage
 
 Skills are discovered automatically after installation. Use them as you would any native Codex skill.
+
+## Skill Priority
+
+1. **Personal skills** (`~/.agents/skills/my-skill/`) — your own skills
+2. **Agentic skills** (`~/.agents/skills/arcforge/`) — symlinked from the arcforge repo
+
+Higher-priority skills override lower ones with the same name.
 
 ### Personal Skills
 
@@ -94,9 +103,19 @@ unlink ~/.agents/skills/arcforge
 rm -rf ~/.agents/arcforge   # optional: remove the repo
 ```
 
-## Windows (PowerShell)
+> **Note:** If Gemini CLI also uses this clone, removing `~/.agents/arcforge` will affect Gemini too.
 
-### Installation
+## Windows
+
+### cmd
+
+```cmd
+git clone https://github.com/GregoryHo/arcforge.git "%USERPROFILE%\.agents\arcforge"
+mkdir "%USERPROFILE%\.agents\skills"
+mklink /J "%USERPROFILE%\.agents\skills\arcforge" "%USERPROFILE%\.agents\arcforge\skills"
+```
+
+### PowerShell
 
 ```powershell
 git clone https://github.com/GregoryHo/arcforge.git "$env:USERPROFILE\.agents\arcforge"
@@ -104,7 +123,15 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
 cmd /c mklink /J "$env:USERPROFILE\.agents\skills\arcforge" "$env:USERPROFILE\.agents\arcforge\skills"
 ```
 
-### Uninstalling
+### Git Bash
+
+```bash
+git clone https://github.com/GregoryHo/arcforge.git ~/.agents/arcforge
+mkdir -p ~/.agents/skills
+ln -s ~/.agents/arcforge/skills ~/.agents/skills/arcforge
+```
+
+### Uninstalling (PowerShell)
 
 ```powershell
 cmd /c rmdir "$env:USERPROFILE\.agents\skills\arcforge"

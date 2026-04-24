@@ -79,6 +79,20 @@ grep -rn "<old-version>" skills/ docs/guide/
 
 Also check for renamed helpers, removed CLI flags, or deprecated config keys that the SKILL.md / rules / guides still mention.
 
+**Install docs and platform READMEs get missed every release** because they sit off the main code path — "what did this release touch" diffs usually light up `scripts/`, `skills/`, `docs/guide/`, not `.codex/` / `.gemini/` / `.opencode/` / `docs/README.*.md`. Audit all six every release:
+
+| File | Why it matters |
+|---|---|
+| `.codex/INSTALL.md`, `.gemini/INSTALL.md`, `.opencode/INSTALL.md` | Fetched and executed by the quick-install one-liner — broken commands ship silently to every new user |
+| `docs/README.codex.md`, `docs/README.gemini.md`, `docs/README.opencode.md` | Human-facing platform guides |
+
+Things to verify, with reasoning:
+
+- **No hardcoded skill/symlink counts.** Values like "24 symlinks" drift every time a skill ships. Replace with invariants ("one symlink per skill") — a description that stays true across all releases needs no maintenance.
+- **No stale path references.** If this release moved anything (state dirs, worktree paths, config locations), greps from the examples above apply here too.
+- **Sibling parity, with judgment.** When Gemini/Codex/OpenCode docs diverge, ask whether the asymmetry is intentional before "fixing" it. Windows shell variants (cmd/PowerShell/Git Bash) being uneven is usually real drift; a missing Tool Mapping table in the Codex doc is intentional (Codex's tool vocabulary isn't publicly documented). Don't blindly force parity — verify *why* they differ first.
+- **Pre-v1.0.0: no "Migrating from old paths" sections.** Before the first public release, migration sections describe fictional users — there is no prior published version they could be migrating from. Keep only the latest setup until after v1.0.0 ships.
+
 **Never rewrite past `CHANGELOG.md` entries.** They are history, and downstream users, the vault's Decision notes, and `git log vPREV..vCURRENT` workflows all depend on them being stable. If a past entry turns out wrong, add a correction inside the *new* release's entry. Stealth edits break provenance.
 
 Out-of-scope for this audit (do not modify):
@@ -156,6 +170,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Ingest before bump.** Once the version flips, the "why" narrative is harder to reconstruct for the vault. That's why it's step 1, not step 5.
 - **`.opencode/plugins/arcforge.js`.** The only non-JSON, non-README version location. It doesn't pattern-match "config file" in a search, so it gets missed.
 - **README badge URL.** The shields.io badge is image-cached; stale numbers visually persist even after every other file is correct. Worth an extra explicit mention.
+- **The six install-surface files.** `.codex/INSTALL.md`, `.gemini/INSTALL.md`, `.opencode/INSTALL.md` plus the three `docs/README.{codex,gemini,opencode}.md` files are sibling-flat and don't light up in normal "what did this release touch" diffs. Step 2 covers the audit details.
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
 - **The post-merge tag.** Merging the PR does not auto-tag. This is the single most commonly skipped step.

@@ -21,6 +21,13 @@
       "prompt": "I want to bump to 1.4.2. The branch is fix/readme-typos — just one commit that fixes three typos in README.md (one was 'arcfroge' instead of 'arcforge', one was a broken markdown link, one was an extra period). That's literally all that changed. Can we release?",
       "expected_output": "Response should recognize this is a trivial patch with no architectural content. Vault ingest scope should be 'skip or just log.md entry' — NOT a full decision note, NOT a refresh of multiple Source notes. CHANGELOG entry should go under Fixed with a brief single-bullet entry. All 5 version locations still need bumping (the minimum is still the minimum). Should still suggest the post-merge tag. Should pause for semver confirmation with 'patch' recommendation.",
       "files": []
+    },
+    {
+      "id": 3,
+      "name": "install-docs-have-drift",
+      "prompt": "我要 release v1.4.2. Branch fix/session-memory-consolidation — 3 commits 修 session memory 跟 global auto-memory 的 coexistence bug。測試全綠, lint 綠。版本從 1.4.1 bump。開始 release workflow。注意: arcforge 還沒正式 release (pre-v1.0.0 phase 的規則一樣適用 — 不該有 Migrating from old paths 段落)。Repo 目前 shipped skill count 是 33。repo 的實際狀態: .gemini/INSTALL.md 還寫 'You should see 24 symlinks' (stale);.codex/INSTALL.md 有一段完整的 'Migrating from ~/.codex/arcforge' section (pre-release 不該保留);docs/README.codex.md 的 Windows 小節只有 PowerShell,sibling (Gemini/OpenCode) 都有 cmd/PowerShell/Git Bash 三種。",
+      "expected_output": "Step 2 audit should explicitly enumerate and check all six install-surface files (.codex/INSTALL.md, .gemini/INSTALL.md, .opencode/INSTALL.md, docs/README.codex.md, docs/README.gemini.md, docs/README.opencode.md). Should (a) flag the '24 symlinks' in .gemini/INSTALL.md as hardcoded drift and recommend replacing with an invariant phrasing like 'one symlink per skill' rather than bumping the number to 33, (b) flag the Migrating section in .codex/INSTALL.md as inappropriate pre-v1.0.0 because there is no prior public version users could be migrating from, (c) note the Windows shell asymmetry in docs/README.codex.md but apply judgment about whether this is intentional drift or a real gap — should not blindly force parity. Agent should refuse to proceed past Step 2 until the drift is addressed, not treat it as cosmetic. Should still walk through the rest of the release workflow (CHANGELOG, 5-file bump, commit/push/PR, post-merge tag) after the drift is fixed.",
+      "files": []
     }
   ]
 }
