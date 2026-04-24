@@ -1,0 +1,92 @@
+epics:
+  - id: skill-contract
+    name: Skill Contract — Invocation, Boundaries, Delegation
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/skill-contract/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: sc-001
+        name: User-invoked skill with spec-id argument
+        status: pending
+        depends_on: []
+        source_requirement: fr-sc-001
+      - id: sc-002
+        name: Hard read-only boundaries enforced via tool grants
+        status: pending
+        depends_on: []
+        source_requirement: fr-sc-002
+      - id: sc-003
+        name: Implementation produced via arc-writing-skills
+        status: pending
+        depends_on: []
+        source_requirement: fr-sc-003
+  - id: audit-agents
+    name: Fan-out Audit Agents — Parallel Review Across Three Axes
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/audit-agents/epic.md
+    worktree: null
+    depends_on:
+      - skill-contract
+    features:
+      - id: aa-001
+        name: Parallel fan-out to three axis-aligned sub-agents
+        status: pending
+        depends_on: []
+        source_requirement: fr-aa-001
+      - id: aa-002
+        name: Structured finding schema
+        status: pending
+        depends_on:
+          - aa-001
+        source_requirement: fr-aa-002
+      - id: aa-003
+        name: Axis-scope separation among the three agents
+        status: pending
+        depends_on:
+          - aa-001
+        source_requirement: fr-aa-003
+      - id: aa-004
+        name: Graceful degradation on missing or failed inputs
+        status: pending
+        depends_on:
+          - aa-001
+          - aa-002
+        source_requirement: fr-aa-004
+  - id: output-and-interaction
+    name: Report Output, Triage / Resolution UX, Decisions, Persistence
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/output-and-interaction/epic.md
+    worktree: null
+    depends_on:
+      - audit-agents
+    features:
+      - id: oi-001
+        name: Phase 2 markdown report with mandatory table layout
+        status: pending
+        depends_on: []
+        source_requirement: fr-oi-001
+      - id: oi-002
+        name: Triage UX — multi-select over HIGH findings
+        status: pending
+        depends_on:
+          - oi-001
+        source_requirement: fr-oi-002
+      - id: oi-003
+        name: Resolution UX — batched per-finding AskUserQuestion with preview diffs
+        status: pending
+        depends_on:
+          - oi-002
+        source_requirement: fr-oi-003
+      - id: oi-004
+        name: Decisions table output at skill end
+        status: pending
+        depends_on:
+          - oi-003
+        source_requirement: fr-oi-004
+      - id: oi-005
+        name: Optional report persistence via --save flag
+        status: pending
+        depends_on:
+          - oi-004
+        source_requirement: fr-oi-005
