@@ -63,7 +63,62 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 | 4 | Resolution UX — batched per-finding AskUserQuestion with diff previews | fr-oi-003 |
 | 5 | Print Decisions markdown table; skill exits | fr-oi-004 |
 
-Sub-agent system prompts and Phase 2–5 rendering logic are produced by the downstream epics (`audit-agents`, `output-and-interaction`). Reference the detail XML under `specs/arc-auditing-spec/details/` for the authoritative contract on what each phase emits.
+### Phase 1 — Parallel Fan-Out to Three Audit Axes
+
+**You MUST dispatch all three audit agents in a SINGLE message using three
+parallel Task tool uses.** Do NOT dispatch them one at a time. Sequential
+dispatch is the baseline failure mode this rule exists to prevent — a stock
+agent defaults to serial execution; this skill forbids it.
+
+Dispatch these three agents concurrently, in a single message:
+- `arc-auditing-spec-cross-artifact-alignment`
+- `arc-auditing-spec-internal-consistency`
+- `arc-auditing-spec-state-transition-integrity`
+
+#### Phase 1 Prompt Template
+
+Assemble the following prompt for each agent's Task invocation. Substitute
+the bracketed values with actual resolved paths or the literal absence marker
+`(absent — file does not exist)`:
+
+```
+spec-id: <spec-id>
+
+Artifact paths (use absolute paths):
+  design.md:      <absolute-path-to-design.md OR "(absent — file does not exist)">
+  spec.xml:       <absolute-path-to-spec.xml OR "(absent — file does not exist)">
+  details/*.xml:  <absolute-path-to-details/ OR "(absent — directory does not exist)">
+  dag.yaml:       <absolute-path-to-dag.yaml OR "(absent — file does not exist)">
+
+You are the <axis-name> audit axis. Follow your agent body exactly.
+Return your findings conforming to skills/arc-auditing-spec/references/finding-schema.md.
+```
+
+Resolve paths before dispatching:
+- `design.md`: newest file matching `docs/plans/<spec-id>/*/design.md` (glob for
+  the most recent iteration directory)
+- `spec.xml`: `specs/<spec-id>/spec.xml`
+- `details/*.xml`: `specs/<spec-id>/details/` directory
+- `dag.yaml`: `specs/<spec-id>/dag.yaml`
+
+If a file or directory does not exist, use the absence marker string verbatim.
+
+#### Partial Failure Contract (fr-aa-004-ac3)
+
+When an axis agent returns an `error_flag` in its findings, that axis has
+failed mid-audit. The main session MUST:
+
+1. Surface the `error_flag` in the Phase 2 Summary table (as a warning row
+   for that axis).
+2. Continue rendering Phases 2–5 using findings from the axes that succeeded.
+3. NOT halt the audit because one axis encountered an error.
+
+One axis's `error_flag` does NOT stop the other two axes' findings from being
+shown and triaged.
+
+Phase 2–5 rendering logic is produced by the downstream `output-and-interaction`
+epic. Reference the detail XML under `specs/arc-auditing-spec/details/` for the
+authoritative contract on what each phase emits.
 
 ## Hard Boundaries
 
