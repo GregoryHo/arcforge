@@ -203,6 +203,14 @@ Notes:
 
 ## Phase 5 — Decisions Table
 
+**Rendering condition (fr-oi-004-ac1/ac4):** The Decisions table is rendered
+only when Phase 3 or Phase 4 actually fired during the invocation (i.e.,
+`ceremony_fired` flag is `true`). When both Phase 3 and Phase 4 were skipped
+because N_HIGH == 0 (per fr-oi-002-ac5), the Decisions table is NOT printed
+and Phase 5 produces no output. The concluding recommendation line from the
+Phase 3 threshold check is the skill's terminal output on that path. Do NOT
+print a stub "No decisions" row or any placeholder.
+
 ```markdown
 ## Decisions
 

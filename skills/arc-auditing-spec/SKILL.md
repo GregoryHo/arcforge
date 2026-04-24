@@ -250,7 +250,23 @@ finding in the queue.
 
 ### Phase 5 — Decisions Table (TERMINAL)
 
-Print the Decisions table, then exit. This is the final deliverable. **Template:** see `references/report-templates.md` §Phase 5.
+**Conditional firing gate (fr-oi-004-ac1):** Phase 5 renders the Decisions
+table ONLY when Phase 3 or Phase 4 actually fired during this invocation.
+Use the in-memory `ceremony_fired` flag that is set to `true` the moment
+either phase issues its first AskUserQuestion call (or, for the N_HIGH == 1
+direct-to-Phase-4 path from fr-oi-002-ac6, when Phase 4 enters its loop).
+Do NOT re-derive this condition at Phase 5 entry — carry the flag forward
+from wherever ceremony began.
+
+**N_HIGH == 0 path (fr-oi-004-ac4):** When both Phase 3 and Phase 4 were
+skipped per fr-oi-002-ac5 (the zero-HIGH exit), `ceremony_fired` remains
+`false`. In that case Phase 5 MUST NOT print a Decisions table, MUST NOT
+print a stub "No decisions" line, and MUST NOT produce any Phase 5 output.
+The concluding recommendation line already printed at the end of Phase 3's
+threshold check is the skill's terminal output on this path.
+
+When `ceremony_fired` is `true`, print the Decisions table, then exit.
+This is the final deliverable. **Template:** see `references/report-templates.md` §Phase 5.
 
 - `Finding ID`: the `A<n>-<NNN>` id.
 - `Chosen Resolution`: label of the option the user selected, or
@@ -260,6 +276,11 @@ Print the Decisions table, then exit. This is the final deliverable. **Template:
 - `User Note`: when the user answered via Other, store that free-text
   **verbatim** — no paraphrasing, no summarizing. Empty when no Other
   text was provided. Empty for auto-skipped findings.
+
+The Decisions table MUST include ALL findings that went through Phase 3
+triage or Phase 4 resolution, including any findings auto-skipped at Phase
+4 whose rows carry the `(no ceremony — see Detail)` sentinel. The record
+must be complete — no finding that entered the Stage-2 queue MUST be left out.
 
 **Phase 5 is TERMINAL.** After printing the Decisions table, the skill exits.
 The main session MUST NOT apply any resolution via Edit, Write, or any

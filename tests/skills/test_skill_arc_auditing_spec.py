@@ -1103,3 +1103,178 @@ def test_eval_scenario_low_resolutions_skip_exists():
         "the sentinel '(no ceremony — see Detail)' Decisions-row behavior. "
         "Expected in oi-003-low-resolutions-skip.md or similar."
     )
+
+
+# ── oi-004: Phase 5 Decisions table conditional rendering (fr-oi-004 v2) ───────
+
+def test_phase5_conditional_firing_gate_in_skill():
+    """fr-oi-004-ac1 (modified): SKILL.md Phase 5 must state that the Decisions table
+    is rendered only when Phase 3 or Phase 4 actually fired during this invocation.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must state the conditional gate — "phase 3 or phase 4 actually fired" or equivalent
+    assert (
+        "phase 3 or phase 4" in lower
+        or "phase 3 or phase 4 actually fired" in lower
+        or "phase 3 or phase 4 fired" in lower
+        or "ceremony actually fired" in lower
+        or "ceremony actually ran" in lower
+        or "actually fired" in lower
+        or "actually ran" in lower
+    ), (
+        "SKILL.md Phase 5 must state the conditional firing gate: the Decisions table "
+        "is rendered ONLY when Phase 3 or Phase 4 actually fired during this invocation "
+        "(fr-oi-004-ac1 modified)"
+    )
+
+
+def test_phase5_no_table_on_zero_high_path_in_skill():
+    """fr-oi-004-ac4 (new): SKILL.md Phase 5 must state that when both Phase 3 and Phase 4
+    were skipped (N_HIGH == 0), no Decisions table is printed.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must reference the no-table exit path for the zero-HIGH branch
+    assert (
+        "fr-oi-002-ac5" in body
+        or "n_high == 0" in lower
+        or "both phase 3 and phase 4" in lower
+        or "both phases were skipped" in lower
+        or "zero-high" in lower
+        or "zero high" in lower
+    ), (
+        "SKILL.md Phase 5 must state that when both Phase 3 and Phase 4 were skipped "
+        "(the N_HIGH == 0 path per fr-oi-002-ac5), no Decisions table is printed "
+        "(fr-oi-004-ac4 new)"
+    )
+    # Must say no Decisions table / no Phase 5 output in this case
+    assert (
+        "no decisions table" in lower
+        or "no phase 5" in lower
+        or "table is not printed" in lower
+        or "does not render" in lower
+        or "not rendered" in lower
+        or "suppressed" in lower
+        or "skipped" in lower
+        or "not printed" in lower
+    ), (
+        "SKILL.md Phase 5 must explicitly state the Decisions table is NOT printed "
+        "on the N_HIGH == 0 / both-phases-skipped path (fr-oi-004-ac4)"
+    )
+
+
+def test_phase5_in_memory_flag_mechanism_in_skill():
+    """fr-oi-004 implementation note: SKILL.md Phase 5 must document that the conditional
+    test for 'Phase 3 or Phase 4 actually fired' is carried as an in-memory flag set
+    when either phase issues its first AskUserQuestion call, not re-derived at Phase 5 entry.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must mention the flag or a boolean tracking mechanism
+    assert (
+        "flag" in lower
+        or "boolean" in lower
+        or "ceremony_fired" in lower
+        or "ceremony fired" in lower
+        or "ceremony_ran" in lower
+        or "ceremony ran" in lower
+        or "set when" in lower
+        or "set true" in lower
+        or "tracked" in lower
+        or "carry" in lower
+        or "carried" in lower
+    ), (
+        "SKILL.md Phase 5 must document the in-memory flag (or equivalent boolean tracking) "
+        "that is set when Phase 3 or Phase 4 issues its first AskUserQuestion call, "
+        "so Phase 5 does not re-derive the condition from scratch "
+        "(fr-oi-004 implementation note)"
+    )
+
+
+def test_phase5_skipped_sentinel_rows_included_when_rendered():
+    """fr-oi-004 invariant: SKILL.md Phase 5 must state that when the Decisions table IS
+    rendered, it includes ALL discussed findings including auto-skipped Phase 4 rows with
+    the sentinel '(no ceremony — see Detail)'.
+    """
+    body = _read(SKILL_PATH)
+    # Must reference the sentinel for auto-skipped rows
+    assert "(no ceremony — see Detail)" in body, (
+        "SKILL.md Phase 5 must state that when rendered, the Decisions table includes "
+        "auto-skipped Phase 4 rows carrying the sentinel '(no ceremony — see Detail)'"
+    )
+    lower = body.lower()
+    # Must say all / every finding in the table (not just the ones that got a question)
+    assert (
+        "all findings" in lower
+        or "all discussed" in lower
+        or "auto-skipped" in lower
+        or "including" in lower
+        or "complete" in lower
+    ), (
+        "SKILL.md Phase 5 must state that the Decisions table covers ALL findings "
+        "including auto-skipped ones with the sentinel value (fr-oi-004 invariant)"
+    )
+
+
+def test_report_templates_decisions_table_render_vs_suppress_note():
+    """fr-oi-004-ac1/ac4: report-templates.md must have a note documenting when the
+    Decisions table is rendered (ceremony fired) vs. suppressed (both phases skipped).
+    """
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    lower = body.lower()
+    # Must describe when the table renders
+    assert (
+        "rendered only" in lower
+        or "rendered when" in lower
+        or "only rendered" in lower
+        or "only when" in lower
+        or "suppressed" in lower
+        or "not rendered" in lower
+        or "not printed" in lower
+        or "conditional" in lower
+    ), (
+        "report-templates.md must have a note about when the Decisions table is "
+        "rendered (ceremony fired) vs. suppressed (both Phase 3 and Phase 4 skipped)"
+    )
+    # Must mention the zero-HIGH / both-phases-skipped suppression condition
+    assert (
+        "n_high == 0" in lower
+        or "zero high" in lower
+        or "both phase 3 and phase 4" in lower
+        or "both phases" in lower
+        or "phase 3 and phase 4 were skipped" in lower
+        or "fr-oi-002-ac5" in body
+    ), (
+        "report-templates.md must document the N_HIGH == 0 / both-phases-skipped "
+        "suppression condition for the Decisions table"
+    )
+
+
+def test_eval_scenario_decisions_table_suppressed_exists():
+    """fr-oi-004-ac4 eval: an eval scenario file explicitly covering the N_HIGH == 0
+    path with assertion that NO Decisions table is printed must exist.
+    This scenario specifically tests Phase 5 suppression (not just Phase 3/4 skipping).
+    """
+    evals_dir = Path("skills/arc-auditing-spec/evals")
+    all_eval_files = list(evals_dir.glob("*.md"))
+    found = False
+    for f in all_eval_files:
+        content = f.read_text(encoding="utf-8").lower()
+        # Must assert absence of the Decisions table on the zero-HIGH path
+        if (
+            ("n_high == 0" in content or "zero high" in content or "0 high" in content)
+            and ("no decisions table" in content or "decisions table" in content and "not" in content)
+            and ("phase 5" in content or "suppressed" in content)
+        ):
+            found = True
+            break
+    assert found, (
+        "An eval scenario file in skills/arc-auditing-spec/evals/ must document the "
+        "N_HIGH == 0 path with an explicit assertion that NO Decisions table (Phase 5) "
+        "is printed. The existing oi-002-threshold-n-high-0.md covers Phase 3/4 skipping "
+        "but this test specifically validates the Phase 5 suppression condition. "
+        "Expected in oi-004-decisions-table-suppressed.md or similar."
+    )
