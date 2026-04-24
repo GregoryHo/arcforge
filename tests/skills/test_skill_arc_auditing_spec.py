@@ -830,3 +830,133 @@ def test_report_templates_file_exists_when_cited():
             "SKILL.md cites report-templates.md but the file does not exist at "
             "skills/arc-auditing-spec/references/report-templates.md"
         )
+
+
+# ── oi-002: Phase 3 threshold branches (fr-oi-002 N_HIGH >= 2 gate) ──────────
+
+def test_phase3_fires_only_when_n_high_ge_2():
+    """fr-oi-002-ac1 (modified): Phase 3 first AskUserQuestion MUST state N_HIGH >= 2 precondition."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must state the threshold condition explicitly
+    assert "n_high >= 2" in lower or "n_high>=2" in lower or "at least 2" in lower or "2 high" in lower or "two high" in lower or "n_high ≥ 2" in lower, (
+        "SKILL.md Phase 3 must state the N_HIGH >= 2 precondition for the first AskUserQuestion call"
+    )
+
+
+def test_phase3_ac3_other_pull_in_requires_firing_phase3():
+    """fr-oi-002-ac3 (modified): Other pull-in of sub-HIGH IDs MUST be limited to when Phase 3 fires (N_HIGH >= 2)."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Phase 3 prose must show the Other channel is only available when Phase 3 fires.
+    # Acceptable signals: "only when phase 3 fires", "only when n_high >= 2", "only channel ... fires",
+    # "no alternative injection", "only reachable ... phase 3 actually fires"
+    assert (
+        "only when phase 3" in lower
+        or "only when n_high" in lower
+        or "n_high >= 2" in lower
+        or "no alternative injection" in lower
+        or "phase 3 actually fires" in lower
+        or "when phase 3 fires" in lower
+        or "only exists when phase 3" in lower
+        or "injection channel only" in lower
+    ), (
+        "SKILL.md must state that the Other free-text injection channel exists ONLY when Phase 3 "
+        "actually fires (N_HIGH >= 2); not available on degraded branches"
+    )
+
+
+def test_phase3_n_high_0_path_skips_phases_3_4_5():
+    """fr-oi-002-ac5 (new): N_HIGH == 0 path MUST skip Phase 3, Phase 4, Phase 5 and print concluding line."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must describe the zero-HIGH exit path
+    assert "n_high == 0" in lower or "zero high" in lower or "n_high=0" in lower or "0 high" in lower or "no high" in lower, (
+        "SKILL.md must document the N_HIGH == 0 exit path"
+    )
+    # Must state Phase 3 is skipped / not fired
+    assert "skip" in lower or "does not fire" in lower or "not fire" in lower or "no phase 3" in lower or "not issue" in lower, (
+        "SKILL.md must state Phase 3 is skipped when N_HIGH == 0"
+    )
+    # Must state a concluding recommendation line is printed
+    assert "concluding" in lower or "recommendation line" in lower or "concluding recommendation" in lower or "concluding line" in lower, (
+        "SKILL.md must state that a concluding recommendation line is printed when N_HIGH == 0"
+    )
+    # Must reference Phase 2 Detail blocks for follow-up
+    assert "phase 2" in lower and ("detail" in lower or "detail block" in lower), (
+        "SKILL.md concluding recommendation must refer the user to Phase 2 Detail blocks"
+    )
+
+
+def test_phase3_n_high_1_path_skips_multiselect_enters_phase4():
+    """fr-oi-002-ac6 (new): N_HIGH == 1 path skips Phase 3 multi-select and proceeds to Phase 4 directly."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must describe the one-HIGH bypass path
+    assert "n_high == 1" in lower or "one high" in lower or "exactly one high" in lower or "single high" in lower or "single-high" in lower, (
+        "SKILL.md must document the N_HIGH == 1 bypass path (already tested for emphasis, now need Phase 4 entry)"
+    )
+    # Must state Phase 3 multi-select does NOT fire for N_HIGH == 1
+    assert (
+        "no phase 3" in lower
+        or "skips phase 3" in lower
+        or "skip phase 3" in lower
+        or "does not issue any phase 3" in lower
+        or "not issue any phase 3" in lower
+        or "directly into phase 4" in lower
+        or "proceed directly" in lower
+        or "phase 4 directly" in lower
+        or "bypass" in lower
+    ), (
+        "SKILL.md must state that Phase 3 multi-select does not fire for N_HIGH == 1 "
+        "and that the skill proceeds directly into Phase 4"
+    )
+    # Must indicate Phase 4 is entered with the single HIGH as the sole Stage-2 queue entry
+    assert "phase 4" in lower, (
+        "SKILL.md must state that Phase 4 is entered for N_HIGH == 1"
+    )
+
+
+# ── oi-002: Concluding recommendation line in report-templates.md ──────────────
+
+def test_report_templates_has_concluding_recommendation_line_section():
+    """fr-oi-002-ac5: report-templates.md MUST have a Concluding recommendation line section for N_HIGH == 0."""
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    lower = body.lower()
+    # Must have a dedicated section for the concluding line
+    assert "concluding" in lower, (
+        "report-templates.md must have a section for the concluding recommendation line (N_HIGH == 0 path)"
+    )
+    # Must reference Phase 2 Detail blocks
+    assert "phase 2" in lower and "detail" in lower, (
+        "report-templates.md concluding-line section must reference Phase 2 Detail blocks for follow-up"
+    )
+    # Must indicate the skill is done / exiting
+    assert "exiting" in lower or "exit" in lower or "done" in lower or "skill exits" in lower or "skill exiting" in lower, (
+        "report-templates.md concluding-line section must make clear the skill is done/exiting"
+    )
+
+
+# ── oi-002: Eval scenario for N_HIGH == 0 path ───────────────────────────────
+
+def test_eval_scenario_n_high_0_exists():
+    """fr-oi-002-ac5 eval: an eval scenario file covering the N_HIGH == 0 path must exist."""
+    evals_dir = Path("skills/arc-auditing-spec/evals")
+    # Accept a standalone file or an extended existing file that documents the N_HIGH == 0 path
+    # Look for any file that documents the zero-HIGH skip behavior
+    all_eval_files = list(evals_dir.glob("*.md"))
+    found = False
+    for f in all_eval_files:
+        content = f.read_text(encoding="utf-8").lower()
+        if ("n_high == 0" in content or "zero high" in content or "0 high" in content or "no high" in content) and \
+           ("concluding" in content or "recommendation line" in content) and \
+           ("phase 3" in content):
+            found = True
+            break
+    assert found, (
+        "An eval scenario file in skills/arc-auditing-spec/evals/ must document the N_HIGH == 0 "
+        "path: skill prints Phase 2 + concluding recommendation line, skips Phase 3, exits cleanly. "
+        "Expected in oi-002-threshold-n-high-0.md or similar."
+    )

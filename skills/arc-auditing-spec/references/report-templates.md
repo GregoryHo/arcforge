@@ -109,6 +109,26 @@ resolution row as a fenced diff block.
 
 ---
 
+## Concluding Recommendation Line (N_HIGH == 0 path)
+
+When N_HIGH == 0, print this line after the Phase 2 Detail blocks. The skill
+then exits cleanly — no Phase 3, no Phase 4, no Phase 5 Decisions table.
+
+```markdown
+_No HIGH findings to triage. See the Phase 2 Detail blocks above for any MED/LOW/INFO follow-up. Skill exiting._
+```
+
+This line MUST:
+- Reference the Phase 2 Detail blocks explicitly so the user knows where to
+  find any MED, LOW, or INFO follow-up.
+- Make clear that the skill is done (exiting / no further interaction).
+- NOT promise any further interaction or Phase 5 output.
+
+The exact wording may vary; the above is a canonical example. The Phase 2
+Detail blocks are the complete deliverable for the N_HIGH == 0 path.
+
+---
+
 ## Phase 3 — Triage AskUserQuestion Template
 
 ```

@@ -158,7 +158,29 @@ visibility; the Phase 3 multi-select is not the only visibility mechanism.
 
 **Goal**: let the reviewer select which HIGH findings to address in this
 session. MED, LOW, INFO MUST NOT appear as options — only reachable via
-the Other free-text channel (F-01, pinned).
+the Other free-text channel (F-01, pinned). Phase 3 fires only when
+N_HIGH >= 2; below that threshold the skill takes a degraded path.
+
+**Step 0 — Threshold check (MANDATORY before any AskUserQuestion call).**
+Count the HIGH-severity findings across all three axes (N_HIGH).
+
+- **N_HIGH == 0**: Phase 3 does NOT fire. Do NOT issue any AskUserQuestion
+  call. Do NOT enter Phase 4. Do NOT render a Phase 5 Decisions table.
+  Instead, print the concluding recommendation line (template:
+  `references/report-templates.md` §Concluding Recommendation Line) and
+  exit cleanly. The Phase 2 Detail blocks are the complete deliverable;
+  no alternative injection channel is provided.
+
+- **N_HIGH == 1**: Phase 3 multi-select does NOT fire (a single-option
+  multi-select would violate `options.minItems: 2`). Skip Phase 3 entirely.
+  The Phase 2 Findings Overview row for the lone HIGH already carries the
+  visual emphasis from fr-oi-001-ac5. Proceed directly into Phase 4 with
+  that single HIGH as the sole Stage-2 queue entry. Phase 4 then proceeds
+  per its existing rules (fr-oi-003). No Other injection channel exists on
+  this path; the Other pull-in channel only exists when Phase 3 actually
+  fires (N_HIGH >= 2).
+
+- **N_HIGH >= 2**: Phase 3 fires. Continue to the steps below.
 
 **Step 1 — Determine HIGH finding list.**
 Collect all HIGH-severity findings across all three axes. Sort: A1 before
@@ -176,7 +198,9 @@ The AskUserQuestion tool appends an auto-generated Other field. After each
 call, scan the Other string for the regex pattern `A[1-3]-\d{3}`. Add each
 matched finding ID to the Stage 2 resolution queue alongside any HIGH IDs
 the user checked. This is the ONLY channel through which MED, LOW, and INFO
-findings enter the queue.
+findings enter the queue. This channel only exists when Phase 3 actually
+fires (N_HIGH >= 2); it is not available on the N_HIGH == 0 or N_HIGH == 1
+degraded paths.
 
 ### Phase 4 — Resolution UX
 
