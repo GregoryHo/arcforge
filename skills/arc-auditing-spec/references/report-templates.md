@@ -1,0 +1,204 @@
+# Report Templates — arc-auditing-spec
+
+Worked examples for Phases 2–5 output. The main skill body (SKILL.md) cites
+this file; these templates are the authoritative layout the main session MUST
+follow exactly.
+
+---
+
+## Phase 2 — Summary Table
+
+Print this table first. One row per axis plus a Totals row. If an axis
+returned an `error_flag`, replace its counts with `ERR` and add a warning
+note below the table.
+
+```markdown
+## Audit Summary
+
+| Axis                         | HIGH | MED | LOW | INFO | Total |
+|------------------------------|------|-----|-----|------|-------|
+| cross-artifact-alignment     |    2 |   1 |   0 |    0 |     3 |
+| internal-consistency         |    0 |   2 |   1 |    0 |     3 |
+| state-transition-integrity   |    1 |   0 |   0 |    1 |     2 |
+| **Totals**                   |  **3** | **3** | **1** | **1** | **8** |
+```
+
+---
+
+## Phase 2 — Findings Overview Table
+
+Print immediately after the Summary table. Every finding from all three
+axes MUST appear — no omissions regardless of severity (HIGH, MED, LOW,
+INFO all appear).
+
+```markdown
+## Findings Overview
+
+| ID     | Sev  | Axis                       | Title                                       | Primary file             |
+|--------|------|----------------------------|---------------------------------------------|--------------------------|
+| A1-001 | HIGH | cross-artifact-alignment   | dag.yaml epic id 'foo-bar' not in design.md | specs/my-spec/dag.yaml   |
+| A1-002 | HIGH | cross-artifact-alignment   | AC id mismatch between spec.xml and dag     | specs/my-spec/spec.xml   |
+| A1-003 | MED  | cross-artifact-alignment   | Feature title drift across artifacts        | docs/plans/my-spec/...   |
+| A2-001 | MED  | internal-consistency       | Dangling depends_on reference in dag.yaml   | specs/my-spec/dag.yaml   |
+| A2-002 | MED  | internal-consistency       | Conflicting consumes/produces in spec.xml   | specs/my-spec/spec.xml   |
+| A2-003 | LOW  | internal-consistency       | Epic description missing in dag.yaml        | specs/my-spec/dag.yaml   |
+| A3-001 | HIGH | state-transition-integrity | Worktree dir present but epic status=pending| .arcforge-epic           |
+| A3-002 | INFO | state-transition-integrity | DAG not yet planned — state integrity N/A   | (none)                   |
+```
+
+---
+
+## Phase 2 — Per-Finding Detail Block
+
+Print one Detail block per finding, in the same order as the Overview table.
+
+Structure:
+1. **Heading**: `### <ID> — <Sev> — <Title>`
+2. **Observed evidence**: markdown table with `location` and `evidence` columns
+3. **Why it matters**: free prose paragraph (ONLY section that may be prose)
+4. **Suggested resolutions**: markdown table with `Resolution` and `Description`
+   columns; add a `Side-effect / Cost` column when applicable
+
+```markdown
+### A1-001 — HIGH — dag.yaml epic id 'foo-bar' not in design.md
+
+**Observed evidence**
+
+| Location                       | Evidence                                              |
+|--------------------------------|-------------------------------------------------------|
+| specs/my-spec/dag.yaml:14      | Epic id defined as `foo-bar`                          |
+| docs/plans/my-spec/.../design.md | All references use `foo-baz`; no alias note present |
+
+**Why it matters**
+
+arc-planning reads dag.yaml epic ids to wire up worktree paths. If the
+design doc and dag use different ids, a coordinator run will produce a
+worktree under the wrong name, silently diverging from the design intent.
+
+**Suggested resolutions**
+
+| Resolution                          | Description                                              | Side-effect / Cost                       |
+|-------------------------------------|----------------------------------------------------------|------------------------------------------|
+| (Recommended) Rename dag epic       | Rename epic id in dag.yaml from `foo-bar` to `foo-baz`  | Existing worktrees must be re-created    |
+| Rename design references            | Replace `foo-baz` with `foo-bar` throughout design.md    | All design prose and diagrams need sweep |
+```
+
+When a resolution has a `preview` diff from the agent, append it under the
+resolution row as a fenced diff block.
+
+---
+
+## Phase 3 — Triage AskUserQuestion Template
+
+```
+AskUserQuestion:
+  header: "Triage"
+  multiSelect: true
+  question: "Select HIGH findings to resolve in this session (batch 1 of N):"
+  options:
+    - label: "A1-001 — dag.yaml epic id 'foo-bar' not in design.md"
+    - label: "A1-002 — AC id mismatch between spec.xml and dag"
+    - label: "A3-001 — Worktree dir present but epic status=pending"
+    - label: "A2-001 — (additional HIGH if available)"
+```
+
+- Ordering: earliest HIGH by axis (A1 before A2 before A3), then by NNN
+  within axis.
+- Max 4 options per call. If more than 4 HIGH findings exist, use sequential
+  calls batching up to 4 each time until all HIGH findings are presented
+  exactly once.
+- MED, LOW, INFO MUST NOT appear as options. Only reachable via the
+  auto-appended Other free-text field.
+
+**Parsing Other free-text**: after each AskUserQuestion call, scan the Other
+string for the pattern `A[1-3]-\d{3}`. Add each matched ID to the Stage 2
+resolution queue, alongside the HIGH IDs the user checked.
+
+---
+
+## Phase 4 — Resolution AskUserQuestion Template
+
+```
+AskUserQuestion:
+  header: "A1-001"
+  multiSelect: false
+  question: |
+    A1-001 — dag.yaml epic id 'foo-bar' not in design.md
+    Observed: dag.yaml:14 defines 'foo-bar'; design.md uses 'foo-baz' throughout.
+  options:
+    - label: "(Recommended) Rename dag epic"
+      description: "Rename epic id in dag.yaml from 'foo-bar' to 'foo-baz'"
+      preview: |
+        --- a/specs/my-spec/dag.yaml
+        +++ b/specs/my-spec/dag.yaml
+        @@ -13,7 +13,7 @@
+        -  id: foo-bar
+        +  id: foo-baz
+    - label: "Rename design references"
+      description: "Replace 'foo-baz' with 'foo-bar' throughout design.md"
+      preview: |
+        --- a/docs/plans/my-spec/2026-04-22/design.md
+        +++ b/docs/plans/my-spec/2026-04-22/design.md
+        @@ -20,4 +20,4 @@
+        -foo-baz
+        +foo-bar
+    - label: "File engine bug"
+      description: "Open issue against coordinator.js to validate epic id alignment"
+```
+
+Notes:
+- `header` = finding ID (6 chars: `A<n>-<NNN>`). Never truncated.
+- `multiSelect: false` — one resolution per finding.
+- `(Recommended)` prefix on first option label when agent flagged a preferred
+  resolution; absent otherwise.
+- Options with editable-artifact changes MUST include `preview` diff.
+  Engine-fix options (no file diff) MAY omit `preview`.
+- Other free-text is a valid answer — accept it, do not throw or drop it.
+  Record verbatim in the Decisions table User Note column.
+- Batch at most 4 findings per AskUserQuestion call; loop sequentially
+  until all N selected findings are asked exactly once.
+
+---
+
+## Phase 5 — Decisions Table
+
+```markdown
+## Decisions
+
+| Finding ID | Chosen Resolution             | User Note                                         |
+|------------|-------------------------------|---------------------------------------------------|
+| A1-001     | (Recommended) Rename dag epic |                                                   |
+| A1-002     | Rename design references      |                                                   |
+| A3-001     | File engine bug               | Check if coordinator.js validates on worktree add |
+```
+
+- `User Note` is empty when user chose a listed option with no Other text.
+- `User Note` contains the Other free-text verbatim when user answered via
+  the Other channel. No paraphrasing.
+- This table is the final output. Skill exits after printing it.
+- Phase 5 is TERMINAL. Do NOT apply any resolution via Edit, Write, or any
+  other mutating tool. Main session owns all subsequent action.
+
+---
+
+## --save File Path
+
+When `--save` is present, write the full Phase 2 report + Decisions table
+to:
+
+```
+~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md
+```
+
+Filename uses 24-hour time (e.g., `2026-04-24-1435.md`).
+
+Obtain `<project-hash>` via subprocess — do NOT reimplement the hash inline:
+
+```bash
+node -e "const { hashRepoPath } = require('./scripts/lib/worktree-paths.js'); console.log(hashRepoPath(process.cwd()));"
+```
+
+Run this from the project root. The printed 6-char hex string is the hash.
+
+Without `--save`: zero files are written anywhere. The skill is read-only
+by default.
