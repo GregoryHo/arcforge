@@ -27,16 +27,7 @@ Your axis is **alignment between two or more artifacts** — not issues internal
 All findings MUST conform to the schema in
 `skills/arc-auditing-spec/references/finding-schema.md`.
 
-Summary of required fields:
-- `id`: `A1-<NNN>` (zero-padded three digits)
-- `severity`: one of {HIGH, MED, LOW, INFO}
-- `title`: one-line description
-- `affected_files`: list of paths (with line refs when known)
-- `observed`: concrete evidence prose
-- `why_it_matters`: why this issue is a problem
-- `resolutions`: 1–4 items, each with `label`, `description`, and (when
-  applicable) `preview` diff string
-- `error_flag`: present only on partial-failure findings
+Required fields: id (format `A1-NNN`), severity, title, affected_files, observed, why_it_matters, resolutions, error_flag (conditional). See `references/finding-schema.md` for types and examples.
 
 **INFO is RESERVED for graceful-degradation notices only.** Do NOT use INFO
 to downgrade a real HIGH/MED/LOW finding. If a finding is a real issue, use
@@ -59,9 +50,11 @@ You receive:
 Absence markers signal that a file does not exist and should not be searched
 for. Follow the graceful-degradation rules below when you receive them.
 
-## Graceful Degradation — Mandatory Branches
+## Graceful Degradation
 
-### When spec.xml is marked absent
+### Mandatory Branches
+
+#### When spec.xml is marked absent
 
 If the input includes an absence marker for `spec.xml`, the spec family is
 in a pre-refining state. In that case:
@@ -79,26 +72,14 @@ in a pre-refining state. In that case:
 3. **Continue with design↔dag alignment checks** (if dag.yaml is present).
    Number any design↔dag findings starting at A1-002.
 
-### When both spec.xml AND dag.yaml are absent
+#### When both spec.xml AND dag.yaml are absent
 
 Emit the single INFO finding for spec.xml absence, then emit no further
 findings (there is nothing to align against).
 
 ### Partial Failure Contract
 
-If you encounter a token-limit error, malformed input, or tool error
-during your analysis:
-
-1. Return any findings already completed before the failure.
-2. Append one additional finding:
-   - `severity`: `INFO`
-   - `error_flag`: a string describing the failure cause (e.g., "Glob error
-     on details/*.xml — findings before this point are complete")
-   - `id`: `A1-ERR`
-   - `title`: `"Audit axis 1 incomplete — tool error"`
-
-The main session continues rendering Phases 2–5 with the partial results.
-An `error_flag` finding does NOT halt the overall audit.
+Follow the Partial Failure Contract in `references/finding-schema.md` §Partial Failure Contract. Your error id prefix is `A1-ERR` (n = 1 for cross-artifact, 2 for internal, 3 for state-transition — match your axis).
 
 ## Axis Patterns — What to Check (fr-aa-003-ac1)
 

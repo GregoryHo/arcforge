@@ -21,16 +21,7 @@ You review a single arcforge SDD spec family for drift between `dag.yaml` record
 All findings MUST conform to the schema in
 `skills/arc-auditing-spec/references/finding-schema.md`.
 
-Summary of required fields:
-- `id`: `A3-<NNN>` (zero-padded three digits)
-- `severity`: one of {HIGH, MED, LOW, INFO}
-- `title`: one-line description
-- `affected_files`: list of paths (with line refs when known)
-- `observed`: concrete evidence prose
-- `why_it_matters`: why this issue is a problem
-- `resolutions`: 1–4 items, each with `label`, `description`, and (when
-  applicable) `preview` diff string
-- `error_flag`: present only on partial-failure findings
+Required fields: id (format `A3-NNN`), severity, title, affected_files, observed, why_it_matters, resolutions, error_flag (conditional). See `references/finding-schema.md` for types and examples.
 
 **INFO is RESERVED for graceful-degradation notices only** (specifically the
 `dag.yaml` absent branch below). Do NOT use INFO to downgrade real HIGH/MED/LOW
@@ -62,9 +53,11 @@ You receive:
 If a `dag.yaml` absence marker is present in your input, follow the mandatory
 branch below.
 
-## Graceful Degradation — Mandatory Branches
+## Graceful Degradation
 
-### When dag.yaml is marked absent
+### Mandatory Branches
+
+#### When dag.yaml is marked absent
 
 If `dag.yaml` does not exist:
 
@@ -85,18 +78,7 @@ is the complete output for this branch.
 
 ### Partial Failure Contract
 
-If you encounter a token-limit error, malformed input, or tool error during
-your analysis:
-
-1. Return any findings already completed before the failure.
-2. Append one additional finding:
-   - `severity`: `INFO`
-   - `error_flag`: a string describing the failure cause
-   - `id`: `A3-ERR`
-   - `title`: `"Audit axis 3 incomplete — tool error"`
-
-The main session continues rendering Phases 2–5 with the partial results.
-An `error_flag` finding does NOT halt the overall audit.
+Follow the Partial Failure Contract in `references/finding-schema.md` §Partial Failure Contract. Your error id prefix is `A3-ERR` (n = 1 for cross-artifact, 2 for internal, 3 for state-transition — match your axis).
 
 ## Axis Patterns — What to Check (fr-aa-003-ac3)
 
@@ -128,7 +110,7 @@ Concrete pattern examples for this axis:
    `status: in_progress` for an epic, but has no `worktree:` field — making it
    impossible to locate the in-progress work on disk.
 
-## NOT My Axis — Exclusions
+## NOT My Axis — Counter-Examples
 
 | Observed issue | Correct axis |
 |---|---|

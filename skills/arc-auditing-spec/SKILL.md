@@ -161,19 +161,7 @@ Present up to 4 HIGH findings per AskUserQuestion call. When more than 4
 HIGH findings exist, make sequential calls batching up to 4 each time until
 every HIGH finding has been presented exactly once.
 
-Example AskUserQuestion invocation (key-value block):
-
-```
-AskUserQuestion:
-  header: "Triage"
-  multiSelect: true
-  question: "Select HIGH findings to resolve in this session (batch 1 of N):"
-  options:
-    - label: "A1-001 — <title>"
-    - label: "A1-002 — <title>"
-    - label: "A3-001 — <title>"
-    - label: "A3-002 — <title>"
-```
+Use `AskUserQuestion` with `header: "Triage"` and `multiSelect: true`. **Template:** see `references/report-templates.md` §Phase 3.
 
 **Step 3 — Parse Other free-text.**
 The AskUserQuestion tool appends an auto-generated Other field. After each
@@ -190,28 +178,7 @@ resolution to apply. One resolution per finding (`multiSelect: false`).
 **Batched loop**: present up to 4 findings per AskUserQuestion call.
 Sequential calls until all N selected findings are asked exactly once.
 
-Example AskUserQuestion invocation:
-
-```
-AskUserQuestion:
-  header: "A1-001"
-  multiSelect: false
-  question: |
-    A1-001 — <title>
-    Observed: <compact one-line summary from observed evidence>
-  options:
-    - label: "(Recommended) <resolution label>"
-      description: "<what this resolution does>"
-      preview: |
-        <diff content here when resolution modifies an editable artifact>
-    - label: "<alternate resolution>"
-      description: "<what this resolution does>"
-      preview: |
-        <diff content here when resolution modifies an editable artifact>
-    - label: "File engine bug"
-      description: "Record as engine-side fix in a separate spec; no artifact edit here"
-      # no preview field — engine-fix resolutions MAY omit preview per fr-oi-003-ac3
-```
+Use `AskUserQuestion` with `header` = finding ID and `multiSelect: false`. **Template:** see `references/report-templates.md` §Phase 4.
 
 Rules:
 - `header` = finding ID (format `A<n>-<NNN>` is 6 chars — no truncation
@@ -227,14 +194,7 @@ Rules:
 
 ### Phase 5 — Decisions Table (TERMINAL)
 
-Print the Decisions table, then exit. This is the final deliverable.
-
-```
-| Finding ID | Chosen Resolution | User Note |
-|---|---|---|
-| A1-001 | (Recommended) Rename dag epic | |
-| A3-001 | File engine bug | Check if coordinator.js validates on worktree add |
-```
+Print the Decisions table, then exit. This is the final deliverable. **Template:** see `references/report-templates.md` §Phase 5.
 
 - `Finding ID`: the `A<n>-<NNN>` id.
 - `Chosen Resolution`: label of the option the user selected, or
@@ -268,6 +228,8 @@ node -e "const { hashRepoPath } = require('./scripts/lib/worktree-paths.js'); co
 
 Run from the project root. The 6-char hex string printed is the hash.
 
+Ensure parent directories exist: `mkdir -p ~/.arcforge/reviews/<project-hash>/<spec-id>/`
+
 Without `--save`: zero files are written anywhere. No file is written at
 any point unless the `--save` flag is explicitly present.
 
@@ -287,7 +249,9 @@ If you find yourself doing any of these, STOP immediately:
 | "The user's spec-id doesn't exist, but this other one is clearly what they meant — I'll audit that and note the substitution at the top" | `fr-sc-001-ac2` forbids substitution. This is a baseline failure mode observed in RED testing — the rationalization "don't ask clarifying questions" does NOT justify picking a different spec. | Print available ids, exit. Let the user re-invoke with the right id. |
 | "The user said `<id>` and `specs/<id>/` is missing, but `docs/plans/<id>/` has a design.md — I'll audit in pure-design mode since the design clearly exists" | Phase 0 requires `specs/<id>/` **specifically**. `docs/plans/<id>/` is not a fallback path — not for pure-design audits, not for partial, not for anything. A design doc without a spec directory is a pre-refining state; the audit skill does not operate on it. | Print available ids, exit. If the user wanted a design-only review, that's `/arc-brainstorming` or manual review territory, not this skill. |
 | "I spotted an obvious typo while reading — fixing it saves a round trip" | Read-only is absolute. Even typos are reported as findings, never patched. | Add a finding (LOW severity) to the axis agent's output; let main session decide. |
-| "The user picked resolution (a) for finding A1-003 in Phase 4 — I should Edit the spec now" / "Phase 5 ended — I'll invoke `/arc-refining` to apply" / "The user selected `(Recommended)` — applying saves a round-trip" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
+| "The user picked resolution (a) for finding A1-003 in Phase 4 — I should Edit the spec now" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
+| "Phase 5 ended — I'll invoke `/arc-refining` to apply the decision" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
+| "The user selected `(Recommended)` — applying saves a round-trip" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
 | "I'll have arc-refining/arc-planning call this skill at the end of their flow for free quality gating" | `fr-sc-001-ac3` forbids pipeline auto-invocation. The skill must remain user-triggered. | Do not add any invocation from any pipeline SKILL.md body. |
 | "Let me add a `--apply` flag so this is one-step for users" | Makes the skill a mutator, defeating its diagnostic-only contract. | Don't. The contract is the contract. |
 | "This MED finding is clearly important so I'll add it to the triage options anyway" | F-01 is pinned: MED/LOW/INFO MUST NOT appear in Phase 3 triage `options`. The Overview table and Detail block already ensure visibility. | MED/LOW/INFO are only reachable via the Other free-text channel. Do not add them to options. |

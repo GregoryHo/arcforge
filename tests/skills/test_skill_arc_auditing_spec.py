@@ -485,14 +485,21 @@ def test_phase2_med_low_info_must_appear():
     assert "med" in lower and "low" in lower and "info" in lower, (
         "Phase 2 must mention MED, LOW, INFO findings"
     )
-    # Must NOT suggest omitting any severity from the overview
-    assert "omit" not in lower or "must not omit" in lower or "no omissions" in lower, (
-        "Phase 2 must NOT direct the session to omit any severity from the overview"
+    # Explicit positive assertion: Phase 2 must state the inclusion rule
+    assert "no omissions" in lower or "must not omit" in lower or "regardless of" in lower, (
+        "Phase 2 must explicitly state MED/LOW/INFO findings appear in the Overview/Detail regardless of severity"
     )
-    # Must explicitly call out that even non-triage severities need detail blocks
-    assert "regardless of" in lower or "no omissions" in lower or "all findings" in lower or "every finding" in lower, (
-        "Phase 2 must state that all findings (regardless of severity) appear in overview"
-    )
+    # Negative assertion: if 'omit' is used in a findings-visibility context, it must be framed as prohibition
+    if "omit" in lower:
+        # Exclude lines where 'omit' refers to optional fields (e.g., 'MAY omit preview')
+        omit_contexts = [
+            line for line in body.splitlines()
+            if "omit" in line.lower() and "preview" not in line.lower()
+        ]
+        assert all(
+            ("must not omit" in line.lower() or "no omissions" in line.lower() or "not omit" in line.lower())
+            for line in omit_contexts
+        ), f"Found 'omit' in non-prohibition context: {omit_contexts}"
 
 
 def test_phase2_references_report_templates_if_extracted():

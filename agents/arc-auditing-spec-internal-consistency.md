@@ -33,16 +33,7 @@ different artifacts (e.g., `spec.xml` vs `dag.yaml`), it belongs to the
 All findings MUST conform to the schema in
 `skills/arc-auditing-spec/references/finding-schema.md`.
 
-Summary of required fields:
-- `id`: `A2-<NNN>` (zero-padded three digits)
-- `severity`: one of {HIGH, MED, LOW, INFO}
-- `title`: one-line description
-- `affected_files`: list of paths (with line refs when known)
-- `observed`: concrete evidence prose
-- `why_it_matters`: why this issue is a problem
-- `resolutions`: 1–4 items, each with `label`, `description`, and (when
-  applicable) `preview` diff string
-- `error_flag`: present only on partial-failure findings
+Required fields: id (format `A2-NNN`), severity, title, affected_files, observed, why_it_matters, resolutions, error_flag (conditional). See `references/finding-schema.md` for types and examples.
 
 **INFO is RESERVED for graceful-degradation notices only.** Do NOT use INFO
 to downgrade a real HIGH/MED/LOW finding that you're uncertain about. If in
@@ -71,22 +62,11 @@ skip checks for that file (you cannot check internal consistency of a
 non-existent file). Do not emit a finding about the absence — that is
 state-transition-integrity's domain.
 
-## Graceful Degradation — Partial Failure Contract
+## Graceful Degradation
 
-If you encounter a token-limit error, malformed input, or tool error during
-your analysis:
+### Partial Failure Contract
 
-1. Return any findings already completed before the failure.
-2. Append one additional finding:
-   - `severity`: `INFO`
-   - `error_flag`: a string describing the failure cause (e.g., "Read error
-     on details/output-and-interaction.xml — findings before this point are
-     complete")
-   - `id`: `A2-ERR`
-   - `title`: `"Audit axis 2 incomplete — tool error"`
-
-The main session continues rendering Phases 2–5 with the partial results.
-An `error_flag` finding does NOT halt the overall audit.
+Follow the Partial Failure Contract in `references/finding-schema.md` §Partial Failure Contract. Your error id prefix is `A2-ERR` (n = 1 for cross-artifact, 2 for internal, 3 for state-transition — match your axis).
 
 ## Axis Patterns — What to Check (fr-aa-003-ac2)
 

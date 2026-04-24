@@ -179,26 +179,3 @@ Notes:
 - Phase 5 is TERMINAL. Do NOT apply any resolution via Edit, Write, or any
   other mutating tool. Main session owns all subsequent action.
 
----
-
-## --save File Path
-
-When `--save` is present, write the full Phase 2 report + Decisions table
-to:
-
-```
-~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md
-```
-
-Filename uses 24-hour time (e.g., `2026-04-24-1435.md`).
-
-Obtain `<project-hash>` via subprocess — do NOT reimplement the hash inline:
-
-```bash
-node -e "const { hashRepoPath } = require('./scripts/lib/worktree-paths.js'); console.log(hashRepoPath(process.cwd()));"
-```
-
-Run this from the project root. The printed 6-char hex string is the hash.
-
-Without `--save`: zero files are written anywhere. The skill is read-only
-by default.
