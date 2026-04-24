@@ -27,11 +27,11 @@ arcforge 在 2026-04-19 的 SDD v2 重構(commit `c1e4e50`)把上游三階段工
 
 - **Cross-Artifact Alignment** — 檢查 design.md ↔ spec.xml ↔ dag.yaml 三層語意對齊
 - **Internal Consistency** — 檢查單一 artifact 內部 requirement / `<consumes>` / rename prose 的邏輯自洽
-- **State Transition Integrity** — 檢查 dag.yaml 記錄狀態是否與 git commits、worktree 實際狀況、feature status 一致
+- **State Transition Integrity** — 檢查 dag.yaml 記錄狀態是否與 `.arcforge-epic` marker 檔案、worktree 目錄實際存在性、feature-status 檔案一致(純檔案層觀察,不檢查 git 歷史層的漂移——那類屬於另一個 engine-fix spec 範圍,out of scope)
 
-**Phase 2 — 印摘要**:Main session 收齊三組 finding 後,印 Summary table(axis × severity × count)+ Findings Overview table(一 finding 一行)+ 每條 HIGH/MED finding 的 Detail 區塊(Observed、Why it matters、Suggested Resolutions 全部用 markdown table 排版)。
+**Phase 2 — 印摘要**:Main session 收齊三組 finding 後,印 Summary table(axis × severity × count,severity 含 HIGH / MED / LOW / INFO)+ Findings Overview table(一 finding 一行,含所有 severity)+ 每條 finding 的 Detail 區塊(Observed、Why it matters、Suggested Resolutions 全部用 markdown table 排版)。
 
-**Phase 3 — Triage (U3 Stage 1)**:以 AskUserQuestion `multiSelect:true` 呈現 HIGH severity finding 清單(最多 4 條),使用者勾選要深入討論的。MED/LOW 不入 triage,只在 Phase 2 印過供 reference。
+**Phase 3 — Triage (U3 Stage 1)**:以 AskUserQuestion `multiSelect:true` 呈現 HIGH severity finding 清單(最多 4 條),使用者勾選要深入討論的。MED / LOW / INFO 不進入 triage options(只在 Phase 2 的 overview 與 detail 印過),但使用者可透過 AskUserQuestion 自動附加的 "Other" free-text 通道指名任意 finding ID(任何 severity),把它們注入 Phase 4 resolution queue。
 
 **Phase 4 — Resolution (U3 Stage 2)**:使用者挑出的 findings 按每批最多 4 條分批,透過 AskUserQuestion 逐條詢問解法。每 option 附 `preview` 欄位放 diff 片段,讓使用者在方向鍵切換時看到實際套用後的檔案差異。"Other" 自動附,使用者可 free-text 補充或否決所有建議。
 
@@ -49,13 +49,13 @@ arcforge 在 2026-04-19 的 SDD v2 重構(commit `c1e4e50`)把上游三階段工
 
 **Fan-out.** Skill body 必須透過 Task tool **並行** spawn 三個 sub-agent,每個 sub-agent 在 fresh context 中執行,工具權限限定為 read-only(Read / Grep / Glob,**禁止** Edit、Write、任何會改狀態的 shell 指令)。每個 agent 收到的輸入:spec-id 本身,外加指向 design.md、spec.xml、details/*.xml、dag.yaml 的路徑。三個 agent 對應三個審查軸:`cross-artifact-alignment`、`internal-consistency`、`state-transition-integrity`。
 
-**Finding structure.** 每一條 finding 必須帶有唯一 ID(格式 `A<axis>-<NNN>`,axis 為 1/2/3)、severity(HIGH / MED / LOW)、一行 title、受影響的檔案清單(含行號,若已知)、一段 "observed" prose、一段 "why it matters" 說明,以及最多四條 suggested resolutions。每條 resolution 包含簡短 label、說明其改動內容的 description,以及——當該 resolution 對應可編輯 artifact 時——一段 diff-preview 字串,供 AskUserQuestion 的 `preview` 欄位使用。當 reviewer 有明確偏好時,第一條 resolution 必須以 "(Recommended)" 前綴標註;若沒有偏好,則不得標註。
+**Finding structure.** 每一條 finding 必須帶有唯一 ID(格式 `A<axis>-<NNN>`,axis 為 1/2/3)、severity(HIGH / MED / LOW / INFO,其中 INFO 保留給 graceful-degradation 這類資訊性通知,不得用於降級的 HIGH / MED / LOW 問題)、一行 title、受影響的檔案清單(含行號,若已知)、一段 "observed" prose、一段 "why it matters" 說明,以及最多四條 suggested resolutions。每條 resolution 包含簡短 label、說明其改動內容的 description,以及——當該 resolution 對應可編輯 artifact 時——一段 diff-preview 字串,供 AskUserQuestion 的 `preview` 欄位使用。當 reviewer 有明確偏好時,第一條 resolution 必須以 "(Recommended)" 前綴標註;若沒有偏好,則不得標註。
 
-**Output format.** Phase 2 的輸出為 markdown:一張 Summary table(axis × severity × count)、一張 Findings Overview table(每行一條 finding:ID / Sev / Axis / Title / primary file)、以及每條 finding 的 Detail 區塊,Observed 證據與 Suggested Resolutions 均以 markdown table 呈現。Prose 僅保留給 "why it matters" 段落。MED 與 LOW 的 finding 會出現在 overview 與 detail,但**不進入 triage 階段**。
+**Output format.** Phase 2 的輸出為 markdown:一張 Summary table(axis × severity × count)、一張 Findings Overview table(每行一條 finding:ID / Sev / Axis / Title / primary file)、以及每條 finding 的 Detail 區塊,Observed 證據與 Suggested Resolutions 均以 markdown table 呈現。Prose 僅保留給 "why it matters" 段落。MED / LOW / INFO 的 finding 會出現在 overview 與 detail,但**不進入 triage options**——使用者可透過 Other free-text 通道指名特定 ID 把它們注入 Phase 4。
 
 ### UX, boundaries, degradation, delegation
 
-**Triage UX (U3 Stage 1).** Phase 3 為一次 AskUserQuestion call,設 `multiSelect: true`、header `"Triage"`。Options 為 HIGH severity findings,每次 call 最多 4 條;若 HIGH 數量超過 4,以追加 call 分批。MED 與 LOW 的 finding 不得進入 triage 階段。
+**Triage UX (U3 Stage 1).** Phase 3 為一次 AskUserQuestion call,設 `multiSelect: true`、header `"Triage"`。Options 為 HIGH severity findings,每次 call 最多 4 條;若 HIGH 數量超過 4,以追加 call 分批。MED / LOW / INFO 的 finding 不得進入 triage options,但使用者可透過 AskUserQuestion 自動附加的 "Other" free-text 通道指名任意 severity 的 finding ID,把它們注入 Phase 4 resolution queue。
 
 **Resolution UX (U3 Stage 2).** Phase 4 對使用者勾選的 findings 以每批最多 4 題分批,每題對應一次 AskUserQuestion question。Question 以 finding ID 作為 `header`(≤12 chars)、以 finding title 加 observed 摘要作為 `question` 文字、以 reviewer 的最多 4 條 resolutions 作為 `options`,設 `multiSelect: false`。當有推薦項時,第一個 option 必須以 "(Recommended)" 標註。`preview` 欄位於 resolution 對應可編輯 artifact 變動時必須填入 diff 字串,否則省略。自動附加的 "Other" 必須保留,使用者可透過它提交 free-text。
 
@@ -65,7 +65,7 @@ arcforge 在 2026-04-19 的 SDD v2 重構(commit `c1e4e50`)把上游三階段工
 
 **Hard boundaries.** 本 skill 及其三個 sub-agent 均 **MUST NOT** 修改 `specs/`、`docs/`、`scripts/`、`skills/`、`agents/`、`hooks/`、`templates/` 下任一檔案,**MUST NOT** 執行 git commit、branch 建立、worktree 建立,或任何檔案刪除。此約束的執行機制為各 agent 定義中的工具授權名單(read-only tool grants),不靠 prompt 指示。
 
-**Graceful degradation.** 當 `specs/<spec-id>/spec.xml` 尚未存在(純 design 階段),A1 跳過「與 spec 對齊」類檢查並以一條 informational finding 記錄跳過原因。當 `specs/<spec-id>/dag.yaml` 尚未存在,A3 回傳單一 informational finding(「DAG 尚未規劃」)而非執行。任一 agent 失敗(token 超限、輸入格式錯誤)時必須回傳部分 findings 並標記 error flag;skill **不得**因一個軸失敗而中斷整個 audit。
+**Graceful degradation.** 當 `specs/<spec-id>/spec.xml` 尚未存在(純 design 階段),A1 跳過「與 spec 對齊」類檢查並以一條 `severity: INFO` 的 finding 記錄跳過原因。當 `specs/<spec-id>/dag.yaml` 尚未存在,A3 回傳單一 `severity: INFO` 的 finding(「DAG 尚未規劃」)而非執行。任一 agent 失敗(token 超限、輸入格式錯誤)時必須回傳部分 findings 並標記 error flag;skill **不得**因一個軸失敗而中斷整個 audit。
 
 **Implementation delegation.** SKILL.md body 的 phase 內容、三個 agent 的 system prompt、以及驗證 audit 正確性的 eval scenarios,均於實作階段透過 `arc-writing-skills` 產出。本 design doc 僅規範可觀察行為與介面 contract,**不規範**上述 artifact 的 markdown 內容。
 

@@ -7,7 +7,7 @@ skill body:
 
 - Phase 2 markdown report (Summary + Overview + per-finding Detail blocks)
 - Phase 3 triage UX (multi-select AskUserQuestion over HIGH findings, free-text
-  pull-in for MED/LOW)
+  pull-in for MED/LOW/INFO)
 - Phase 4 resolution UX (per-finding AskUserQuestion with diff previews)
 - Phase 5 Decisions table
 - Optional `--save` persistence to the L4 path

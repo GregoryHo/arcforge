@@ -24,8 +24,8 @@
         with error flags),
         When Phase 2 executes,
         Then the main session MUST print a Summary markdown table whose
-        columns are axis, HIGH count, MED count, LOW count, and Total, with
-        one row per axis plus a totals row.
+        columns are axis, HIGH count, MED count, LOW count, INFO count, and
+        Total, with one row per axis plus a totals row.
         <trace>design.md §Requirements Part 1 — Output format</trace>
       </criterion>
       <criterion id="fr-oi-001-ac2">
@@ -48,7 +48,7 @@
         <trace>design.md §Requirements Part 1 — Output format</trace>
       </criterion>
       <criterion id="fr-oi-001-ac4">
-        Given findings include MED or LOW severity,
+        Given findings include MED, LOW, or INFO severity,
         When Phase 2 renders,
         Then those findings MUST appear in the Findings Overview table and
         MUST have their Detail blocks printed, regardless of whether they
@@ -62,9 +62,9 @@
     <title>Triage UX — multi-select over HIGH findings with free-text pull-in</title>
     <description>
       Phase 3 MUST use AskUserQuestion with `multiSelect: true` to let the
-      user pick which HIGH findings proceed into Stage 2 resolution. MED
-      and LOW findings MUST NOT appear in triage options, but the user MAY
-      inject specific IDs (of any severity) via AskUserQuestion's
+      user pick which HIGH findings proceed into Stage 2 resolution. MED,
+      LOW, and INFO findings MUST NOT appear in triage options, but the
+      user MAY inject specific IDs (of any severity) via AskUserQuestion's
       auto-appended Other free-text option.
     </description>
     <acceptance_criteria>
@@ -88,7 +88,7 @@
       <criterion id="fr-oi-002-ac3">
         Given the user uses the auto-appended "Other" option in any triage
         call to submit free-text containing one or more finding IDs (format
-        `A&lt;axis&gt;-&lt;NNN&gt;`, any severity including MED or LOW),
+        `A&lt;axis&gt;-&lt;NNN&gt;`, any severity — including MED, LOW, or INFO),
         When the skill parses the Other input,
         Then the specified IDs MUST be added to the Stage 2 resolution
         queue, even when their severity is below HIGH.
@@ -97,8 +97,9 @@
       <criterion id="fr-oi-002-ac4">
         Given Phase 3 is running,
         When any AskUserQuestion call is issued during triage,
-        Then MED and LOW findings MUST NOT appear in that call's `options`
-        list; users may only reach them via the Other free-text channel.
+        Then MED, LOW, and INFO findings MUST NOT appear in that call's
+        `options` list; users may only reach them via the Other free-text
+        channel.
         <trace>design.md §Requirements Part 2 — Triage UX</trace>
       </criterion>
     </acceptance_criteria>

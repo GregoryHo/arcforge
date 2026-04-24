@@ -6,7 +6,7 @@
     <artifact>specs/&lt;spec-id&gt;/spec.xml (when present)</artifact>
     <artifact>specs/&lt;spec-id&gt;/details/*.xml (when present)</artifact>
     <artifact>specs/&lt;spec-id&gt;/dag.yaml (when present)</artifact>
-    <artifact>Git state surface (commits, worktree listing) for the state-transition-integrity agent</artifact>
+    <artifact>`.arcforge-epic` marker files and worktree directory presence under `~/.arcforge/worktrees/` (file-level observation only — no git commands) for the state-transition-integrity agent</artifact>
   </consumes>
   <produces>
     <artifact>Structured finding lists returned to the main session via Task-tool responses (no filesystem output)</artifact>
@@ -54,10 +54,10 @@
         Given a sub-agent produces a finding,
         When the finding is emitted,
         Then it MUST include: a unique ID in format `A&lt;axis&gt;-&lt;NNN&gt;`
-        (axis ∈ {1, 2, 3}, NNN zero-padded), a severity in {HIGH, MED, LOW},
-        a one-line title, a list of affected file paths (with line references
-        when known), an "observed" prose block, a "why it matters" paragraph,
-        and up to four suggested resolutions.
+        (axis ∈ {1, 2, 3}, NNN zero-padded), a severity in {HIGH, MED, LOW,
+        INFO}, a one-line title, a list of affected file paths (with line
+        references when known), an "observed" prose block, a "why it matters"
+        paragraph, and up to four suggested resolutions.
         <trace>design.md §Requirements Part 1 — Finding structure</trace>
       </criterion>
       <criterion id="fr-aa-002-ac2">
@@ -80,11 +80,15 @@
       <criterion id="fr-aa-002-ac4">
         Given severity is assigned to a finding,
         When severity taxonomy is interpreted,
-        Then severity is explicitly a reviewer-agent judgment call — the
-        specific HIGH / MED / LOW cut-off criteria MUST live in each agent's
-        system prompt (produced via arc-writing-skills implementation), not in
-        this spec. This spec asserts only the presence of a severity field
-        drawn from the three-value enum, not its semantic thresholds.
+        Then severity is drawn from a four-value enum {HIGH, MED, LOW, INFO}.
+        HIGH / MED / LOW are reviewer-agent judgment calls — specific cut-off
+        criteria MUST live in each agent's system prompt (produced via
+        arc-writing-skills implementation), not in this spec. INFO is reserved
+        for findings that are informational rather than issue-raising (e.g.,
+        graceful-degradation notices per fr-aa-004); it MUST NOT be used for
+        downgraded HIGH / MED / LOW issues. This spec asserts only the presence
+        of a severity field drawn from this four-value enum, not the HIGH /
+        MED / LOW semantic thresholds.
         <trace>Refiner clarifying question Q1 → answer (b): loose spec definition, detail deferred to implementation</trace>
       </criterion>
     </acceptance_criteria>
@@ -118,9 +122,11 @@
         Given the `state-transition-integrity` agent runs,
         When its findings are inspected,
         Then every emitted finding MUST address whether `dag.yaml` recorded
-        state (epic status, worktree pointer, feature status) matches git
-        commit history, on-disk worktree presence, or other ground-truth
-        state signals — not the semantic content of upstream artifacts.
+        state (epic status, worktree pointer, feature status) matches
+        on-disk worktree directory presence, `.arcforge-epic` marker files,
+        and feature-status files — not the semantic content of upstream
+        artifacts and not git-history-layer drift (the latter is out of
+        scope for this skill and belongs to a separate engine-fix spec).
         <trace>design.md §Architecture — State Transition Integrity axis</trace>
       </criterion>
     </acceptance_criteria>
@@ -139,16 +145,15 @@
         (pure design-stage audit),
         When `cross-artifact-alignment` runs,
         Then it MUST skip alignment-with-spec checks and emit exactly one
-        informational finding (tagged informational, separate from HIGH/MED/
-        LOW severity) that records the skip and its cause.
+        finding with `severity: INFO` that records the skip and its cause.
         <trace>design.md §Requirements Part 2 — Graceful degradation</trace>
       </criterion>
       <criterion id="fr-aa-004-ac2">
         Given `specs/&lt;spec-id&gt;/dag.yaml` does not exist at skill invocation,
         When `state-transition-integrity` runs,
-        Then it MUST return exactly one informational finding ("DAG not yet
-        planned — state integrity not applicable") rather than running further
-        checks.
+        Then it MUST return exactly one finding with `severity: INFO` and
+        title "DAG not yet planned — state integrity not applicable" rather
+        than running further checks.
         <trace>design.md §Requirements Part 2 — Graceful degradation</trace>
       </criterion>
       <criterion id="fr-aa-004-ac3">
