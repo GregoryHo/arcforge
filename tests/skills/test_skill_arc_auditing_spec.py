@@ -960,3 +960,146 @@ def test_eval_scenario_n_high_0_exists():
         "path: skill prints Phase 2 + concluding recommendation line, skips Phase 3, exits cleanly. "
         "Expected in oi-002-threshold-n-high-0.md or similar."
     )
+
+
+# ── oi-003: Phase 4 per-finding skip rule (fr-oi-003-ac1 modified, fr-oi-003-ac6 new) ──
+
+def test_phase4_ge2_resolutions_precondition_in_skill():
+    """fr-oi-003-ac1 (modified): SKILL.md Phase 4 prose must state the ≥2-resolutions precondition
+    on the AskUserQuestion loop — only findings with at least 2 resolutions get a question.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must state the qualifying condition in Phase 4 context
+    assert (
+        "at least 2" in lower
+        or "2 suggested resolutions" in lower
+        or ">= 2 resolutions" in lower
+        or ">= 2 suggested" in lower
+        or "fewer than 2" in lower
+        or "less than 2" in lower
+        or "qualifying findings" in lower
+        or "qualifying" in lower
+    ), (
+        "SKILL.md Phase 4 must state the ≥2-resolutions precondition: only findings with at least "
+        "2 suggested resolutions receive an AskUserQuestion question"
+    )
+
+
+def test_phase4_skip_rule_lt2_resolutions_in_skill():
+    """fr-oi-003-ac6 (new): SKILL.md Phase 4 must state the auto-skip rule for findings
+    with fewer than 2 suggested resolutions.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must state the skip behavior for <2 resolutions
+    assert (
+        "fewer than 2" in lower
+        or "less than 2" in lower
+        or "< 2" in lower
+        or "0 or 1 resolution" in lower
+        or "zero or one resolution" in lower
+        or "skip" in lower
+    ), (
+        "SKILL.md Phase 4 must state the auto-skip rule for findings with fewer than 2 "
+        "suggested resolutions (fr-oi-003-ac6)"
+    )
+    # Must say AskUserQuestion is NOT issued for skipped findings
+    assert (
+        "must not issue" in lower
+        or "not issue" in lower
+        or "no question" in lower
+        or "skip" in lower
+    ), (
+        "SKILL.md Phase 4 must state that no AskUserQuestion question is issued for "
+        "findings with <2 resolutions"
+    )
+
+
+def test_phase4_sentinel_string_in_skill():
+    """fr-oi-003-ac6 (new): SKILL.md Phase 4 must state the exact sentinel string
+    '(no ceremony — see Detail)' for the Decisions-table row of a skipped finding.
+    """
+    body = _read(SKILL_PATH)
+    # Exact sentinel string — em-dash, exact punctuation
+    assert "(no ceremony — see Detail)" in body, (
+        "SKILL.md Phase 4 must contain the exact sentinel string "
+        "'(no ceremony — see Detail)' (em-dash, exact punctuation) "
+        "for the Decisions-table Chosen Resolution of a skipped finding"
+    )
+
+
+def test_phase4_skip_not_an_error_in_skill():
+    """fr-oi-003-ac6 (new): SKILL.md Phase 4 must state the skip is NOT treated as an error."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must assert the skip branch is non-error / clean
+    assert (
+        "not an error" in lower
+        or "not treat" in lower
+        or "not be treated" in lower
+        or "must not treat" in lower
+        or "no error" in lower
+        or "clean" in lower
+        or "silently" in lower
+    ), (
+        "SKILL.md Phase 4 must state that the skip of a <2-resolution finding "
+        "is NOT treated as an error (fr-oi-003-ac6)"
+    )
+
+
+def test_phase4_skipped_finding_still_in_phase2_detail():
+    """fr-oi-003-ac6 invariant: SKILL.md Phase 4 must note that skipped findings
+    still appear in the Phase 2 Detail block — the skip suppresses the interactive
+    question only, not the data surface.
+    """
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must clarify that Phase 2 coverage is unaffected by the Phase 4 skip
+    assert (
+        "phase 2 detail" in lower
+        or "phase 2" in lower
+        and "detail" in lower
+    ), (
+        "SKILL.md Phase 4 must note that skipped findings still appear in the "
+        "Phase 2 Detail block — the skip only suppresses the interactive question"
+    )
+
+
+def test_report_templates_sentinel_row_format():
+    """fr-oi-003-ac6: report-templates.md must document the sentinel row format
+    '(no ceremony — see Detail)' for the Decisions table.
+    """
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    # Exact sentinel string must appear
+    assert "(no ceremony — see Detail)" in body, (
+        "report-templates.md must contain the exact sentinel string "
+        "'(no ceremony — see Detail)' in the Decisions table section or "
+        "a dedicated Phase 4 auto-skip note"
+    )
+
+
+def test_eval_scenario_low_resolutions_skip_exists():
+    """fr-oi-003-ac6 eval: an eval scenario file covering a Stage-2 finding with
+    fewer than 2 resolutions must exist — documents the sentinel Decisions-row behavior.
+    """
+    evals_dir = Path("skills/arc-auditing-spec/evals")
+    all_eval_files = list(evals_dir.glob("*.md"))
+    found = False
+    for f in all_eval_files:
+        content = f.read_text(encoding="utf-8").lower()
+        # Must cover the low-resolutions skip scenario
+        if (
+            ("fewer than 2" in content or "less than 2" in content or "< 2" in content or "0 resolution" in content or "1 resolution" in content or "single resolution" in content)
+            and "sentinel" in content
+        ):
+            found = True
+            break
+    assert found, (
+        "An eval scenario file in skills/arc-auditing-spec/evals/ must document the "
+        "Phase 4 auto-skip for a finding with fewer than 2 resolutions, including "
+        "the sentinel '(no ceremony — see Detail)' Decisions-row behavior. "
+        "Expected in oi-003-low-resolutions-skip.md or similar."
+    )

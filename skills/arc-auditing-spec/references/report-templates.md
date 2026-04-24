@@ -220,3 +220,18 @@ Notes:
 - Phase 5 is TERMINAL. Do NOT apply any resolution via Edit, Write, or any
   other mutating tool. Main session owns all subsequent action.
 
+**Phase 4 auto-skip row format (fr-oi-003-ac6):** When a Stage-2 finding
+had fewer than 2 suggested resolutions and was auto-skipped at Phase 4,
+its Decisions table row MUST use the sentinel string
+`(no ceremony — see Detail)` in the Chosen Resolution column and leave
+User Note empty:
+
+```markdown
+| Finding ID | Chosen Resolution             | User Note |
+|------------|-------------------------------|-----------|
+| A2-003     | (no ceremony — see Detail)    |           |
+```
+
+The sentinel string is exactly `(no ceremony — see Detail)` — em-dash
+(`—`), not a hyphen (`-`). Exact punctuation matters.
+

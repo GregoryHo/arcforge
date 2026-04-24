@@ -206,9 +206,14 @@ degraded paths.
 
 **Goal**: for each finding in the resolution queue, ask the reviewer which
 resolution to apply. One resolution per finding (`multiSelect: false`).
+Only findings with at least 2 suggested resolutions receive an
+AskUserQuestion question; findings with fewer than 2 suggested resolutions
+are auto-skipped (see Per-Finding Skip Rule below).
 
-**Batched loop**: present up to 4 findings per AskUserQuestion call.
-Sequential calls until all N selected findings are asked exactly once.
+**Batched loop**: iterate the Stage-2 queue. For each entry, check its
+resolution count before issuing a question. Batch qualifying findings
+(those with >= 2 resolutions) at most 4 per AskUserQuestion call.
+Sequential calls until all qualifying findings are asked exactly once.
 
 Use `AskUserQuestion` with `header` = finding ID and `multiSelect: false`. **Template:** see `references/report-templates.md` §Phase 4.
 
@@ -224,16 +229,37 @@ Rules:
 - Other free-text is a valid decision — accept it, do not throw or drop it.
   Record it verbatim in the Phase 5 Decisions table User Note column.
 
+**Per-Finding Skip Rule (fr-oi-003-ac6):** When Phase 4 iterates to a
+finding whose suggested-resolutions count is less than 2 (i.e., 0 or 1
+resolution), the skill MUST NOT issue any AskUserQuestion question for it.
+AskUserQuestion's `options.minItems: 2` constraint forbids a single-option
+question, and asking among a single option is pure ceremony. Such findings
+rely on their Phase 2 Detail block's Suggested Resolutions table as the
+deliverable — the user reads it and decides what to do in the main session.
+Note: skipped findings still appear in the Phase 2 Detail block with their
+full Resolutions table. The skip only suppresses the interactive question,
+not the data surface.
+
+When the Decisions table is rendered (per fr-oi-004), a skipped finding's
+row MUST have its Chosen Resolution column set to the sentinel string
+`(no ceremony — see Detail)` and its User Note column left empty.
+
+This skip is NOT an error. Do not treat it as a failure, do not log a
+warning, and do not halt the Phase 4 loop. Simply proceed to the next
+finding in the queue.
+
 ### Phase 5 — Decisions Table (TERMINAL)
 
 Print the Decisions table, then exit. This is the final deliverable. **Template:** see `references/report-templates.md` §Phase 5.
 
 - `Finding ID`: the `A<n>-<NNN>` id.
 - `Chosen Resolution`: label of the option the user selected, or
-  "(Other)" when answered via free-text.
+  "(Other)" when answered via free-text. For findings auto-skipped
+  at Phase 4 (fewer than 2 resolutions), use the sentinel
+  `(no ceremony — see Detail)`.
 - `User Note`: when the user answered via Other, store that free-text
   **verbatim** — no paraphrasing, no summarizing. Empty when no Other
-  text was provided.
+  text was provided. Empty for auto-skipped findings.
 
 **Phase 5 is TERMINAL.** After printing the Decisions table, the skill exits.
 The main session MUST NOT apply any resolution via Edit, Write, or any
