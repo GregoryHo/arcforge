@@ -105,6 +105,34 @@ def test_agent_frontmatter_identity(path: Path):
     assert front.get("name") == path.stem
 
 
+def test_command_wrapper_exists_and_delegates():
+    """fr-sc-001-ac1: `/arc-auditing-spec <spec-id>` must be a real slash command.
+
+    In Claude Code, a typed `/<name>` slash command resolves to `commands/<name>.md`
+    (or to a skill with `user-invocable: true`). Since arcforge's convention for
+    slash-command surfaces is a thin `commands/` wrapper, this test asserts
+    that the wrapper exists, opts out of auto-invocation, and delegates to
+    the skill body.
+    """
+    cmd_path = Path("commands/arc-auditing-spec.md")
+    assert cmd_path.exists(), (
+        "commands/arc-auditing-spec.md must exist so `/arc-auditing-spec` "
+        "resolves per fr-sc-001-ac1"
+    )
+    text = cmd_path.read_text(encoding="utf-8")
+    front, body = _parse_frontmatter(text)
+
+    # Commands must opt out of auto-invocation (per .claude/rules/templates-commands-agents.md)
+    assert front.get("disable-model-invocation", "").strip().lower() == "true", (
+        "commands/arc-auditing-spec.md must set `disable-model-invocation: true`"
+    )
+    # Body must delegate to the skill, not reimplement logic
+    assert "arc-auditing-spec" in body, "command wrapper must delegate to the skill"
+    assert "skill" in body.lower(), (
+        "command wrapper must explicitly delegate to a skill (thin wrapper rule)"
+    )
+
+
 def test_no_pipeline_auto_invocation_of_audit_skill():
     """sc-001-ac3: no pipeline skill's SKILL.md may invoke /arc-auditing-spec."""
     pipeline_skills = [
