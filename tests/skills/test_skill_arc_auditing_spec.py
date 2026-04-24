@@ -419,3 +419,336 @@ def test_axis_eval_state_transition_exists():
         "At least one aa-state-transition-001-* eval scenario file must exist "
         "in skills/arc-auditing-spec/evals/ (fr-sc-003-ac2 ship gate)"
     )
+
+
+# ── oi-001: Phase 2 markdown report tables ───────────────────────────────────
+
+def test_phase2_summary_table_columns():
+    """fr-oi-001-ac1: Phase 2 must direct printing a Summary table with axis rows and severity columns."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "summary" in lower, "Phase 2 must mention a Summary table"
+    assert "high" in lower and "med" in lower and "low" in lower and "info" in lower, (
+        "Phase 2 must include HIGH, MED, LOW, INFO as table columns"
+    )
+    assert "total" in lower, "Phase 2 Summary table must include a Total column"
+    # axis names or axis identifiers must appear
+    assert "cross-artifact" in lower or "axis" in lower, (
+        "Phase 2 Summary table must reference audit axes"
+    )
+
+
+def test_phase2_findings_overview_table():
+    """fr-oi-001-ac2: Phase 2 must direct printing a Findings Overview table with pinned columns."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "findings overview" in lower, "Phase 2 must include a 'Findings Overview' section"
+    assert "primary file" in lower or "primary_file" in lower, (
+        "Findings Overview table must include a 'Primary file' column"
+    )
+    # ID, Sev, Axis, Title columns
+    assert "| id " in lower or "| id|" in lower or "id |" in lower or "| id\n" in lower or "| id|" in lower or "`id`" in lower or "id |" in lower, (
+        "Findings Overview table must include ID column"
+    )
+    assert "sev" in lower or "severity" in lower, (
+        "Findings Overview table must include Severity column"
+    )
+    assert "title" in lower, "Findings Overview table must include Title column"
+
+
+def test_phase2_detail_block_structure():
+    """fr-oi-001-ac3: per-finding Detail blocks must use tables for evidence and resolutions."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "detail block" in lower or "detail blocks" in lower or "per-finding detail" in lower, (
+        "Phase 2 must describe per-finding Detail blocks"
+    )
+    # Observed evidence as a table
+    assert "location" in lower, (
+        "Detail block observed evidence must use a table with 'location' column"
+    )
+    # Resolutions as a table
+    assert "side-effect" in lower or "cost" in lower, (
+        "Detail block resolutions must use a table including side-effect/cost column"
+    )
+    # Only why it matters may be free prose
+    assert "why it matters" in lower, (
+        "Detail block must call out 'why it matters' as the sole prose exception"
+    )
+
+
+def test_phase2_med_low_info_must_appear():
+    """fr-oi-001-ac4: MED, LOW, INFO findings MUST appear in overview and have detail blocks."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must explicitly say MED/LOW/INFO MUST appear — not optional
+    assert "med" in lower and "low" in lower and "info" in lower, (
+        "Phase 2 must mention MED, LOW, INFO findings"
+    )
+    # Must NOT suggest omitting any severity from the overview
+    assert "omit" not in lower or "must not omit" in lower or "no omissions" in lower, (
+        "Phase 2 must NOT direct the session to omit any severity from the overview"
+    )
+    # Must explicitly call out that even non-triage severities need detail blocks
+    assert "regardless of" in lower or "no omissions" in lower or "all findings" in lower or "every finding" in lower, (
+        "Phase 2 must state that all findings (regardless of severity) appear in overview"
+    )
+
+
+def test_phase2_references_report_templates_if_extracted():
+    """fr-oi-001: if a report-templates reference file is used, SKILL.md must cite it."""
+    report_templates = Path("skills/arc-auditing-spec/references/report-templates.md")
+    body = _read(SKILL_PATH)
+    if report_templates.exists():
+        assert "report-templates" in body, (
+            "SKILL.md must cite skills/arc-auditing-spec/references/report-templates.md "
+            "using the REQUIRED BACKGROUND convention"
+        )
+        assert "REQUIRED BACKGROUND" in body, (
+            "SKILL.md must use the REQUIRED BACKGROUND convention when citing report-templates.md"
+        )
+
+
+# ── oi-002: Phase 3 Triage UX ────────────────────────────────────────────────
+
+def test_phase3_multiselect_true_and_triage_header():
+    """fr-oi-002-ac1: Phase 3 first AskUserQuestion must have multiSelect: true and header Triage."""
+    body = _read(SKILL_PATH)
+    assert "multiSelect: true" in body, (
+        "Phase 3 must show AskUserQuestion with multiSelect: true"
+    )
+    assert '"Triage"' in body or "'Triage'" in body or "Triage" in body, (
+        "Phase 3 AskUserQuestion must have header: Triage"
+    )
+
+
+def test_phase3_up_to_4_options():
+    """fr-oi-002-ac1/ac2: Phase 3 must restrict to up to 4 findings per batch."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "up to 4" in lower or "at most 4" in lower or "maximum 4" in lower or "max 4" in lower, (
+        "Phase 3 must explicitly cap AskUserQuestion options at 4 per call"
+    )
+
+
+def test_phase3_sequential_batching_loop():
+    """fr-oi-002-ac2: Phase 3 must describe sequential batching loop for >4 HIGH findings."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "sequential" in lower or "batching" in lower or "batch" in lower, (
+        "Phase 3 must describe sequential batching when >4 HIGH findings exist"
+    )
+    # Must indicate exactly once — prevent re-asking
+    assert "exactly once" in lower or "presented once" in lower or "each high" in lower, (
+        "Phase 3 batching must ensure each HIGH finding is presented exactly once"
+    )
+
+
+def test_phase3_other_free_text_id_regex():
+    """fr-oi-002-ac3: Phase 3 must instruct parsing Other free-text for A[1-3]-NNN IDs."""
+    body = _read(SKILL_PATH)
+    # Must reference the ID regex pattern
+    assert "A[1-3]" in body or r"A[1-3]-\d{3}" in body or "A1-" in body or "regex" in body.lower(), (
+        "Phase 3 must direct parsing Other free-text for finding IDs matching the A<axis>-NNN pattern"
+    )
+    assert "other" in body.lower() or "Other" in body, (
+        "Phase 3 must mention the Other free-text channel"
+    )
+    assert "resolution queue" in body.lower() or "stage 2" in body.lower() or "queue" in body.lower(), (
+        "Phase 3 must direct that ID matches from Other are added to the resolution queue"
+    )
+
+
+def test_phase3_explicit_prohibition_med_low_info_in_options():
+    """fr-oi-002-ac4: Phase 3 MUST explicitly prohibit MED/LOW/INFO from triage options."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Must contain an explicit prohibition (not just an implication)
+    assert "must not" in lower or "must never" in lower or "prohibited" in lower or "only high" in lower, (
+        "Phase 3 must explicitly prohibit MED/LOW/INFO from appearing in triage options"
+    )
+    # Must mention the Other channel as the correct path for MED/LOW/INFO
+    assert "other" in lower, (
+        "Phase 3 must name the Other free-text channel for MED/LOW/INFO injection"
+    )
+
+
+def test_phase3_red_flag_med_in_options():
+    """fr-oi-002: Red Flags table must preempt the 'MED is clearly important' rationalization."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "med" in lower and ("option" in lower or "clearly" in lower), (
+        "Red Flags must preempt the rationalization about MED findings in triage options"
+    )
+
+
+# ── oi-003: Phase 4 Resolution UX ────────────────────────────────────────────
+
+def test_phase4_multiselect_false():
+    """fr-oi-003-ac2: Phase 4 AskUserQuestion must have multiSelect: false."""
+    body = _read(SKILL_PATH)
+    assert "multiSelect: false" in body, (
+        "Phase 4 must show AskUserQuestion with multiSelect: false"
+    )
+
+
+def test_phase4_batched_loop():
+    """fr-oi-003-ac1: Phase 4 must batch at most 4 per call with explicit loop."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "batch" in lower or "sequential" in lower, (
+        "Phase 4 must describe batched sequential resolution UX"
+    )
+    assert "up to 4" in lower or "at most 4" in lower or "4 per" in lower or "4 questions" in lower, (
+        "Phase 4 must cap at 4 questions per AskUserQuestion call"
+    )
+    assert "exactly once" in lower or "each finding" in lower or "all n" in lower or "n selected" in lower, (
+        "Phase 4 must ensure each selected finding is asked exactly once"
+    )
+
+
+def test_phase4_preview_diff_field():
+    """fr-oi-003-ac3: Phase 4 options with editable-artifact changes MUST include preview diff."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "preview" in lower, (
+        "Phase 4 must mention the preview diff field for resolution options"
+    )
+    assert "editable" in lower or "artifact change" in lower or "editable-artifact" in lower, (
+        "Phase 4 must distinguish editable-artifact options (require preview) from engine-fix options"
+    )
+
+
+def test_phase4_recommended_prefix_first_option():
+    """fr-oi-003-ac4: When a Recommended resolution exists, first option label must start with (Recommended)."""
+    body = _read(SKILL_PATH)
+    assert "(Recommended)" in body, (
+        "Phase 4 must direct that the first option label starts with (Recommended) "
+        "when the reviewer marked a preferred resolution"
+    )
+
+
+def test_phase4_other_free_text_accepted():
+    """fr-oi-003-ac5: Phase 4 must accept Other free-text as a valid resolution decision."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "other" in lower, "Phase 4 must mention the Other free-text channel"
+    # Must say accepted / valid — not dropped or throw
+    assert "accept" in lower or "valid" in lower, (
+        "Phase 4 must state that Other free-text is accepted as a valid resolution decision"
+    )
+
+
+# ── oi-004: Phase 5 Decisions table ──────────────────────────────────────────
+
+def test_phase5_decisions_table_columns():
+    """fr-oi-004-ac1: Phase 5 must print a Decisions table with the three pinned columns."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "decisions" in lower or "decision" in lower, (
+        "Phase 5 must print a Decisions table"
+    )
+    assert "finding id" in lower or "finding_id" in lower, (
+        "Decisions table must have a Finding ID column"
+    )
+    assert "chosen resolution" in lower or "chosen_resolution" in lower, (
+        "Decisions table must have a Chosen Resolution column"
+    )
+    assert "user note" in lower or "user_note" in lower, (
+        "Decisions table must have a User Note column"
+    )
+
+
+def test_phase5_other_free_text_verbatim():
+    """fr-oi-004-ac2: Phase 5 must store Other free-text verbatim in User Note column."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "verbatim" in lower, (
+        "Phase 5 must state that Other free-text is stored verbatim in the User Note column"
+    )
+    assert "paraphras" not in lower or "no paraphras" in lower or "not paraphras" in lower, (
+        "Phase 5 must NOT permit paraphrasing of Other free-text"
+    )
+
+
+def test_phase5_is_terminal():
+    """fr-oi-004-ac3: Phase 5 must be labeled TERMINAL and prohibit any mutations."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "terminal" in lower, "Phase 5 must be labeled TERMINAL"
+    # Must explicitly say skill does NOT mutate / apply
+    assert "must not" in lower or "does not" in lower or "never" in lower, (
+        "Phase 5 must explicitly prohibit applying resolutions"
+    )
+
+
+def test_phase5_terminal_in_red_flags():
+    """fr-oi-004-ac3: Red Flags must contain a row about Phase 5 being terminal / no auto-apply."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    # Red Flags already has a row about Phase 5; verify it covers auto-apply angle
+    assert "phase 5 is terminal" in lower or "phase 5" in lower, (
+        "Red Flags table must mention Phase 5 terminal constraint"
+    )
+    # Must mention mutation or apply in that context
+    assert "apply" in lower or "edit" in lower or "mutate" in lower, (
+        "Red Flags Phase 5 row must prohibit auto-applying resolutions"
+    )
+
+
+# ── oi-005: --save persistence ───────────────────────────────────────────────
+
+def test_save_flag_zero_files_without_flag():
+    """fr-oi-005-ac1: Without --save the skill MUST NOT write any file."""
+    body = _read(SKILL_PATH)
+    lower = body.lower()
+    assert "--save" in body, "SKILL.md must document the --save flag"
+    assert "zero" in lower or "no file" in lower or "must not write" in lower or "nothing is written" in lower or "no file is written" in lower, (
+        "SKILL.md must state that without --save no file is written"
+    )
+
+
+def test_save_flag_output_path_format():
+    """fr-oi-005-ac2: With --save, output path MUST follow the pinned template."""
+    body = _read(SKILL_PATH)
+    assert "~/.arcforge/reviews/" in body, (
+        "SKILL.md must specify ~/.arcforge/reviews/ as the --save output path"
+    )
+    assert "<project-hash>" in body or "project-hash" in body, (
+        "SKILL.md must include <project-hash> in the --save path template"
+    )
+    assert "<spec-id>" in body or "spec-id" in body or "spec_id" in body, (
+        "SKILL.md must include <spec-id> in the --save path template"
+    )
+    assert "YYYY-MM-DD" in body, (
+        "SKILL.md must include YYYY-MM-DD date format in the --save filename template"
+    )
+    assert "HHMM" in body, (
+        "SKILL.md must include HHMM time format in the --save filename template"
+    )
+
+
+def test_save_flag_reuses_worktree_paths_module():
+    """fr-oi-005-ac3: SKILL.md must direct the session to use scripts/lib/worktree-paths.js for the hash."""
+    body = _read(SKILL_PATH)
+    assert "worktree-paths" in body or "worktree_paths" in body, (
+        "SKILL.md must reference scripts/lib/worktree-paths.js for project-hash derivation"
+    )
+    assert "scripts/lib" in body, (
+        "SKILL.md must cite the scripts/lib path for worktree-paths module"
+    )
+    # Must show a concrete invocation — subprocess call
+    assert "node" in body.lower() or "require" in body.lower(), (
+        "SKILL.md must show a concrete node one-liner or require call to obtain the hash"
+    )
+
+
+def test_report_templates_file_exists_when_cited():
+    """oi-005 ship gate: if SKILL.md references report-templates.md it must exist."""
+    report_templates = Path("skills/arc-auditing-spec/references/report-templates.md")
+    body = _read(SKILL_PATH)
+    if "report-templates" in body:
+        assert report_templates.exists(), (
+            "SKILL.md cites report-templates.md but the file does not exist at "
+            "skills/arc-auditing-spec/references/report-templates.md"
+        )
