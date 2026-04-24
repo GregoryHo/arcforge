@@ -1,7 +1,9 @@
 # SDD v2 Downstream Contract Gap — Investigation Report
 
-Date: 2026-04-20
-Source session: implementation of `arc-evaluating-v2` spec (8 epics, 28 features)
+Date: 2026-04-20 (initial) · updated 2026-04-24 (Finding 6 + Appendix D added from `arc-auditing-spec` session)
+Source sessions:
+- 2026-04-20: implementation of `arc-evaluating-v2` spec (8 epics, 28 features) — produced Findings 1–5
+- 2026-04-24: implementation of `arc-auditing-spec` spec (3 epics, 12 features) — produced Finding 6
 Investigator: Claude (Opus 4.7)
 
 ## What This Report Answers
@@ -260,6 +262,260 @@ These are all "semantic" checks. The validator's scope is deliberately "structur
 
 ---
 
+## Finding 6 — Re-run Confirmation and New Observations (`arc-auditing-spec` session, 2026-04-24)
+
+This finding is authored in a distinct contributor session from Findings
+1–5 and deliberately re-tests each mechanical defect against fresh
+evidence. Key identifiers separating it from the 2026-04-20 session:
+
+- **Date**: 2026-04-24 (four days after the initial report).
+- **Spec implemented**: `specs/arc-auditing-spec/` (3 epics:
+  `skill-contract`, `audit-agents`, `output-and-interaction`; 12
+  features total), not `arc-evaluating-v2`.
+- **Base branch**: `feature/sdd-enhance` (same branch previously
+  receiving `spec-driven-refine` work), merged locally via
+  `arc-finishing-epic` Option 1. No PR, no squash.
+- **Workflow chain used**: `arc-implementing` per epic →
+  `arc-writing-skills` (RED/GREEN/REFACTOR) via dispatched
+  `arcforge:implementer` subagent → `arc-requesting-review` →
+  `arc-verifying` → `arc-finishing-epic`. Same skill stack as the
+  2026-04-20 run.
+- **Integration merge commits** (none modified `dag.yaml`):
+  - `6b56a9d feat: integrate skill-contract epic`
+  - `7a4b493 feat: integrate audit-agents epic`
+  - `528f8b4 feat: integrate output-and-interaction epic`
+- **Outcome**: all three epics merged to base, worktrees for this
+  spec removed via `arcforge cleanup --spec-id arc-auditing-spec`,
+  final test suite 980 Jest + 6 Node `--test` + 6 hooks + 387 pytest
+  green on the integrated base.
+
+### 6.1 §2.2 reproduces identically — `dag.yaml` uncommitted at session end
+
+After all three merges completed, `git status` showed:
+
+```
+On branch feature/sdd-enhance
+Changes not staged for commit:
+  modified:   specs/arc-auditing-spec/dag.yaml
+```
+
+The diff was strictly three epics flipping `status: pending` →
+`status: completed` (plus the coordinator stripping the trailing
+newline — a cosmetic side-effect). `git log feature/sdd-enhance --
+specs/arc-auditing-spec/dag.yaml` returns zero commits from this
+session that touched the file. Re-confirming §2.2's root cause in
+`scripts/lib/coordinator.js`: `_mergeEpicsInBase` writes the mutated
+DAG via `_dagTransaction` → `fs.writeFileSync`, and no `git add` or
+`git commit` call exists anywhere in the coordinator
+(`grep -nE "git.*(add|commit)" scripts/lib/coordinator.js` returns only
+three matches — a timeout constant and two comments warning *against*
+`git add -A` patterns).
+
+**Cross-session note**: this session *began* with
+`M specs/arc-auditing-spec/dag.yaml` already dirty in
+`git status` — the prior contributor session (which produced commit
+`b000ee5 feat(skills): arc-auditing-spec skill-contract epic`) also
+left the file dirty. The "coordinator writes, contributor never
+commits" pattern is therefore not a per-session oversight; it is the
+observed steady state across at least two contributor sessions on the
+same spec, and across two different specs (arc-evaluating-v2 per §2.2
+transcript trail, arc-auditing-spec per this session).
+
+### 6.2 §2.4 did NOT reproduce — but a new orphan class surfaced
+
+`arcforge cleanup --spec-id arc-auditing-spec` ran cleanly at each
+`arc-finishing-epic` point. The audit-agents merge cleanup, for
+example, returned:
+
+```json
+{
+  "removed": 2,
+  "paths": [
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-skill-contract",
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-audit-agents"
+  ]
+}
+```
+
+The cleanup gate at `coordinator.js:521-527`
+(`if (!epic.worktree) continue;`) was satisfied because no human
+ever nulled `epic.worktree` manually in this session. §2.4's original
+reproduction required manual dag.yaml reconciliation that collapsed
+`status=completed` and `worktree=null` into a single edit; with no
+manual edit, the coordinator's merge leaves `worktree: <name>`
+populated, and cleanup iterates it correctly.
+
+**This reframes §2.4**: the defect is *not* "coordinator cleanup is
+broken" but "the cleanup gate depends on an invariant that manual
+reconciliation (§2.2's workaround) breaks." If §2.2 is resolved by
+making the coordinator auto-commit dag.yaml writes, §2.4 disappears
+by construction. If §2.2 is resolved by documenting a
+`git checkout --` revert convention (see §6.5), §2.4 still risks
+resurfacing when anyone edits dag.yaml by hand.
+
+**New class of orphan observed**: `~/.arcforge/worktrees/` contained
+8 stale directories pre-dating this session. Each carries an intact
+`.arcforge-epic` marker pointing at a `base_worktree` path under
+`/private/tmp/arcforge-tests/<epoch>/...` — integration-test fixture
+roots that are long gone. Sample markers:
+
+```
+project-0bd992-epic-formatter    base_worktree: /private/tmp/arcforge-tests/1776521572/…
+project-57a7d0-epic-parser        base_worktree: /private/tmp/arcforge-tests/1776520454/…
+project-f7cf29-epic-parser        base_worktree: /private/tmp/arcforge-tests/1776521516/…
+expand-debug2-302ce1-epic-formatter  base_worktree: /private/tmp/arcforge-tests/1776498615/…
+(and 4 others, all dated April 18)
+```
+
+None of these are in the current project's DAG, so
+`arcforge cleanup --spec-id <id>` cannot discover or reap them —
+cleanup is scoped per-spec, and these orphans name vanished specs
+(`demo-spec`) inside vanished bases. No CLI command implements
+"find-and-remove worktrees whose `base_worktree` path no longer
+exists." Orphans accumulate across unrelated test runs or deleted
+branches with no GC.
+
+The original report's §2.4 treated cleanup as a per-merge flow; this
+session reveals a second scope (cross-project / abandoned-base GC)
+that is not implemented at all.
+
+### 6.3 §2.5 reproduces with a new artifact class — `package-lock.json`
+
+Commit `c0a9728 chore: sync package-lock.json version to 2.1.0 + add
+hooks/package-lock.json` landed on the `audit-agents` epic branch
+prior to its merge. The commit's actual diff is pure `npm install`
+byproduct (a `package-lock.json` version bump and a new
+`hooks/package-lock.json` file) — unrelated to the audit-agents
+feature content, but attached to the feature branch's history.
+
+`arcforge:code-reviewer` flagged this as Minor M-2 on the
+audit-agents review, observing that a future reader running
+`git log hooks/package-lock.json` would see the file attributed to an
+epic that makes no mention of hooks tooling. The reviewer's
+suggested convention: "split such housekeeping into a pre-merge
+chore commit on `main` or on a dedicated chore branch rather than
+attaching it to a feature epic."
+
+This is the same class of ownership violation as §2.5 (rename sweep
+mutating structured artifacts it does not own) — generalizable to:
+**any tool-generated state (lockfiles, caches, generated TypeScript,
+linter autofixes) whose ownership is not asserted by the epic's
+spec should not appear in that epic's commit history**. No rule file
+or skill today enforces this boundary.
+
+### 6.4 New — Commit-granularity contract ambiguity for docs-only epics
+
+Each epic's implementer brief prescribed one conventional commit per
+feature (e.g. "`feat(skills): oi-001 …`", "`feat(skills): oi-002
+…`", etc.). In practice:
+
+- **`audit-agents`** implementer combined `aa-003` + `aa-004` into
+  one commit, rationale: "the graceful-degradation branches are part
+  of the agent body prose, which is the same content as the aa-003
+  patterns … separating them would have required committing
+  incomplete agent bodies."
+- **`output-and-interaction`** implementer collapsed `oi-001`
+  through `oi-005` into a single commit titled
+  `feat(skills): oi-001 Phase 2 markdown report tables (Summary,
+  Overview, Detail)`. The commit title names only oi-001 but its
+  159-line SKILL.md diff also carries Phase 3, Phase 4, Phase 5, the
+  `--save` carve-out, 9 new Red Flags rows, and the report-templates
+  reference extraction. Reviewer verdict: "defensible but commit
+  message under-describes content."
+
+No `skills/arc-writing-skills/` rule, nor any SDD v2 artifact,
+specifies commit granularity for docs-only epics where multiple
+features edit interleaved sections of the same file. The
+"one commit per feature" norm was imported from `arc-writing-tasks`
+/ `arc-agent-driven`, where code features have easily-isolated
+test-passing boundaries. It does not translate cleanly to prose epics
+where splitting a single SKILL.md's Phase 2-5 content into five
+commits may produce intermediate states with dangling
+cross-references or failing parametrized pytest assertions.
+
+**Open question**: should docs-only epics (a) relax to one commit per
+epic, (b) require feature-ordered prose authorship so per-feature
+commits stay self-consistent, or (c) permit multi-feature commits
+whose messages enumerate all covered IDs
+(`feat(skills): oi-001..005 phases 2-5 + --save`)? The two
+implementer agents in this session each picked their own answer;
+neither was wrong under any written rule, but the resulting
+git-log triage cost is non-zero.
+
+### 6.5 New — Explicit user-convention signal on `dag.yaml` disposal, contradicting the 2026-04-20 pattern
+
+At session end, the draft cleanup proposal included committing the
+coordinator-written dag.yaml drift under a `chore(dag): mark
+arc-auditing-spec epics completed post-merge` message (modelled after
+the 2026-04-20 session's `97e1b76` / `5faac1c` / `c791e47`
+reconciliation commits in Appendix A). The user rejected the action
+verbatim:
+
+> dag 要清掉的吧, 為什麼你還要 commit
+
+("The dag should be cleared, why are you still committing it?")
+
+The user's intended disposition: `git checkout --
+specs/<spec-id>/dag.yaml`. Revert the coordinator's write, leave the
+working tree matching HEAD, allow nothing to persist in git from the
+coordinator's runtime state.
+
+Two mutually exclusive conventions are now observable in this repo's
+history:
+
+| Convention | Evidence | Effect on `arcforge status` read-back |
+|---|---|---|
+| **Revert-after-merge** | arc-auditing-spec 2026-04-24 session, per user directive | Read-back shows all epics `pending` despite being merged; truth of completion lives only in `git log` of integration commits |
+| **Reconcile-after-merge** | arc-evaluating-v2 2026-04-20 session, commits `97e1b76` / `5faac1c` / `c791e47` in Appendix A | Read-back shows truthful `completed` status; dag.yaml is persisted source of truth across sessions at the cost of manual reconciliation commits on feature branches |
+
+Neither convention is documented in `skills/arc-finishing-epic/`,
+`skills/arc-coordinating/`, or any rule file. The coordinator is
+structurally neutral: it writes mutated state and walks away. This
+session's directive and the 2026-04-20 session's reconciliation
+commits cannot both be correct under a single consistent contract.
+
+**This ambiguity is the clearest real-world downstream-contract gap
+surfaced by the two sessions combined.** The write-to-disk-but-do-
+not-commit behavior noted in §2.2 is not itself a defect — it is
+the *deferral* of the disposition decision to each contributor.
+Contributors have answered it inconsistently because no single
+source of truth defines the answer. Any future Phase 2 DAG-consumer
+contract (see Proposed Direction below) must resolve this by
+picking one of: (a) coordinator auto-commits status writes,
+(b) coordinator refuses to mutate tracked files at all and maintains
+status in a separate sidecar (e.g., `.arcforge-status.json`),
+(c) a post-merge skill (`arc-finishing-epic`) runs a documented
+`git checkout --` revert as its last step.
+
+Until resolved, future skill logic that reads dag.yaml status —
+including the `state-transition-integrity` sub-agent this spec
+family itself ships (see `agents/arc-auditing-spec-state-transition-
+integrity.md`) — will produce findings inconsistent with actual
+merge state depending on which convention was last applied.
+
+### 6.6 Review-pass coverage — confirms Finding 4
+
+Three `arc-requesting-review` dispatches (one per epic, via
+`arcforge:code-reviewer`) returned:
+
+| Epic | Verdict | Critical | Important | Minor |
+|---|---|---|---|---|
+| skill-contract | SHIP-READY | 0 | 0 | 4 (3 deferred) |
+| audit-agents | SHIP-READY | 0 | 0 | 4 (1 addressed — M-1 shell-script delete) |
+| output-and-interaction | SHIP-READY | 0 | 0 | 4 (2 addressed — no-preview example, hashRepoPath test hardening) |
+
+None of the reviewer-flagged Minor items overlapped with §2.1–§2.7
+or §6.1–§6.5. Per-epic code review catches per-epic quality concerns
+and skill-rules conformance (word-count tier, frontmatter format,
+axis-boundary correctness). It does not surface cross-cutting DAG,
+worktree, or artifact-ownership contract gaps — confirming Finding
+4's observation that "each scenario is scoped to a single skill" and
+extending it to: *each review pass is scoped to a single epic*, so
+no single reviewer ever sees enough of the pipeline to notice
+integration-level drift.
+
+---
+
 ## Proposed Direction (for user decision, not acted upon)
 
 The user has indicated preference for a **linter-style audit skill** (reports inconsistencies; does not autofix). The skill would sit alongside refining/planning, not inside them, and could be called manually or wired into a hook. Details deferred.
@@ -310,3 +566,24 @@ Two prior exchanges in the session narrowed scope:
 2. The user confirmed that "spec" in their question refers to **SDD v2 meta-spec** (`specs/spec-driven-refine/`), not the `arc-evaluating-v2` spec we had just implemented.
 
 The user then elected to defer design decisions and requested this report instead.
+
+## Appendix D — Key Commits from `arc-auditing-spec` Session (2026-04-24)
+
+| SHA | Subject | Relevance |
+|---|---|---|
+| `b000ee5` | `feat(skills): arc-auditing-spec skill-contract epic` | Prior-session commit; left `dag.yaml` already dirty at this session's start (§6.1) |
+| `6b56a9d` | `feat: integrate skill-contract epic` | §6.1 — integration commit 1, no `dag.yaml` modification |
+| `35aba8a` | `feat(skills): aa-001 Phase 1 fan-out prompt template + parallel-dispatch instruction` | Single-feature feat commit (baseline for granularity comparison in §6.4) |
+| `9ca4c9b` | `feat(skills): aa-003 axis-scope separation with pattern + counter-example lists` | §6.4 — combined aa-003 + aa-004 content in one commit |
+| `c0a9728` | `chore: sync package-lock.json version to 2.1.0 + add hooks/package-lock.json` | §6.3 — npm-install byproduct on feature-epic branch |
+| `7a4b493` | `feat: integrate audit-agents epic` | §6.1 — integration commit 2, no `dag.yaml` modification |
+| `8ad3942` | `chore(skills): M-1 remove redundant sc-002-tool-grant-structural.sh` | §6.6 — review-minor addressed before merge |
+| `986293d` | `feat(skills): oi-001 Phase 2 markdown report tables (Summary, Overview, Detail)` | §6.4 — 5-feature-wide commit (oi-001..005 + `--save`) under an oi-001-only title |
+| `f62d795` | `test(skills): Phase 2-5 coverage + references extraction + RED baseline doc` | Test harness for output-and-interaction epic |
+| `fd61988` | `chore(skills): M1 no-preview option example + harden hashRepoPath test` | §6.6 — review-minor addressed before merge |
+| `528f8b4` | `feat: integrate output-and-interaction epic` | §6.1 — integration commit 3, no `dag.yaml` modification |
+
+None of the three `feat: integrate <epic> epic` commits (`6b56a9d`,
+`7a4b493`, `528f8b4`) touched `specs/arc-auditing-spec/dag.yaml` —
+the file was left dirty in the working tree after each merge, exactly
+as §2.2 describes and §6.1 re-confirms.
