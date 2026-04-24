@@ -253,9 +253,13 @@ finding in the queue.
 **Conditional firing gate (fr-oi-004-ac1):** Phase 5 renders the Decisions
 table ONLY when Phase 3 or Phase 4 actually fired during this invocation.
 Use the in-memory `ceremony_fired` flag that is set to `true` the moment
-either phase issues its first AskUserQuestion call (or, for the N_HIGH == 1
-direct-to-Phase-4 path from fr-oi-002-ac6, when Phase 4 enters its loop).
-Do NOT re-derive this condition at Phase 5 entry — carry the flag forward
+either phase issues its first AskUserQuestion call. This single rule
+covers every path uniformly: the standard N_HIGH >= 2 path flips the flag
+on Phase 3's first call; the N_HIGH == 1 + ≥2-resolutions direct-to-Phase-4
+path (fr-oi-002-ac6) flips the flag on Phase 4's first question; the
+N_HIGH == 1 + <2-resolutions path enters Phase 4 but issues no question,
+so the flag correctly stays `false` and no Decisions table renders. Do
+NOT re-derive this condition at Phase 5 entry — carry the flag forward
 from wherever ceremony began.
 
 **N_HIGH == 0 path (fr-oi-004-ac4):** When both Phase 3 and Phase 4 were
@@ -347,5 +351,5 @@ Per fr-sc-003, this skill's phase content, the three sub-agent system prompts, a
 
 - Agents: `agents/arc-auditing-spec-cross-artifact-alignment.md`, `agents/arc-auditing-spec-internal-consistency.md`, `agents/arc-auditing-spec-state-transition-integrity.md`
 - Spec: `specs/arc-auditing-spec/spec.xml` + `specs/arc-auditing-spec/details/{skill-contract,audit-agents,output-and-interaction}.xml`
-- Design: `docs/plans/arc-auditing-spec/2026-04-22/design.md`
+- Design: `docs/plans/arc-auditing-spec/2026-04-22/design.md` (v1, frozen) · `docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md` (v2 Change Intent — ceremony threshold rules)
 - Eval scenarios: `skills/arc-auditing-spec/evals/`
