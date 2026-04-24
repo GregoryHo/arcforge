@@ -2,11 +2,12 @@
 <spec>
   <overview>
     <spec_id>arc-auditing-spec</spec_id>
-    <spec_version>1</spec_version>
+    <spec_version>2</spec_version>
+    <supersedes>arc-auditing-spec:v1</supersedes>
     <status>active</status>
     <source>
-      <design_path>docs/plans/arc-auditing-spec/2026-04-22/design.md</design_path>
-      <design_iteration>2026-04-22</design_iteration>
+      <design_path>docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md</design_path>
+      <design_iteration>2026-04-24-iterate2</design_iteration>
     </source>
     <title>Spec Auditing Skill</title>
     <description>
@@ -18,13 +19,18 @@
       "notify the human, let them decide" feedback. arc-auditing-spec fans out
       three axis-aligned sub-agents, presents structured findings via
       AskUserQuestion U3 two-stage triage, and surrenders final decisions to
-      the main session — never modifying upstream artifacts itself.
+      the main session — never modifying upstream artifacts itself. v2
+      iteration tightens the ceremony layer: Phase 3 and Phase 4 fire only
+      when they add value the Phase 2 report alone does not carry, extending
+      the skill's existing graceful-degradation stance from the input layer
+      (missing spec.xml or dag.yaml) to the output layer (too few HIGH
+      findings to batch, too few resolutions to choose between).
     </description>
     <scope>
       <includes>
         <feature id="skill-contract">Public contract of the /arc-auditing-spec skill: user-invoked invocation semantics, hard read-only boundaries enforced via tool grants, no pipeline auto-invocation, implementation delegated to arc-writing-skills.</feature>
         <feature id="audit-agents">Three parallel fan-out sub-agents (cross-artifact-alignment, internal-consistency, state-transition-integrity), their finding schema, axis-scope separation, and graceful degradation on missing inputs.</feature>
-        <feature id="output-and-interaction">Markdown-table report format, U3 two-stage AskUserQuestion triage UX (multiSelect Stage 1, batched Stage 2 with diff previews), Decisions table output, and optional L4-path persistence via --save flag.</feature>
+        <feature id="output-and-interaction">Markdown-table report format, U3 two-stage AskUserQuestion triage UX (multiSelect Stage 1, batched Stage 2 with diff previews), Decisions table output, and optional L4-path persistence via --save flag. v2 adds ceremony-threshold rules: Phase 3 only fires when N_HIGH >= 2, Phase 4 only fires per finding with >= 2 resolutions, Decisions table only renders when ceremony ran at all, and the Phase 2 Overview row carries visual emphasis when exactly one HIGH is present.</feature>
       </includes>
       <excludes>
         <reason>Pipeline auto-invocation — brainstorming / refining / planning MUST remain unchanged; the skill is ad-hoc user-invoked (T1 decision).</reason>
@@ -32,10 +38,17 @@
         <reason>Code review / PR review — source-code review is handled by arc-requesting-review, arc-receiving-review, Claude Code /review, pr-review-toolkit; this skill only audits spec-family artifacts.</reason>
         <reason>Cross-spec batch audit — one invocation audits one spec-id; multi-spec loops are user-driven, not built in.</reason>
         <reason>Policy boundary around free-text edits to structured artifacts (Finding 2.5 in the gap report) — deferred to a separate future spec (arc-structured-artifact-policy).</reason>
-        <reason>Coordinator / engine bug fixes — A3 agent surfaces DAG state drift, but fixes to scripts/lib/coordinator.js belong to a separate engine-fix spec.</reason>
+        <reason>Coordinator / engine bug fixes — A3 agent surfaces DAG state drift, but fixes to scripts/lib/coordinator.js belong to a separate engine-fix spec. The §6.5 downstream-contract gap (dag.yaml auto-commit vs. revert-after-merge) is explicitly out of scope for the v2 iteration.</reason>
         <reason>Changes to upstream pipeline skills — arc-brainstorming / arc-refining / arc-planning and their Iron Laws are not touched by this spec.</reason>
       </excludes>
     </scope>
+    <delta version="2" iteration="2026-04-24-iterate2">
+      <modified ref="fr-sc-003" />
+      <modified ref="fr-oi-001" />
+      <modified ref="fr-oi-002" />
+      <modified ref="fr-oi-003" />
+      <modified ref="fr-oi-004" />
+    </delta>
   </overview>
 
   <details>

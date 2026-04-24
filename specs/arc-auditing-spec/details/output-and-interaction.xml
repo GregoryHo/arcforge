@@ -16,7 +16,11 @@
       Phase 2 MUST render three distinct sections of markdown output —
       Summary table, Findings Overview table, and per-finding Detail blocks —
       before proceeding to triage. Tables carry as much content as possible;
-      prose is reserved only for "why it matters" paragraphs.
+      prose is reserved only for "why it matters" paragraphs. When exactly
+      one HIGH-severity finding exists in the overall finding set, its row
+      in the Findings Overview MUST carry a visual emphasis marker so the
+      reader's eye catches it even when no Phase 3 triage call fires (the
+      below-threshold case governed by fr-oi-002).
     </description>
     <acceptance_criteria>
       <criterion id="fr-oi-001-ac1">
@@ -45,7 +49,7 @@
         enumerate each resolution with its label, description, and (when
         applicable) side-effect or cost column. Only the "why it matters"
         paragraph MAY remain free prose.
-        <trace>design.md §Requirements Part 1 — Output format</trace>
+        <trace>design.md §Requirements Part 1 — Output format (clarified in design 2026-04-24-iterate2 §Context — Defect 2: only Observed and Suggested Resolutions are tables; why-it-matters stays prose)</trace>
       </criterion>
       <criterion id="fr-oi-001-ac4">
         Given findings include MED, LOW, or INFO severity,
@@ -55,26 +59,44 @@
         are later selected into triage.
         <trace>design.md §Requirements Part 1 — Output format</trace>
       </criterion>
+      <criterion id="fr-oi-001-ac5">
+        Given the audit produces exactly one HIGH-severity finding across
+        the full finding set,
+        When the Findings Overview table is rendered,
+        Then the row for that HIGH finding MUST start its Title column with
+        a ⚠️ prefix AND render the Title text in markdown bold, so the
+        single HIGH is visually distinguished from lower-severity rows even
+        when Phase 3 does not fire.
+        <trace>design 2026-04-24-iterate2 §Change Intent — Change 1 (N_HIGH == 1 visual emphasis)</trace>
+      </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-oi-002">
-    <title>Triage UX — multi-select over HIGH findings with free-text pull-in</title>
+    <title>Triage UX — conditional multi-select over HIGH findings with free-text pull-in</title>
     <description>
-      Phase 3 MUST use AskUserQuestion with `multiSelect: true` to let the
-      user pick which HIGH findings proceed into Stage 2 resolution. MED,
-      LOW, and INFO findings MUST NOT appear in triage options, but the
-      user MAY inject specific IDs (of any severity) via AskUserQuestion's
-      auto-appended Other free-text option.
+      Phase 3 MUST fire only when the audit produced at least 2 HIGH-severity
+      findings; the AskUserQuestion tool's `options.minItems: 2` constraint
+      makes a single-option triage call illegal, and a zero-HIGH call has no
+      content. When Phase 3 fires, it MUST use AskUserQuestion with
+      `multiSelect: true` to let the user pick which HIGH findings proceed
+      into Stage 2 resolution; MED, LOW, and INFO findings MUST NOT appear
+      in triage options, but the user MAY inject specific IDs (of any
+      severity) via the auto-appended Other free-text option. When Phase 3
+      does not fire (N_HIGH &lt; 2), the skill takes the degraded paths
+      defined by ac5 and ac6 — Phase 2 Detail blocks are the deliverable for
+      any sub-HIGH follow-up, and no alternative injection channel is
+      provided.
     </description>
     <acceptance_criteria>
       <criterion id="fr-oi-002-ac1">
-        Given Phase 3 is entered,
+        Given Phase 3 is entered AND the audit produced at least 2
+        HIGH-severity findings,
         When the first AskUserQuestion call is made,
         Then it MUST set `multiSelect: true`, `header: "Triage"`, and list
         up to 4 HIGH-severity findings as `options` in a stable order
         (earliest HIGH by axis-then-ID first).
-        <trace>design.md §Architecture — Phase 3 Triage</trace>
+        <trace>design.md §Architecture — Phase 3 Triage (conditional firing added in design 2026-04-24-iterate2 §Change Intent — Change 1)</trace>
       </criterion>
       <criterion id="fr-oi-002-ac2">
         Given the audit produced more than 4 HIGH findings,
@@ -86,13 +108,14 @@
         <trace>Refiner clarifying question Q3 → answer (a): sequential multi-batch triage</trace>
       </criterion>
       <criterion id="fr-oi-002-ac3">
-        Given the user uses the auto-appended "Other" option in any triage
-        call to submit free-text containing one or more finding IDs (format
-        `A&lt;axis&gt;-&lt;NNN&gt;`, any severity — including MED, LOW, or INFO),
+        Given Phase 3 is firing (N_HIGH &gt;= 2) AND the user uses the
+        auto-appended "Other" option in any triage call to submit free-text
+        containing one or more finding IDs (format `A&lt;axis&gt;-&lt;NNN&gt;`,
+        any severity — including MED, LOW, or INFO),
         When the skill parses the Other input,
         Then the specified IDs MUST be added to the Stage 2 resolution
         queue, even when their severity is below HIGH.
-        <trace>Refiner clarifying question Q2 → answer (b): Other may inject MED/LOW IDs</trace>
+        <trace>Refiner clarifying question Q2 → answer (b): Other may inject MED/LOW IDs (precondition tightened in design 2026-04-24-iterate2 §Change Intent — Change 1: Other pull-in only exists when Phase 3 actually fires)</trace>
       </criterion>
       <criterion id="fr-oi-002-ac4">
         Given Phase 3 is running,
@@ -102,25 +125,56 @@
         channel.
         <trace>design.md §Requirements Part 2 — Triage UX</trace>
       </criterion>
+      <criterion id="fr-oi-002-ac5">
+        Given the audit produced zero HIGH-severity findings,
+        When the skill finishes Phase 2,
+        Then the skill MUST NOT issue any Phase 3 AskUserQuestion call,
+        MUST NOT enter Phase 4, MUST NOT render a Phase 5 Decisions table,
+        MUST print a concluding recommendation line referring the user to
+        the Phase 2 Detail blocks for any follow-up, AND MUST exit cleanly
+        with a successful status.
+        <trace>design 2026-04-24-iterate2 §Change Intent — Change 1 (N_HIGH == 0 exit path)</trace>
+      </criterion>
+      <criterion id="fr-oi-002-ac6">
+        Given the audit produced exactly one HIGH-severity finding,
+        When the skill finishes Phase 2,
+        Then the skill MUST NOT issue any Phase 3 multi-select AskUserQuestion
+        call (which would violate `options.minItems: 2`), MUST ensure the
+        Phase 2 Findings Overview row for that HIGH carries the visual
+        emphasis required by fr-oi-001-ac5, AND MUST proceed directly into
+        Phase 4 with that single HIGH finding as the sole Stage-2 queue
+        entry — subject thereafter to fr-oi-003's per-finding resolution-count
+        rules, which may further collapse Phase 4 into a no-question case.
+        <trace>design 2026-04-24-iterate2 §Change Intent — Change 1 (N_HIGH == 1 direct-to-Phase-4 flow)</trace>
+      </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-oi-003">
-    <title>Resolution UX — batched per-finding AskUserQuestion with preview diffs</title>
+    <title>Resolution UX — conditional batched per-finding AskUserQuestion with preview diffs</title>
     <description>
       Phase 4 MUST iterate the Stage-2 queue in batches of at most 4
-      questions per AskUserQuestion call, rendering one question per
-      selected finding. Resolutions with editable-artifact equivalents MUST
-      include `preview` diff content; resolutions without such an
+      AskUserQuestion questions per call, rendering one question per
+      selected finding that has at least 2 suggested resolutions. Findings
+      with fewer than 2 suggested resolutions MUST NOT have an
+      AskUserQuestion question issued for them — AskUserQuestion's
+      `options.minItems: 2` constraint forbids a single-option question,
+      and asking among a single option is pure ceremony. Such findings rely
+      on their Phase 2 Detail block's Suggested Resolutions table as the
+      deliverable and appear in the Decisions table (when it is rendered)
+      with a sentinel value. Resolutions with editable-artifact equivalents
+      MUST include `preview` diff content; resolutions without such an
       equivalent MAY omit `preview`.
     </description>
     <acceptance_criteria>
       <criterion id="fr-oi-003-ac1">
-        Given Phase 4 starts with N selected findings,
+        Given Phase 4 starts with a Stage-2 queue whose M entries each have
+        at least 2 suggested resolutions,
         When AskUserQuestion questions are issued,
         Then each call MUST contain at most 4 questions; sequential calls
-        MUST be used until all N findings have been asked exactly once.
-        <trace>design.md §Architecture — Phase 4 Resolution</trace>
+        MUST be used until all M qualifying findings have been asked exactly
+        once.
+        <trace>design.md §Architecture — Phase 4 Resolution (resolution-count precondition added in design 2026-04-24-iterate2 §Change Intent — Change 1)</trace>
       </criterion>
       <criterion id="fr-oi-003-ac2">
         Given one question is rendered for a finding,
@@ -154,26 +208,44 @@
         error.
         <trace>design.md §Requirements Part 2 — Resolution UX</trace>
       </criterion>
+      <criterion id="fr-oi-003-ac6">
+        Given the Stage-2 resolution queue contains a finding whose
+        suggested-resolutions count is less than 2,
+        When Phase 4 iterates to that finding,
+        Then the skill MUST NOT issue any AskUserQuestion question for it,
+        MUST (when the Decisions table is rendered per fr-oi-004) record
+        that finding's row with Chosen Resolution set to the sentinel
+        string `(no ceremony — see Detail)` and User Note empty, AND MUST
+        NOT treat the skip as an error.
+        <trace>design 2026-04-24-iterate2 §Change Intent — Change 1 (single-resolution finding skipped at Phase 4, sentinel recorded in Decisions table)</trace>
+      </criterion>
     </acceptance_criteria>
   </requirement>
 
   <requirement id="fr-oi-004">
-    <title>Decisions table output at skill end</title>
+    <title>Decisions table output at skill end (conditional on ceremony firing)</title>
     <description>
-      Phase 5 MUST render a Decisions markdown table summarising the user's
-      choices across all discussed findings, leaving it in main-session
-      context as the skill's final artifact. The skill body MUST NOT
-      perform any Edit or Write on audited artifacts based on those
-      decisions — post-audit execution is explicitly the main session's
-      responsibility.
+      Phase 5's Decisions markdown table MUST be rendered only when Phase 3
+      or Phase 4 actually fired during this invocation — i.e., when there
+      was ceremony producing decisions to record. When both Phase 3 and
+      Phase 4 were skipped (the N_HIGH == 0 path governed by fr-oi-002-ac5),
+      no Decisions table MUST be printed; the skill exits after the Phase 2
+      report plus the concluding recommendation line. When the Decisions
+      table is rendered, it summarises the user's choices across all
+      discussed findings, including auto-skipped single-resolution findings
+      recorded via the sentinel defined in fr-oi-003-ac6. The skill body
+      MUST NOT perform any Edit or Write on audited artifacts based on
+      those decisions — post-audit execution is explicitly the main
+      session's responsibility.
     </description>
     <acceptance_criteria>
       <criterion id="fr-oi-004-ac1">
-        Given Phase 4 has completed and collected user answers,
+        Given Phase 3 or Phase 4 actually fired during this invocation AND
+        those phases completed and collected user answers,
         When Phase 5 runs,
         Then the main session MUST print a markdown Decisions table with
         columns Finding ID / Chosen Resolution / User Note.
-        <trace>design.md §Architecture — Phase 5 Decisions</trace>
+        <trace>design.md §Architecture — Phase 5 Decisions (conditional firing added in design 2026-04-24-iterate2 §Change Intent — Change 1)</trace>
       </criterion>
       <criterion id="fr-oi-004-ac2">
         Given the user submitted free-text via AskUserQuestion's Other
@@ -192,6 +264,15 @@
         ownership of any subsequent actions is explicit and out of scope
         for this skill.
         <trace>design.md §Requirements Part 2 — Decisions</trace>
+      </criterion>
+      <criterion id="fr-oi-004-ac4">
+        Given both Phase 3 and Phase 4 were skipped during this invocation
+        per fr-oi-002-ac5 (the N_HIGH == 0 path),
+        When the skill reaches its exit point,
+        Then no Decisions table MUST be printed; the skill MUST exit
+        cleanly after the Phase 2 report and the concluding recommendation
+        line, with no Phase 5 output rendered.
+        <trace>design 2026-04-24-iterate2 §Change Intent — Change 1 (Decisions table conditional on ceremony firing)</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

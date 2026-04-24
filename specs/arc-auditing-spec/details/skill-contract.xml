@@ -108,6 +108,24 @@
         state-transition-integrity).
         <trace>design.md §Architecture — Implementation delegation</trace>
       </criterion>
+      <criterion id="fr-sc-003-ac3">
+        Given the skill is ready to ship on v2,
+        When the eval suite is inspected,
+        Then it MUST additionally contain at least one eval scenario for each
+        of the three Change-1 threshold branches:
+        (a) N_HIGH == 0 — the skill exits after Phase 2 with the concluding
+        recommendation line and no Phase 3 / Phase 4 / Phase 5 output;
+        (b) N_HIGH == 1 — the Phase 2 Findings Overview row for the lone
+        HIGH carries the ⚠️-prefix + bold visual emphasis, no Phase 3
+        multi-select call is issued, and (when that HIGH's suggested
+        resolutions count is at least 2) Phase 4 is entered directly for
+        that single finding;
+        (c) a Stage-2 resolution queue entry whose resolutions count is
+        less than 2 — the skill issues no AskUserQuestion for it and
+        records its Decisions-table row with Chosen Resolution set to
+        `(no ceremony — see Detail)`.
+        <trace>design 2026-04-24-iterate2 §Architecture Impact — new eval scenarios</trace>
+      </criterion>
     </acceptance_criteria>
   </requirement>
 </detail>
