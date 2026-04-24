@@ -7,8 +7,12 @@
 #   - only {Read, Grep, Glob} appear
 #   - NONE of {Edit, Write, Bash, NotebookEdit} appear
 #
-# Also codified as test_agent_read_only_tool_grant in
-# tests/skills/test_skill_arc_auditing_spec.py — keep them in sync.
+# NOTE (M-2): This shell script uses a bespoke awk/grep YAML parser which is
+# fragile against the inline-array tools form (`tools: [Read, Grep, Glob]`).
+# The canonical check is now the pytest assertion `test_agent_read_only_tool_grant`
+# in tests/skills/test_skill_arc_auditing_spec.py, which uses yaml.safe_load
+# and handles both block-list and inline-array YAML forms correctly.
+# This shell script is retained as a secondary smoke test only.
 
 set -euo pipefail
 

@@ -2,32 +2,62 @@
 
 Evaluation scenarios validating the `/arc-auditing-spec` skill. Organized by the epic that produces each file.
 
-## Landed in `skill-contract` epic (this epic)
+## Harness-executable vs Behavioral Review
 
-| File | Covers | Shape |
-|---|---|---|
-| `sc-001-invocation-contract.md` | fr-sc-001-ac1, fr-sc-001-ac2 | Behavioral pressure scenarios (RED baselines captured during skill-contract epic) |
-| `sc-001-no-pipeline-invocation.sh` | fr-sc-001-ac3 | Static shell check |
-| `sc-002-read-only-behavior.md` | fr-sc-002-ac1, fr-sc-002-ac2 | Behavioral pressure scenarios — verify read-only boundary holds under edit-pressure |
-| `sc-002-tool-grant-structural.sh` | fr-sc-002-ac3 | Static YAML-frontmatter check on the three agent files |
+| Shape | Meaning |
+|---|---|
+| **Harness-executable** | A scoring script can evaluate PASS/FAIL automatically (e.g., grep for a finding id prefix, check tool call logs) |
+| **Behavioral / manual** | A human reviewer reads the agent's output to verify conformance (used when the criterion is about absence of rationalization or qualitative content) |
+
+---
+
+## Landed in `skill-contract` epic
+
+| File | Covers | ACs | Shape |
+|---|---|---|---|
+| `sc-001-invocation-contract.md` | fr-sc-001-ac1, fr-sc-001-ac2 | Invocation fail-closed, no substitution | Behavioral — manual review |
+| `sc-001-no-pipeline-invocation.sh` | fr-sc-001-ac3 | No pipeline auto-invocation | Harness-executable (shell grep) |
+| `sc-002-read-only-behavior.md` | fr-sc-002-ac1, fr-sc-002-ac2 | Read-only under edit pressure | Behavioral — manual review |
+| `sc-002-tool-grant-structural.sh` | fr-sc-002-ac3 | Agent frontmatter tool allowlist | Harness-executable (shell/YAML parse); also in pytest (M-2/M-3) |
 
 Structural checks are also codified in `tests/skills/test_skill_arc_auditing_spec.py` and run under `npm run test:skills`.
 
-## To be added in `audit-agents` epic
+---
 
-| File | Covers | Shape |
-|---|---|---|
-| `axis-cross-artifact-alignment.md` | fr-aa-001–fr-aa-004 (axis 1) | Behavioral eval — synthetic spec with injected design↔spec drift |
-| `axis-internal-consistency.md` | fr-aa-001–fr-aa-004 (axis 2) | Behavioral eval — synthetic spec with self-contradicting acceptance criteria |
-| `axis-state-transition-integrity.md` | fr-aa-001–fr-aa-004 (axis 3) | Behavioral eval — synthetic dag.yaml with drift from on-disk markers |
+## Landed in `audit-agents` epic (this epic)
+
+| File | Covers | ACs | Shape |
+|---|---|---|---|
+| `aa-cross-artifact-001-rename-drift.md` | fr-aa-001–fr-aa-004 (axis 1) | Cross-artifact rename drift detection | Harness-executable (A1-prefix check) + Behavioral (no axis bleed) |
+| `aa-internal-001-ac-contradiction.md` | fr-aa-001–fr-aa-004 (axis 2) | Internal AC contradiction detection | Harness-executable (A2-prefix check) + Behavioral (no axis bleed) |
+| `aa-state-transition-001-stale-worktree.md` | fr-aa-001–fr-aa-004 (axis 3) | Stale worktree pointer detection | Harness-executable (A3-prefix + no git calls) + Behavioral (no git-history findings) |
 
 Ship gate (fr-sc-003-ac2): all three axis evals MUST exist and at least one scenario per axis MUST pass before the skill ships.
+
+### AC Coverage by Eval Scenario
+
+| AC | Scenario | Check type |
+|---|---|---|
+| fr-aa-001-ac1 (single-message parallel dispatch) | All three axis evals | Harness (structural — verified by SKILL.md tests) |
+| fr-aa-001-ac2 (prompt template with paths) | All three axis evals | Harness (agent receives spec-id + paths) |
+| fr-aa-002-ac1 (id format A\<axis>-NNN) | All three axis evals | Harness (regex check on finding ids) |
+| fr-aa-002-ac2 (resolution preview field) | aa-cross-artifact-001 | Behavioral (agent emits preview diff) |
+| fr-aa-002-ac3 (Recommended prefix rule) | All three axis evals | Behavioral (agent follows schema) |
+| fr-aa-002-ac4 (severity enum + cut-offs) | All three axis evals | Behavioral (agent uses HIGH/MED/LOW correctly) |
+| fr-aa-003-ac1 (cross-artifact patterns + counter-examples) | aa-cross-artifact-001 | Harness + Behavioral |
+| fr-aa-003-ac2 (internal-consistency patterns + counter-examples) | aa-internal-001 | Harness + Behavioral |
+| fr-aa-003-ac3 (state-transition file-level patterns + git exclusion) | aa-state-transition-001 | Harness (no git calls) + Behavioral |
+| fr-aa-004-ac1 (spec.xml absent → single INFO) | Not in aa-* evals; covered by sc-002 behavioral | Behavioral |
+| fr-aa-004-ac2 (dag.yaml absent → single INFO, verbatim title) | Not in aa-* evals; covered by sc-002 behavioral | Behavioral |
+| fr-aa-004-ac3 (partial failure error_flag) | All three axis evals (negative path) | Behavioral |
+
+---
 
 ## To be added in `output-and-interaction` epic
 
 | File | Covers | Shape |
 |---|---|---|
-| `report-rendering.md` | fr-oi-001 | Table layout conformance |
-| `triage-ux.md` | fr-oi-002 | AskUserQuestion Stage 1 multi-select + Other pull-in |
-| `resolution-ux.md` | fr-oi-003 | AskUserQuestion Stage 2 per-finding + preview diffs |
-| `decisions-and-save.md` | fr-oi-004, fr-oi-005 | Decisions table format + --save path + no-save default |
+| `report-rendering.md` | fr-oi-001 | Harness-executable (table layout conformance) |
+| `triage-ux.md` | fr-oi-002 | Behavioral — AskUserQuestion multi-select + Other pull-in |
+| `resolution-ux.md` | fr-oi-003 | Behavioral — AskUserQuestion per-finding + preview diffs |
+| `decisions-and-save.md` | fr-oi-004, fr-oi-005 | Harness-executable (Decisions table format) + Behavioral (--save path) |
