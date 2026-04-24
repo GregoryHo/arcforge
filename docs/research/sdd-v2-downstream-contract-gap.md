@@ -1,9 +1,10 @@
 # SDD v2 Downstream Contract Gap — Investigation Report
 
-Date: 2026-04-20 (initial) · updated 2026-04-24 (Finding 6 + Appendix D added from `arc-auditing-spec` session)
+Date: 2026-04-20 (initial) · updated 2026-04-24 (Finding 6 + Appendix D added from `arc-auditing-spec` v1 session) · updated 2026-04-24 (Finding 7 + Appendix E added from `arc-auditing-spec` v2 iteration session)
 Source sessions:
 - 2026-04-20: implementation of `arc-evaluating-v2` spec (8 epics, 28 features) — produced Findings 1–5
-- 2026-04-24: implementation of `arc-auditing-spec` spec (3 epics, 12 features) — produced Finding 6
+- 2026-04-24 morning: implementation of `arc-auditing-spec` v1 (3 epics, 12 features) — produced Finding 6
+- 2026-04-24 afternoon: iteration of `arc-auditing-spec` v1 → v2 (5 epics, 5 features) — produced Finding 7
 Investigator: Claude (Opus 4.7)
 
 ## What This Report Answers
@@ -516,6 +517,282 @@ integration-level drift.
 
 ---
 
+## Finding 7 — Cleanup Scope Gap and Delete-After-Sprint Convention (`arc-auditing-spec` v2 iteration, 2026-04-24 afternoon)
+
+This finding is authored in a distinct third contributor session,
+append-only per the discipline established in Finding 6. It is the
+second session on the `arc-auditing-spec` spec family and the FIRST
+session to iterate that spec from v1 to v2 — meaning the v1 skill
+shipped by Finding 6's session has now been consumed by the user as
+its own inspection target (`/arc-auditing-spec arc-auditing-spec`),
+and the findings surfaced by that dog-food run drove the Change
+Intent for this iteration.
+
+Key identifiers separating this session from Findings 1–6:
+
+- **Date**: 2026-04-24 afternoon (same calendar day as Finding 6, but
+  a distinct session begun after the morning dog-food run).
+- **Spec iterated**: `specs/arc-auditing-spec/` v1 → v2 (5 `<modified>`
+  refs in the new `<delta version="2">`: `fr-sc-003`, `fr-oi-001`,
+  `fr-oi-002`, `fr-oi-003`, `fr-oi-004`).
+- **Iteration design**:
+  `docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md` —
+  carries Context summarizing v1 + dog-food findings and Change Intent
+  for two changes: (1) ceremony-threshold rule (Phase 3 fires only
+  when N_HIGH ≥ 2; Phase 4 fires only when a finding has ≥ 2
+  resolutions; Decisions table renders only when ceremony actually
+  ran); (2) correct the v1 design.md line 32 Phase-2-summary
+  contradiction.
+- **Workflow chain used**: `arc-brainstorming` → `arc-refining` →
+  `arc-planning` → `arc-coordinating expand` + dispatched
+  `arcforge:implementer` subagent per epic (linear dependency chain
+  serialized all five, no parallelism) → `arc-coordinating merge` →
+  `arc-coordinating cleanup` → manual `git branch -d` + `git rm` of
+  planner output.
+- **Integration merge commits** (5, none modifying `dag.yaml`):
+  `b2a71a9`, `3569306`, `68f3289`, `347a480`, `058dd78`.
+- **Outcome**: all 5 epics merged to base; worktrees cleaned via
+  `arcforge cleanup`; branches deleted via `git branch -d`; `dag.yaml`
+  + `epics/` deleted via `git rm`. Final test suite on the integrated
+  base: 980 Jest + 6 Node `--test` + 6 hooks + **415 pytest** (up
+  from 387 at the end of Finding 6; +28 tests added across the 5 v2
+  epics).
+
+### 7.1 §6.5 friction re-confirmed — revert-after-merge blocks the next iteration's refiner gate
+
+The session began with the refiner's Phase 1 DAG completion gate
+blocking immediately:
+
+```
+BLOCKED: 3 of 3 epics still incomplete:
+  - skill-contract (pending)
+  - audit-agents (pending)
+  - output-and-interaction (pending)
+Complete current sprint before iterating.
+```
+
+The block is mechanically correct: `scripts/lib/sdd-utils.js`'s
+`checkDagStatus` reads `dag.yaml` status fields only, not git log. The
+v1 sprint was functionally complete per git log (Finding 6's three
+integrate commits `6b56a9d` / `7a4b493` / `528f8b4` all landed on
+`feature/sdd-enhance`), but the user-directed "revert-after-merge"
+convention applied in Finding 6's session left `dag.yaml` with all
+three epics `status: pending` — which reads to the gate as "prior
+sprint incomplete" and prevents any v2 iteration from starting.
+
+This is empirical confirmation of §6.5's closing paragraph:
+
+> future skill logic that reads dag.yaml status — including the
+> state-transition-integrity sub-agent this spec family itself ships
+> — will produce findings inconsistent with actual merge state
+> depending on which convention was last applied.
+
+The refiner's gate is exactly such a "skill logic that reads dag.yaml
+status." The convention chosen in Finding 6 was locally satisfying
+(clean git history at the end of that session) but globally costly
+(the next iteration's refiner cannot proceed until the convention's
+effect is undone). Resolution in this session: an up-front repair
+commit `ae12cb0 chore(specs): drop stale arc-auditing-spec planner
+output (dag.yaml + epics/)` that deleted dag.yaml + epics/, causing
+`checkDagStatus` to return null ("No dag.yaml — proceed (legal:
+refined but not yet planned)") and unblocking the refiner. Only after
+this repair did the v2 iteration's refiner / planner / coordinator
+chain proceed cleanly.
+
+### 7.2 Three cleanup gaps surfaced by `arcforge cleanup`
+
+At the end of the v2 sprint, `arcforge cleanup --spec-id
+arc-auditing-spec` ran without error:
+
+```json
+{
+  "removed": 5,
+  "paths": [
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-update-oi-001",
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-update-oi-002",
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-update-oi-003",
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-update-oi-004",
+    "/Users/gregho/.arcforge/worktrees/arcforge-40c922-update-sc-003"
+  ]
+}
+```
+
+But three classes of lingering state remained that cleanup did not
+touch. The user explicitly flagged each one in turn, suggesting the
+gap is not theoretical — a contributor following cleanup's implicit
+contract will reliably leave leftover state unless they know to look
+for these cases.
+
+**(a) Epic branches.** `arcforge cleanup` removes worktree directories
+but leaves the branches those worktrees checked out. After cleanup,
+`git branch --list` showed five merged-but-undeleted branches:
+
+```
+  arc-auditing-spec/update-oi-001
+  arc-auditing-spec/update-oi-002
+  arc-auditing-spec/update-oi-003
+  arc-auditing-spec/update-oi-004
+  arc-auditing-spec/update-sc-003
+* feature/sdd-enhance
+  main
+```
+
+The user explicitly directed "branch 也要 clean up 吧" ("the branches
+need to be cleaned up too"). All five branches were fully merged
+(`git branch --merged feature/sdd-enhance` reported all five), so
+`git branch -d` succeeded cleanly — no `-D` force flag needed — but
+the cleanup step is manual. Over many sprints this would accumulate
+dozens of stale branches with no GC path. The CLI `arcforge cleanup`
+surface has an obvious extension point (take a `--branches` flag or
+include branch deletion by default for merged-ancestor branches), but
+the current behavior does nothing.
+
+**(b) Uncommitted `dag.yaml` drift.** Matching §6.1's observation
+word-for-word: at the end of the v2 sprint,
+`git status specs/arc-auditing-spec/dag.yaml` returned `M` —
+coordinator-flipped to all-epics-`completed` in working tree, but no
+integrate commit carried the change. The original §6.5 conventions
+address this drift (either by reverting or by reconciling), but
+`arcforge cleanup` itself does not close out the file's state; the
+next commit (whatever it is) inherits whatever the last contributor
+chose. The defect in §2.2 / §6.1 and the cleanup scope gap are
+therefore sequential: the coordinator writes but doesn't commit at
+merge time (§2.2), and cleanup doesn't resolve the resulting drift at
+sprint end (this finding).
+
+**(c) Tracked `epics/` directory.** The planner writes both `dag.yaml`
+and a directory tree at `specs/<spec-id>/epics/` containing one
+`epic.md` + one `features/*.md` per feature. `arcforge cleanup` does
+not touch `epics/` — it is outside the coordinator's declared scope.
+For the 5-epic v2 sprint this left 10 tracked files under
+`specs/arc-auditing-spec/epics/` after worktree cleanup. Disposition
+is implicit: either preserve the files (which conflicts with the
+planner's "overwrite, never archive" Iron Law at the next iteration's
+start) or delete them (which requires a separate `git rm -r` chore
+commit). There is no automated path.
+
+### 7.3 Convention C — Delete-after-sprint
+
+The user's directive "完成就是 clean up 然後刪掉那些 planning 的產物"
+("completion is cleanup, then delete the planning artifacts")
+crystallized a convention distinct from either of §6.5's two
+conventions and from `arcforge cleanup`'s current scope:
+
+| Convention | Mechanism | Post-sprint state of `specs/<spec-id>/dag.yaml` | Blocks next-iteration refiner? |
+|---|---|---|---|
+| **A. Revert-after-merge** (§6.5, Finding 6 session) | `git checkout -- dag.yaml` | File present with all epics `status: pending`; truth in git log | Yes — §7.1 proves it |
+| **B. Reconcile-after-merge** (§6.5, Finding 2.2 session) | Manual `Edit` + chore commit promoting completed statuses | File present with all epics `status: completed`; truth in file | No — gate passes naturally |
+| **C. Delete-after-sprint** (THIS session) | `git rm dag.yaml && git rm -r epics/` | File absent | No — `checkDagStatus` returns null, which is a legal "refined but not yet planned" state |
+
+Convention C has three properties worth naming:
+
+1. **It sidesteps §6.5's friction at the source.** By removing the
+   artifact, there is nothing to read-back inconsistently. Future
+   refiner runs hit `checkDagStatus` returning null, which passes
+   the gate without any manual repair.
+2. **It respects the planner's Iron Law verbatim.** The planner's
+   rule is "DAG is disposable per sprint — rebuild from scratch
+   every time, never archive." Delete-after-sprint is the literal
+   interpretation: once the sprint is done, the DAG no longer exists
+   on disk. The existing "overwrite on next planner run" behavior is
+   a weaker approximation that only achieves disposability at the
+   *start* of the next sprint, not at the *end* of the current one.
+3. **It bookends the iteration symmetrically.** This session deleted
+   stale v1 planner output at the start (`ae12cb0`, required to
+   unblock the refiner per §7.1) and deleted v2 planner output at
+   the end (`c6849bd`, per user directive per §7.3). The iteration
+   is framed as a self-contained arc: design → spec delta → planner
+   output → implementation → delete planner output. What persists
+   on disk is `design.md` (per-iteration history),
+   `spec.xml + details/` (live contract), and git log (completion
+   record) — the three-layer truth the SDD v2 pipeline already
+   relies on elsewhere.
+
+Convention C is not documented in any skill or rule file, and its
+relationship to the existing `arcforge cleanup` command is unclear:
+
+- If `arcforge cleanup`'s scope should expand to cover branch
+  deletion + `git rm` of `dag.yaml` and `epics/`, that is a concrete
+  change to `scripts/lib/coordinator.js` and would formalize
+  Convention C as the single blessed behavior at the CLI layer.
+- If cleanup's scope should stay narrow (worktrees only) and a
+  separate skill (`arc-finishing-sprint`?) or manual chore carries
+  the delete, that is a workflow-documentation change and leaves
+  room for contributors to choose A / B / C per sprint.
+- If the existing `arc-finishing-epic` skill is the right home for
+  Convention C as its last step (parallel to §6.5's option c), that
+  couples sprint-level teardown to per-epic finishing logic, which
+  may or may not be desirable.
+
+This finding does not recommend a path; it merely documents the
+convention's emergence, its mechanical advantages over A and B, and
+the three disposition questions above. The question "where does
+Convention C live as code or documentation?" is the natural follow-up
+to §6.5's architectural options list, not a competitor to it.
+
+### 7.4 Self-reference — v2 Change Intent was driven by v1's own dog-food output
+
+The Change Intent of this iteration originated from the user running
+`/arc-auditing-spec arc-auditing-spec` (the v1 skill shipped in
+Finding 6's session auditing its own spec family) on 2026-04-24
+morning. The dog-food run surfaced two defects — a Phase 3/4 ceremony
+gap at the skill-body level (new behavior, not captured by any v1
+requirement) and a design.md line 32 internal contradiction (MED
+finding from the `internal-consistency` axis). Both defects became
+this session's Change 1 and Change 2 respectively.
+
+Notably, no Phase 3 U3 triage call actually fired during that
+dog-food run. A1 (`cross-artifact-alignment`) and A3
+(`state-transition-integrity`) returned zero findings, and A2's
+single finding was MED — so `N_HIGH == 0`. That is itself the
+scenario exposing the ceremony gap (the v1 skill had no documented
+exit path for `N_HIGH < 2`). The skill's correct behavior on its own
+input revealed its own incompleteness.
+
+Within the iterated spec family, `fr-sc-003-ac3` (new in v2, shipped
+by this session's `update-sc-003` epic, commit `213944a`) locks this
+in: the eval suite now contains at least one scenario per Change-1
+threshold branch (N_HIGH == 0 exit, N_HIGH == 1 emphasis + direct
+Phase 4, <2-resolutions skip), and a pytest test enforces the
+per-branch presence by parsing a coverage-index file
+`skills/arc-auditing-spec/evals/threshold-change1-coverage.md`. If a
+future iteration deletes a scenario covering one of the three
+branches, that test fails. The self-reference is therefore
+closed-loop: the audit skill's ability to audit itself is now
+regression-guarded against the specific gap its own v1 dog-food
+surfaced.
+
+§7.4 is not a contract-gap observation per se; it is recorded here
+because Finding 7's existence is itself a consequence of the SDD v2
+pipeline being able to iterate on a spec whose v1 form audits itself.
+Future contributors reading this report should be aware that the
+arc-auditing-spec spec is both subject and instrument in this
+research corpus from v2 onward.
+
+### 7.5 `arc-finishing-epic` does not exist in the coordinator's actual workflow this session
+
+For completeness: this session did NOT invoke `arc-finishing-epic` at
+any point, despite Finding 6 listing it in its workflow chain. The
+coordinator's `merge` subcommand performed the integrate-commit step
+directly from the base session (no in-worktree `arc-finishing-epic`
+skill run). Cleanup was via `arcforge cleanup` — a separate CLI call
+from the base, not an in-worktree finishing step. This reduces the
+friction surface per epic at the cost of skipping any `arc-finishing-
+epic`-level checks (e.g., eval runs, ship-readiness gates).
+
+Whether that omission is a defect depends on what
+`arc-finishing-epic` is for — if it is a workflow convenience, the
+direct coordinator path is fine; if it is a quality gate, skipping it
+is a silent regression in discipline. The skill's description ("Use
+when epic implementation in a worktree is complete, all tests pass,
+and you need to decide how to integrate") reads as workflow
+convenience, so skipping it is defensible — but the fact that
+Finding 6's workflow chain listed it and this session's did not is
+itself an observation about per-session inconsistency in which
+finishing-level skills get called.
+
+---
+
 ## Proposed Direction (for user decision, not acted upon)
 
 The user has indicated preference for a **linter-style audit skill** (reports inconsistencies; does not autofix). The skill would sit alongside refining/planning, not inside them, and could be called manually or wired into a hook. Details deferred.
@@ -587,3 +864,30 @@ None of the three `feat: integrate <epic> epic` commits (`6b56a9d`,
 `7a4b493`, `528f8b4`) touched `specs/arc-auditing-spec/dag.yaml` —
 the file was left dirty in the working tree after each merge, exactly
 as §2.2 describes and §6.1 re-confirms.
+
+## Appendix E — Key Commits from `arc-auditing-spec` v2 Iteration (2026-04-24 afternoon)
+
+| SHA | Subject | Relevance |
+|---|---|---|
+| `f7f2932` | `docs: add arc-auditing-spec v2 iteration design (2026-04-24-iterate2)` | v2 iteration design doc (Context + Change Intent) |
+| `ae12cb0` | `chore(specs): drop stale arc-auditing-spec planner output (dag.yaml + epics/)` | §7.1 — repair required to unblock the refiner gate after Finding 6's revert-after-merge convention; first half of §7.3's bookend |
+| `7af537b` | `docs: refine spec for arc-auditing-spec (v2, 2026-04-24-iterate2)` | v2 `spec.xml` with `<delta version="2">` appending five `<modified>` refs |
+| `52524f0` | `docs: plan epics and features for arc-auditing-spec (v2 sprint)` | Planner output regenerated for v2 sprint |
+| `1e8a74f` | `feat(skills): fr-oi-001-ac5 single-HIGH visual emphasis in Phase 2 Overview` | update-oi-001 implementation |
+| `b2a71a9` | `feat: integrate update-oi-001 epic` | §7.2(b) — integration commit 1, no `dag.yaml` modification |
+| `3f7b9f6` | `feat(skills): fr-oi-002 Phase 3 conditional firing (N_HIGH threshold branches)` | update-oi-002 implementation |
+| `3569306` | `feat: integrate update-oi-002 epic` | §7.2(b) — integration commit 2, no `dag.yaml` modification |
+| `2ac868f` | `feat(skills): fr-oi-003 Phase 4 per-finding skip rule with sentinel` | update-oi-003 implementation |
+| `68f3289` | `feat: integrate update-oi-003 epic` | §7.2(b) — integration commit 3, no `dag.yaml` modification |
+| `eee7420` | `feat(skills): fr-oi-004 Phase 5 Decisions table conditional rendering` | update-oi-004 implementation |
+| `347a480` | `feat: integrate update-oi-004 epic` | §7.2(b) — integration commit 4, no `dag.yaml` modification |
+| `213944a` | `feat(skills): fr-sc-003-ac3 Change-1 threshold eval coverage` | §7.4 — self-reference lock-in: per-branch eval-suite coverage test for Change-1 threshold behaviours |
+| `058dd78` | `feat: integrate update-sc-003 epic` | §7.2(b) — integration commit 5, no `dag.yaml` modification |
+| `c6849bd` | `chore(specs): drop arc-auditing-spec v2 planner output after sprint completion` | §7.3 — Convention C in action (delete-after-sprint bookend); symmetric to `ae12cb0` |
+
+None of the five `feat: integrate <epic> epic` commits (`b2a71a9`,
+`3569306`, `68f3289`, `347a480`, `058dd78`) touched
+`specs/arc-auditing-spec/dag.yaml` — the file was left dirty after
+each merge in the same pattern §2.2 / §6.1 describe. At sprint end
+the dirty state was resolved by `c6849bd`'s `git rm`, not by the
+§6.5-A revert nor by the §6.5-B reconcile.
