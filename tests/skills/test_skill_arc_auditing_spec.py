@@ -1423,3 +1423,75 @@ def test_threshold_change1_branch_b_full_end_to_end_scenario_exists():
         "(4) Phase 5 Decisions table rendered. "
         "Add a new end-to-end scenario, e.g., threshold-change1-n-high-1-full.md."
     )
+
+
+# ── Reference-file extraction: cite-and-exist contract ───────────────────────
+
+def test_phase1_prompt_reference_is_cited_when_extracted():
+    """If references/phase1-prompt.md exists, SKILL.md must cite it via REQUIRED BACKGROUND."""
+    ref_path = Path("skills/arc-auditing-spec/references/phase1-prompt.md")
+    body = _read(SKILL_PATH)
+    if ref_path.exists():
+        assert "phase1-prompt" in body, (
+            "SKILL.md must cite skills/arc-auditing-spec/references/phase1-prompt.md "
+            "using the REQUIRED BACKGROUND convention — otherwise the reference is dead."
+        )
+        assert "REQUIRED BACKGROUND" in body, (
+            "SKILL.md must use the REQUIRED BACKGROUND convention when citing phase1-prompt.md"
+        )
+
+
+def test_phase1_prompt_reference_carries_template_block():
+    """If extracted, phase1-prompt.md must contain the literal Task-prompt template block."""
+    ref_path = Path("skills/arc-auditing-spec/references/phase1-prompt.md")
+    if not ref_path.exists():
+        return
+    body = ref_path.read_text(encoding="utf-8")
+    lower = body.lower()
+    # The extracted template must carry the fields the axis agents expect
+    assert "spec-id" in lower, "phase1-prompt.md must include spec-id parameter"
+    assert "design.md" in body, "phase1-prompt.md must reference design.md path"
+    assert "spec.xml" in body, "phase1-prompt.md must reference spec.xml path"
+    assert "dag.yaml" in body, "phase1-prompt.md must reference dag.yaml path"
+    assert "absent" in lower, (
+        "phase1-prompt.md must document the absence marker for missing artifacts"
+    )
+
+
+def test_save_flag_reference_is_cited_when_extracted():
+    """If references/save-flag.md exists, SKILL.md must cite it via REQUIRED BACKGROUND."""
+    ref_path = Path("skills/arc-auditing-spec/references/save-flag.md")
+    body = _read(SKILL_PATH)
+    if ref_path.exists():
+        assert "save-flag" in body, (
+            "SKILL.md must cite skills/arc-auditing-spec/references/save-flag.md "
+            "using the REQUIRED BACKGROUND convention — otherwise the reference is dead."
+        )
+        assert "REQUIRED BACKGROUND" in body, (
+            "SKILL.md must use the REQUIRED BACKGROUND convention when citing save-flag.md"
+        )
+
+
+def test_save_flag_reference_carries_hash_invocation():
+    """If extracted, save-flag.md must carry the full node subprocess invocation."""
+    ref_path = Path("skills/arc-auditing-spec/references/save-flag.md")
+    if not ref_path.exists():
+        return
+    body = ref_path.read_text(encoding="utf-8")
+    # The concrete hash one-liner — which SKILL.md summarizes but does not fully reproduce —
+    # must live here so the reader following the REQUIRED BACKGROUND pointer can copy-paste.
+    assert "hashRepoPath" in body, (
+        "save-flag.md must name the hashRepoPath function used to derive <project-hash>"
+    )
+    assert "worktree-paths" in body, (
+        "save-flag.md must cite scripts/lib/worktree-paths.js as the canonical hash source"
+    )
+    assert "node -e" in body or "node(1)" in body or "node --" in body, (
+        "save-flag.md must show the concrete node subprocess invocation (e.g., `node -e ...`)"
+    )
+    assert "mkdir -p" in body, (
+        "save-flag.md must document the `mkdir -p` parent-directory command"
+    )
+    assert "~/.arcforge/reviews/" in body, (
+        "save-flag.md must carry the pinned ~/.arcforge/reviews/ output-path template"
+    )

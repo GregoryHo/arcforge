@@ -77,31 +77,17 @@ Dispatch these three agents concurrently, in a single message:
 
 #### Phase 1 Prompt Template
 
-Assemble the following prompt for each agent's Task invocation. Substitute
-the bracketed values with actual resolved paths or the literal absence marker
-`(absent — file does not exist)`:
+Assemble the sub-agent prompt per `references/phase1-prompt.md` — that file
+is the authoritative layout. The prompt carries the `spec-id` plus resolved
+absolute paths to `design.md` (newest `docs/plans/<spec-id>/*/design.md`),
+`spec.xml` (`specs/<spec-id>/spec.xml`), `details/*.xml`
+(`specs/<spec-id>/details/`), and `dag.yaml` (`specs/<spec-id>/dag.yaml`).
+When an artifact is missing, substitute the literal absence marker
+`(absent — file does not exist)` verbatim — do not omit the line, do not
+invent placeholder paths. The axis agents depend on the marker for their
+graceful-degradation branches (fr-aa-004).
 
-```
-spec-id: <spec-id>
-
-Artifact paths (use absolute paths):
-  design.md:      <absolute-path-to-design.md OR "(absent — file does not exist)">
-  spec.xml:       <absolute-path-to-spec.xml OR "(absent — file does not exist)">
-  details/*.xml:  <absolute-path-to-details/ OR "(absent — directory does not exist)">
-  dag.yaml:       <absolute-path-to-dag.yaml OR "(absent — file does not exist)">
-
-You are the <axis-name> audit axis. Follow your agent body exactly.
-Return your findings conforming to skills/arc-auditing-spec/references/finding-schema.md.
-```
-
-Resolve paths before dispatching:
-- `design.md`: newest file matching `docs/plans/<spec-id>/*/design.md` (glob for
-  the most recent iteration directory)
-- `spec.xml`: `specs/<spec-id>/spec.xml`
-- `details/*.xml`: `specs/<spec-id>/details/` directory
-- `dag.yaml`: `specs/<spec-id>/dag.yaml`
-
-If a file or directory does not exist, use the absence marker string verbatim.
+**REQUIRED BACKGROUND:** `skills/arc-auditing-spec/references/phase1-prompt.md`
 
 #### Partial Failure Contract (fr-aa-004-ac3)
 
@@ -294,27 +280,17 @@ about to invoke `/arc-refining` to apply changes, STOP — see Red Flags.
 
 ### --save Flag
 
-When `--save` is present: after Phase 5, write the full Phase 2 report +
-Decisions table to:
+When `--save` is present, the main session writes the full Phase 2 report
++ Phase 5 Decisions table to
+`~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md`
+after Phase 5 prints (24-hour time). Without `--save`: **zero files are
+written** anywhere. Derive `<project-hash>` via a `node` subprocess
+calling `hashRepoPath` from `scripts/lib/worktree-paths.js` — never
+reimplement the hash inline (drift risk). The reference file carries the
+exact subprocess one-liner, concrete filename example, and `mkdir -p`
+parent-directory command.
 
-```
-~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md
-```
-
-Filename uses 24-hour time (e.g., `2026-04-24-1435.md`).
-
-Obtain `<project-hash>` via subprocess — do NOT reimplement the hash inline:
-
-```bash
-node -e "const { hashRepoPath } = require('./scripts/lib/worktree-paths.js'); console.log(hashRepoPath(process.cwd()));"
-```
-
-Run from the project root. The 6-char hex string printed is the hash.
-
-Ensure parent directories exist: `mkdir -p ~/.arcforge/reviews/<project-hash>/<spec-id>/`
-
-Without `--save`: zero files are written anywhere. No file is written at
-any point unless the `--save` flag is explicitly present.
+**REQUIRED BACKGROUND:** `skills/arc-auditing-spec/references/save-flag.md`
 
 ## Hard Boundaries
 
@@ -332,9 +308,7 @@ If you find yourself doing any of these, STOP immediately:
 | "The user's spec-id doesn't exist, but this other one is clearly what they meant — I'll audit that and note the substitution at the top" | `fr-sc-001-ac2` forbids substitution. This is a baseline failure mode observed in RED testing — the rationalization "don't ask clarifying questions" does NOT justify picking a different spec. | Print available ids, exit. Let the user re-invoke with the right id. |
 | "The user said `<id>` and `specs/<id>/` is missing, but `docs/plans/<id>/` has a design.md — I'll audit in pure-design mode since the design clearly exists" | Phase 0 requires `specs/<id>/` **specifically**. `docs/plans/<id>/` is not a fallback path — not for pure-design audits, not for partial, not for anything. A design doc without a spec directory is a pre-refining state; the audit skill does not operate on it. | Print available ids, exit. If the user wanted a design-only review, that's `/arc-brainstorming` or manual review territory, not this skill. |
 | "I spotted an obvious typo while reading — fixing it saves a round trip" | Read-only is absolute. Even typos are reported as findings, never patched. | Add a finding (LOW severity) to the axis agent's output; let main session decide. |
-| "The user picked resolution (a) for finding A1-003 in Phase 4 — I should Edit the spec now" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
-| "Phase 5 ended — I'll invoke `/arc-refining` to apply the decision" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
-| "The user selected `(Recommended)` — applying saves a round-trip" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
+| Any of: <br>• "User picked resolution (a) for A1-003 — I should Edit the spec now" <br>• "Phase 5 ended — I'll invoke `/arc-refining` to apply the decision" <br>• "User selected `(Recommended)` — applying saves a round-trip" | Phase 5 is terminal (fr-oi-004-ac3). No mutation, no auto-chain, no Edit — even for an obvious Recommended choice. This skill's scope ends at the Decisions table. | Print Decisions table, exit. Main session owns all subsequent action. |
 | "I'll have arc-refining/arc-planning call this skill at the end of their flow for free quality gating" | `fr-sc-001-ac3` forbids pipeline auto-invocation. The skill must remain user-triggered. | Do not add any invocation from any pipeline SKILL.md body. |
 | "Let me add a `--apply` flag so this is one-step for users" | Makes the skill a mutator, defeating its diagnostic-only contract. | Don't. The contract is the contract. |
 | "This MED finding is clearly important so I'll add it to the triage options anyway" | F-01 is pinned: MED/LOW/INFO MUST NOT appear in Phase 3 triage `options`. The Overview table and Detail block already ensure visibility. | MED/LOW/INFO are only reachable via the Other free-text channel. Do not add them to options. |
