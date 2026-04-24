@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="skill-contract">
+  <title>Skill Contract — Invocation, Boundaries, Delegation</title>
+  <consumes>
+    <artifact>specs/&lt;spec-id&gt;/ (target audit spec, identified by the skill argument)</artifact>
+  </consumes>
+  <produces>
+    <artifact>Main-session terminal output (report markdown + AskUserQuestion flows + Decisions table)</artifact>
+    <artifact>~/.arcforge/reviews/&lt;project-hash&gt;/&lt;spec-id&gt;/&lt;YYYY-MM-DD-HHMM&gt;.md (only when --save flag is present)</artifact>
+  </produces>
+
+  <requirement id="fr-sc-001">
+    <title>User-invoked skill with spec-id argument</title>
+    <description>
+      The skill MUST be invocable via `/arc-auditing-spec &lt;spec-id&gt;` and MUST
+      fail cleanly when the target spec-id does not exist under `specs/`. No
+      pipeline stage — brainstorming, refining, or planning — may be modified
+      to auto-invoke this skill.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sc-001-ac1">
+        Given a user runs `/arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` exists,
+        When the skill starts,
+        Then it MUST proceed to Phase 1 (fan-out) without error and without
+        writing any file to disk at this point.
+        <trace>design.md §Requirements Part 1 — Invocation</trace>
+      </criterion>
+      <criterion id="fr-sc-001-ac2">
+        Given a user runs `/arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` does NOT
+        exist,
+        When the skill starts,
+        Then it MUST fail with a terminal message that lists the currently
+        available spec-ids under `specs/`, MUST NOT spawn any sub-agent, and
+        MUST NOT write any file.
+        <trace>design.md §Requirements Part 1 — Invocation</trace>
+      </criterion>
+      <criterion id="fr-sc-001-ac3">
+        Given the arc-auditing-spec skill is installed,
+        When arc-brainstorming, arc-refining, or arc-planning completes its
+        Stage Completion,
+        Then none of those skills' bodies MUST contain a direct or indirect
+        invocation of `/arc-auditing-spec`. The only trigger path is the user
+        typing the command.
+        <trace>design.md §Scope — Out of scope (Pipeline auto-invocation)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sc-002">
+    <title>Hard read-only boundaries enforced via tool grants</title>
+    <description>
+      The skill body and all three sub-agents MUST NOT modify any file or
+      execute any mutating git or filesystem action. Enforcement MUST be via
+      restricted tool grants in the agent definitions themselves, not via prose
+      instructions inside system prompts.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sc-002-ac1">
+        Given any invocation of the skill,
+        When the skill body and its sub-agents execute,
+        Then they MUST NOT modify any file under `specs/`, `docs/`, `scripts/`,
+        `skills/`, `agents/`, `hooks/`, or `templates/`.
+        <trace>design.md §Requirements Part 2 — Hard boundaries</trace>
+      </criterion>
+      <criterion id="fr-sc-002-ac2">
+        Given any invocation of the skill,
+        When the sub-agents execute,
+        Then they MUST NOT perform git commit, git branch creation, git
+        worktree creation, or any file-delete operation.
+        <trace>design.md §Requirements Part 2 — Hard boundaries</trace>
+      </criterion>
+      <criterion id="fr-sc-002-ac3">
+        Given each sub-agent definition file,
+        When its tool allowlist is inspected,
+        Then the allowlist MUST include only read tools (Read / Grep / Glob)
+        and MUST NOT include Edit, Write, or any state-mutating tool — such
+        that the read-only constraint is enforced by the tool grant rather than
+        relying on prompt instructions.
+        <trace>design.md §Requirements Part 2 — Hard boundaries</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sc-003">
+    <title>Implementation produced via arc-writing-skills</title>
+    <description>
+      The SKILL.md body (its phase content), the three sub-agent system
+      prompts, and eval scenarios validating audit correctness MUST all be
+      produced through arc-writing-skills' TDD + eval-driven flow during
+      implementation. This spec specifies observable behavior and interface
+      contracts only, not the literal markdown content of those artifacts.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sc-003-ac1">
+        Given this spec reaches the implementation epic,
+        When deliverable markdown files (SKILL.md, agent files, eval
+        scenarios) are produced,
+        Then they MUST go through arc-writing-skills' RED / GREEN / REFACTOR
+        cycle with recorded baseline (without-skill) and validated (with-skill)
+        behaviors.
+        <trace>design.md §Architecture — Implementation delegation</trace>
+      </criterion>
+      <criterion id="fr-sc-003-ac2">
+        Given the skill is ready to ship,
+        When the eval suite is inspected,
+        Then it MUST contain at least one eval scenario exercising each of the
+        three audit axes (cross-artifact-alignment, internal-consistency,
+        state-transition-integrity).
+        <trace>design.md §Architecture — Implementation delegation</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
