@@ -1278,3 +1278,148 @@ def test_eval_scenario_decisions_table_suppressed_exists():
         "but this test specifically validates the Phase 5 suppression condition. "
         "Expected in oi-004-decisions-table-suppressed.md or similar."
     )
+
+
+# ── sc-003-ac3: Change-1 threshold branch eval coverage index ────────────────
+
+COVERAGE_INDEX_PATH = Path("skills/arc-auditing-spec/evals/threshold-change1-coverage.md")
+
+
+def test_threshold_change1_coverage_index_exists():
+    """fr-sc-003-ac3: the coverage index document must exist."""
+    assert COVERAGE_INDEX_PATH.exists(), (
+        f"{COVERAGE_INDEX_PATH} must exist — it is the human-readable audit trail "
+        "for fr-sc-003-ac3 Change-1 threshold branch eval coverage."
+    )
+
+
+def test_threshold_change1_branch_a_n_high_0_covered():
+    """fr-sc-003-ac3 (a): coverage index must cite at least one scenario for the N_HIGH == 0 exit path."""
+    assert COVERAGE_INDEX_PATH.exists(), f"{COVERAGE_INDEX_PATH} must exist"
+    content = COVERAGE_INDEX_PATH.read_text(encoding="utf-8")
+    lower = content.lower()
+    # Must document branch (a) by name or by the N_HIGH == 0 condition
+    assert (
+        "branch (a)" in lower
+        or "n_high == 0" in lower
+        or "(a)" in lower
+    ), (
+        "threshold-change1-coverage.md must cite branch (a) — N_HIGH == 0 exit path"
+    )
+    # Must cite at least one scenario file covering this branch
+    assert (
+        "oi-002" in content
+        or "oi-004" in content
+        or "n-high-0" in content
+        or "n_high_0" in content
+        or "threshold-n-high-zero" in content
+    ), (
+        "threshold-change1-coverage.md must cite a scenario file covering branch (a) N_HIGH == 0"
+    )
+
+
+def test_threshold_change1_branch_b_n_high_1_covered():
+    """fr-sc-003-ac3 (b): coverage index must cite at least one scenario for the full N_HIGH == 1 path
+    (emphasis + no Phase 3 + direct Phase 4 entry + Phase 5 rendering).
+    """
+    assert COVERAGE_INDEX_PATH.exists(), f"{COVERAGE_INDEX_PATH} must exist"
+    content = COVERAGE_INDEX_PATH.read_text(encoding="utf-8")
+    lower = content.lower()
+    # Must document branch (b) by name or by the N_HIGH == 1 condition
+    assert (
+        "branch (b)" in lower
+        or "n_high == 1" in lower
+        or "(b)" in lower
+    ), (
+        "threshold-change1-coverage.md must cite branch (b) — N_HIGH == 1 full path"
+    )
+    # Must cite a scenario covering branch (b) — either an existing one or a new end-to-end one
+    assert (
+        "oi-001" in content
+        or "oi-004" in content
+        or "n-high-1" in content
+        or "n_high_1" in content
+        or "threshold-n-high-one" in content
+        or "threshold-change1-n-high-1" in content
+    ), (
+        "threshold-change1-coverage.md must cite a scenario file covering branch (b) N_HIGH == 1"
+    )
+
+
+def test_threshold_change1_branch_c_lt2_resolutions_covered():
+    """fr-sc-003-ac3 (c): coverage index must cite at least one scenario for the
+    <2-resolutions Phase 4 skip with sentinel Decisions-table row.
+    """
+    assert COVERAGE_INDEX_PATH.exists(), f"{COVERAGE_INDEX_PATH} must exist"
+    content = COVERAGE_INDEX_PATH.read_text(encoding="utf-8")
+    lower = content.lower()
+    # Must document branch (c) by name or by the <2-resolutions condition
+    assert (
+        "branch (c)" in lower
+        or "< 2" in content
+        or "fewer than 2" in lower
+        or "(c)" in lower
+    ), (
+        "threshold-change1-coverage.md must cite branch (c) — <2-resolutions Phase 4 skip"
+    )
+    # Must cite a scenario file covering this branch
+    assert (
+        "oi-003" in content
+        or "low-resolutions" in content
+        or "lt-2" in content
+        or "threshold-low-resolutions" in content
+    ), (
+        "threshold-change1-coverage.md must cite a scenario file covering branch (c) <2 resolutions"
+    )
+
+
+def test_threshold_change1_branch_b_full_end_to_end_scenario_exists():
+    """fr-sc-003-ac3 (b) end-to-end: at least one scenario must tie together ALL four
+    behaviors for the N_HIGH == 1 path:
+    (1) ⚠️ + bold emphasis in Overview row,
+    (2) no Phase 3 multi-select,
+    (3) direct Phase 4 entry for the lone HIGH (when ≥2 resolutions),
+    (4) Phase 5 Decisions table rendered.
+    """
+    evals_dir = Path("skills/arc-auditing-spec/evals")
+    all_eval_files = list(evals_dir.glob("*.md"))
+    found = False
+    for f in all_eval_files:
+        content = f.read_text(encoding="utf-8")
+        lower = content.lower()
+        has_emphasis = "⚠️" in content and ("bold" in lower or "**" in content)
+        has_no_phase3 = (
+            "no phase 3" in lower
+            or "phase 3" in lower and "not fire" in lower
+            or "phase 3" in lower and "skip" in lower
+            or "no multiselect" in lower
+            or "does not fire" in lower
+            or "phase 3 multi-select" in lower
+        )
+        has_phase4_direct = (
+            "phase 4" in lower
+            and (
+                "directly" in lower
+                or "direct" in lower
+                or "enters" in lower
+                or "enters phase 4" in lower
+                or "entered directly" in lower
+                or "sole" in lower
+            )
+        )
+        has_phase5 = (
+            "decisions" in lower
+            and ("phase 5" in lower or "rendered" in lower or "table" in lower)
+        )
+        if has_emphasis and has_no_phase3 and has_phase4_direct and has_phase5:
+            found = True
+            break
+    assert found, (
+        "No eval scenario in skills/arc-auditing-spec/evals/ ties together ALL four "
+        "behaviors of the N_HIGH == 1 path for fr-sc-003-ac3 (b): "
+        "(1) ⚠️ + bold emphasis in Overview, "
+        "(2) no Phase 3 multi-select, "
+        "(3) direct Phase 4 entry for the lone HIGH with ≥2 resolutions, "
+        "(4) Phase 5 Decisions table rendered. "
+        "Add a new end-to-end scenario, e.g., threshold-change1-n-high-1-full.md."
+    )
