@@ -1,0 +1,67 @@
+epics:
+  - id: update-oi-001
+    name: "Update fr-oi-001 — single-HIGH visual emphasis in Phase 2 Overview"
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/update-oi-001/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: oi-001-emphasis
+        name: "Implement ⚠️ prefix + bold Title for single-HIGH Overview row"
+        status: pending
+        source_requirement: fr-oi-001
+        depends_on: []
+
+  - id: update-oi-002
+    name: "Update fr-oi-002 — Phase 3 conditional firing (N_HIGH >= 2)"
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/update-oi-002/epic.md
+    worktree: null
+    depends_on: [update-oi-001]
+    features:
+      - id: oi-002-threshold
+        name: "Implement Phase 3 threshold branches: zero-HIGH exit, one-HIGH direct-to-Phase-4"
+        status: pending
+        source_requirement: fr-oi-002
+        depends_on: []
+
+  - id: update-oi-003
+    name: "Update fr-oi-003 — Phase 4 per-finding skip rule (< 2 resolutions)"
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/update-oi-003/epic.md
+    worktree: null
+    depends_on: [update-oi-002]
+    features:
+      - id: oi-003-skip
+        name: "Implement Phase 4 auto-skip with '(no ceremony — see Detail)' sentinel"
+        status: pending
+        source_requirement: fr-oi-003
+        depends_on: []
+
+  - id: update-oi-004
+    name: "Update fr-oi-004 — Decisions table conditional rendering"
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/update-oi-004/epic.md
+    worktree: null
+    depends_on: [update-oi-003]
+    features:
+      - id: oi-004-conditional
+        name: "Implement Decisions table suppression when both Phase 3 and Phase 4 skipped"
+        status: pending
+        source_requirement: fr-oi-004
+        depends_on: []
+
+  - id: update-sc-003
+    name: "Update fr-sc-003 — eval scenarios for Change-1 threshold branches"
+    status: pending
+    spec_path: specs/arc-auditing-spec/epics/update-sc-003/epic.md
+    worktree: null
+    depends_on: [update-oi-001, update-oi-002, update-oi-003, update-oi-004]
+    features:
+      - id: sc-003-eval-coverage
+        name: "Add eval scenarios: N_HIGH==0 exit, N_HIGH==1 emphasis+direct-Phase-4, <2-resolutions skip"
+        status: pending
+        source_requirement: fr-sc-003
+        depends_on: []
+
+blocked: []
