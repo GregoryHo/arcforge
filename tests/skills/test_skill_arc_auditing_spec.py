@@ -741,6 +741,11 @@ def test_save_flag_reuses_worktree_paths_module():
     assert "node" in body.lower() or "require" in body.lower(), (
         "SKILL.md must show a concrete node one-liner or require call to obtain the hash"
     )
+    assert "hashRepoPath" in body, (
+        "SKILL.md --save directive must name the hashRepoPath function "
+        "exported by scripts/lib/worktree-paths.js — not just the module path — "
+        "so silent renames in the module are caught."
+    )
 
 
 def test_report_templates_file_exists_when_cited():

@@ -206,6 +206,11 @@ AskUserQuestion:
         <diff content here when resolution modifies an editable artifact>
     - label: "<alternate resolution>"
       description: "<what this resolution does>"
+      preview: |
+        <diff content here when resolution modifies an editable artifact>
+    - label: "File engine bug"
+      description: "Record as engine-side fix in a separate spec; no artifact edit here"
+      # no preview field — engine-fix resolutions MAY omit preview per fr-oi-003-ac3
 ```
 
 Rules:
