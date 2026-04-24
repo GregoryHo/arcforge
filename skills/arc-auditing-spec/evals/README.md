@@ -18,7 +18,7 @@ Evaluation scenarios validating the `/arc-auditing-spec` skill. Organized by the
 | `sc-001-invocation-contract.md` | fr-sc-001-ac1, fr-sc-001-ac2 | Invocation fail-closed, no substitution | Behavioral — manual review |
 | `sc-001-no-pipeline-invocation.sh` | fr-sc-001-ac3 | No pipeline auto-invocation | Harness-executable (shell grep) |
 | `sc-002-read-only-behavior.md` | fr-sc-002-ac1, fr-sc-002-ac2 | Read-only under edit pressure | Behavioral — manual review |
-| `sc-002-tool-grant-structural.sh` | fr-sc-002-ac3 | Agent frontmatter tool allowlist | Harness-executable (shell/YAML parse); also in pytest (M-2/M-3) |
+| `tests/skills/test_skill_arc_auditing_spec.py::test_agent_read_only_tool_grant` | fr-sc-002-ac3 | Agent frontmatter tool allowlist | Harness-executable (pytest / yaml.safe_load — canonical) |
 
 Structural checks are also codified in `tests/skills/test_skill_arc_auditing_spec.py` and run under `npm run test:skills`.
 

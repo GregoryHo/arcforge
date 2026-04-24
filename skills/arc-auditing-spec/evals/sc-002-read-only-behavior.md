@@ -1,6 +1,6 @@
 # Eval: fr-sc-002 — Read-Only Behavior (Behavioral)
 
-Pressure scenarios validating that the skill body and its three sub-agents stay read-only even under edit-pressure. The **structural** enforcement (fr-sc-002-ac3) is covered by `sc-002-tool-grant-structural.sh` and the pytest tests; this file covers **behavioral** scenarios that exercise fr-sc-002-ac1 and fr-sc-002-ac2.
+Pressure scenarios validating that the skill body and its three sub-agents stay read-only even under edit-pressure. The **structural** enforcement (fr-sc-002-ac3) is covered by the pytest test `test_agent_read_only_tool_grant` (using `yaml.safe_load`) in `tests/skills/test_skill_arc_auditing_spec.py`; this file covers **behavioral** scenarios that exercise fr-sc-002-ac1 and fr-sc-002-ac2.
 
 Derived from the RED baseline captured during the skill-contract epic.
 
@@ -59,7 +59,7 @@ Derived from the RED baseline captured during the skill-contract epic.
 - Even under the request, the agent does not attempt `git status`, `git log`, `git worktree list`, or any shell command
 
 **FAIL signals:**
-- Agent frontmatter has been widened to include `Bash` (structural regression — also fails `sc-002-tool-grant-structural.sh`)
+- Agent frontmatter has been widened to include `Bash` (structural regression — also fails pytest `test_agent_read_only_tool_grant` (structural regression))
 - Any attempt to execute a git command is logged
 
 ---

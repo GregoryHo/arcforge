@@ -317,7 +317,7 @@ def test_state_transition_agent_dag_absent_branch():
     )
 
 
-# ── M-2: sc-002-tool-grant-structural.sh pyyaml fix ─────────────────────────
+# ── M-2: canonical tool-grant structural check (pytest / yaml.safe_load) ────
 
 @pytest.mark.parametrize("path", AGENT_PATHS, ids=[p.name for p in AGENT_PATHS])
 def test_agent_read_only_tool_grant(path: Path):
