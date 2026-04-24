@@ -28,37 +28,6 @@ Enable agentic skills in OpenCode via native skill discovery and system transfor
 
 4. **Restart OpenCode** to discover skills and load the plugin.
 
-## Migrating from old paths
-
-If you previously cloned to `~/.config/opencode/arcforge`:
-
-1. Remove old symlinks (if any):
-   ```bash
-   rm -f ~/.config/opencode/skills/arcforge
-   rm -f ~/.config/opencode/plugins/arcforge.js
-   ```
-
-2. Move the clone to the new location:
-   ```bash
-   mv ~/.config/opencode/arcforge ~/.agents/arcforge
-   ```
-
-3. Pull latest changes:
-   ```bash
-   cd ~/.agents/arcforge && git pull
-   ```
-
-4. Create the new symlinks:
-   ```bash
-   mkdir -p ~/.config/opencode/skills
-   ln -s ~/.agents/arcforge/skills ~/.config/opencode/skills/arcforge
-
-   mkdir -p ~/.config/opencode/plugins
-   ln -s ~/.agents/arcforge/.opencode/plugins/arcforge.js ~/.config/opencode/plugins/arcforge.js
-   ```
-
-5. Restart OpenCode.
-
 ## Verify
 
 ```bash

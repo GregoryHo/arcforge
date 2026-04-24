@@ -127,6 +127,6 @@ done
 
 ### Skills not found
 
-1. Verify symlinks: `ls -la ~/.gemini/skills/arc-*` (should show 24 symlinks)
+1. Verify symlinks: `ls -la ~/.gemini/skills/arc-*` (should show one symlink per skill)
 2. Verify a skill resolves: `ls ~/.gemini/skills/arc-using/SKILL.md`
 3. Restart Gemini CLI to trigger skill discovery
