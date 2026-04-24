@@ -53,11 +53,17 @@ Ship gate (fr-sc-003-ac2): all three axis evals MUST exist and at least one scen
 
 ---
 
-## To be added in `output-and-interaction` epic
+## Landed in `update-oi-001` epic (fr-oi-001-ac5)
+
+| File | Covers | ACs | Shape |
+|---|---|---|---|
+| `oi-001-emphasis-single-high.md` | fr-oi-001-ac5 | Single-HIGH ⚠️ emphasis in Phase 2 Overview; N_HIGH == 0 and N_HIGH >= 2 baseline non-emphasis | Harness-executable (⚠️ prefix check) + Behavioral (detail-block no-bleed, Phase 3 firing) |
+
+## To be added in future `output-and-interaction` epics
 
 | File | Covers | Shape |
 |---|---|---|
-| `report-rendering.md` | fr-oi-001 | Harness-executable (table layout conformance) |
+| `report-rendering.md` | fr-oi-001 (full layout conformance) | Harness-executable (table layout conformance) |
 | `triage-ux.md` | fr-oi-002 | Behavioral — AskUserQuestion multi-select + Other pull-in |
 | `resolution-ux.md` | fr-oi-003 | Behavioral — AskUserQuestion per-finding + preview diffs |
 | `decisions-and-save.md` | fr-oi-004, fr-oi-005 | Harness-executable (Decisions table format) + Behavioral (--save path) |

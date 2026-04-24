@@ -134,6 +134,14 @@ its counts with `ERR` and note the error below the table.
 Every finding from all three axes MUST appear — MED, LOW, and INFO findings
 appear in this table exactly as HIGH findings do. No omissions.
 
+When exactly one HIGH-severity finding exists across the full finding set
+(N_HIGH == 1), the Title cell for that single-HIGH row MUST start with `⚠️`
+and MUST render the title text in markdown bold: `⚠️ **<title>**`. This visual
+emphasis ensures the lone HIGH is conspicuous even when Phase 3 triage does not
+fire. When N_HIGH is 0 or >= 2, render all Overview rows without the `⚠️`
+prefix (baseline rendering). The `⚠️` prefix MUST NOT appear in the
+per-finding Detail block header — the emphasis is Overview-row-only.
+
 **Section C — Per-finding Detail blocks**. One block per finding, same order
 as the Overview. Each block contains:
 - Observed evidence as a markdown table (`location | evidence`).

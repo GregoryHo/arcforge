@@ -31,6 +31,9 @@ Print immediately after the Summary table. Every finding from all three
 axes MUST appear — no omissions regardless of severity (HIGH, MED, LOW,
 INFO all appear).
 
+**Baseline rendering (N_HIGH == 0 or N_HIGH >= 2):** all rows render with
+plain Title text — no emphasis prefix.
+
 ```markdown
 ## Findings Overview
 
@@ -45,6 +48,24 @@ INFO all appear).
 | A3-001 | HIGH | state-transition-integrity | Worktree dir present but epic status=pending| .arcforge-epic           |
 | A3-002 | INFO | state-transition-integrity | DAG not yet planned — state integrity N/A   | (none)                   |
 ```
+
+**Single-HIGH rendering (N_HIGH == 1):** when exactly one HIGH-severity
+finding exists across the full finding set, its Title cell MUST start with
+`⚠️` and the title text MUST be wrapped in markdown bold. Example:
+
+```markdown
+## Findings Overview
+
+| ID     | Sev  | Axis                       | Title                                                         | Primary file             |
+|--------|------|----------------------------|---------------------------------------------------------------|--------------------------|
+| A2-001 | HIGH | internal-consistency       | ⚠️ **Design doc contradicts spec on Phase 2 output format**   | docs/plans/my-spec/...   |
+| A2-002 | MED  | internal-consistency       | Dangling depends_on reference in dag.yaml                     | specs/my-spec/dag.yaml   |
+| A3-001 | INFO | state-transition-integrity | DAG not yet planned — state integrity N/A                     | (none)                   |
+```
+
+The `⚠️` prefix and bold Title apply ONLY to the Overview row. The Detail
+block header for that same finding renders WITHOUT the emphasis (plain
+`### A2-001 — HIGH — Design doc contradicts spec on Phase 2 output format`).
 
 ---
 

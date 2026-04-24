@@ -516,6 +516,72 @@ def test_phase2_references_report_templates_if_extracted():
         )
 
 
+def test_phase2_single_high_overview_row_emphasis_in_skill():
+    """fr-oi-001-ac5: SKILL.md Phase 2 must document ⚠️ + bold Title emphasis for N_HIGH == 1."""
+    body = _read(SKILL_PATH)
+    # Must describe the visual emphasis rule
+    assert "⚠️" in body, (
+        "SKILL.md Phase 2 must mention ⚠️ as the emphasis prefix for a single-HIGH Overview row"
+    )
+    # Must state the condition: exactly one HIGH
+    lower = body.lower()
+    assert "exactly one high" in lower or "n_high == 1" in lower or "n_high=1" in lower or "single high" in lower or "single-high" in lower or "one high" in lower, (
+        "SKILL.md must state the N_HIGH == 1 trigger for the visual emphasis rule"
+    )
+    # Must require bold — **<title>** format
+    assert "**" in body, (
+        "SKILL.md must show markdown bold (**...**) for the single-HIGH Title emphasis"
+    )
+
+
+def test_phase2_single_high_overview_row_emphasis_in_templates():
+    """fr-oi-001-ac5: report-templates.md must show ⚠️ + bold Title for single-HIGH Overview row."""
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    # Must show the literal emphasis format: ⚠️ **<title>**
+    assert "⚠️" in body, (
+        "report-templates.md must include ⚠️ prefix in Overview row example for single-HIGH case"
+    )
+    assert "**" in body, (
+        "report-templates.md must show markdown bold (**...**) in Overview row for single-HIGH case"
+    )
+    # Must annotate when this emphasis applies vs. baseline (N_HIGH == 1 only)
+    lower = body.lower()
+    assert "n_high" in lower or "single high" in lower or "single-high" in lower or "exactly one high" in lower or "one high" in lower or "n_high == 1" in lower, (
+        "report-templates.md must annotate the single-HIGH condition for the emphasis format"
+    )
+
+
+def test_phase2_single_high_emphasis_not_in_detail_block():
+    """fr-oi-001-ac5: The ⚠️ emphasis must NOT appear in the per-finding Detail block header."""
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    # Detail block headings follow the pattern '### <ID> — <Sev> — <Title>'
+    # None of these heading lines should contain ⚠️
+    detail_header_lines = [
+        line for line in body.splitlines()
+        if line.startswith("### ") and "—" in line
+    ]
+    for line in detail_header_lines:
+        assert "⚠️" not in line, (
+            f"Detail block header must NOT contain ⚠️ (emphasis is Overview-row-only): {line!r}"
+        )
+
+
+def test_phase2_baseline_overview_row_no_emphasis_for_zero_or_multi_high():
+    """fr-oi-001-ac5 baseline: N_HIGH == 0 and N_HIGH >= 2 Overview rows render without ⚠️."""
+    templates_path = Path("skills/arc-auditing-spec/references/report-templates.md")
+    assert templates_path.exists(), "report-templates.md must exist"
+    body = _read(templates_path)
+    # The template must document that baseline rows (non-single-HIGH) render without ⚠️
+    lower = body.lower()
+    assert "n_high == 0" in lower or "zero high" in lower or "n_high = 0" in lower or "baseline" in lower or "n_high >= 2" in lower or "two or more" in lower or "multiple high" in lower or "without emphasis" in lower, (
+        "report-templates.md must document that N_HIGH == 0 or N_HIGH >= 2 renders Overview rows without ⚠️ emphasis"
+    )
+
+
 # ── oi-002: Phase 3 Triage UX ────────────────────────────────────────────────
 
 def test_phase3_multiselect_true_and_triage_header():
