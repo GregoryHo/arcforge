@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="coordinator-commits">
+  <title>Coordinator Commit-Integration and Cleanup Scope</title>
+  <consumes>
+    <artifact>scripts/lib/coordinator.js (specifically _mergeEpicsInBase at coordinator.js:426-493 and cleanupWorktrees at coordinator.js:501-538)</artifact>
+    <artifact>scripts/lib/models.js (TaskStatus enum and dag epic schema)</artifact>
+  </consumes>
+  <produces>
+    <artifact>Modified scripts/lib/coordinator.js with dag.yaml staging inside _mergeEpicsInBase and pure-disk cleanup</artifact>
+    <artifact>Modified scripts/cli.js with --epic flag on the cleanup subcommand</artifact>
+  </produces>
+
+  <requirement id="fr-cc-001">
+    <title>Integrate commit carries dag.yaml state transition</title>
+    <description>
+      The coordinator's _mergeEpicsInBase MUST bundle dag.yaml state changes
+      into the integrate commit it produces. Both epic.status = COMPLETED and
+      epic.worktree = null MUST be mutated in the same in-memory save, and
+      specs/&lt;spec-id&gt;/dag.yaml MUST be staged with git add before the
+      integrate commit is created. This closes the §2.2 / §6.1 defect where
+      dag.yaml writes persisted as dirty working-tree state across sessions.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-001-ac1">
+        Given a spec with one or more epics in status=completed awaiting merge,
+        When arcforge merge runs and _mergeEpicsInBase processes an epic,
+        Then the in-memory dag mutation MUST set both epic.status = COMPLETED
+        and epic.worktree = null in the same save operation.
+        <trace>design.md §Proposed Solution — Layer 1 (Q1=c resolution)</trace>
+      </criterion>
+      <criterion id="fr-cc-001-ac2">
+        Given _mergeEpicsInBase has produced the mutated dag.yaml on disk,
+        When the integrate commit is created,
+        Then git add specs/&lt;spec-id&gt;/dag.yaml MUST be invoked before the
+        commit so that git log -1 --name-only on the integrate commit
+        includes specs/&lt;spec-id&gt;/dag.yaml.
+        <trace>design.md §Identifiable Requirements R1.1</trace>
+      </criterion>
+      <criterion id="fr-cc-001-ac3">
+        Given an integrate commit produced by _mergeEpicsInBase,
+        When its message is inspected,
+        Then the subject MUST remain feat: integrate &lt;epic&gt; epic (no
+        separate chore commit for the dag.yaml update), and the commit MUST
+        include both the files merged from the epic branch and the dag.yaml
+        state change as a single logical unit.
+        <trace>design.md §Proposed Solution — Layer 1</trace>
+      </criterion>
+      <criterion id="fr-cc-001-ac4">
+        Given arcforge merge completes successfully for an epic,
+        When git status is read immediately after,
+        Then specs/&lt;spec-id&gt;/dag.yaml MUST NOT appear in the working-tree
+        diff (no M flag), confirming that the coordinator has left no
+        uncommitted drift behind.
+        <trace>design.md §Problem — §2.2 / §6.1 resolution</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-002">
+    <title>cleanup is a pure disk-and-branch operation</title>
+    <description>
+      arcforge cleanup MUST NOT mutate specs/&lt;spec-id&gt;/dag.yaml under any
+      code path. With fr-cc-001 transferring worktree=null into the merge
+      commit, cleanup's only responsibilities are filesystem removal, git
+      worktree prune, and local branch deletion for fully-merged branches.
+      This removes the drift window that previously existed between cleanup
+      and any subsequent user action.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-002-ac1">
+        Given cleanup is invoked for one or more completed epics,
+        When the operation returns,
+        Then specs/&lt;spec-id&gt;/dag.yaml MUST be byte-identical to its state
+        before the cleanup invocation (no write, no git add, no diff in git
+        status).
+        <trace>design.md §Proposed Solution — Layer 1 (cleanup purified)</trace>
+      </criterion>
+      <criterion id="fr-cc-002-ac2">
+        Given cleanup processes an epic whose worktree directory exists on
+        disk,
+        When cleanup runs,
+        Then it MUST remove the worktree directory via fs.rmSync AND invoke
+        git worktree prune so the git worktree registry no longer references
+        the removed path.
+        <trace>design.md §Problem — §7.2 cleanup scope</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-003">
+    <title>cleanup deletes fully-merged epic branches</title>
+    <description>
+      arcforge cleanup MUST extend its scope to local branch deletion. For
+      every epic it processes, cleanup MUST attempt git branch -d
+      &lt;epic-branch&gt; and MUST succeed silently when the branch is
+      fully-merged to the current branch, MUST skip silently when the branch
+      is not fully-merged (no -D force-delete), and MUST surface per-branch
+      results in the command output.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-003-ac1">
+        Given an epic whose branch has been fully merged into the current
+        branch,
+        When cleanup processes that epic,
+        Then the branch MUST be removed via git branch -d and the branch
+        name MUST appear in the cleanup JSON result under a removed-branches
+        listing.
+        <trace>design.md §Identifiable Requirements R1.2</trace>
+      </criterion>
+      <criterion id="fr-cc-003-ac2">
+        Given an epic whose branch has uncommitted changes or is not merged
+        into the current branch,
+        When cleanup processes that epic,
+        Then the branch MUST be left intact (no git branch -D, no force),
+        MUST NOT cause the overall cleanup invocation to fail, and MUST be
+        surfaced in the cleanup JSON result under a skipped-branches listing.
+        <trace>design.md §Problem — §7.2(a) branch cleanup gap</trace>
+      </criterion>
+      <criterion id="fr-cc-003-ac3">
+        Given a cleanup invocation that removes N worktrees,
+        When the cleanup command completes,
+        Then the JSON output MUST list the worktrees removed and, as a
+        separate field, the branches removed versus skipped, so that
+        downstream automation can distinguish the two outcomes.
+        <trace>design.md §Proposed Solution — Layer 1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-004">
+    <title>cleanup CLI exposes --epic flag consistent with expand and loop</title>
+    <description>
+      The CLI surface for cleanup MUST accept a --epic &lt;name&gt; flag to
+      select a single epic, aligning with expand --epic and loop --epic. The
+      existing positional [epic_ids...] form MUST remain functional as an
+      alias. Skills SHOULD use the flag form going forward; positional form
+      is retained solely for backward compatibility with existing
+      invocations.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-004-ac1">
+        Given a user or skill invokes arcforge cleanup --spec-id &lt;id&gt; --epic
+        &lt;name&gt;,
+        When the command parses arguments,
+        Then it MUST target only the named epic within the given spec and
+        MUST produce the same result shape as an equivalent positional
+        invocation arcforge cleanup --spec-id &lt;id&gt; &lt;name&gt;.
+        <trace>design.md §Identifiable Requirements R1.2 (Q3=a)</trace>
+      </criterion>
+      <criterion id="fr-cc-004-ac2">
+        Given the arcforge CLI help output,
+        When scripts/cli.js is invoked with --help or its usage banner
+        printed,
+        Then the cleanup usage line MUST list both the positional
+        [epic_ids...] form and the --epic &lt;name&gt; flag form.
+        <trace>design.md §Proposed Solution — Layer 1</trace>
+      </criterion>
+      <criterion id="fr-cc-004-ac3">
+        Given arcforge cleanup is invoked with both positional epic ids and
+        the --epic flag,
+        When the CLI parses arguments,
+        Then it MUST error with a clear message that the two forms are
+        mutually exclusive, rather than silently preferring one over the
+        other.
+        <trace>design.md §Proposed Solution — Layer 1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

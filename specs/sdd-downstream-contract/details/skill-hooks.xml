@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="skill-hooks">
+  <title>Skill-Level Hooks into arcforge finish</title>
+  <consumes>
+    <artifact>skills/arc-finishing-epic/SKILL.md (Step 4 Option 1 merge locally path)</artifact>
+    <artifact>skills/arc-dispatching-teammates/SKILL.md and references/wrap-up-sequence.md (Step 8 wrap-up)</artifact>
+    <artifact>skills/arc-coordinating/SKILL.md (command table)</artifact>
+    <artifact>evals/scenarios/ (new scenarios covering each skill hook)</artifact>
+  </consumes>
+  <produces>
+    <artifact>Modified SKILL.md files with finish --if-last calls at the correct step</artifact>
+    <artifact>New eval scenarios for sdd-downstream-contract skill hooks (naming: evals/scenarios/sdd-downstream-contract-*.md)</artifact>
+    <artifact>Updated Red Flags / Common Rationalizations tables that close skip-finish loopholes</artifact>
+  </produces>
+
+  <requirement id="fr-sh-001">
+    <title>arc-finishing-epic Step 4 Option 1 calls finish --if-last</title>
+    <description>
+      skills/arc-finishing-epic/SKILL.md Step 4 Option 1 (merge locally)
+      MUST be updated so that after the cleanup call on line 103 it invokes
+      arcforge finish --spec-id &lt;spec-id&gt; --if-last. This is the single
+      hook that makes Convention C automatic for the most common
+      per-epic-terminus path (arc-implementing, arc-agent-driven, arc-
+      looping, arc-dispatching-parallel all route through here).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-001-ac1">
+        Given skills/arc-finishing-epic/SKILL.md after implementation,
+        When Step 4 Option 1 (Merge Locally) is read top-to-bottom,
+        Then immediately after the finish-epic.js cleanup invocation
+        currently at line 103 there MUST appear a line invoking arcforge
+        finish --spec-id &lt;spec-id&gt; --if-last (or an equivalent
+        finish-epic.js wrapper that forwards to the same CLI).
+        <trace>design.md §Identifiable Requirements R2.1</trace>
+      </criterion>
+      <criterion id="fr-sh-001-ac2">
+        Given an agent session that has just merged the final epic of a
+        sprint via arc-finishing-epic Step 4 Option 1,
+        When the session completes,
+        Then specs/&lt;spec-id&gt;/dag.yaml MUST have been removed and a
+        chore(specs): finish &lt;spec-id&gt; sprint commit MUST be present on
+        the current branch, evidencing that the skill hook fired.
+        <trace>design.md §Identifiable Requirements R2.1 (end-to-end)</trace>
+      </criterion>
+      <criterion id="fr-sh-001-ac3">
+        Given an agent session that merges a non-final epic,
+        When the session completes,
+        Then the --if-last call MUST have exited zero with no-op output and
+        specs/&lt;spec-id&gt;/dag.yaml MUST still exist, so that intermediate
+        epic merges do not accidentally delete planner output.
+        <trace>design.md §Proposed Solution — Layer 2 (conditional)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sh-002">
+    <title>arc-finishing-epic Step 4 Option 2 (PR) must not call finish</title>
+    <description>
+      skills/arc-finishing-epic/SKILL.md Step 4 Option 2 (Create PR) MUST
+      NOT include any arcforge finish call. PRs land on the remote after
+      human / CI review; local arcforge finish would fail its "all
+      branches fully merged" guard. Users running PR-only sprints invoke
+      arcforge finish manually after all PRs merge. The skill MUST
+      document this in prose so the implementer does not insert finish by
+      symmetry with Option 1.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-002-ac1">
+        Given skills/arc-finishing-epic/SKILL.md after implementation,
+        When Step 4 Option 2 is read,
+        Then no line in that option MUST invoke arcforge finish (or a
+        wrapper that forwards to it) under any conditional.
+        <trace>design.md §Identifiable Requirements R2.1 (PR carve-out)</trace>
+      </criterion>
+      <criterion id="fr-sh-002-ac2">
+        Given the same SKILL.md,
+        When the reader reaches the end of Step 4 Option 2,
+        Then prose MUST explain why PR-path does not auto-finish (guard
+        mismatch, remote merge timing), and MUST direct the user to run
+        arcforge finish manually once all PRs merge.
+        <trace>design.md §Scope — Excludes (PR-based sprint-end)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sh-003">
+    <title>arc-dispatching-teammates wrap-up calls finish --if-last</title>
+    <description>
+      skills/arc-dispatching-teammates/SKILL.md (Step 8b in the body or
+      references/wrap-up-sequence.md, whichever is the authoritative
+      location for the wrap-up prescription) MUST be updated so that after
+      the batch arcforge cleanup call it invokes arcforge finish --spec-id
+      &lt;spec-id&gt; --if-last. The lead session has the global view; this
+      hook covers the multi-teammate dispatch scenario where per-teammate
+      arc-finishing-epic cannot reliably detect "last epic" because
+      teammates run in parallel.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-003-ac1">
+        Given the authoritative wrap-up location in arc-dispatching-
+        teammates after implementation,
+        When Step 8 (wrap-up) is read top-to-bottom,
+        Then immediately after the batch cleanup call there MUST appear a
+        line invoking arcforge finish --spec-id &lt;spec-id&gt; --if-last.
+        <trace>design.md §Identifiable Requirements R2.2 (Q4-2=b)</trace>
+      </criterion>
+      <criterion id="fr-sh-003-ac2">
+        Given a lead session that dispatched multiple teammates, all of
+        whom merged their final-sprint epics,
+        When the lead session runs Step 8 wrap-up,
+        Then specs/&lt;spec-id&gt;/dag.yaml MUST be removed and the finish
+        commit MUST be present on the lead's branch, evidencing that the
+        lead-side hook fired rather than any individual teammate.
+        <trace>design.md §Proposed Solution — Layer 2 (lead detects last)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sh-004">
+    <title>arc-coordinating command table lists finish</title>
+    <description>
+      skills/arc-coordinating/SKILL.md command table MUST add a row for
+      finish with the description "End a sprint (delete dag.yaml + epics/
+      when all epics completed)" and example invocation arcforge finish
+      --spec-id &lt;id&gt;. This makes the new subcommand discoverable through
+      the same routing surface users already use to learn cleanup,
+      expand, merge, sync, and status.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-004-ac1">
+        Given skills/arc-coordinating/SKILL.md after implementation,
+        When the command table near line 32 is read,
+        Then a finish row MUST be present with the description noted
+        above and an example arcforge finish --spec-id &lt;id&gt;.
+        <trace>design.md §Identifiable Requirements R2.3</trace>
+      </criterion>
+      <criterion id="fr-sh-004-ac2">
+        Given the same SKILL.md,
+        When the full document is read for consistency,
+        Then no claim MUST remain that cleanup removes dag.yaml or
+        epics/ (earlier prose that conflated the two scopes MUST be
+        updated so cleanup and finish are clearly separated).
+        <trace>design.md §Proposed Solution — Layer 3</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sh-005">
+    <title>Skill Red Flags close skip-finish rationalizations</title>
+    <description>
+      Each of the three modified SKILL.md files (arc-finishing-epic,
+      arc-dispatching-teammates, arc-coordinating) MUST include at least
+      one Red Flag entry (or Common Rationalizations row where that
+      structure is used) that explicitly closes the loophole of skipping
+      finish when it is the last epic. Phrasings MUST name concrete
+      temptations ("This is the last epic but I will just git rm manually"
+      / "finish seems redundant with cleanup"), not vague prohibitions.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-005-ac1">
+        Given each of the three modified SKILL.md files,
+        When its Red Flags / Common Rationalizations section is read,
+        Then at least one entry MUST explicitly warn against manually
+        performing git rm of dag.yaml / epics in place of calling finish,
+        and MUST state that Convention C is the single sanctioned terminus
+        path.
+        <trace>design.md §Identifiable Requirements R2.4</trace>
+      </criterion>
+      <criterion id="fr-sh-005-ac2">
+        Given an adversarial eval scenario that presents a last-epic merge
+        and tempts the skill to skip finish (with a plausible-sounding
+        rationalization),
+        When the skill runs with the updated Red Flags in place,
+        Then the agent MUST either invoke arcforge finish --if-last or
+        surface the temptation and refuse it, and MUST NOT manually git
+        rm dag.yaml / epics.
+        <trace>design.md §Identifiable Requirements R2.4 (adversarial eval)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sh-006">
+    <title>Skill-layer changes follow arc-writing-skills TDD-for-docs</title>
+    <description>
+      The implementation of fr-sh-001 through fr-sh-005 MUST proceed under
+      arc-writing-skills discipline: RED (eval scenarios fail without the
+      skill edits) → GREEN (skill edits land, scenarios pass) → REFACTOR
+      (Red Flags / Rationalizations added to close remaining loopholes
+      observed during REFACTOR). Each of the three skills modified MUST
+      have at least one eval scenario under
+      evals/scenarios/sdd-downstream-contract-*.md whose RED baseline is
+      recorded and whose GREEN pass is verified in the implementing PR.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sh-006-ac1">
+        Given the sdd-downstream-contract implementation PR,
+        When the PR description and eval outputs are reviewed,
+        Then at least three eval scenarios MUST be present (one per
+        modified skill) each with a RED baseline evidencing pre-change
+        failure and a GREEN result evidencing post-change success.
+        <trace>design.md §Proposed Solution — Layer 3 discipline</trace>
+      </criterion>
+      <criterion id="fr-sh-006-ac2">
+        Given the three modified SKILL.md files,
+        When tests/skills/ pytest runs against them,
+        Then every existing validator MUST continue to pass (no
+        frontmatter regressions, no missing required sections, no word-
+        count tier violations beyond the established limits).
+        <trace>design.md §Proposed Solution — Layer 3 discipline</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>
