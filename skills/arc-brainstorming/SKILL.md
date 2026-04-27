@@ -23,6 +23,38 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 
 **Before any elicitation, scan `specs/` for existing spec_ids.**
 
+### Step 0a: Pending-Conflict Detection (fr-bs-008)
+
+**Check for `specs/<spec-id>/_pending-conflict.md` FIRST, before the new-vs-iterate confirmation gate.**
+
+If `specs/<spec-id>/_pending-conflict.md` exists at the start of Phase 0, brainstorming MUST automatically enter the iterate branch — DO NOT ask "new spec or iteration?". This is the explicit exception carved out in `fr-bs-002-ac3`: the iterate-branch target is determined by filesystem state per `fr-bs-008-ac1`, and the user-consent gate is satisfied by the resolution-pick prompt in `fr-bs-008-ac2` — no separate "new spec or iteration?" confirmation is asked.
+
+**Loading the conflict (fr-bs-008-ac1):**
+
+Use `parseConflictMarker(filePath)` to load the file. It returns `{ axis_fired, conflict_description, candidate_resolutions, user_action_prompt }`. Treat the conflict body (`conflict_description` + cited design line ranges / Q&A `q_ids`) as the Change Intent seed. The canonical file path is `specs/<spec-id>/_pending-conflict.md` (from `PENDING_CONFLICT_RULES.canonical_path`).
+
+**Presenting resolutions (fr-bs-008-ac2):**
+
+Present `candidate_resolutions` to the user VERBATIM from the pending file — do not paraphrase. Prompt:
+
+> "pick (a), (b), (c), or describe your own"
+
+The user does not retell the conflict; brainstorming does not re-derive the conflict from scratch.
+
+**Read-only constraint (fr-bs-008-ac4):**
+
+Phase 0's conflict-detection branch MUST NOT modify or rewrite `_pending-conflict.md` content — the file is read-only from brainstorming's perspective. Any framing changes happen in the new `design.md`, not by editing the handoff file.
+
+**Deletion on success (fr-bs-008-ac3):**
+
+After the user picks (or describes) a resolution AND brainstorming successfully writes the new `design.md` to `docs/plans/<spec-id>/<NEW-DATE>/design.md`, brainstorming MUST delete `specs/<spec-id>/_pending-conflict.md`. Cleanup is gated on successful write — if the design write fails, the pending file persists for retry and MUST NOT be deleted.
+
+---
+
+### Step 0b: Standard New-vs-Iterate Confirmation
+
+If no `_pending-conflict.md` exists, proceed with the standard confirmation gate:
+
 1. List all directories under `specs/` that contain a `spec.xml`
 2. If any exist, present them to the user: `Found existing specs: auth, payments, ...`
 3. Ask the user to confirm the target — do NOT auto-detect:

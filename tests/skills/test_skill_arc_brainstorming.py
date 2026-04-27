@@ -392,3 +392,169 @@ def test_arc_brainstorming_phase2_replaces_v1_free_form():
     assert not has_freeform_instruction, (
         "SKILL.md must NOT instruct emission of free-form prose decision-log.md"
     )
+
+
+# ---------------------------------------------------------------------------
+# fr-bs-008: Phase 0 pending-conflict detection + iterate-branch auto-entry
+# ---------------------------------------------------------------------------
+
+
+def test_arc_brainstorming_phase0_pending_conflict_auto_entry():
+    """fr-bs-008-ac1: Phase 0 MUST auto-enter iterate branch when _pending-conflict.md exists.
+
+    Brainstorming MUST NOT ask 'new spec or iteration?' when the pending-conflict file
+    is detected — filesystem state determines the branch automatically.
+    """
+    text = _read_skill()
+
+    # Must mention the pending-conflict file path pattern
+    has_pending_conflict_path = (
+        '_pending-conflict.md' in text
+        or 'pending-conflict.md' in text
+    )
+    assert has_pending_conflict_path, (
+        "SKILL.md must reference _pending-conflict.md existence check in Phase 0"
+    )
+
+    # Must direct automatic entry into iterate branch
+    has_auto_entry = (
+        'automatically enter the iterate branch' in text.lower()
+        or 'auto-enter' in text.lower()
+        or 'automatically enter' in text.lower()
+    )
+    assert has_auto_entry, (
+        "SKILL.md must direct brainstorming to automatically enter the iterate branch "
+        "when _pending-conflict.md exists (fr-bs-008-ac1)"
+    )
+
+    # Must reference parseConflictMarker
+    assert 'parseConflictMarker' in text, (
+        "SKILL.md must reference parseConflictMarker as the API for loading the conflict file"
+    )
+
+
+def test_arc_brainstorming_phase0_pending_conflict_resolution_prompt():
+    """fr-bs-008-ac2: Phase 0 MUST present candidate_resolutions verbatim and prompt user to pick.
+
+    The user does not retell the conflict; brainstorming does not re-derive it from scratch.
+    The exact prompt template 'pick (a), (b), (c), or describe your own' (or close) must appear.
+    """
+    text = _read_skill()
+
+    # Must mention candidate_resolutions (from parseConflictMarker output)
+    assert 'candidate_resolutions' in text, (
+        "SKILL.md must reference candidate_resolutions field from parseConflictMarker output"
+    )
+
+    # Must include the verbatim pick prompt
+    has_pick_prompt = (
+        'pick (a), (b), (c)' in text.lower()
+        or 'pick (a)' in text.lower() and 'describe your own' in text.lower()
+    )
+    assert has_pick_prompt, (
+        "SKILL.md must include 'pick (a), (b), (c), or describe your own' prompt template "
+        "(fr-bs-008-ac2)"
+    )
+
+    # Must state the user does NOT retell the conflict
+    has_no_retell = (
+        'does not retell' in text.lower()
+        or 'user does not retell' in text.lower()
+        or 'not re-derive' in text.lower()
+    )
+    assert has_no_retell, (
+        "SKILL.md must state that the user does not retell the conflict and "
+        "brainstorming does not re-derive it (fr-bs-008-ac2)"
+    )
+
+
+def test_arc_brainstorming_phase0_pending_conflict_delete_on_success():
+    """fr-bs-008-ac3: SKILL.md MUST direct deletion of _pending-conflict.md after successful write.
+
+    Deletion is GATED on successful design write. If the write fails, the file MUST persist.
+    """
+    text = _read_skill()
+
+    # Must direct deletion of the pending file
+    has_delete_directive = (
+        'delete' in text.lower() and 'pending-conflict' in text.lower()
+        or 'delete' in text.lower() and '_pending-conflict.md' in text.lower()
+    )
+    assert has_delete_directive, (
+        "SKILL.md must direct deletion of specs/<spec-id>/_pending-conflict.md "
+        "after successful design write (fr-bs-008-ac3)"
+    )
+
+    # Must state deletion is gated on successful design write
+    has_gated_delete = (
+        'gated on successful' in text.lower()
+        or 'after successful' in text.lower() and 'delete' in text.lower()
+        or 'on successful write' in text.lower()
+        or 'successful design write' in text.lower()
+    )
+    assert has_gated_delete, (
+        "SKILL.md must state that deletion of _pending-conflict.md is gated on "
+        "successful design write (fr-bs-008-ac3)"
+    )
+
+    # Must state file persists on failure (the failure-path contract)
+    has_failure_path = (
+        'if the' in text.lower() and 'write fails' in text.lower()
+        or 'write fails' in text.lower()
+        or 'persists for retry' in text.lower()
+        or 'must not be deleted' in text.lower()
+    )
+    assert has_failure_path, (
+        "SKILL.md must state that _pending-conflict.md persists for retry if design write fails "
+        "(fr-bs-008-ac3 failure path)"
+    )
+
+
+def test_arc_brainstorming_phase0_pending_conflict_read_only():
+    """fr-bs-008-ac4: Phase 0 conflict-detection MUST NOT modify _pending-conflict.md.
+
+    The file is read-only from brainstorming's perspective.
+    Any framing changes happen in the new design.md.
+    """
+    text = _read_skill()
+
+    has_read_only = (
+        'read-only' in text.lower()
+        or 'read only' in text.lower()
+        or 'must not modify' in text.lower()
+        or 'must not rewrite' in text.lower()
+        or 'do not modify' in text.lower()
+    )
+    assert has_read_only, (
+        "SKILL.md must state that _pending-conflict.md is read-only from brainstorming's "
+        "perspective — Phase 0 must NOT modify or rewrite it (fr-bs-008-ac4)"
+    )
+
+
+def test_arc_brainstorming_phase0_pending_conflict_fr_bs_002_ac3_cross_reference():
+    """R1: SKILL.md MUST cross-reference fr-bs-002-ac3's explicit exception clause.
+
+    The exception clause states: the iterate-branch target is determined by filesystem state
+    per fr-bs-008-ac1, and the user-consent gate is satisfied by the resolution-pick prompt
+    in fr-bs-008-ac2 — no separate 'new spec or iteration?' confirmation is asked.
+
+    This cross-reference must appear so a contributor reading SKILL.md alone understands
+    why fr-bs-002's confirmation gate does not fire in the pending-conflict path.
+    """
+    text = _read_skill()
+
+    # Must reference fr-bs-002-ac3 by ID
+    assert 'fr-bs-002-ac3' in text, (
+        "SKILL.md must cite fr-bs-002-ac3 exception clause so contributors understand "
+        "why the standard confirmation gate is bypassed in pending-conflict path"
+    )
+
+    # Must reference fr-bs-008-ac1 in context of filesystem state determining the branch
+    assert 'fr-bs-008-ac1' in text, (
+        "SKILL.md must cite fr-bs-008-ac1 as the mechanism for filesystem-state branch selection"
+    )
+
+    # Must reference fr-bs-008-ac2 in context of user-consent gate satisfaction
+    assert 'fr-bs-008-ac2' in text, (
+        "SKILL.md must cite fr-bs-008-ac2 as the mechanism satisfying the user-consent gate"
+    )
