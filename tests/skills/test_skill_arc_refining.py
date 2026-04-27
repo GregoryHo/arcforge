@@ -240,3 +240,146 @@ def test_arc_refining_no_refiner_input_check():
     text = _read_skill()
 
     assert "REFINER_INPUT" not in text
+
+
+# ---------------------------------------------------------------------------
+# fr-rf-013 — Phase 5 No-Invention Discipline
+# ---------------------------------------------------------------------------
+
+
+def test_fr_rf_013_ac1_rate_limited_example_and_three_moves():
+    """fr-rf-013-ac1: Phase 5 must contain the rate-limited / qualitative-phrase example
+    showing refiner MUST NOT author a concrete MUST, and must enumerate the three
+    legitimate moves (a/b/c).
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    # Must mention qualitative phrasing or a concrete rate-limited example
+    has_qualitative_example = (
+        "rate-limited" in lower
+        or "rate limited" in lower
+        or ("qualitative" in lower and "phrase" in lower)
+    )
+    assert has_qualitative_example, (
+        "fr-rf-013-ac1: Phase 5 must contain a rate-limited or analogous qualitative-phrase example"
+    )
+
+    # Must show that inventing a concrete MUST is forbidden
+    has_invention_forbidden = (
+        "training-data" in lower
+        or "training data" in lower
+    )
+    assert has_invention_forbidden, (
+        "fr-rf-013-ac1: Phase 5 must state that inventing a concrete MUST from training-data is forbidden"
+    )
+
+    # Three legitimate moves must be present (a, b, c enumeration in Phase 5)
+    # Check that all three move patterns appear in Phase 5's "No invention" subsection
+    phase5_start = text.find("## Phase 5")
+    phase6_start = text.find("## Phase 5.5")
+    assert phase5_start != -1, "Phase 5 heading must exist"
+    assert phase6_start != -1, "Phase 5.5 heading must exist"
+    phase5_section = text[phase5_start:phase6_start]
+    phase5_lower = phase5_section.lower()
+
+    has_move_a = (
+        "should/may" in phase5_lower
+        or "should" in phase5_lower and "qualitative" in phase5_lower
+        or "preserve" in phase5_lower and "should" in phase5_lower
+    )
+    has_move_b = (
+        "leave the axis unbound" in phase5_lower
+        or "axis unbound" in phase5_lower
+        or "no criterion" in phase5_lower
+    )
+    has_move_c = (
+        "block" in phase5_lower and "candidate" in phase5_lower
+        or "block with candidate" in phase5_lower
+    )
+    assert has_move_a, "fr-rf-013-ac1: Phase 5 must list move (a) — preserve as SHOULD/MAY"
+    assert has_move_b, "fr-rf-013-ac1: Phase 5 must list move (b) — leave axis unbound"
+    assert has_move_c, "fr-rf-013-ac1: Phase 5 must list move (c) — BLOCK with candidate resolutions"
+
+
+def test_fr_rf_013_ac2_deferral_signal_true():
+    """fr-rf-013-ac2: Phase 5 must mention deferral_signal=true, the four canonical phrases,
+    reference DECISION_LOG_RULES.deferral_signal_canonical_phrases, and state that deferral
+    does NOT authorize a concrete MUST.
+    """
+    text = _read_skill()
+
+    # Must mention deferral_signal (the boolean flag name)
+    assert "deferral_signal" in text, (
+        "fr-rf-013-ac2: Phase 5 must mention deferral_signal (the flag from DECISION_LOG_RULES)"
+    )
+
+    # Must call out DECISION_LOG_RULES.deferral_signal_canonical_phrases as source of truth
+    assert "DECISION_LOG_RULES" in text, (
+        "fr-rf-013-ac2: Phase 5 must reference DECISION_LOG_RULES as source of truth for deferral phrases"
+    )
+    assert "deferral_signal_canonical_phrases" in text, (
+        "fr-rf-013-ac2: Phase 5 must reference deferral_signal_canonical_phrases specifically"
+    )
+
+    # Must include the four canonical phrases (any location in skill is acceptable)
+    lower = text.lower()
+    assert "use defaults" in lower, (
+        'fr-rf-013-ac2: Must include canonical phrase "use defaults"'
+    )
+    assert "covered." in text, (
+        'fr-rf-013-ac2: Must include canonical phrase "covered."'
+    )
+    assert '"skip"' in text or "'skip'" in text or "\"skip\"" in text or "skip" in lower, (
+        'fr-rf-013-ac2: Must include canonical phrase "skip"'
+    )
+    assert "you decide" in lower, (
+        'fr-rf-013-ac2: Must include canonical phrase "you decide"'
+    )
+
+    # Phase 5 section must state deferral does NOT authorize a concrete MUST
+    phase5_start = text.find("## Phase 5")
+    phase55_start = text.find("## Phase 5.5")
+    assert phase5_start != -1
+    phase5_section = text[phase5_start:phase55_start]
+    phase5_lower = phase5_section.lower()
+
+    deferral_no_concrete_must = (
+        "deferral" in phase5_lower and "does not authorize" in phase5_lower
+        or "deferral" in phase5_lower and "not authorize" in phase5_lower
+        or "deferral" in phase5_lower and "unbound" in phase5_lower
+    )
+    assert deferral_no_concrete_must, (
+        "fr-rf-013-ac2: Phase 5 must state that deferral does NOT authorize a concrete MUST"
+    )
+
+
+def test_fr_rf_013_ac3_every_concrete_must_sourced():
+    """fr-rf-013-ac3: Phase 5 must direct that for every concrete MUST the refiner
+    must cite a non-deferral source; it must also mention mechanicalAuthorizationCheck
+    to signal that this rule is enforced mechanically at Phase 6.
+    """
+    text = _read_skill()
+
+    # Must mention mechanicalAuthorizationCheck (Phase 6 enforcement link)
+    assert "mechanicalAuthorizationCheck" in text, (
+        "fr-rf-013-ac3: SKILL.md must mention mechanicalAuthorizationCheck so the LLM "
+        "understands the prompt is enforced mechanically downstream"
+    )
+
+    # Phase 5 section must contain the "for every concrete MUST → cite non-deferral source" rule
+    phase5_start = text.find("## Phase 5")
+    phase55_start = text.find("## Phase 5.5")
+    assert phase5_start != -1
+    phase5_section = text[phase5_start:phase55_start]
+    phase5_lower = phase5_section.lower()
+
+    has_source_rule = (
+        "non-deferral source" in phase5_lower
+        or ("non-deferral" in phase5_lower and "concrete must" in phase5_lower)
+        or ("concrete must" in phase5_lower and "source" in phase5_lower and "deferral" in phase5_lower)
+    )
+    assert has_source_rule, (
+        "fr-rf-013-ac3: Phase 5 must contain the rule: every concrete MUST must trace to "
+        "a non-deferral source (design phrase or non-deferral Q&A row)"
+    )

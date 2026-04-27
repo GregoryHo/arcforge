@@ -159,6 +159,10 @@ Refiner MUST NOT author criteria from training-data inference. When a design phr
 
 Inventing a concrete MUST from training-data common practice ("most rate-limiters use 60-second windows, so MUST window=60s") is **not** on this list. It violates the Iron Law's first clause.
 
+**Deferral signals (ac2).** A Q&A row carries `deferral_signal=true` when its `user_answer_verbatim` matches one of the canonical deferral phrases — the four canonical phrases per `DECISION_LOG_RULES.deferral_signal_canonical_phrases` are: "use defaults", "covered.", "skip", "you decide". When `deferral_signal=true`, the corresponding axis is unbound. Deferral does NOT authorize a concrete MUST derived from training-data common practice — the same three legitimate moves apply. A deferred answer means the user deliberately left the axis open; refiner has no authorization to pre-fill it.
+
+**Every concrete MUST must be sourced (ac3).** For every concrete MUST the refiner is about to author, it MUST be able to point to a non-deferral source — either a design phrase that contains the concrete value, or a Q&A row whose `user_answer_verbatim` contains the concrete value with `deferral_signal=false`. If no such source exists, the criterion is invention and MUST NOT be authored; use one of the three legitimate moves instead. This rule is the runtime invariant that `mechanicalAuthorizationCheck` (in `scripts/lib/sdd-validators.js`) verifies at Phase 6 — every concrete MUST in the produced spec will be checked mechanically, so any invention the LLM drafts here will be caught and cause a block downstream.
+
 Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
 
 ### Version Increment (when prior spec exists)
