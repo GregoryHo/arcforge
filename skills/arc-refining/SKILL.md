@@ -241,22 +241,41 @@ Phase 5.5 hosts two independent checks. Both can block; their block behaviors di
 
 Before Phase 6 output validation, re-read each requirement's `<description>` against each `<criterion>` (and against sibling criteria). Two failure modes to flag:
 
-- **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test.
-- **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes.
+- **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test. Remediation hint: "widen ACs to cover failure path, or narrow description to match ACs."
+- **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes. Remediation hint: "align verbs across description and ACs for the same axis."
 
-If any requirement fails this sub-pass — **BLOCK (no conflict file).** Print to terminal: requirement ID, the specific scope or verb mismatch, and a remediation hint (widen ACs to cover description scope, narrow description to match ACs, or align verbs). Exit non-zero. Write no files — the in-memory draft is discarded; nothing on disk reflects the failed draft. **Do NOT write `_pending-conflict.md` for this block** — it is a schema/drafting error, not an R3 axis contradiction (per fr-rf-015-ac2).
+If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions, which is precisely Pattern 3 of the eval evidence.
+
+**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):**
+
+```bash
+node -e "
+  const { writeConflictMarker } = require('./scripts/lib/sdd-utils');
+  writeConflictMarker('<spec-id>', {
+    axis_fired: '3',
+    conflict_description: '<requirement ID>: <specific scope or verb mismatch> — <remediation hint from ac1/ac2>',
+    candidate_resolutions: [
+      '(a) <first candidate>',
+      '(b) <second candidate>'
+    ],
+    user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
+  });
+"
+```
+
+The `conflict_description` carries the requirement ID and the relevant remediation hint (ac1: widen/narrow scope; ac2: align verbs). This is the single recovery surface for every R3 BLOCK — self-contradiction is not exempted from the handoff.
 
 ### 5.5b — Axis-3 LLM Judgment Pass
 
-Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) source. This is the LLM-judgment layer of axis 3 (the mechanical layer runs at Phase 6 via `mechanicalAuthorizationCheck`).
+Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) citable source. This is the LLM-judgment layer of axis 3 (the mechanical layer runs at Phase 6 via `mechanicalAuthorizationCheck` — Phase 5.5b is LLM judgment, Phase 6 is the mechanical follow-up over `<trace>` elements). Criteria with no citable source trigger BLOCK per fr-rf-001 axis 3.
 
-If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1).** This is an R3 axis-3 block. Before exiting non-zero:
+If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1, R3 enforcement severity).** Phase 5.5 findings MUST NOT be downgraded to WARNING — Pattern 3 applies here too. Before exiting non-zero:
 
 1. Call `writeConflictMarker` (same pattern as Phase 4 block shown above), setting `axis_fired: '3'`.
 2. Print to terminal: which criterion has no source, and the 1–3 candidate resolutions.
 3. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`.
 
-This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design inputs; Phase 5.5 catches the spec-to-be contradicting itself (5.5a) or having invented criteria (5.5b).
+This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design inputs; Phase 5.5 catches the spec-to-be contradicting itself (5.5a) or having invented criteria (5.5b). Both 5.5a and 5.5b write `_pending-conflict.md` — single recovery surface for every R3 BLOCK.
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 
@@ -381,7 +400,7 @@ Hand off to `/arc-planning` — the planner reads `specs/<spec-id>/spec.xml` and
 - spec-id: `<spec-id>`
 - reason: [DAG gate: prior sprint incomplete | design doc invalid | axis 1 design contradiction | axis 2 design↔Q&A conflict | axis 3 unauthorized criterion (invention) | spec self-contradiction (Phase 5.5a) | output validation errors]
 - issues listed to terminal with requirement IDs, issue types, remediation
-- files written (R3 axis-1/2/3 blocks only): `specs/<spec-id>/_pending-conflict.md` (ephemeral handoff — brainstorming reads and deletes it)
+- files written (R3 axis-1/2/3 blocks, Phase 5.5a, Phase 5.5b): `specs/<spec-id>/_pending-conflict.md` (ephemeral handoff — brainstorming reads and deletes it)
 - files written (all other blocks): **none** (no spec.xml, no details/, no report)
 - exit: non-zero
 - action: for R3 axis blocks → run `/arc-brainstorming iterate <spec-id>` to resolve. For other blocks → address issues then re-run refiner.

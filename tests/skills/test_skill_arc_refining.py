@@ -766,3 +766,253 @@ def test_fr_rf_010_ac5_mechanical_auth_check_trace_types():
         "fr-rf-010-ac5: Phase 6 must state that on axis-3 mechanical ERROR, "
         "_pending-conflict.md is written via writeConflictMarker"
     )
+
+
+# ---------------------------------------------------------------------------
+# fr-rf-014 — Phase 5.5 Self-Contradiction Sub-Pass + Axis-3 LLM Judgment
+# ---------------------------------------------------------------------------
+
+
+def _get_phase55_section(text: str) -> str:
+    """Extract Phase 5.5 section text (between Phase 5.5 heading and Phase 6 heading)."""
+    phase55_start = text.find("## Phase 5.5")
+    phase6_start = text.find("## Phase 6")
+    assert phase55_start != -1, "Phase 5.5 heading must exist"
+    assert phase6_start != -1, "Phase 6 heading must exist"
+    return text[phase55_start:phase6_start]
+
+
+def _get_phase55a_section(text: str) -> str:
+    """Extract Phase 5.5a sub-section text."""
+    phase55 = _get_phase55_section(text)
+    a_start = phase55.find("### 5.5a")
+    b_start = phase55.find("### 5.5b")
+    assert a_start != -1, "Phase 5.5a heading must exist"
+    assert b_start != -1, "Phase 5.5b heading must exist"
+    return phase55[a_start:b_start]
+
+
+def _get_phase55b_section(text: str) -> str:
+    """Extract Phase 5.5b sub-section text."""
+    phase55 = _get_phase55_section(text)
+    b_start = phase55.find("### 5.5b")
+    assert b_start != -1, "Phase 5.5b heading must exist"
+    return phase55[b_start:]
+
+
+def test_fr_rf_014_ac1_scope_mismatch_detection():
+    """fr-rf-014-ac1: Phase 5.5a MUST direct refiner to detect scope mismatches
+    (description covers both success and failure paths but ACs only test success)
+    and BLOCK with the exact remediation hint.
+    """
+    text = _read_skill()
+    section_a = _get_phase55a_section(text)
+    lower_a = section_a.lower()
+
+    # Must mention scope mismatch detection
+    has_scope_mismatch = (
+        "scope mismatch" in lower_a
+        or ("success" in lower_a and "failure" in lower_a and "path" in lower_a)
+    )
+    assert has_scope_mismatch, (
+        "fr-rf-014-ac1: Phase 5.5a must describe scope mismatch detection "
+        "(description covers success+failure but ACs only test success)"
+    )
+
+    # Must include exact remediation hint for scope mismatch (ac1 spec text)
+    has_ac1_hint = (
+        "widen acs to cover failure path" in lower_a
+        or "widen ACs to cover failure path" in section_a
+        or ("widen" in lower_a and "failure path" in lower_a)
+    )
+    assert has_ac1_hint, (
+        "fr-rf-014-ac1: Phase 5.5a must include the remediation hint "
+        "'widen ACs to cover failure path, or narrow description to match ACs'"
+    )
+
+    has_narrow_hint = (
+        "narrow description to match acs" in lower_a
+        or "narrow description" in lower_a
+    )
+    assert has_narrow_hint, (
+        "fr-rf-014-ac1: Phase 5.5a must include the remediation hint "
+        "'narrow description to match ACs'"
+    )
+
+
+def test_fr_rf_014_ac2_rfc2119_verb_mismatch_detection():
+    """fr-rf-014-ac2: Phase 5.5a MUST direct refiner to detect RFC-2119 verb mismatches
+    (description uses MUST but sibling AC uses SHOULD for same axis) and BLOCK
+    with the exact remediation hint.
+    """
+    text = _read_skill()
+    section_a = _get_phase55a_section(text)
+    lower_a = section_a.lower()
+
+    # Must mention RFC-2119 verb mismatch
+    has_verb_mismatch = (
+        "rfc-2119" in lower_a
+        or "rfc 2119" in lower_a
+        or ("must" in lower_a and "should" in lower_a and "mismatch" in lower_a)
+        or "verb mismatch" in lower_a
+    )
+    assert has_verb_mismatch, (
+        "fr-rf-014-ac2: Phase 5.5a must describe RFC-2119 verb mismatch detection "
+        "(description uses MUST but AC uses SHOULD on same axis, or vice versa)"
+    )
+
+    # Must include exact remediation hint for verb mismatch (ac2 spec text)
+    has_ac2_hint = (
+        "align verbs across description and acs" in lower_a
+        or "align verbs" in lower_a
+    )
+    assert has_ac2_hint, (
+        "fr-rf-014-ac2: Phase 5.5a must include the remediation hint "
+        "'align verbs across description and ACs for the same axis'"
+    )
+
+    has_same_axis = (
+        "same axis" in lower_a
+        or "for the same axis" in lower_a
+    )
+    assert has_same_axis, (
+        "fr-rf-014-ac2: Phase 5.5a remediation hint must reference 'the same axis'"
+    )
+
+
+def test_fr_rf_014_ac3_axis3_llm_coverage_in_phase55b():
+    """fr-rf-014-ac3: Phase 5.5b MUST direct refiner to verify axis-3 LLM coverage:
+    for every criterion in the in-memory draft, a citable source (design phrase or
+    non-deferral Q&A row) must exist. Must contrast with mechanical layer at Phase 6.
+    """
+    text = _read_skill()
+    section_b = _get_phase55b_section(text)
+    lower_b = section_b.lower()
+
+    # Must describe citable source requirement
+    has_citable_source = (
+        "citable source" in lower_b
+        or ("design phrase" in lower_b and "q&a" in lower_b)
+        or ("design phrase" in lower_b and "non-deferral" in lower_b)
+    )
+    assert has_citable_source, (
+        "fr-rf-014-ac3: Phase 5.5b must state that every criterion must have a citable source "
+        "(design phrase or non-deferral Q&A row)"
+    )
+
+    # Must contrast with mechanical layer at Phase 6
+    has_mechanical_contrast = (
+        "mechanical" in lower_b
+        or "phase 6" in lower_b
+        or "mechanicalauthorizationcheck" in lower_b
+    )
+    assert has_mechanical_contrast, (
+        "fr-rf-014-ac3: Phase 5.5b must contrast LLM judgment layer with the mechanical "
+        "layer at Phase 6 (per fr-rf-010-ac5)"
+    )
+
+
+def test_fr_rf_014_ac4_r3_severity_no_warn():
+    """fr-rf-014-ac4: Phase 5.5 MUST state that ANY finding (5.5a or 5.5b) is R3
+    enforcement severity — exit non-zero, no spec.xml, no details/, no narrative report.
+    Findings MUST NOT be downgraded to WARNING. Must cite Pattern 3 rationale.
+    """
+    text = _read_skill()
+    phase55 = _get_phase55_section(text)
+    lower55 = phase55.lower()
+
+    # Must state R3 severity
+    has_r3_severity = (
+        "r3" in lower55
+        or "r3 enforcement" in lower55
+        or "r3 severity" in lower55
+    )
+    assert has_r3_severity, (
+        "fr-rf-014-ac4: Phase 5.5 must state findings are R3 enforcement severity"
+    )
+
+    # Must state no downgrade to WARN
+    has_no_warn = (
+        "must not be downgraded to warning" in lower55
+        or "not be downgraded to warn" in lower55
+        or "no warn" in lower55
+        or "must not downgrade" in lower55
+        or ("warn" in lower55 and "not" in lower55 and "downgrade" in lower55)
+        or "phase 5.5 findings must not be downgraded" in lower55
+    )
+    assert has_no_warn, (
+        "fr-rf-014-ac4: Phase 5.5 must explicitly state findings MUST NOT be downgraded to WARNING"
+    )
+
+    # Must cite Pattern 3 rationale
+    has_pattern3 = (
+        "pattern 3" in lower55
+        or "pattern3" in lower55
+    )
+    assert has_pattern3, (
+        "fr-rf-014-ac4: Phase 5.5 must cite Pattern 3 rationale for why WARN is forbidden "
+        "(a WARN would let the spec ship with internal contradictions)"
+    )
+
+
+def test_fr_rf_014_ac5_phase55a_writes_conflict_marker():
+    """fr-rf-014-ac5 (audit-patched): Phase 5.5a MUST invoke writeConflictMarker
+    for self-contradiction findings — NOT terminal-only. The prior fr-rf-015 commit
+    incorrectly said 'Do NOT write _pending-conflict.md' for 5.5a blocks; the
+    audit patch reverses this. Both 5.5a and 5.5b write the conflict file.
+    """
+    text = _read_skill()
+    section_a = _get_phase55a_section(text)
+
+    # Phase 5.5a MUST invoke writeConflictMarker
+    assert "writeConflictMarker" in section_a, (
+        "fr-rf-014-ac5: Phase 5.5a must invoke writeConflictMarker "
+        "(audit-patched: self-contradiction is NOT exempt from the handoff)"
+    )
+
+    # Phase 5.5a MUST NOT say "do not write _pending-conflict.md" (the old wrong instruction)
+    lower_a = section_a.lower()
+    wrong_instruction = (
+        "do not write `_pending-conflict" in lower_a
+        or "do not write _pending-conflict" in lower_a
+        or "terminal only" in lower_a and "no conflict" in lower_a
+    )
+    assert not wrong_instruction, (
+        "fr-rf-014-ac5: Phase 5.5a must NOT say 'do not write _pending-conflict.md' — "
+        "audit patch requires self-contradiction to also write the handoff file"
+    )
+
+    # The conflict_description must be seeded with requirement ID + remediation hint
+    has_seeded_description = (
+        "conflict_description" in section_a
+        and (
+            "requirement id" in lower_a
+            or "remediation" in lower_a
+        )
+    )
+    assert has_seeded_description, (
+        "fr-rf-014-ac5: Phase 5.5a must seed conflict_description with the requirement ID "
+        "and the relevant remediation hint (widen/narrow for ac1, align verbs for ac2)"
+    )
+
+
+def test_fr_rf_014_ac5_phase55b_writes_conflict_marker():
+    """fr-rf-014-ac5: Phase 5.5b MUST also invoke writeConflictMarker for axis-3
+    LLM findings (already covered by fr-rf-015 commit; this test guards regression).
+    """
+    text = _read_skill()
+    section_b = _get_phase55b_section(text)
+
+    # Phase 5.5b MUST invoke writeConflictMarker
+    assert "writeConflictMarker" in section_b, (
+        "fr-rf-014-ac5: Phase 5.5b must invoke writeConflictMarker for axis-3 LLM findings"
+    )
+
+    # axis_fired must be '3' for 5.5b
+    has_axis3 = (
+        "axis_fired" in section_b
+        and "'3'" in section_b
+    )
+    assert has_axis3, (
+        "fr-rf-014-ac5: Phase 5.5b writeConflictMarker call must set axis_fired to '3'"
+    )
