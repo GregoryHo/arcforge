@@ -270,3 +270,125 @@ def test_arc_brainstorming_routes_to_arc_refining():
 
     # Must reference arc-refining as next step
     assert "/arc-refining" in text or "arc-refining" in text
+
+
+# ---------------------------------------------------------------------------
+# fr-bs-009: Structured decision-log output in Phase 2
+# ---------------------------------------------------------------------------
+
+
+def test_arc_brainstorming_phase2_decision_log_required_fields():
+    """fr-bs-009-ac1/ac2: Phase 2 MUST direct production of all four required fields.
+
+    The four fields are defined in DECISION_LOG_RULES.required_fields_per_row.
+    Every Q&A row produced by Phase 2 MUST carry exactly these four fields.
+    """
+    text = _read_skill()
+
+    # All four field names must appear
+    assert "q_id" in text, "SKILL.md must mention q_id field (fr-bs-009-ac1)"
+    assert "question" in text, "SKILL.md must mention question field (fr-bs-009-ac1)"
+    assert "user_answer_verbatim" in text, (
+        "SKILL.md must mention user_answer_verbatim field (fr-bs-009-ac2)"
+    )
+    assert "deferral_signal" in text, (
+        "SKILL.md must mention deferral_signal field (fr-bs-009-ac2)"
+    )
+
+
+def test_arc_brainstorming_phase2_decision_log_wire_format():
+    """fr-bs-009-ac1: Phase 2 output MUST be YAML (matching parseDecisionLog wire format)."""
+    text = _read_skill()
+
+    # Wire format must be specified as YAML
+    assert "yaml" in text.lower() or "YAML" in text, (
+        "SKILL.md must specify YAML as the wire format for decision-log (fr-bs-009-ac1)"
+    )
+
+    # Must use .yml extension (not .md or free-form)
+    assert "decision-log.yml" in text, (
+        "SKILL.md must specify decision-log.yml as the output file path (fr-bs-009-ac1)"
+    )
+
+
+def test_arc_brainstorming_phase2_decision_log_q_id_stability():
+    """fr-bs-009-ac3: Phase 2 instructions MUST direct q_id stability across revisions."""
+    text = _read_skill()
+
+    # q_id stability rule must be stated
+    has_stability = (
+        "stable" in text.lower() and "q_id" in text
+        or "q_id" in text and "reassign" in text.lower()
+        or "q_id" in text and "persist" in text.lower()
+        or "q_id" in text and "sequential" in text.lower()
+    )
+    assert has_stability, (
+        "SKILL.md must direct q_id stability (once assigned, q_id must not change within session)"
+    )
+
+
+def test_arc_brainstorming_phase2_deferral_signal_canonical_phrases():
+    """fr-bs-009-ac4: Phase 2 MUST instruct deferral_signal detection for the four canonical phrases."""
+    text = _read_skill()
+
+    # All four canonical deferral phrases from DECISION_LOG_RULES must appear
+    assert '"use defaults"' in text or "'use defaults'" in text or "use defaults" in text, (
+        'SKILL.md must include canonical phrase "use defaults"'
+    )
+    assert '"covered."' in text or "'covered.'" in text or "covered." in text, (
+        'SKILL.md must include canonical phrase "covered."'
+    )
+    assert '"skip"' in text or "'skip'" in text or "`skip`" in text, (
+        'SKILL.md must include canonical phrase "skip"'
+    )
+    assert '"you decide"' in text or "'you decide'" in text or "you decide" in text, (
+        'SKILL.md must include canonical phrase "you decide"'
+    )
+
+    # Must reference DECISION_LOG_RULES as the source of truth for canonical phrases
+    assert "DECISION_LOG_RULES" in text, (
+        "SKILL.md must reference DECISION_LOG_RULES as the source of truth for canonical phrases"
+    )
+
+
+def test_arc_brainstorming_phase2_decision_log_schema_reference():
+    """fr-bs-009: Phase 2 must reference the decision-log schema doc."""
+    text = _read_skill()
+
+    has_schema_ref = (
+        "scripts/lib/sdd-schemas/decision-log.md" in text
+        or "sdd-schemas/decision-log" in text
+        or "decision-log schema" in text.lower()
+    )
+    assert has_schema_ref, (
+        "SKILL.md must reference scripts/lib/sdd-schemas/decision-log.md schema doc"
+    )
+
+
+def test_arc_brainstorming_phase2_replaces_v1_free_form():
+    """fr-bs-009: v1 free-form decision-log.md is REPLACED by structured YAML.
+
+    SKILL.md must state that the structured format replaces the v1 free-form,
+    and must NOT describe emitting free-form prose decision-log.md.
+    """
+    text = _read_skill()
+
+    # Must say v1 free-form is replaced
+    has_replacement_notice = (
+        "replaced" in text.lower() and "decision-log" in text.lower()
+        or "replaces" in text.lower() and "decision-log" in text.lower()
+        or "no longer" in text.lower() and "decision-log" in text.lower()
+    )
+    assert has_replacement_notice, (
+        "SKILL.md must state that the v1 free-form decision-log.md is REPLACED by structured YAML"
+    )
+
+    # Must NOT instruct brainstorming to emit free-form prose decision-log.md
+    # (the old format that the parser cannot consume)
+    has_freeform_instruction = (
+        "free-form decision-log.md" in text.lower()
+        or "prose decision-log" in text.lower()
+    )
+    assert not has_freeform_instruction, (
+        "SKILL.md must NOT instruct emission of free-form prose decision-log.md"
+    )

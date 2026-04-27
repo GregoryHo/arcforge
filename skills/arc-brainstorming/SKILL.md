@@ -124,6 +124,56 @@ Use 2-Action Rule: Save research findings to `docs/research/<topic>.md` after ev
 
 Apply YAGNI ruthlessly: only capture what the user explicitly states is changing.
 
+#### Phase 2 Decision-Log Output (fr-bs-009)
+
+Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The v1 free-form `decision-log.md` is **replaced** by this structured format — the refiner now mechanically parses the decision-log via `parseDecisionLog`, so brainstorming MUST NOT emit the old free-form prose.
+
+**Output path:** `<brainstorming-output-dir>/decision-log.yml`
+
+That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
+
+**Wire format — YAML sequence, one mapping per Q&A row:**
+
+```yaml
+- q_id: q1
+  question: "Verbatim text of the question asked"
+  user_answer_verbatim: "Verbatim text of the user's answer, not paraphrased"
+  deferral_signal: false
+
+- q_id: q2
+  question: "Next question asked"
+  user_answer_verbatim: "use defaults"
+  deferral_signal: true
+```
+
+**Four required fields per row** (from `DECISION_LOG_RULES.required_fields_per_row` in `scripts/lib/sdd-rules.js` — single source of truth):
+
+| Field | Type | Rule |
+|---|---|---|
+| `q_id` | string | Stable identifier, unique within the session. See q_id stability rule below. |
+| `question` | string | Verbatim text of the question asked during elicitation. |
+| `user_answer_verbatim` | string | Verbatim text of the user's answer — MUST NOT be paraphrased or summarized. |
+| `deferral_signal` | boolean | `true` when answer matches a canonical deferral phrase; `false` otherwise. |
+
+Missing any field is ERROR per the schema. See `scripts/lib/sdd-schemas/decision-log.md` for full schema documentation.
+
+**q_id stability rule (fr-bs-009-ac3):**
+
+`q_id` values MUST be stable across the brainstorming session. Assign q_ids sequentially (`q1`, `q2`, `q3`, ...) and persist them across iteration revisions. Once a question receives `q1`, that q_id MUST NOT be reassigned to a different question within the same session. If a row is added or a question is revised, new rows get the next sequential q_id; existing q_ids stay fixed.
+
+**Deferral-signal detection rule (fr-bs-009-ac4):**
+
+Brainstorming MUST set `deferral_signal: true` when `user_answer_verbatim` matches any of the canonical phrases in `DECISION_LOG_RULES.deferral_signal_canonical_phrases` (case-insensitive, trimmed). The minimum required set is:
+
+- `use defaults`
+- `covered.`
+- `skip`
+- `you decide`
+
+Implementations MAY extend this list with additional deferral phrases. Any extensions MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is the authoritative source — when the list changes there, the detection rule changes automatically.
+
+**Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
+
 ### Phase 3 Output
 
 The design doc carries a Context summary plus a natural-language Change Intent. The downstream refiner reads this alongside `specs/<spec-id>/spec.xml` and **derives the structured `<delta>` itself** — the design doc carries human-authored narrative, never a pre-authored ADDED/MODIFIED/REMOVED list.
