@@ -12,10 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseDagYaml } = require('./yaml-parser');
 const { DAG, TaskStatus } = require('./models');
-const {
-  PENDING_CONFLICT_RULES: _PENDING_CONFLICT_RULES,
-  DECISION_LOG_RULES: _DECISION_LOG_RULES,
-} = require('./sdd-rules');
+const { PENDING_CONFLICT_RULES, DECISION_LOG_RULES } = require('./sdd-rules');
 const {
   parseConflictMarker,
   parseDecisionLog,
@@ -243,15 +240,9 @@ const SPEC_HEADER_RULES = Object.freeze({
   },
 });
 
-// -----------------------------------------------------------------------------
-// PENDING_CONFLICT_RULES and DECISION_LOG_RULES — re-exported from sdd-rules.js.
-// -----------------------------------------------------------------------------
-// The constants live in sdd-rules.js (single source of truth) to avoid a
-// circular dependency with sdd-validators.js. Re-exported here so the public
-// API of sdd-utils.js is unchanged for all callers (tests, print-schema.js, etc.).
-// See fr-sd-012 (PENDING_CONFLICT_RULES) and fr-sd-013 (DECISION_LOG_RULES).
-const PENDING_CONFLICT_RULES = _PENDING_CONFLICT_RULES;
-const DECISION_LOG_RULES = _DECISION_LOG_RULES;
+// PENDING_CONFLICT_RULES (fr-sd-012) and DECISION_LOG_RULES (fr-sd-013) live in
+// sdd-rules.js to avoid a circular dependency with sdd-validators.js, and are
+// re-exported here so the public API of sdd-utils.js is unchanged for callers.
 
 /**
  * Parse a spec XML string and return a structured header object.

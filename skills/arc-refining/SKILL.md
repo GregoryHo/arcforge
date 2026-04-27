@@ -246,24 +246,13 @@ Before Phase 6 output validation, re-read each requirement's `<description>` aga
 
 If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions, which is precisely Pattern 3 of the eval evidence.
 
-**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):**
+**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):** call `writeConflictMarker` (recipe above in Phase 4) with these values:
+- `axis_fired: '3'`
+- `conflict_description`: `'<requirement ID>: <specific scope or verb mismatch> — <remediation hint from ac1/ac2>'` (ac1: widen/narrow scope; ac2: align verbs)
+- `candidate_resolutions`: 1–3 concrete user-pickable resolutions
+- `user_action_prompt`: `'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'`
 
-```bash
-node -e "
-  const { writeConflictMarker } = require('./scripts/lib/sdd-utils');
-  writeConflictMarker('<spec-id>', {
-    axis_fired: '3',
-    conflict_description: '<requirement ID>: <specific scope or verb mismatch> — <remediation hint from ac1/ac2>',
-    candidate_resolutions: [
-      '(a) <first candidate>',
-      '(b) <second candidate>'
-    ],
-    user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
-  });
-"
-```
-
-The `conflict_description` carries the requirement ID and the relevant remediation hint (ac1: widen/narrow scope; ac2: align verbs). This is the single recovery surface for every R3 BLOCK — self-contradiction is not exempted from the handoff.
+This is the single recovery surface for every R3 BLOCK — self-contradiction is not exempted from the handoff.
 
 ### 5.5b — Axis-3 LLM Judgment Pass
 

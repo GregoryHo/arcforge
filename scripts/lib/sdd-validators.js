@@ -17,10 +17,21 @@
  * convention. The parse() function from yaml-parser.js handles both.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const { parse } = require('./yaml-parser');
+const { readFileSafe, atomicWriteFile } = require('./utils');
 const { PENDING_CONFLICT_RULES, DECISION_LOG_RULES } = require('./sdd-rules');
+
+// Hoisted regexes — kept at module scope so they aren't reallocated on every
+// call inside per-trace loops in mechanicalAuthorizationCheck.
+const TRACE_TOKEN_RE =
+  /<requirement\s+id="([^"]*)"|<criterion\s+id="([^"]*)"|<trace>([^<]*)<\/trace>/g;
+const TRACE_LEGACY_RE = /^REQ-[A-Z]\d+/;
+const TRACE_DESIGN_RE = /^(\d{4}-\d{2}-\d{2}):(.+)$/;
+const TRACE_QA_RE = /^([a-zA-Z][a-zA-Z0-9_-]*):(.+)$/;
+// YAML scalar quoting predicate: quote if value contains characters the parser
+// could misread, has surrounding whitespace, or is empty.
+const YAML_NEEDS_QUOTING_RE = /[:#[\]{},&*!|>'"%@`]/;
 
 // ---------------------------------------------------------------------------
 // parseYamlSequence — internal helper for YAML root-level arrays.
@@ -66,14 +77,8 @@ function parseYamlSequence(content) {
  *   Returns null if file not found, unparseable, or fails schema validation.
  */
 function parseConflictMarker(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  let content;
-  try {
-    content = fs.readFileSync(filePath, 'utf8');
-  } catch {
+  const content = readFileSafe(filePath);
+  if (content === null) {
     return null;
   }
 
@@ -89,12 +94,16 @@ function parseConflictMarker(filePath) {
   }
 
   // Validate required fields from the rules constant (fr-sd-014-ac4: no local literals).
+  // Honor each rule's `allowed` enum where declared (e.g., axis_fired ∈ {'1','2','3'}).
   for (const rule of PENDING_CONFLICT_RULES.required_fields) {
     const value = parsed[rule.key];
     if (value === null || value === undefined) {
       return null;
     }
     if (typeof value === 'string' && value.trim() === '') {
+      return null;
+    }
+    if (Array.isArray(rule.allowed) && !rule.allowed.includes(String(value))) {
       return null;
     }
   }
@@ -132,14 +141,8 @@ function parseConflictMarker(filePath) {
  *   Returns null if file not found or unparseable.
  */
 function parseDecisionLog(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  let content;
-  try {
-    content = fs.readFileSync(filePath, 'utf8');
-  } catch {
+  const content = readFileSafe(filePath);
+  if (content === null) {
     return null;
   }
 
@@ -289,22 +292,32 @@ function validateDecisionLog(parsed) {
  *   criterion_id: string, reason: string }> }}
  */
 function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLogFilePath) {
+  if (typeof specXmlContent !== 'string') {
+    throw new Error('mechanicalAuthorizationCheck: specXmlContent must be a string');
+  }
+  if (typeof designFilePath !== 'string' || designFilePath.trim() === '') {
+    throw new Error('mechanicalAuthorizationCheck: designFilePath must be a non-empty string');
+  }
+  if (
+    decisionLogFilePath !== null &&
+    decisionLogFilePath !== undefined &&
+    typeof decisionLogFilePath !== 'string'
+  ) {
+    throw new Error('mechanicalAuthorizationCheck: decisionLogFilePath must be a string or null');
+  }
+
   const unauthorizedTraces = [];
 
-  // Read design file content once.
-  let designContent = '';
-  try {
-    if (fs.existsSync(designFilePath)) {
-      designContent = fs.readFileSync(designFilePath, 'utf8');
-    }
-  } catch {
-    // If design file is unreadable, all design traces will fail.
-  }
+  // Read design file content once. path.resolve handles relative + absolute.
+  const designContent = readFileSafe(path.resolve(designFilePath)) || '';
+  // Lowercase once — the per-trace loop matches case-insensitively, and the
+  // design content is invariant across iterations.
+  const designLower = designContent.toLowerCase();
 
   // Parse decision-log once (may be null).
   let decisionRows = null;
   if (decisionLogFilePath !== null && decisionLogFilePath !== undefined) {
-    decisionRows = parseDecisionLog(decisionLogFilePath);
+    decisionRows = parseDecisionLog(path.resolve(decisionLogFilePath));
   }
 
   // Build a lookup map from q_id to row for O(1) access.
@@ -331,8 +344,7 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
     if (classification.type === 'design') {
       // Design trace: verify cited section/phrase appears in design content.
       const cited = classification.cited;
-      const found = designContent.toLowerCase().includes(cited.toLowerCase());
-      if (!found) {
+      if (!designLower.includes(cited.toLowerCase())) {
         unauthorizedTraces.push({
           trace_value,
           requirement_id,
@@ -398,13 +410,10 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
  */
 function extractTraceEntries(xml) {
   const entries = [];
-  // Tags we track: <requirement id="...">, <criterion id="...">, <trace>...</trace>
-  const tokenRe = /<requirement\s+id="([^"]*)"|<criterion\s+id="([^"]*)"|<trace>([^<]*)<\/trace>/g;
-
   let currentReqId = '';
   let currentCritId = '';
 
-  for (const m of xml.matchAll(tokenRe)) {
+  for (const m of xml.matchAll(TRACE_TOKEN_RE)) {
     if (m[1] !== undefined) {
       currentReqId = m[1];
       currentCritId = '';
@@ -434,26 +443,17 @@ function extractTraceEntries(xml) {
 function classifyTrace(traceValue) {
   const trimmed = (traceValue || '').trim();
 
-  // Legacy: REQ-F* patterns (e.g., REQ-F010, REQ-F010-ac1) — skip entirely.
-  if (/^REQ-[A-Z]\d+/.test(trimmed)) {
+  if (TRACE_LEGACY_RE.test(trimmed)) {
     return { type: 'legacy' };
   }
-
-  // Design trace: starts with ISO date YYYY-MM-DD followed by ':'
-  // e.g., "2026-04-27:Architecture" or "2026-04-27:B.1"
-  const designMatch = /^(\d{4}-\d{2}-\d{2}):(.+)$/.exec(trimmed);
+  const designMatch = trimmed.match(TRACE_DESIGN_RE);
   if (designMatch) {
     return { type: 'design', cited: designMatch[2].trim() };
   }
-
-  // Q&A trace: a q_id-style identifier followed by ':' and cited content.
-  // q_id pattern: starts with a letter, no ISO date prefix.
-  // e.g., "q1:60 requests per minute" or "qRateLimit:some answer"
-  const qaMatch = /^([a-zA-Z][a-zA-Z0-9_-]*):(.+)$/.exec(trimmed);
+  const qaMatch = trimmed.match(TRACE_QA_RE);
   if (qaMatch) {
     return { type: 'qa', q_id: qaMatch[1], cited: qaMatch[2].trim() };
   }
-
   // Plain identifier with no colon — treat as legacy (pre-v2).
   return { type: 'legacy' };
 }
@@ -473,7 +473,7 @@ function serializeYamlScalar(value) {
   const s = String(value);
   // Quote if value contains characters that could be misread by the parser.
   // Use double quotes and escape any double-quotes in the content.
-  const needsQuoting = /[:#[\]{},&*!|>'"%@`]/.test(s) || s.trim() !== s || s === '';
+  const needsQuoting = YAML_NEEDS_QUOTING_RE.test(s) || s.trim() !== s || s === '';
   if (needsQuoting) {
     return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
@@ -494,15 +494,25 @@ function serializeYamlScalar(value) {
  * @param {string} specId - The spec identifier (e.g., 'spec-driven-refine').
  * @param {{ axis_fired: string, conflict_description: string,
  *   candidate_resolutions: string[], user_action_prompt: string }} conflictData
- * @param {string} [projectRoot] - Project root; defaults to process.cwd().
+ * @param {string} projectRoot - Project root (required; explicit avoids cwd surprises
+ *   when refiner is invoked from a skill-bash block).
  * @returns {string} Absolute path of the written file.
- * @throws {Error} When a required field is missing or candidate_resolutions length
- *   is outside the 1..=3 range defined by PENDING_CONFLICT_RULES.
+ * @throws {Error} When a required field is missing, fails its enum/length rule,
+ *   or the serialized YAML fails to round-trip through parseConflictMarker.
  */
 function writeConflictMarker(specId, conflictData, projectRoot) {
-  const root = projectRoot || process.cwd();
+  if (typeof specId !== 'string' || specId.trim() === '') {
+    throw new Error('writeConflictMarker: specId must be a non-empty string');
+  }
+  if (!conflictData || typeof conflictData !== 'object') {
+    throw new Error('writeConflictMarker: conflictData must be an object');
+  }
+  if (typeof projectRoot !== 'string' || projectRoot.trim() === '') {
+    throw new Error('writeConflictMarker: projectRoot is required (pass an absolute path)');
+  }
 
   // Validate required fields against PENDING_CONFLICT_RULES (fr-sd-014-ac4).
+  // Honors each rule's `allowed` enum where declared (e.g., axis_fired ∈ {'1','2','3'}).
   for (const rule of PENDING_CONFLICT_RULES.required_fields) {
     const value = conflictData[rule.key];
     if (value === null || value === undefined) {
@@ -513,6 +523,11 @@ function writeConflictMarker(specId, conflictData, projectRoot) {
     if (typeof value === 'string' && value.trim() === '') {
       throw new Error(
         `writeConflictMarker: required field "${rule.key}" must not be empty (per PENDING_CONFLICT_RULES).`,
+      );
+    }
+    if (Array.isArray(rule.allowed) && !rule.allowed.includes(String(value))) {
+      throw new Error(
+        `writeConflictMarker: field "${rule.key}" value ${JSON.stringify(value)} is not in allowed set ${JSON.stringify(rule.allowed)} (per PENDING_CONFLICT_RULES).`,
       );
     }
   }
@@ -534,26 +549,36 @@ function writeConflictMarker(specId, conflictData, projectRoot) {
 
   // Build the YAML content matching the wire format parseConflictMarker expects.
   // Format: plain YAML with root-level keys; candidate_resolutions as a block sequence.
-  const axisLine = `axis_fired: ${serializeYamlScalar(conflictData.axis_fired)}`;
-  const descLine = `conflict_description: ${serializeYamlScalar(conflictData.conflict_description)}`;
-  const resLines = ['candidate_resolutions:']
-    .concat(resolutions.map((r) => `  - ${serializeYamlScalar(r)}`))
-    .join('\n');
-  const promptLine = `user_action_prompt: ${serializeYamlScalar(conflictData.user_action_prompt)}`;
-  const yamlContent = [axisLine, descLine, resLines, promptLine].join('\n') + '\n';
+  const yamlLines = [
+    `axis_fired: ${serializeYamlScalar(conflictData.axis_fired)}`,
+    `conflict_description: ${serializeYamlScalar(conflictData.conflict_description)}`,
+    'candidate_resolutions:',
+    ...resolutions.map((r) => `  - ${serializeYamlScalar(r)}`),
+    `user_action_prompt: ${serializeYamlScalar(conflictData.user_action_prompt)}`,
+  ];
+  const yamlContent = `${yamlLines.join('\n')}\n`;
 
-  // Determine destination path from PENDING_CONFLICT_RULES.canonical_path.
+  // Round-trip self-test: parse what we are about to write. If the parser would
+  // reject our output, fail fast before we touch the filesystem — silent YAML
+  // corruption is the failure mode this guards against, since the serializer
+  // and parser are sister implementations that can drift.
+  const roundTripped = parse(yamlContent);
+  if (!roundTripped || typeof roundTripped !== 'object') {
+    throw new Error('writeConflictMarker: round-trip YAML check failed (parser rejected output)');
+  }
+  for (const rule of PENDING_CONFLICT_RULES.required_fields) {
+    if (roundTripped[rule.key] === null || roundTripped[rule.key] === undefined) {
+      throw new Error(
+        `writeConflictMarker: round-trip YAML check failed (field "${rule.key}" missing after re-parse)`,
+      );
+    }
+  }
+
   // canonical_path = 'specs/<spec-id>/_pending-conflict.md'; substitute spec-id.
   const relPath = PENDING_CONFLICT_RULES.canonical_path.replace('<spec-id>', specId);
-  const destPath = path.resolve(root, relPath);
-  const tmpPath = `${destPath}.tmp`;
+  const destPath = path.resolve(projectRoot, relPath);
 
-  // Atomic write: write to tmp, then rename (mirrors session-aliases.js pattern).
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  fs.writeFileSync(tmpPath, yamlContent, 'utf8');
-  fs.renameSync(tmpPath, destPath);
-
-  return destPath;
+  return atomicWriteFile(destPath, yamlContent);
 }
 
 module.exports = {

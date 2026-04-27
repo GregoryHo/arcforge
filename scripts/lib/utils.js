@@ -88,6 +88,35 @@ function writeFileSafe(filePath, content, options = {}) {
 }
 
 /**
+ * Atomic file write — write to a sibling tmp path, then rename.
+ * Sibling tmp guarantees same-filesystem rename (real atomicity, not a copy).
+ * Cleans up the tmp file on rename failure to avoid leaving orphans in the
+ * destination directory. Throws on any I/O failure — callers that prefer a
+ * boolean-result wrapper should catch and convert.
+ *
+ * @param {string} destPath - Final destination path (absolute recommended).
+ * @param {string} content - Content to write.
+ * @param {object} [options] - Write options (encoding etc.); default utf8.
+ * @returns {string} The destination path.
+ */
+function atomicWriteFile(destPath, content, options = { encoding: 'utf8' }) {
+  const tmpPath = `${destPath}.tmp`;
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.writeFileSync(tmpPath, content, options);
+  try {
+    fs.renameSync(tmpPath, destPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // best-effort cleanup; ignore.
+    }
+    throw err;
+  }
+  return destPath;
+}
+
+/**
  * Get cross-platform temp directory
  */
 function getTempDir() {
@@ -576,6 +605,7 @@ module.exports = {
   fileExists,
   readFileSafe,
   writeFileSafe,
+  atomicWriteFile,
   getTempDir,
   findUpwards,
   commandExists,
