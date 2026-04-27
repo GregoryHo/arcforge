@@ -5,47 +5,74 @@
     <artifact>docs/plans/&lt;spec-id&gt;/&lt;date&gt;/design.md (complete design doc)</artifact>
     <artifact>specs/&lt;spec-id&gt;/spec.xml (when a prior spec exists)</artifact>
     <artifact>specs/&lt;spec-id&gt;/dag.yaml (when a prior spec exists, for completion gate check per fr-rf-012)</artifact>
+    <artifact>structured decision-log per fr-cc-if-008 (when brainstorming Q&amp;A produced one; consumed for Phase 4 axis 2 check and Phase 6 mechanical authorization check per fr-rf-010)</artifact>
   </consumes>
   <produces>
     <artifact>specs/&lt;spec-id&gt;/spec.xml</artifact>
     <artifact>specs/&lt;spec-id&gt;/details/*.xml</artifact>
+    <artifact>specs/&lt;spec-id&gt;/_pending-conflict.md (ephemeral handoff on R3 axis-1/2/3 block per fr-rf-015; consumed-and-deleted by brainstorming per fr-bs-008)</artifact>
   </produces>
 
   <requirement id="fr-rf-001">
-    <title>Block on Design Contradictions (R3)</title>
+    <title>Three-Axis R3 Contradiction Check</title>
     <description>
-      Refiner MUST block when the design doc contains contradictory requirements
-      or when the design doc's Change Intent contradicts the prior spec, per
-      Rule R3 (Block on Contradictions). Blocks are transient: refiner prints a
-      detailed error message to terminal and exits non-zero. No artifact is
-      written on block — no spec.xml, no details/, no report file. Retry
-      semantics are clean: fix the design doc, re-run refiner.
+      Refiner MUST block when any of three contradiction axes fires, per Rule R3
+      (Block on Contradictions). The three axes:
+      (1) design.md internal contradictions — including conflict between new
+      design requirements and existing spec requirements when a prior spec
+      exists, and broken dependencies on removed requirements;
+      (2) design.md ↔ user Q&amp;A — design says X and a structured decision-log
+      row says ¬X; refiner has no authorization to silently pick either side;
+      (3) spec-draft coverage — every produced criterion must trace to a
+      (design phrase ∪ Q&amp;A row) source; criteria with no such source are
+      invention.
+      Phasing: axes 1 and 2 are checked at Phase 4 (pre-draft, LLM judgment);
+      axis 3 has LLM judgment at Phase 5.5 (per fr-rf-014) and mechanical
+      enforcement at Phase 6 (per fr-rf-010). On any axis firing, refiner blocks:
+      no spec.xml, no details/, no narrative report — the only persistent
+      artifact written is the ephemeral handoff at
+      specs/&lt;spec-id&gt;/_pending-conflict.md (per fr-rf-015), which is
+      non-versioned and consumed-and-deleted by brainstorming per fr-bs-008.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-001-ac1">
         Given a design doc where REQ-A requires "sessions expire after 15 minutes"
-        and REQ-B requires "sessions never expire", refiner MUST print the
-        contradiction to terminal with specific requirement IDs and exit non-zero.
-        <trace>REQ-F008</trace>
+        and REQ-B requires "sessions never expire", refiner MUST block on axis 1
+        with the contradiction printed to terminal including specific requirement
+        IDs and a pointer to specs/&lt;spec-id&gt;/_pending-conflict.md. Refiner
+        MUST exit non-zero.
+        <trace>2026-04-27:A.2</trace>
       </criterion>
       <criterion id="fr-rf-001-ac2">
-        When blocked, refiner MUST NOT write or modify any file — not spec.xml,
-        not details/, not any report file. Nothing persists across the blocked
-        invocation.
-        <trace>REQ-F008</trace>
+        Given a design phrase saying X and a structured decision-log row saying
+        ¬X, refiner MUST block on axis 2. Silently picking either side is
+        forbidden — even if the Q&amp;A answer is more recent than the design.
+        Terminal output MUST cite both the design line range and the Q&amp;A
+        q_id; the _pending-conflict.md handoff carries at least one candidate
+        resolution per side ("keep design wording", "accept Q&amp;A answer",
+        "make the axis configurable so both stances coexist").
+        <trace>2026-04-27:A.2</trace>
       </criterion>
       <criterion id="fr-rf-001-ac3">
-        Refiner MUST NOT write any refiner-report.md or equivalent persistent
-        artifact on block. The only output channels on block are terminal
-        (stderr) and the process exit code.
-        <trace>REQ-F009</trace>
+        When blocked on any axis (1, 2, or 3), refiner MUST NOT write any
+        authoritative artifact — no spec.xml, no file under
+        specs/&lt;spec-id&gt;/details/, no refiner-report.md or any other
+        persistent narrative reporting artifact. The only persistent artifact
+        permitted on R3 axis-1/2/3 block is the ephemeral handoff
+        specs/&lt;spec-id&gt;/_pending-conflict.md per fr-rf-015, which is
+        non-versioned and consumed-and-deleted by brainstorming on successful
+        new-design write per fr-bs-008.
+        <trace>2026-04-27:A.1</trace>
       </criterion>
       <criterion id="fr-rf-001-ac4">
-        Terminal output on block MUST list each detected issue (contradiction,
-        missing acceptance criterion, broken dependency) with the specific
-        requirement ID(s) involved, and MUST include a Recommendations section
-        with a concrete suggestion for resolving each listed issue.
-        <trace>REQ-F009</trace>
+        Terminal output on block MUST list each detected issue with: (i) which
+        axis fired (1, 2, or 3) and a one-line description; (ii) the specific
+        design line ranges and Q&amp;A row q_ids involved. The 1–3 candidate
+        resolutions and the user-action prompt directing the user to
+        /arc-brainstorming iterate &lt;spec-id&gt; are written to
+        _pending-conflict.md per fr-rf-015 — terminal output points the user
+        to that file.
+        <trace>2026-04-27:A.2, 2026-04-27:B.2</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -288,6 +315,12 @@
     <description>
       After producing a new or updated spec, refiner MUST validate that the
       resulting spec has no internal contradictions before writing output.
+      This requirement covers inter-requirement merge contradictions —
+      contradictions across requirements introduced by merging the design's
+      Change Intent with the prior spec. Intra-requirement self-contradictions
+      (description ↔ AC scope mismatches, RFC-2119 verb mismatches inside a
+      single requirement) are covered separately by fr-rf-014's Phase 5.5
+      sub-pass.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-008-ac1">
@@ -354,12 +387,20 @@
   </requirement>
 
   <requirement id="fr-rf-010">
-    <title>Output Validation — Two-Pass Write</title>
+    <title>Output Validation — Two-Pass Write with Mechanical Authorization Check</title>
     <description>
       Refiner MUST follow the two-pass write pattern (fr-cc-val-001): build
       the complete spec.xml and details/ in memory, validate against the Spec
-      Identity Header contract (fr-cc-if-002), then write to disk only if
-      validation passes.
+      Identity Header contract (fr-cc-if-002) AND perform the mechanical
+      authorization check (axis 3 enforcement at validator level), then write
+      to disk only if all validation passes. The mechanical authorization
+      check iterates over every &lt;trace&gt; element in the in-memory spec
+      and verifies the cited content appears at the cited source location:
+      for traces citing design line ranges, the cited content MUST appear at
+      those lines; for traces citing Q&amp;A rows by q_id, the cited content
+      MUST appear in that row's user_answer_verbatim of the structured
+      decision-log. This is the validator-level layer of axis 3 enforcement;
+      the LLM-judgment layer fires earlier at Phase 5.5 per fr-rf-014.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-010-ac1">
@@ -386,6 +427,164 @@
         operation. Partial writes (spec.xml written but details/ incomplete)
         MUST NOT occur.
         <trace>REQ-F012</trace>
+      </criterion>
+      <criterion id="fr-rf-010-ac5">
+        Refiner MUST perform the mechanical authorization check at Phase 6.
+        For every &lt;trace&gt; element in the in-memory draft: (i) if the
+        trace cites a design line range, refiner MUST verify the cited
+        content appears at those lines in the design doc; (ii) if the trace
+        cites a Q&amp;A row by q_id, refiner MUST verify the cited content
+        appears in that row's user_answer_verbatim of the structured
+        decision-log per fr-cc-if-008. Any mismatch is ERROR. On axis-3
+        mechanical-check ERROR, refiner MUST block per fr-rf-001 axis 3 —
+        the _pending-conflict.md handoff per fr-rf-015 is written, no
+        spec.xml or details/ are written.
+        <trace>2026-04-27:B.4</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-013">
+    <title>Phase 5 No-Invention Discipline</title>
+    <description>
+      During Phase 5 (drafting the spec in memory), refiner MUST NOT author
+      any criterion from training-data inference. When a design phrase is
+      qualitative ("rate-limited", "fast", "secure") or a Q&amp;A row defers
+      ("use defaults", "covered.", "skip", "you decide", or similar deferral
+      phrases with deferral_signal=true per fr-cc-if-008), the legitimate
+      refiner moves are exactly three:
+      (a) preserve the design's qualitative phrasing as SHOULD/MAY (the
+      source phrase is in design.md — that is the authorization);
+      (b) leave the axis unbound (no criterion at all on that axis;
+      downstream stages may surface it as a planning question);
+      (c) BLOCK on axis 3 with a candidate-resolution handoff via fr-rf-015.
+      Inventing a concrete MUST from training-data common practice is not
+      among the legitimate moves.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-013-ac1">
+        Given a design phrase "the system is rate-limited" with no concrete
+        rate value, and no decision-log row resolving the rate, refiner MUST
+        NOT author "rate limit MUST be 60 requests per minute" (or any other
+        concrete value) — that would be invention. Legitimate moves:
+        (a) emit "the system SHOULD be rate-limited" with trace to the
+        qualitative design phrase; (b) leave the rate axis unbound (no
+        criterion); (c) BLOCK on axis 3.
+        <trace>2026-04-27:A.3</trace>
+      </criterion>
+      <criterion id="fr-rf-013-ac2">
+        Given a Q&amp;A row whose user_answer_verbatim matches a deferral
+        signal (deferral_signal=true), refiner MUST treat the corresponding
+        axis as unbound — deferral does NOT authorize a concrete MUST
+        derived from training-data common practice. The three legitimate
+        moves still apply.
+        <trace>2026-04-27:A.3</trace>
+      </criterion>
+      <criterion id="fr-rf-013-ac3">
+        For every concrete MUST in the produced spec, refiner MUST be able
+        to point to a non-deferral source — either a design phrase containing
+        the concrete value, or a Q&amp;A row whose user_answer_verbatim
+        contains the concrete value with deferral_signal=false. If no such
+        source exists, the criterion is invention and MUST NOT be authored
+        (use one of the three legitimate moves instead).
+        <trace>2026-04-27:A.3</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-014">
+    <title>Phase 5.5 — Self-Contradiction Sub-Pass and Axis 3 LLM Judgment</title>
+    <description>
+      Before Phase 6 output validation, refiner MUST perform a Phase 5.5 LLM
+      sub-pass that hosts two checks:
+      (a) self-contradiction — re-read each requirement's &lt;description&gt;
+      against each &lt;criterion&gt; (and against sibling criteria) to detect
+      scope mismatches (description says "the system handles X" but ACs only
+      test the success path) and RFC-2119 verb mismatches (description uses
+      MUST but a sibling AC uses SHOULD on the same axis);
+      (b) axis 3 LLM judgment — for each criterion in the in-memory draft,
+      verify a (design phrase ∪ Q&amp;A row) source can be cited; criteria
+      with no citable source are invention per fr-rf-013.
+      Both findings are R3 enforcement failures (BLOCK + non-zero exit + no
+      spec.xml + no details/), with severity equal to Patterns 1a/1b/2 — not
+      WARN. Phase 5.5 findings are not silently corrected; they BLOCK and
+      route to recovery. Whether _pending-conflict.md is also written is
+      governed by fr-rf-015's scope (axis 3 findings trigger handoff per
+      fr-rf-015-ac1 since axis 3 is enumerated; self-contradiction findings
+      depend on fr-rf-015's interpretation).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-014-ac1">
+        Given a requirement whose description says "the system handles X
+        under both success and failure paths" but whose ACs only test the
+        success path, refiner MUST detect the scope mismatch at Phase 5.5
+        and BLOCK with terminal output including the requirement ID and a
+        remediation hint ("widen ACs to cover failure path, or narrow
+        description to match ACs").
+        <trace>2026-04-27:A.4</trace>
+      </criterion>
+      <criterion id="fr-rf-014-ac2">
+        Given a requirement whose description uses "MUST validate" but
+        whose AC for the same axis uses "SHOULD validate" (or vice versa),
+        refiner MUST detect the RFC-2119 verb mismatch at Phase 5.5 and
+        BLOCK with terminal output including the requirement ID and a
+        remediation hint ("align verbs across description and ACs for the
+        same axis").
+        <trace>2026-04-27:A.4</trace>
+      </criterion>
+      <criterion id="fr-rf-014-ac3">
+        Phase 5.5 MUST also perform axis 3 coverage LLM judgment: for every
+        criterion in the in-memory draft, refiner verifies a citable source
+        (design phrase or non-deferral Q&amp;A row) exists. Criteria with no
+        citable source trigger BLOCK per fr-rf-001 axis 3. This is the
+        LLM-judgment layer; the mechanical layer fires at Phase 6 per
+        fr-rf-010-ac5.
+        <trace>2026-04-27:A.2, 2026-04-27:A.4</trace>
+      </criterion>
+      <criterion id="fr-rf-014-ac4">
+        On any Phase 5.5 finding (self-contradiction per ac1/ac2 OR axis-3
+        LLM coverage per ac3), refiner MUST treat it as R3 enforcement
+        severity — exit non-zero, no spec.xml, no details/, no narrative
+        report. Phase 5.5 findings MUST NOT be downgraded to WARNING. A
+        WARN would let the spec ship with internal contradictions, which is
+        precisely Pattern 3 of the eval evidence.
+        <trace>2026-04-27:A.4</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-rf-015">
+    <title>_pending-conflict.md Write-on-Block Contract</title>
+    <description>
+      When refiner blocks on axis 1, 2, or 3 (per fr-rf-001), it MUST write
+      a single structured handoff file at
+      specs/&lt;spec-id&gt;/_pending-conflict.md and exit non-zero. Per
+      A.1's narrowed Iron Law clause 3 (NEVER WRITE AUTHORITATIVE STATE ON
+      BLOCK), this file is the explicit ephemeral exception: non-versioned,
+      non-authoritative, and consumed-and-deleted by brainstorming on
+      successful new-design write per fr-bs-008. The file's purpose is to
+      enable arc-brainstorming Phase 0 iterate-branch auto-entry without
+      requiring the user to retell the conflict.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-rf-015-ac1">
+        On axis-1, axis-2, or axis-3 block (per fr-rf-001 or per fr-rf-010-ac5
+        for axis-3 mechanical), refiner MUST write
+        specs/&lt;spec-id&gt;/_pending-conflict.md with content per
+        fr-cc-if-007: which axis fired (1, 2, or 3), the conflict description
+        (specific design line ranges and Q&amp;A row q_ids involved), 1–3
+        candidate resolutions, and a user-action prompt directing the user
+        to /arc-brainstorming iterate &lt;spec-id&gt;.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+      <criterion id="fr-rf-015-ac2">
+        Refiner MUST NOT write _pending-conflict.md for non-R3-axis blocks:
+        DAG completion gate failure per fr-rf-012, design-doc validation
+        failure per fr-rf-009, or identity-header validation errors per
+        fr-rf-010-ac1 through fr-rf-010-ac4. These are pipeline-mechanical
+        or programmer-error blocks, not axis contradictions; their output
+        channels are terminal and exit code only.
+        <trace>2026-04-27:B.2</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

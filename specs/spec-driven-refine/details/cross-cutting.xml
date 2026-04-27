@@ -283,6 +283,105 @@
     </acceptance_criteria>
   </requirement>
 
+  <requirement id="fr-cc-if-007">
+    <title>_pending-conflict.md Handoff Schema</title>
+    <description>
+      The _pending-conflict.md file is the interface contract between
+      refiner (producer, on R3 axis-1/2/3 block per fr-rf-015) and
+      brainstorming (consumer, in Phase 0 iterate-branch auto-entry per
+      fr-bs-008). This contract defines the file's location, lifecycle,
+      and required content fields. Per A.1's narrowed Iron Law clause 3,
+      this artifact is the explicit ephemeral exception to "no
+      authoritative state on block" — non-versioned, non-authoritative,
+      and consumed-and-deleted by brainstorming on successful new-design
+      write.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-007-ac1">
+        File location MUST be specs/&lt;spec-id&gt;/_pending-conflict.md.
+        The underscore prefix marks the file as ephemeral hand-off, not
+        versioned spec content. The file MUST NOT live under
+        details/ or any path that would be parsed as a spec detail file.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac2">
+        The file MUST carry: (i) which axis fired (1, 2, or 3); (ii) the
+        conflict description (specific design line ranges and Q&amp;A row
+        q_ids involved); (iii) 1–3 candidate resolutions, each phrased as a
+        concrete action the user can pick; (iv) a user-action prompt
+        directing the user to /arc-brainstorming iterate &lt;spec-id&gt;.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac3">
+        Lifecycle: refiner writes the file on R3 axis-1/2/3 block per
+        fr-rf-015; brainstorming reads it as Change Intent seed in Phase 0
+        per fr-bs-008; brainstorming deletes it on successful new-design
+        write. The file MUST NOT persist across a completed conflict
+        cycle — net zero authoritative state preserved.
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac4">
+        The file MUST be machine-parseable so that brainstorming Phase 0
+        can mechanically iterate over candidate resolutions and the
+        cited design line ranges / Q&amp;A q_ids without LLM
+        re-interpretation. The wire format (YAML, structured markdown,
+        etc.) is an implementation choice; the contract is the field
+        shape and machine-parseability.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-008">
+    <title>Structured Decision-Log Format</title>
+    <description>
+      The decision-log is the interface contract between brainstorming
+      (producer of Q&amp;A rows during Phase 2 elicitation per fr-bs-009)
+      and refiner (consumer for Phase 4 axis 2 contradiction check and
+      Phase 6 mechanical authorization check per fr-rf-010-ac5). This
+      contract defines the field shape and machine-parseability. The wire
+      format (YAML, strict markdown table, etc.) is a deliberately
+      unspecified implementation choice — pinning the format here would
+      over-constrain the implementation and freeze a swappable detail
+      into the contract.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-008-ac1">
+        Each Q&amp;A row MUST carry exactly four required fields:
+        q_id (stable identifier, unique per brainstorming session),
+        question (verbatim text of the question asked),
+        user_answer_verbatim (verbatim text of the user's answer), and
+        deferral_signal (boolean). Missing any field is ERROR.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac2">
+        The decision-log MUST be machine-parseable. The producer
+        (brainstorming) and consumer (refiner) MUST agree on a single wire
+        format — drift between producer and consumer is ERROR. The format
+        choice is an implementation decision; the spec captures the
+        contract (field shape, parseability), not the format.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac3">
+        Rows MUST be addressable by q_id so that refiner's Phase 6
+        mechanical authorization check (per fr-rf-010-ac5) can iterate
+        over rows and verify cited content appears in the correct row's
+        user_answer_verbatim. Lookup by q_id MUST be a deterministic
+        operation on the parsed structure.
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac4">
+        The deferral_signal field MUST be set to true when the
+        user_answer_verbatim matches one of the canonical deferral
+        phrases ("use defaults", "covered.", "skip", "you decide", and
+        similar) per fr-bs-009-ac4. deferral_signal=true tells refiner
+        the corresponding axis is unbound — refiner MUST NOT treat it
+        as authorization for a concrete MUST per fr-rf-013.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
   <!-- ═══════════════ Per-Stage Validation Pattern ═══════════════ -->
 
   <requirement id="fr-cc-val-001">

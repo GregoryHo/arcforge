@@ -352,6 +352,136 @@
     </acceptance_criteria>
   </requirement>
 
+  <requirement id="fr-sd-012">
+    <title>_pending-conflict.md Schema Definition</title>
+    <description>
+      scripts/lib/sdd-schemas/ MUST include a schema describing the
+      _pending-conflict.md handoff format (per fr-cc-if-007), and
+      scripts/lib/sdd-utils.js MUST export the corresponding rule
+      constants (PENDING_CONFLICT_RULES, frozen). This makes the
+      handoff format validator-addressable by Phase 6 mechanical
+      authorization check (per fr-rf-010-ac5) and by brainstorming
+      Phase 0 detection (per fr-bs-008).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-012-ac1">
+        scripts/lib/sdd-utils.js MUST export a frozen
+        PENDING_CONFLICT_RULES object containing: canonical_path
+        ("specs/&lt;spec-id&gt;/_pending-conflict.md"), required_fields
+        (axis_fired, conflict_description with cited design line ranges
+        and Q&amp;A q_ids, candidate_resolutions list with
+        len(1..=3), user_action_prompt), lifecycle (ephemeral, deleted by
+        brainstorming on new-design write).
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-012-ac2">
+        The schema MUST forbid persistent or versioned variants — the
+        file is non-authoritative ephemeral by design (per A.1's narrowed
+        Iron Law). Validators MUST treat any attempt to persist the file
+        across a completed conflict cycle as ERROR ("a prior conflict
+        cycle did not complete cleanly").
+        <trace>2026-04-27:A.1, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-012-ac3">
+        The schema MUST include both a valid example (axis 1 fired,
+        2 candidate resolutions, user-action prompt present) and an
+        invalid example (no candidate resolutions) with error message:
+        "_pending-conflict.md MUST contain at least one candidate
+        resolution".
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-013">
+    <title>Structured Decision-Log Schema Definition</title>
+    <description>
+      scripts/lib/sdd-schemas/ MUST include a schema describing the
+      structured decision-log format (per fr-cc-if-008), and
+      scripts/lib/sdd-utils.js MUST export the corresponding rule
+      constants (DECISION_LOG_RULES, frozen). This makes the decision-log
+      format validator-addressable by refiner's Phase 4 axis 2 check and
+      Phase 6 mechanical authorization check.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-013-ac1">
+        scripts/lib/sdd-utils.js MUST export a frozen DECISION_LOG_RULES
+        object containing: canonical_path (relative to brainstorming's
+        output directory), required_fields_per_row (q_id, question,
+        user_answer_verbatim, deferral_signal), q_id_uniqueness
+        (per-session unique), deferral_signal_canonical_phrases (at
+        minimum: "use defaults", "covered.", "skip", "you decide").
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-sd-013-ac2">
+        The schema MUST specify that rows are addressable by q_id —
+        lookup by q_id is a deterministic operation on the parsed
+        structure (no LLM re-interpretation needed for trace
+        verification).
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-013-ac3">
+        The schema MUST include a valid example (3 Q&amp;A rows with
+        distinct q_ids, mix of deferral_signal=true and false) and
+        invalid examples: (1) duplicate q_id within a session, (2)
+        missing deferral_signal field, (3) missing user_answer_verbatim
+        field.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-014">
+    <title>SDD Utils — Conflict and Decision-Log Validator API</title>
+    <description>
+      scripts/lib/sdd-utils.js MUST export functions for parsing and
+      validating the _pending-conflict.md handoff and the structured
+      decision-log, plus a Phase 6 mechanical authorization helper.
+      These implement the deterministic checks needed by refiner per
+      fr-rf-010-ac5 and by brainstorming per fr-bs-008.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-014-ac1">
+        MUST export parseConflictMarker(filePath: string) that returns
+        {axis_fired, conflict_description, candidate_resolutions,
+        user_action_prompt} or null if file not found. The function
+        MUST validate against PENDING_CONFLICT_RULES (per fr-sd-012)
+        and surface schema violations as parse errors.
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac2">
+        MUST export parseDecisionLog(filePath: string) that returns an
+        array of row objects, each containing {q_id, question,
+        user_answer_verbatim, deferral_signal}, plus
+        validateDecisionLog(parsed) that returns {valid, issues} per
+        the same shape as validateDesignDoc / validateSpecHeader (per
+        fr-sd-008-ac2 / fr-sd-009-ac2). Validation MUST enforce
+        DECISION_LOG_RULES (per fr-sd-013).
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac3">
+        MUST export a Phase 6 mechanical authorization helper that, given
+        an in-memory spec XML, the design.md file path, and the
+        decision-log file path (when present), iterates over every
+        &lt;trace&gt; element and verifies the cited content appears at
+        the cited source location: design line ranges checked against
+        the design file content, Q&amp;A q_id refs checked against the
+        decision-log row's user_answer_verbatim. Returns {valid,
+        unauthorized_traces} where unauthorized_traces lists every
+        trace whose cited content is missing.
+        <trace>2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac4">
+        Validator functions MUST reference the exported rule constants
+        (PENDING_CONFLICT_RULES, DECISION_LOG_RULES) for their schema
+        invariants — not duplicate the rules as local literals inside
+        function bodies. Drift between rules and validators is ERROR
+        per fr-sd-010-ac3's pattern (single source of truth).
+        <trace>2026-04-27:B.1, 2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
   <requirement id="fr-sd-011">
     <title>Schema Access Pattern — print-schema CLI</title>
     <description>

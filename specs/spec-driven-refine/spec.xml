@@ -2,11 +2,12 @@
 <spec>
   <overview>
     <spec_id>spec-driven-refine</spec_id>
-    <spec_version>1</spec_version>
+    <spec_version>2</spec_version>
+    <supersedes>spec-driven-refine:v1</supersedes>
     <status>active</status>
     <source>
-      <design_path>docs/plans/spec-driven-refine/2026-04-16/design.md</design_path>
-      <design_iteration>2026-04-16</design_iteration>
+      <design_path>docs/plans/spec-driven-refine/2026-04-27/design.md</design_path>
+      <design_iteration>2026-04-27</design_iteration>
     </source>
     <title>Spec-Driven Development Pipeline</title>
     <description>
@@ -18,20 +19,36 @@
     </description>
     <scope>
       <includes>
-        <feature id="stage-1-brainstorming">Scan existing specs, confirm spec target, produce design doc with context-sensitive sections (prose when no prior spec; Context + Change Intent when prior spec exists), output validation</feature>
-        <feature id="stage-2-refiner">One behavior with conditional fields based on filesystem state, wiki-style accumulating delta output, DAG completion gate upstream of iteration, R3 block via terminal (no persistent artifact), input/output validation</feature>
+        <feature id="stage-1-brainstorming">Scan existing specs, confirm spec target, produce design doc with context-sensitive sections (prose when no prior spec; Context + Change Intent when prior spec exists), Phase 0 pending-conflict detection with iterate-branch auto-entry, structured decision-log Q&amp;A output, output validation</feature>
+        <feature id="stage-2-refiner">One behavior with conditional fields based on filesystem state, wiki-style accumulating delta output, DAG completion gate upstream of iteration, three-axis R3 contradiction check (design internal, design ↔ Q&amp;A, criterion coverage), Phase 5 no-invention discipline, Phase 5.5 self-contradiction sub-pass, R3 block via terminal (no authoritative artifact; ephemeral _pending-conflict.md handoff to brainstorming on axis-1/2/3 block), input/output validation including Phase 6 mechanical authorization check over &lt;trace&gt; elements</feature>
         <feature id="stage-3-planner">Pure function (spec + delta) → (dag.yaml + epics/), overwrite DAG each sprint (no archive, no state preservation, no gate), delta-scoped planning with epic generation for added/modified/removed/renamed, 1:1 mapping, done signal, input/output validation</feature>
         <feature id="cross-cutting-rules">R1 (human consent), R2 (unidirectional), R3 (block on contradictions)</feature>
-        <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec)</feature>
+        <feature id="artifact-layout">Directory structure for designs, specs, DAG (per-spec), and the ephemeral _pending-conflict.md handoff</feature>
         <feature id="spec-identity-header">XML schema for spec self-identification, versioning, and wiki-style accumulating delta metadata</feature>
-        <feature id="interface-contracts">Design Doc and Spec Identity Header format contracts — sdd-schemas/ (guidance) + sdd-utils.js (validation toolkit)</feature>
-        <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, and deterministic/semantic split</feature>
+        <feature id="interface-contracts">Design Doc, Spec Identity Header, _pending-conflict.md handoff, and structured decision-log format contracts — sdd-schemas/ (guidance) + sdd-utils.js (validation toolkit)</feature>
+        <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, deterministic/semantic split, and Phase 6 mechanical authorization check (axis 3 enforcement at validator level)</feature>
       </includes>
       <excludes>
         <reason>Cross-spec dependencies — deferred until multi-spec usage is established</reason>
         <reason>Downstream migration (Phase 2) — coordinator.js per-spec DAG support, CLI --spec parameter, loop.js multi-spec parallelism, skill path updates, worktree marker spec_id</reason>
+        <reason>Stage 3 cross-model audit pass — proposal's optional defense-in-depth (different-model judge re-reads in-memory spec inside Phase 5.5); deferred unless same-model-bias check shows &gt;1 finding divergence</reason>
+        <reason>Cleanup of deprecated fr-cc-if-003 (SDD Schemas Guidance Layer) — the v1 requirement that scripts/lib/sdd-schemas/design.md and spec.md exist remains valid as artifact-location spec; per fr-sd-011-ac3 those files are deprecated as SoT but remain as artifacts. Removing fr-cc-if-003 would also require removing those files; that scope-creep does not belong in this R3-enforcement iteration.</reason>
       </excludes>
     </scope>
+    <delta version="2" iteration="2026-04-27">
+      <modified ref="fr-rf-001" />
+      <modified ref="fr-rf-010" />
+      <added ref="fr-rf-013" />
+      <added ref="fr-rf-014" />
+      <added ref="fr-rf-015" />
+      <added ref="fr-bs-008" />
+      <added ref="fr-bs-009" />
+      <added ref="fr-cc-if-007" />
+      <added ref="fr-cc-if-008" />
+      <added ref="fr-sd-012" />
+      <added ref="fr-sd-013" />
+      <added ref="fr-sd-014" />
+    </delta>
   </overview>
 
   <cross_cutting>
