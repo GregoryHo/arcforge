@@ -114,13 +114,13 @@ Before drafting the spec, read the design doc and the brainstorming Q&A decision
 
 **Axis 1 — design.md internal contradictions.**
 
-- Contradictory requirements within the design (e.g., "sessions expire after 15 minutes" vs. "sessions never expire")
-- When prior spec exists: contradiction between new design requirements and existing spec requirements
-- Broken dependencies (requirements that depend on removed requirements)
+- Contradictory requirements within the design. Print both requirement IDs to terminal — e.g., REQ-A requires "sessions expire after 15 minutes" and REQ-B requires "sessions never expire" is an axis-1 contradiction; terminal output MUST name both REQ-A and REQ-B with a pointer to `specs/<spec-id>/_pending-conflict.md`.
+- When prior spec exists: contradiction between new design requirements and existing spec requirements.
+- Broken dependencies (requirements that depend on removed requirements).
 
 **Axis 2 — design.md ↔ user Q&A answers.**
 
-If design says X and a user Q&A row says ¬X, the conflict is unresolved. Refiner does not silently pick one. Examples:
+If design says X and a user Q&A row says ¬X, the conflict is unresolved. Refiner does not silently pick one — **silently picking either side is forbidden even if the Q&A answer is more recent than the design.** Terminal output MUST cite both the design line range and the Q&A row q_id. Examples:
 
 - Design says `windowSec: 60`; Q&A row says "use `windowMs` for consistency" → axis 2 fires.
 - Design says `max=32`; Q&A row says "make 32 the default but configurable via flag" → axis 2 fires.

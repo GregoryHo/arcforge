@@ -82,14 +82,14 @@ epics:
         source_requirement: fr-rf-015
       - id: rf-self-contradiction-axis3-llm
         name: Phase 5.5 self-contradiction sub-pass + axis 3 LLM judgment
-        status: pending
+        status: completed
         depends_on:
           - rf-no-invention-discipline
           - rf-pending-conflict-writer
         source_requirement: fr-rf-014
       - id: rf-mechanical-auth-check
         name: Phase 6 mechanical authorization check (axis 3 mechanical)
-        status: pending
+        status: completed
         depends_on:
           - rf-pending-conflict-writer
         source_requirement: fr-rf-010

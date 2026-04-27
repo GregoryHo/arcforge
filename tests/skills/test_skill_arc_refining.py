@@ -1016,3 +1016,342 @@ def test_fr_rf_014_ac5_phase55b_writes_conflict_marker():
     assert has_axis3, (
         "fr-rf-014-ac5: Phase 5.5b writeConflictMarker call must set axis_fired to '3'"
     )
+
+
+# ---------------------------------------------------------------------------
+# fr-rf-001 — Three-Axis R3 Contradiction Check (orchestrator integration)
+# ---------------------------------------------------------------------------
+
+
+def _get_phase4_section(text: str) -> str:
+    """Extract Phase 4 section text (between Phase 4 heading and Phase 5 heading)."""
+    phase4_start = text.find("## Phase 4")
+    phase5_start = text.find("## Phase 5 —")
+    assert phase4_start != -1, "Phase 4 heading must exist"
+    assert phase5_start != -1, "Phase 5 heading must exist"
+    return text[phase4_start:phase5_start]
+
+
+def test_fr_rf_001_ac1_axis1_requires_req_ids_in_terminal_output():
+    """fr-rf-001-ac1: Phase 4 axis-1 block MUST print specific requirement IDs to
+    terminal and point the user to _pending-conflict.md. The sessions-expire example
+    (REQ-A / REQ-B or equivalent) must appear in Phase 4 with both REQ identifiers.
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must mention specific requirement IDs in the axis-1 example
+    # Accept REQ-A/REQ-B labels or the literal IDs (e.g., "REQ-A", "REQ-B")
+    has_req_ids = (
+        "req-a" in lower4
+        or "req-b" in lower4
+        or "requirement id" in lower4
+        or "requirement ids" in lower4
+    )
+    assert has_req_ids, (
+        "fr-rf-001-ac1: Phase 4 axis-1 must reference specific requirement IDs (e.g., REQ-A, REQ-B) "
+        "in the contradiction example — terminal output must include both IDs"
+    )
+
+    # Must mention sessions-expire example (or paraphrase)
+    has_sessions_example = (
+        "sessions expire" in lower4
+        or "sessions never expire" in lower4
+        or "15 minute" in lower4
+    )
+    assert has_sessions_example, (
+        "fr-rf-001-ac1: Phase 4 axis-1 must include the sessions-expire contradiction example "
+        "(REQ-A 'sessions expire after 15 minutes' vs REQ-B 'sessions never expire')"
+    )
+
+    # Must include pointer to _pending-conflict.md on block
+    has_conflict_pointer = "_pending-conflict.md" in phase4
+    assert has_conflict_pointer, (
+        "fr-rf-001-ac1: Phase 4 must point the user to _pending-conflict.md on axis-1 block"
+    )
+
+    # Must exit non-zero (explicitly stated in the BLOCK instructions)
+    has_exit_nonzero = "exit non-zero" in lower4 or "process.exit(1)" in phase4
+    assert has_exit_nonzero, (
+        "fr-rf-001-ac1: Phase 4 BLOCK must document non-zero exit"
+    )
+
+
+def test_fr_rf_001_ac1_axis1_detects_spec_conflicts_and_broken_deps():
+    """fr-rf-001-ac1: Phase 4 axis-1 MUST direct refiner to detect:
+    (a) contradictions between new design requirements and existing spec requirements
+    (b) broken dependencies on removed requirements
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must detect conflict between new design requirements and existing spec requirements
+    has_spec_conflict = (
+        "existing spec" in lower4
+        or ("new design" in lower4 and "spec" in lower4)
+        or ("prior spec" in lower4 and "contradiction" in lower4)
+        or ("prior spec" in lower4 and "conflict" in lower4)
+    )
+    assert has_spec_conflict, (
+        "fr-rf-001-ac1: Phase 4 axis-1 must direct refiner to detect contradictions between "
+        "new design requirements and existing spec requirements (when a prior spec exists)"
+    )
+
+    # Must detect broken dependencies on removed requirements
+    has_broken_deps = (
+        "broken dependenc" in lower4
+        or "removed requirements" in lower4
+        or ("depend" in lower4 and "removed" in lower4)
+    )
+    assert has_broken_deps, (
+        "fr-rf-001-ac1: Phase 4 axis-1 must direct refiner to detect broken dependencies "
+        "on removed requirements"
+    )
+
+
+def test_fr_rf_001_ac2_axis2_silent_pick_forbidden():
+    """fr-rf-001-ac2: Phase 4 axis-2 MUST state that silently picking either side
+    is forbidden — even if the Q&A answer is more recent than the design.
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must forbid silent pick
+    has_no_silent_pick = (
+        "silently pick" in lower4
+        or "silent pick" in lower4
+        or "silently picking" in lower4
+        or "no authorization to pick" in lower4
+        or "does not silently pick" in lower4
+    )
+    assert has_no_silent_pick, (
+        "fr-rf-001-ac2: Phase 4 axis-2 must explicitly state that silently picking "
+        "either side is forbidden"
+    )
+
+    # Must state forbidden even if Q&A more recent
+    has_recency_caveat = (
+        "more recent" in lower4
+        or "q&a is more recent" in lower4
+        or "q&a answer is more recent" in lower4
+        or "even if" in lower4 and "recent" in lower4
+    )
+    assert has_recency_caveat, (
+        "fr-rf-001-ac2: Phase 4 axis-2 must state that silent pick is forbidden "
+        "even if the Q&A answer is more recent than the design"
+    )
+
+
+def test_fr_rf_001_ac2_axis2_cites_both_design_line_and_qid():
+    """fr-rf-001-ac2: Phase 4 axis-2 terminal output MUST cite both the design line range
+    AND the Q&A q_id when blocking.
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must cite design line range
+    has_design_line = (
+        "design line" in lower4
+        or "line range" in lower4
+        or "line ranges" in lower4
+    )
+    assert has_design_line, (
+        "fr-rf-001-ac2: Phase 4 axis-2 block must cite the specific design line ranges"
+    )
+
+    # Must cite Q&A q_id
+    has_qid = "q_id" in phase4 or "q_ids" in phase4
+    assert has_qid, (
+        "fr-rf-001-ac2: Phase 4 axis-2 block must cite the Q&A row q_id"
+    )
+
+
+def test_fr_rf_001_ac2_candidate_resolutions_all_three_sides():
+    """fr-rf-001-ac2: The candidate_resolutions for axis-2 BLOCK MUST include at least
+    one option per side: 'keep design wording', 'accept Q&A answer', and a reconciliation
+    option ('make the axis configurable so both stances coexist').
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must include 'keep design wording'
+    has_keep_design = "keep design wording" in lower4
+    assert has_keep_design, (
+        "fr-rf-001-ac2: Phase 4 axis-2 candidate_resolutions must include 'keep design wording'"
+    )
+
+    # Must include 'accept Q&A answer'
+    has_accept_qa = "accept q&a answer" in lower4
+    assert has_accept_qa, (
+        "fr-rf-001-ac2: Phase 4 axis-2 candidate_resolutions must include 'accept Q&A answer'"
+    )
+
+    # Must include reconciliation option ('make the axis configurable so both stances coexist')
+    has_reconcile = (
+        "make the axis configurable" in lower4
+        or "configurable so both stances coexist" in lower4
+        or "both stances coexist" in lower4
+    )
+    assert has_reconcile, (
+        "fr-rf-001-ac2: Phase 4 axis-2 candidate_resolutions must include a reconciliation option "
+        "('make the axis configurable so both stances coexist')"
+    )
+
+
+def test_fr_rf_001_ac3_block_writes_no_authoritative_artifacts():
+    """fr-rf-001-ac3: SKILL.md MUST be unambiguous: when blocked on ANY axis (1, 2, or 3),
+    refiner MUST NOT write spec.xml, details/*.xml, or any narrative report.
+    Only _pending-conflict.md is permitted (for R3 axis blocks).
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    # Must state no spec.xml on block
+    has_no_spec_xml = (
+        "no spec.xml" in lower
+        or "no `spec.xml`" in lower
+        or "not write spec.xml" in lower
+        or "must not write" in lower and "spec.xml" in lower
+    )
+    assert has_no_spec_xml, (
+        "fr-rf-001-ac3: SKILL.md must explicitly state that spec.xml is NOT written on block"
+    )
+
+    # Must state no details/ on block
+    has_no_details = (
+        "no details/" in lower
+        or "no `details/`" in lower
+        or "no details" in lower
+        or "not write details" in lower
+    )
+    assert has_no_details, (
+        "fr-rf-001-ac3: SKILL.md must explicitly state that details/*.xml is NOT written on block"
+    )
+
+    # Must state no narrative report (no refiner-report.md)
+    has_no_report = (
+        "no refiner-report" in lower
+        or "no narrative report" in lower
+        or "no report" in lower
+    )
+    assert has_no_report, (
+        "fr-rf-001-ac3: SKILL.md must explicitly state that no narrative report is written on block"
+    )
+
+    # Must state _pending-conflict.md is the only permitted artifact
+    has_only_pending = (
+        "_pending-conflict.md" in text
+        and (
+            "only file" in lower
+            or "only persistent artifact" in lower
+            or "only permitted" in lower
+            or "only artifact" in lower
+        )
+    )
+    assert has_only_pending, (
+        "fr-rf-001-ac3: SKILL.md must state that _pending-conflict.md is the only permitted "
+        "artifact on R3 axis-1/2/3 block"
+    )
+
+
+def test_fr_rf_001_ac4_terminal_output_format():
+    """fr-rf-001-ac4: SKILL.md MUST direct refiner that terminal output on block lists
+    each detected issue with:
+    (i) which axis fired (1/2/3) and a one-line description
+    (ii) the specific design line ranges and Q&A row q_ids involved
+    AND points the user to _pending-conflict.md.
+    """
+    text = _read_skill()
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+
+    # Must list axis number in terminal output
+    has_axis_in_output = (
+        "which axis fired" in lower4
+        or "axis fired" in lower4
+        or "axis (1, 2, or 3)" in lower4
+        or "axis 1" in lower4 and "axis 2" in lower4 and "axis 3" in lower4
+    )
+    assert has_axis_in_output, (
+        "fr-rf-001-ac4: Phase 4 terminal output must state which axis fired (1, 2, or 3)"
+    )
+
+    # Must include one-line description per issue
+    has_oneline_desc = (
+        "one-line description" in lower4
+        or "one line description" in lower4
+        or "description of the conflict" in lower4
+    )
+    assert has_oneline_desc, (
+        "fr-rf-001-ac4: Phase 4 terminal output must include a one-line description of the conflict"
+    )
+
+    # Must point user to _pending-conflict.md
+    has_pending_pointer = "_pending-conflict.md" in phase4
+    assert has_pending_pointer, (
+        "fr-rf-001-ac4: Phase 4 terminal output must point user to _pending-conflict.md"
+    )
+
+
+def test_fr_rf_001_phase_to_axis_taxonomy_explicit():
+    """fr-rf-001 description: The three-axis taxonomy MUST be explicit in the skill:
+    Phase 4 = axes 1 and 2 (pre-draft LLM check);
+    Phase 5.5 = axis 3 LLM judgment;
+    Phase 6 = axis 3 mechanical enforcement.
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    # Phase 4 covers axes 1 and 2 (must be explicit somewhere — description or Phase 4 header)
+    has_phase4_axes12 = (
+        "phase 4" in lower and "axis 1" in lower and "axis 2" in lower
+        and (
+            "phase 4" in lower
+            and ("axes 1 and 2" in lower or "axis 1 and 2" in lower or "axis-1" in lower and "axis-2" in lower)
+        )
+    )
+    # More targeted: check Phase 4 section specifically
+    phase4 = _get_phase4_section(text)
+    lower4 = phase4.lower()
+    # Phase 4 section should cover both axis 1 and axis 2 (already present)
+    has_phase4_axis1 = "axis 1" in lower4
+    has_phase4_axis2 = "axis 2" in lower4
+    assert has_phase4_axis1 and has_phase4_axis2, (
+        "fr-rf-001: Phase 4 must explicitly name Axis 1 and Axis 2 "
+        "(the pre-draft LLM contradiction check)"
+    )
+
+    # Phase 5.5 covers axis 3 LLM judgment
+    phase55_start = text.find("## Phase 5.5")
+    phase6_start = text.find("## Phase 6")
+    assert phase55_start != -1
+    phase55 = text[phase55_start:phase6_start]
+    lower55 = phase55.lower()
+    has_phase55_axis3 = (
+        "axis 3" in lower55
+        or "axis-3" in lower55
+        or "llm judgment" in lower55
+        or "llm-judgment" in lower55
+    )
+    assert has_phase55_axis3, (
+        "fr-rf-001: Phase 5.5 must cover axis-3 LLM judgment"
+    )
+
+    # Phase 6 covers axis 3 mechanical enforcement
+    phase6_section = text[phase6_start:]
+    next_phase = phase6_section.find("\n## ", 1)
+    if next_phase != -1:
+        phase6_section = phase6_section[:next_phase]
+    lower6 = phase6_section.lower()
+    has_phase6_axis3_mechanical = (
+        "mechanical" in lower6
+        and ("axis" in lower6 or "axis 3" in lower6 or "mechanicalauthorizationcheck" in lower6)
+    )
+    assert has_phase6_axis3_mechanical, (
+        "fr-rf-001: Phase 6 must cover axis-3 mechanical enforcement"
+    )
