@@ -5,6 +5,7 @@ const os = require('node:os');
 const {
   DESIGN_DOC_RULES,
   SPEC_HEADER_RULES,
+  PENDING_CONFLICT_RULES,
   parseDesignDoc,
   validateDesignDoc,
   parseSpecHeader,
@@ -1816,5 +1817,79 @@ describe('print-schema CLI drift detection', () => {
     expect(out.path_regex.endsWith('</regex>')).toBe(true);
     // Round-trip: the encoded string must contain the actual regex source.
     expect(out.path_regex).toContain(DESIGN_DOC_RULES.path_regex.source);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PENDING_CONFLICT_RULES — fr-sd-012-ac1 schema constant invariants
+// ---------------------------------------------------------------------------
+
+describe('PENDING_CONFLICT_RULES schema constant (fr-sd-012-ac1)', () => {
+  it('is exported from sdd-utils', () => {
+    expect(PENDING_CONFLICT_RULES).toBeDefined();
+  });
+
+  it('top-level object is frozen', () => {
+    expect(Object.isFrozen(PENDING_CONFLICT_RULES)).toBe(true);
+  });
+
+  it('has canonical_path equal to "specs/<spec-id>/_pending-conflict.md"', () => {
+    expect(PENDING_CONFLICT_RULES.canonical_path).toBe('specs/<spec-id>/_pending-conflict.md');
+  });
+
+  it('has required_fields describing axis_fired', () => {
+    const fields = PENDING_CONFLICT_RULES.required_fields;
+    expect(fields).toBeDefined();
+    const axisFired = Array.isArray(fields)
+      ? fields.find((f) => f.key === 'axis_fired')
+      : fields.axis_fired;
+    expect(axisFired).toBeDefined();
+  });
+
+  it('has required_fields describing conflict_description', () => {
+    const fields = PENDING_CONFLICT_RULES.required_fields;
+    const conflictDescription = Array.isArray(fields)
+      ? fields.find((f) => f.key === 'conflict_description')
+      : fields.conflict_description;
+    expect(conflictDescription).toBeDefined();
+  });
+
+  it('has required_fields describing candidate_resolutions', () => {
+    const fields = PENDING_CONFLICT_RULES.required_fields;
+    const candidateResolutions = Array.isArray(fields)
+      ? fields.find((f) => f.key === 'candidate_resolutions')
+      : fields.candidate_resolutions;
+    expect(candidateResolutions).toBeDefined();
+  });
+
+  it('has required_fields describing user_action_prompt', () => {
+    const fields = PENDING_CONFLICT_RULES.required_fields;
+    const userActionPrompt = Array.isArray(fields)
+      ? fields.find((f) => f.key === 'user_action_prompt')
+      : fields.user_action_prompt;
+    expect(userActionPrompt).toBeDefined();
+  });
+
+  it('has lifecycle describing ephemeral semantics', () => {
+    const lifecycle = PENDING_CONFLICT_RULES.lifecycle;
+    expect(lifecycle).toBeDefined();
+    // lifecycle must mention "ephemeral" (the key property per fr-sd-012-ac1)
+    const lifecycleStr = JSON.stringify(lifecycle).toLowerCase();
+    expect(lifecycleStr).toContain('ephemeral');
+  });
+
+  it('has lifecycle describing deletion by brainstorming on new-design write', () => {
+    const lifecycle = PENDING_CONFLICT_RULES.lifecycle;
+    const lifecycleStr = JSON.stringify(lifecycle).toLowerCase();
+    // Must encode the "deleted by brainstorming on new-design write" semantics
+    expect(lifecycleStr).toContain('brainstorming');
+  });
+
+  it('nested required_fields array/object is also frozen (deep freeze)', () => {
+    expect(Object.isFrozen(PENDING_CONFLICT_RULES.required_fields)).toBe(true);
+  });
+
+  it('nested lifecycle object is also frozen (deep freeze)', () => {
+    expect(Object.isFrozen(PENDING_CONFLICT_RULES.lifecycle)).toBe(true);
   });
 });

@@ -232,6 +232,68 @@ const SPEC_HEADER_RULES = Object.freeze({
   },
 });
 
+// -----------------------------------------------------------------------------
+// PENDING_CONFLICT_RULES — single source of truth for _pending-conflict.md schema.
+// -----------------------------------------------------------------------------
+// Refiner writes specs/<spec-id>/_pending-conflict.md on R3 axis-1/2/3 block
+// (fr-rf-015). Brainstorming reads it as Change Intent seed in Phase 0 (fr-bs-008)
+// and deletes it on successful new-design write. Per A.1's narrowed Iron Law, this
+// is the explicit ephemeral exception to "no authoritative state on block".
+//
+// Validators (fr-sd-014) and brainstorming Phase 0 detection (fr-bs-008) read from
+// this object — there is exactly one source of truth and it is the code.
+//
+// Deep-frozen: nested arrays and objects are also frozen so mutation at any depth
+// is rejected. Nested objects are frozen inline using Object.freeze() at each level.
+const PENDING_CONFLICT_RULES = Object.freeze({
+  canonical_path: 'specs/<spec-id>/_pending-conflict.md',
+  // The underscore prefix marks the file as ephemeral hand-off, not versioned spec
+  // content. The file MUST NOT live under details/ or any path parsed as a spec detail.
+  required_fields: Object.freeze([
+    Object.freeze({
+      key: 'axis_fired',
+      type: 'enum',
+      // Which R3 axis triggered the block: 1 (design.md internal), 2 (design.md ↔ Q&A),
+      // or 3 (spec-draft coverage — criterion cannot be traced to a design phrase or Q&A row).
+      allowed: Object.freeze(['1', '2', '3']),
+      description: 'Which contradiction axis fired (1, 2, or 3 per fr-rf-015 / A.2).',
+    }),
+    Object.freeze({
+      key: 'conflict_description',
+      type: 'string',
+      description:
+        'Specific design line ranges and Q&A row q_ids involved in the contradiction. ' +
+        'Must cite exact sources so brainstorming Phase 0 can mechanically address them.',
+    }),
+    Object.freeze({
+      key: 'candidate_resolutions',
+      type: 'list',
+      min_length: 1,
+      max_length: 3,
+      description:
+        '1–3 candidate resolutions, each phrased as a concrete action the user can pick. ' +
+        'Zero resolutions is an ERROR: "_pending-conflict.md MUST contain at least one candidate resolution".',
+    }),
+    Object.freeze({
+      key: 'user_action_prompt',
+      type: 'string',
+      description:
+        'Directs the user to run /arc-brainstorming iterate <spec-id> to resolve the conflict. ' +
+        'Must be present so the user knows how to proceed after reading the conflict file.',
+    }),
+  ]),
+  lifecycle: Object.freeze({
+    state: 'ephemeral',
+    written_by: 'refiner on R3 axis-1/2/3 block (fr-rf-015)',
+    read_by: 'brainstorming Phase 0 iterate-branch auto-entry (fr-bs-008)',
+    deleted_by: 'brainstorming on successful new-design write',
+    // Per A.1's narrowed Iron Law: non-versioned, non-authoritative.
+    // Validators (fr-sd-014) MUST treat persistence across a completed conflict cycle as
+    // ERROR ("a prior conflict cycle did not complete cleanly").
+    persist_across_completed_cycle: 'ERROR',
+  }),
+});
+
 /**
  * Parse a spec XML string and return a structured header object.
  *
@@ -721,6 +783,7 @@ module.exports = {
   // tests). Exported so drift between code and docs is impossible by construction.
   DESIGN_DOC_RULES,
   SPEC_HEADER_RULES,
+  PENDING_CONFLICT_RULES,
   // Parsers / validators.
   parseDesignDoc,
   validateDesignDoc,
