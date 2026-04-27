@@ -275,7 +275,9 @@ node -e "
 
 Phase 6 runs two checks:
 
-**6a — Identity-header validation (non-R3 block):**
+**6a — Identity-header validation (non-R3 block, per fr-cc-if-002):**
+
+`validateSpecHeader` verifies the identity-header contract (fr-cc-if-002): `spec_id`, `spec_version`, `status`, `source`, and `scope` must all be present and well-formed. Any missing or malformed field is ERROR.
 
 - If `validateSpecHeader` returns any `level: 'ERROR'` — **BLOCK (no conflict file, per fr-rf-015-ac2)**. Print all findings with remediation guidance to terminal, exit non-zero, write no files (no `spec.xml`, no `details/`, no report file). **Do NOT write `_pending-conflict.md`** — header validation errors are schema/programmer errors, not axis contradictions.
 - WARNINGs are surfaced to the user but do not block writing.

@@ -77,7 +77,7 @@ epics:
         source_requirement: fr-rf-013
       - id: rf-pending-conflict-writer
         name: _pending-conflict.md write-on-block contract
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-rf-015
       - id: rf-self-contradiction-axis3-llm

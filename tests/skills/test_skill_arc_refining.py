@@ -523,3 +523,246 @@ def test_fr_rf_015_pending_conflict_rules_cited():
     assert "PENDING_CONFLICT_RULES" in text, (
         "fr-rf-015: SKILL.md must reference PENDING_CONFLICT_RULES as schema source of truth"
     )
+
+
+# ---------------------------------------------------------------------------
+# fr-rf-010 — Output Validation: Two-Pass Write with Mechanical Auth Check
+# ---------------------------------------------------------------------------
+
+
+def test_fr_rf_010_ac1_identity_header_validation_in_phase6():
+    """fr-rf-010-ac1: Phase 6 MUST direct refiner to validate the identity header
+    per fr-cc-if-002: spec_id, spec_version, status, source, scope all present
+    and well-formed. Missing fields are ERROR. Refiner uses validateSpecHeader.
+    """
+    text = _read_skill()
+
+    # Phase 6 section must be present
+    phase6_start = text.find("## Phase 6")
+    assert phase6_start != -1, "Phase 6 heading must exist"
+
+    phase6_section = text[phase6_start:]
+    # Find the next top-level section after Phase 6 to scope the check
+    next_section = phase6_section.find("\n## ", 1)
+    if next_section != -1:
+        phase6_section = phase6_section[:next_section]
+
+    # validateSpecHeader must be called in Phase 6
+    assert "validateSpecHeader" in phase6_section, (
+        "fr-rf-010-ac1: Phase 6 must invoke validateSpecHeader for identity-header validation"
+    )
+
+    # Must reference fr-cc-if-002 or list the required fields explicitly
+    has_contract_ref = (
+        "fr-cc-if-002" in phase6_section
+        or (
+            "spec_id" in phase6_section
+            and "spec_version" in phase6_section
+            and "status" in phase6_section
+            and "scope" in phase6_section
+        )
+        or (
+            "fr-cc-if-002" in text  # acceptable anywhere in skill
+            and "validateSpecHeader" in phase6_section
+        )
+    )
+    assert has_contract_ref, (
+        "fr-rf-010-ac1: Phase 6 must reference fr-cc-if-002 or enumerate the required "
+        "identity-header fields (spec_id, spec_version, status, source, scope)"
+    )
+
+    # Missing fields must be ERROR
+    phase6_lower = phase6_section.lower()
+    has_error_on_missing = (
+        "error" in phase6_lower
+        and "validatespecheader" in phase6_lower
+    )
+    assert has_error_on_missing, (
+        "fr-rf-010-ac1: Phase 6 must state that missing identity-header fields are ERROR"
+    )
+
+
+def test_fr_rf_010_ac2_every_requirement_has_ac_with_trace():
+    """fr-rf-010-ac2: SKILL.md MUST direct refiner to verify every <requirement>
+    in the in-memory draft has at least one <acceptance_criteria> block containing
+    at least one <criterion> with a <trace> element. Requirements without testable
+    AC are ERROR.
+    """
+    text = _read_skill()
+
+    # Must state the structural check rule (in Phase 6 or quality checklist)
+    has_ac_trace_rule = (
+        "every requirement" in text.lower()
+        and "acceptance_criteria" in text or "<trace>" in text
+    )
+    # More precise: must say every requirement needs AC with trace
+    has_structural_rule = (
+        (
+            "every requirement has at least one acceptance" in text.lower()
+            or "every <requirement>" in text
+            or "every requirement" in text.lower() and "trace" in text.lower()
+        )
+    )
+    assert has_structural_rule, (
+        "fr-rf-010-ac2: SKILL.md must direct that every requirement has at least one "
+        "acceptance_criteria with a <trace> element"
+    )
+
+    # Requirements without testable AC must be flagged as ERROR
+    # This must be somewhere in the skill prose (Phase 6 or checklist or Iron Law)
+    has_error_directive = (
+        "requirements without" in text.lower()
+        or "requirement without" in text.lower()
+        or (
+            "every requirement" in text.lower()
+            and "error" in text.lower()
+            and "trace" in text.lower()
+        )
+    )
+    assert has_error_directive, (
+        "fr-rf-010-ac2: SKILL.md must state that requirements without testable AC are ERROR"
+    )
+
+
+def test_fr_rf_010_ac3_no_authoritative_files_with_ephemeral_exception():
+    """fr-rf-010-ac3 (audit-patched): SKILL.md MUST use language that makes
+    authoritative-vs-ephemeral distinction explicit:
+    - On validation ERROR: no authoritative files (spec.xml, details/)
+    - The _pending-conflict.md ephemeral exception applies ONLY for R3 axis blocks
+    - For non-R3 errors (identity-header, schema): nothing is written at all
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    # Must use "authoritative" in the context of no-write
+    has_authoritative_no_write = (
+        "no authoritative" in lower
+        or "authoritative state" in lower
+        or "authoritative files" in lower
+    )
+    assert has_authoritative_no_write, (
+        "fr-rf-010-ac3: SKILL.md must use 'authoritative' language for the no-write rule "
+        "(distinguishing authoritative files from the ephemeral _pending-conflict.md)"
+    )
+
+    # Must state the ephemeral exception for R3 axis blocks only
+    has_ephemeral_exception = (
+        "ephemeral" in lower
+        and "_pending-conflict.md" in text
+    )
+    assert has_ephemeral_exception, (
+        "fr-rf-010-ac3: SKILL.md must note the ephemeral _pending-conflict.md exception "
+        "applies only for R3 axis blocks"
+    )
+
+    # Must state that non-R3 errors (identity-header) write nothing at all
+    has_non_r3_nothing_written = (
+        "per fr-rf-015-ac2" in text
+        or (
+            "non-r3" in lower
+            and ("no file" in lower or "nothing" in lower or "terminal" in lower)
+        )
+        or (
+            "identity-header" in lower
+            and ("no file" in lower or "terminal" in lower or "do not write" in lower)
+        )
+    )
+    assert has_non_r3_nothing_written, (
+        "fr-rf-010-ac3: SKILL.md must state that non-R3 errors (identity-header, schema) "
+        "result in nothing written at all (terminal output only)"
+    )
+
+
+def test_fr_rf_010_ac4_atomic_write_in_phase6():
+    """fr-rf-010-ac4: SKILL.md MUST direct refiner to write all files atomically
+    — spec.xml and all details/*.xml in a single operation. Partial writes MUST
+    NOT occur. The build-validate-write order must be described.
+    """
+    text = _read_skill()
+
+    # Phase 6 must describe atomic write
+    phase6_start = text.find("## Phase 6")
+    assert phase6_start != -1, "Phase 6 heading must exist"
+    phase6_section = text[phase6_start:]
+    next_section = phase6_section.find("\n## ", 1)
+    if next_section != -1:
+        phase6_section = phase6_section[:next_section]
+    phase6_lower = phase6_section.lower()
+
+    has_atomic = "atomic" in phase6_lower
+    assert has_atomic, (
+        "fr-rf-010-ac4: Phase 6 must state that files are written atomically"
+    )
+
+    has_no_partial = (
+        "partial write" in phase6_lower
+        or "partial writes" in phase6_lower
+        or "must not occur" in phase6_lower
+    )
+    assert has_no_partial, (
+        "fr-rf-010-ac4: Phase 6 must state that partial writes MUST NOT occur"
+    )
+
+    # Build-validate-write order (two-pass pattern) must be described somewhere in skill
+    has_build_validate_write = (
+        "build in memory" in text.lower()
+        or "two-pass" in text.lower()
+        or "validate" in text.lower() and "then write" in text.lower()
+    )
+    assert has_build_validate_write, (
+        "fr-rf-010-ac4: SKILL.md must describe the build-validate-write order "
+        "(two-pass write pattern)"
+    )
+
+
+def test_fr_rf_010_ac5_mechanical_auth_check_trace_types():
+    """fr-rf-010-ac5: Phase 6 MUST invoke mechanicalAuthorizationCheck and must
+    explicitly distinguish two trace types:
+    (i) design line-range traces — cited content must appear at those lines
+    (ii) q_id traces — cited content must appear in that row's user_answer_verbatim
+    On axis-3 mechanical ERROR, _pending-conflict.md IS written via writeConflictMarker.
+    """
+    text = _read_skill()
+
+    # Phase 6 must invoke mechanicalAuthorizationCheck
+    phase6_start = text.find("## Phase 6")
+    assert phase6_start != -1, "Phase 6 heading must exist"
+    phase6_section = text[phase6_start:]
+    next_section = phase6_section.find("\n## ", 1)
+    if next_section != -1:
+        phase6_section = phase6_section[:next_section]
+
+    assert "mechanicalAuthorizationCheck" in phase6_section, (
+        "fr-rf-010-ac5: Phase 6 must invoke mechanicalAuthorizationCheck"
+    )
+
+    # Must distinguish design line-range traces
+    has_line_range = (
+        "line range" in phase6_section.lower()
+        or "line ranges" in phase6_section.lower()
+        or "design line" in phase6_section.lower()
+        or "design.md" in phase6_section
+    )
+    assert has_line_range, (
+        "fr-rf-010-ac5: Phase 6 must describe design line-range trace verification"
+    )
+
+    # Must distinguish q_id traces / decision-log
+    has_qid = (
+        "q_id" in phase6_section
+        or "decision-log" in phase6_section
+        or "user_answer_verbatim" in phase6_section
+    )
+    assert has_qid, (
+        "fr-rf-010-ac5: Phase 6 must describe q_id / decision-log trace verification"
+    )
+
+    # On axis-3 mechanical ERROR: must write _pending-conflict.md
+    has_conflict_on_error = (
+        "writeConflictMarker" in phase6_section
+        and "_pending-conflict.md" in phase6_section or "_pending-conflict" in phase6_section
+    )
+    assert has_conflict_on_error, (
+        "fr-rf-010-ac5: Phase 6 must state that on axis-3 mechanical ERROR, "
+        "_pending-conflict.md is written via writeConflictMarker"
+    )
