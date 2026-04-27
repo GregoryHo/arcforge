@@ -1,17 +1,25 @@
 /**
- * sdd-contracts.test.js — Cross-cutting contract resolution tests for fr-cc-if-007.
+ * sdd-contracts.test.js — Cross-cutting contract resolution tests for fr-cc-if-007
+ * and fr-cc-if-008.
  *
- * These tests assert that the _pending-conflict.md handoff schema exported from
- * sdd-rules.js satisfies the four acceptance criteria of fr-cc-if-007. They are
- * intentionally separate from sdd-utils.test.js: the latter tests implementation
- * correctness; this file tests that the implementation satisfies the cross-cutting
- * contract. Audience: anyone verifying that epic-sdd-schemas' deliverables fulfil
- * the interface contract between refiner and brainstorming.
+ * These tests assert that the _pending-conflict.md handoff schema (fr-cc-if-007)
+ * and the decision-log schema (fr-cc-if-008) exported from sdd-rules.js satisfy
+ * the four acceptance criteria of each requirement. They are intentionally separate
+ * from sdd-utils.test.js: the latter tests implementation correctness; this file
+ * tests that the implementation satisfies the cross-cutting contracts. Audience:
+ * anyone verifying that epic-sdd-schemas' deliverables fulfil the interface
+ * contracts between refiner and brainstorming.
  *
- * Drift-check approach: before committing, a temporary typo was introduced in
- * PENDING_CONFLICT_RULES.canonical_path ('specs/<spec-id>/_pending-conflicts.md'
+ * Drift-check (fr-cc-if-007): before committing, a temporary typo was introduced
+ * in PENDING_CONFLICT_RULES.canonical_path ('specs/<spec-id>/_pending-conflicts.md'
  * with a spurious trailing 's') to confirm the ac1 test failed. The typo was
  * reverted and all tests now pass green.
+ *
+ * Drift-check (fr-cc-if-008): before committing, 'skip' was temporarily removed
+ * from DECISION_LOG_RULES.deferral_signal_canonical_phrases to confirm the ac4
+ * test (deferral_signal_canonical_phrases contains required phrases) failed with:
+ * "Expected the array to contain 'skip'". The mutation was reverted; all tests
+ * now pass green.
  */
 
 const fs = require('node:fs');
@@ -19,7 +27,10 @@ const path = require('node:path');
 
 const {
   PENDING_CONFLICT_RULES,
+  DECISION_LOG_RULES,
   parseConflictMarker,
+  parseDecisionLog,
+  validateDecisionLog,
   parseSpecHeader,
 } = require('../../scripts/lib/sdd-utils');
 
@@ -199,5 +210,168 @@ describe('integration: fr-cc-if-007 is referenced in spec-driven-refine spec.xml
     // Belt-and-suspenders: grep approach from epic note.
     const content = fs.readFileSync(specXmlPath, 'utf8');
     expect(content).toContain('<added ref="fr-cc-if-007" />');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fr-cc-if-008-ac1 — Four required fields per row
+// ---------------------------------------------------------------------------
+
+describe('fr-cc-if-008-ac1: each Q&A row carries exactly the four contract fields', () => {
+  // Contract enumeration (fr-cc-if-008-ac1): q_id, question,
+  // user_answer_verbatim, deferral_signal.
+  const CONTRACT_FIELD_NAMES = new Set([
+    'q_id',
+    'question',
+    'user_answer_verbatim',
+    'deferral_signal',
+  ]);
+
+  it('required_fields_per_row is an array', () => {
+    expect(Array.isArray(DECISION_LOG_RULES.required_fields_per_row)).toBe(true);
+  });
+
+  it('required_fields_per_row has exactly 4 entries', () => {
+    expect(DECISION_LOG_RULES.required_fields_per_row).toHaveLength(4);
+  });
+
+  it('required_fields_per_row names match the contract enumeration exactly', () => {
+    // Iterate the constant — do not hardcode; assert the SET matches.
+    const actualNames = new Set(DECISION_LOG_RULES.required_fields_per_row);
+    expect(actualNames).toEqual(CONTRACT_FIELD_NAMES);
+  });
+
+  it('required_fields_per_row contains q_id', () => {
+    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('q_id');
+  });
+
+  it('required_fields_per_row contains question', () => {
+    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('question');
+  });
+
+  it('required_fields_per_row contains user_answer_verbatim', () => {
+    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('user_answer_verbatim');
+  });
+
+  it('required_fields_per_row contains deferral_signal', () => {
+    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('deferral_signal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fr-cc-if-008-ac2 — Machine-parseable; parser/validator pair exists
+// ---------------------------------------------------------------------------
+
+describe('fr-cc-if-008-ac2: parseDecisionLog and validateDecisionLog operationalize machine-parseability', () => {
+  it('parseDecisionLog is a callable function', () => {
+    expect(typeof parseDecisionLog).toBe('function');
+  });
+
+  it('parseDecisionLog accepts at least one argument (filePath)', () => {
+    expect(parseDecisionLog.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('parseDecisionLog returns null for a non-existent file (safe boundary)', () => {
+    // Confirms the parser behaves per contract (returns null, does not throw)
+    // when the file is absent — safe live call.
+    const result = parseDecisionLog('/non/existent/decision-log.yaml');
+    expect(result).toBeNull();
+  });
+
+  it('validateDecisionLog is a callable function', () => {
+    expect(typeof validateDecisionLog).toBe('function');
+  });
+
+  it('validateDecisionLog accepts at least one argument (parsed array)', () => {
+    expect(validateDecisionLog.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('validateDecisionLog returns {valid, issues} for null input (safe boundary)', () => {
+    // Confirms the validator returns a structured result for null — does not throw.
+    const result = validateDecisionLog(null);
+    expect(result).toHaveProperty('valid');
+    expect(result).toHaveProperty('issues');
+    expect(typeof result.valid).toBe('boolean');
+    expect(Array.isArray(result.issues)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fr-cc-if-008-ac3 — q_id addressability
+// ---------------------------------------------------------------------------
+
+describe('fr-cc-if-008-ac3: DECISION_LOG_RULES encodes deterministic q_id lookup', () => {
+  it('DECISION_LOG_RULES has an addressable_by field', () => {
+    expect(DECISION_LOG_RULES).toHaveProperty('addressable_by');
+  });
+
+  it('addressable_by is the string "q_id"', () => {
+    // fr-sd-013-ac2 / fr-cc-if-008-ac3: rows addressable by q_id for deterministic lookup.
+    expect(DECISION_LOG_RULES.addressable_by).toBe('q_id');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fr-cc-if-008-ac4 — deferral_signal canonical phrases
+// ---------------------------------------------------------------------------
+
+describe('fr-cc-if-008-ac4: deferral_signal canonical phrases are frozen and complete', () => {
+  it('deferral_signal_canonical_phrases is defined on DECISION_LOG_RULES', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases).toBeDefined();
+  });
+
+  it('deferral_signal_canonical_phrases is an array', () => {
+    expect(Array.isArray(DECISION_LOG_RULES.deferral_signal_canonical_phrases)).toBe(true);
+  });
+
+  it('deferral_signal_canonical_phrases is Object.isFrozen', () => {
+    // Deep-frozen: the canonical phrases MUST NOT be mutated at runtime.
+    expect(Object.isFrozen(DECISION_LOG_RULES.deferral_signal_canonical_phrases)).toBe(true);
+  });
+
+  it('deferral_signal_canonical_phrases contains "use defaults"', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases).toContain('use defaults');
+  });
+
+  it('deferral_signal_canonical_phrases contains "covered."', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases).toContain('covered.');
+  });
+
+  it('deferral_signal_canonical_phrases contains "skip"', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases).toContain('skip');
+  });
+
+  it('deferral_signal_canonical_phrases contains "you decide"', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases).toContain('you decide');
+  });
+
+  it('deferral_signal_canonical_phrases has at least 4 entries (spec says "at minimum")', () => {
+    expect(DECISION_LOG_RULES.deferral_signal_canonical_phrases.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration sanity — fr-cc-if-008 appears in spec.xml delta
+// ---------------------------------------------------------------------------
+
+describe('integration: fr-cc-if-008 is referenced in spec-driven-refine spec.xml delta', () => {
+  const specXmlPath = path.resolve(__dirname, '../../specs/spec-driven-refine/spec.xml');
+
+  it('spec.xml exists', () => {
+    expect(fs.existsSync(specXmlPath)).toBe(true);
+  });
+
+  it('fr-cc-if-008 appears as an added ref in a delta', () => {
+    const content = fs.readFileSync(specXmlPath, 'utf8');
+    const parsed = parseSpecHeader(content);
+    // Flatten all added refs across all deltas.
+    const allAddedRefs = parsed.deltas.flatMap((d) => (d.added || []).map((a) => a.ref));
+    expect(allAddedRefs).toContain('fr-cc-if-008');
+  });
+
+  it('fr-cc-if-008 raw text in spec.xml contains <added ref="fr-cc-if-008" />', () => {
+    // Belt-and-suspenders: grep approach parallel to fr-cc-if-007 integration test.
+    const content = fs.readFileSync(specXmlPath, 'utf8');
+    expect(content).toContain('<added ref="fr-cc-if-008" />');
   });
 });
