@@ -417,9 +417,13 @@
       </criterion>
       <criterion id="fr-rf-010-ac3">
         If output validation finds ERRORs, refiner MUST report all findings
-        with remediation guidance and MUST NOT write any files to
-        specs/&lt;spec-id&gt;/.
-        <trace>REQ-F008, REQ-F015</trace>
+        with remediation guidance and MUST NOT write any authoritative files
+        to specs/&lt;spec-id&gt;/ (no spec.xml, no details/). The ephemeral
+        _pending-conflict.md handoff per fr-rf-015 is the carved-out
+        exception on R3 axis-1/2/3 blocks per ac5; for non-R3-axis ERRORs
+        (e.g. identity-header errors per ac1/ac2, or schema-validation
+        errors per fr-rf-010-ac1/ac2/ac4) no files MUST be written at all.
+        <trace>REQ-F008, REQ-F015, 2026-04-27:A.1</trace>
       </criterion>
       <criterion id="fr-rf-010-ac4">
         If output validation passes (zero ERRORs), refiner MUST write all
@@ -508,10 +512,12 @@
       Both findings are R3 enforcement failures (BLOCK + non-zero exit + no
       spec.xml + no details/), with severity equal to Patterns 1a/1b/2 — not
       WARN. Phase 5.5 findings are not silently corrected; they BLOCK and
-      route to recovery. Whether _pending-conflict.md is also written is
-      governed by fr-rf-015's scope (axis 3 findings trigger handoff per
-      fr-rf-015-ac1 since axis 3 is enumerated; self-contradiction findings
-      depend on fr-rf-015's interpretation).
+      route to recovery. Axis-3 LLM-coverage findings trigger the
+      _pending-conflict.md handoff per fr-rf-015-ac1 (axis 3 enumerated).
+      Self-contradiction findings (description ↔ AC scope mismatch and
+      RFC-2119 verb mismatch per ac1/ac2) ALSO trigger the handoff so the
+      user has a single one-message recovery path covering every R3 BLOCK
+      surface; see ac5 for the contract.
     </description>
     <acceptance_criteria>
       <criterion id="fr-rf-014-ac1">
@@ -549,6 +555,15 @@
         WARN would let the spec ship with internal contradictions, which is
         precisely Pattern 3 of the eval evidence.
         <trace>2026-04-27:A.4</trace>
+      </criterion>
+      <criterion id="fr-rf-014-ac5">
+        On any Phase 5.5 finding (self-contradiction per ac1/ac2 OR axis-3
+        LLM coverage per ac3), refiner MUST also write the
+        _pending-conflict.md handoff per fr-rf-015's contract. This is the
+        single recovery surface for every R3 BLOCK — self-contradiction is
+        not exempted. The seed conflict_description carries the
+        requirement ID and the relevant remediation hint from ac1/ac2/ac3.
+        <trace>2026-04-27:A.4, 2026-04-27:B.2</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

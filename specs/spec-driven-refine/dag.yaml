@@ -70,21 +70,21 @@ epics:
         status: "pending"
         source_requirement: "fr-rf-013"
         depends_on: []
-      - id: "rf-self-contradiction-axis3-llm"
-        name: "Phase 5.5 self-contradiction sub-pass + axis 3 LLM judgment"
-        status: "pending"
-        source_requirement: "fr-rf-014"
-        depends_on: ["rf-no-invention-discipline"]
       - id: "rf-pending-conflict-writer"
         name: "_pending-conflict.md write-on-block contract"
         status: "pending"
         source_requirement: "fr-rf-015"
         depends_on: []
+      - id: "rf-self-contradiction-axis3-llm"
+        name: "Phase 5.5 self-contradiction sub-pass + axis 3 LLM judgment"
+        status: "pending"
+        source_requirement: "fr-rf-014"
+        depends_on: ["rf-no-invention-discipline", "rf-pending-conflict-writer"]
       - id: "rf-mechanical-auth-check"
         name: "Phase 6 mechanical authorization check (axis 3 mechanical)"
         status: "pending"
         source_requirement: "fr-rf-010"
-        depends_on: []
+        depends_on: ["rf-pending-conflict-writer"]
       - id: "rf-three-axis-orchestrator"
         name: "Three-axis R3 contradiction check (orchestrator integrating axes 1/2/3)"
         status: "pending"

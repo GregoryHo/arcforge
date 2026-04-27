@@ -52,8 +52,13 @@
       </criterion>
       <criterion id="fr-bs-002-ac3">
         Brainstorming MUST NOT assume the target without user confirmation. The
-        confirmation is explicit, not inferred.
-        <trace>REQ-F002</trace>
+        confirmation is explicit, not inferred. Exception: when
+        specs/&lt;spec-id&gt;/_pending-conflict.md exists at start of Phase 0,
+        the iterate-branch target is determined by filesystem state per
+        fr-bs-008-ac1, and the user-consent gate is satisfied by the
+        resolution-pick prompt in fr-bs-008-ac2 — no separate "new spec or
+        iteration?" confirmation is asked.
+        <trace>REQ-F002, 2026-04-27:B.3</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
