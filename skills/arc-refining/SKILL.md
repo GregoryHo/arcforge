@@ -7,9 +7,9 @@ description: Use when converting design documents to structured specs, when spec
 
 ## Iron Law
 
-**SPEC IS THE WIKI — PRESERVE EVERY PRIOR DELTA. NEVER WRITE ON BLOCK.**
+**NO INVENTION WITHOUT AUTHORIZATION. PRESERVE EVERY PRIOR DELTA. NEVER WRITE ON BLOCK.**
 
-No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. Block = terminal output + non-zero exit + zero filesystem state. If you find yourself wanting to trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
+Every criterion the refiner emits MUST trace to a design phrase or a user Q&A row — invention from training-data inference is forbidden. No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. Block = terminal output + non-zero exit + zero filesystem state. If you find yourself wanting to fill an unbound axis with a "sensible default", trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
 
 **REQUIRED BACKGROUND:**
 - Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec` before producing any spec.xml — it prints the canonical identity-header schema (required fields, supersedes format, delta-element rules) directly from `scripts/lib/sdd-utils.js`'s `SPEC_HEADER_RULES`. This is the single source of truth — no templates, no hand-authored examples, no drift.
@@ -108,21 +108,56 @@ When a prior spec exists, the design doc MUST have both Context and Change Inten
 
 When the design doc's date folder is older than or equal to the spec's recorded `design_iteration`, produce a WARNING: "design iteration `<date>` is not newer than spec source `<spec-date>` — this may be a stale design doc."
 
-## Phase 4 — LLM Judgment: Contradiction Check
+## Phase 4 — LLM Judgment: Three-Axis Contradiction Check
 
-Before drafting the spec, read the design doc in full and check for:
+Before drafting the spec, read the design doc and the brainstorming Q&A decision-log in full, then check three axes. R3 fires when ANY axis surfaces a contradiction.
 
-- Contradictory requirements (e.g., "sessions expire after 15 minutes" vs. "sessions never expire")
-- When prior spec exists: contradiction between new requirements and existing spec requirements
+**Axis 1 — design.md internal contradictions.**
+
+- Contradictory requirements within the design (e.g., "sessions expire after 15 minutes" vs. "sessions never expire")
+- When prior spec exists: contradiction between new design requirements and existing spec requirements
 - Broken dependencies (requirements that depend on removed requirements)
 
-If contradictions or broken dependencies are found — **BLOCK**. Print each detected issue to terminal with the specific requirement IDs involved, plus a Recommendations section with concrete remediation per issue. Exit non-zero. Write no files. **No `refiner-report.md` or any other persistent artifact is written anywhere** — block behavior is terminal-only, with clean retry semantics (fix the design doc, re-run refiner, no stale state to clean up).
+**Axis 2 — design.md ↔ user Q&A answers.**
 
-Ask at least 2–3 clarifying questions based on gaps or ambiguities found.
+If design says X and a user Q&A row says ¬X, the conflict is unresolved. Refiner does not silently pick one. Examples:
+
+- Design says `windowSec: 60`; Q&A row says "use `windowMs` for consistency" → axis 2 fires.
+- Design says `max=32`; Q&A row says "make 32 the default but configurable via flag" → axis 2 fires.
+
+The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any reconciled middle ground) without surfacing the conflict is the failure mode this axis catches.
+
+**Axis 3 — spec-draft coverage (deferral and invention).**
+
+- Every criterion the refiner is about to draft must trace to a (design phrase ∪ Q&A row) source. A criterion with no such source is invention; under R3, it does not belong in the spec.
+- Deferral signals in Q&A ("use defaults", "covered.", "skip", "you decide", and similar) DO NOT authorize concrete MUSTs. A deferred axis is unbound, not "implicitly authorized via training-data common practice".
+
+**On any axis firing — BLOCK.** Print to terminal:
+
+1. Which axis fired (1, 2, or 3) and a one-line description of the conflict.
+2. The specific design line ranges and Q&A row q_ids involved (so the user can locate them without re-reading the whole design).
+3. **1–3 candidate resolutions** the user can pick from when re-running brainstorming. Examples per axis:
+   - Axis 1: `(a) keep requirement A, drop B; (b) keep B, drop A; (c) widen scope so both hold under disjoint conditions`.
+   - Axis 2: `(a) keep design wording, edit Q&A row; (b) accept Q&A answer, edit design; (c) make the axis configurable so both stances coexist`.
+   - Axis 3: `(a) downgrade the criterion to SHOULD/MAY citing design's qualitative phrase; (b) leave the axis unbound; (c) ask user to specify a concrete value in a new design iteration`.
+
+Exit non-zero. Write no files — no `spec.xml`, no `details/`, no report. The user routes through `/arc-brainstorming iterate <spec-id>` to author a new dated `design.md` (R1-authorized), refiner re-runs against the new design, no stale state to clean up.
+
+Ask at least 2–3 clarifying questions when gaps or ambiguities (not contradictions) surface — gaps are unbound axes (legal under axis 3 by leaving the axis unbound), not R3 triggers.
 
 ## Phase 5 — Draft Spec In Memory (Two-Pass Write)
 
 Build the complete `spec.xml` and all `specs/<spec-id>/details/*.xml` **in memory** before writing any file to disk. This is the two-pass write pattern: build in memory → validate → write atomically only if valid.
+
+### No invention without authorization
+
+Refiner MUST NOT author criteria from training-data inference. When a design phrase is qualitative ("rate-limited", "fast", "secure") or a Q&A row defers ("use defaults", "covered.", "skip", "you decide"), the legitimate refiner moves are exactly three:
+
+1. **Preserve design's qualitative phrasing as SHOULD/MAY.** The source phrase is in design.md — that is the authorization. SHOULD/MAY signals "non-binding hint" without inventing a concrete number. The `<trace>` cites the qualitative phrase in design.md.
+2. **Leave the axis unbound.** No criterion at all on that axis. Downstream stages (planner, implementing) may surface the unbound axis as a planning question; refiner does not pre-answer it.
+3. **BLOCK with candidate resolutions.** When ambiguity is large enough that neither (1) nor (2) is honest — for example, the design's qualitative phrase is so vague that any SHOULD wording would itself be invention — route the user through brainstorming via Phase 4's block flow.
+
+Inventing a concrete MUST from training-data common practice ("most rate-limiters use 60-second windows, so MUST window=60s") is **not** on this list. It violates the Iron Law's first clause.
 
 Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
 
@@ -168,6 +203,17 @@ For the first formalization (no prior spec): no `<delta>` element. Its absence s
 
 For v2+: the new delta is appended after the prior delta(s). The resulting sequence MUST be ordered ascending by `version`. Both `parsed.deltas` (full array) and `parsed.latest_delta` (highest version) are exposed by `parseSpecHeader` for downstream consumers.
 
+## Phase 5.5 — Spec Self-Contradiction Sub-Pass
+
+Before Phase 6 output validation, re-read each requirement's `<description>` against each `<criterion>` (and against sibling criteria). Two failure modes to flag:
+
+- **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test.
+- **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes.
+
+If any requirement fails this sub-pass — **BLOCK**. Print to terminal: requirement ID, the specific scope or verb mismatch, and a remediation hint (widen ACs to cover description scope, narrow description to match ACs, or align verbs). Exit non-zero. Write no files — the in-memory draft is discarded; nothing on disk reflects the failed draft.
+
+This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design and the spec-to-be; Phase 5.5 catches the spec-to-be contradicting itself.
+
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 
 Before writing any file to disk, validate the in-memory spec:
@@ -192,6 +238,8 @@ node -e "
 Before writing files, confirm:
 
 - [ ] every requirement has at least one acceptance criterion with a `<trace>` element
+- [ ] every `<trace>` points to a real source — a design.md line range that contains the cited content, or a Q&A row q_id whose `user_answer_verbatim` contains the cited content (no invention from training data)
+- [ ] every concrete MUST has an authorizing source — design phrase or non-deferral Q&A answer; deferral signals do NOT authorize concrete MUSTs
 - [ ] no vague language — use MUST/SHOULD/MAY per RFC 2119
 - [ ] all requirement IDs are unique across all detail files
 - [ ] all `<detail_file path="...">` references point to files that will be written
@@ -200,7 +248,8 @@ Before writing files, confirm:
 - [ ] new `<delta>` element present and well-formed (when prior spec exists): version/iteration match, all refs resolve
 - [ ] every prior `<delta>` is preserved verbatim — `<overview>` contains the full ascending sequence
 - [ ] new `<delta>` is the last child of `<overview>`
-- [ ] no contradictions between requirements
+- [ ] Phase 4 three axes all clean (design internal, design ↔ Q&A, criterion coverage)
+- [ ] Phase 5.5 sub-pass clean (no description ↔ AC scope or verb mismatches)
 - [ ] user confirms: "Is this spec complete?"
 
 ## Red Flags — Stop
@@ -212,8 +261,13 @@ Before writing files, confirm:
 - "I'll just write a quick refiner-report.md so the user knows what blocked"
 - "I'll force past the DAG gate this once"
 - "I'll trim the older deltas — they're noise"
+- "user said 'use defaults' / 'covered.' / 'skip', so I'll pick a sensible value"
+- "training data shows most systems do X, so MUST X"
+- "design says X and Q&A says ¬X, but Q&A is more recent so I'll use that" (axis 2 silent pick)
+- "the criterion is obviously implied by the design's wording" (no `<trace>` source = invention)
+- "this scope mismatch between description and ACs is minor, ship it"
 
-**All mean: stop. Keep asking until checklist complete and user confirms. On block, terminal + exit only — no files. No escape hatch from the gate. Prior deltas are preserved verbatim.**
+**All mean: stop. Keep asking until checklist complete and user confirms. On block, terminal + exit only — no files. No escape hatch from the gate. Prior deltas are preserved verbatim. No invention from training data; no silent picks across design/Q&A conflicts; no shipping a spec that contradicts itself.**
 
 ## Commit Requirements
 
@@ -243,7 +297,7 @@ Hand off to `/arc-planning` — the planner reads `specs/<spec-id>/spec.xml` and
 
 ⚠️ refiner blocked
 - spec-id: `<spec-id>`
-- reason: [DAG gate: prior sprint incomplete | design doc invalid | contradictions found | output validation errors]
+- reason: [DAG gate: prior sprint incomplete | design doc invalid | axis 1 design contradiction | axis 2 design↔Q&A conflict | axis 3 unauthorized criterion (invention) | spec self-contradiction (Phase 5.5) | output validation errors]
 - issues listed to terminal with requirement IDs, issue types, remediation
 - files written: **none** (no spec.xml, no details/, no report)
 - exit: non-zero
