@@ -7,9 +7,9 @@ description: Use when converting design documents to structured specs, when spec
 
 ## Iron Law
 
-**NO INVENTION WITHOUT AUTHORIZATION. PRESERVE EVERY PRIOR DELTA. NEVER WRITE ON BLOCK.**
+**NO INVENTION WITHOUT AUTHORIZATION. PRESERVE EVERY PRIOR DELTA. NEVER WRITE AUTHORITATIVE STATE ON BLOCK.**
 
-Every criterion the refiner emits MUST trace to a design phrase or a user Q&A row — invention from training-data inference is forbidden. No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. Block = terminal output + non-zero exit + zero filesystem state. If you find yourself wanting to fill an unbound axis with a "sensible default", trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
+Every criterion the refiner emits MUST trace to a design phrase or a user Q&A row — invention from training-data inference is forbidden. No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. On R3 axis block: write only `_pending-conflict.md` (the explicit ephemeral exception per fr-rf-015), exit non-zero, no authoritative state (`spec.xml`, `details/`). On non-R3 blocks: terminal output only, exit non-zero, zero filesystem state. If you find yourself wanting to fill an unbound axis with a "sensible default", trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
 
 **REQUIRED BACKGROUND:**
 - Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec` before producing any spec.xml — it prints the canonical identity-header schema (required fields, supersedes format, delta-element rules) directly from `scripts/lib/sdd-utils.js`'s `SPEC_HEADER_RULES`. This is the single source of truth — no templates, no hand-authored examples, no drift.
@@ -136,12 +136,38 @@ The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any re
 
 1. Which axis fired (1, 2, or 3) and a one-line description of the conflict.
 2. The specific design line ranges and Q&A row q_ids involved (so the user can locate them without re-reading the whole design).
-3. **1–3 candidate resolutions** the user can pick from when re-running brainstorming. Examples per axis:
+3. **1–3 candidate resolutions** the user can pick from when re-running brainstorming. Provide AT LEAST 1 and AT MOST 3 — the writer enforces this range. Examples per axis:
    - Axis 1: `(a) keep requirement A, drop B; (b) keep B, drop A; (c) widen scope so both hold under disjoint conditions`.
    - Axis 2: `(a) keep design wording, edit Q&A row; (b) accept Q&A answer, edit design; (c) make the axis configurable so both stances coexist`.
    - Axis 3: `(a) downgrade the criterion to SHOULD/MAY citing design's qualitative phrase; (b) leave the axis unbound; (c) ask user to specify a concrete value in a new design iteration`.
 
-Exit non-zero. Write no files — no `spec.xml`, no `details/`, no report. The user routes through `/arc-brainstorming iterate <spec-id>` to author a new dated `design.md` (R1-authorized), refiner re-runs against the new design, no stale state to clean up.
+**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-015-ac1):**
+
+```bash
+node -e "
+  const { writeConflictMarker } = require('./scripts/lib/sdd-utils');
+  writeConflictMarker('<spec-id>', {
+    axis_fired: '<1|2|3>',
+    conflict_description: '<specific design line ranges and Q&A row q_ids involved>',
+    candidate_resolutions: [
+      '(a) <first candidate>',
+      '(b) <second candidate>'
+    ],
+    user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
+  });
+"
+```
+
+The schema source of truth is `PENDING_CONFLICT_RULES` (from `scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md`. It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up.
+
+**MUST NOT write `_pending-conflict.md` for non-R3-axis blocks (fr-rf-015-ac2):**
+- DAG completion gate failure (fr-rf-012) → terminal output only, exit non-zero, no file written.
+- Design-doc validation failure (fr-rf-009) → terminal output only, exit non-zero, no file written.
+- Identity-header validation errors (fr-rf-010-ac1 through fr-rf-010-ac4) → terminal output only, exit non-zero, no file written.
+
+These are pipeline-mechanical or programmer-error blocks, not axis contradictions. Their output channel is terminal only.
+
+Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`, no report. The `_pending-conflict.md` is the only file written. The user routes through `/arc-brainstorming iterate <spec-id>` to author a new dated `design.md` (R1-authorized), refiner re-runs against the new design, no stale state to clean up.
 
 Ask at least 2–3 clarifying questions when gaps or ambiguities (not contradictions) surface — gaps are unbound axes (legal under axis 3 by leaving the axis unbound), not R3 triggers.
 
@@ -207,16 +233,30 @@ For the first formalization (no prior spec): no `<delta>` element. Its absence s
 
 For v2+: the new delta is appended after the prior delta(s). The resulting sequence MUST be ordered ascending by `version`. Both `parsed.deltas` (full array) and `parsed.latest_delta` (highest version) are exposed by `parseSpecHeader` for downstream consumers.
 
-## Phase 5.5 — Spec Self-Contradiction Sub-Pass
+## Phase 5.5 — Spec Self-Contradiction Sub-Pass + Axis-3 LLM Judgment
+
+Phase 5.5 hosts two independent checks. Both can block; their block behaviors differ.
+
+### 5.5a — Self-Contradiction Sub-Pass
 
 Before Phase 6 output validation, re-read each requirement's `<description>` against each `<criterion>` (and against sibling criteria). Two failure modes to flag:
 
 - **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test.
 - **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes.
 
-If any requirement fails this sub-pass — **BLOCK**. Print to terminal: requirement ID, the specific scope or verb mismatch, and a remediation hint (widen ACs to cover description scope, narrow description to match ACs, or align verbs). Exit non-zero. Write no files — the in-memory draft is discarded; nothing on disk reflects the failed draft.
+If any requirement fails this sub-pass — **BLOCK (no conflict file).** Print to terminal: requirement ID, the specific scope or verb mismatch, and a remediation hint (widen ACs to cover description scope, narrow description to match ACs, or align verbs). Exit non-zero. Write no files — the in-memory draft is discarded; nothing on disk reflects the failed draft. **Do NOT write `_pending-conflict.md` for this block** — it is a schema/drafting error, not an R3 axis contradiction (per fr-rf-015-ac2).
 
-This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design and the spec-to-be; Phase 5.5 catches the spec-to-be contradicting itself.
+### 5.5b — Axis-3 LLM Judgment Pass
+
+Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) source. This is the LLM-judgment layer of axis 3 (the mechanical layer runs at Phase 6 via `mechanicalAuthorizationCheck`).
+
+If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1).** This is an R3 axis-3 block. Before exiting non-zero:
+
+1. Call `writeConflictMarker` (same pattern as Phase 4 block shown above), setting `axis_fired: '3'`.
+2. Print to terminal: which criterion has no source, and the 1–3 candidate resolutions.
+3. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`.
+
+This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design inputs; Phase 5.5 catches the spec-to-be contradicting itself (5.5a) or having invented criteria (5.5b).
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 
@@ -233,9 +273,45 @@ node -e "
 "
 ```
 
-- If validation returns any `level: 'ERROR'` — **BLOCK**. Print all findings with remediation guidance to terminal, exit non-zero, write no files (no `spec.xml`, no `details/`, no report file).
+Phase 6 runs two checks:
+
+**6a — Identity-header validation (non-R3 block):**
+
+- If `validateSpecHeader` returns any `level: 'ERROR'` — **BLOCK (no conflict file, per fr-rf-015-ac2)**. Print all findings with remediation guidance to terminal, exit non-zero, write no files (no `spec.xml`, no `details/`, no report file). **Do NOT write `_pending-conflict.md`** — header validation errors are schema/programmer errors, not axis contradictions.
 - WARNINGs are surfaced to the user but do not block writing.
-- If zero ERRORs — write all files atomically: `spec.xml` and all `details/*.xml` in a single operation. Partial writes (spec.xml written but details/ incomplete) MUST NOT occur.
+
+**6b — Axis-3 mechanical authorization check (R3-axis block, writes conflict file):**
+
+```bash
+node -e "
+  const fs = require('fs');
+  const { mechanicalAuthorizationCheck, writeConflictMarker } = require('./scripts/lib/sdd-utils');
+  const result = mechanicalAuthorizationCheck(
+    fs.readFileSync('_draft_spec.xml', 'utf-8'),
+    'docs/plans/<spec-id>/<date>/design.md',
+    'docs/plans/<spec-id>/<date>/decision-log.yaml'
+  );
+  if (!result.valid) {
+    console.log(JSON.stringify(result.unauthorized_traces, null, 2));
+    writeConflictMarker('<spec-id>', {
+      axis_fired: '3',
+      conflict_description: 'Mechanical authorization check failed: ' +
+        result.unauthorized_traces.map(t => t.trace_value + ' (' + t.reason + ')').join('; '),
+      candidate_resolutions: [
+        '(a) Add authorizing source to design.md for the flagged criterion.',
+        '(b) Downgrade the criterion to SHOULD/MAY citing design qualitative phrase.',
+        '(c) Remove the criterion — the axis is unbound without an authorizing source.'
+      ],
+      user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
+    });
+    process.exit(1);
+  }
+"
+```
+
+If `mechanicalAuthorizationCheck` returns `valid: false` — **BLOCK (write conflict file, per fr-rf-015-ac1)**. Call `writeConflictMarker` with `axis_fired: '3'`, then exit non-zero. Write no authoritative files.
+
+**If both checks pass:** write all files atomically: `spec.xml` and all `details/*.xml` in a single operation. Partial writes (spec.xml written but details/ incomplete) MUST NOT occur.
 
 ## Quality Checklist
 
@@ -271,7 +347,7 @@ Before writing files, confirm:
 - "the criterion is obviously implied by the design's wording" (no `<trace>` source = invention)
 - "this scope mismatch between description and ACs is minor, ship it"
 
-**All mean: stop. Keep asking until checklist complete and user confirms. On block, terminal + exit only — no files. No escape hatch from the gate. Prior deltas are preserved verbatim. No invention from training data; no silent picks across design/Q&A conflicts; no shipping a spec that contradicts itself.**
+**All mean: stop. Keep asking until checklist complete and user confirms. On R3 axis block: write `_pending-conflict.md` then exit non-zero — no authoritative files. On all other blocks: terminal + exit only — zero files. No escape hatch from the gate. Prior deltas are preserved verbatim. No invention from training data; no silent picks across design/Q&A conflicts; no shipping a spec that contradicts itself.**
 
 ## Commit Requirements
 
@@ -301,10 +377,11 @@ Hand off to `/arc-planning` — the planner reads `specs/<spec-id>/spec.xml` and
 
 ⚠️ refiner blocked
 - spec-id: `<spec-id>`
-- reason: [DAG gate: prior sprint incomplete | design doc invalid | axis 1 design contradiction | axis 2 design↔Q&A conflict | axis 3 unauthorized criterion (invention) | spec self-contradiction (Phase 5.5) | output validation errors]
+- reason: [DAG gate: prior sprint incomplete | design doc invalid | axis 1 design contradiction | axis 2 design↔Q&A conflict | axis 3 unauthorized criterion (invention) | spec self-contradiction (Phase 5.5a) | output validation errors]
 - issues listed to terminal with requirement IDs, issue types, remediation
-- files written: **none** (no spec.xml, no details/, no report)
+- files written (R3 axis-1/2/3 blocks only): `specs/<spec-id>/_pending-conflict.md` (ephemeral handoff — brainstorming reads and deletes it)
+- files written (all other blocks): **none** (no spec.xml, no details/, no report)
 - exit: non-zero
-- action: address issues then re-run refiner
+- action: for R3 axis blocks → run `/arc-brainstorming iterate <spec-id>` to resolve. For other blocks → address issues then re-run refiner.
 
-There is no `refiner-report.md` artifact. Block behavior is intentionally transient — terminal output + non-zero exit, zero filesystem state across invocations. Clean retry semantics: fix the design doc (or finish the sprint), re-run.
+There is no `refiner-report.md` artifact. Block behavior is intentionally transient — terminal output + non-zero exit, no authoritative filesystem state. The `_pending-conflict.md` is the only permitted artifact on R3 axis blocks; it is ephemeral (brainstorming deletes it). Clean retry semantics: resolve the conflict (or fix the design doc / finish the sprint), re-run.

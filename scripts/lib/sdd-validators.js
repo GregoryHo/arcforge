@@ -1,11 +1,16 @@
 /**
- * sdd-validators.js — Parser/validator API for fr-sd-014.
+ * sdd-validators.js — Parser/validator API for fr-sd-014 + writer for fr-rf-015.
  *
- * Exports parseConflictMarker, parseDecisionLog, validateDecisionLog, and
- * mechanicalAuthorizationCheck. These are the three new exports required by
- * fr-sd-014-ac1 through fr-sd-014-ac3. All functions reference
- * PENDING_CONFLICT_RULES / DECISION_LOG_RULES as their schema source of
- * truth — no field names are duplicated as local literals (fr-sd-014-ac4).
+ * Exports parseConflictMarker, parseDecisionLog, validateDecisionLog,
+ * mechanicalAuthorizationCheck, and writeConflictMarker.
+ *
+ * fr-sd-014: parseConflictMarker, parseDecisionLog, validateDecisionLog,
+ *   mechanicalAuthorizationCheck — parsers + validators required by fr-sd-014-ac1
+ *   through fr-sd-014-ac3.
+ * fr-rf-015: writeConflictMarker — writer called by refiner on R3 axis-1/2/3 block.
+ *
+ * All functions reference PENDING_CONFLICT_RULES / DECISION_LOG_RULES as their schema
+ * source of truth — no field names are duplicated as local literals (fr-sd-014-ac4).
  *
  * Wire format for both _pending-conflict.md and decision-log files: YAML.
  * This matches arcforge's "all state as YAML, JSON, JSONL, or Markdown"
@@ -13,6 +18,7 @@
  */
 
 const fs = require('node:fs');
+const path = require('node:path');
 const { parse } = require('./yaml-parser');
 const { PENDING_CONFLICT_RULES, DECISION_LOG_RULES } = require('./sdd-rules');
 
@@ -452,9 +458,108 @@ function classifyTrace(traceValue) {
   return { type: 'legacy' };
 }
 
+// ---------------------------------------------------------------------------
+// writeConflictMarker — fr-rf-015 write-on-block contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Serialize a YAML string value, quoting it if it contains special characters.
+ * Used internally to build the YAML wire format that parseConflictMarker expects.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function serializeYamlScalar(value) {
+  const s = String(value);
+  // Quote if value contains characters that could be misread by the parser.
+  // Use double quotes and escape any double-quotes in the content.
+  const needsQuoting = /[:#[\]{},&*!|>'"%@`]/.test(s) || s.trim() !== s || s === '';
+  if (needsQuoting) {
+    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+  return s;
+}
+
+/**
+ * Write _pending-conflict.md at specs/<specId>/_pending-conflict.md (fr-rf-015).
+ *
+ * Called by refiner on R3 axis-1, axis-2, or axis-3 block. Validates conflictData
+ * against PENDING_CONFLICT_RULES (fr-sd-014-ac4: no local literal field names) before
+ * writing. Writes atomically via a tmp file + renameSync. The produced YAML
+ * round-trips cleanly through parseConflictMarker.
+ *
+ * Lifecycle: ephemeral. Brainstorming Phase 0 reads and deletes it on successful
+ * new-design write (fr-cc-if-007-ac3). Refiner does NOT clean up the file.
+ *
+ * @param {string} specId - The spec identifier (e.g., 'spec-driven-refine').
+ * @param {{ axis_fired: string, conflict_description: string,
+ *   candidate_resolutions: string[], user_action_prompt: string }} conflictData
+ * @param {string} [projectRoot] - Project root; defaults to process.cwd().
+ * @returns {string} Absolute path of the written file.
+ * @throws {Error} When a required field is missing or candidate_resolutions length
+ *   is outside the 1..=3 range defined by PENDING_CONFLICT_RULES.
+ */
+function writeConflictMarker(specId, conflictData, projectRoot) {
+  const root = projectRoot || process.cwd();
+
+  // Validate required fields against PENDING_CONFLICT_RULES (fr-sd-014-ac4).
+  for (const rule of PENDING_CONFLICT_RULES.required_fields) {
+    const value = conflictData[rule.key];
+    if (value === null || value === undefined) {
+      throw new Error(
+        `writeConflictMarker: missing required field "${rule.key}" (per PENDING_CONFLICT_RULES).`,
+      );
+    }
+    if (typeof value === 'string' && value.trim() === '') {
+      throw new Error(
+        `writeConflictMarker: required field "${rule.key}" must not be empty (per PENDING_CONFLICT_RULES).`,
+      );
+    }
+  }
+
+  // candidate_resolutions length check (1..=max_length per fr-sd-012-ac1, fr-cc-if-007-ac2).
+  const candidateRule = PENDING_CONFLICT_RULES.required_fields.find(
+    (r) => r.key === 'candidate_resolutions',
+  );
+  const resolutions = conflictData[candidateRule.key];
+  if (!Array.isArray(resolutions) || resolutions.length < (candidateRule.min_length || 1)) {
+    // Exact error message per fr-sd-012-ac3.
+    throw new Error('_pending-conflict.md MUST contain at least one candidate resolution');
+  }
+  if (resolutions.length > (candidateRule.max_length || 3)) {
+    throw new Error(
+      `writeConflictMarker: candidate_resolutions must have at most ${candidateRule.max_length} entries (got ${resolutions.length}).`,
+    );
+  }
+
+  // Build the YAML content matching the wire format parseConflictMarker expects.
+  // Format: plain YAML with root-level keys; candidate_resolutions as a block sequence.
+  const axisLine = `axis_fired: ${serializeYamlScalar(conflictData.axis_fired)}`;
+  const descLine = `conflict_description: ${serializeYamlScalar(conflictData.conflict_description)}`;
+  const resLines = ['candidate_resolutions:']
+    .concat(resolutions.map((r) => `  - ${serializeYamlScalar(r)}`))
+    .join('\n');
+  const promptLine = `user_action_prompt: ${serializeYamlScalar(conflictData.user_action_prompt)}`;
+  const yamlContent = [axisLine, descLine, resLines, promptLine].join('\n') + '\n';
+
+  // Determine destination path from PENDING_CONFLICT_RULES.canonical_path.
+  // canonical_path = 'specs/<spec-id>/_pending-conflict.md'; substitute spec-id.
+  const relPath = PENDING_CONFLICT_RULES.canonical_path.replace('<spec-id>', specId);
+  const destPath = path.resolve(root, relPath);
+  const tmpPath = `${destPath}.tmp`;
+
+  // Atomic write: write to tmp, then rename (mirrors session-aliases.js pattern).
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.writeFileSync(tmpPath, yamlContent, 'utf8');
+  fs.renameSync(tmpPath, destPath);
+
+  return destPath;
+}
+
 module.exports = {
   parseConflictMarker,
   parseDecisionLog,
   validateDecisionLog,
   mechanicalAuthorizationCheck,
+  writeConflictMarker,
 };

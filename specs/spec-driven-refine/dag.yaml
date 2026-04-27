@@ -62,7 +62,7 @@ epics:
         source_requirement: fr-bs-008
   - id: epic-refiner
     name: Refiner — R3 Enforcement + Conflict Handoff
-    status: pending
+    status: in_progress
     spec_path: specs/spec-driven-refine/epics/epic-refiner/epic.md
     worktree: null
     depends_on:
@@ -72,7 +72,7 @@ epics:
     features:
       - id: rf-no-invention-discipline
         name: Phase 5 no-invention discipline (three legitimate moves)
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-rf-013
       - id: rf-pending-conflict-writer

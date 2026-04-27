@@ -383,3 +383,143 @@ def test_fr_rf_013_ac3_every_concrete_must_sourced():
         "fr-rf-013-ac3: Phase 5 must contain the rule: every concrete MUST must trace to "
         "a non-deferral source (design phrase or non-deferral Q&A row)"
     )
+
+
+# ---------------------------------------------------------------------------
+# fr-rf-015 — _pending-conflict.md Write-on-Block Contract
+# ---------------------------------------------------------------------------
+
+
+def test_fr_rf_015_ac1_r3_block_paths_invoke_write_conflict_marker():
+    """fr-rf-015-ac1: On axis-1, axis-2, or axis-3 block, SKILL.md MUST direct
+    refiner to call writeConflictMarker before exiting non-zero.
+    """
+    text = _read_skill()
+
+    # Must mention writeConflictMarker (the writer function name)
+    assert "writeConflictMarker" in text, (
+        "fr-rf-015-ac1: SKILL.md must direct refiner to call writeConflictMarker on R3 axis block"
+    )
+
+    # Phase 4 (axis 1/2 block) must invoke the writer
+    phase4_start = text.find("## Phase 4")
+    phase5_start = text.find("## Phase 5 —")
+    assert phase4_start != -1, "Phase 4 heading must exist"
+    assert phase5_start != -1, "Phase 5 heading must exist"
+    phase4_section = text[phase4_start:phase5_start]
+    assert "writeConflictMarker" in phase4_section, (
+        "fr-rf-015-ac1: Phase 4 BLOCK path must invoke writeConflictMarker (axis 1/2)"
+    )
+
+    # Phase 5.5 or Phase 6 must invoke the writer for axis-3 blocks
+    phase55_start = text.find("## Phase 5.5")
+    phase6_start = text.find("## Phase 6")
+    assert phase55_start != -1, "Phase 5.5 heading must exist"
+    assert phase6_start != -1, "Phase 6 heading must exist"
+    post_draft_section = text[phase55_start:]
+    assert "writeConflictMarker" in post_draft_section, (
+        "fr-rf-015-ac1: Phase 5.5 or Phase 6 axis-3 BLOCK path must invoke writeConflictMarker"
+    )
+
+
+def test_fr_rf_015_ac1_four_required_fields_in_skill():
+    """fr-rf-015-ac1: SKILL.md must show the four required fields from fr-cc-if-007
+    when describing the writeConflictMarker call: axis_fired, conflict_description,
+    candidate_resolutions, user_action_prompt.
+    """
+    text = _read_skill()
+
+    assert "axis_fired" in text, (
+        "fr-rf-015-ac1: SKILL.md must show axis_fired field in writeConflictMarker call"
+    )
+    assert "conflict_description" in text, (
+        "fr-rf-015-ac1: SKILL.md must show conflict_description field"
+    )
+    assert "candidate_resolutions" in text, (
+        "fr-rf-015-ac1: SKILL.md must show candidate_resolutions field"
+    )
+    assert "user_action_prompt" in text, (
+        "fr-rf-015-ac1: SKILL.md must show user_action_prompt field"
+    )
+
+
+def test_fr_rf_015_ac1_candidate_resolution_range():
+    """fr-rf-015-ac1: SKILL.md must direct refiner to provide AT LEAST 1 and AT MOST 3
+    candidate resolutions (per fr-sd-012-ac1, fr-cc-if-007-ac2).
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    has_range = (
+        "at least 1" in lower
+        or "1–3" in text  # Unicode en-dash range
+        or "1–3" in text       # ASCII dash variant
+        or ("at least" in lower and "candidate" in lower)
+        or ("at most 3" in lower and "candidate" in lower)
+    )
+    assert has_range, (
+        "fr-rf-015-ac1: SKILL.md must state the 1–3 candidate resolution range"
+    )
+
+
+def test_fr_rf_015_ac2_no_write_for_non_r3_blocks():
+    """fr-rf-015-ac2: SKILL.md must explicitly state that _pending-conflict.md
+    MUST NOT be written for non-R3-axis blocks: DAG gate, design-doc validation,
+    identity-header validation errors.
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    # Must mention the no-write condition explicitly
+    has_no_write_directive = (
+        "must not write" in lower
+        or "do not write" in lower
+        or "do not write `_pending-conflict" in lower
+        or "per fr-rf-015-ac2" in lower
+    )
+    assert has_no_write_directive, (
+        "fr-rf-015-ac2: SKILL.md must explicitly state when NOT to write _pending-conflict.md"
+    )
+
+    # Must list at least one of the non-R3 block categories
+    has_non_r3_category = (
+        "dag completion gate" in lower
+        or "dag gate" in lower
+        or "design-doc validation" in lower
+        or "identity-header validation" in lower
+        or "fr-rf-012" in text
+        or "fr-rf-009" in text
+        or "fr-rf-010" in text
+    )
+    assert has_non_r3_category, (
+        "fr-rf-015-ac2: SKILL.md must name at least one non-R3 block category"
+    )
+
+
+def test_fr_rf_015_lifecycle_reminder():
+    """fr-rf-015: SKILL.md must note that _pending-conflict.md is ephemeral —
+    brainstorming Phase 0 reads and deletes it; refiner does not need to clean up.
+    """
+    text = _read_skill()
+    lower = text.lower()
+
+    has_ephemeral = (
+        "ephemeral" in lower
+        or ("brainstorming" in lower and "deletes" in lower)
+        or ("brainstorming" in lower and "delete" in lower and "pending" in lower)
+    )
+    assert has_ephemeral, (
+        "fr-rf-015: SKILL.md must note that _pending-conflict.md is ephemeral "
+        "and deleted by brainstorming"
+    )
+
+
+def test_fr_rf_015_pending_conflict_rules_cited():
+    """fr-rf-015: SKILL.md must reference PENDING_CONFLICT_RULES as the schema
+    source of truth for the conflict file fields.
+    """
+    text = _read_skill()
+
+    assert "PENDING_CONFLICT_RULES" in text, (
+        "fr-rf-015: SKILL.md must reference PENDING_CONFLICT_RULES as schema source of truth"
+    )

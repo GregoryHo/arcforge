@@ -21,6 +21,7 @@ const {
   parseDecisionLog,
   validateDecisionLog,
   mechanicalAuthorizationCheck,
+  writeConflictMarker,
 } = require('./sdd-validators');
 
 // -----------------------------------------------------------------------------
@@ -755,4 +756,6 @@ module.exports = {
   parseDecisionLog,
   validateDecisionLog,
   mechanicalAuthorizationCheck,
+  // fr-rf-015: conflict marker writer — called by refiner on R3 axis-1/2/3 block.
+  writeConflictMarker,
 };
