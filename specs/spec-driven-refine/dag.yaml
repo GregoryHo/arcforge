@@ -43,7 +43,7 @@ epics:
         source_requirement: fr-cc-if-008
   - id: epic-brainstorming
     name: Brainstorming — Phase 0 Detection + Decision-Log Output
-    status: pending
+    status: completed
     spec_path: specs/spec-driven-refine/epics/epic-brainstorming/epic.md
     worktree: null
     depends_on:
@@ -52,12 +52,12 @@ epics:
     features:
       - id: bs-decision-log-producer
         name: Structured decision-log output (Phase 2 producer)
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-bs-009
       - id: bs-pending-conflict-detection
         name: Phase 0 pending-conflict detection + iterate-branch auto-entry
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-bs-008
   - id: epic-refiner
