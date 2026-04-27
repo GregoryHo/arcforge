@@ -1,0 +1,96 @@
+epics:
+  - id: "epic-sdd-schemas"
+    name: "SDD Schemas — _pending-conflict.md and Decision-Log"
+    status: "pending"
+    spec_path: "specs/spec-driven-refine/epics/epic-sdd-schemas/epic.md"
+    worktree: null
+    depends_on: []
+    features:
+      - id: "sdd-pending-conflict-rules"
+        name: "PENDING_CONFLICT_RULES constant + schema doc"
+        status: "pending"
+        source_requirement: "fr-sd-012"
+        depends_on: []
+      - id: "sdd-decision-log-rules"
+        name: "DECISION_LOG_RULES constant + schema doc"
+        status: "pending"
+        source_requirement: "fr-sd-013"
+        depends_on: []
+      - id: "sdd-validator-api"
+        name: "parseConflictMarker / parseDecisionLog / validateDecisionLog / mechanicalAuthorizationCheck"
+        status: "pending"
+        source_requirement: "fr-sd-014"
+        depends_on: ["sdd-pending-conflict-rules", "sdd-decision-log-rules"]
+
+  - id: "epic-cross-cutting"
+    name: "Cross-Cutting Interface Contracts"
+    status: "pending"
+    spec_path: "specs/spec-driven-refine/epics/epic-cross-cutting/epic.md"
+    worktree: null
+    depends_on: ["epic-sdd-schemas"]
+    features:
+      - id: "cc-pending-conflict-contract"
+        name: "_pending-conflict.md handoff contract"
+        status: "pending"
+        source_requirement: "fr-cc-if-007"
+        depends_on: []
+      - id: "cc-decision-log-contract"
+        name: "Structured decision-log format contract"
+        status: "pending"
+        source_requirement: "fr-cc-if-008"
+        depends_on: []
+
+  - id: "epic-brainstorming"
+    name: "Brainstorming — Phase 0 Detection + Decision-Log Output"
+    status: "pending"
+    spec_path: "specs/spec-driven-refine/epics/epic-brainstorming/epic.md"
+    worktree: null
+    depends_on: ["epic-sdd-schemas", "epic-cross-cutting"]
+    features:
+      - id: "bs-decision-log-producer"
+        name: "Structured decision-log output (Phase 2 producer)"
+        status: "pending"
+        source_requirement: "fr-bs-009"
+        depends_on: []
+      - id: "bs-pending-conflict-detection"
+        name: "Phase 0 pending-conflict detection + iterate-branch auto-entry"
+        status: "pending"
+        source_requirement: "fr-bs-008"
+        depends_on: []
+
+  - id: "epic-refiner"
+    name: "Refiner — R3 Enforcement + Conflict Handoff"
+    status: "pending"
+    spec_path: "specs/spec-driven-refine/epics/epic-refiner/epic.md"
+    worktree: null
+    depends_on: ["epic-sdd-schemas", "epic-cross-cutting", "epic-brainstorming"]
+    features:
+      - id: "rf-no-invention-discipline"
+        name: "Phase 5 no-invention discipline (three legitimate moves)"
+        status: "pending"
+        source_requirement: "fr-rf-013"
+        depends_on: []
+      - id: "rf-self-contradiction-axis3-llm"
+        name: "Phase 5.5 self-contradiction sub-pass + axis 3 LLM judgment"
+        status: "pending"
+        source_requirement: "fr-rf-014"
+        depends_on: ["rf-no-invention-discipline"]
+      - id: "rf-pending-conflict-writer"
+        name: "_pending-conflict.md write-on-block contract"
+        status: "pending"
+        source_requirement: "fr-rf-015"
+        depends_on: []
+      - id: "rf-mechanical-auth-check"
+        name: "Phase 6 mechanical authorization check (axis 3 mechanical)"
+        status: "pending"
+        source_requirement: "fr-rf-010"
+        depends_on: []
+      - id: "rf-three-axis-orchestrator"
+        name: "Three-axis R3 contradiction check (orchestrator integrating axes 1/2/3)"
+        status: "pending"
+        source_requirement: "fr-rf-001"
+        depends_on:
+          - "rf-no-invention-discipline"
+          - "rf-self-contradiction-axis3-llm"
+          - "rf-pending-conflict-writer"
+          - "rf-mechanical-auth-check"
