@@ -294,6 +294,50 @@ const PENDING_CONFLICT_RULES = Object.freeze({
   }),
 });
 
+// -----------------------------------------------------------------------------
+// DECISION_LOG_RULES — single source of truth for structured decision-log schema.
+// -----------------------------------------------------------------------------
+// Brainstorming produces Q&A rows during Phase 2 elicitation (fr-bs-009).
+// Refiner consumes rows for Phase 4 axis 2 contradiction check and Phase 6
+// mechanical authorization check (fr-rf-010-ac5). This constant is the interface
+// contract between those two stages per fr-cc-if-008.
+//
+// Validators (fr-sd-014) and refiner Phase 6 read from this object — there is
+// exactly one source of truth and it is the code.
+//
+// Deep-frozen: nested arrays and objects are also frozen so mutation at any depth
+// is rejected. Nested objects are frozen inline using Object.freeze() at each level.
+const DECISION_LOG_RULES = Object.freeze({
+  // Path is relative to brainstorming's output directory (the date-stamped folder
+  // under docs/plans/<spec-id>/). Wire format (YAML, strict markdown table, etc.)
+  // is a swappable implementation detail — the contract is the field shape.
+  canonical_path: '<brainstorming-output-dir>/decision-log.<ext>',
+  // The four required fields every Q&A row MUST carry (fr-cc-if-008-ac1).
+  // Missing any field is ERROR. Order here matches the wire order convention.
+  required_fields_per_row: Object.freeze([
+    'q_id',
+    'question',
+    'user_answer_verbatim',
+    'deferral_signal',
+  ]),
+  // q_id is a stable identifier, unique within a single brainstorming session.
+  // Duplicate q_id within one session is ERROR — it breaks deterministic lookup.
+  q_id_uniqueness: 'unique per brainstorming session; duplicate q_id within a session is ERROR',
+  // Rows MUST be addressable by q_id so refiner Phase 6 can look up cited content
+  // without LLM re-interpretation (fr-sd-013-ac2, fr-cc-if-008-ac3).
+  addressable_by: 'q_id',
+  // Canonical deferral phrases. When user_answer_verbatim matches any of these
+  // (case-insensitive, trimmed), deferral_signal MUST be set to true (fr-cc-if-008-ac4).
+  // Refiner MUST NOT treat a deferred axis as authorization for a concrete MUST
+  // (fr-rf-013). Additional phrases MAY be included by implementations.
+  deferral_signal_canonical_phrases: Object.freeze([
+    'use defaults',
+    'covered.',
+    'skip',
+    'you decide',
+  ]),
+});
+
 /**
  * Parse a spec XML string and return a structured header object.
  *
@@ -784,6 +828,7 @@ module.exports = {
   DESIGN_DOC_RULES,
   SPEC_HEADER_RULES,
   PENDING_CONFLICT_RULES,
+  DECISION_LOG_RULES,
   // Parsers / validators.
   parseDesignDoc,
   validateDesignDoc,

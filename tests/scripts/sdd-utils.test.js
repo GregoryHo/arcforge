@@ -6,6 +6,7 @@ const {
   DESIGN_DOC_RULES,
   SPEC_HEADER_RULES,
   PENDING_CONFLICT_RULES,
+  DECISION_LOG_RULES,
   parseDesignDoc,
   validateDesignDoc,
   parseSpecHeader,
@@ -1891,5 +1892,66 @@ describe('PENDING_CONFLICT_RULES schema constant (fr-sd-012-ac1)', () => {
 
   it('nested lifecycle object is also frozen (deep freeze)', () => {
     expect(Object.isFrozen(PENDING_CONFLICT_RULES.lifecycle)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DECISION_LOG_RULES — fr-sd-013-ac1/ac2 schema constant invariants
+// ---------------------------------------------------------------------------
+
+describe('DECISION_LOG_RULES schema constant (fr-sd-013-ac1)', () => {
+  it('is exported from sdd-utils', () => {
+    expect(DECISION_LOG_RULES).toBeDefined();
+  });
+
+  it('top-level object is frozen', () => {
+    expect(Object.isFrozen(DECISION_LOG_RULES)).toBe(true);
+  });
+
+  it('has canonical_path as a string referencing brainstorming output directory', () => {
+    expect(typeof DECISION_LOG_RULES.canonical_path).toBe('string');
+    expect(DECISION_LOG_RULES.canonical_path.length).toBeGreaterThan(0);
+  });
+
+  it('required_fields_per_row contains exactly four field names: q_id, question, user_answer_verbatim, deferral_signal', () => {
+    const fields = DECISION_LOG_RULES.required_fields_per_row;
+    expect(Array.isArray(fields)).toBe(true);
+    expect(fields).toHaveLength(4);
+    expect(fields).toContain('q_id');
+    expect(fields).toContain('question');
+    expect(fields).toContain('user_answer_verbatim');
+    expect(fields).toContain('deferral_signal');
+  });
+
+  it('q_id_uniqueness descriptor is present and encodes per-session uniqueness', () => {
+    expect(DECISION_LOG_RULES.q_id_uniqueness).toBeDefined();
+    const uniquenessStr = JSON.stringify(DECISION_LOG_RULES.q_id_uniqueness).toLowerCase();
+    expect(uniquenessStr).toContain('session');
+  });
+
+  it('deferral_signal_canonical_phrases is a frozen array containing at minimum the four canonical phrases', () => {
+    const phrases = DECISION_LOG_RULES.deferral_signal_canonical_phrases;
+    expect(Array.isArray(phrases)).toBe(true);
+    expect(Object.isFrozen(phrases)).toBe(true);
+    expect(phrases).toContain('use defaults');
+    expect(phrases).toContain('covered.');
+    expect(phrases).toContain('skip');
+    expect(phrases).toContain('you decide');
+    expect(phrases.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('encodes lookup-by-q_id addressability (fr-sd-013-ac2)', () => {
+    // The constant must have a field (e.g. addressable_by) encoding that rows
+    // are addressable by q_id deterministically.
+    expect(DECISION_LOG_RULES.addressable_by).toBeDefined();
+    expect(DECISION_LOG_RULES.addressable_by).toBe('q_id');
+  });
+
+  it('nested required_fields_per_row array is frozen (deep freeze)', () => {
+    expect(Object.isFrozen(DECISION_LOG_RULES.required_fields_per_row)).toBe(true);
+  });
+
+  it('nested deferral_signal_canonical_phrases array is frozen (deep freeze)', () => {
+    expect(Object.isFrozen(DECISION_LOG_RULES.deferral_signal_canonical_phrases)).toBe(true);
   });
 });
