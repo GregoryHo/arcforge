@@ -25,7 +25,7 @@ epics:
         source_requirement: fr-sd-014
   - id: epic-cross-cutting
     name: Cross-Cutting Interface Contracts
-    status: pending
+    status: completed
     spec_path: specs/spec-driven-refine/epics/epic-cross-cutting/epic.md
     worktree: null
     depends_on:
@@ -33,12 +33,12 @@ epics:
     features:
       - id: cc-pending-conflict-contract
         name: _pending-conflict.md handoff contract
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cc-if-007
       - id: cc-decision-log-contract
         name: Structured decision-log format contract
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cc-if-008
   - id: epic-brainstorming
