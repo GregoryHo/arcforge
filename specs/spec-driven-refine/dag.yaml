@@ -62,7 +62,7 @@ epics:
         source_requirement: fr-bs-008
   - id: epic-refiner
     name: Refiner — R3 Enforcement + Conflict Handoff
-    status: in_progress
+    status: completed
     spec_path: specs/spec-driven-refine/epics/epic-refiner/epic.md
     worktree: null
     depends_on:
@@ -95,7 +95,7 @@ epics:
         source_requirement: fr-rf-010
       - id: rf-three-axis-orchestrator
         name: Three-axis R3 contradiction check (orchestrator integrating axes 1/2/3)
-        status: pending
+        status: completed
         depends_on:
           - rf-no-invention-discipline
           - rf-self-contradiction-axis3-llm
