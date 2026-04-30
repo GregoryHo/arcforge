@@ -1,104 +1,44 @@
 epics:
-  - id: epic-sdd-schemas
-    name: SDD Schemas — _pending-conflict.md and Decision-Log
-    status: completed
-    spec_path: specs/spec-driven-refine/epics/epic-sdd-schemas/epic.md
+  - id: epic-schema-axis
+    name: Schema Auto-Gen Pipeline Completion
+    status: pending
+    spec_path: specs/spec-driven-refine/epics/epic-schema-axis/epic.md
     worktree: null
     depends_on: []
     features:
-      - id: sdd-pending-conflict-rules
-        name: PENDING_CONFLICT_RULES constant + schema doc
-        status: completed
+      - id: schema-renderers
+        name: print-schema.js renderDecisionLog + renderPendingConflict
+        status: pending
         depends_on: []
-        source_requirement: fr-sd-012
-      - id: sdd-decision-log-rules
-        name: DECISION_LOG_RULES constant + schema doc
-        status: completed
-        depends_on: []
-        source_requirement: fr-sd-013
-      - id: sdd-validator-api
-        name: parseConflictMarker / parseDecisionLog / validateDecisionLog / mechanicalAuthorizationCheck
-        status: completed
+        source_requirement: fr-sd-015
+      - id: schema-drift-gate
+        name: sdd-schemas-fresh.test.js extension to all 4 schemas
+        status: pending
         depends_on:
-          - sdd-pending-conflict-rules
-          - sdd-decision-log-rules
-        source_requirement: fr-sd-014
-  - id: epic-cross-cutting
-    name: Cross-Cutting Interface Contracts
-    status: completed
-    spec_path: specs/spec-driven-refine/epics/epic-cross-cutting/epic.md
+          - schema-renderers
+        source_requirement: fr-sd-016
+      - id: schema-cli-access-pattern
+        name: print-schema.js 4 targets + skill access pattern shift (direct read primary)
+        status: pending
+        depends_on:
+          - schema-renderers
+        source_requirement: fr-sd-011
+  - id: epic-path-discipline
+    name: cc-005 Plugin Path Discipline
+    status: pending
+    spec_path: specs/spec-driven-refine/epics/epic-path-discipline/epic.md
     worktree: null
     depends_on:
-      - epic-sdd-schemas
+      - epic-schema-axis
     features:
-      - id: cc-pending-conflict-contract
-        name: _pending-conflict.md handoff contract
-        status: completed
+      - id: path-discipline-lint
+        name: tests/scripts/skill-path-discipline.test.js CI lint
+        status: pending
         depends_on: []
-        source_requirement: fr-cc-if-007
-      - id: cc-decision-log-contract
-        name: Structured decision-log format contract
-        status: completed
-        depends_on: []
-        source_requirement: fr-cc-if-008
-  - id: epic-brainstorming
-    name: Brainstorming — Phase 0 Detection + Decision-Log Output
-    status: completed
-    spec_path: specs/spec-driven-refine/epics/epic-brainstorming/epic.md
-    worktree: null
-    depends_on:
-      - epic-sdd-schemas
-      - epic-cross-cutting
-    features:
-      - id: bs-decision-log-producer
-        name: Structured decision-log output (Phase 2 producer)
-        status: completed
-        depends_on: []
-        source_requirement: fr-bs-009
-      - id: bs-pending-conflict-detection
-        name: Phase 0 pending-conflict detection + iterate-branch auto-entry
-        status: completed
-        depends_on: []
-        source_requirement: fr-bs-008
-  - id: epic-refiner
-    name: Refiner — R3 Enforcement + Conflict Handoff
-    status: completed
-    spec_path: specs/spec-driven-refine/epics/epic-refiner/epic.md
-    worktree: null
-    depends_on:
-      - epic-sdd-schemas
-      - epic-cross-cutting
-      - epic-brainstorming
-    features:
-      - id: rf-no-invention-discipline
-        name: Phase 5 no-invention discipline (three legitimate moves)
-        status: completed
-        depends_on: []
-        source_requirement: fr-rf-013
-      - id: rf-pending-conflict-writer
-        name: _pending-conflict.md write-on-block contract
-        status: completed
-        depends_on: []
-        source_requirement: fr-rf-015
-      - id: rf-self-contradiction-axis3-llm
-        name: Phase 5.5 self-contradiction sub-pass + axis 3 LLM judgment
-        status: completed
+        source_requirement: fr-cc-pl-001
+      - id: path-discipline-remediation
+        name: Existing P2/P3 violation remediation across SDD skills
+        status: pending
         depends_on:
-          - rf-no-invention-discipline
-          - rf-pending-conflict-writer
-        source_requirement: fr-rf-014
-      - id: rf-mechanical-auth-check
-        name: Phase 6 mechanical authorization check (axis 3 mechanical)
-        status: completed
-        depends_on:
-          - rf-pending-conflict-writer
-        source_requirement: fr-rf-010
-      - id: rf-three-axis-orchestrator
-        name: Three-axis R3 contradiction check (orchestrator integrating axes 1/2/3)
-        status: completed
-        depends_on:
-          - rf-no-invention-discipline
-          - rf-self-contradiction-axis3-llm
-          - rf-pending-conflict-writer
-          - rf-mechanical-auth-check
-        source_requirement: fr-rf-001
+          - path-discipline-lint
+        source_requirement: fr-cc-pl-002
