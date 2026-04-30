@@ -382,6 +382,105 @@
     </acceptance_criteria>
   </requirement>
 
+  <!-- ═══════════════ SDD v3 Additions: Plugin Path Discipline (cc-005 enforcement) ═══════════════ -->
+
+  <requirement id="fr-cc-pl-001">
+    <title>Skill Path Discipline CI Lint</title>
+    <description>
+      cc-005 (Cross-Component Plugin Path Discipline, defined in
+      spec.xml &lt;cross_cutting&gt;) requires LLM-facing prose in
+      skills/, templates/, and agents/ to prefix references to plugin
+      shared library content (paths under scripts/lib/) with
+      ${ARCFORGE_ROOT}/. This requirement specifies the mechanical
+      enforcement: a CI lint test that scans the affected files
+      syntactically and fails on bare scripts/lib/ references. The
+      lint scope is deliberately narrow per design.md's path-resolution
+      axis — Node.js module-system paths inside scripts/lib/, test
+      runner paths inside tests/, and hook paths via
+      ${CLAUDE_PLUGIN_ROOT} are out-of-scope because each has a
+      separate, correct mechanism. Skill-local relative patterns are
+      author's judgment and not enforced.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-pl-001-ac1">
+        tests/scripts/skill-path-discipline.test.js MUST exist and
+        scan three globs: skills/**/SKILL.md, templates/**/*.md,
+        agents/**/*.md. The scan MUST detect two violation patterns:
+        (i) bare scripts/lib/ references in prose not preceded by
+        ${ARCFORGE_ROOT}/ on the same logical token, and (ii)
+        node -e "require('./scripts/lib/...')" cwd-relative require
+        invocations. Detection MUST use regex patterns documented
+        inline in the test file with rationale comments.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-001-ac2">
+        Each violation MUST report: file path, line number, the
+        offending line content (truncated to 120 chars if longer),
+        and the corrective form (${ARCFORGE_ROOT}/scripts/lib/...).
+        Test failure MUST block CI and merge — there is no bypass
+        annotation, no skip marker, no allowlist mechanism.
+        Remediation is to fix the path; suppression is forbidden.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-001-ac3">
+        The lint MUST NOT scan: scripts/lib/ (Node module system
+        handles cross-project safety via file-relative resolution),
+        tests/ (test runner sets cwd to plugin root), hooks/ (hooks
+        use ${CLAUDE_PLUGIN_ROOT} per Claude Code plugin contract),
+        and skill-local paths under skills/&lt;name&gt;/scripts/ or
+        skills/&lt;name&gt;/references/ that use ${SKILL_ROOT}/ or
+        cd-then-bare patterns. Static analysis cannot reliably
+        distinguish legitimate from broken cd-then-bare patterns
+        without parsing Bash semantics; cc-005 leaves these to
+        author's judgment per fr-cc-pl-001-ac1's narrowed scope.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-pl-002">
+    <title>Existing P2/P3 Violation Remediation</title>
+    <description>
+      Landing fr-cc-pl-001 with existing violations unfixed would
+      ship a broken state — the new lint would fail on the existing
+      audited violations. This requirement specifies that the audited
+      P2/P3 violations across the affected SDD skills MUST be fixed
+      in the same v3 sprint as fr-cc-pl-001's introduction. The fix
+      is mechanical (add ${ARCFORGE_ROOT}/ prefix); no semantic
+      changes to SDD skill behavior are permitted under this
+      requirement.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-pl-002-ac1">
+        All existing bare scripts/lib/ references in skills/**/SKILL.md,
+        templates/**/*.md, and agents/**/*.md MUST be prefixed with
+        ${ARCFORGE_ROOT}/ such that fr-cc-pl-001-ac1's lint passes
+        cleanly when v3 is merged. The audit set includes (but is not
+        limited to) arc-brainstorming, arc-refining, arc-planning;
+        the lint surfaces the complete current set authoritatively.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-002-ac2">
+        Fixes MUST be mechanical prefix additions only. Reorganizing
+        Bash blocks, switching from CLI to direct read (or vice
+        versa), changing skill instruction semantics, or any other
+        non-prefix modification is out-of-scope for this requirement
+        and MUST be tracked separately if needed.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-002-ac3">
+        Pre-existing arc-writing-skills Path Resolution section
+        (committed at 2a189db prior to v3 sprint start) is
+        considered upstream pre-work and is not subject to this
+        requirement's audit — it was authored against the v3
+        cc-005 contract from the outset. Any drift from the
+        contract surfaced in that section MUST be fixed under
+        this requirement.
+        <trace>design.md:Architecture Impact section</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
   <!-- ═══════════════ Per-Stage Validation Pattern ═══════════════ -->
 
   <requirement id="fr-cc-val-001">

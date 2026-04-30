@@ -2,12 +2,12 @@
 <spec>
   <overview>
     <spec_id>spec-driven-refine</spec_id>
-    <spec_version>2</spec_version>
-    <supersedes>spec-driven-refine:v1</supersedes>
+    <spec_version>3</spec_version>
+    <supersedes>spec-driven-refine:v2</supersedes>
     <status>active</status>
     <source>
-      <design_path>docs/plans/spec-driven-refine/2026-04-27/design.md</design_path>
-      <design_iteration>2026-04-27</design_iteration>
+      <design_path>docs/plans/spec-driven-refine/2026-04-30/design.md</design_path>
+      <design_iteration>2026-04-30</design_iteration>
     </source>
     <title>Spec-Driven Development Pipeline</title>
     <description>
@@ -27,6 +27,8 @@
         <feature id="spec-identity-header">XML schema for spec self-identification, versioning, and wiki-style accumulating delta metadata</feature>
         <feature id="interface-contracts">Design Doc, Spec Identity Header, _pending-conflict.md handoff, and structured decision-log format contracts — sdd-schemas/ (guidance) + sdd-utils.js (validation toolkit)</feature>
         <feature id="per-stage-validation">Input/output validation at each pipeline stage with three-tier severity, two-pass write, deterministic/semantic split, and Phase 6 mechanical authorization check (axis 3 enforcement at validator level)</feature>
+        <feature id="schema-auto-gen-completion">Extend print-schema.js auto-gen pipeline to cover decision-log and pending-conflict schemas (renderers + drift gate), completing the v2.0.0 single-source-of-truth decision applied unevenly across the four sdd-schemas/*.md files</feature>
+        <feature id="plugin-path-discipline">cc-005 cross-cutting constraint (plugin distribution path discipline for skills/templates/agents references to scripts/lib/), CI lint mechanical enforcement, remediation of existing P2/P3 violations across affected SDD skills</feature>
       </includes>
       <excludes>
         <reason>Cross-spec dependencies — deferred until multi-spec usage is established</reason>
@@ -49,6 +51,13 @@
       <added ref="fr-sd-013" />
       <added ref="fr-sd-014" />
     </delta>
+    <delta version="3" iteration="2026-04-30">
+      <modified ref="fr-sd-011" />
+      <added ref="fr-sd-015" />
+      <added ref="fr-sd-016" />
+      <added ref="fr-cc-pl-001" />
+      <added ref="fr-cc-pl-002" />
+    </delta>
   </overview>
 
   <cross_cutting>
@@ -70,6 +79,25 @@
         Each pipeline stage receives a self-contained input: the complete design
         doc for refiner, the complete spec.xml for planner. Stages MUST NOT rely
         on implicit context from prior conversation or session state.
+      </description>
+    </constraint>
+    <constraint id="cc-005">
+      <title>Cross-Component Plugin Path Discipline</title>
+      <description>
+        arcforge ships as a Claude Code plugin. At runtime the LLM works in the
+        user's project (cwd is the user's project, not the plugin install). Any
+        LLM-facing prose in skills/, templates/, or agents/ that references
+        plugin shared library content (paths under scripts/lib/) MUST prefix
+        the path with ${ARCFORGE_ROOT}/ — bare cwd-relative references break
+        when the LLM executes them in a user's project. Out of scope: Node.js
+        module-system requires inside scripts/lib/ itself (file-relative
+        resolution is cross-project safe), test runner paths inside tests/
+        (test runner sets cwd to plugin root), hook execution paths via
+        ${CLAUDE_PLUGIN_ROOT} (plugin contract handles them), and skill-local
+        relative patterns under ${SKILL_ROOT}/ (author's judgment, static
+        analysis cannot reliably distinguish legitimate from broken patterns).
+        Mechanical enforcement is fr-cc-pl-001 (CI lint); existing violations
+        are remediated under fr-cc-pl-002.
       </description>
     </constraint>
   </cross_cutting>
