@@ -4,7 +4,10 @@
   <produces>
     <artifact>scripts/lib/sdd-schemas/design.md (design doc structure guide)</artifact>
     <artifact>scripts/lib/sdd-schemas/spec.md (spec identity header guide)</artifact>
-    <artifact>scripts/lib/sdd-utils.js (programmatic validators)</artifact>
+    <artifact>scripts/lib/sdd-schemas/decision-log.md (structured decision-log format guide, auto-generated per fr-sd-015)</artifact>
+    <artifact>scripts/lib/sdd-schemas/pending-conflict.md (pending-conflict handoff format guide, auto-generated per fr-sd-015)</artifact>
+    <artifact>scripts/lib/sdd-utils.js (programmatic validators + facade re-exports of decision-log / pending-conflict rules)</artifact>
+    <artifact>scripts/lib/sdd-rules.js (canonical home for DECISION_LOG_RULES and PENDING_CONFLICT_RULES constants; split from sdd-utils.js to keep file size below 700-line hard limit)</artifact>
   </produces>
 
   <!-- ═══════════════ Design Doc Schema ═══════════════ -->
@@ -312,9 +315,19 @@
     <description>
       Design-doc and spec-header schema rules MUST live as exported constants
       in scripts/lib/sdd-utils.js (DESIGN_DOC_RULES and SPEC_HEADER_RULES).
+      The newer DECISION_LOG_RULES and PENDING_CONFLICT_RULES constants
+      (added in v2 per fr-sd-012, fr-sd-013) are DEFINED in a sibling
+      module scripts/lib/sdd-rules.js — split from sdd-utils.js to keep
+      the latter under the 700-line hard limit per coding-standards —
+      and RE-EXPORTED through scripts/lib/sdd-utils.js so consumers
+      can import all four rule constants from a single facade. Both
+      module paths are valid import sources for the re-exported pair;
+      the canonical home (definition site) is sdd-rules.js.
+
       Validators (parseDesignDoc, validateDesignDoc, parseSpecHeader,
-      validateSpecHeader) MUST consume these constants — not duplicate the
-      rules as regex literals inside the function bodies. Downstream
+      validateSpecHeader, parseDecisionLog, validateDecisionLog,
+      parseConflictMarker) MUST consume these constants — not duplicate
+      the rules as regex literals inside the function bodies. Downstream
       consumers (skills, tests, the print-schema CLI) MUST read from these
       exports rather than redescribing the schema in hand-authored text.
 
@@ -517,10 +530,12 @@
       <criterion id="fr-sd-011-ac2">
         print-schema.js MUST derive its output from the exported rule
         constants (DESIGN_DOC_RULES, SPEC_HEADER_RULES, DECISION_LOG_RULES,
-        PENDING_CONFLICT_RULES) in sdd-utils.js / sdd-rules.js. It MUST
-        NOT hand-author schema content. Prose narrative inside renderer
-        functions (lines.push patterns) is permitted as renderer-template
-        content; structured fields MUST come from the rule constants.
+        PENDING_CONFLICT_RULES) imported via the sdd-utils.js facade
+        (which re-exports the latter two from sdd-rules.js per fr-sd-010).
+        It MUST NOT hand-author schema content. Prose narrative inside
+        renderer functions (lines.push patterns) is permitted as
+        renderer-template content; structured fields MUST come from the
+        rule constants.
         <trace>REQ-F003, REQ-F010</trace>
       </criterion>
       <criterion id="fr-sd-011-ac3">

@@ -137,7 +137,13 @@
       Schema files are the guidance layer — they tell the LLM what format
       to produce. They live in scripts/lib/ (shared infrastructure) so any
       skill can read them without cross-skill coupling. Full schema content
-      definitions are in details/sdd-schemas.xml (fr-sd-001 through fr-sd-007).
+      definitions are in details/sdd-schemas.xml (fr-sd-001 through fr-sd-016).
+      The four pipeline-artifact schema files governed by this requirement
+      are: design.md (per fr-sd-001 through fr-sd-004), spec.md (per
+      fr-sd-005 through fr-sd-007), decision-log.md (per fr-sd-013, v2),
+      and pending-conflict.md (per fr-sd-012, v2). The latter two ship via
+      print-schema.js auto-gen (per fr-sd-015, v3) with byte-equal drift
+      gate (per fr-sd-016, v3).
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-003-ac1">
@@ -167,8 +173,8 @@
       validates structure and provides information, but does NOT merge or
       author spec content (the LLM manages spec content directly, like
       maintaining a wiki page). Full API definitions are in
-      details/sdd-schemas.xml (fr-sd-008, fr-sd-009). LLM judgment is
-      reserved for semantic checks (contradictions, ambiguity).
+      details/sdd-schemas.xml (fr-sd-008, fr-sd-009, fr-sd-014). LLM
+      judgment is reserved for semantic checks (contradictions, ambiguity).
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-004-ac1">
