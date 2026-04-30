@@ -201,6 +201,14 @@ function validateDesignDoc(parsed) {
 // parseSpecHeader + validateSpecHeader read from this object; print-schema.js
 // imports it to render the spec schema for humans and LLMs. Any new rule goes
 // HERE — never in hand-authored markdown or skill templates.
+//
+// SHAPE CONTRACT: required_fields entries follow the universal shape contract
+// documented at the top of scripts/lib/sdd-rules.js. Core: {key, type}.
+// SPEC_HEADER_RULES adds the `field` extension for XML wire paths (e.g.
+// `source/design_path`); other rule constants without a nested wire format
+// (PENDING_CONFLICT_RULES, DECISION_LOG_RULES) omit `field` and tooling
+// defaults to `key`. The cross-rules invariant test
+// (tests/scripts/sdd-rules-invariants.test.js) enforces conformance.
 const SPEC_HEADER_RULES = Object.freeze({
   canonical_path: 'specs/<spec-id>/spec.xml',
   // Design iteration identifier: ISO date prefix + optional human-chosen suffix.
@@ -209,14 +217,25 @@ const SPEC_HEADER_RULES = Object.freeze({
   design_iteration_regex: /^\d{4}-\d{2}-\d{2}(-.+)?$/,
   // supersedes format for v2+: <spec-id>:v<N>
   supersedes_regex: /^[a-z0-9-]+:v\d+$/,
-  required_fields: [
-    { key: 'spec_version', field: 'spec_version', type: 'positive integer' },
-    { key: 'status', field: 'status', type: 'enum', allowed: ['active'] },
-    { key: 'title', field: 'title', type: 'string' },
-    { key: 'design_path', field: 'source/design_path', type: 'existing file path' },
-    { key: 'design_iteration', field: 'source/design_iteration', type: 'YYYY-MM-DD[-suffix]' },
-  ],
-  conditional_fields: [{ key: 'supersedes', when: 'spec_version > 1', format: '<spec-id>:v<N>' }],
+  required_fields: Object.freeze([
+    Object.freeze({ key: 'spec_version', field: 'spec_version', type: 'positive integer' }),
+    Object.freeze({
+      key: 'status',
+      field: 'status',
+      type: 'enum',
+      allowed: Object.freeze(['active']),
+    }),
+    Object.freeze({ key: 'title', field: 'title', type: 'string' }),
+    Object.freeze({ key: 'design_path', field: 'source/design_path', type: 'existing file path' }),
+    Object.freeze({
+      key: 'design_iteration',
+      field: 'source/design_iteration',
+      type: 'YYYY-MM-DD[-suffix]',
+    }),
+  ]),
+  conditional_fields: Object.freeze([
+    Object.freeze({ key: 'supersedes', when: 'spec_version > 1', format: '<spec-id>:v<N>' }),
+  ]),
   scope: {
     includes: 'required; list of <feature id="..."> elements (empty = WARNING)',
     excludes: 'recommended; list of <reason> elements',

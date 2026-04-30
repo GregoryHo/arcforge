@@ -235,26 +235,28 @@ describe('fr-cc-if-008-ac1: each Q&A row carries exactly the four contract field
     expect(DECISION_LOG_RULES.required_fields_per_row).toHaveLength(4);
   });
 
-  it('required_fields_per_row names match the contract enumeration exactly', () => {
+  it('required_fields_per_row keys match the contract enumeration exactly', () => {
     // Iterate the constant — do not hardcode; assert the SET matches.
-    const actualNames = new Set(DECISION_LOG_RULES.required_fields_per_row);
-    expect(actualNames).toEqual(CONTRACT_FIELD_NAMES);
+    const actualKeys = new Set(DECISION_LOG_RULES.required_fields_per_row.map((f) => f.key));
+    expect(actualKeys).toEqual(CONTRACT_FIELD_NAMES);
   });
 
+  const fieldKeys = () => DECISION_LOG_RULES.required_fields_per_row.map((f) => f.key);
+
   it('required_fields_per_row contains q_id', () => {
-    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('q_id');
+    expect(fieldKeys()).toContain('q_id');
   });
 
   it('required_fields_per_row contains question', () => {
-    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('question');
+    expect(fieldKeys()).toContain('question');
   });
 
   it('required_fields_per_row contains user_answer_verbatim', () => {
-    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('user_answer_verbatim');
+    expect(fieldKeys()).toContain('user_answer_verbatim');
   });
 
   it('required_fields_per_row contains deferral_signal', () => {
-    expect(DECISION_LOG_RULES.required_fields_per_row).toContain('deferral_signal');
+    expect(fieldKeys()).toContain('deferral_signal');
   });
 });
 

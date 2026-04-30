@@ -7,6 +7,51 @@
  *
  * These are fr-sd-012 (PENDING_CONFLICT_RULES) and fr-sd-013 (DECISION_LOG_RULES)
  * schema constants — single source of truth for downstream validators and tests.
+ *
+ * =============================================================================
+ *  SCHEMA-RULE CONSTANT SHAPE CONTRACT (read this before adding a new constant)
+ * =============================================================================
+ *
+ *  Every SDD schema-rule constant in this codebase — both here and the original
+ *  SPEC_HEADER_RULES in sdd-utils.js — MUST follow the shape contract below for
+ *  any property that lists "required fields" (whether named `required_fields`,
+ *  `required_fields_per_row`, or another suffix). The contract enables uniform
+ *  cross-rules tooling: print-schema rendering, generic validators, and
+ *  cross-rules lints can iterate ANY rule constant without per-shape branches.
+ *
+ *  CORE CONTRACT (universal — every entry MUST satisfy):
+ *    - `key`         non-empty string. The canonical logical identifier.
+ *                    Tooling reads `key` for cross-rules iteration. This is the
+ *                    primary identifier; do NOT introduce alternative names
+ *                    (e.g. `name`, `field_name`) as the primary key.
+ *    - `type`        non-empty string. Logical type tag (e.g. 'string', 'enum',
+ *                    'boolean', 'positive integer', 'list').
+ *
+ *  OPTIONAL EXTENSIONS (when present, MUST be well-formed):
+ *    - `description` non-empty string. Human/LLM-facing explanation of intent.
+ *                    Recommended for any field whose `type` does not fully
+ *                    convey semantics. Required for PENDING_CONFLICT_RULES and
+ *                    DECISION_LOG_RULES; spec-header fields are simple enough
+ *                    that `type` alone carries the meaning.
+ *    - `field`       non-empty string. Wire-format path for nested formats
+ *                    (e.g. SPEC_HEADER_RULES uses `source/design_path` in XML).
+ *                    Renderers default to `key` when `field` is absent (flat
+ *                    formats like the YAML in pending-conflict / decision-log).
+ *    - `allowed`     non-empty array of strings. Used when `type === 'enum'`.
+ *    - `min_length`, `max_length`  positive integers. Used when `type === 'list'`.
+ *
+ *  ENFORCEMENT:
+ *    - tests/scripts/sdd-rules-invariants.test.js iterates every registered
+ *      rule constant and asserts core + extension shape. If you add a new
+ *      schema-rule constant, register it in that test's RULE_REGISTRY array;
+ *      otherwise the cross-rules invariants do not cover it.
+ *
+ *  WHEN YOU MUST CHANGE THIS CONTRACT:
+ *    Update this comment block, update sdd-rules-invariants.test.js, and
+ *    audit print-schema.js for the new shape. A drift between any of these
+ *    three is the failure mode this contract exists to prevent.
+ *
+ * =============================================================================
  */
 
 // -----------------------------------------------------------------------------
@@ -91,11 +136,38 @@ const DECISION_LOG_RULES = Object.freeze({
   canonical_path: '<brainstorming-output-dir>/decision-log.<ext>',
   // The four required fields every Q&A row MUST carry (fr-cc-if-008-ac1).
   // Missing any field is ERROR. Order here matches the wire order convention.
+  // Shape mirrors PENDING_CONFLICT_RULES.required_fields and
+  // SPEC_HEADER_RULES.required_fields: array of {key, type, description}
+  // so generic schema tooling (print-schema, cross-rules lints) can iterate
+  // both constants uniformly.
   required_fields_per_row: Object.freeze([
-    'q_id',
-    'question',
-    'user_answer_verbatim',
-    'deferral_signal',
+    Object.freeze({
+      key: 'q_id',
+      type: 'string',
+      description:
+        'Stable identifier, unique within a single brainstorming session. ' +
+        'Refiner Phase 6 looks up rows by q_id for deterministic citation without LLM re-interpretation.',
+    }),
+    Object.freeze({
+      key: 'question',
+      type: 'string',
+      description:
+        'The question text the brainstormer asked the user. Used for context when refiner cites a row.',
+    }),
+    Object.freeze({
+      key: 'user_answer_verbatim',
+      type: 'string',
+      description:
+        'Verbatim user answer (no paraphrasing). Refiner Phase 6 cites this content directly; ' +
+        'paraphrasing would introduce LLM judgment into what is meant to be a mechanical lookup.',
+    }),
+    Object.freeze({
+      key: 'deferral_signal',
+      type: 'boolean',
+      description:
+        'True iff user_answer_verbatim matches a canonical deferral phrase (case-insensitive, trimmed). ' +
+        'Refiner MUST NOT treat a deferred axis as authorization for a concrete MUST (fr-rf-013).',
+    }),
   ]),
   // q_id is a stable identifier, unique within a single brainstorming session.
   // Duplicate q_id within one session is ERROR -- it breaks deterministic lookup.

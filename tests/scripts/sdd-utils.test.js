@@ -1917,14 +1917,26 @@ describe('DECISION_LOG_RULES schema constant (fr-sd-013-ac1)', () => {
     expect(DECISION_LOG_RULES.canonical_path.length).toBeGreaterThan(0);
   });
 
-  it('required_fields_per_row contains exactly four field names: q_id, question, user_answer_verbatim, deferral_signal', () => {
+  it('required_fields_per_row contains exactly four field entries: q_id, question, user_answer_verbatim, deferral_signal', () => {
     const fields = DECISION_LOG_RULES.required_fields_per_row;
     expect(Array.isArray(fields)).toBe(true);
     expect(fields).toHaveLength(4);
-    expect(fields).toContain('q_id');
-    expect(fields).toContain('question');
-    expect(fields).toContain('user_answer_verbatim');
-    expect(fields).toContain('deferral_signal');
+    const keys = fields.map((f) => f.key);
+    expect(keys).toContain('q_id');
+    expect(keys).toContain('question');
+    expect(keys).toContain('user_answer_verbatim');
+    expect(keys).toContain('deferral_signal');
+  });
+
+  it('required_fields_per_row entries are {key, type, description} objects (uniform shape with PENDING_CONFLICT_RULES.required_fields)', () => {
+    for (const f of DECISION_LOG_RULES.required_fields_per_row) {
+      expect(typeof f.key).toBe('string');
+      expect(f.key.length).toBeGreaterThan(0);
+      expect(typeof f.type).toBe('string');
+      expect(f.type.length).toBeGreaterThan(0);
+      expect(typeof f.description).toBe('string');
+      expect(f.description.length).toBeGreaterThan(0);
+    }
   });
 
   it('q_id_uniqueness descriptor is present and encodes per-session uniqueness', () => {
@@ -2213,9 +2225,11 @@ describe('validateDecisionLog (fr-sd-014-ac2)', () => {
     const rows = [{ q_id: 'q1', question: 'A?' }]; // missing user_answer_verbatim + deferral_signal
     const result = validateDecisionLog(rows);
     const errorMessages = result.issues.filter((i) => i.level === 'ERROR').map((i) => i.message);
-    const ruleFields = [...DECISION_LOG_RULES.required_fields_per_row];
+    const ruleFieldKeys = DECISION_LOG_RULES.required_fields_per_row.map((f) => f.key);
     // At least one error message should mention a field in the rules constant
-    const mentionsRuleField = errorMessages.some((msg) => ruleFields.some((f) => msg.includes(f)));
+    const mentionsRuleField = errorMessages.some((msg) =>
+      ruleFieldKeys.some((k) => msg.includes(k)),
+    );
     expect(mentionsRuleField).toBe(true);
   });
 });

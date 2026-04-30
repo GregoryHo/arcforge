@@ -208,7 +208,8 @@ function validateDecisionLog(parsed) {
   }
 
   // Per-row required-field checks. Field names from DECISION_LOG_RULES (fr-sd-014-ac4).
-  const requiredFields = DECISION_LOG_RULES.required_fields_per_row;
+  // required_fields_per_row is an array of {key, type, description} objects.
+  const requiredFieldKeys = DECISION_LOG_RULES.required_fields_per_row.map((f) => f.key);
 
   for (let i = 0; i < parsed.length; i++) {
     const row = parsed[i];
@@ -221,7 +222,7 @@ function validateDecisionLog(parsed) {
       continue;
     }
 
-    for (const field of requiredFields) {
+    for (const field of requiredFieldKeys) {
       const value = row[field];
       const isMissing =
         value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
