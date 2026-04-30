@@ -30,7 +30,7 @@ Transform design documents into structured XML specifications. The spec becomes 
 2. **source of truth** — spec.xml is authoritative; downstream skills quote it, never the design doc
 3. **checklist validation** — complete quality checklist before writing any files
 4. **iterative refinement** — ask 2–3 clarifying questions per iteration
-5. **R2 unidirectional** — refiner MUST NOT write to `docs/plans/`. On block (any reason), refiner writes nothing — terminal output and non-zero exit only.
+5. **R2 unidirectional** — refiner MUST NOT write to `docs/plans/`. On non-R3 blocks (DAG gate, design-doc validation, identity-header validation), refiner writes nothing — terminal output and non-zero exit only. On R3 axis blocks (Phase 4 axis-1/2/3, Phase 5.5a self-contradiction, Phase 5.5b axis-3-LLM, Phase 6b mechanical-auth-check), refiner writes ONLY the ephemeral `specs/<spec-id>/_pending-conflict.md` per fr-rf-015 — never `spec.xml`, never `details/`. The Iron Law's "NEVER WRITE AUTHORITATIVE STATE ON BLOCK" governs both cases.
 
 ## Phase 0 — Locate Inputs
 
@@ -299,7 +299,7 @@ node -e "
   const result = mechanicalAuthorizationCheck(
     fs.readFileSync('_draft_spec.xml', 'utf-8'),
     'docs/plans/<spec-id>/<date>/design.md',
-    'docs/plans/<spec-id>/<date>/decision-log.yaml'
+    'docs/plans/<spec-id>/<date>/decision-log.yml'
   );
   if (!result.valid) {
     console.log(JSON.stringify(result.unauthorized_traces, null, 2));
@@ -339,7 +339,10 @@ Before writing files, confirm:
 - [ ] every prior `<delta>` is preserved verbatim — `<overview>` contains the full ascending sequence
 - [ ] new `<delta>` is the last child of `<overview>`
 - [ ] Phase 4 three axes all clean (design internal, design ↔ Q&A, criterion coverage)
-- [ ] Phase 5.5 sub-pass clean (no description ↔ AC scope or verb mismatches)
+- [ ] Phase 5.5a sub-pass clean (no description ↔ AC scope or verb mismatches)
+- [ ] Phase 5.5b axis-3 LLM judgment clean (every criterion has a citable source)
+- [ ] Phase 6a identity-header validation passed (`validateSpecHeader` returns no ERROR)
+- [ ] Phase 6b mechanical authorization check passed (`mechanicalAuthorizationCheck` returns `valid: true` — every `<trace>` resolves to design.md or decision-log content)
 - [ ] user confirms: "Is this spec complete?"
 
 ## Red Flags — Stop
