@@ -406,6 +406,17 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
  * Extract all trace entries from spec XML, each annotated with their enclosing
  * requirement_id and criterion_id. Uses sequential scan to maintain context.
  *
+ * Multi-value traces use comma as the separator between independent citations,
+ * e.g. <trace>2026-04-27:B.1, 2026-04-27:B.2</trace> means the criterion cites
+ * two distinct design phrases. Each comma-separated token is its own entry so
+ * classifyTrace and the downstream authorization check operate on individual
+ * citations rather than a concatenated string. The trace token grammar
+ * (date:section-id or q_id:content or REQ-Fxxx) does NOT permit raw commas
+ * inside a token's content — verified across the spec-driven-refine corpus —
+ * so split-on-comma is unambiguous. If a future spec convention introduces
+ * commas inside cited content, switch to multiple <trace> elements rather than
+ * adding an escape mechanism.
+ *
  * @param {string} xml - Raw spec XML content.
  * @returns {Array<{trace_value: string, requirement_id: string, criterion_id: string}>}
  */
@@ -421,11 +432,15 @@ function extractTraceEntries(xml) {
     } else if (m[2] !== undefined) {
       currentCritId = m[2];
     } else if (m[3] !== undefined) {
-      entries.push({
-        trace_value: m[3].trim(),
-        requirement_id: currentReqId,
-        criterion_id: currentCritId,
-      });
+      for (const raw of m[3].split(',')) {
+        const value = raw.trim();
+        if (value === '') continue;
+        entries.push({
+          trace_value: value,
+          requirement_id: currentReqId,
+          criterion_id: currentCritId,
+        });
+      }
     }
   }
 

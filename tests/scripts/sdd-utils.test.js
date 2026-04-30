@@ -2382,4 +2382,83 @@ describe('mechanicalAuthorizationCheck (fr-sd-014-ac3)', () => {
     expect(result.unauthorized_traces).toHaveLength(1);
     expect(result.unauthorized_traces[0].requirement_id).toBe('fr-002');
   });
+
+  // -------------------------------------------------------------------------
+  // Multi-value <trace> support: comma separates independent citations.
+  // Regression coverage: previously the entire string was classified as one
+  // trace, causing false-positive "unauthorized" flags on multi-value traces
+  // present in real spec corpora (e.g. <trace>2026-04-27:B.1, 2026-04-27:B.2</trace>).
+  // -------------------------------------------------------------------------
+
+  it('multi-value design trace: both citations present in design.md → all authorized', () => {
+    const designPath = writeFile('design.md', DESIGN_CONTENT);
+    const spec = makeSpec([
+      {
+        req: 'fr-001',
+        crit: 'fr-001-ac1',
+        trace: '2026-04-27:Architecture, 2026-04-27:Context',
+      },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(true);
+    expect(result.unauthorized_traces).toHaveLength(0);
+  });
+
+  it('multi-value design trace: one valid + one missing → exactly the missing one is flagged', () => {
+    const designPath = writeFile('design.md', DESIGN_CONTENT);
+    const spec = makeSpec([
+      {
+        req: 'fr-001',
+        crit: 'fr-001-ac1',
+        trace: '2026-04-27:Architecture, 2026-04-27:NonExistentSection',
+      },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
+    expect(result.unauthorized_traces[0].trace_value).toContain('NonExistentSection');
+    expect(result.unauthorized_traces[0].trace_value).not.toContain('Architecture');
+  });
+
+  it('multi-value mixed-type trace (legacy + design): legacy skipped, design checked individually', () => {
+    const designPath = writeFile('design.md', DESIGN_CONTENT);
+    const spec = makeSpec([
+      {
+        req: 'fr-001',
+        crit: 'fr-001-ac1',
+        trace: 'REQ-F010, 2026-04-27:Architecture',
+      },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(true);
+    expect(result.unauthorized_traces).toHaveLength(0);
+  });
+
+  it('multi-value trace tolerates surrounding whitespace per token', () => {
+    const designPath = writeFile('design.md', DESIGN_CONTENT);
+    const spec = makeSpec([
+      {
+        req: 'fr-001',
+        crit: 'fr-001-ac1',
+        trace: '  2026-04-27:Architecture  ,   2026-04-27:Context  ',
+      },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(true);
+    expect(result.unauthorized_traces).toHaveLength(0);
+  });
+
+  it('trailing or duplicate commas produce no empty-string entries', () => {
+    const designPath = writeFile('design.md', DESIGN_CONTENT);
+    const spec = makeSpec([
+      {
+        req: 'fr-001',
+        crit: 'fr-001-ac1',
+        trace: '2026-04-27:Architecture, , 2026-04-27:Context,',
+      },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(true);
+    expect(result.unauthorized_traces).toHaveLength(0);
+  });
 });
