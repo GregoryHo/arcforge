@@ -1,0 +1,55 @@
+- q_id: q1
+  question: |
+    Production target 下 v3 該包多大?
+    (I) v3 = Production Path-Resolution Discipline:涵蓋所有 P2/P3 違規,加 cc-005 跨切約束,含 Issue 4 schema 修法為 sub-feature,一次到位但 sprint 大。
+    (II) v3 = 只修 schema 軸,P2/P3 違規 flag 為 v4 scope。
+  user_answer_verbatim: |
+    I 吧。一開始我想說用 arcforge root path + cli 把 schema 回覆給 LLM,但如果是這樣其實就也可以直接 reference 到 schema 了,不用多繞一層。我原本就是想這樣設計的,看起來是 spec and 實作偏移了。
+  deferral_signal: false
+
+- q_id: q2
+  question: |
+    CLI (print-schema.js) 在 v3 後的 fate?
+    (a) 兩條等價:`${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/<name>.md` 直讀 與 `node ${ARCFORGE_ROOT}/scripts/lib/print-schema.js <name>` CLI 都是合法 reference path,SKILL 可任選。
+    (b) 完全廢棄:markdown 直讀為唯一 access path,移除 print-schema.js。
+    (c) CLI 純 ops tool:不再對 SKILL 暴露,只給 contributor 用來 regenerate markdown。
+  user_answer_verbatim: |
+    那我覺得就用 a 吧。因為原本也是依賴 root 呼叫 CLI 拿到 markdown,但現在這樣就不用這麼鬧了。cli 留著給以後的有其他用途可以呼叫。
+  deferral_signal: false
+
+- q_id: q3
+  question: |
+    確認 v3 sprint 在 schema SoT 軸的工作就是「把 decision-log / pending-conflict 補進 print-schema.js auto-gen pipeline」,不引入新 SoT 模型?
+    步驟:加 renderDecisionLog() / renderPendingConflict() 到 print-schema.js;把 prose narrative 從手寫 markdown 搬進 renderer 函式(lines.push 多行);regenerate markdown;擴展 sdd-schemas-fresh.test.js 涵蓋新增兩個檔;加 AUTO-GENERATED header。原 v2.0.0「sdd-utils 是 SoT」決策(見 [[arcforge-decision-spec-schema-formalization]])不動,本 sprint 只補當時沒做完的部份。
+    (是) 按四步機械擴展
+    (否) 有別的考量
+  user_answer_verbatim: |
+    是
+    1. 記得上面提到的 arcroot
+    2. 然後可以把 LLM 讀 markdown 的方式改成直接 refernce (但 CLI 保留)
+  deferral_signal: false
+
+- q_id: q4
+  question: |
+    cc-005 (Cross-Component Plugin Path Discipline) 的 enforcement 機制?
+    Discipline 主家:arc-writing-skills (skill 作者教育),不是 arc-using (路由層)。CI lint 範圍要怎麼定?
+    (a) 窄但可靠:CI lint 只對 scripts/lib/ references 做 syntactic check,涵蓋 skills/**/SKILL.md, templates/**/*.md, agents/**/*.md。其他 plugin 內路徑(hooks/, scripts/cli.js 等)接受 prose 警告即可。
+    (b) 寬一點:涵蓋多個 plugin 內目錄 + 白名單機制。
+    (c) 完全不做 CI:只靠 prose + review。
+  user_answer_verbatim: |
+    你列的點都滿怪的。理論上 writing-tasks 沒有處理這個規範嗎?他是撰寫 skill 人的。arc-using 也不適合做這件事情。你在 CI 檢查一些錯誤 import 尚可接受,但 skill 本身的 scripts 就是 cwd relative path,你沒辦法區分吧?
+
+    [refinement: arc-writing-skills 才是對的家;CI 接受;但 skill-local cwd-relative 沒辦法靜態區分]
+
+    [picked (a) — 窄但可靠的 CI lint scope,只對 scripts/lib/ references 做 syntactic check]
+  deferral_signal: false
+
+- q_id: q4b
+  question: |
+    cc-005 對 skill-local cwd-relative path (例:cd ${SKILL_ROOT} && node scripts/planner.js) 的處理態度?
+    (I) 禁止 cd-then-bare:強制全形 `node "${SKILL_ROOT}/scripts/x.js"`,lint 一律擋 bare scripts/
+    (II) 允許 cd-then-bare:lint 要識別 cd 上下文(實際做不到,SAST 極限)
+    (III) Case-by-case:作者判斷,lint 只擋 plugin shared (scripts/lib/) 不管 skill-local
+  user_answer_verbatim: |
+    iii
+  deferral_signal: false
