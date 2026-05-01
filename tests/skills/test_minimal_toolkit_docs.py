@@ -22,16 +22,22 @@ def test_architecture_describes_arc_using_as_bounded_router():
 def test_readme_positions_arcforge_as_minimal_composable_toolkit():
     """README should present ArcForge as a toolkit, not an enforced workflow OS."""
     content = _read("README.md")
+    lower = content.lower()
 
-    assert "minimal, composable" in content.lower()
-    assert "skills are tools, not laws" in content.lower()
-    assert "workflow is enforced" not in content.lower()
-    assert "skills trigger automatically" not in content.lower()
+    assert "minimal, composable" in lower
+    assert "skills are tools, not laws" in lower
+    assert "core toolkit" in lower
+    assert "optional workflows" in lower
+    assert "harness/eval layer" in lower
+    assert "non-activation behavior" in lower
+    assert "workflow is enforced" not in lower
+    assert "skills trigger automatically" not in lower
 
 
 def test_skills_reference_has_bounded_arc_using_and_meta_only_writing_skills():
     """Public skill reference should match the new routing and meta-skill model."""
     content = _read("docs/guide/skills-reference.md")
+    lower = content.lower()
 
     assert "even 1% chance" not in content
     assert "even if 1% chance" not in content
@@ -42,9 +48,15 @@ def test_skills_reference_has_bounded_arc_using_and_meta_only_writing_skills():
     assert "No Action Without Skill Check" not in content
     assert "non-negotiable across all arcforge workflows" not in content
     assert "arc-learning --> arc-writing-skills" not in content
-    assert "bounded router" in content.lower()
-    assert "project-level meta" in content.lower()
+    assert "bounded router" in lower
+    assert "project-level meta" in lower
     assert "arc-writing-skills" in content
+    assert "33 skills" in content
+    assert "three-layer model" in lower
+    assert "core toolkit" in lower
+    assert "optional workflows" in lower
+    assert "harness/eval layer" in lower
+    assert "activation and non-activation behavior" in lower
 
 
 def test_active_specs_do_not_require_global_1_percent_routing():

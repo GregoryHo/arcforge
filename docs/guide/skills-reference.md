@@ -40,7 +40,13 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 32 skills are organized into 7 categories:
+arcforge's 33 skills are organized into a three-layer model:
+
+1. **Core toolkit** — the small promoted surface most users should learn first.
+2. **Optional workflows** — recipes and advanced orchestration used only when the task justifies them.
+3. **Harness/eval layer** — tests and evaluation skills that verify both activation and non-activation behavior.
+
+The complete catalog still uses functional categories for lookup:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|

@@ -16,9 +16,15 @@ The outcome: your agent has disciplined workflows when the task justifies them, 
 
 ## How it works
 
+ArcForge is split into three layers:
+
+1. **Core toolkit** — a small promoted surface for routing, design, specs, planning, TDD, debugging, verification, and eval.
+2. **Optional workflows** — recipes for SDD, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
+3. **Harness/eval layer** — tests that verify both activation and non-activation behavior, including instruction-strength regressions.
+
 When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, `ARCFORGE_ROOT` is set, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
 
-Once a design is approved, it builds a clear implementation plan and then executes tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
+Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
 Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
 
