@@ -256,11 +256,13 @@ function createTrialDir(evalName, trialNumber, projectRoot) {
 function initializeGitBoundary(trialDir) {
   try {
     const gitDir = path.join(trialDir, '.git');
-    fs.mkdirSync(gitDir, { recursive: true });
+    fs.mkdirSync(path.join(gitDir, 'objects'), { recursive: true });
+    fs.mkdirSync(path.join(gitDir, 'refs', 'heads'), { recursive: true });
+    fs.mkdirSync(path.join(gitDir, 'refs', 'tags'), { recursive: true });
     fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n');
     fs.writeFileSync(
       path.join(gitDir, 'config'),
-      '[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n',
+      '[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n',
     );
   } catch {
     /* silent — git boundary is best-effort */

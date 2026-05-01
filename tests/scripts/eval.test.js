@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 // Mock utils.execCommand so gradeWithModel tests can intercept Claude calls.
 // Default implementation delegates to the real function — only gradeWithModel
@@ -694,9 +695,15 @@ Do something.
   // ── runTrial ────────────────────────────────────────────────
 
   describe('runTrial', () => {
-    it('should initialize a best-effort git boundary in trial dirs', () => {
+    it('should initialize an effective git boundary in trial dirs', () => {
+      execFileSync('git', ['init', '--quiet'], { cwd: tempDir });
+
       const trialDir = createTrialDir('boundary-test', 1, tempDir);
-      expect(fs.existsSync(path.join(trialDir, '.git', 'HEAD'))).toBe(true);
+      const gitRoot = execFileSync('git', ['-C', trialDir, 'rev-parse', '--show-toplevel'], {
+        encoding: 'utf8',
+      }).trim();
+
+      expect(fs.realpathSync(gitRoot)).toBe(fs.realpathSync(trialDir));
     });
 
     it('should return structured setup_failed infraError instead of throwing', () => {
