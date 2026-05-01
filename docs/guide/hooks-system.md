@@ -261,7 +261,7 @@ assert.ok(result.stdout.includes('systemMessage'));
 
 ### Eval (behavioral verification)
 
-For hooks that inject context into Claude (inject-skills, inject-context), use the eval harness to verify Claude demonstrates the injected knowledge. See `evals/scenarios/hook-inject-skills.md` for an example.
+For hooks that inject context into Claude (inject-skills, inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. See `evals/scenarios/eval-sessionstart-minimal-bootstrap.md` for a current-format SessionStart example.
 
 ## Common Mistakes
 

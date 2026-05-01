@@ -90,4 +90,4 @@ node scripts/cli.js eval ab eval-sessionstart-tool-minimalism --plugin-dir . --k
 
 ## Out of Scope
 
-The old scenario corpus is intentionally not treated as a reliable benchmark here. It should be migrated separately to the current assertion-ID and grader contract before it is used as a release gate.
+The old scenario corpus is intentionally not treated as a reliable benchmark here. Invalid active scenarios that did not meet the current assertion-ID and grader contract were removed from `evals/scenarios/`; historical benchmark snapshots may still reference them as archival records.

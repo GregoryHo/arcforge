@@ -1,11 +1,13 @@
 from pathlib import Path
 
 
-def test_eval_scenario_format_uses_normalized_five_tier_scale():
-    text = Path("evals/scenarios/eval-trap-design.md").read_text(encoding="utf-8")
-    lower = text.lower()
+def test_active_eval_scenarios_use_current_assertion_format():
+    scenario_paths = sorted(Path("evals/scenarios").glob("*.md"))
 
-    assert "normalized 0.0-1.0" in lower
-    assert "0.25" in text
-    assert "0.75" in text
-    assert "0-10 scale" not in lower
+    assert scenario_paths
+
+    for path in scenario_paths:
+        text = path.read_text(encoding="utf-8")
+        assert "# Eval:" in text
+        assert "## Assertions" in text
+        assert "0-10 scale" not in text.lower()
