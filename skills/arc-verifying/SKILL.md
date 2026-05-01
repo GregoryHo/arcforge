@@ -9,6 +9,10 @@ description: Use when you need to verify work is complete before making completi
 
 **Claiming work is complete without verification is dishonesty, not efficiency.**
 
+## Boundary
+
+`arc-verifying` owns producing fresh evidence for completion claims. It does not own authoring spec artifacts (that is `arc-refining`) and it does not own reconciling spec/code drift after implementation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router). Spec/code drift checks may quote verification evidence as input, but verification itself is not a spec-sync skill.
+
 ## The Iron Law
 
 ```
@@ -158,7 +162,7 @@ digraph cannot_verify {
 
 ## Integration
 
-**Called by:** `arc-using` routing table — triggers when about to claim work is complete.
+**Discoverable from:** `arc-using` when a task is approaching a completion claim and verification guidance would help.
 
 **Also embedded in:**
 - **arc-finishing** / **arc-finishing-epic** — verify tests before offering merge options

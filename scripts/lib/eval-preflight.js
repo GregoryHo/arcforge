@@ -25,6 +25,16 @@ const CEILING_THRESHOLD = 0.8;
 const PREFLIGHT_K = 3;
 
 /**
+ * Return true only for an explicit scenario-level `## Preflight\nskip` policy.
+ * Missing/unknown values keep the existing fail-closed A/B preflight gate.
+ * @param {Object|null|undefined} scenario - Parsed eval scenario
+ * @returns {boolean} Whether the A/B preflight gate should be bypassed
+ */
+function shouldSkipPreflightGate(scenario) {
+  return String(scenario?.preflight || '').toLowerCase() === 'skip';
+}
+
+/**
  * Compute a stable scenario hash from file contents.
  * Returns the first 16 hex characters of the SHA-256 digest.
  * @param {string} contents - Raw scenario file contents
@@ -264,6 +274,7 @@ module.exports = {
   resolveScenarioFile,
   runPreflight,
   checkPreflightGate,
+  shouldSkipPreflightGate,
   PREFLIGHT_DIR,
   CEILING_THRESHOLD,
   PREFLIGHT_K,

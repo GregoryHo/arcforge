@@ -31,6 +31,8 @@ const graders = require('./eval-graders');
  * @property {string} grader - 'code' | 'model' | 'human'
  * @property {string} graderConfig - Grader-specific configuration
  * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
+ * @property {string} [preflight] - Optional preflight policy ('skip' to bypass A/B preflight gate)
+ * @property {string} [verdictPolicy] - Optional A/B verdict policy ('non-regression' to judge treatment pass/fail instead of delta)
  */
 
 /**
@@ -160,6 +162,8 @@ function parseScenario(filePath, projectRoot) {
   const trials = trialsRaw ? parseInt(trialsRaw, 10) : undefined;
   const version = section('version');
   const target = section('target');
+  const preflight = section('preflight').toLowerCase();
+  const verdictPolicy = section('verdict policy').toLowerCase();
 
   // Plugin Dir: resolve ${PROJECT_ROOT} or use absolute path
   const pluginDirRaw = section('plugin dir');
@@ -186,6 +190,8 @@ function parseScenario(filePath, projectRoot) {
     ...(target ? { target } : {}),
     ...(trials && !Number.isNaN(trials) ? { trials } : {}),
     ...(version ? { version } : {}),
+    ...(preflight ? { preflight } : {}),
+    ...(verdictPolicy ? { verdictPolicy } : {}),
     ...(pluginDir ? { pluginDir } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
@@ -236,7 +242,31 @@ function createTrialDir(evalName, trialNumber, projectRoot) {
     : path.join(process.cwd(), '.eval-trials');
   ensureDir(base);
   const prefix = `${sanitizeFilename(evalName)}-t${trialNumber}-`;
-  return fs.mkdtempSync(path.join(base, prefix));
+  const trialDir = fs.mkdtempSync(path.join(base, prefix));
+  initializeGitBoundary(trialDir);
+  return trialDir;
+}
+
+/**
+ * Initialize a minimal git repository boundary in a trial directory.
+ * This is best-effort and intentionally avoids spawning git so unit-test exec
+ * mocks and eval process accounting are not affected.
+ * @param {string} trialDir - Trial directory path
+ */
+function initializeGitBoundary(trialDir) {
+  try {
+    const gitDir = path.join(trialDir, '.git');
+    fs.mkdirSync(path.join(gitDir, 'objects'), { recursive: true });
+    fs.mkdirSync(path.join(gitDir, 'refs', 'heads'), { recursive: true });
+    fs.mkdirSync(path.join(gitDir, 'refs', 'tags'), { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n');
+    fs.writeFileSync(
+      path.join(gitDir, 'config'),
+      '[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n',
+    );
+  } catch {
+    /* silent — git boundary is best-effort */
+  }
 }
 
 /**
@@ -466,11 +496,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   } = options;
   const timestamp = getTimestamp();
 
-  // Merge CLI overrides with scenario defaults (only when not fully isolated)
-  const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
-
-  // Validate pluginDir exists before running trial
-  if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
+  const buildInfraError = (error, errorType, extra = {}) => {
     const evalName = label ? `${scenario.name}-${label}` : scenario.name;
     return {
       eval: evalName,
@@ -483,21 +509,35 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       duration_ms: null,
       input_tokens: null,
       output_tokens: null,
-      error: `Plugin dir does not exist: ${pluginDir}`,
+      error,
+      errorType,
       infraError: true,
       ...(model ? { model } : {}),
       ...(runId ? { runId } : {}),
+      ...extra,
     };
+  };
+
+  // Merge CLI overrides with scenario defaults (only when not fully isolated)
+  const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
+
+  // Validate pluginDir exists before running trial
+  if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
+    return buildInfraError(`Plugin dir does not exist: ${pluginDir}`, 'plugin_dir_missing');
   }
 
   // Always run in trial dir for workspace safety
   const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
-  if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
+  try {
+    if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
+  } catch (error) {
+    return buildInfraError(error.message || String(error), 'setup_failed', { trialDir });
+  }
 
   // Isolation mode: full isolation uses writeIsolationSettings,
   // pluginDir uses semi-isolation (no claudeMdExcludes)
   if (pluginDir) {
-    const semiSettings = buildIsolationSettings({ excludeClaudeMd: false });
+    const semiSettings = isolationSettings || buildIsolationSettings({ excludeClaudeMd: false });
     writeIsolationSettings(trialDir, semiSettings);
   } else if (isolated) {
     writeIsolationSettings(trialDir, isolationSettings);
@@ -656,9 +696,13 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     maxTurns,
   });
   if (result.infraError) {
-    appendResult(result, projectRoot);
-    if (onTrialComplete) onTrialComplete(label, trialNumber, result);
-    return result;
+    try {
+      appendResult(result, projectRoot);
+      if (onTrialComplete) onTrialComplete(label, trialNumber, result);
+      return result;
+    } finally {
+      cleanupTrialDir(result.trialDir);
+    }
   }
   try {
     const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
@@ -1040,9 +1084,10 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
   const result = {
     delta,
     deltaCi,
-    verdict: stats.verdictFromDeltaCI(baseline, treatment),
+    verdict: stats.verdictFromAbPolicy(baseline, treatment, scenario.verdictPolicy),
     baseline: bStats,
     treatment: tStats,
+    ...(scenario.verdictPolicy ? { verdictPolicy: scenario.verdictPolicy } : {}),
     ...(baselineWarning ? { baselineWarning } : {}),
   };
 

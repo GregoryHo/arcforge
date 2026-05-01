@@ -1,11 +1,13 @@
 ---
 name: arc-writing-skills
-description: Use when creating new arcforge skills, editing existing skills, or verifying skills work before deployment
+description: Use when maintaining ArcForge itself by creating, editing, or verifying ArcForge skills before deployment
 ---
 
-# Writing Skills
+# Writing ArcForge Skills
 
 ## Overview
+
+This is a **project-level meta skill** for maintaining ArcForge's own composable skill system. It is not a general promoted/user-facing core skill for ordinary product work.
 
 **Writing skills IS Test-Driven Development applied to process documentation.**
 
@@ -38,18 +40,24 @@ A **skill** is a reference guide for proven techniques, patterns, or tools. Skil
 | **Watch it pass** | Verify agent now complies |
 | **Refactor cycle** | Find new rationalizations → plug → re-verify |
 
-## When to Create a Skill
+## Scope
+
+Use this skill for ArcForge maintainer work: changing `skills/`, skill tests, pressure fixtures, evals, and skill distribution behavior.
+
+Do not use it as a default workflow for non-ArcForge product implementation. For ordinary project work, route to the smallest useful product-facing skill instead.
+
+## When to Create an ArcForge Skill
 
 **Create when:**
 - Technique wasn't intuitively obvious to you
-- You'd reference this again across projects
-- Pattern applies broadly (not project-specific)
+- ArcForge users or maintainers would reference this again
+- Pattern applies broadly across ArcForge-supported agent workflows
 - Others would benefit
 
 **Don't create for:**
 - One-off solutions
 - Standard practices well-documented elsewhere
-- Project-specific conventions (put in CLAUDE.md)
+- Product-specific conventions (put in that project's instructions instead)
 - Mechanical constraints (if enforceable with regex/validation, automate it)
 
 ## Skill Types

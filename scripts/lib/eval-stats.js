@@ -373,6 +373,23 @@ function verdictFromDeltaCI(baseline, treatment, _fallbackThresholds) {
 }
 
 /**
+ * Get an A/B verdict under an explicit scenario policy.
+ * Default behavior remains delta-CI improvement judging. The non-regression
+ * policy is for code-graded non-interference scenarios where success means the
+ * treatment itself must pass every trial, regardless of baseline ceiling.
+ * @param {import('./eval').TrialResult[]} baseline - Baseline results
+ * @param {import('./eval').TrialResult[]} treatment - Treatment results
+ * @param {string} [policy] - Scenario verdict policy
+ * @returns {string} A/B verdict
+ */
+function verdictFromAbPolicy(baseline, treatment, policy) {
+  if (policy === 'non-regression') {
+    return passAllK(treatment) ? 'PASS' : 'REGRESSED';
+  }
+  return verdictFromDeltaCI(baseline, treatment);
+}
+
+/**
  * Return a user-visible remediation message for a verdict that requires action.
  * Returns null for verdicts that have no remediation guidance.
  * @param {string} verdict - Verdict string from verdictFromDeltaCI or similar
@@ -456,6 +473,7 @@ module.exports = {
   verdictFromRate,
   verdictFromDelta,
   verdictFromDeltaCI,
+  verdictFromAbPolicy,
   ciForDelta,
   verdictFromCI,
   getVerdict,

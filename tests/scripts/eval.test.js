@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 // Mock utils.execCommand so gradeWithModel tests can intercept Claude calls.
 // Default implementation delegates to the real function — only gradeWithModel
@@ -35,10 +36,12 @@ const {
   parseActionsFromTranscript,
   buildPluginDirSettings,
   resolveMaxTurns,
+  createTrialDir,
   runTrial,
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
+  compareResults,
   snapScore,
   validateGraderResponse,
   SCENARIOS_DIR,
@@ -270,6 +273,48 @@ Do stuff.
       const scenario = parseScenario(filePath);
 
       expect(scenario.version).toBeUndefined();
+    });
+
+    it('should extract explicit preflight skip section', () => {
+      const content = `# Eval: non-regression
+## Scenario
+Do something.
+## Preflight
+skip
+`;
+      const filePath = writeScenario(tempDir, 'preflight-skip.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.preflight).toBe('skip');
+    });
+
+    it('should default preflight to undefined when missing', () => {
+      const content = '# Eval: default-preflight\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'default-preflight.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.preflight).toBeUndefined();
+    });
+
+    it('should extract explicit verdict policy section', () => {
+      const content = `# Eval: non-regression
+## Scenario
+Do something.
+## Verdict Policy
+non-regression
+`;
+      const filePath = writeScenario(tempDir, 'verdict-policy.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.verdictPolicy).toBe('non-regression');
+    });
+
+    it('should default verdict policy to undefined when missing', () => {
+      const content = '# Eval: default-verdict-policy\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'default-verdict-policy.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.verdictPolicy).toBeUndefined();
     });
 
     it('should extract target section', () => {
@@ -650,6 +695,94 @@ Do something.
   // ── runTrial ────────────────────────────────────────────────
 
   describe('runTrial', () => {
+    it('should initialize an effective git boundary in trial dirs', () => {
+      execFileSync('git', ['init', '--quiet'], { cwd: tempDir });
+
+      const trialDir = createTrialDir('boundary-test', 1, tempDir);
+      const gitRoot = execFileSync('git', ['-C', trialDir, 'rev-parse', '--show-toplevel'], {
+        encoding: 'utf8',
+      }).trim();
+
+      expect(fs.realpathSync(gitRoot)).toBe(fs.realpathSync(trialDir));
+    });
+
+    it('should return structured setup_failed infraError instead of throwing', () => {
+      const scenario = {
+        name: 'setup-failure',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('setup_failed');
+      expect(result.error).toContain('Setup failed');
+      expect(result.trialDir).toBeTruthy();
+      expect(fs.existsSync(result.trialDir)).toBe(true);
+    });
+
+    it('should clean trial dirs for setup_failed infraError in executeAndGradeTrial', () => {
+      const scenario = {
+        name: 'setup-cleanup',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('setup_failed');
+      expect(fs.existsSync(result.trialDir)).toBe(false);
+    });
+
+    it('should use cached semi-isolation settings for pluginDir trials', () => {
+      const scenario = {
+        name: 'cached-semi',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+        pluginDir: tempDir,
+        isolationSettings: '{"cached":true}',
+      });
+
+      expect(result.infraError).toBeUndefined();
+      const settings = fs.readFileSync(
+        path.join(result.trialDir, '.claude', 'settings.json'),
+        'utf8',
+      );
+      expect(settings).toBe('{"cached":true}');
+      expect(mockUtils.execCommand).toHaveBeenCalledTimes(1);
+    });
+
     it('should not use raw stream-json as graded output when no assistant text is captured', () => {
       const scenario = {
         name: 'thinking-only',
@@ -970,6 +1103,67 @@ Do something.
     it('should return 0 for identical scores', () => {
       const data = [{ score: 0.7 }, { score: 0.7 }];
       expect(computeDelta(data, data)).toBeCloseTo(0);
+    });
+  });
+
+  // ── getVerdict ────────────────────────────────────────────────
+
+  describe('compareResults verdict policy', () => {
+    it('should preserve default A/B delta CI verdict behavior', () => {
+      const baseline = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 1, passed: true }),
+      ];
+      const treatment = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 1, passed: true }),
+      ];
+
+      const comparison = compareResults({ grader: 'code' }, baseline, treatment, tempDir);
+
+      expect(comparison.verdict).toBe('INSUFFICIENT_DATA');
+    });
+
+    it('should pass non-regression policy when every treatment trial passes', () => {
+      const baseline = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 1, passed: true }),
+      ];
+      const treatment = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 1, passed: true }),
+      ];
+
+      const comparison = compareResults(
+        { grader: 'code', verdictPolicy: 'non-regression' },
+        baseline,
+        treatment,
+        tempDir,
+      );
+
+      expect(comparison.verdict).toBe('PASS');
+      expect(comparison.verdictPolicy).toBe('non-regression');
+      expect(comparison.delta).toBe(0);
+    });
+
+    it('should regress non-regression policy when any treatment trial fails', () => {
+      const baseline = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 1, passed: true }),
+      ];
+      const treatment = [
+        makeResult({ score: 1, passed: true }),
+        makeResult({ score: 0, passed: false }),
+      ];
+
+      const comparison = compareResults(
+        { grader: 'code', verdictPolicy: 'non-regression' },
+        baseline,
+        treatment,
+        tempDir,
+      );
+
+      expect(comparison.verdict).toBe('REGRESSED');
     });
   });
 

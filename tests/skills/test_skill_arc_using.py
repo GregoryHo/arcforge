@@ -4,28 +4,33 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_arc_using_has_iron_law():
-    """Test skill has mandatory routing requirement."""
+def test_arc_using_is_bounded_router_not_iron_law():
+    """Test skill is a bounded router, not a global mandatory policy."""
     skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
     content = skill_path.read_text()
 
-    # Must have 1% rule or similar forcing mechanism
-    assert "MUST" in content or "1%" in content
+    forbidden = [
+        "Even a 1% chance",
+        "1% rule",
+        "BEFORE any response or action",
+        "checks routing table before ANY action",
+        "<EXTREMELY-IMPORTANT>",
+    ]
+    for phrase in forbidden:
+        assert phrase not in content
 
-    # Must have EXTREMELY-IMPORTANT or similar emphasis
-    assert "IMPORTANT" in content or "mandatory" in content.lower()
+    assert "smallest useful workflow" in content.lower()
+    assert "higher-priority instructions" in content.lower()
 
 
-def test_arc_using_has_red_flags():
-    """Test skill has red flags against skipping routing."""
+def test_arc_using_has_non_activation_guidance():
+    """Test skill states when a workflow should not be forced."""
     skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
     content = skill_path.read_text()
 
-    # Red flags table
-    assert "## Red Flags" in content or "Red Flags" in content
-
-    # Specific flags against common bypasses
-    assert "simple" in content.lower() or "overkill" in content.lower()
+    assert "## When Not to Route" in content
+    for phrase in ["simple", "read-only", "eval", "grading"]:
+        assert phrase in content.lower()
 
 
 def test_arc_using_has_routing_table():
@@ -59,7 +64,7 @@ def test_arc_using_routing_table_has_arc_evaluating_row():
     # The row must appear in the Discipline Skills routing table
     assert "arc-evaluating" in content
 
-    # The Iron Law must mention INSUFFICIENT_DATA
+    # The evaluating row must mention INSUFFICIENT_DATA
     assert "INSUFFICIENT_DATA" in content
 
     # The condition must mention shipping/merging/completing

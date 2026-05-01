@@ -19,10 +19,15 @@ Every criterion the refiner emits MUST trace to a design phrase or a user Q&A ro
 
 Transform design documents into structured XML specifications. The spec becomes Source of Truth — downstream skills read it directly, never the design doc. The refiner is the central transformation: raw source (design.md) → live contract (spec.xml).
 
+## Boundary
+
+`arc-refining` owns formalizing design docs into authoritative `specs/<spec-id>/spec.xml` and `details/*.xml`. It does not own completion-claim verification (that is `arc-verifying`) and it does not own post-implementation spec sync or spec/code drift reconciliation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router).
+
 ## When NOT to Use
 
 - No design doc exists yet (run `/arc-brainstorming` first)
 - Task is small enough that a structured spec is overhead
+- Spec is already authoritative and the work is reconciling it with post-implementation reality — that is the `arc-syncing-spec` job (separate, opt-in workflow), not refiner
 
 ## Core Rules
 

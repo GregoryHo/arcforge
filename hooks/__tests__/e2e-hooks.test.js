@@ -101,7 +101,7 @@ function makeStopInput(overrides = {}) {
 describe('E2E: inject-skills/main.sh', () => {
   const scriptPath = path.join(HOOKS_DIR, 'inject-skills', 'main.sh');
 
-  it('should inject arc-using skill content with ARCFORGE_ROOT', () => {
+  it('should inject minimal arcforge bootstrap context with ARCFORGE_ROOT', () => {
     const envFile = path.join(os.tmpdir(), `test-env-${Date.now()}`);
     const result = runBashHook(scriptPath, null, { CLAUDE_ENV_FILE: envFile });
 
@@ -111,10 +111,15 @@ describe('E2E: inject-skills/main.sh', () => {
     const ctx = parsed.hookSpecificOutput.additionalContext;
     assert.ok(ctx.includes('arcforge'), 'Should mention arcforge');
     assert.ok(ctx.includes('ARCFORGE_ROOT'), 'Should include ARCFORGE_ROOT');
+    assert.ok(ctx.includes('smallest useful workflow'), 'Should prefer small workflows');
+    assert.ok(ctx.includes('read or invoke'), 'Should tell agents how to use skills on demand');
+    assert.ok(!ctx.includes('<EXTREMELY_IMPORTANT>'), 'Should not use high-pressure wrapper');
+    assert.ok(!ctx.includes('Even a 1% chance'), 'Should not inject 1% routing pressure');
     assert.ok(
-      ctx.includes('arc-brainstorming') || ctx.includes('arc-tdd'),
-      'Should include skill names',
+      !ctx.includes('Below is the full content'),
+      'Should not inject full arc-using content',
     );
+    assert.ok(ctx.length < 1200, `Bootstrap should stay compact. Got ${ctx.length} chars`);
 
     assert.ok(fs.existsSync(envFile), 'Should write CLAUDE_ENV_FILE');
     fs.rmSync(envFile, { force: true });

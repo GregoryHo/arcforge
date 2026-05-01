@@ -4,23 +4,29 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It moves orchestration into the session so agents follow disciplined workflows from design to implementation.
+arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
 
 ## Why arcforge
 
-AI coding agents are powerful but undisciplined. Left to their defaults, they skip design, ignore review, and lose context across sessions. The result is code that works in the moment but accumulates debt fast.
+AI coding agents are powerful but uneven. Left to their defaults, they skip design, ignore review, and lose context across sessions. Heavy always-on process creates a different failure mode: the agent follows workflow ceremony when a direct answer or isolated eval would be better.
 
-arcforge solves this by embedding a skill-based workflow directly into the agent's session. Skills trigger automatically based on context — the agent doesn't need to remember commands or follow a manual checklist. Design, planning, TDD, and review happen because the workflow enforces them.
+arcforge solves this with a small composable toolkit. Skills are available in the session, but they are selected when useful: design when intent is unclear, structured specs when artifacts matter, TDD/debugging/review when implementation risk is present, and verification before completion claims.
 
-The outcome: your agent behaves like a disciplined engineer. It designs before building, plans before coding, tests before shipping, and learns from every session.
+The outcome: your agent has disciplined workflows when the task justifies them, while preserving direct execution, harness isolation, and small-task speed when a workflow would be overhead.
 
 ## How it works
 
-When your coding agent starts a session, arcforge's hooks inject available skills into context. Instead of jumping into code, it activates skills that guide you through design, planning, and execution.
+ArcForge is split into three layers:
 
-Once a design is approved, it builds a clear implementation plan and then executes tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
+1. **Core toolkit** — a small promoted surface for routing, design, specs, planning, TDD, debugging, verification, and eval.
+2. **Optional workflows** — recipes for SDD, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
+3. **Harness/eval layer** — tests that verify both activation and non-activation behavior, including instruction-strength regressions.
 
-Because skills trigger automatically, you do not need to remember commands. The workflow is enforced by the skills themselves.
+When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, `ARCFORGE_ROOT` is set, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
+
+Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
+
+Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
 
 ## Installation
 
@@ -101,11 +107,11 @@ These are the most frequently used commands:
 
 ![ArcForge Overview](assets/arcforge-overview.png)
 
-`arc-using` sits at the center as the routing layer. Skills fan out into four categories: Workflow Pipeline (left), Quality Gates (right), Infrastructure (bottom), and Learning (far right).
+`arc-using` is a bounded router and index, not an always-on policy engine. Skills fan out into workflow, quality, infrastructure, and learning categories; agents should pick the smallest useful path for the task.
 
 ## How Skills Compose
 
-`arc-using` inspects context and recommends a path. You can also enter at any skill directly.
+`arc-using` helps choose a path when routing is useful. You can also enter at any skill directly.
 
 | Context | Recommended skills | Entry point |
 |---------|-------------------|-------------|
@@ -131,26 +137,31 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-### Workflow Skills
+### Core Toolkit Skills
 
-- **arc-using** - Routing check for task scale
+- **arc-using** - Bounded routing help for task scale
 - **arc-brainstorming** - Design exploration
 - **arc-refining** - Spec generation
 - **arc-planning** - DAG breakdown
+- **arc-tdd** - Test-driven development
+- **arc-debugging** - Systematic debugging with four phases
+- **arc-verifying** - Verification evidence before completion claims
+- **arc-evaluating** - Measure whether skills and workflows change agent behavior
+
+### Optional Workflow Skills
+
 - **arc-coordinating** - Worktree management
 - **arc-implementing** - TDD implementation
-
-### Supporting Skills
-
 - **arc-using-worktrees** - Create isolated workspace for epic development
 - **arc-finishing-epic** - Epic completion with merge decision
 - **arc-finishing** - Branch completion with merge decision
 - **arc-writing-tasks** - Break epics or features into executable tasks
 - **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
-- **arc-verifying** - Verification mindset (evidence before claims)
-- **arc-debugging** - Systematic debugging with four phases
-- **arc-writing-skills** - Create and edit skills using TDD principles
 - **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
+
+### Project-Level Meta Skills
+
+- **arc-writing-skills** - ArcForge project-level meta skill for maintaining ArcForge's own skills and skill tests
 
 ### Execution Layer
 
@@ -261,7 +272,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 - **Incremental progress** - Small changes that compile and pass tests
 - **Clear intent** - Boring and obvious code
-- **Skill-first workflow** - Use the existing skills before improvising
+- **Smallest useful workflow** - Use skills when they add leverage; avoid ceremony when a direct answer is enough
 - **Evidence over claims** - Verify before declaring success
 
 ## Documentation

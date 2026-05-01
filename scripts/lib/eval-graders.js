@@ -178,7 +178,12 @@ function validateGraderResponse(grade, assertionCount) {
 function gradeTrialResult(result, scenario, projectRoot, actionLog) {
   if (scenario.grader === 'code') {
     // Code grading runs in trialDir (where agent artifacts live), with $PROJECT_ROOT available
-    return gradeWithCode(result, scenario.graderConfig, projectRoot);
+    return gradeWithCode(
+      result,
+      scenario.graderConfig,
+      projectRoot,
+      scenario.assertions?.length || 0,
+    );
   }
   if (scenario.grader === 'model') {
     return gradeWithModel(result, scenario, projectRoot);
@@ -198,9 +203,10 @@ function gradeTrialResult(result, scenario, projectRoot, actionLog) {
  * @param {import('./eval').TrialResult} result - Trial result to grade
  * @param {string|string[]} testCommand - Test command to run
  * @param {string} projectRoot - Project root directory
+ * @param {number} [assertionCount=0] - Expected scenario assertion count for labeled output
  * @returns {import('./eval').TrialResult} New result with grade
  */
-function gradeWithCode(result, testCommand, projectRoot) {
+function gradeWithCode(result, testCommand, projectRoot, assertionCount = 0) {
   const [cmd, args] = Array.isArray(testCommand)
     ? [testCommand[0], testCommand.slice(1)]
     : ['sh', ['-c', testCommand]];
@@ -219,6 +225,19 @@ function gradeWithCode(result, testCommand, projectRoot) {
   // Parse per-assertion labels from stdout (convention: A1:PASS, A2:FAIL:reason)
   const assertions = parseAssertionLabels(stdout || '');
   if (assertions.length > 0) {
+    const labelError = validateAssertionLabels(assertions, assertionCount);
+    if (labelError) {
+      return {
+        ...result,
+        passed: false,
+        score: 0,
+        gradeError: true,
+        errorType: labelError.errorType,
+        error: labelError.error,
+        ...extra,
+      };
+    }
+
     const assertionScores = assertions.map((a) => (a.passed ? 1.0 : 0.0));
     const evidence = assertions.map((a) =>
       a.passed ? 'PASS' : `FAIL${a.reason ? `: ${a.reason}` : ''}`,
@@ -259,6 +278,41 @@ function parseAssertionLabels(stdout) {
     }
   }
   return results.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Validate code-grader per-assertion labels when a scenario assertion count is known.
+ * @param {{ index: number }[]} labels - Parsed labels
+ * @param {number} assertionCount - Expected scenario assertion count
+ * @returns {{ errorType: string, error: string }|null}
+ */
+function validateAssertionLabels(labels, assertionCount) {
+  if (!(assertionCount > 0) || labels.length === 0) return null;
+
+  const seen = new Map();
+  const duplicates = [];
+  const outOfRange = [];
+  for (const label of labels) {
+    if (label.index < 1 || label.index > assertionCount) outOfRange.push(label.index);
+    const count = seen.get(label.index) || 0;
+    if (count === 1) duplicates.push(label.index);
+    seen.set(label.index, count + 1);
+  }
+  const missing = [];
+  for (let i = 1; i <= assertionCount; i++) {
+    if (!seen.has(i)) missing.push(i);
+  }
+
+  if (duplicates.length === 0 && outOfRange.length === 0 && missing.length === 0) return null;
+
+  const details = [];
+  if (missing.length > 0) details.push(`missing labels for A${missing.join(', A')}`);
+  if (duplicates.length > 0) details.push(`duplicate labels for A${duplicates.join(', A')}`);
+  if (outOfRange.length > 0) details.push(`out-of-range labels A${outOfRange.join(', A')}`);
+  return {
+    errorType: 'code_grader_assertion_labels_invalid',
+    error: `Code grader emitted invalid per-assertion labels for ${assertionCount} assertions: ${details.join('; ')}`,
+  };
 }
 
 /**
@@ -978,8 +1032,23 @@ function gradeWithMixed(result, scenario, projectRoot, actionLog) {
     return gradeWithModel(result, scenario, projectRoot);
   }
 
+  // Behavioral assertions require a captured action log. Without one,
+  // fail closed instead of letting [tool_not_called] pass against an empty log.
+  if (!Array.isArray(actionLog)) {
+    return {
+      ...result,
+      passed: false,
+      score: 0,
+      gradeError: true,
+      errorType: 'action_log_missing',
+      error: 'Behavioral tool assertions require an action log, but none was captured',
+      assertionScores: new Array(scenario.assertions.length).fill(0),
+      grader: 'mixed',
+    };
+  }
+
   // Grade behavioral assertions
-  const actions = actionLog || [];
+  const actions = actionLog;
   const behavioralScores = behavioral.map((b) => gradeBehavioralAssertion(b.parsed, actions));
 
   // Fallback: 0 text → pure behavioral grading
@@ -1043,6 +1112,7 @@ module.exports = {
   gradeTrialResult,
   gradeWithCode,
   parseAssertionLabels,
+  validateAssertionLabels,
   buildCodeGraderBlockRefs,
   captureTrialArtifacts,
   gradeWithModel,

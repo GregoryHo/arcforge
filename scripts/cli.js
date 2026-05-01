@@ -584,7 +584,7 @@ async function main() {
         };
 
         const printAbSummary = (label, opts) => {
-          const { baseline, treatment, delta, deltaCi, verdict } = opts;
+          const { baseline, treatment, delta, deltaCi, verdict, verdictPolicy } = opts;
           const bStats = opts.bStats ?? eval_.statsFromResults(baseline);
           const tStats = opts.tStats ?? eval_.statsFromResults(treatment);
           const showCI = bStats.count >= 5 && tStats.count >= 5;
@@ -597,6 +597,7 @@ async function main() {
           console.log(`${label}Treatment: ${fmtStats(tStats)}`);
           const ciStr = deltaCi && showCI ? ` CI[${deltaCi.lower}, ${deltaCi.upper}]` : '';
           console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}${ciStr}`);
+          if (verdictPolicy) console.log(`${label}Policy:    ${verdictPolicy}`);
           console.log(`${label}Verdict:   ${verdict}`);
           const remediation = eval_.verdictMessage(verdict);
           if (remediation) console.log(`${label}Remediation: ${remediation}`);
@@ -739,8 +740,13 @@ async function main() {
               runId,
               isolated: true,
             });
-          const stubGrade = (result, _t) =>
-            eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+          const stubGrade = (result, _t) => {
+            try {
+              return eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+            } finally {
+              eval_.cleanupTrialDir(result.trialDir);
+            }
+          };
 
           const outcome = runPreflight(scenarioName, projectRoot, {
             runTrial: stubRunTrial,
@@ -824,11 +830,18 @@ async function main() {
           // Preflight gate: require a PASS preflight for this (scenario, model)
           // before running A/B eval. Gate is keyed by both — a PASS produced
           // under one model does NOT unblock A/B runs on another model.
-          const { checkPreflightGate } = require('./lib/eval-preflight');
-          const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
-          if (gateError) {
-            console.error(`Error: ${gateError}`);
-            process.exit(1);
+          // Non-regression/non-interference scenarios may explicitly opt out
+          // with `## Preflight\nskip`; all existing scenarios continue to gate
+          // by default.
+          const { checkPreflightGate, shouldSkipPreflightGate } = require('./lib/eval-preflight');
+          if (shouldSkipPreflightGate(scenario)) {
+            console.log(`Preflight: skipped by scenario policy (${scenario.name})`);
+          } else {
+            const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
+            if (gateError) {
+              console.error(`Error: ${gateError}`);
+              process.exit(1);
+            }
           }
 
           const k = parseK(scenario, true);
@@ -891,7 +904,12 @@ async function main() {
             treatment: result.treatment,
             delta: result.delta,
             deltaCi: eval_.ciForDelta(result.baseline, result.treatment),
-            verdict: eval_.verdictFromDeltaCI(result.baseline, result.treatment),
+            verdict: eval_.verdictFromAbPolicy(
+              result.baseline,
+              result.treatment,
+              scenario.verdictPolicy,
+            ),
+            verdictPolicy: scenario.verdictPolicy,
           });
 
           // fr-gr-005: blind-comparator auto-trigger
@@ -962,6 +980,7 @@ async function main() {
             delta: comparison.delta,
             deltaCi: comparison.deltaCi,
             verdict: comparison.verdict,
+            verdictPolicy: comparison.verdictPolicy,
             bStats: comparison.baseline,
             tStats: comparison.treatment,
           });

@@ -1,6 +1,6 @@
 # inject-skills
 
-Injects `arc-using` skill content into every Claude Code session.
+Injects a minimal ArcForge bootstrap into every Claude Code session.
 
 ## Hook Event
 
@@ -8,26 +8,23 @@ Injects `arc-using` skill content into every Claude Code session.
 
 ## How it works
 
-1. Reads the `arc-using` SKILL.md content from the plugin cache
-2. Wraps content in `<EXTREMELY_IMPORTANT>` tags for priority injection
-3. Escapes content for JSON output
-4. Returns `additionalContext` that gets injected into Claude's system prompt
+1. Determines the ArcForge plugin root.
+2. Exports `ARCFORGE_ROOT` through `CLAUDE_ENV_FILE` when available.
+3. Emits compact `additionalContext` that says ArcForge skills are available and should be used on demand.
+
+The hook intentionally does **not** inject the full `arc-using` skill. The bootstrap should preserve harness/eval isolation and avoid turning ArcForge into an always-on workflow policy.
 
 ## Context Wrapper
 
-The skill content is wrapped in emphasis tags to ensure Claude prioritizes it:
+The injected context is plain guidance, not an emphasis wrapper:
 
-```xml
-<EXTREMELY_IMPORTANT>
-You have arcforge skills.
-
-**Below is the full content of your 'arc-using' skill...**
-
-[skill content here]
-</EXTREMELY_IMPORTANT>
+```text
+ArcForge skills are available for this project.
+ARCFORGE_ROOT=...
+Use ArcForge as a minimal, composable toolkit...
 ```
 
-This wrapper is intentional - it tells Claude to treat the skill instructions as high-priority system context rather than optional guidance.
+Agents should read or invoke specific skills when they are useful for the task, and proceed directly for simple, read-only, grading, or isolated eval work.
 
 ## Output format
 
@@ -35,7 +32,7 @@ This wrapper is intentional - it tells Claude to treat the skill instructions as
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>...</EXTREMELY_IMPORTANT>"
+    "additionalContext": "ArcForge skills are available..."
   }
 }
 ```
