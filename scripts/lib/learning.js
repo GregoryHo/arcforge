@@ -4,7 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const VALID_SCOPES = new Set(['project', 'global']);
-const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'materialized']);
+const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'materialized', 'activated']);
 const REQUIRED_CANDIDATE_FIELDS = [
   'id',
   'scope',
@@ -190,7 +190,7 @@ function transitionCandidate(
   status,
   { scope = 'project', projectRoot = process.cwd(), homeDir, now = new Date().toISOString() } = {},
 ) {
-  if (!VALID_STATUSES.has(status) || status === 'pending') {
+  if (!VALID_STATUSES.has(status) || status === 'pending' || status === 'activated') {
     throw new Error('status transition must be approved, rejected, or materialized');
   }
   const candidates = loadCandidates({ scope, projectRoot, homeDir });
@@ -338,6 +338,90 @@ function materializeCandidate(
   return { scope, candidate: updated, draft_paths: draftPaths };
 }
 
+function getActiveArtifactPaths(candidate) {
+  if (candidate.artifact_type !== 'skill') {
+    throw new Error('only skill candidate activation is supported');
+  }
+  assertSafeSkillName(candidate.name);
+  return [
+    path.join('skills', candidate.name, 'SKILL.md'),
+    path.join('tests', 'skills', skillTestName(candidate.name)),
+  ];
+}
+
+function assertRecordedDraftPaths(candidate, expectedDraftPaths) {
+  if (!Array.isArray(candidate.draft_paths)) {
+    throw new Error('candidate draft paths must match materialized artifacts');
+  }
+  if (
+    candidate.draft_paths.length !== expectedDraftPaths.length ||
+    expectedDraftPaths.some((draftPath, index) => candidate.draft_paths[index] !== draftPath)
+  ) {
+    throw new Error('candidate draft paths must match materialized artifacts');
+  }
+}
+
+function activateCandidate(
+  id,
+  { scope = 'project', projectRoot = process.cwd(), homeDir, now = new Date().toISOString() } = {},
+) {
+  assertScope(scope);
+  if (scope !== 'project') {
+    throw new Error('only project candidate activation is supported');
+  }
+  const candidates = loadCandidates({ scope, projectRoot, homeDir });
+  const index = candidates.findIndex((candidate) => candidate.id === id);
+  if (index === -1) throw new Error(`candidate not found: ${id}`);
+
+  const candidate = candidates[index];
+  const validation = validateCandidate(candidate);
+  if (!validation.ok) {
+    throw new Error(`invalid candidate: ${validation.errors.join('; ')}`);
+  }
+  if (candidate.scope !== scope) {
+    throw new Error('candidate scope must match requested activation scope');
+  }
+  if (candidate.status !== 'materialized') {
+    throw new Error('candidate must be materialized before activation');
+  }
+
+  const draftRelPaths = getDraftArtifactPaths(candidate);
+  assertRecordedDraftPaths(candidate, draftRelPaths);
+  const activeRelPaths = getActiveArtifactPaths(candidate);
+  const draftAbsPaths = draftRelPaths.map((rel) => path.join(projectRoot, rel));
+  const activeAbsPaths = activeRelPaths.map((rel) => path.join(projectRoot, rel));
+
+  const missingDrafts = draftAbsPaths.filter((p) => !fs.existsSync(p));
+  if (missingDrafts.length > 0) {
+    throw new Error(
+      `cannot activate: draft artifact missing: ${missingDrafts.map((p) => path.relative(projectRoot, p)).join(', ')}`,
+    );
+  }
+
+  const conflicting = activeAbsPaths.filter((p) => fs.existsSync(p));
+  if (conflicting.length > 0) {
+    throw new Error(
+      `cannot activate: active artifact already exists: ${conflicting.map((p) => path.relative(projectRoot, p)).join(', ')}`,
+    );
+  }
+
+  for (let i = 0; i < draftAbsPaths.length; i++) {
+    fs.mkdirSync(path.dirname(activeAbsPaths[i]), { recursive: true });
+    fs.renameSync(draftAbsPaths[i], activeAbsPaths[i]);
+  }
+
+  const updated = {
+    ...candidate,
+    status: 'activated',
+    active_paths: activeRelPaths,
+    activated_at: now,
+    updated_at: now,
+  };
+  candidates[index] = updated;
+  rewriteCandidates(candidates, { scope, projectRoot, homeDir });
+  return { scope, candidate: updated, active_paths: activeRelPaths };
+}
+
 function readJsonLines(filePath) {
   if (!fs.existsSync(filePath)) return [];
   return fs
@@ -455,6 +539,7 @@ module.exports = {
   REQUIRED_CANDIDATE_FIELDS,
   VALID_SCOPES,
   VALID_STATUSES,
+  activateCandidate,
   appendCandidate,
   assertCanMaterialize,
   analyzeLearning,

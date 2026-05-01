@@ -25,7 +25,7 @@
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
- *   learn status|enable|disable|analyze|review|approve|reject|materialize  Manage optional learning subsystem
+ *   learn status|enable|disable|analyze|review|approve|reject|materialize|activate  Manage optional learning subsystem
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
@@ -333,6 +333,8 @@ COMMANDS:
                                      Record user authorization decision for a candidate.
   learn materialize <candidate-id> --project|--global [--json]
                                      Write approved candidate drafts without activating behavior.
+  learn activate <candidate-id> --project|--global [--json]
+                                     Promote materialized drafts to active artifacts (project scope only).
 
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
@@ -1131,6 +1133,11 @@ async function main() {
           if (!candidateId) throw new Error('learn materialize requires a candidate id');
           const scope = resolveLearningScope();
           output(learning.materializeCandidate(candidateId, { scope, projectRoot }), asJson);
+        } else if (subcommand === 'activate') {
+          const candidateId = args.positional[1];
+          if (!candidateId) throw new Error('learn activate requires a candidate id');
+          const scope = resolveLearningScope();
+          output(learning.activateCandidate(candidateId, { scope, projectRoot }), asJson);
         } else if (subcommand === 'approve' || subcommand === 'reject') {
           const candidateId = args.positional[1];
           if (!candidateId) throw new Error(`learn ${subcommand} requires a candidate id`);
@@ -1148,7 +1155,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [status|enable|disable|analyze|review|approve <id>|reject <id>|materialize <id>] [--project|--global]',
+            'Usage: arc learn [status|enable|disable|analyze|review|approve <id>|reject <id>|materialize <id>|activate <id>] [--project|--global]',
           );
           process.exit(1);
         }

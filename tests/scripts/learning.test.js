@@ -6,6 +6,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const {
+  activateCandidate,
   appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
@@ -576,6 +577,294 @@ describe('learning subsystem MVP-1', () => {
     );
     expect(approved.status).toBe('approved');
     expect(approved.evidence[0].session_id).toBe('session-abc');
+  });
+
+  it('activates a materialized project candidate by promoting drafts to active artifacts', () => {
+    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    materializeCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T00:03:00Z',
+    });
+
+    const result = activateCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T00:04:00Z',
+    });
+
+    expect(result.candidate.status).toBe('activated');
+    expect(result.candidate.active_paths).toEqual([
+      'skills/arc-releasing/SKILL.md',
+      'tests/skills/test_skill_arc_releasing.py',
+    ]);
+    expect(result.candidate.activated_at).toBe('2026-05-01T00:04:00Z');
+    expect(result.candidate.draft_paths).toEqual([
+      'skills/arc-releasing/SKILL.md.draft',
+      'tests/skills/test_skill_arc_releasing.py.draft',
+    ]);
+    expect(result.candidate.evidence).toHaveLength(1);
+
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
+    expect(
+      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
+    ).toBe(false);
+
+    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].status).toBe('activated');
+    expect(persisted[0].active_paths).toEqual([
+      'skills/arc-releasing/SKILL.md',
+      'tests/skills/test_skill_arc_releasing.py',
+    ]);
+  });
+
+  it('refuses to activate global scope candidates in this MVP', () => {
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'global',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/only project candidate activation is supported/i);
+  });
+
+  it('refuses to activate candidates that are not materialized', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/must be materialized/i);
+
+    transitionCandidate('arc-releasing-20260501-001', 'approved', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/must be materialized/i);
+  });
+
+  it('refuses to activate when the candidate cannot be found', () => {
+    expect(() =>
+      activateCandidate('nonexistent-id', { scope: 'project', projectRoot, homeDir }),
+    ).toThrow(/candidate not found/i);
+  });
+
+  it('refuses to activate malformed materialized candidates before writing artifacts', () => {
+    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify({ id: 'broken-candidate', scope: 'project', status: 'materialized' })}\n`,
+      'utf8',
+    );
+
+    expect(() =>
+      activateCandidate('broken-candidate', { scope: 'project', projectRoot, homeDir }),
+    ).toThrow(/invalid candidate/i);
+    expect(fs.existsSync(path.join(projectRoot, 'skills'))).toBe(false);
+  });
+
+  it('refuses to activate materialized candidates whose recorded draft paths are missing', () => {
+    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+    const draftSkillPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
+    const draftTestPath = path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.mkdirSync(path.dirname(draftSkillPath), { recursive: true });
+    fs.mkdirSync(path.dirname(draftTestPath), { recursive: true });
+    fs.writeFileSync(draftSkillPath, '---\nname: arc-releasing\ndescription: draft\n---\n', 'utf8');
+    fs.writeFileSync(draftTestPath, '# draft test\n', 'utf8');
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify(candidate({ status: 'materialized' }))}\n`,
+      'utf8',
+    );
+
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', { scope: 'project', projectRoot, homeDir }),
+    ).toThrow(/draft paths must match/i);
+    expect(fs.existsSync(draftSkillPath)).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })[0].status).toBe(
+      'materialized',
+    );
+  });
+
+  it('refuses to activate when stored candidate scope does not match requested scope', () => {
+    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify(
+        candidate({
+          status: 'materialized',
+          scope: 'global',
+          draft_paths: [
+            'skills/arc-releasing/SKILL.md.draft',
+            'tests/skills/test_skill_arc_releasing.py.draft',
+          ],
+        }),
+      )}\n`,
+      'utf8',
+    );
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/scope must match/i);
+  });
+
+  it('refuses to activate when draft artifacts are missing and leaves the queue untouched', () => {
+    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    materializeCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+
+    fs.rmSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'));
+
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/draft.*missing|missing.*draft/i);
+
+    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(persisted[0].status).toBe('materialized');
+    expect(persisted[0].active_paths).toBeUndefined();
+    expect(
+      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
+      false,
+    );
+  });
+
+  it('refuses to overwrite an existing active SKILL.md and does not move the test draft', () => {
+    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    materializeCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+    const activeSkillPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md');
+    fs.writeFileSync(activeSkillPath, 'pre-existing content', 'utf8');
+
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/already exists/i);
+
+    expect(fs.readFileSync(activeSkillPath, 'utf8')).toBe('pre-existing content');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
+      false,
+    );
+
+    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(persisted[0].status).toBe('materialized');
+  });
+
+  it('refuses to overwrite an existing active test file and does not move the skill draft', () => {
+    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    materializeCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+    const activeTestPath = path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py');
+    fs.mkdirSync(path.dirname(activeTestPath), { recursive: true });
+    fs.writeFileSync(activeTestPath, '# pre-existing test', 'utf8');
+
+    expect(() =>
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow(/already exists/i);
+
+    expect(fs.readFileSync(activeTestPath, 'utf8')).toBe('# pre-existing test');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+  });
+
+  it('CLI learn activate promotes a materialized candidate to active artifacts', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    execFileSync('node', [cli, 'learn', 'approve', 'arc-releasing-20260501-001', '--project'], {
+      env,
+      encoding: 'utf8',
+    });
+    execFileSync('node', [cli, 'learn', 'materialize', 'arc-releasing-20260501-001', '--project'], {
+      env,
+      encoding: 'utf8',
+    });
+
+    const activated = JSON.parse(
+      execFileSync(
+        'node',
+        [cli, 'learn', 'activate', 'arc-releasing-20260501-001', '--project', '--json'],
+        { env, encoding: 'utf8' },
+      ),
+    );
+
+    expect(activated.candidate.status).toBe('activated');
+    expect(activated.candidate.active_paths).toContain('skills/arc-releasing/SKILL.md');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
+  });
+
+  it('CLI learn activate fails closed for global scope', () => {
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    let exitCode = 0;
+    let stderr = '';
+    try {
+      execFileSync('node', [cli, 'learn', 'activate', 'arc-releasing-20260501-001', '--global'], {
+        env,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      exitCode = err.status;
+      stderr = err.stderr ? err.stderr.toString() : '';
+    }
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toMatch(/only project candidate activation is supported/i);
   });
 
   it('CLI learn status/enable/disable uses explicit project scope', () => {
