@@ -24,13 +24,14 @@ The filename uses 24-hour time. A concrete example:
 
 Obtain `<project-hash>` via a subprocess call — do NOT reimplement the
 hash inline. Reimplementing risks drift from the canonical hash in
-`scripts/lib/worktree-paths.js`, which in turn breaks the one-project-one-hash
-guarantee that ties review paths to worktree paths (fr-oi-005-ac3).
+`${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`, which in turn breaks
+the one-project-one-hash guarantee that ties review paths to worktree
+paths (fr-oi-005-ac3).
 
-Run this one-liner from the project root:
+Run this one-liner from anywhere:
 
 ```bash
-node -e "const { hashRepoPath } = require('./scripts/lib/worktree-paths.js'); console.log(hashRepoPath(process.cwd()));"
+node -e "const { hashRepoPath } = require('${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js'); console.log(hashRepoPath(process.cwd()));"
 ```
 
 The 6-char hex string printed is `<project-hash>`.

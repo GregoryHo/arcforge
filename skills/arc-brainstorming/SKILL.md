@@ -178,7 +178,7 @@ That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
   deferral_signal: true
 ```
 
-**Four required fields per row** (from `DECISION_LOG_RULES.required_fields_per_row` in `scripts/lib/sdd-rules.js` — single source of truth):
+**Four required fields per row** (from `DECISION_LOG_RULES.required_fields_per_row` in `${ARCFORGE_ROOT}/scripts/lib/sdd-rules.js` — single source of truth):
 
 | Field | Type | Rule |
 |---|---|---|

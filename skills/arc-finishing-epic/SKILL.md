@@ -165,8 +165,8 @@ if [ -f .arcforge-epic ]; then
 fi
 
 # Delegate worktree removal to the coordinator — it derives the canonical
-# path via scripts/lib/worktree-paths.js and handles force-remove of the
-# .arcforge-epic marker. Never call `git worktree remove` by hand.
+# path via ${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js and handles
+# force-remove of the .arcforge-epic marker. Never call `git worktree remove` by hand.
 node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup <epic-name>
 git branch -D <epic-name>
 ```

@@ -47,7 +47,7 @@ Validate the spec programmatically using sdd-utils, and extract the current spri
 ```bash
 node -e "
   const fs = require('fs');
-  const { parseSpecHeader, validateSpecHeader } = require('./scripts/lib/sdd-utils');
+  const { parseSpecHeader, validateSpecHeader } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const xml = fs.readFileSync('specs/<spec-id>/spec.xml', 'utf-8');
   const parsed = parseSpecHeader(xml);
   const result = validateSpecHeader(parsed);

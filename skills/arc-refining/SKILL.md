@@ -48,7 +48,7 @@ Before producing a new spec version, verify that the prior sprint is complete. T
 
 ```bash
 node -e "
-  const { checkDagStatus } = require('./scripts/lib/sdd-utils');
+  const { checkDagStatus } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const status = checkDagStatus('specs/<spec-id>/dag.yaml');
   if (status === null) {
     console.log('No dag.yaml — proceed (legal: refined but not yet planned).');
@@ -84,7 +84,7 @@ Validate the design doc programmatically:
 
 ```bash
 node -e "
-  const { parseDesignDoc, validateDesignDoc } = require('./scripts/lib/sdd-utils');
+  const { parseDesignDoc, validateDesignDoc } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const parsed = parseDesignDoc('docs/plans/<spec-id>/<date>/design.md');
   const result = validateDesignDoc(parsed);
   console.log(JSON.stringify(result, null, 2));
@@ -145,7 +145,7 @@ The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any re
 
 ```bash
 node -e "
-  const { writeConflictMarker } = require('./scripts/lib/sdd-utils');
+  const { writeConflictMarker } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   writeConflictMarker('<spec-id>', {
     axis_fired: '<1|2|3>',
     conflict_description: '<specific design line ranges and Q&A row q_ids involved>',
@@ -158,7 +158,7 @@ node -e "
 "
 ```
 
-The schema source of truth is `PENDING_CONFLICT_RULES` (from `scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md`. It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up.
+The schema source of truth is `PENDING_CONFLICT_RULES` (from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md`. It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up.
 
 **MUST NOT write `_pending-conflict.md` for non-R3-axis blocks (fr-rf-015-ac2):**
 - DAG completion gate failure (fr-rf-012) → terminal output only, exit non-zero, no file written.
@@ -187,7 +187,7 @@ Inventing a concrete MUST from training-data common practice ("most rate-limiter
 
 **Deferral signals (ac2).** A Q&A row carries `deferral_signal=true` when its `user_answer_verbatim` matches one of the canonical deferral phrases — the four canonical phrases per `DECISION_LOG_RULES.deferral_signal_canonical_phrases` are: "use defaults", "covered.", "skip", "you decide". When `deferral_signal=true`, the corresponding axis is unbound. Deferral does NOT authorize a concrete MUST derived from training-data common practice — the same three legitimate moves apply. A deferred answer means the user deliberately left the axis open; refiner has no authorization to pre-fill it.
 
-**Every concrete MUST must be sourced (ac3).** For every concrete MUST the refiner is about to author, it MUST be able to point to a non-deferral source — either a design phrase that contains the concrete value, or a Q&A row whose `user_answer_verbatim` contains the concrete value with `deferral_signal=false`. If no such source exists, the criterion is invention and MUST NOT be authored; use one of the three legitimate moves instead. This rule is the runtime invariant that `mechanicalAuthorizationCheck` (in `scripts/lib/sdd-validators.js`) verifies at Phase 6 — every concrete MUST in the produced spec will be checked mechanically, so any invention the LLM drafts here will be caught and cause a block downstream.
+**Every concrete MUST must be sourced (ac3).** For every concrete MUST the refiner is about to author, it MUST be able to point to a non-deferral source — either a design phrase that contains the concrete value, or a Q&A row whose `user_answer_verbatim` contains the concrete value with `deferral_signal=false`. If no such source exists, the criterion is invention and MUST NOT be authored; use one of the three legitimate moves instead. This rule is the runtime invariant that `mechanicalAuthorizationCheck` (in `${ARCFORGE_ROOT}/scripts/lib/sdd-validators.js`) verifies at Phase 6 — every concrete MUST in the produced spec will be checked mechanically, so any invention the LLM drafts here will be caught and cause a block downstream.
 
 Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
 
@@ -273,7 +273,7 @@ Before writing any file to disk, validate the in-memory spec:
 ```bash
 node -e "
   const fs = require('fs');
-  const { parseSpecHeader, validateSpecHeader } = require('./scripts/lib/sdd-utils');
+  const { parseSpecHeader, validateSpecHeader } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const xml = fs.readFileSync('_draft_spec.xml', 'utf-8');
   const parsed = parseSpecHeader(xml);
   const result = validateSpecHeader(parsed);
@@ -295,7 +295,7 @@ Phase 6 runs two checks:
 ```bash
 node -e "
   const fs = require('fs');
-  const { mechanicalAuthorizationCheck, writeConflictMarker } = require('./scripts/lib/sdd-utils');
+  const { mechanicalAuthorizationCheck, writeConflictMarker } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const result = mechanicalAuthorizationCheck(
     fs.readFileSync('_draft_spec.xml', 'utf-8'),
     'docs/plans/<spec-id>/<date>/design.md',

@@ -31,7 +31,7 @@ No `--apply` flag, no "while I'm here let me fix this typo" shortcut, no Phase 6
 ```
 
 - `<spec-id>` — directory name under `specs/`. Exact match only; no fuzzy resolution.
-- `--save` — optional. When present, writes the full Phase 2 report + Phase 5 Decisions table to `~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md` (hash from `scripts/lib/worktree-paths.js`). When absent, no file is written anywhere.
+- `--save` — optional. When present, writes the full Phase 2 report + Phase 5 Decisions table to `~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md` (hash from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`). When absent, no file is written anywhere.
 
 ### Phase 0 — Precondition Check (MANDATORY)
 
@@ -285,7 +285,7 @@ When `--save` is present, the main session writes the full Phase 2 report
 `~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md`
 after Phase 5 prints (24-hour time). Without `--save`: **zero files are
 written** anywhere. Derive `<project-hash>` via a `node` subprocess
-calling `hashRepoPath` from `scripts/lib/worktree-paths.js` — never
+calling `hashRepoPath` from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` — never
 reimplement the hash inline (drift risk). The reference file carries the
 exact subprocess one-liner, concrete filename example, and `mkdir -p`
 parent-directory command.
@@ -315,7 +315,7 @@ If you find yourself doing any of these, STOP immediately:
 | "This MED finding is clearly important so I'll add it to the triage options anyway" | F-01 is pinned: MED/LOW/INFO MUST NOT appear in Phase 3 triage `options`. The Overview table and Detail block already ensure visibility. | MED/LOW/INFO are only reachable via the Other free-text channel. Do not add them to options. |
 | "The user might miss the MED finding if it's not in the triage options" | Phase 2 overview table and detail block ensure every finding is visible regardless of severity. The triage `options` array is for HIGH findings only — that is the structural boundary. | Trust the overview table. Other free-text is the channel for user-initiated MED/LOW/INFO selection. |
 | "The `--save` path is pinned to `~/.arcforge/reviews/` but a symlink into `docs/reviews/` or `specs/` would be more discoverable" | `--save` is the ONE carve-out, and only to `~/.arcforge/reviews/` specifically. Any other path violates the Iron Law. | Write only to `~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md`. |
-| "I'll reimplement the project hash inline — it's just sha256 of cwd" | fr-oi-005-ac3: the hash MUST come from `scripts/lib/worktree-paths.js` so a single project has one hash across worktree paths and review paths. Reimplementing risks drift. | Use the subprocess one-liner shown in the --save section. |
+| "I'll reimplement the project hash inline — it's just sha256 of cwd" | fr-oi-005-ac3: the hash MUST come from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` so a single project has one hash across worktree paths and review paths. Reimplementing risks drift. | Use the subprocess one-liner shown in the --save section. |
 | "Without `--save`, I'll save the report anyway — it's harmless and the user will appreciate it" | fr-oi-005-ac1: without `--save`, ZERO files are written. Default is read-only. | Do not write any file unless `--save` is explicitly present. |
 
 ## Implementation Delegation

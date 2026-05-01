@@ -25,7 +25,7 @@ epics:
         source_requirement: fr-sd-011
   - id: epic-path-discipline
     name: cc-005 Plugin Path Discipline
-    status: pending
+    status: completed
     spec_path: specs/spec-driven-refine/epics/epic-path-discipline/epic.md
     worktree: null
     depends_on:
@@ -33,12 +33,12 @@ epics:
     features:
       - id: path-discipline-lint
         name: tests/scripts/skill-path-discipline.test.js CI lint
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-cc-pl-001
       - id: path-discipline-remediation
         name: Existing P2/P3 violation remediation across SDD skills
-        status: pending
+        status: completed
         depends_on:
           - path-discipline-lint
         source_requirement: fr-cc-pl-002
