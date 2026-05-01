@@ -214,6 +214,239 @@ describe('learning subsystem MVP-1', () => {
     expect(shouldObserve({ projectRoot, homeDir })).toBe(true);
   });
 
+  function writeObservations(records) {
+    const { getProjectId } = require('../../scripts/lib/learning');
+    const observationPath = path.join(
+      homeDir,
+      '.arcforge',
+      'observations',
+      path.basename(projectRoot),
+      'observations.jsonl',
+    );
+    fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+    fs.writeFileSync(
+      observationPath,
+      `${records
+        .map((record) => JSON.stringify({ project_id: getProjectId(projectRoot), ...record }))
+        .join('\n')}\n`,
+      'utf8',
+    );
+    return observationPath;
+  }
+
+  it('analyzes repeated release observations into one pending project skill candidate', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm test && npm run lint && npm version patch && git tag v1.2.3',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: 'update CHANGELOG then run full tests and prepare release push',
+      },
+    ]);
+
+    const result = analyzeLearning({
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T02:00:00Z',
+    });
+
+    expect(result.enabled).toBe(true);
+    expect(result.emitted).toBe(1);
+    expect(result.candidates[0]).toMatchObject({
+      id: 'arc-releasing-20260501-001',
+      scope: 'project',
+      artifact_type: 'skill',
+      name: 'arc-releasing',
+      status: 'pending',
+    });
+    expect(result.candidates[0].trigger).toContain('release');
+    expect(result.candidates[0].evidence.map((item) => item.session_id).sort()).toEqual([
+      'session-release-a',
+      'session-release-b',
+    ]);
+    expect(result.candidates[0].evidence[0]).not.toHaveProperty('input');
+
+    const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(queued).toHaveLength(1);
+    expect(queued[0].name).toBe('arc-releasing');
+  });
+
+  it('does not emit candidates when learning is disabled or evidence is below threshold', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm test && npm run lint && git tag v1.2.3',
+      },
+    ]);
+
+    expect(analyzeLearning({ scope: 'project', projectRoot, homeDir }).enabled).toBe(false);
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
+
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+
+    expect(result.enabled).toBe(true);
+    expect(result.emitted).toBe(0);
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
+  });
+
+  it('skips malformed observation lines instead of failing analyzer runs', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const observationPath = writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm version patch && npm test && git tag v1.2.3',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: 'release notes and full tests before tag and push',
+      },
+    ]);
+    fs.appendFileSync(observationPath, '{not-json}\n', 'utf8');
+
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+
+    expect(result.emitted).toBe(1);
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(1);
+  });
+
+  it('ignores observations from another project id even when project basenames collide', () => {
+    const { analyzeLearning, getProjectId } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const otherProjectRoot = path.join(testDir, 'other', path.basename(projectRoot));
+    writeObservations([
+      {
+        project_id: getProjectId(otherProjectRoot),
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm version patch && npm test && git tag v1.2.3',
+      },
+      {
+        project_id: getProjectId(otherProjectRoot),
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: 'release notes and full tests before tag and push',
+      },
+    ]);
+
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+
+    expect(result.emitted).toBe(0);
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
+  });
+
+  it('does not queue duplicate analyzer candidates across multiple days', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm version patch && npm test && git tag v1.2.3',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: 'release notes and full tests before tag and push',
+      },
+    ]);
+
+    expect(
+      analyzeLearning({
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-01T02:00:00Z',
+      }).emitted,
+    ).toBe(1);
+    expect(
+      analyzeLearning({
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-02T02:00:00Z',
+      }).emitted,
+    ).toBe(0);
+
+    const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(queued).toHaveLength(1);
+    expect(queued[0].id).toBe('arc-releasing-20260501-001');
+  });
+
+  it('CLI learn analyze queues candidates from enabled project observations', () => {
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm version minor; update changelog; npm test; git tag v1.3.0',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: '準備發版: release notes, full tests, tag and push',
+      },
+    ]);
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    const analyzed = JSON.parse(
+      execFileSync('node', [cli, 'learn', 'analyze', '--project', '--json'], {
+        env,
+        encoding: 'utf8',
+      }),
+    );
+
+    expect(analyzed.emitted).toBe(1);
+    expect(analyzed.candidates[0].name).toBe('arc-releasing');
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(1);
+  });
+
   it('CLI learn review/approve/reject manages candidate lifecycle without deleting evidence', () => {
     appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     const cli = path.join(__dirname, '../../scripts/cli.js');

@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const VALID_SCOPES = new Set(['project', 'global']);
 const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'materialized']);
@@ -20,6 +21,10 @@ const REQUIRED_CANDIDATE_FIELDS = [
 
 function homePath(homeDir) {
   return homeDir || os.homedir();
+}
+
+function getProjectId(projectRoot = process.cwd()) {
+  return crypto.createHash('sha256').update(path.resolve(projectRoot)).digest('hex').slice(0, 16);
 }
 
 function assertScope(scope) {
@@ -42,6 +47,16 @@ function getCandidateQueuePath({ scope, projectRoot = process.cwd(), homeDir } =
       ? path.join(homePath(homeDir), '.arcforge', 'learning')
       : path.join(projectRoot, '.arcforge', 'learning');
   return path.join(base, 'candidates', 'queue.jsonl');
+}
+
+function getObservationPath({ projectRoot = process.cwd(), homeDir } = {}) {
+  return path.join(
+    homePath(homeDir),
+    '.arcforge',
+    'observations',
+    path.basename(projectRoot),
+    'observations.jsonl',
+  );
 }
 
 function readJsonFile(filePath, fallback) {
@@ -202,14 +217,130 @@ function assertCanMaterialize(candidate) {
   return true;
 }
 
+function readJsonLines(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  return fs
+    .readFileSync(filePath, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function releaseSignalScore(observation) {
+  const text = `${observation.input || ''}\n${observation.output || ''}`.toLowerCase();
+  let score = 0;
+  if (/\b(release|ship|cut a release|prepare release)\b|發版/.test(text)) score += 2;
+  if (/\b(changelog|release notes?)\b/.test(text)) score += 1;
+  if (/\b(version|npm version|bump)\b/.test(text)) score += 1;
+  if (/\b(git tag|tag v?\d|tag and push)\b/.test(text)) score += 1;
+  if (/\b(npm test|npm run test|full tests?|npm run lint|preflight)\b/.test(text)) score += 1;
+  if (/\b(push|handoff|pr preparation)\b/.test(text)) score += 1;
+  return score;
+}
+
+function releaseReason(observation) {
+  const parts = [];
+  const text = `${observation.input || ''}\n${observation.output || ''}`.toLowerCase();
+  if (/\b(release|ship|cut a release|prepare release)\b|發版/.test(text))
+    parts.push('release request');
+  if (/\b(changelog|release notes?)\b/.test(text)) parts.push('changelog or release notes');
+  if (/\b(version|npm version|bump)\b/.test(text)) parts.push('version bump');
+  if (/\b(git tag|tag v?\d|tag and push)\b/.test(text)) parts.push('tagging');
+  if (/\b(npm test|npm run test|full tests?|npm run lint|preflight)\b/.test(text)) {
+    parts.push('tests or lint');
+  }
+  if (/\b(push|handoff|pr preparation)\b/.test(text)) parts.push('push or handoff');
+  return parts.join(', ');
+}
+
+function buildReleaseCandidate(observations, { scope, now }) {
+  const date = now.slice(0, 10).replace(/-/g, '');
+  const evidence = observations.map((observation) => ({
+    session_id: observation.session || 'unknown',
+    source: 'observation',
+    reason: releaseReason(observation),
+  }));
+  return {
+    id: `arc-releasing-${date}-001`,
+    scope,
+    artifact_type: 'skill',
+    name: 'arc-releasing',
+    summary: 'Project release flow repeated across multiple sessions.',
+    trigger: 'when the user asks to cut, ship, bump, prepare, or complete a release',
+    evidence,
+    confidence: 0.72,
+    status: 'pending',
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function analyzeLearning({
+  scope = 'project',
+  projectRoot = process.cwd(),
+  homeDir,
+  now = new Date().toISOString(),
+} = {}) {
+  assertScope(scope);
+  if (!isLearningEnabled({ scope, projectRoot, homeDir })) {
+    return { scope, enabled: false, emitted: 0, candidates: [] };
+  }
+  if (scope !== 'project') {
+    return { scope, enabled: true, emitted: 0, candidates: [] };
+  }
+
+  const observations = readJsonLines(getObservationPath({ projectRoot, homeDir }));
+  const projectId = getProjectId(projectRoot);
+  const existing = loadCandidates({ scope, projectRoot, homeDir }).find(
+    (candidate) =>
+      candidate.scope === scope &&
+      candidate.artifact_type === 'skill' &&
+      candidate.name === 'arc-releasing',
+  );
+  if (existing) {
+    return { scope, enabled: true, emitted: 0, candidates: [existing] };
+  }
+
+  const releaseBySession = new Map();
+  for (const observation of observations) {
+    if (observation.project_id !== projectId) continue;
+    if (releaseSignalScore(observation) < 2) continue;
+    const session = observation.session || 'unknown';
+    if (!releaseBySession.has(session)) releaseBySession.set(session, observation);
+  }
+
+  if (releaseBySession.size < 2) {
+    return { scope, enabled: true, emitted: 0, candidates: [] };
+  }
+
+  const candidate = buildReleaseCandidate([...releaseBySession.values()], { scope, now });
+  const written = appendCandidate(candidate, { scope, projectRoot, homeDir });
+  return {
+    scope,
+    enabled: true,
+    emitted: written.duplicate ? 0 : 1,
+    candidates: [written.candidate],
+  };
+}
+
 module.exports = {
   REQUIRED_CANDIDATE_FIELDS,
   VALID_SCOPES,
   VALID_STATUSES,
   appendCandidate,
   assertCanMaterialize,
+  analyzeLearning,
   getCandidateQueuePath,
   getLearningConfigPath,
+  getObservationPath,
+  getProjectId,
   isLearningEnabled,
   loadCandidates,
   readLearningConfig,

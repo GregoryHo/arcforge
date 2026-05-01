@@ -325,6 +325,8 @@ COMMANDS:
                                      Explicitly enable learning for project or global scope.
   learn disable --project|--global [--json]
                                      Disable new learning observations/analyzer runs for a scope.
+  learn analyze --project|--global [--json]
+                                     Analyze enabled observations and queue candidate learnings.
   learn review --project|--global [--json]
                                      List queued learning candidates for review.
   learn approve|reject <candidate-id> --project|--global [--json]
@@ -1100,7 +1102,7 @@ async function main() {
         const resolveLearningScope = () => {
           if (args.flags.global) return 'global';
           if (args.flags.project) return 'project';
-          throw new Error('learn enable/disable requires --project or --global');
+          throw new Error('learn command requires --project or --global');
         };
 
         if (subcommand === 'status') {
@@ -1119,6 +1121,9 @@ async function main() {
           const scope = resolveLearningScope();
           const candidates = learning.loadCandidates({ scope, projectRoot });
           output({ scope, count: candidates.length, candidates }, asJson);
+        } else if (subcommand === 'analyze') {
+          const scope = resolveLearningScope();
+          output(learning.analyzeLearning({ scope, projectRoot }), asJson);
         } else if (subcommand === 'approve' || subcommand === 'reject') {
           const candidateId = args.positional[1];
           if (!candidateId) throw new Error(`learn ${subcommand} requires a candidate id`);
@@ -1136,7 +1141,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [status|enable|disable|review|approve <id>|reject <id>] [--project|--global]',
+            'Usage: arc learn [status|enable|disable|analyze|review|approve <id>|reject <id>] [--project|--global]',
           );
           process.exit(1);
         }

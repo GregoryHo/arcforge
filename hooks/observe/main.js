@@ -23,7 +23,7 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
-const { isLearningEnabled } = require('../../scripts/lib/learning');
+const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -163,6 +163,7 @@ function main() {
       tool: toolName,
       session: sessionId,
       project,
+      project_id: getProjectId(process.env.CLAUDE_PROJECT_DIR || process.cwd()),
     };
 
     // Add input/output based on phase
