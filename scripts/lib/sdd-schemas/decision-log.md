@@ -59,6 +59,65 @@ trimmed), `deferral_signal` MUST be set to `true`:
 Additional phrases MAY be recognized by implementations. The list above is the minimum
 required set per `fr-cc-if-008-ac4`.
 
+## Examples
+
+The schema-shape examples below illustrate the field contract. The wire format (YAML shown here) is one of several permitted choices; the contract is the field shape, not the wire encoding.
+
+### Valid example
+
+Three Q&A rows with distinct `q_id`s, mixing `deferral_signal=true` and `deferral_signal=false`:
+
+```yaml
+- q_id: q1
+  question: "Which auth provider should the v2 spec target?"
+  user_answer_verbatim: "Auth0 — we already have an org account."
+  deferral_signal: false
+
+- q_id: q2
+  question: "Should refresh tokens rotate on every use?"
+  user_answer_verbatim: "use defaults"
+  deferral_signal: true
+
+- q_id: q3
+  question: "What is the session inactivity timeout?"
+  user_answer_verbatim: "30 minutes."
+  deferral_signal: false
+```
+
+### Invalid examples
+
+1. Duplicate `q_id` within a session — `q1` reused for two different questions. Error: "duplicate q_id within a brainstorming session is ERROR" (per `q_id_uniqueness`).
+
+```yaml
+- q_id: q1
+  question: "First question."
+  user_answer_verbatim: "Answer A."
+  deferral_signal: false
+
+- q_id: q1   # ← duplicate; MUST be q2
+  question: "Second question."
+  user_answer_verbatim: "Answer B."
+  deferral_signal: false
+```
+
+2. Missing `deferral_signal` field. Error: "decision-log row missing required field: deferral_signal".
+
+```yaml
+- q_id: q1
+  question: "Should we cache?"
+  user_answer_verbatim: "yes, redis"
+  # deferral_signal omitted ← ERROR
+```
+
+3. Missing `user_answer_verbatim` field. Error: "decision-log row missing required field: user_answer_verbatim".
+
+```yaml
+- q_id: q1
+  question: "Should we cache?"
+  # user_answer_verbatim omitted ← ERROR
+  deferral_signal: false
+```
+
 ## Enforcement Authority
 
 `scripts/lib/sdd-rules.js` — `DECISION_LOG_RULES` is the canonical source of truth

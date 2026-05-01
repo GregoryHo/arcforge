@@ -6,7 +6,7 @@
 
 | Scenario Type | Environment Needs | Setup Example |
 |--------------|-------------------|---------------|
-| Agent reads project code | Copy relevant files | `cp $PROJECT_ROOT/scripts/lib/eval.js .` |
+| Agent reads project code | Copy relevant files | `cp $PROJECT_ROOT/src/eval.js .` |
 | Agent writes new code | Empty dir is fine | (no setup needed) |
 | Agent reviews existing code | Provide the code to review | `cp $PROJECT_ROOT/src/auth.js .` |
 | Agent answers from context only | Empty dir, rich Context | (no setup needed, but Context must be sufficient) |

@@ -43,6 +43,32 @@ All four fields MUST be present. Missing any one field is an ERROR.
 | `candidate_resolutions` | list, length 1–3 | 1-3 candidate resolutions, each phrased as a concrete action the user can pick. Zero resolutions is an ERROR: "_pending-conflict.md MUST contain at least one candidate resolution". |
 | `user_action_prompt` | string | Directs the user to run /arc-brainstorming iterate <spec-id> to resolve the conflict. Must be present so the user knows how to proceed after reading the conflict file. |
 
+## Examples
+
+### Valid example
+
+Axis 1 fired, two candidate resolutions are present, and the user-action prompt tells the user exactly what to choose.
+
+```yaml
+axis_fired: "1"
+conflict_description: "REQ-A says export is CSV-only, but the new design asks for JSON as the default."
+candidate_resolutions:
+  - "Keep CSV-only and reject JSON default."
+  - "Change REQ-A to allow JSON default and record the compatibility impact."
+user_action_prompt: "Choose one candidate resolution, or provide a new explicit requirement."
+```
+
+### Invalid example
+
+No candidate resolutions are present. Error: "_pending-conflict.md MUST contain at least one candidate resolution".
+
+```yaml
+axis_fired: "1"
+conflict_description: "Existing spec and new design disagree about the export format."
+candidate_resolutions: []
+user_action_prompt: "Please resolve the conflict."
+```
+
 ## Enforcement Authority
 
 `scripts/lib/sdd-rules.js` — `PENDING_CONFLICT_RULES` is the canonical source of truth

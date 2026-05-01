@@ -23,24 +23,30 @@
  *   node scripts/lib/print-schema.js design --json        → JSON machine form
  *   node scripts/lib/print-schema.js spec [--markdown|--json]
  *
- * Non-goals:
- *   - Producing examples. Examples live in test fixtures that are independently
- *     validated; embedding them here would re-introduce the drift problem.
- *     If you want a known-valid example, consult tests/scripts/sdd-utils.test.js
- *     or the refiner's produced artifacts under specs/<some-spec>/.
+ * Examples:
+ *   The decision-log and pending-conflict renderers emit valid + invalid
+ *   examples per fr-sd-013-ac3 and fr-sd-012-ac3. Examples are renderer
+ *   prose (lines.push string literals); structured field data still comes
+ *   from the rule constants. The design and spec renderers do not emit
+ *   examples — their fr-sd-002-ac2/fr-sd-003-ac3/fr-sd-007-ac1 examples
+ *   live in test fixtures (tests/scripts/sdd-utils.test.js).
  */
 
-const { DESIGN_DOC_RULES, SPEC_HEADER_RULES } = require('./sdd-utils');
-const { DECISION_LOG_RULES, PENDING_CONFLICT_RULES } = require('./sdd-rules');
+const {
+  DESIGN_DOC_RULES,
+  SPEC_HEADER_RULES,
+  DECISION_LOG_RULES,
+  PENDING_CONFLICT_RULES,
+} = require('./sdd-utils');
 
 // Markdown mode wraps regex values in inline code so renderers (GitHub, Obsidian)
 // don't misinterpret characters like `[`, `]`, `*`, `\` as markdown syntax.
 // Plain mode (terminal) skips the backticks for readability in narrow terminals.
 function fmtRegex(source, markdown) {
-  return markdown ? '`' + source + '`' : source;
+  return markdown ? `\`${source}\`` : source;
 }
 function fmtCode(s, markdown) {
-  return markdown ? '`' + s + '`' : s;
+  return markdown ? `\`${s}\`` : s;
 }
 
 const GENERATED_HEADER = [
@@ -257,6 +263,75 @@ function renderDecisionLog(opts = {}) {
   );
   lines.push('required set per `fr-cc-if-008-ac4`.');
   lines.push('');
+  lines.push('## Examples');
+  lines.push('');
+  lines.push(
+    'The schema-shape examples below illustrate the field contract. The wire format (YAML shown here) is one of several permitted choices; the contract is the field shape, not the wire encoding.',
+  );
+  lines.push('');
+  lines.push('### Valid example');
+  lines.push('');
+  lines.push(
+    'Three Q&A rows with distinct `q_id`s, mixing `deferral_signal=true` and `deferral_signal=false`:',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('- q_id: q1');
+  lines.push('  question: "Which auth provider should the v2 spec target?"');
+  lines.push('  user_answer_verbatim: "Auth0 — we already have an org account."');
+  lines.push('  deferral_signal: false');
+  lines.push('');
+  lines.push('- q_id: q2');
+  lines.push('  question: "Should refresh tokens rotate on every use?"');
+  lines.push('  user_answer_verbatim: "use defaults"');
+  lines.push('  deferral_signal: true');
+  lines.push('');
+  lines.push('- q_id: q3');
+  lines.push('  question: "What is the session inactivity timeout?"');
+  lines.push('  user_answer_verbatim: "30 minutes."');
+  lines.push('  deferral_signal: false');
+  lines.push('```');
+  lines.push('');
+  lines.push('### Invalid examples');
+  lines.push('');
+  lines.push(
+    '1. Duplicate `q_id` within a session — `q1` reused for two different questions. Error: "duplicate q_id within a brainstorming session is ERROR" (per `q_id_uniqueness`).',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('- q_id: q1');
+  lines.push('  question: "First question."');
+  lines.push('  user_answer_verbatim: "Answer A."');
+  lines.push('  deferral_signal: false');
+  lines.push('');
+  lines.push('- q_id: q1   # ← duplicate; MUST be q2');
+  lines.push('  question: "Second question."');
+  lines.push('  user_answer_verbatim: "Answer B."');
+  lines.push('  deferral_signal: false');
+  lines.push('```');
+  lines.push('');
+  lines.push(
+    '2. Missing `deferral_signal` field. Error: "decision-log row missing required field: deferral_signal".',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('- q_id: q1');
+  lines.push('  question: "Should we cache?"');
+  lines.push('  user_answer_verbatim: "yes, redis"');
+  lines.push('  # deferral_signal omitted ← ERROR');
+  lines.push('```');
+  lines.push('');
+  lines.push(
+    '3. Missing `user_answer_verbatim` field. Error: "decision-log row missing required field: user_answer_verbatim".',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('- q_id: q1');
+  lines.push('  question: "Should we cache?"');
+  lines.push('  # user_answer_verbatim omitted ← ERROR');
+  lines.push('  deferral_signal: false');
+  lines.push('```');
+  lines.push('');
   lines.push('## Enforcement Authority');
   lines.push('');
   lines.push('`scripts/lib/sdd-rules.js` — `DECISION_LOG_RULES` is the canonical source of truth');
@@ -324,6 +399,42 @@ function renderPendingConflict(opts = {}) {
     }
   }
   lines.push('');
+  lines.push('## Examples');
+  lines.push('');
+  lines.push('### Valid example');
+  lines.push('');
+  lines.push(
+    'Axis 1 fired, two candidate resolutions are present, and the user-action prompt tells the user exactly what to choose.',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('axis_fired: "1"');
+  lines.push(
+    'conflict_description: "REQ-A says export is CSV-only, but the new design asks for JSON as the default."',
+  );
+  lines.push('candidate_resolutions:');
+  lines.push('  - "Keep CSV-only and reject JSON default."');
+  lines.push('  - "Change REQ-A to allow JSON default and record the compatibility impact."');
+  lines.push(
+    'user_action_prompt: "Choose one candidate resolution, or provide a new explicit requirement."',
+  );
+  lines.push('```');
+  lines.push('');
+  lines.push('### Invalid example');
+  lines.push('');
+  lines.push(
+    'No candidate resolutions are present. Error: "_pending-conflict.md MUST contain at least one candidate resolution".',
+  );
+  lines.push('');
+  lines.push('```yaml');
+  lines.push('axis_fired: "1"');
+  lines.push(
+    'conflict_description: "Existing spec and new design disagree about the export format."',
+  );
+  lines.push('candidate_resolutions: []');
+  lines.push('user_action_prompt: "Please resolve the conflict."');
+  lines.push('```');
+  lines.push('');
   lines.push('## Enforcement Authority');
   lines.push('');
   lines.push(
@@ -378,16 +489,16 @@ Flags:
   --help      Show this help.
 
 Rules source:
-  scripts/lib/sdd-utils.js — DESIGN_DOC_RULES, SPEC_HEADER_RULES.
-  scripts/lib/sdd-rules.js — DECISION_LOG_RULES, PENDING_CONFLICT_RULES.
-  This script NEVER duplicates schema information. If you find yourself
-  wanting to add a hand-authored example here, stop — add a fixture to
-  tests/scripts/sdd-utils.test.js instead and assert it validates.`;
+  scripts/lib/sdd-utils.js — DESIGN_DOC_RULES, SPEC_HEADER_RULES,
+  DECISION_LOG_RULES, PENDING_CONFLICT_RULES.
+  This script NEVER duplicates structured schema fields. Valid/invalid
+  examples for decision-log and pending-conflict live in renderer prose
+  per fr-sd-013-ac3/fr-sd-012-ac3.`;
 
 function main(argv) {
   const args = argv.slice(2);
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
-    process.stdout.write(HELP + '\n');
+    process.stdout.write(`${HELP}\n`);
     return 0;
   }
   const target = args[0];
@@ -418,7 +529,7 @@ function main(argv) {
   let out;
   if (asJson) out = JSON.stringify(jsonifyRules(RULES), null, 2);
   else out = renderer({ markdown: asMarkdown });
-  process.stdout.write(out + '\n');
+  process.stdout.write(`${out}\n`);
   return 0;
 }
 

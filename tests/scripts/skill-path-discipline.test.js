@@ -11,8 +11,8 @@ const path = require('node:path');
 //
 // Detection (per fr-cc-pl-001-ac1):
 //   P2: node -e "...require('./scripts/lib/...')..." cwd-relative invocations.
-//   P3: bare scripts/lib/ references in prose not preceded by ${ARCFORGE_ROOT}/
-//       on the same logical token.
+//   P3: any scripts/lib/ reference in prose not prefixed exactly with
+//       ${ARCFORGE_ROOT}/ on the same logical token.
 //
 // Exclusions (per fr-cc-pl-001-ac3):
 //   - scripts/lib/ itself, tests/, hooks/ (each has a separate, correct
@@ -20,11 +20,8 @@ const path = require('node:path');
 //   - skill-local files under skills/<name>/scripts/ or skills/<name>/agents/
 //     (those are JS / agent definitions, not LLM-facing prose).
 //   - skills/*-workspace/ (eval workspaces, not shipped surface).
-//   - arc-writing-skills SKILL.md per fr-cc-pl-002-ac3 — its Path Resolution
-//     section deliberately renders WRONG/CORRECT anti-pattern examples to
-//     teach skill authors. Adding the prefix to those WRONG examples would
-//     defeat their pedagogical purpose. The CORRECT examples in the same
-//     file already carry the prefix.
+//   - The fenced Anti-patterns example block in arc-writing-skills only;
+//     those WRONG examples are deliberately invalid teaching material.
 //
 // Reporting (per fr-cc-pl-001-ac2):
 //   Each violation reports file path, line number, offending line content
@@ -33,9 +30,9 @@ const path = require('node:path');
 //   individual lines — fix the path, do not annotate around the lint.
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
-
-// Files exempt from the lint per fr-cc-pl-002-ac3.
-const FILE_ALLOWLIST = new Set([path.join(REPO_ROOT, 'skills', 'arc-writing-skills', 'SKILL.md')]);
+const ARCFORGE_ROOT_TOKEN = `${'${'}ARCFORGE_ROOT}/`;
+const ARCFORGE_ROOT_PREFIX = `${ARCFORGE_ROOT_TOKEN}scripts/lib/`;
+const ARC_WRITING_SKILLS_PATH = path.join(REPO_ROOT, 'skills', 'arc-writing-skills', 'SKILL.md');
 
 // Recursively collect markdown files under a base dir, with include/exclude
 // rules. Returns absolute paths.
@@ -88,7 +85,7 @@ function collectScopedFiles() {
   const templateFiles = collectMarkdown(templatesDir);
   const agentFiles = collectMarkdown(agentsDir);
 
-  return [...skillFiles, ...templateFiles, ...agentFiles].filter((f) => !FILE_ALLOWLIST.has(f));
+  return [...skillFiles, ...templateFiles, ...agentFiles];
 }
 
 // Pattern P2: node -e block invoking require('./scripts/lib/...').
@@ -97,15 +94,11 @@ function collectScopedFiles() {
 // node -e wrapper, so we flag any line containing require('./scripts/lib/.
 const P2_PATTERN = /require\(\s*['"`]\.\/scripts\/lib\//;
 
-// Pattern P3: bare scripts/lib/ reference in prose. The negative lookbehind
-// allows any path-like prefix character (word char, slash, or close-brace)
-// before "scripts/lib/" — that covers ${ARCFORGE_ROOT}/scripts/lib/,
-// ${SKILL_ROOT}/scripts/lib/, $PROJECT_ROOT/scripts/lib/ (user-project
-// reference), absolute /scripts/lib/, and any other variable expansion. The
-// failure mode this lint targets is the bare token form ("see scripts/lib/x"
-// in prose, or "scripts/lib/x" at the start of a line/string) where an LLM
-// or user would interpret the path as cwd-relative and break in production.
-const P3_PATTERN = /(?<![\w/}])scripts\/lib\//;
+// Pattern P3: every scripts/lib/ token in LLM-facing prose must be prefixed
+// exactly with ${ARCFORGE_ROOT}/. Other prefixes (${SKILL_ROOT}/, absolute
+// paths, or project-root variables) are violations for plugin shared library
+// content because they do not resolve reliably from user-project cwd.
+const P3_PATTERN = /scripts\/lib\//g;
 
 function truncate(s, n) {
   return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
@@ -115,6 +108,32 @@ function relativizeToRepo(absPath) {
   return path.relative(REPO_ROOT, absPath);
 }
 
+function isArcWritingSkillsAntiPatternExample(absPath, lines, index) {
+  if (absPath !== ARC_WRITING_SKILLS_PATH) return false;
+
+  let inAntiPatternsSection = false;
+  let inFence = false;
+  for (let i = 0; i <= index; i++) {
+    const line = lines[i];
+    if (line.startsWith('### ') && line !== '### Anti-patterns') {
+      inAntiPatternsSection = false;
+    }
+    if (line === '### Anti-patterns') {
+      inAntiPatternsSection = true;
+      inFence = false;
+      continue;
+    }
+    if (inAntiPatternsSection && line.startsWith('```')) {
+      inFence = !inFence;
+    }
+  }
+  return inAntiPatternsSection && inFence;
+}
+
+function hasRequiredArcforgeRootPrefix(line, matchIndex) {
+  return line.slice(0, matchIndex).endsWith(ARCFORGE_ROOT_TOKEN);
+}
+
 function findViolations(absPath) {
   const content = fs.readFileSync(absPath, 'utf8');
   const lines = content.split('\n');
@@ -122,25 +141,27 @@ function findViolations(absPath) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    if (isArcWritingSkillsAntiPatternExample(absPath, lines, i)) continue;
+
     if (P2_PATTERN.test(line)) {
       out.push({
         file: relativizeToRepo(absPath),
         line: i + 1,
         kind: 'P2',
         content: truncate(line, 120),
-        corrective:
-          "use require('${ARCFORGE_ROOT}/scripts/lib/<module>') so the path resolves regardless of cwd",
+        corrective: `use require('${ARCFORGE_ROOT_PREFIX}<module>') so the path resolves regardless of cwd`,
       });
       continue; // P2 already implies a scripts/lib/ reference; do not double-report as P3
     }
 
-    if (P3_PATTERN.test(line)) {
+    for (const match of line.matchAll(P3_PATTERN)) {
+      if (hasRequiredArcforgeRootPrefix(line, match.index)) continue;
       out.push({
         file: relativizeToRepo(absPath),
         line: i + 1,
         kind: 'P3',
         content: truncate(line, 120),
-        corrective: 'prefix the reference with ${ARCFORGE_ROOT}/',
+        corrective: `prefix the reference with ${ARCFORGE_ROOT_PREFIX}`,
       });
     }
   }

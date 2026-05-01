@@ -105,7 +105,7 @@ arcforge ships as a plugin. At runtime the LLM works in a user's project — cwd
 
 | Reference target | Prefix | Example |
 |---|---|---|
-| Plugin shared library (`scripts/lib/`, `scripts/cli.js`) | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/scripts/lib/print-schema.js` |
+| Plugin shared library (`${ARCFORGE_ROOT}/scripts/lib/`, `${ARCFORGE_ROOT}/scripts/cli.js`) | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/scripts/lib/print-schema.js` |
 | Skill's own files (`skills/<name>/scripts/`, `references/`) | `${SKILL_ROOT}/` | `${SKILL_ROOT}/scripts/planner.js` |
 | Plugin templates / agents referenced from a skill | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/templates/<name>.md` |
 | User's project files (not plugin) | (none — bare is correct) | `specs/<spec-id>/spec.xml` |
@@ -134,7 +134,7 @@ node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec --markdown
 
 ### CI enforcement
 
-CI lint scans `skills/**/SKILL.md`, `templates/**/*.md`, and `agents/**/*.md` for bare `scripts/lib/` references not prefixed with `${ARCFORGE_ROOT}/`. Failures block merge. Skill-local relative paths (using `${SKILL_ROOT}/`, or `cd ${SKILL_ROOT}` then bare) are author's judgment — not enforced.
+CI lint scans `skills/**/SKILL.md`, `skills/**/references/**/*.md`, `templates/**/*.md`, and `agents/**/*.md` for `${ARCFORGE_ROOT}/scripts/lib/` discipline: any plugin shared-library reference must use that exact prefix. Failures block merge. The only exception is this fenced Anti-patterns teaching block. Skill-local relative paths (using `${SKILL_ROOT}/`, or `cd ${SKILL_ROOT}` then bare) are author's judgment — not enforced.
 
 ## SKILL.md Structure
 

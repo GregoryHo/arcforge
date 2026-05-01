@@ -164,30 +164,7 @@ Brainstorming MUST emit the Q&A history as a structured decision-log in YAML for
 
 That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
 
-**Wire format — YAML sequence, one mapping per Q&A row:**
-
-```yaml
-- q_id: q1
-  question: "Verbatim text of the question asked"
-  user_answer_verbatim: "Verbatim text of the user's answer, not paraphrased"
-  deferral_signal: false
-
-- q_id: q2
-  question: "Next question asked"
-  user_answer_verbatim: "use defaults"
-  deferral_signal: true
-```
-
-**Four required fields per row** (from `DECISION_LOG_RULES.required_fields_per_row` in `${ARCFORGE_ROOT}/scripts/lib/sdd-rules.js` — single source of truth):
-
-| Field | Type | Rule |
-|---|---|---|
-| `q_id` | string | Stable identifier, unique within the session. See q_id stability rule below. |
-| `question` | string | Verbatim text of the question asked during elicitation. |
-| `user_answer_verbatim` | string | Verbatim text of the user's answer — MUST NOT be paraphrased or summarized. |
-| `deferral_signal` | boolean | `true` when answer matches a canonical deferral phrase; `false` otherwise. |
-
-Missing any field is ERROR per the schema. See `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` for full schema documentation.
+**Schema source of truth:** Before writing or validating `decision-log.yml`, direct-read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` and follow the `DECISION_LOG_RULES` contract exported via `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. Do not copy a structural template into this skill; the generated schema is authoritative for required fields (`q_id`, `question`, `user_answer_verbatim`, `deferral_signal`), valid/invalid examples, canonical path, and deferral-signal phrases.
 
 **q_id stability rule (fr-bs-009-ac3):**
 
@@ -195,14 +172,7 @@ Missing any field is ERROR per the schema. See `${ARCFORGE_ROOT}/scripts/lib/sdd
 
 **Deferral-signal detection rule (fr-bs-009-ac4):**
 
-Brainstorming MUST set `deferral_signal: true` when `user_answer_verbatim` matches any of the canonical phrases in `DECISION_LOG_RULES.deferral_signal_canonical_phrases` (case-insensitive, trimmed). The minimum required set is:
-
-- `use defaults`
-- `covered.`
-- `skip`
-- `you decide`
-
-Implementations MAY extend this list with additional deferral phrases. Any extensions MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is the authoritative source — when the list changes there, the detection rule changes automatically.
+Brainstorming MUST set `deferral_signal: true` according to `DECISION_LOG_RULES.deferral_signal_canonical_phrases` from the generated schema/source constants (currently including `use defaults`, `covered.`, `skip`, and `you decide`). Implementations MAY extend this list with additional deferral phrases, but any extension MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is authoritative — when the list changes there, the detection rule changes automatically.
 
 **Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
 

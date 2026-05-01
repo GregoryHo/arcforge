@@ -410,9 +410,10 @@
     <acceptance_criteria>
       <criterion id="fr-cc-pl-001-ac1">
         tests/scripts/skill-path-discipline.test.js MUST exist and
-        scan three globs: skills/**/SKILL.md, templates/**/*.md,
-        agents/**/*.md. The scan MUST detect two violation patterns:
-        (i) bare scripts/lib/ references in prose not preceded by
+        scan four globs: skills/**/SKILL.md,
+        skills/**/references/**/*.md, templates/**/*.md, agents/**/*.md.
+        The scan MUST detect two violation patterns:
+        (i) scripts/lib/ references in prose not preceded exactly by
         ${ARCFORGE_ROOT}/ on the same logical token, and (ii)
         node -e "require('./scripts/lib/...')" cwd-relative require
         invocations. Detection MUST use regex patterns documented
@@ -424,8 +425,11 @@
         offending line content (truncated to 120 chars if longer),
         and the corrective form (${ARCFORGE_ROOT}/scripts/lib/...).
         Test failure MUST block CI and merge — there is no bypass
-        annotation, no skip marker, no allowlist mechanism.
+        annotation, no skip marker, no file allowlist mechanism.
         Remediation is to fix the path; suppression is forbidden.
+        The only permitted exception is the fenced Path Resolution
+        anti-pattern example block in arc-writing-skills, where WRONG
+        examples intentionally show invalid paths for pedagogy.
         <trace>design.md:Path-resolution axis section</trace>
       </criterion>
       <criterion id="fr-cc-pl-001-ac3">
@@ -434,11 +438,8 @@
         tests/ (test runner sets cwd to plugin root), hooks/ (hooks
         use ${CLAUDE_PLUGIN_ROOT} per Claude Code plugin contract),
         and skill-local paths under skills/&lt;name&gt;/scripts/ or
-        skills/&lt;name&gt;/references/ that use ${SKILL_ROOT}/ or
-        cd-then-bare patterns. Static analysis cannot reliably
-        distinguish legitimate from broken cd-then-bare patterns
-        without parsing Bash semantics; cc-005 leaves these to
-        author's judgment per fr-cc-pl-001-ac1's narrowed scope.
+        skills/&lt;name&gt;/agents/. Skill references/ markdown is
+        LLM-facing prose and is in scope.
         <trace>design.md:Path-resolution axis section</trace>
       </criterion>
     </acceptance_criteria>
