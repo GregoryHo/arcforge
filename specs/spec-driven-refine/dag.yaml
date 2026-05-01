@@ -8,12 +8,12 @@ epics:
     features:
       - id: schema-renderers
         name: print-schema.js renderDecisionLog + renderPendingConflict
-        status: pending
+        status: completed
         depends_on: []
         source_requirement: fr-sd-015
       - id: schema-drift-gate
         name: sdd-schemas-fresh.test.js extension to all 4 schemas
-        status: pending
+        status: completed
         depends_on:
           - schema-renderers
         source_requirement: fr-sd-016

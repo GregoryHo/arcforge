@@ -1,34 +1,72 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { renderDesignMarkdown, renderSpecMarkdown } = require('../../scripts/lib/print-schema');
+const {
+  renderDesignMarkdown,
+  renderSpecMarkdown,
+  renderDecisionLog,
+  renderPendingConflict,
+} = require('../../scripts/lib/print-schema');
 
 // ---------------------------------------------------------------------------
-// sdd-schemas/*.md freshness — OpenSpec-style two-phase layer (fr-sd-011).
+// sdd-schemas/*.md freshness — extends fr-sd-011 to all four schemas (fr-sd-016).
 // ---------------------------------------------------------------------------
 //
-// scripts/lib/sdd-schemas/design.md and spec.md are the human-oriented VIEWS
-// of DESIGN_DOC_RULES / SPEC_HEADER_RULES in sdd-utils.js. They are committed
-// so humans browsing the tree find them at conventional paths, but they are
-// generated from the rule constants and MUST stay in sync.
+// scripts/lib/sdd-schemas/{design,spec,decision-log,pending-conflict}.md are the
+// human-oriented VIEWS of the four rule constants in scripts/lib/sdd-utils.js
+// (DESIGN_DOC_RULES, SPEC_HEADER_RULES) and scripts/lib/sdd-rules.js
+// (DECISION_LOG_RULES, PENDING_CONFLICT_RULES). They are committed so humans
+// browsing the tree find them at conventional paths, but they are generated
+// from the rule constants and MUST stay in sync.
 //
-// This test reproduces the CLI output in-memory and asserts it matches the
-// committed file. Divergence means either (a) someone edited the file by hand
-// (do not — edit DESIGN_DOC_RULES instead), or (b) a rule change was made but
-// the committed view wasn't regenerated.
+// This test reproduces the renderer output in-memory and asserts it matches
+// the committed file. Divergence means either (a) someone edited the file by
+// hand (do not — edit the rule constant instead), or (b) a rule change was
+// made but the committed view wasn't regenerated.
 //
-// Remediation in either case:
-//   node scripts/lib/print-schema.js design --markdown > scripts/lib/sdd-schemas/design.md
-//   node scripts/lib/print-schema.js spec   --markdown > scripts/lib/sdd-schemas/spec.md
+// Remediation in either case (run from repo root):
+//   node scripts/lib/print-schema.js design           --markdown > scripts/lib/sdd-schemas/design.md
+//   node scripts/lib/print-schema.js spec             --markdown > scripts/lib/sdd-schemas/spec.md
+//   node scripts/lib/print-schema.js decision-log     --markdown > scripts/lib/sdd-schemas/decision-log.md
+//   node scripts/lib/print-schema.js pending-conflict --markdown > scripts/lib/sdd-schemas/pending-conflict.md
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const DESIGN_MD = path.join(REPO_ROOT, 'scripts', 'lib', 'sdd-schemas', 'design.md');
-const SPEC_MD = path.join(REPO_ROOT, 'scripts', 'lib', 'sdd-schemas', 'spec.md');
+const SCHEMAS_DIR = path.join(REPO_ROOT, 'scripts', 'lib', 'sdd-schemas');
+
+// Each entry: target name (used in CLI + in error messages) → committed file path
+// + renderer function (no args; markdown=true is implicit via the *Markdown alias
+// or via {markdown: true} for the new renderers).
+const SCHEMAS = [
+  {
+    target: 'design',
+    file: path.join(SCHEMAS_DIR, 'design.md'),
+    render: () => renderDesignMarkdown(),
+    sourceConstant: 'DESIGN_DOC_RULES',
+  },
+  {
+    target: 'spec',
+    file: path.join(SCHEMAS_DIR, 'spec.md'),
+    render: () => renderSpecMarkdown(),
+    sourceConstant: 'SPEC_HEADER_RULES',
+  },
+  {
+    target: 'decision-log',
+    file: path.join(SCHEMAS_DIR, 'decision-log.md'),
+    render: () => renderDecisionLog({ markdown: true }),
+    sourceConstant: 'DECISION_LOG_RULES',
+  },
+  {
+    target: 'pending-conflict',
+    file: path.join(SCHEMAS_DIR, 'pending-conflict.md'),
+    render: () => renderPendingConflict({ markdown: true }),
+    sourceConstant: 'PENDING_CONFLICT_RULES',
+  },
+];
 
 // The CLI appends a trailing newline to stdout; renderer output does not.
 // Normalize both sides by trimming trailing whitespace before comparison.
 function norm(s) {
-  return s.replace(/[\s\uFEFF\xA0]+$/, '');
+  return s.replace(/[\s﻿\xA0]+$/, '');
 }
 
 function diffHint(expected, actual) {
@@ -47,41 +85,30 @@ function diffHint(expected, actual) {
   return firstDiff.join('\n');
 }
 
-describe('sdd-schemas markdown views are in sync with DESIGN_DOC_RULES / SPEC_HEADER_RULES', () => {
-  it('scripts/lib/sdd-schemas/design.md matches `print-schema.js design --markdown`', () => {
-    const committed = fs.readFileSync(DESIGN_MD, 'utf8');
-    const generated = renderDesignMarkdown();
-    if (norm(committed) !== norm(generated)) {
-      throw new Error(
-        'design.md is out of sync with DESIGN_DOC_RULES.\n\n' +
-          'To fix, run:\n' +
-          '  node scripts/lib/print-schema.js design --markdown > scripts/lib/sdd-schemas/design.md\n\n' +
-          'First diverging lines:\n' +
-          diffHint(generated, committed),
-      );
-    }
-  });
+describe('sdd-schemas markdown views are in sync with their rule constants (fr-sd-016)', () => {
+  for (const { target, file, render, sourceConstant } of SCHEMAS) {
+    const relPath = path.relative(REPO_ROOT, file);
+    it(`${relPath} matches \`print-schema.js ${target} --markdown\``, () => {
+      const committed = fs.readFileSync(file, 'utf8');
+      const generated = render();
+      if (norm(committed) !== norm(generated)) {
+        throw new Error(
+          `${relPath} is out of sync with ${sourceConstant}.\n\n` +
+            `To fix, run:\n` +
+            `  node scripts/lib/print-schema.js ${target} --markdown > ${relPath}\n\n` +
+            'First diverging lines:\n' +
+            diffHint(generated, committed),
+        );
+      }
+    });
+  }
 
-  it('scripts/lib/sdd-schemas/spec.md matches `print-schema.js spec --markdown`', () => {
-    const committed = fs.readFileSync(SPEC_MD, 'utf8');
-    const generated = renderSpecMarkdown();
-    if (norm(committed) !== norm(generated)) {
-      throw new Error(
-        'spec.md is out of sync with SPEC_HEADER_RULES.\n\n' +
-          'To fix, run:\n' +
-          '  node scripts/lib/print-schema.js spec --markdown > scripts/lib/sdd-schemas/spec.md\n\n' +
-          'First diverging lines:\n' +
-          diffHint(generated, committed),
-      );
-    }
-  });
-
-  it('committed markdown files start with the AUTO-GENERATED header', () => {
+  it('every committed markdown file starts with the AUTO-GENERATED header', () => {
     // Belt-and-suspenders: if someone copy-pastes the file out and edits it
     // without running the regenerator, they at least see the warning.
-    const design = fs.readFileSync(DESIGN_MD, 'utf8');
-    const spec = fs.readFileSync(SPEC_MD, 'utf8');
-    expect(design).toMatch(/^<!--\s*\n\s*AUTO-GENERATED/);
-    expect(spec).toMatch(/^<!--\s*\n\s*AUTO-GENERATED/);
+    for (const { file } of SCHEMAS) {
+      const content = fs.readFileSync(file, 'utf8');
+      expect(content).toMatch(/^<!--\s*\n\s*AUTO-GENERATED/);
+    }
   });
 });
