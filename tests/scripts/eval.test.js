@@ -273,6 +273,27 @@ Do stuff.
       expect(scenario.version).toBeUndefined();
     });
 
+    it('should extract explicit preflight skip section', () => {
+      const content = `# Eval: non-regression
+## Scenario
+Do something.
+## Preflight
+skip
+`;
+      const filePath = writeScenario(tempDir, 'preflight-skip.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.preflight).toBe('skip');
+    });
+
+    it('should default preflight to undefined when missing', () => {
+      const content = '# Eval: default-preflight\n\n## Scenario\nJust a task.\n';
+      const filePath = writeScenario(tempDir, 'default-preflight.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.preflight).toBeUndefined();
+    });
+
     it('should extract target section', () => {
       const content = `# Eval: with-target
 ## Scope

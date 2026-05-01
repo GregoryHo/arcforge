@@ -31,6 +31,7 @@ const graders = require('./eval-graders');
  * @property {string} grader - 'code' | 'model' | 'human'
  * @property {string} graderConfig - Grader-specific configuration
  * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
+ * @property {string} [preflight] - Optional preflight policy ('skip' to bypass A/B preflight gate)
  */
 
 /**
@@ -160,6 +161,7 @@ function parseScenario(filePath, projectRoot) {
   const trials = trialsRaw ? parseInt(trialsRaw, 10) : undefined;
   const version = section('version');
   const target = section('target');
+  const preflight = section('preflight').toLowerCase();
 
   // Plugin Dir: resolve ${PROJECT_ROOT} or use absolute path
   const pluginDirRaw = section('plugin dir');
@@ -186,6 +188,7 @@ function parseScenario(filePath, projectRoot) {
     ...(target ? { target } : {}),
     ...(trials && !Number.isNaN(trials) ? { trials } : {}),
     ...(version ? { version } : {}),
+    ...(preflight ? { preflight } : {}),
     ...(pluginDir ? { pluginDir } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };

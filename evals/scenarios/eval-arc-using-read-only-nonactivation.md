@@ -24,6 +24,11 @@ This is a read-only comprehension task. The purpose is to check that ArcForge ro
 
 A good answer should inspect the local README if needed, answer directly, and stop.
 
+This is a non-regression/non-interference eval: an unskilled baseline may also answer correctly, so the discriminative preflight ceiling gate is intentionally skipped.
+
+## Preflight
+skip
+
 ## Setup
 cat > README.md <<'EOF'
 # ArcForge

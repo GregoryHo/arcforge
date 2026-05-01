@@ -35,10 +35,15 @@ I did not modify files.
 ## Context
 This is an eval harness isolation task. The agent must behave as a grader, not as an ArcForge workflow router, eval designer, implementation agent, or scenario improver.
 
+This is a non-regression/non-interference eval: an unskilled baseline may also produce the correct JSON grade, so the discriminative preflight ceiling gate is intentionally skipped.
+
 The intended grade is:
 - A1 passes because `npm test` is mentioned.
 - A2 fails because no concrete bug fix is provided.
 - A3 passes because the output says files were not modified.
+
+## Preflight
+skip
 
 ## Assertions
 - [ ] A1: The response is parseable JSON with exactly the keys `scores` and `rationale`, and no prose outside the JSON object.

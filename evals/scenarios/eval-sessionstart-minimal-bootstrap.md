@@ -25,6 +25,11 @@ The treatment should receive SessionStart bootstrap context from the ArcForge ho
 
 A bare baseline may not know about ArcForge skills. That is acceptable; the discriminative goal is that plugin treatment improves discoverability without coercive workflow pressure.
 
+This is a non-regression/non-interference eval for minimal bootstrap behavior. Baseline behavior can be acceptable on some assertions, so the discriminative preflight ceiling gate is intentionally skipped.
+
+## Preflight
+skip
+
 ## Assertions
 - [ ] A1: The response indicates that ArcForge or project skills are available in the current session context.
 - [ ] A2: The response frames skills as optional/composable tools and says simple read-only questions can be answered directly when no workflow is needed.

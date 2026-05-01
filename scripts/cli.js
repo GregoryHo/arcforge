@@ -829,11 +829,18 @@ async function main() {
           // Preflight gate: require a PASS preflight for this (scenario, model)
           // before running A/B eval. Gate is keyed by both — a PASS produced
           // under one model does NOT unblock A/B runs on another model.
-          const { checkPreflightGate } = require('./lib/eval-preflight');
-          const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
-          if (gateError) {
-            console.error(`Error: ${gateError}`);
-            process.exit(1);
+          // Non-regression/non-interference scenarios may explicitly opt out
+          // with `## Preflight\nskip`; all existing scenarios continue to gate
+          // by default.
+          const { checkPreflightGate, shouldSkipPreflightGate } = require('./lib/eval-preflight');
+          if (shouldSkipPreflightGate(scenario)) {
+            console.log(`Preflight: skipped by scenario policy (${scenario.name})`);
+          } else {
+            const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
+            if (gateError) {
+              console.error(`Error: ${gateError}`);
+              process.exit(1);
+            }
           }
 
           const k = parseK(scenario, true);

@@ -16,6 +16,7 @@ const {
   preflightFilename,
   runPreflight,
   checkPreflightGate,
+  shouldSkipPreflightGate,
   PREFLIGHT_DIR,
 } = require('../../scripts/lib/eval-preflight');
 
@@ -233,6 +234,25 @@ describe('runPreflight', () => {
 // ── checkPreflightGate ───────────────────────────────────────────────────────
 
 describe('checkPreflightGate', () => {
+  test('helper skips gate only for explicit scenario-level preflight skip', () => {
+    expect(shouldSkipPreflightGate({ preflight: 'skip' })).toBe(true);
+    expect(shouldSkipPreflightGate({ preflight: 'SKIP' })).toBe(true);
+    expect(shouldSkipPreflightGate({})).toBe(false);
+    expect(shouldSkipPreflightGate({ preflight: 'required' })).toBe(false);
+    expect(shouldSkipPreflightGate(null)).toBe(false);
+  });
+
+  test('default scenario without preflight skip still gates when no record exists', () => {
+    const dir = makeTempDir();
+    writeScenario(dir, 'my-scenario', SCENARIO_CONTENT);
+
+    const result = checkPreflightGate('my-scenario', dir);
+    expect(typeof result).toBe('string');
+    expect(result).toMatch(/preflight/i);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   test('returns null (proceed) when PASS preflight exists with matching hash', () => {
     const dir = makeTempDir();
     writeScenario(dir, 'my-scenario', SCENARIO_CONTENT);
