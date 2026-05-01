@@ -1,7 +1,6 @@
 // scripts/lib/session-aliases.js
-const fs = require('node:fs');
 const path = require('node:path');
-const { readFileSafe, getProjectSessionsDir, log } = require('./utils');
+const { readFileSafe, atomicWriteFile, getProjectSessionsDir, log } = require('./utils');
 
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';
@@ -65,22 +64,11 @@ function loadAliases(project) {
  * @returns {boolean} Success
  */
 function saveAliases(project, data) {
-  const aliasesPath = getAliasesPath(project);
-  const tempPath = `${aliasesPath}.tmp`;
-  const content = JSON.stringify(data, null, 2);
-
   try {
-    fs.mkdirSync(path.dirname(aliasesPath), { recursive: true });
-    fs.writeFileSync(tempPath, content, 'utf8');
-    fs.renameSync(tempPath, aliasesPath);
+    atomicWriteFile(getAliasesPath(project), JSON.stringify(data, null, 2));
     return true;
   } catch (err) {
     log(`[Aliases] Save failed: ${err.message}`);
-    try {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    } catch {
-      // best-effort cleanup
-    }
     return false;
   }
 }

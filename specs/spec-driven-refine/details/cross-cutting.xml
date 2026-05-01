@@ -34,10 +34,13 @@
     <acceptance_criteria>
       <criterion id="fr-cc-002-ac1">
         Refiner MUST NOT write to any file under docs/plans/. Its only
-        output path on success is specs/&lt;spec-id&gt;/. On block, refiner
-        writes no files anywhere — the error is reported to terminal and
-        refiner exits non-zero (per fr-rf-001-ac3).
-        <trace>REQ-F025</trace>
+        output path on success is specs/&lt;spec-id&gt;/. On non-R3 blocks,
+        refiner writes no files anywhere — the error is reported to terminal
+        and refiner exits non-zero (per fr-rf-001-ac3). On R3 axis blocks,
+        refiner writes only specs/&lt;spec-id&gt;/_pending-conflict.md as the
+        explicit ephemeral exception defined by fr-cc-if-007; it MUST NOT
+        write spec.xml, details/, or report artifacts.
+        <trace>REQ-F025, 2026-04-27:B.2</trace>
       </criterion>
       <criterion id="fr-cc-002-ac2">
         Planner MUST NOT write to specs/&lt;spec-id&gt;/spec.xml or
@@ -137,7 +140,13 @@
       Schema files are the guidance layer — they tell the LLM what format
       to produce. They live in scripts/lib/ (shared infrastructure) so any
       skill can read them without cross-skill coupling. Full schema content
-      definitions are in details/sdd-schemas.xml (fr-sd-001 through fr-sd-007).
+      definitions are in details/sdd-schemas.xml (fr-sd-001 through fr-sd-016).
+      The four pipeline-artifact schema files governed by this requirement
+      are: design.md (per fr-sd-001 through fr-sd-004), spec.md (per
+      fr-sd-005 through fr-sd-007), decision-log.md (per fr-sd-013, v2),
+      and pending-conflict.md (per fr-sd-012, v2). The latter two ship via
+      print-schema.js auto-gen (per fr-sd-015, v3) with byte-equal drift
+      gate (per fr-sd-016, v3).
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-003-ac1">
@@ -167,8 +176,8 @@
       validates structure and provides information, but does NOT merge or
       author spec content (the LLM manages spec content directly, like
       maintaining a wiki page). Full API definitions are in
-      details/sdd-schemas.xml (fr-sd-008, fr-sd-009). LLM judgment is
-      reserved for semantic checks (contradictions, ambiguity).
+      details/sdd-schemas.xml (fr-sd-008, fr-sd-009, fr-sd-014). LLM
+      judgment is reserved for semantic checks (contradictions, ambiguity).
     </description>
     <acceptance_criteria>
       <criterion id="fr-cc-if-004-ac1">
@@ -279,6 +288,205 @@
         The two layers describe the same underlying schema — sdd-utils
         enforces it, sdd-schemas documents it. Drift between them is ERROR.
         <trace>REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-007">
+    <title>_pending-conflict.md Handoff Schema</title>
+    <description>
+      The _pending-conflict.md file is the interface contract between
+      refiner (producer, on R3 axis-1/2/3 block per fr-rf-015) and
+      brainstorming (consumer, in Phase 0 iterate-branch auto-entry per
+      fr-bs-008). This contract defines the file's location, lifecycle,
+      and required content fields. Per A.1's narrowed Iron Law clause 3,
+      this artifact is the explicit ephemeral exception to "no
+      authoritative state on block" — non-versioned, non-authoritative,
+      and consumed-and-deleted by brainstorming on successful new-design
+      write.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-007-ac1">
+        File location MUST be specs/&lt;spec-id&gt;/_pending-conflict.md.
+        The underscore prefix marks the file as ephemeral hand-off, not
+        versioned spec content. The file MUST NOT live under
+        details/ or any path that would be parsed as a spec detail file.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac2">
+        The file MUST carry: (i) which axis fired (1, 2, or 3); (ii) the
+        conflict description (specific design line ranges and Q&amp;A row
+        q_ids involved); (iii) 1–3 candidate resolutions, each phrased as a
+        concrete action the user can pick; (iv) a user-action prompt
+        directing the user to /arc-brainstorming iterate &lt;spec-id&gt;.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac3">
+        Lifecycle: refiner writes the file on R3 axis-1/2/3 block per
+        fr-rf-015; brainstorming reads it as Change Intent seed in Phase 0
+        per fr-bs-008; brainstorming deletes it on successful new-design
+        write. The file MUST NOT persist across a completed conflict
+        cycle — net zero authoritative state preserved.
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-cc-if-007-ac4">
+        The file MUST be machine-parseable so that brainstorming Phase 0
+        can mechanically iterate over candidate resolutions and the
+        cited design line ranges / Q&amp;A q_ids without LLM
+        re-interpretation. The wire format (YAML, structured markdown,
+        etc.) is an implementation choice; the contract is the field
+        shape and machine-parseability.
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-if-008">
+    <title>Structured Decision-Log Format</title>
+    <description>
+      The decision-log is the interface contract between brainstorming
+      (producer of Q&amp;A rows during Phase 2 elicitation per fr-bs-009)
+      and refiner (consumer for Phase 4 axis 2 contradiction check and
+      Phase 6 mechanical authorization check per fr-rf-010-ac5). This
+      contract defines the field shape and machine-parseability. The wire
+      format (YAML, strict markdown table, etc.) is a deliberately
+      unspecified implementation choice — pinning the format here would
+      over-constrain the implementation and freeze a swappable detail
+      into the contract.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-if-008-ac1">
+        Each Q&amp;A row MUST carry exactly four required fields:
+        q_id (stable identifier, unique per brainstorming session),
+        question (verbatim text of the question asked),
+        user_answer_verbatim (verbatim text of the user's answer), and
+        deferral_signal (boolean). Missing any field is ERROR.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac2">
+        The decision-log MUST be machine-parseable. The producer
+        (brainstorming) and consumer (refiner) MUST agree on a single wire
+        format — drift between producer and consumer is ERROR. The format
+        choice is an implementation decision; the spec captures the
+        contract (field shape, parseability), not the format.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac3">
+        Rows MUST be addressable by q_id so that refiner's Phase 6
+        mechanical authorization check (per fr-rf-010-ac5) can iterate
+        over rows and verify cited content appears in the correct row's
+        user_answer_verbatim. Lookup by q_id MUST be a deterministic
+        operation on the parsed structure.
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-cc-if-008-ac4">
+        The deferral_signal field MUST be set to true when the
+        user_answer_verbatim matches one of the canonical deferral
+        phrases ("use defaults", "covered.", "skip", "you decide", and
+        similar) per fr-bs-009-ac4. deferral_signal=true tells refiner
+        the corresponding axis is unbound — refiner MUST NOT treat it
+        as authorization for a concrete MUST per fr-rf-013.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ SDD v3 Additions: Plugin Path Discipline (cc-005 enforcement) ═══════════════ -->
+
+  <requirement id="fr-cc-pl-001">
+    <title>Skill Path Discipline CI Lint</title>
+    <description>
+      cc-005 (Cross-Component Plugin Path Discipline, defined in
+      spec.xml &lt;cross_cutting&gt;) requires LLM-facing prose in
+      skills/, templates/, and agents/ to prefix references to plugin
+      shared library content (paths under scripts/lib/) with
+      ${ARCFORGE_ROOT}/. This requirement specifies the mechanical
+      enforcement: a CI lint test that scans the affected files
+      syntactically and fails on bare scripts/lib/ references. The
+      lint scope is deliberately narrow per design.md's path-resolution
+      axis — Node.js module-system paths inside scripts/lib/, test
+      runner paths inside tests/, and hook paths via
+      ${CLAUDE_PLUGIN_ROOT} are out-of-scope because each has a
+      separate, correct mechanism. Skill-local relative patterns are
+      author's judgment and not enforced.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-pl-001-ac1">
+        tests/scripts/skill-path-discipline.test.js MUST exist and
+        scan four globs: skills/**/SKILL.md,
+        skills/**/references/**/*.md, templates/**/*.md, agents/**/*.md.
+        The scan MUST detect two violation patterns:
+        (i) scripts/lib/ references in prose not preceded exactly by
+        ${ARCFORGE_ROOT}/ on the same logical token, and (ii)
+        node -e "require('./scripts/lib/...')" cwd-relative require
+        invocations. Detection MUST use regex patterns documented
+        inline in the test file with rationale comments.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-001-ac2">
+        Each violation MUST report: file path, line number, the
+        offending line content (truncated to 120 chars if longer),
+        and the corrective form (${ARCFORGE_ROOT}/scripts/lib/...).
+        Test failure MUST block CI and merge — there is no bypass
+        annotation, no skip marker, no file allowlist mechanism.
+        Remediation is to fix the path; suppression is forbidden.
+        The only permitted exception is the fenced Path Resolution
+        anti-pattern example block in arc-writing-skills, where WRONG
+        examples intentionally show invalid paths for pedagogy.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-001-ac3">
+        The lint MUST NOT scan: scripts/lib/ (Node module system
+        handles cross-project safety via file-relative resolution),
+        tests/ (test runner sets cwd to plugin root), hooks/ (hooks
+        use ${CLAUDE_PLUGIN_ROOT} per Claude Code plugin contract),
+        and skill-local paths under skills/&lt;name&gt;/scripts/ or
+        skills/&lt;name&gt;/agents/. Skill references/ markdown is
+        LLM-facing prose and is in scope.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cc-pl-002">
+    <title>Existing P2/P3 Violation Remediation</title>
+    <description>
+      Landing fr-cc-pl-001 with existing violations unfixed would
+      ship a broken state — the new lint would fail on the existing
+      audited violations. This requirement specifies that the audited
+      P2/P3 violations across the affected SDD skills MUST be fixed
+      in the same v3 sprint as fr-cc-pl-001's introduction. The fix
+      is mechanical (add ${ARCFORGE_ROOT}/ prefix); no semantic
+      changes to SDD skill behavior are permitted under this
+      requirement.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cc-pl-002-ac1">
+        All existing bare scripts/lib/ references in skills/**/SKILL.md,
+        templates/**/*.md, and agents/**/*.md MUST be prefixed with
+        ${ARCFORGE_ROOT}/ such that fr-cc-pl-001-ac1's lint passes
+        cleanly when v3 is merged. The audit set includes (but is not
+        limited to) arc-brainstorming, arc-refining, arc-planning;
+        the lint surfaces the complete current set authoritatively.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-002-ac2">
+        Fixes MUST be mechanical prefix additions only. Reorganizing
+        Bash blocks, switching from CLI to direct read (or vice
+        versa), changing skill instruction semantics, or any other
+        non-prefix modification is out-of-scope for this requirement
+        and MUST be tracked separately if needed.
+        <trace>design.md:Path-resolution axis section</trace>
+      </criterion>
+      <criterion id="fr-cc-pl-002-ac3">
+        Pre-existing arc-writing-skills Path Resolution section
+        (committed at 2a189db prior to v3 sprint start) is
+        considered upstream pre-work and is not subject to this
+        requirement's audit — it was authored against the v3
+        cc-005 contract from the outset. Any drift from the
+        contract surfaced in that section MUST be fixed under
+        this requirement.
+        <trace>design.md:Architecture Impact section</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

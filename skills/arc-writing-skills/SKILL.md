@@ -95,6 +95,47 @@ skills/
 
 **Keep inline:** Principles, concepts, code patterns (< 50 lines)
 
+## Path Resolution (Plugin Distribution Awareness)
+
+arcforge ships as a plugin. At runtime the LLM works in a user's project — cwd is the user's project, NOT the plugin install. Any reference to plugin internal files from skill prose must be absolute, derived from `${ARCFORGE_ROOT}` — never bare cwd-relative.
+
+`${ARCFORGE_ROOT}` is set by the SessionStart hook (`inject-skills`) and points at the plugin install root.
+
+### Which prefix to use
+
+| Reference target | Prefix | Example |
+|---|---|---|
+| Plugin shared library (`${ARCFORGE_ROOT}/scripts/lib/`, `${ARCFORGE_ROOT}/scripts/cli.js`) | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/scripts/lib/print-schema.js` |
+| Skill's own files (`skills/<name>/scripts/`, `references/`) | `${SKILL_ROOT}/` | `${SKILL_ROOT}/scripts/planner.js` |
+| Plugin templates / agents referenced from a skill | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/templates/<name>.md` |
+| User's project files (not plugin) | (none — bare is correct) | `specs/<spec-id>/spec.xml` |
+
+`${SKILL_ROOT}` is set via the skill loader header. Use this idiom at the top of any Bash block that needs it:
+
+```bash
+: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/<your-skill-name>}"
+```
+
+### Anti-patterns
+
+```bash
+# WRONG — cwd-relative require breaks when cwd ≠ plugin root
+node -e "require('./scripts/lib/sdd-utils')"
+
+# WRONG — bare prose path; LLM follows literally and fails in user's cwd
+"Read scripts/lib/sdd-schemas/spec.md for the schema."
+
+# CORRECT — direct read with prefix (preferred for LLM consumption)
+"Read ${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md for the schema."
+
+# CORRECT — Bash invocation with prefix
+node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec --markdown
+```
+
+### CI enforcement
+
+CI lint scans `skills/**/SKILL.md`, `skills/**/references/**/*.md`, `templates/**/*.md`, and `agents/**/*.md` for `${ARCFORGE_ROOT}/scripts/lib/` discipline: any plugin shared-library reference must use that exact prefix. Failures block merge. The only exception is this fenced Anti-patterns teaching block. Skill-local relative paths (using `${SKILL_ROOT}/`, or `cd ${SKILL_ROOT}` then bare) are author's judgment — not enforced.
+
 ## SKILL.md Structure
 
 **Frontmatter (YAML):**

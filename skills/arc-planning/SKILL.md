@@ -11,7 +11,7 @@ description: Use when breaking down a structured spec into an executable DAG, wh
 
 No state preservation. No archive. No gate. No reading the design doc. Overwrite `dag.yaml` every sprint — git history is the only retroactive trace. If you find yourself wanting to add state, an archive file, or a completion check, stop and surface the underlying need to the user instead.
 
-**REQUIRED BACKGROUND:** Read `scripts/lib/sdd-schemas/spec.md` before building any `dag.yaml` — you need to know the `<delta>` element structure (multi-delta accumulation, four child types with epic semantics) to correctly extract sprint scope from the current `spec_version`'s delta.
+**REQUIRED BACKGROUND:** Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md` before building any `dag.yaml` — you need to know the `<delta>` element structure (multi-delta accumulation, four child types with epic semantics) to correctly extract sprint scope from the current `spec_version`'s delta.
 
 ## Overview
 
@@ -47,7 +47,7 @@ Validate the spec programmatically using sdd-utils, and extract the current spri
 ```bash
 node -e "
   const fs = require('fs');
-  const { parseSpecHeader, validateSpecHeader } = require('./scripts/lib/sdd-utils');
+  const { parseSpecHeader, validateSpecHeader } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const xml = fs.readFileSync('specs/<spec-id>/spec.xml', 'utf-8');
   const parsed = parseSpecHeader(xml);
   const result = validateSpecHeader(parsed);

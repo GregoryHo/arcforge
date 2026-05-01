@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="documentation">
+  <title>User-Facing Documentation and Cross-Spec Reference</title>
+  <consumes>
+    <artifact>docs/plans/sdd-downstream-contract/2026-04-24/design.md (source narrative)</artifact>
+    <artifact>docs/research/sdd-v2-downstream-contract-gap.md (Findings 1-7, Convention C history)</artifact>
+    <artifact>specs/spec-driven-refine/spec.xml:32 (Phase 2 exclusion, read-only reference)</artifact>
+  </consumes>
+  <produces>
+    <artifact>docs/guide/downstream-contract.md (new user-facing guide)</artifact>
+    <artifact>Narrative cross-references in this spec's own design and detail files to specs/spec-driven-refine/spec.xml:32</artifact>
+  </produces>
+
+  <requirement id="fr-doc-001">
+    <title>docs/guide/downstream-contract.md user-facing guide</title>
+    <description>
+      A new user-facing guide MUST be created at
+      docs/guide/downstream-contract.md. It MUST describe: (1) the
+      three-workflow-terminus contract (arc-finishing-epic Option 1,
+      arc-dispatching-teammates wrap-up, and user-manual, all ending
+      with arcforge finish --if-last or arcforge finish); (2) the
+      Convention C history — why Revert-after-merge (Finding 6.5
+      transcript) and Reconcile-after-merge (Finding 2.2 transcript) are
+      retired and Delete-after-sprint (Finding 7.3) is canonical; (3) the
+      PR-based carve-out from fr-sh-002 so PR-only users know to invoke
+      finish manually. The guide MUST live in ships=yes territory per
+      .claude/rules/dev-context.md and MUST NOT contain contributor-only
+      footnotes.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-doc-001-ac1">
+        Given docs/guide/downstream-contract.md after implementation,
+        When the file is read top-to-bottom,
+        Then it MUST contain explicit sections covering (a) the three
+        workflow termini listed above, (b) Convention C history with
+        reference to the relevant Findings in the gap research doc, and
+        (c) the PR carve-out with manual-finish guidance.
+        <trace>design.md §Identifiable Requirements R3.1</trace>
+      </criterion>
+      <criterion id="fr-doc-001-ac2">
+        Given docs/guide/downstream-contract.md,
+        When its prose is reviewed for audience fit,
+        Then it MUST read as instructions for a fresh arcforge user
+        (ships=yes audience) and MUST NOT contain contributor-only
+        caveats such as "only matters when editing arcforge itself" or
+        references to the local dev plugin-disablement.
+        <trace>.claude/rules/dev-context.md §Everything you ship is for users</trace>
+      </criterion>
+      <criterion id="fr-doc-001-ac3">
+        Given docs/guide/downstream-contract.md,
+        When the Convention C section is read,
+        Then it MUST explicitly name the retired conventions
+        (Revert-after-merge, Reconcile-after-merge) and explain in prose
+        why each is no longer supported, so that users finding older
+        transcripts or commits understand the change.
+        <trace>design.md §Scope — "不在 scope 內但值得記錄" note on Convention C</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-doc-002">
+    <title>Cross-reference to specs/spec-driven-refine/spec.xml:32</title>
+    <description>
+      This spec's design doc and spec.xml description MUST explicitly
+      reference specs/spec-driven-refine/spec.xml:32 — the exclusion line
+      that defers Phase 2 downstream migration — and MUST identify
+      sdd-downstream-contract as the formal successor fulfilling that
+      deferred scope. The specs/spec-driven-refine spec itself MUST NOT
+      be modified (out-of-scope per this spec's Excludes), so the
+      cross-reference is narrative only.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-doc-002-ac1">
+        Given specs/sdd-downstream-contract/spec.xml,
+        When the overview description is read,
+        Then it MUST contain an explicit textual reference to
+        specs/spec-driven-refine/spec.xml:32 and MUST state that this
+        spec is the successor for the deferred Phase 2 scope.
+        <trace>design.md §Identifiable Requirements R3.2</trace>
+      </criterion>
+      <criterion id="fr-doc-002-ac2">
+        Given the repository after implementation,
+        When specs/spec-driven-refine/ is inspected,
+        Then it MUST be byte-identical to its pre-implementation state
+        (no modifications, no new files, no added back-reference), so
+        that the successor relationship is expressed only from this
+        spec's side.
+        <trace>design.md §Scope — Excludes (Iteration of spec-driven-refine)</trace>
+      </criterion>
+      <criterion id="fr-doc-002-ac3">
+        Given docs/guide/downstream-contract.md,
+        When the introductory section is read,
+        Then it MUST also reference specs/spec-driven-refine/spec.xml:32
+        so users arriving at the guide understand the split between
+        upstream pipeline (stages 1-3) and downstream consumer contract
+        (this spec, stages 4+).
+        <trace>design.md §Identifiable Requirements R3.1 + R3.2 together</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

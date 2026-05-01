@@ -52,8 +52,13 @@
       </criterion>
       <criterion id="fr-bs-002-ac3">
         Brainstorming MUST NOT assume the target without user confirmation. The
-        confirmation is explicit, not inferred.
-        <trace>REQ-F002</trace>
+        confirmation is explicit, not inferred. Exception: when
+        specs/&lt;spec-id&gt;/_pending-conflict.md exists at start of Phase 0,
+        the iterate-branch target is determined by filesystem state per
+        fr-bs-008-ac1, and the user-consent gate is satisfied by the
+        resolution-pick prompt in fr-bs-008-ac2 — no separate "new spec or
+        iteration?" confirmation is asked.
+        <trace>REQ-F002, 2026-04-27:B.3</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>
@@ -181,6 +186,110 @@
         present, no pre-authored structured delta section. ERROR on missing
         required sections.
         <trace>REQ-F005</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-008">
+    <title>Phase 0 — Pending-Conflict Detection and Iterate-Branch Auto-Entry</title>
+    <description>
+      Brainstorming's Phase 0 scan-and-route logic MUST check for the
+      presence of specs/&lt;spec-id&gt;/_pending-conflict.md (the ephemeral
+      handoff written by refiner per fr-rf-015 on R3 axis-1/2/3 block). If
+      the file exists, brainstorming MUST automatically enter its iterate
+      branch with the conflict body as Change Intent seed — the user does
+      not need to retell the conflict. The user picks a candidate resolution
+      (or describes their own); brainstorming writes a new dated
+      docs/plans/&lt;spec-id&gt;/&lt;NEW-DATE&gt;/design.md with the
+      resolution baked in; the pending file MUST be deleted on successful
+      design write so zero authoritative state remains across the conflict
+      cycle (R3 holds — refiner never wrote design.md; brainstorming did,
+      after user authorization; the ephemeral marker existed transiently
+      and is now removed).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-008-ac1">
+        Given specs/&lt;spec-id&gt;/_pending-conflict.md exists at the start
+        of brainstorming Phase 0, brainstorming MUST automatically enter the
+        iterate branch (without asking the user "new spec or iteration?") and
+        load the file's conflict_description, candidate_resolutions, and
+        cited design line ranges / Q&amp;A q_ids as Change Intent seed.
+        <trace>2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-bs-008-ac2">
+        Brainstorming MUST present the candidate resolutions to the user
+        verbatim from the pending file and prompt for selection ("pick (a),
+        (b), (c), or describe your own"). The user does not retell the
+        conflict; brainstorming does not re-derive the conflict from
+        scratch.
+        <trace>2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-bs-008-ac3">
+        Once the user selects (or describes) a resolution and brainstorming
+        successfully writes the new design.md to
+        docs/plans/&lt;spec-id&gt;/&lt;NEW-DATE&gt;/design.md, brainstorming
+        MUST delete specs/&lt;spec-id&gt;/_pending-conflict.md. If the
+        new-design write fails, the pending file MUST NOT be deleted —
+        cleanup is gated on successful write.
+        <trace>2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-bs-008-ac4">
+        Brainstorming's Phase 0 conflict-detection branch MUST NOT modify or
+        rewrite the _pending-conflict.md content — the file is read-only
+        from brainstorming's perspective. Any changes to the conflict
+        framing happen in the new design.md, not by editing the handoff
+        file.
+        <trace>2026-04-27:B.3</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-bs-009">
+    <title>Structured Decision-Log Output Format</title>
+    <description>
+      Brainstorming Phase 2 (eliciting Q&amp;A) MUST emit the Q&amp;A history
+      as a structured decision-log conforming to fr-cc-if-008. The
+      decision-log is consumed by refiner for Phase 4 axis 2 contradiction
+      check (design ↔ Q&amp;A) and Phase 6 mechanical authorization check
+      (axis 3 trace verification). The previous free-form decision-log.md
+      format (where rows had no stable identifiers and refiner could not
+      mechanically iterate over Q&amp;A rows by q_id) is replaced by the
+      structured format.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-bs-009-ac1">
+        Each Q&amp;A row in the decision-log MUST carry the four required
+        fields per fr-cc-if-008: q_id (stable identifier, unique per
+        brainstorming session), question (verbatim text of the question
+        asked), user_answer_verbatim (verbatim text of the user's answer),
+        and deferral_signal (boolean — true when the answer matches
+        deferral phrases like "use defaults", "covered.", "skip", "you
+        decide", or similar; false otherwise).
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-bs-009-ac2">
+        The decision-log MUST be machine-parseable per fr-cc-if-008. The
+        wire format (YAML, strict markdown table, etc.) is an
+        implementation choice that brainstorming's writer and refiner's
+        parser MUST agree on; the contract this requirement captures is
+        the field shape and machine-parseability, not the format.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-bs-009-ac3">
+        q_id values MUST be stable across the brainstorming session — if
+        a question is asked once, its q_id MUST NOT change in later
+        revisions of the same decision-log within the same session. This
+        stability is what enables refiner's traces (per fr-rf-010-ac5) to
+        cite Q&amp;A rows by q_id and have those traces remain valid.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-bs-009-ac4">
+        Brainstorming MUST detect deferral signals canonically: at minimum
+        the phrases "use defaults", "covered.", "skip", "you decide" set
+        deferral_signal=true. Implementations MAY extend the canonical
+        list with additional deferral phrases, provided the extensions are
+        documented alongside the format implementation.
+        <trace>2026-04-27:B.1</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

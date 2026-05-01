@@ -4,7 +4,10 @@
   <produces>
     <artifact>scripts/lib/sdd-schemas/design.md (design doc structure guide)</artifact>
     <artifact>scripts/lib/sdd-schemas/spec.md (spec identity header guide)</artifact>
-    <artifact>scripts/lib/sdd-utils.js (programmatic validators)</artifact>
+    <artifact>scripts/lib/sdd-schemas/decision-log.md (structured decision-log format guide, auto-generated per fr-sd-015)</artifact>
+    <artifact>scripts/lib/sdd-schemas/pending-conflict.md (pending-conflict handoff format guide, auto-generated per fr-sd-015)</artifact>
+    <artifact>scripts/lib/sdd-utils.js (programmatic validators + facade re-exports of decision-log / pending-conflict rules)</artifact>
+    <artifact>scripts/lib/sdd-rules.js (canonical home for DECISION_LOG_RULES and PENDING_CONFLICT_RULES constants; split from sdd-utils.js to keep file size below 700-line hard limit)</artifact>
   </produces>
 
   <!-- ═══════════════ Design Doc Schema ═══════════════ -->
@@ -312,9 +315,19 @@
     <description>
       Design-doc and spec-header schema rules MUST live as exported constants
       in scripts/lib/sdd-utils.js (DESIGN_DOC_RULES and SPEC_HEADER_RULES).
+      The newer DECISION_LOG_RULES and PENDING_CONFLICT_RULES constants
+      (added in v2 per fr-sd-012, fr-sd-013) are DEFINED in a sibling
+      module scripts/lib/sdd-rules.js — split from sdd-utils.js to keep
+      the latter under the 700-line hard limit per coding-standards —
+      and RE-EXPORTED through scripts/lib/sdd-utils.js so consumers
+      can import all four rule constants from a single facade. Both
+      module paths are valid import sources for the re-exported pair;
+      the canonical home (definition site) is sdd-rules.js.
+
       Validators (parseDesignDoc, validateDesignDoc, parseSpecHeader,
-      validateSpecHeader) MUST consume these constants — not duplicate the
-      rules as regex literals inside the function bodies. Downstream
+      validateSpecHeader, parseDecisionLog, validateDecisionLog,
+      parseConflictMarker) MUST consume these constants — not duplicate
+      the rules as regex literals inside the function bodies. Downstream
       consumers (skills, tests, the print-schema CLI) MUST read from these
       exports rather than redescribing the schema in hand-authored text.
 
@@ -352,45 +365,279 @@
     </acceptance_criteria>
   </requirement>
 
-  <requirement id="fr-sd-011">
-    <title>Schema Access Pattern — print-schema CLI</title>
+  <requirement id="fr-sd-012">
+    <title>_pending-conflict.md Schema Definition</title>
     <description>
-      Skills and agents that need to know an SDD artifact's schema MUST
-      obtain it by invoking scripts/lib/print-schema.js, not by reading
-      hand-authored markdown or by copying templates into SKILL.md bodies.
-      The CLI reads directly from the exported rule constants
-      (fr-sd-010), so there is exactly one source of truth and the output
-      cannot drift from the validator's behavior.
+      scripts/lib/sdd-schemas/ MUST include a schema describing the
+      _pending-conflict.md handoff format (per fr-cc-if-007), and
+      scripts/lib/sdd-utils.js MUST export the corresponding rule
+      constants (PENDING_CONFLICT_RULES, frozen). This makes the
+      handoff format validator-addressable by Phase 6 mechanical
+      authorization check (per fr-rf-010-ac5) and by brainstorming
+      Phase 0 detection (per fr-bs-008).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-012-ac1">
+        scripts/lib/sdd-utils.js MUST export a frozen
+        PENDING_CONFLICT_RULES object containing: canonical_path
+        ("specs/&lt;spec-id&gt;/_pending-conflict.md"), required_fields
+        (axis_fired, conflict_description with cited design line ranges
+        and Q&amp;A q_ids, candidate_resolutions list with
+        len(1..=3), user_action_prompt), lifecycle (ephemeral, deleted by
+        brainstorming on new-design write).
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-012-ac2">
+        The schema MUST forbid persistent or versioned variants — the
+        file is non-authoritative ephemeral by design (per A.1's narrowed
+        Iron Law). Validators MUST treat any attempt to persist the file
+        across a completed conflict cycle as ERROR ("a prior conflict
+        cycle did not complete cleanly").
+        <trace>2026-04-27:A.1, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-012-ac3">
+        The schema MUST include both a valid example (axis 1 fired,
+        2 candidate resolutions, user-action prompt present) and an
+        invalid example (no candidate resolutions) with error message:
+        "_pending-conflict.md MUST contain at least one candidate
+        resolution".
+        <trace>2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-013">
+    <title>Structured Decision-Log Schema Definition</title>
+    <description>
+      scripts/lib/sdd-schemas/ MUST include a schema describing the
+      structured decision-log format (per fr-cc-if-008), and
+      scripts/lib/sdd-utils.js MUST export the corresponding rule
+      constants (DECISION_LOG_RULES, frozen). This makes the decision-log
+      format validator-addressable by refiner's Phase 4 axis 2 check and
+      Phase 6 mechanical authorization check.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-013-ac1">
+        scripts/lib/sdd-utils.js MUST export a frozen DECISION_LOG_RULES
+        object containing: canonical_path (relative to brainstorming's
+        output directory), required_fields_per_row (q_id, question,
+        user_answer_verbatim, deferral_signal), q_id_uniqueness
+        (per-session unique), deferral_signal_canonical_phrases (at
+        minimum: "use defaults", "covered.", "skip", "you decide").
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+      <criterion id="fr-sd-013-ac2">
+        The schema MUST specify that rows are addressable by q_id —
+        lookup by q_id is a deterministic operation on the parsed
+        structure (no LLM re-interpretation needed for trace
+        verification).
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-013-ac3">
+        The schema MUST include a valid example (3 Q&amp;A rows with
+        distinct q_ids, mix of deferral_signal=true and false) and
+        invalid examples: (1) duplicate q_id within a session, (2)
+        missing deferral_signal field, (3) missing user_answer_verbatim
+        field.
+        <trace>2026-04-27:B.1</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-014">
+    <title>SDD Utils — Conflict and Decision-Log Validator API</title>
+    <description>
+      scripts/lib/sdd-utils.js MUST export functions for parsing and
+      validating the _pending-conflict.md handoff and the structured
+      decision-log, plus a Phase 6 mechanical authorization helper.
+      These implement the deterministic checks needed by refiner per
+      fr-rf-010-ac5 and by brainstorming per fr-bs-008.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-014-ac1">
+        MUST export parseConflictMarker(filePath: string) that returns
+        {axis_fired, conflict_description, candidate_resolutions,
+        user_action_prompt} or null if file not found. The function
+        MUST validate against PENDING_CONFLICT_RULES (per fr-sd-012)
+        and surface schema violations as parse errors.
+        <trace>2026-04-27:B.2, 2026-04-27:B.3</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac2">
+        MUST export parseDecisionLog(filePath: string) that returns an
+        array of row objects, each containing {q_id, question,
+        user_answer_verbatim, deferral_signal}, plus
+        validateDecisionLog(parsed) that returns {valid, issues} per
+        the same shape as validateDesignDoc / validateSpecHeader (per
+        fr-sd-008-ac2 / fr-sd-009-ac2). Validation MUST enforce
+        DECISION_LOG_RULES (per fr-sd-013).
+        <trace>2026-04-27:B.1, 2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac3">
+        MUST export a Phase 6 mechanical authorization helper that, given
+        an in-memory spec XML, the design.md file path, and the
+        decision-log file path (when present), iterates over every
+        &lt;trace&gt; element and verifies the cited content appears at
+        the cited source location: design line ranges checked against
+        the design file content, Q&amp;A q_id refs checked against the
+        decision-log row's user_answer_verbatim. Returns {valid,
+        unauthorized_traces} where unauthorized_traces lists every
+        trace whose cited content is missing.
+        <trace>2026-04-27:B.4</trace>
+      </criterion>
+      <criterion id="fr-sd-014-ac4">
+        Validator functions MUST reference the exported rule constants
+        (PENDING_CONFLICT_RULES, DECISION_LOG_RULES) for their schema
+        invariants — not duplicate the rules as local literals inside
+        function bodies. Drift between rules and validators is ERROR
+        per fr-sd-010-ac3's pattern (single source of truth).
+        <trace>2026-04-27:B.1, 2026-04-27:B.2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-011">
+    <title>Schema Access Pattern — Direct Read Primary, CLI Retained</title>
+    <description>
+      Skills and agents that need to know an SDD artifact's schema have
+      two equivalent access paths: (a) direct read of the markdown view
+      at ${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/&lt;name&gt;.md, and
+      (b) invoking the CLI via node ${ARCFORGE_ROOT}/scripts/lib/print-schema.js
+      &lt;name&gt;. Both paths emit the same content because the markdown
+      view is auto-generated from the same rule constants the CLI reads
+      (per fr-sd-010, drift-protected per fr-sd-016). Direct read is the
+      recommended primary form in skill prose because it avoids the Bash
+      + Node + stdout indirection and works uniformly across agent
+      platforms; the CLI remains a valid alternative and is the canonical
+      tool for contributor regeneration of the markdown view.
 
       This requirement exists because hand-authored schema copies in
-      skills produced the 2026-04-19 "Context heading" bug. Skills MUST
-      NOT embed structural templates; they link to the CLI instead.
+      skills produced the 2026-04-19 "Context heading" bug. The
+      auto-generation pipeline (fr-sd-015 + fr-sd-016) makes drift
+      structurally impossible across all four schemas (design, spec,
+      decision-log, pending-conflict).
     </description>
     <acceptance_criteria>
       <criterion id="fr-sd-011-ac1">
-        scripts/lib/print-schema.js MUST exist and accept two targets
-        (design, spec) plus a --json flag. Default output is
-        human-readable text. --json emits the raw rule object with
+        scripts/lib/print-schema.js MUST exist and accept four targets
+        (design, spec, decision-log, pending-conflict) plus --markdown
+        and --json flags. Default output is human-readable text.
+        --markdown emits the committed-markdown form (with the
+        AUTO-GENERATED header). --json emits the raw rule object with
         RegExp values encoded as &lt;regex&gt;pattern&lt;/regex&gt; strings.
+        Unknown targets MUST exit non-zero with a usage message.
         <trace>REQ-F003, REQ-F010</trace>
       </criterion>
       <criterion id="fr-sd-011-ac2">
-        print-schema.js MUST derive its output from the exported
-        DESIGN_DOC_RULES and SPEC_HEADER_RULES constants in
-        sdd-utils.js. It MUST NOT hand-author schema content.
+        print-schema.js MUST derive its output from the exported rule
+        constants (DESIGN_DOC_RULES, SPEC_HEADER_RULES, DECISION_LOG_RULES,
+        PENDING_CONFLICT_RULES) imported via the sdd-utils.js facade
+        (which re-exports the latter two from sdd-rules.js per fr-sd-010).
+        It MUST NOT hand-author schema content. Prose narrative inside
+        renderer functions (lines.push patterns) is permitted as
+        renderer-template content; structured fields MUST come from the
+        rule constants.
         <trace>REQ-F003, REQ-F010</trace>
       </criterion>
       <criterion id="fr-sd-011-ac3">
         arc-brainstorming, arc-refining, and any other SDD-pipeline skill
-        MUST reference print-schema.js (e.g., "run `node
-        scripts/lib/print-schema.js design`") as the canonical way to get
-        the schema. SDD skills MUST NOT embed structural code-block
-        templates that duplicate schema content; REQUIRED BACKGROUND
-        links to print-schema.js instead. Skills also MUST NOT reference
-        hand-authored markdown in scripts/lib/sdd-schemas/ as schema
-        sources of truth (those files are deprecated pointers to the CLI
-        and constants).
+        SHOULD reference the schema via direct read at
+        ${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/&lt;name&gt;.md as the
+        primary form in skill prose. Direct read MUST use the
+        ${ARCFORGE_ROOT}/ prefix per cc-005 — bare scripts/lib/ paths
+        in skill prose are forbidden. The CLI form
+        node ${ARCFORGE_ROOT}/scripts/lib/print-schema.js &lt;name&gt;
+        is an equivalent valid alternative and MAY appear in skill
+        prose where it fits (e.g., when the skill needs a specific
+        flag like --json). SDD skills MUST NOT embed structural
+        code-block templates that duplicate schema content.
         <trace>REQ-F003, REQ-F005, REQ-F010</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <!-- ═══════════════ SDD v3 Additions: Auto-Gen Extension to Two Missing Schemas ═══════════════ -->
+
+  <requirement id="fr-sd-015">
+    <title>print-schema.js Renderer Extension for Decision-Log and Pending-Conflict</title>
+    <description>
+      scripts/lib/print-schema.js MUST grow two renderer functions
+      (renderDecisionLog and renderPendingConflict) following the same
+      pattern as renderSpec and renderDesign. Each renderer pulls
+      structured field data from its rule constant
+      (DECISION_LOG_RULES or PENDING_CONFLICT_RULES) and emits prose
+      narrative via lines.push() string literals — the renderer function
+      body is the natural template location for prose, just as the
+      existing renderers do for spec.md and design.md. The two new
+      markdown files at scripts/lib/sdd-schemas/decision-log.md and
+      scripts/lib/sdd-schemas/pending-conflict.md MUST be regenerated
+      via the CLI (--markdown) and carry the existing AUTO-GENERATED
+      header used by spec.md and design.md.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-015-ac1">
+        scripts/lib/print-schema.js MUST export renderDecisionLog(opts)
+        and renderPendingConflict(opts) functions matching the existing
+        renderSpec/renderDesign signature (markdown flag in opts, returns
+        joined string). The functions MUST be wired into main()'s target
+        dispatch so that `node print-schema.js decision-log` and
+        `node print-schema.js pending-conflict` produce output.
+        <trace>design.md:Schema axis section</trace>
+      </criterion>
+      <criterion id="fr-sd-015-ac2">
+        Each renderer MUST source structured fields (canonical_path,
+        required_fields, deferral_signal_canonical_phrases, lifecycle,
+        etc.) from the corresponding rule constant — DECISION_LOG_RULES
+        for decision-log, PENDING_CONFLICT_RULES for pending-conflict.
+        Prose narrative (canonical path explanation, lifecycle
+        discussion, examples) MUST live in the renderer function body
+        as lines.push('...') string literals, NOT as a "narrative" field
+        inside the rule constant.
+        <trace>design.md:Schema axis section</trace>
+      </criterion>
+      <criterion id="fr-sd-015-ac3">
+        scripts/lib/sdd-schemas/decision-log.md and pending-conflict.md
+        MUST be regenerated via `node print-schema.js decision-log
+        --markdown &gt; scripts/lib/sdd-schemas/decision-log.md` (and
+        equivalent for pending-conflict) and MUST carry the existing
+        AUTO-GENERATED header (the same comment block used by spec.md
+        and design.md). After regeneration, hand-edits to these files
+        are forbidden — modifications go to the rule constant or the
+        renderer function body.
+        <trace>design.md:Schema axis section</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-sd-016">
+    <title>Drift Gate Extension to All Four Schemas</title>
+    <description>
+      tests/scripts/sdd-schemas-fresh.test.js MUST be extended to cover
+      all four sdd-schemas/*.md files (design, spec, decision-log,
+      pending-conflict). The test asserts byte-equal between the
+      committed markdown file and the renderer output, blocking CI on
+      any drift. This is the structural enforcement of fr-sd-011's "two
+      equivalent access paths" claim — without this gate, hand-edits
+      to the markdown could silently diverge from the rule constants
+      that validators consume.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-sd-016-ac1">
+        tests/scripts/sdd-schemas-fresh.test.js MUST contain four
+        per-schema test cases (one each for design.md, spec.md,
+        decision-log.md, pending-conflict.md). Each case MUST read the
+        committed file, invoke the corresponding renderer (with markdown
+        flag), and assert byte-equal after trailing-whitespace
+        normalization.
+        <trace>design.md:Schema axis section</trace>
+      </criterion>
+      <criterion id="fr-sd-016-ac2">
+        On test failure, the diff hint output MUST identify the first
+        differing line with both committed and generated content
+        (matching the existing diffHint helper pattern). Remediation
+        guidance MUST point to the regeneration command:
+        `node scripts/lib/print-schema.js &lt;name&gt; --markdown &gt;
+        scripts/lib/sdd-schemas/&lt;name&gt;.md`.
+        <trace>design.md:Schema axis section</trace>
       </criterion>
     </acceptance_criteria>
   </requirement>

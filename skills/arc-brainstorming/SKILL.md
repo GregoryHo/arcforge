@@ -11,7 +11,7 @@ description: Use when exploring ideas before implementation or when user wants t
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
-**REQUIRED BACKGROUND:** Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` before producing any design doc — it prints the canonical schema (required/forbidden sections, heading regexes, enforcement authority) directly from `scripts/lib/sdd-utils.js`'s rule constants. The same schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply — this is not a "mode" switch.
+**REQUIRED BACKGROUND:** Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/design.md` before producing any design doc — it carries the canonical schema (required/forbidden sections, heading regexes, enforcement authority), auto-generated from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`'s rule constants. The CLI alternative `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` produces equivalent content. The same schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply — this is not a "mode" switch.
 
 ## When NOT to Use
 
@@ -22,6 +22,38 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 ## Phase 0: Scan and Route
 
 **Before any elicitation, scan `specs/` for existing spec_ids.**
+
+### Step 0a: Pending-Conflict Detection (fr-bs-008)
+
+**Check for `specs/<spec-id>/_pending-conflict.md` FIRST, before the new-vs-iterate confirmation gate.**
+
+If `specs/<spec-id>/_pending-conflict.md` exists at the start of Phase 0, brainstorming MUST automatically enter the iterate branch — DO NOT ask "new spec or iteration?". This is the explicit exception carved out in `fr-bs-002-ac3`: the iterate-branch target is determined by filesystem state per `fr-bs-008-ac1`, and the user-consent gate is satisfied by the resolution-pick prompt in `fr-bs-008-ac2` — no separate "new spec or iteration?" confirmation is asked.
+
+**Loading the conflict (fr-bs-008-ac1):**
+
+Use `parseConflictMarker(filePath)` to load the file. It returns `{ axis_fired, conflict_description, candidate_resolutions, user_action_prompt }`. Treat the conflict body (`conflict_description` + cited design line ranges / Q&A `q_ids`) as the Change Intent seed. The canonical file path is `specs/<spec-id>/_pending-conflict.md` (from `PENDING_CONFLICT_RULES.canonical_path`).
+
+**Presenting resolutions (fr-bs-008-ac2):**
+
+Present `candidate_resolutions` to the user VERBATIM from the pending file — do not paraphrase. Prompt:
+
+> "pick (a), (b), (c), or describe your own"
+
+The user does not retell the conflict; brainstorming does not re-derive the conflict from scratch.
+
+**Read-only constraint (fr-bs-008-ac4):**
+
+Phase 0's conflict-detection branch MUST NOT modify or rewrite `_pending-conflict.md` content — the file is read-only from brainstorming's perspective. Any framing changes happen in the new `design.md`, not by editing the handoff file.
+
+**Deletion on success (fr-bs-008-ac3):**
+
+After the user picks (or describes) a resolution AND brainstorming successfully writes the new `design.md` to `docs/plans/<spec-id>/<NEW-DATE>/design.md`, brainstorming MUST delete `specs/<spec-id>/_pending-conflict.md`. Cleanup is gated on successful write — if the design write fails, the pending file persists for retry and MUST NOT be deleted.
+
+---
+
+### Step 0b: Standard New-vs-Iterate Confirmation
+
+If no `_pending-conflict.md` exists, proceed with the standard confirmation gate:
 
 1. List all directories under `specs/` that contain a `spec.xml`
 2. If any exist, present them to the user: `Found existing specs: auth, payments, ...`
@@ -124,17 +156,39 @@ Use 2-Action Rule: Save research findings to `docs/research/<topic>.md` after ev
 
 Apply YAGNI ruthlessly: only capture what the user explicitly states is changing.
 
+#### Phase 2 Decision-Log Output (fr-bs-009)
+
+Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The v1 free-form `decision-log.md` is **replaced** by this structured format — the refiner now mechanically parses the decision-log via `parseDecisionLog`, so brainstorming MUST NOT emit the old free-form prose.
+
+**Output path:** `<brainstorming-output-dir>/decision-log.yml`
+
+That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
+
+**Schema source of truth:** Before writing or validating `decision-log.yml`, direct-read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` and follow the `DECISION_LOG_RULES` contract exported via `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. Do not copy a structural template into this skill; the generated schema is authoritative for required fields (`q_id`, `question`, `user_answer_verbatim`, `deferral_signal`), valid/invalid examples, canonical path, and deferral-signal phrases.
+
+**q_id stability rule (fr-bs-009-ac3):**
+
+`q_id` values MUST be stable across the brainstorming session. Assign q_ids sequentially (`q1`, `q2`, `q3`, ...) and persist them across iteration revisions. Once a question receives `q1`, that q_id MUST NOT be reassigned to a different question within the same session. If a row is added or a question is revised, new rows get the next sequential q_id; existing q_ids stay fixed.
+
+**Deferral-signal detection rule (fr-bs-009-ac4):**
+
+Brainstorming MUST set `deferral_signal: true` according to `DECISION_LOG_RULES.deferral_signal_canonical_phrases` from the generated schema/source constants (currently including `use defaults`, `covered.`, `skip`, and `you decide`). Implementations MAY extend this list with additional deferral phrases, but any extension MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is authoritative — when the list changes there, the detection rule changes automatically.
+
+**Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
+
 ### Phase 3 Output
 
 The design doc carries a Context summary plus a natural-language Change Intent. The downstream refiner reads this alongside `specs/<spec-id>/spec.xml` and **derives the structured `<delta>` itself** — the design doc carries human-authored narrative, never a pre-authored ADDED/MODIFIED/REMOVED list.
 
 **Get the current schema (required reading before writing):**
 
+Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/design.md` directly (primary form), or invoke the equivalent CLI:
+
 ```bash
 node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design
 ```
 
-This prints the canonical design-doc schema — required sections, forbidden sections, heading regexes, and enforcement authority. This is the single source of truth; do NOT reconstruct the schema from memory, and do NOT copy schema content into this skill. The rules live in `scripts/lib/sdd-utils.js` (`DESIGN_DOC_RULES`) and the validator (`validateDesignDoc`) enforces them. If this skill and the validator ever disagree, the validator wins.
+Either form yields the canonical design-doc schema — required sections, forbidden sections, heading regexes, and enforcement authority. This is the single source of truth; do NOT reconstruct the schema from memory, and do NOT copy schema content into this skill. The rules live in `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js` (`DESIGN_DOC_RULES`) and the validator (`validateDesignDoc`) enforces them. If this skill and the validator ever disagree, the validator wins.
 
 **Validate before writing to disk:**
 

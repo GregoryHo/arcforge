@@ -1,0 +1,44 @@
+epics:
+  - id: epic-schema-axis
+    name: Schema Auto-Gen Pipeline Completion
+    status: completed
+    spec_path: specs/spec-driven-refine/epics/epic-schema-axis/epic.md
+    worktree: null
+    depends_on: []
+    features:
+      - id: schema-renderers
+        name: print-schema.js renderDecisionLog + renderPendingConflict
+        status: completed
+        depends_on: []
+        source_requirement: fr-sd-015
+      - id: schema-drift-gate
+        name: sdd-schemas-fresh.test.js extension to all 4 schemas
+        status: completed
+        depends_on:
+          - schema-renderers
+        source_requirement: fr-sd-016
+      - id: schema-cli-access-pattern
+        name: print-schema.js 4 targets + skill access pattern shift (direct read primary)
+        status: completed
+        depends_on:
+          - schema-renderers
+        source_requirement: fr-sd-011
+  - id: epic-path-discipline
+    name: cc-005 Plugin Path Discipline
+    status: completed
+    spec_path: specs/spec-driven-refine/epics/epic-path-discipline/epic.md
+    worktree: null
+    depends_on:
+      - epic-schema-axis
+    features:
+      - id: path-discipline-lint
+        name: tests/scripts/skill-path-discipline.test.js CI lint
+        status: completed
+        depends_on: []
+        source_requirement: fr-cc-pl-001
+      - id: path-discipline-remediation
+        name: Existing P2/P3 violation remediation across SDD skills
+        status: completed
+        depends_on:
+          - path-discipline-lint
+        source_requirement: fr-cc-pl-002

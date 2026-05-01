@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="cli-finish">
+  <title>arcforge finish Subcommand and allEpicsCompleted Helper</title>
+  <consumes>
+    <artifact>scripts/cli.js (subcommand dispatch)</artifact>
+    <artifact>scripts/lib/coordinator.js (finish implementation will live alongside cleanup)</artifact>
+    <artifact>scripts/lib/models.js (new allEpicsCompleted helper)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml (inspected, then deleted)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/epics/ (recursively deleted)</artifact>
+  </consumes>
+  <produces>
+    <artifact>New arcforge finish subcommand exposed via scripts/cli.js</artifact>
+    <artifact>New commit chore(specs): finish &lt;spec-id&gt; sprint when sprint-end runs</artifact>
+    <artifact>Pure helper allEpicsCompleted(dag) exported from scripts/lib/models.js</artifact>
+  </produces>
+
+  <requirement id="fr-cf-001">
+    <title>finish guards before any side effect</title>
+    <description>
+      arcforge finish --spec-id &lt;id&gt; MUST verify a set of preconditions
+      before performing any filesystem or git mutation. If any guard fails,
+      the command MUST exit non-zero, print all failing guards to terminal
+      (not just the first), and MUST NOT perform any cleanup, git rm, or
+      commit. Guards: (1) specs/&lt;spec-id&gt;/dag.yaml exists; (2) every epic
+      in the dag has status=completed; (3) every epic branch is fully
+      merged into the current branch; (4) the working tree is clean (no
+      uncommitted modifications anywhere, including dag.yaml itself).
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cf-001-ac1">
+        Given specs/&lt;spec-id&gt;/dag.yaml does not exist,
+        When arcforge finish --spec-id &lt;spec-id&gt; runs,
+        Then the command MUST exit non-zero with a message naming the
+        missing file and MUST NOT delete any epics/ directory or create any
+        commit.
+        <trace>design.md §Identifiable Requirements R1.3 guard 1</trace>
+      </criterion>
+      <criterion id="fr-cf-001-ac2">
+        Given a dag.yaml where at least one epic has status != "completed",
+        When arcforge finish runs,
+        Then the command MUST exit non-zero with a message listing every
+        incomplete epic id and its actual status, and MUST NOT perform any
+        mutation.
+        <trace>design.md §Identifiable Requirements R1.3 guard 2</trace>
+      </criterion>
+      <criterion id="fr-cf-001-ac3">
+        Given at least one epic branch is not fully merged into the current
+        branch (per git branch --merged),
+        When arcforge finish runs,
+        Then the command MUST exit non-zero with a message listing each
+        unmerged branch, and MUST NOT delete dag.yaml or epics/.
+        <trace>design.md §Identifiable Requirements R1.3 guard 3</trace>
+      </criterion>
+      <criterion id="fr-cf-001-ac4">
+        Given the working tree has any uncommitted modification (including
+        to specs/&lt;spec-id&gt;/dag.yaml),
+        When arcforge finish runs,
+        Then the command MUST exit non-zero with a message listing the
+        dirty paths, and MUST NOT perform any mutation. With fr-cc-001 in
+        effect there SHOULD be no drift at this point; the guard exists to
+        surface anomalies rather than paper over them.
+        <trace>design.md §Identifiable Requirements R1.3 guard 4 (tightened per Q1=c)</trace>
+      </criterion>
+      <criterion id="fr-cf-001-ac5">
+        Given multiple guards fail simultaneously,
+        When arcforge finish runs,
+        Then the terminal output MUST list every failing guard (not stop at
+        the first), so a user or skill retry loop can fix all blockers in
+        one pass.
+        <trace>design.md §Proposed Solution — Layer 1 (finish guards)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cf-002">
+    <title>finish body deletes planner output and commits</title>
+    <description>
+      After all guards in fr-cf-001 pass, arcforge finish MUST run (in
+      order): (1) internal invocation of cleanup to remove any remaining
+      completed-epic worktrees and fully-merged branches for the spec;
+      (2) git rm specs/&lt;spec-id&gt;/dag.yaml; (3) git rm -r
+      specs/&lt;spec-id&gt;/epics/; (4) git commit with message
+      chore(specs): finish &lt;spec-id&gt; sprint. The commit MUST contain
+      exactly the dag.yaml and epics/ removals.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cf-002-ac1">
+        Given all guards pass,
+        When arcforge finish runs,
+        Then after the command completes, specs/&lt;spec-id&gt;/dag.yaml MUST
+        NOT exist and specs/&lt;spec-id&gt;/epics/ MUST NOT exist on disk.
+        <trace>design.md §Identifiable Requirements R1.4</trace>
+      </criterion>
+      <criterion id="fr-cf-002-ac2">
+        Given arcforge finish produces a commit,
+        When git log -1 --format=%s is read,
+        Then the subject MUST equal chore(specs): finish &lt;spec-id&gt;
+        sprint (with the actual spec-id substituted).
+        <trace>design.md §Proposed Solution — Layer 1 (finish commit message)</trace>
+      </criterion>
+      <criterion id="fr-cf-002-ac3">
+        Given arcforge finish produces a commit,
+        When git log -1 --name-status is read,
+        Then the changed files MUST be exactly specs/&lt;spec-id&gt;/dag.yaml
+        (D) and all files previously under specs/&lt;spec-id&gt;/epics/
+        (D), with no other files included.
+        <trace>design.md §Identifiable Requirements R1.4</trace>
+      </criterion>
+      <criterion id="fr-cf-002-ac4">
+        Given at sprint end there are still completed-epic worktrees on
+        disk or fully-merged epic branches locally,
+        When arcforge finish runs and guards pass,
+        Then the internal cleanup call MUST remove the remaining worktree
+        directories and merged branches before the git rm step, so that
+        sprint-end leaves no per-epic residue.
+        <trace>design.md §Identifiable Requirements R1.4</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cf-003">
+    <title>finish --if-last flag for conditional execution</title>
+    <description>
+      arcforge finish --spec-id &lt;id&gt; --if-last MUST first consult
+      allEpicsCompleted(dag). If the predicate returns false, the command
+      MUST exit zero with a short informational message (for example, "Not
+      last epic — skipping finish") and MUST NOT perform any guard check or
+      mutation. If the predicate returns true, the command MUST proceed as
+      if --if-last were absent, running the guards in fr-cf-001 and the
+      body in fr-cf-002. This flag lets skills call finish unconditionally
+      at their terminus without needing to read dag state themselves.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cf-003-ac1">
+        Given a dag where not every epic has status=completed,
+        When arcforge finish --spec-id &lt;id&gt; --if-last runs,
+        Then the exit code MUST be zero, a single line message such as
+        "Not last epic — skipping finish" MUST be printed, and NO guard
+        failure messages MUST appear (the guards are not evaluated in this
+        path).
+        <trace>design.md §Identifiable Requirements R1.5</trace>
+      </criterion>
+      <criterion id="fr-cf-003-ac2">
+        Given a dag where every epic has status=completed,
+        When arcforge finish --spec-id &lt;id&gt; --if-last runs,
+        Then the command MUST behave identically to arcforge finish
+        --spec-id &lt;id&gt; without the flag: guards evaluated, and if all
+        pass, body executed and commit produced.
+        <trace>design.md §Identifiable Requirements R1.5</trace>
+      </criterion>
+      <criterion id="fr-cf-003-ac3">
+        Given arcforge finish --spec-id &lt;id&gt; --if-last is invoked
+        repeatedly while a sprint progresses,
+        When not yet complete, the command MUST be safe to re-invoke as a
+        no-op; when complete, the first invocation after completion MUST
+        execute the full finish; subsequent invocations MUST fail cleanly
+        at the dag.yaml-missing guard (fr-cf-001-ac1).
+        <trace>design.md §Proposed Solution — Layer 2 (skill-friendly idempotence)</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-cf-004">
+    <title>allEpicsCompleted helper in scripts/lib/models.js</title>
+    <description>
+      A pure function allEpicsCompleted(dag) MUST be exported from
+      scripts/lib/models.js. It takes a parsed dag object and returns a
+      boolean: true when every epic in dag.epics has status equal to
+      TaskStatus.COMPLETED, false otherwise (including when dag.epics is
+      empty — an empty dag MUST return false to avoid accidental finish on
+      a freshly-planned spec). The helper MUST be the single source of
+      truth for the --if-last branch in fr-cf-003 and for any test that
+      needs to assert sprint completeness.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-cf-004-ac1">
+        Given a dag whose every epic has status="completed",
+        When allEpicsCompleted(dag) is called,
+        Then it MUST return true.
+        <trace>design.md §Identifiable Requirements R1.6 (Q2a=models.js)</trace>
+      </criterion>
+      <criterion id="fr-cf-004-ac2">
+        Given a dag with at least one epic whose status is not "completed"
+        (pending / in_progress / blocked),
+        When allEpicsCompleted(dag) is called,
+        Then it MUST return false.
+        <trace>design.md §Identifiable Requirements R1.6</trace>
+      </criterion>
+      <criterion id="fr-cf-004-ac3">
+        Given a dag with an empty epics array,
+        When allEpicsCompleted(dag) is called,
+        Then it MUST return false, so that a freshly-created or zero-epic
+        dag is never treated as a finished sprint.
+        <trace>design.md §Proposed Solution — Layer 2 (guard edge case)</trace>
+      </criterion>
+      <criterion id="fr-cf-004-ac4">
+        Given scripts/lib/models.js,
+        When the module is imported,
+        Then allEpicsCompleted MUST be a named export callable without any
+        filesystem or git side effect (purity requirement), so it is safe
+        to use from unit tests, CLI, and future integrations.
+        <trace>design.md §Proposed Solution — Layer 2</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

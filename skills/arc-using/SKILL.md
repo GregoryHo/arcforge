@@ -32,7 +32,7 @@ If no skill fits, proceed directly.
 ## Worktree Rule
 
 ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<epic>/`,
-computed at runtime by `scripts/lib/worktree-paths.js` and managed by
+computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` and managed by
 `coordinator.js`. Because the path is derived, not literal, four norms
 apply whenever you touch worktrees:
 

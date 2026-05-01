@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<detail id="audit-agents">
+  <title>Fan-out Audit Agents — Parallel Review Across Three Axes</title>
+  <consumes>
+    <artifact>docs/plans/&lt;spec-id&gt;/&lt;iteration&gt;/design.md</artifact>
+    <artifact>specs/&lt;spec-id&gt;/spec.xml (when present)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/details/*.xml (when present)</artifact>
+    <artifact>specs/&lt;spec-id&gt;/dag.yaml (when present)</artifact>
+    <artifact>`.arcforge-epic` marker files and worktree directory presence under `~/.arcforge/worktrees/` (file-level observation only — no git commands) for the state-transition-integrity agent</artifact>
+  </consumes>
+  <produces>
+    <artifact>Structured finding lists returned to the main session via Task-tool responses (no filesystem output)</artifact>
+  </produces>
+
+  <requirement id="fr-aa-001">
+    <title>Parallel fan-out to three axis-aligned sub-agents</title>
+    <description>
+      Phase 1 of the skill body MUST spawn exactly three sub-agents in
+      parallel via the Task tool, one per audit axis. Each sub-agent runs in
+      fresh context with zero visibility into the parent session's prior
+      messages.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-aa-001-ac1">
+        Given Phase 1 begins,
+        When the skill body fires fan-out,
+        Then it MUST spawn exactly three sub-agents — `cross-artifact-alignment`,
+        `internal-consistency`, and `state-transition-integrity` — concurrently
+        in a single Task-tool message with multiple parallel tool uses.
+        <trace>design.md §Architecture — Phase 1 Fan-out</trace>
+      </criterion>
+      <criterion id="fr-aa-001-ac2">
+        Given each sub-agent is spawned,
+        When its prompt is assembled,
+        Then it MUST include the target spec-id plus explicit absolute paths
+        (or explicit absence markers) for design.md, spec.xml, details/*.xml,
+        and dag.yaml, so the agent can read them via its Read tool without
+        guessing paths.
+        <trace>design.md §Requirements Part 1 — Fan-out</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-aa-002">
+    <title>Structured finding schema</title>
+    <description>
+      Every finding emitted by any sub-agent MUST conform to a structured
+      schema carrying identity, severity, diagnostic prose, and up to four
+      suggested resolutions — each resolution carrying an optional diff-preview
+      string for downstream AskUserQuestion rendering.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-aa-002-ac1">
+        Given a sub-agent produces a finding,
+        When the finding is emitted,
+        Then it MUST include: a unique ID in format `A&lt;axis&gt;-&lt;NNN&gt;`
+        (axis ∈ {1, 2, 3}, NNN zero-padded), a severity in {HIGH, MED, LOW,
+        INFO}, a one-line title, a list of affected file paths (with line
+        references when known), an "observed" prose block, a "why it matters"
+        paragraph, and up to four suggested resolutions.
+        <trace>design.md §Requirements Part 1 — Finding structure</trace>
+      </criterion>
+      <criterion id="fr-aa-002-ac2">
+        Given a finding carries one or more resolutions,
+        When each resolution is serialised,
+        Then it MUST include a short label (1-5 words), a description of its
+        effect, and — when the resolution corresponds to an editable artifact
+        change — a `preview` diff string suitable for AskUserQuestion's
+        preview field. Resolutions without a direct editable-artifact
+        equivalent (e.g., engine-fix recommendations) MAY omit `preview`.
+        <trace>design.md §Requirements Part 1 — Finding structure</trace>
+      </criterion>
+      <criterion id="fr-aa-002-ac3">
+        Given the reviewer agent has a clear preference among its resolutions,
+        When resolutions are ordered,
+        Then the first resolution MUST be prefixed `"(Recommended)"`; when no
+        preference exists, the prefix MUST NOT be applied to any resolution.
+        <trace>design.md §Requirements Part 1 — Finding structure</trace>
+      </criterion>
+      <criterion id="fr-aa-002-ac4">
+        Given severity is assigned to a finding,
+        When severity taxonomy is interpreted,
+        Then severity is drawn from a four-value enum {HIGH, MED, LOW, INFO}.
+        HIGH / MED / LOW are reviewer-agent judgment calls — specific cut-off
+        criteria MUST live in each agent's system prompt (produced via
+        arc-writing-skills implementation), not in this spec. INFO is reserved
+        for findings that are informational rather than issue-raising (e.g.,
+        graceful-degradation notices per fr-aa-004); it MUST NOT be used for
+        downgraded HIGH / MED / LOW issues. This spec asserts only the presence
+        of a severity field drawn from this four-value enum, not the HIGH /
+        MED / LOW semantic thresholds.
+        <trace>Refiner clarifying question Q1 → answer (b): loose spec definition, detail deferred to implementation</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-aa-003">
+    <title>Axis-scope separation among the three agents</title>
+    <description>
+      Each of the three sub-agents MUST cover a distinct audit axis. Findings
+      outside an agent's axis MUST NOT appear in that agent's output.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-aa-003-ac1">
+        Given the `cross-artifact-alignment` agent runs,
+        When its findings are inspected,
+        Then every emitted finding MUST address semantic alignment between
+        two or more of `design.md`, `spec.xml`, or `dag.yaml` — not an issue
+        internal to a single artifact.
+        <trace>design.md §Architecture — Cross-Artifact Alignment axis</trace>
+      </criterion>
+      <criterion id="fr-aa-003-ac2">
+        Given the `internal-consistency` agent runs,
+        When its findings are inspected,
+        Then every emitted finding MUST address a contradiction, dangling
+        reference, or self-referential prose within a single artifact (e.g.,
+        requirement contradicting a `&lt;consumes&gt;` entry inside the same
+        spec.xml, or rename source/target identity within design.md).
+        <trace>design.md §Architecture — Internal Consistency axis</trace>
+      </criterion>
+      <criterion id="fr-aa-003-ac3">
+        Given the `state-transition-integrity` agent runs,
+        When its findings are inspected,
+        Then every emitted finding MUST address whether `dag.yaml` recorded
+        state (epic status, worktree pointer, feature status) matches
+        on-disk worktree directory presence, `.arcforge-epic` marker files,
+        and feature-status files — not the semantic content of upstream
+        artifacts and not git-history-layer drift (the latter is out of
+        scope for this skill and belongs to a separate engine-fix spec).
+        <trace>design.md §Architecture — State Transition Integrity axis</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+
+  <requirement id="fr-aa-004">
+    <title>Graceful degradation on missing or failed inputs</title>
+    <description>
+      Each sub-agent MUST degrade gracefully when an expected artifact is
+      missing or when its own execution fails partially. The skill body MUST
+      NOT abort the full audit because one axis cannot complete.
+    </description>
+    <acceptance_criteria>
+      <criterion id="fr-aa-004-ac1">
+        Given `specs/&lt;spec-id&gt;/spec.xml` does not exist at skill invocation
+        (pure design-stage audit),
+        When `cross-artifact-alignment` runs,
+        Then it MUST skip alignment-with-spec checks and emit exactly one
+        finding with `severity: INFO` that records the skip and its cause.
+        <trace>design.md §Requirements Part 2 — Graceful degradation</trace>
+      </criterion>
+      <criterion id="fr-aa-004-ac2">
+        Given `specs/&lt;spec-id&gt;/dag.yaml` does not exist at skill invocation,
+        When `state-transition-integrity` runs,
+        Then it MUST return exactly one finding with `severity: INFO` and
+        title "DAG not yet planned — state integrity not applicable" rather
+        than running further checks.
+        <trace>design.md §Requirements Part 2 — Graceful degradation</trace>
+      </criterion>
+      <criterion id="fr-aa-004-ac3">
+        Given any sub-agent experiences a partial failure (token-limit
+        exhaustion, malformed input, tool error),
+        When the agent returns to the orchestrator,
+        Then it MUST return any partial findings already collected plus an
+        explicit `error_flag` field describing the failure cause; the skill
+        body MUST continue rendering Phases 2-5 using findings from axes that
+        succeeded.
+        <trace>design.md §Requirements Part 2 — Graceful degradation</trace>
+      </criterion>
+    </acceptance_criteria>
+  </requirement>
+</detail>

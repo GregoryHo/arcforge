@@ -29,9 +29,9 @@ is unknown — you cannot create a worktree for an epic that is not in the DAG.
 node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <epic-id> --project-setup
 ```
 
-What this does (single authoritative implementation in `scripts/lib/coordinator.js`):
+What this does (single authoritative implementation in `${ARCFORGE_ROOT}/scripts/lib/coordinator.js`):
 
-- Derives the canonical worktree path via `scripts/lib/worktree-paths.js`
+- Derives the canonical worktree path via `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`
   (`~/.arcforge/worktrees/<project>-<hash>-<epic>/`).
 - Runs `git worktree add <path> -b <epic-id>`.
 - Writes the `.arcforge-epic` marker with base worktree + base branch.

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spec>
+  <overview>
+    <spec_id>sdd-downstream-contract</spec_id>
+    <spec_version>1</spec_version>
+    <status>active</status>
+    <source>
+      <design_path>docs/plans/sdd-downstream-contract/2026-04-24/design.md</design_path>
+      <design_iteration>2026-04-24</design_iteration>
+    </source>
+    <title>SDD v2 Downstream Contract</title>
+    <description>
+      Formalize the downstream-consumer half of the SDD v2 pipeline. Where
+      specs/spec-driven-refine covers stages 1-3 (brainstorming, refining,
+      planning) and explicitly excludes Phase 2 downstream migration
+      (specs/spec-driven-refine/spec.xml:32), this spec fills that gap. It
+      defines the coordinator's contract around dag.yaml mutations, expands
+      arcforge cleanup scope, introduces arcforge finish as an explicit
+      sprint-terminus primitive, and re-points existing workflow skills
+      (arc-finishing-epic, arc-dispatching-teammates, arc-coordinating) at
+      the new contract. Research backing:
+      docs/research/sdd-v2-downstream-contract-gap.md Findings 1-7. The spec
+      codifies Convention C (delete-after-sprint) from Finding 7.3 as the
+      single sanctioned sprint-terminus behavior, retiring the conflicting
+      revert-after-merge and reconcile-after-merge conventions observed
+      across prior contributor sessions.
+    </description>
+    <scope>
+      <includes>
+        <feature id="coordinator-commits">Coordinator writes to specs/&lt;id&gt;/dag.yaml are bundled into their originating git commit. _mergeEpicsInBase mutates both status=completed and worktree=null in one save and stages dag.yaml so the integrate commit carries the full state transition. arcforge cleanup becomes a pure disk-and-branch operation that does not mutate dag.yaml, and gains a --epic flag consistent with expand / loop.</feature>
+        <feature id="cli-finish">New arcforge finish subcommand terminates a spec's sprint by guarded removal of dag.yaml and epics/. Accepts --spec-id for the target spec and --if-last for skill-friendly conditional execution (no-op when not the last epic). Backed by a pure helper allEpicsCompleted(dag) in scripts/lib/models.js, shared by CLI and tests.</feature>
+        <feature id="skill-hooks">arc-finishing-epic (Step 4 Option 1), arc-dispatching-teammates (wrap-up), and arc-coordinating (command table) each route their terminus through arcforge finish --if-last. Changes follow arc-writing-skills TDD-for-docs discipline, including Red Flags that close rationalizations for skipping finish.</feature>
+        <feature id="documentation">User-facing docs/guide/downstream-contract.md explains the three-workflow-terminus contract and the Convention C history. Design and spec cross-reference specs/spec-driven-refine/spec.xml:32 as the Phase 2 exclusion this spec now formally carries, without mutating that upstream spec.</feature>
+      </includes>
+      <excludes>
+        <reason>Creation of new skills — design constraint. All skill-layer changes land in existing skills (arc-finishing-epic, arc-dispatching-teammates, arc-coordinating).</reason>
+        <reason>Iteration of specs/spec-driven-refine/ — that spec's stage-1-3 scope is preserved verbatim. This spec is the Phase 2 successor and cross-references spec.xml:32 without mutating it.</reason>
+        <reason>Machine-readable review gate — arcforge finish does NOT check whether code review passed. The existing skill chain (arc-requesting-review → arc-receiving-review → arc-finishing-epic) enforces review discipline; a machine gate would require a new state artifact outside this scope.</reason>
+        <reason>Orphan worktree garbage collection — cross-project worktrees whose base path no longer exists (Finding 6.2) require a filesystem-scan primitive. Out of scope; left to a future spec.</reason>
+        <reason>Planner / refiner / brainstorming changes — upstream SDD v2 stages are untouched. Only downstream consumer behavior is formalized.</reason>
+        <reason>Sidecar state files — the .arcforge-epic marker schema and dag.yaml location are preserved. Only commit behavior and sprint-end deletion change.</reason>
+        <reason>PR-based sprint-end automation — arc-finishing-epic Step 4 Option 2 (PR) deliberately does not call finish, since PR merge occurs on the remote. Users running PR-only sprints invoke arcforge finish manually after all PRs merge.</reason>
+        <reason>Commit granularity contract for docs-only epics (Finding 6.4) — an open question about whether prose-epic features collapse into one commit or stay per-feature. Out of scope.</reason>
+        <reason>New integration-test pipeline fixtures under tests/integration/sdd-v2-pipeline/ — implementation updates existing fixtures as needed but does not add new ones.</reason>
+      </excludes>
+    </scope>
+  </overview>
+
+  <details>
+    <detail_file path="details/coordinator-commits.xml" />
+    <detail_file path="details/cli-finish.xml" />
+    <detail_file path="details/skill-hooks.xml" />
+    <detail_file path="details/documentation.xml" />
+  </details>
+</spec>
