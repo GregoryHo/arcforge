@@ -25,6 +25,7 @@
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
+ *   learn status|enable|disable      Manage optional learning subsystem
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
@@ -317,6 +318,17 @@ COMMANDS:
   eval history                       List benchmark snapshots
   eval audit [--top N]               Audit grading history for promotion/retirement candidates
   eval dashboard [--port N]          Live web dashboard (default: 3333)
+
+  learn status [--json]
+                                     Show optional learning enablement state.
+  learn enable --project|--global [--json]
+                                     Explicitly enable learning for project or global scope.
+  learn disable --project|--global [--json]
+                                     Disable new learning observations/analyzer runs for a scope.
+  learn review --project|--global [--json]
+                                     List queued learning candidates for review.
+  learn approve|reject <candidate-id> --project|--global [--json]
+                                     Record user authorization decision for a candidate.
 
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
@@ -1076,6 +1088,55 @@ async function main() {
         } else {
           console.error(
             'Usage: arc eval [list|run|preflight|lint|ab|compare|report|history|audit|dashboard]',
+          );
+          process.exit(1);
+        }
+        break;
+      }
+
+      case 'learn': {
+        const learning = require('./lib/learning');
+        const subcommand = args.positional[0];
+        const resolveLearningScope = () => {
+          if (args.flags.global) return 'global';
+          if (args.flags.project) return 'project';
+          throw new Error('learn enable/disable requires --project or --global');
+        };
+
+        if (subcommand === 'status') {
+          output(learning.readLearningConfig({ projectRoot }), asJson);
+        } else if (subcommand === 'enable' || subcommand === 'disable') {
+          const scope = resolveLearningScope();
+          output(
+            learning.setLearningEnabled({
+              scope,
+              enabled: subcommand === 'enable',
+              projectRoot,
+            }),
+            asJson,
+          );
+        } else if (subcommand === 'review') {
+          const scope = resolveLearningScope();
+          const candidates = learning.loadCandidates({ scope, projectRoot });
+          output({ scope, count: candidates.length, candidates }, asJson);
+        } else if (subcommand === 'approve' || subcommand === 'reject') {
+          const candidateId = args.positional[1];
+          if (!candidateId) throw new Error(`learn ${subcommand} requires a candidate id`);
+          const scope = resolveLearningScope();
+          output(
+            learning.transitionCandidate(
+              candidateId,
+              subcommand === 'approve' ? 'approved' : 'rejected',
+              {
+                scope,
+                projectRoot,
+              },
+            ),
+            asJson,
+          );
+        } else {
+          console.error(
+            'Usage: arc learn [status|enable|disable|review|approve <id>|reject <id>] [--project|--global]',
           );
           process.exit(1);
         }
