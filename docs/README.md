@@ -36,7 +36,7 @@ Three numbered stages (Dispatch, Accept, Deliver) with AND-gated acceptance — 
 
 These files are kept in-repo as raw source material for the wiki:
 
-- **Guides**: `guide/eval-system.md`, `guide/hooks-system.md`, `guide/worktree-workflow.md`, `guide/skills-reference.md`
+- **Guides**: `guide/eval-system.md`, `guide/composable-skill-eval-coverage.md`, `guide/hooks-system.md`, `guide/worktree-workflow.md`, `guide/skills-reference.md`
 - **Designs**: `plans/` — architecture decision records
 - **Research**: `research/` — landscape analysis and experiment baselines
 - **Platform Install**: `README.codex.md`, `README.gemini.md`, `README.opencode.md`
