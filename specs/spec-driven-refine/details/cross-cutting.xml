@@ -34,10 +34,13 @@
     <acceptance_criteria>
       <criterion id="fr-cc-002-ac1">
         Refiner MUST NOT write to any file under docs/plans/. Its only
-        output path on success is specs/&lt;spec-id&gt;/. On block, refiner
-        writes no files anywhere — the error is reported to terminal and
-        refiner exits non-zero (per fr-rf-001-ac3).
-        <trace>REQ-F025</trace>
+        output path on success is specs/&lt;spec-id&gt;/. On non-R3 blocks,
+        refiner writes no files anywhere — the error is reported to terminal
+        and refiner exits non-zero (per fr-rf-001-ac3). On R3 axis blocks,
+        refiner writes only specs/&lt;spec-id&gt;/_pending-conflict.md as the
+        explicit ephemeral exception defined by fr-cc-if-007; it MUST NOT
+        write spec.xml, details/, or report artifacts.
+        <trace>REQ-F025, 2026-04-27:B.2</trace>
       </criterion>
       <criterion id="fr-cc-002-ac2">
         Planner MUST NOT write to specs/&lt;spec-id&gt;/spec.xml or
