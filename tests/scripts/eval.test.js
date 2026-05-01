@@ -35,6 +35,7 @@ const {
   parseActionsFromTranscript,
   buildPluginDirSettings,
   resolveMaxTurns,
+  createTrialDir,
   runTrial,
   executeAndGradeTrial,
   runSkillEval,
@@ -650,6 +651,88 @@ Do something.
   // ── runTrial ────────────────────────────────────────────────
 
   describe('runTrial', () => {
+    it('should initialize a best-effort git boundary in trial dirs', () => {
+      const trialDir = createTrialDir('boundary-test', 1, tempDir);
+      expect(fs.existsSync(path.join(trialDir, '.git', 'HEAD'))).toBe(true);
+    });
+
+    it('should return structured setup_failed infraError instead of throwing', () => {
+      const scenario = {
+        name: 'setup-failure',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('setup_failed');
+      expect(result.error).toContain('Setup failed');
+      expect(result.trialDir).toBeTruthy();
+      expect(fs.existsSync(result.trialDir)).toBe(true);
+    });
+
+    it('should clean trial dirs for setup_failed infraError in executeAndGradeTrial', () => {
+      const scenario = {
+        name: 'setup-cleanup',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('setup_failed');
+      expect(fs.existsSync(result.trialDir)).toBe(false);
+    });
+
+    it('should use cached semi-isolation settings for pluginDir trials', () => {
+      const scenario = {
+        name: 'cached-semi',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done' }),
+      ].join('\n');
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+        pluginDir: tempDir,
+        isolationSettings: '{"cached":true}',
+      });
+
+      expect(result.infraError).toBeUndefined();
+      const settings = fs.readFileSync(
+        path.join(result.trialDir, '.claude', 'settings.json'),
+        'utf8',
+      );
+      expect(settings).toBe('{"cached":true}');
+      expect(mockUtils.execCommand).toHaveBeenCalledTimes(1);
+    });
+
     it('should not use raw stream-json as graded output when no assistant text is captured', () => {
       const scenario = {
         name: 'thinking-only',

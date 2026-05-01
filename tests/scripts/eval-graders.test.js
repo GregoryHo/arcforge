@@ -19,6 +19,8 @@ const mockUtils = require('../../scripts/lib/utils');
 
 const {
   gradeWithModel,
+  gradeWithCode,
+  gradeWithMixed,
   gradeTrialResult,
   validateGraderResponse,
   snapScore,
@@ -325,6 +327,71 @@ describe('eval-graders.js', () => {
       // Verdict must be invariant to weak_assertions
       expect(gradedWithWeak.score).toBe(gradedNoWeak.score);
       expect(gradedWithWeak.passed).toBe(gradedNoWeak.passed);
+    });
+  });
+
+  describe('code grader assertion labels', () => {
+    it('accepts exactly one label for each scenario assertion', () => {
+      const result = makeTrialResult({ grader: 'code', trialDir: tempDir });
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: 'A1:PASS\nA2:FAIL:missing file\n',
+        stderr: '',
+        exitCode: 1,
+      });
+
+      const graded = gradeWithCode(result, 'node grader.js', tempDir, 2);
+
+      expect(graded.gradeError).toBeUndefined();
+      expect(graded.assertionScores).toEqual([1, 0]);
+      expect(graded.score).toBe(0.5);
+      expect(graded.passed).toBe(false);
+    });
+
+    it('fails closed when a label is missing for a scenario assertion', () => {
+      const result = makeTrialResult({ grader: 'code', trialDir: tempDir });
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: 'A1:PASS\n', stderr: '', exitCode: 0 });
+
+      const graded = gradeWithCode(result, 'node grader.js', tempDir, 2);
+
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0);
+      expect(graded.gradeError).toBe(true);
+      expect(graded.errorType).toBe('code_grader_assertion_labels_invalid');
+      expect(graded.error).toContain('missing labels for A2');
+    });
+
+    it('fails closed on duplicate and out-of-range labels', () => {
+      const result = makeTrialResult({ grader: 'code', trialDir: tempDir });
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: 'A1:PASS\nA1:FAIL:dup\nA3:PASS\n',
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const graded = gradeWithCode(result, 'node grader.js', tempDir, 2);
+
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0);
+      expect(graded.gradeError).toBe(true);
+      expect(graded.error).toContain('duplicate labels for A1');
+      expect(graded.error).toContain('out-of-range labels A3');
+    });
+  });
+
+  describe('behavioral tool assertions', () => {
+    it('fails closed when behavioral assertions need an absent action log', () => {
+      const result = makeTrialResult({ grader: 'mixed' });
+      const scenario = makeScenario({
+        grader: 'mixed',
+        assertions: ['[tool_not_called] Bash:rm -rf'],
+      });
+
+      const graded = gradeWithMixed(result, scenario, tempDir);
+
+      expect(graded.passed).toBe(false);
+      expect(graded.score).toBe(0);
+      expect(graded.gradeError).toBe(true);
+      expect(graded.errorType).toBe('action_log_missing');
     });
   });
 });

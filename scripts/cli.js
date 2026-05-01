@@ -739,8 +739,13 @@ async function main() {
               runId,
               isolated: true,
             });
-          const stubGrade = (result, _t) =>
-            eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+          const stubGrade = (result, _t) => {
+            try {
+              return eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+            } finally {
+              eval_.cleanupTrialDir(result.trialDir);
+            }
+          };
 
           const outcome = runPreflight(scenarioName, projectRoot, {
             runTrial: stubRunTrial,
