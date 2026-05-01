@@ -11,6 +11,7 @@ const {
   getCandidateQueuePath,
   isLearningEnabled,
   loadCandidates,
+  materializeCandidate,
   readLearningConfig,
   setLearningEnabled,
   transitionCandidate,
@@ -173,6 +174,108 @@ describe('learning subsystem MVP-1', () => {
         homeDir,
       }).status,
     ).toBe('materialized');
+  });
+
+  it('materializes approved project skill candidates as inactive draft artifacts', () => {
+    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+
+    const result = materializeCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T00:03:00Z',
+    });
+
+    expect(result.candidate.status).toBe('materialized');
+    expect(result.candidate.draft_paths).toEqual([
+      'skills/arc-releasing/SKILL.md.draft',
+      'tests/skills/test_skill_arc_releasing.py.draft',
+    ]);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
+      false,
+    );
+
+    const draft = fs.readFileSync(
+      path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'),
+      'utf8',
+    );
+    expect(draft).toContain('name: arc-releasing');
+    expect(draft).toContain('candidate: arc-releasing-20260501-001');
+    expect(draft).toContain('Draft artifact only');
+  });
+
+  it('refuses to materialize pending or rejected candidates', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+
+    expect(() =>
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow('candidate must be approved before materialization');
+
+    transitionCandidate('arc-releasing-20260501-001', 'rejected', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+    expect(() =>
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow('candidate must be approved before materialization');
+  });
+
+  it('refuses to materialize candidates whose recorded scope does not match the queue scope', () => {
+    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify(candidate({ status: 'approved', scope: 'global' }))}\n`,
+      'utf8',
+    );
+
+    expect(() =>
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow('candidate scope must match requested materialization scope');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
+  });
+
+  it('CLI learn materialize writes drafts after approval without activating a skill', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    execFileSync('node', [cli, 'learn', 'approve', 'arc-releasing-20260501-001', '--project'], {
+      env,
+      encoding: 'utf8',
+    });
+    const materialized = JSON.parse(
+      execFileSync(
+        'node',
+        [cli, 'learn', 'materialize', 'arc-releasing-20260501-001', '--project', '--json'],
+        { env, encoding: 'utf8' },
+      ),
+    );
+
+    expect(materialized.candidate.status).toBe('materialized');
+    expect(materialized.candidate.draft_paths).toContain('skills/arc-releasing/SKILL.md.draft');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
   });
 
   it('observe redaction removes common secrets before observations are stored', () => {

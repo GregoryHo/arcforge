@@ -217,6 +217,127 @@ function assertCanMaterialize(candidate) {
   return true;
 }
 
+function skillTestName(skillName) {
+  return `test_skill_${skillName.replace(/-/g, '_')}.py`;
+}
+
+function assertSafeSkillName(name) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) {
+    throw new Error('candidate skill name must be lowercase kebab-case');
+  }
+}
+
+function getDraftArtifactPaths(candidate) {
+  if (candidate.artifact_type !== 'skill') {
+    throw new Error('only skill candidate materialization is supported');
+  }
+  assertSafeSkillName(candidate.name);
+  return [
+    path.join('skills', candidate.name, 'SKILL.md.draft'),
+    path.join('tests', 'skills', `${skillTestName(candidate.name)}.draft`),
+  ];
+}
+
+function oneLine(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function renderSkillDraft(candidate) {
+  const description = JSON.stringify(`Use when ${oneLine(candidate.trigger)}`);
+  return `---
+name: ${candidate.name}
+description: ${description}
+---
+
+# ${candidate.name}
+
+> Draft artifact only. This file is intentionally inactive until explicitly activated.
+
+Generated from learning candidate: ${candidate.id}
+
+## Trigger
+
+${candidate.trigger}
+
+## Summary
+
+${candidate.summary}
+
+## Workflow
+
+1. Confirm the user's request matches the trigger.
+2. Run the project preflight checks before changing release state.
+3. Check version, changelog or release notes, tests, tags, and push/PR handoff.
+4. Stop before destructive or irreversible release actions unless the user explicitly approves.
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderSkillTestDraft(candidate) {
+  const safeName = candidate.name.replace(/-/g, '_');
+  return `from pathlib import Path
+
+
+def test_${safeName}_draft_is_not_active():
+    draft = Path(__file__).with_suffix(Path(__file__).suffix + ".draft")
+    assert draft.name.endswith(".draft")
+
+
+def test_${safeName}_draft_frontmatter_mentions_candidate():
+    draft = Path(__file__).parents[2] / "skills" / "${candidate.name}" / "SKILL.md.draft"
+    text = draft.read_text()
+    assert "name: ${candidate.name}" in text
+    assert "candidate: ${candidate.id}" in text or "${candidate.id}" in text
+`;
+}
+
+function materializeCandidate(
+  id,
+  { scope = 'project', projectRoot = process.cwd(), homeDir, now = new Date().toISOString() } = {},
+) {
+  assertScope(scope);
+  if (scope !== 'project') {
+    throw new Error('only project candidate materialization is supported');
+  }
+  const candidates = loadCandidates({ scope, projectRoot, homeDir });
+  const index = candidates.findIndex((candidate) => candidate.id === id);
+  if (index === -1) throw new Error(`candidate not found: ${id}`);
+
+  const candidate = candidates[index];
+  const validation = validateCandidate(candidate);
+  if (!validation.ok) {
+    throw new Error(`invalid candidate: ${validation.errors.join('; ')}`);
+  }
+  if (candidate.scope !== scope) {
+    throw new Error('candidate scope must match requested materialization scope');
+  }
+  assertCanMaterialize(candidate);
+  const draftPaths = getDraftArtifactPaths(candidate);
+  const [skillDraftPath, testDraftPath] = draftPaths.map((relativePath) =>
+    path.join(projectRoot, relativePath),
+  );
+
+  fs.mkdirSync(path.dirname(skillDraftPath), { recursive: true });
+  fs.writeFileSync(skillDraftPath, renderSkillDraft(candidate), 'utf8');
+  fs.mkdirSync(path.dirname(testDraftPath), { recursive: true });
+  fs.writeFileSync(testDraftPath, renderSkillTestDraft(candidate), 'utf8');
+
+  const updated = {
+    ...candidate,
+    status: 'materialized',
+    draft_paths: draftPaths,
+    updated_at: now,
+  };
+  candidates[index] = updated;
+  rewriteCandidates(candidates, { scope, projectRoot, homeDir });
+  return { scope, candidate: updated, draft_paths: draftPaths };
+}
+
 function readJsonLines(filePath) {
   if (!fs.existsSync(filePath)) return [];
   return fs
@@ -343,6 +464,7 @@ module.exports = {
   getProjectId,
   isLearningEnabled,
   loadCandidates,
+  materializeCandidate,
   readLearningConfig,
   setLearningEnabled,
   transitionCandidate,
