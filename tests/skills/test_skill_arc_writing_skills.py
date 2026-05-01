@@ -49,6 +49,15 @@ class TestFrontmatterAndBasicRules:
         total = len(front.get("name", "") + front.get("description", ""))
         assert total < 1024
 
+    def test_positioned_as_arcforge_project_level_meta_skill(self):
+        """arc-writing-skills is for maintaining ArcForge, not ordinary product work."""
+        text = _read_skill()
+        lowered = text.lower()
+        assert "project-level meta skill" in lowered
+        assert "maintaining arcforge" in lowered
+        assert "not a general promoted/user-facing core skill" in lowered
+        assert "ordinary product work" in lowered
+
     def test_no_at_syntax_in_skill(self):
         """Ensure no @ force-loading syntax in skill content."""
         text = _read_skill()

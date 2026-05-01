@@ -12,9 +12,6 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "export ARCFORGE_ROOT=\"${PLUGIN_ROOT}\"" >> "$CLAUDE_ENV_FILE"
 fi
 
-# Read arc-using content
-using_content=$(cat "${PLUGIN_ROOT}/skills/arc-using/SKILL.md" 2>&1 || echo "Error reading arc-using skill")
-
 # Escape outputs for JSON using pure bash
 escape_for_json() {
     local s="$1"
@@ -26,13 +23,26 @@ escape_for_json() {
     printf '%s' "$s"
 }
 
-using_escaped=$(escape_for_json "$using_content")
+bootstrap_context=$(cat <<EOF_CONTEXT
+ArcForge skills are available for this project.
+
+ARCFORGE_ROOT=${PLUGIN_ROOT}
+
+Use ArcForge as a minimal, composable toolkit:
+- Respect higher-priority instructions, explicit user constraints, and harness/eval isolation.
+- Prefer the smallest useful workflow; skills are tools, not laws.
+- For ArcForge workflow tasks, read or invoke the relevant skill on demand.
+- For simple answers, read-only inspection, grading, or isolated evals, proceed directly when no workflow is needed.
+EOF_CONTEXT
+)
+
+bootstrap_escaped=$(escape_for_json "$bootstrap_context")
 
 cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have arcforge skills.\n\nARCFORGE_ROOT=${PLUGIN_ROOT}\n\n**Below is the full content of your 'arc-using' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_escaped}\n</EXTREMELY_IMPORTANT>"
+    "additionalContext": "${bootstrap_escaped}"
   }
 }
 EOF

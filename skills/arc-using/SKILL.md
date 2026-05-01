@@ -1,142 +1,125 @@
 ---
 name: arc-using
-description: Use when starting any arcforge task - establishes routing discipline and checks routing table before ANY action
+description: Use when an ArcForge task needs routing help or the user asks which ArcForge skill/workflow applies
 ---
 
-<EXTREMELY-IMPORTANT>
-When a skill matches your context, invoke it before acting. Skills provide tested workflows
-that prevent common mistakes — skipping them means losing that protection.
+# arc-using
 
-If a skill turns out not to fit after reading it, you can set it aside.
-If no skill fits, proceed directly.
-</EXTREMELY-IMPORTANT>
+## Purpose
+
+`arc-using` is a bounded router for ArcForge skills. It helps choose the smallest useful workflow for the current task. It is guidance, not a global law.
+
+Use it when:
+
+- The user asks to use ArcForge or an ArcForge skill.
+- The task is an ArcForge workflow task: brainstorming, refining specs, planning, implementing epics, verifying, evaluating, or maintaining ArcForge skills.
+- You are unsure which ArcForge skill should handle the next step.
+
+Respect higher-priority instructions, explicit user constraints, and the host harness. If a workflow would add more friction than value, do not force it.
 
 ## How to Access Skills
 
-**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you — follow it directly. Never use the Read tool on skill files.
 
-**In other environments:** Check your platform's documentation for how skills are loaded.
+**In other environments:** Use the platform's skill-loading mechanism, or read the relevant skill documentation when no tool exists.
 
 ## Core Philosophy
 
-**File artifacts = truth** (SDD pipeline v2 — per-spec layout)
+- Skills are tools, not laws.
+- Prefer the smallest useful workflow.
+- File artifacts are the source of truth when the workflow creates them.
+- Session context is current workflow state only; resume from files, not memory.
+- Strong workflows are opt-in by task fit, not always-on behavior.
+
+## File Artifacts = Truth
+
+SDD pipeline v2 uses per-spec layout:
+
 - `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` → Design documents
 - `specs/<spec-id>/spec.xml` + `specs/<spec-id>/details/*.xml` → Refined specifications
 - `specs/<spec-id>/dag.yaml` + `specs/<spec-id>/epics/` → Implementation plans
 - Isolated feature work → see Worktree Rule below
 
-**Session context = current workflow only**
-- Don't rely on memory of past sessions
-- Resume from file artifacts, not conversation history
-
 ## Worktree Rule
 
-ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<epic>/`,
-computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` and managed by
-`coordinator.js`. Because the path is derived, not literal, four norms
-apply whenever you touch worktrees:
+ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<epic>/`, computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` and managed by `coordinator.js`.
 
-- **Don't hardcode paths in output.** Use abstract language ("the worktree",
-  "the epic's checkout") in messages and completion formats, or fill from
-  CLI output. Hardcoded paths become stale the moment the rule evolves —
-  and the rule has evolved before.
-- **Don't create worktrees manually.** Delegate to `arc-coordinating expand`
-  (batch) or `arc-using-worktrees` (single). Raw `git worktree add` bypasses
-  the `.arcforge-epic` marker schema that DAG sync depends on, producing
-  silently broken state.
-- **Enter worktrees via `arcforge status --json`.** It returns the absolute
-  path. Don't reconstruct it from pattern knowledge — you'll get the hash
-  wrong.
-- **Use file-editing tools only where `.arcforge-epic` lives.** A session
-  "owns" the side whose cwd contains the `.arcforge-epic` marker — worktree
-  sessions have it, base sessions don't (they have `dag.yaml` without the
-  marker). Limit direct file-editing tools (Read/Edit/Write in Claude Code,
-  or your platform's equivalent) to the owning session; to modify worktree
-  code from base, start a fresh agent session in the worktree path rather
-  than reaching across. This keeps coordination (`expand`/`status`/`sync`/
-  `merge`) architecturally separate from implementation and sidesteps
-  out-of-cwd permission issues that most agent platforms enforce. Shell
-  subprocess calls (`arcforge sync`, `git status`, `grep`, etc.) are not
-  restricted — the norm is scoped to direct file-editing tools only.
+When touching worktrees:
 
-For the full derivation rules (hash function, marker schema, cleanup
-semantics), see `docs/guide/worktree-workflow.md`.
+- Don't hardcode paths in output. Use abstract language like "the worktree" or fill paths from CLI output.
+- Don't create worktrees manually. Delegate to `arc-coordinating expand` or `arc-using-worktrees` so marker schema and DAG sync stay valid.
+- Enter worktrees via `arcforge status --json`; do not reconstruct paths from memory.
+- Use direct file-editing tools only where `.arcforge-epic` lives. Base sessions coordinate; worktree sessions implement.
 
-## The Rule
+For derivation rules, marker schema, and cleanup semantics, see `docs/guide/worktree-workflow.md`.
 
-**Invoke relevant or requested skills BEFORE any response or action.** Even a 1% chance a skill might apply means that you should invoke the skill to check. If an invoked skill turns out to be wrong for the situation, you don't need to use it.
+## Routing Flow
 
 ```dot
 digraph skill_flow {
     "User message received" [shape=doublecircle];
-    "Might any skill apply?" [shape=diamond];
-    "Invoke Skill tool" [shape=box];
-    "Announce: 'Using [skill] to [purpose]'" [shape=box];
-    "Has checklist?" [shape=diamond];
-    "Create TodoWrite todo per item" [shape=box];
-    "Follow skill exactly" [shape=box];
-    "Respond (including clarifications)" [shape=doublecircle];
+    "ArcForge workflow task?" [shape=diamond];
+    "Simple/read-only/eval/grading?" [shape=diamond];
+    "Choose smallest useful skill" [shape=box];
+    "Invoke/read skill" [shape=box];
+    "Proceed directly" [shape=box];
+    "Act with evidence" [shape=doublecircle];
 
-    "User message received" -> "Might any skill apply?";
-    "Might any skill apply?" -> "Invoke Skill tool" [label="yes, even 1%"];
-    "Might any skill apply?" -> "Respond (including clarifications)" [label="definitely not"];
-    "Invoke Skill tool" -> "Announce: 'Using [skill] to [purpose]'";
-    "Announce: 'Using [skill] to [purpose]'" -> "Has checklist?";
-    "Has checklist?" -> "Create TodoWrite todo per item" [label="yes"];
-    "Has checklist?" -> "Follow skill exactly" [label="no"];
-    "Create TodoWrite todo per item" -> "Follow skill exactly";
+    "User message received" -> "ArcForge workflow task?";
+    "ArcForge workflow task?" -> "Proceed directly" [label="no"];
+    "ArcForge workflow task?" -> "Simple/read-only/eval/grading?" [label="yes"];
+    "Simple/read-only/eval/grading?" -> "Proceed directly" [label="yes"];
+    "Simple/read-only/eval/grading?" -> "Choose smallest useful skill" [label="no"];
+    "Choose smallest useful skill" -> "Invoke/read skill";
+    "Invoke/read skill" -> "Act with evidence";
+    "Proceed directly" -> "Act with evidence";
 }
 ```
 
 ## Skill Priority
 
-When multiple skills could apply:
+When multiple skills could apply, choose the smallest useful one:
 
-1. **Process skills first** (brainstorm, debug, refiner, planner, writing-tasks, writing-skills) - determine approach, requirements, and task breakdown
-2. **Workflow skills second** (coordinator, implementer, executing-tasks) - orchestrate and execute
+1. **Clarify intent** — `arc-brainstorming` when requirements or decisions are unclear.
+2. **Formalize source of truth** — `arc-refining` when converting a design/decision log into structured specs.
+3. **Plan work** — `arc-planning` when a refined spec needs an implementation DAG.
+4. **Execute work** — `arc-coordinating`, `arc-dispatching-teammates`, `arc-looping`, or `arc-implementing` based on DAG/worktree context.
+5. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
 
 Examples:
-- "Let's build X" → arc-brainstorming (if design is unclear) or arc-writing-tasks (if requirements are known)
-- "Fix this bug" → arc-debugging (if cause unknown) or arc-tdd (if cause is clear)
-- "Implement epic" → arc-planning (if no dag.yaml), arc-coordinating (if dag.yaml exists, single epic), arc-dispatching-teammates (if 2+ ready epics and lead staying present), arc-looping (if 2+ ready epics and lead walking away), arc-implementing (if in worktree)
-- "Save this to my vault", "create a note", "what do I know about X", "audit my vault" → arc-maintaining-obsidian (ingest/query/audit modes)
+
+- "Let's build X" → `arc-brainstorming` if design is unclear; `arc-planning` if a refined spec already exists.
+- "Fix this bug" → `arc-debugging` if cause is unknown; `arc-tdd` if cause and expected behavior are clear.
+- "Implement epic" → `arc-planning` if no `specs/<spec-id>/dag.yaml`; coordination/implementation skills if the DAG exists.
+- "Audit this skill/workflow" → `arc-evaluating` when shipping/merge/completion evidence matters.
 
 ## Discipline Skills — Conditional Triggers
 
-These skills activate **during any workflow** when the condition is met. They are not pipeline steps — they fire cross-cutting based on what you are about to do.
+These skills activate during a workflow when the condition is present. They are not mandatory pipeline steps for every message.
 
-| Condition | Skill | Iron Law |
-|-----------|-------|----------|
-| About to write implementation code | `arc-tdd` | No production code without a failing test first |
-| Test fails or unexpected behavior | `arc-debugging` | No fixes without root cause investigation first |
-| About to claim work is complete | `arc-verifying` | No completion claims without fresh verification evidence |
+| Condition | Skill | Gate |
+|-----------|-------|------|
+| About to write implementation code | `arc-tdd` | Failing test before production code |
+| Test fails or unexpected behavior appears | `arc-debugging` | Root cause before fixes |
+| About to claim work is complete | `arc-verifying` | Fresh verification evidence before completion claims |
 | Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
 | Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
-| User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` (audit mode) | Propose changes, never auto-modify without approval |
-| About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | No shipping claim without an eval run that does not return INSUFFICIENT_DATA |
+| User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` audit mode | Propose changes, never auto-modify without approval |
+| About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | Eval evidence that does not return `INSUFFICIENT_DATA` |
 
-**The 1% rule applies here too.** If there is even a 1% chance a discipline skill should activate, invoke it. These are quality gates — skipping them is how bugs, false completions, and unreviewed code slip through.
+## When Not to Route
 
-## Red Flags
+Do not force an ArcForge workflow when the task is:
 
-These patterns often lead to skipping useful skills. When you notice them, pause and
-check — but if after checking no skill genuinely fits, proceed directly.
+- A simple factual answer or direct clarification.
+- Read-only inspection where no workflow decision is needed.
+- Harness, eval, or grading execution that must preserve isolation.
+- A single-skill eval where `arc-using` would contaminate the behavior under test.
+- Explicitly constrained by the user to avoid workflow overhead.
+- Outside ArcForge's domain.
 
-| Thought | Reality |
-|---------|---------|
-| "This is just a simple question" | Questions are tasks. Check for skills. |
-| "I need more context first" | Skill check comes BEFORE clarifying questions. |
-| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
-| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
-| "Let me gather information first" | Skills tell you HOW to gather information. |
-| "This doesn't need a formal skill" | If a skill exists, use it. |
-| "I remember this skill" | Skills evolve. Read current version. |
-| "This doesn't count as a task" | Action = task. Check for skills. |
-| "The skill is overkill" | Simple things become complex. Use it. |
-| "I'll just do this one thing first" | Check BEFORE doing anything. |
-| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
-| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+In those cases, proceed directly, and only mention ArcForge skills if they materially help.
 
 ## User Instructions
 
-Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
+User instructions say what outcome matters. ArcForge skills can help decide how to get there, but they do not override user intent, harness constraints, or higher-priority system instructions.

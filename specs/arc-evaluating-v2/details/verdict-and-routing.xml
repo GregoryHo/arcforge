@@ -57,7 +57,8 @@
       Iron Law column MUST state "No shipping claim without an eval run that
       does not return INSUFFICIENT_DATA". Because arc-evaluating then lives in
       the routing table, the skill's discovery also changes from Meta to
-      Discipline; this is a conceptual relabel only.
+      Discipline; this is a conceptual relabel only. This routing is conditional,
+      not a global always-on invocation rule.
     </description>
     <acceptance_criteria>
       <criterion id="fr-vr-002-ac1">
@@ -67,8 +68,8 @@
       </criterion>
       <criterion id="fr-vr-002-ac2">
         The routing row's Condition column MUST reference "ship", "merge", or
-        "mark complete" so the 1% rule triggers when the user is about to claim
-        skill completion.
+        "mark complete" so the bounded router can select arc-evaluating when the
+        user is about to claim skill completion.
         <trace>fr-vr-002</trace>
       </criterion>
       <criterion id="fr-vr-002-ac3">

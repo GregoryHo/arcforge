@@ -31,24 +31,24 @@ Every skill belongs to one of three types. The type determines how it gets trigg
 |------|-------------------|-------------|---------|
 | **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
 | **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
-| **Meta** | Independent — user or system invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
+| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
 
 ### When Creating a New Skill
 
 1. **Determine its type** — Is it a pipeline step (Workflow), a cross-cutting quality gate (Discipline), or a system management tool (Meta)?
 2. **Workflow skills** MUST have an "After This Skill" section with explicit next-step guidance
 3. **Discipline skills** MUST be added to `arc-using`'s "Discipline Skills — Conditional Triggers" table
-4. **Meta skills** need no routing — they are invoked directly when needed
+4. **Meta skills** need no routing — they are invoked directly when needed. `arc-writing-skills` is project-level meta for maintaining ArcForge's own skills and tests, not a general user-facing promoted skill.
 
 ### Why This Matters
 
-Discipline skills without routing entries will never be triggered — they become dead documentation. Workflow skills without handoff sections create dead-ends in autonomous mode.
+Discipline skills without routing entries are easy to miss, but routing must stay bounded: use concrete conditions, preserve harness/eval isolation, and avoid global "always invoke" language. Workflow skills without handoff sections create dead-ends in autonomous mode.
 
 ## Design Anti-Patterns
 
 These were discovered through eval and should not be repeated:
 
-- **"Mindset" skills** — AI agents don't internalize mindsets. A skill that says "embed me in everything" relies on copy-paste, which is unreliable. Use the routing table to trigger discipline skills instead.
+- **"Mindset" skills** — AI agents don't internalize mindsets. A skill that says "embed me in everything" relies on copy-paste, which is unreliable. Use bounded routing conditions to trigger discipline skills instead.
 - **Self-contradicting invocation** — Never write "don't invoke me" in a skill that's registered in the routing table. The routing table says "invoke it"; the skill says "don't invoke me" → agent obeys the prohibition.
 - **Embedded-only verification** — Verification embedded in other skills (arc-finishing Step 1, arc-tdd Verify RED/GREEN) is defense-in-depth, not the primary mechanism. The primary trigger is the routing table.
 

@@ -37,17 +37,19 @@ derivation rules and `skills/arc-using/SKILL.md` for the agent Worktree Rule.
 
 ## Skill Routing & Composition
 
-`arc-using` is the **routing layer** — injected at session start, always in context. It contains the 1% rule: "If there's even a 1% chance a skill applies, invoke it."
+`arc-using` is a **bounded router** and skill index. SessionStart injects only a minimal bootstrap; it does not inject full `arc-using` content or mandatory global routing language.
 
-Skills compose in two ways depending on type:
+Use the smallest useful workflow. Respect user constraints, higher-priority instructions, and harness/eval isolation. For simple answers, read-only inspection, grading, or single-skill evals, do not force routing.
+
+Skills compose in three ways depending on type:
 
 | Skill Type | Composition | Mechanism |
 |------------|-------------|-----------|
 | Workflow | Sequential handoff | Each skill's "After This Skill" section defines next step |
-| Discipline | Conditional routing | `arc-using` routing table maps conditions → skills |
-| Meta | Direct invocation | User or system triggers as needed |
+| Discipline | Conditional routing | `arc-using` maps concrete conditions → skills |
+| Meta | Direct invocation | User, maintainer, or project-level task triggers as needed |
 
-Discipline skills (arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review) are quality gates that fire cross-cutting during any workflow. They MUST be registered in `arc-using`'s routing table to be reliably triggered.
+Discipline skills (arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating) are quality gates that fire when their condition is actually present. They should be documented in `arc-using`'s conditional trigger table, but they are not mandatory steps for every message.
 
 ## Multi-Platform
 

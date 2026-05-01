@@ -2,18 +2,20 @@
 
 ## Quick Start
 
-arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that enforce discipline, prevent common mistakes, and ensure consistent quality across AI-assisted development sessions.
+arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
 > **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
 
-**Start here — the core skills every user should learn first:**
+**Core skills every user should learn first:**
 
-1. **arc-using** — Entry point for all tasks (routing discipline)
-2. **arc-writing-tasks** — Break features into executable tasks
-3. **arc-executing-tasks** — Run task lists with human checkpoints
-4. **arc-debugging** — Systematic root cause investigation
-5. **arc-journaling** — Capture session reflections
-6. **arc-maintaining-obsidian** — Ingest, query, and audit an Obsidian vault (if you keep a knowledge base)
+1. **arc-using** — Bounded router and skill index for ArcForge tasks
+2. **arc-brainstorming** — Design exploration when intent is unclear
+3. **arc-refining** — Convert design decisions into structured specs
+4. **arc-planning** — Break refined specs into a DAG
+5. **arc-tdd** — Test-driven implementation discipline
+6. **arc-debugging** — Systematic root cause investigation
+7. **arc-verifying** — Fresh evidence before completion claims
+8. **arc-evaluating** — Measure whether skills and workflows change behavior
 
 **What are you trying to do?**
 
@@ -28,7 +30,7 @@ What are you trying to do?
 |   +-- arc-debugging --> arc-tdd --> arc-verifying
 |
 +-- Understand the system?
-|   +-- arc-using (start here, always)
+|   +-- arc-using (when routing help is useful)
 |
 +-- Improve workflow?
     +-- arc-journaling --> arc-reflecting
@@ -48,7 +50,7 @@ arcforge's 32 skills are organized into 7 categories:
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-writing-skills | Create and maintain skills |
+| **Meta** | arc-writing-skills | Project-level meta skill for maintaining ArcForge's own skills |
 
 **How skills flow through a project:**
 
@@ -315,22 +317,22 @@ arcforge's 32 skills are organized into 7 categories:
 
 ### arc-using
 
-**Purpose:** Entry point for all arcforge tasks — establishes routing discipline and checks the skill routing table before ANY action.
+**Purpose:** Bounded router and skill index for ArcForge tasks — helps choose the smallest useful workflow without becoming a global policy layer.
 
-**When to use:** When starting any arcforge task — establishes routing discipline and checks routing table before ANY action.
+**When to use:** When an ArcForge task needs routing help, when the user asks which skill/workflow applies, or when task scope is ambiguous enough that a skill choice matters.
 
 **Key workflow:**
-1. Receive user message
-2. Check: might any skill apply? (even 1% chance = yes)
-3. Invoke the relevant Skill tool
-4. Follow the invoked skill exactly
-5. If skill has a checklist, create TodoWrite per item
+1. Understand the user request and constraints
+2. Decide whether routing adds value; skip routing for simple answers, read-only inspection, grading, or isolated evals
+3. If useful, pick the smallest applicable skill or workflow path
+4. Read/invoke only the relevant skill(s)
+5. Preserve harness/eval isolation and higher-priority instructions
 
 **Artifacts:**
-- Input: user message
-- Output: routes to appropriate skill
+- Input: user request that benefits from routing
+- Output: selected skill(s) or direct continuation when routing is unnecessary
 
-**Related:** always first --> **arc-using** --> any other skill
+**Related:** optional session bootstrap --> **arc-using** --> any applicable skill, or direct task execution
 
 ---
 
@@ -784,22 +786,22 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-writing-skills
 
-**Purpose:** TDD applied to process documentation — create, test, and deploy arcforge skills.
+**Purpose:** ArcForge project-level meta skill for maintaining ArcForge's own skill system using TDD for process documentation.
 
-**When to use:** When creating new arcforge skills, editing existing skills, or verifying skills work before deployment.
+**When to use:** When maintaining ArcForge itself: creating new ArcForge skills, editing existing ArcForge skills, or verifying ArcForge skills before deployment. This is not a general promoted/user-facing core skill for ordinary product work.
 
 **Key workflow:**
 1. RED — run pressure scenario WITHOUT skill, document baseline failures
 2. GREEN — write minimal SKILL.md addressing specific rationalizations found
-3. REFACTOR — find new loopholes, add counters, re-test until bulletproof
+3. REFACTOR — find new loopholes, add counters, re-test until the skill behavior is covered
 4. Validate: frontmatter (name + description only, max 1024 chars, "Use when...")
-5. Run pytest validation, commit skill
+5. Run pytest validation and commit skill changes
 
 **Artifacts:**
 - Input: baseline test results showing agent failures
 - Output: `skills/<skill-name>/SKILL.md`, pytest test file
 
-**Related:** arc-learning --> **arc-writing-skills** --> deployed skill
+**Related:** ArcForge maintainer task --> **arc-writing-skills** --> deployed ArcForge skill
 
 ---
 
@@ -850,14 +852,13 @@ Systematic debugging first (no guessing), TDD to fix (failing test proves the bu
 ### 4. Learning Loop
 
 ```
-arc-journaling --> arc-reflecting --> arc-learning --> arc-writing-skills
-     |                  |                 |                  |
-     v                  v                 v                  v
-  diary entry      patterns found    instincts         new skill created
-                                     clustered
+arc-journaling --> arc-reflecting --> arc-learning
+     |                  |                 |
+     v                  v                 v
+  diary entry      patterns found    instincts clustered
 ```
 
-Capture session insights in diaries, extract patterns after 5+ entries, cluster related instincts, create new skills from proven patterns.
+Capture session insights in diaries, extract patterns after 5+ entries, and cluster related instincts. ArcForge maintainers may separately use `arc-writing-skills` when a proven pattern should become an ArcForge skill.
 
 ---
 
@@ -892,13 +893,13 @@ Capture session insights in diaries, extract patterns after 5+ entries, cluster 
 
 ---
 
-## Iron Laws
+## Operating Principles
 
-These 7 rules are non-negotiable across all arcforge workflows:
+These principles keep ArcForge disciplined without making every task follow the same workflow:
 
-1. **No Action Without Skill Check** — arc-using must be invoked first, even if 1% chance a skill applies
-2. **No Design Without Exploration** — arc-brainstorming: research existing patterns before proposing new
-3. **No Skill Without Failing Test** — arc-writing-skills: TDD for documentation
+1. **Smallest Useful Workflow** — use direct answers for simple/read-only tasks; route only when a skill adds leverage
+2. **Explore Before Committing to Design** — arc-brainstorming: research existing patterns before proposing new
+3. **No ArcForge Skill Without Failing Test** — arc-writing-skills: project-level TDD for ArcForge skill documentation
 4. **No Fix Without Hypothesis** — arc-debugging: Observe, Hypothesize, Test, Fix cycle
 5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
 6. **Verify Before Implementing Review Feedback** — arc-receiving-review: technical rigor, not performative agreement
