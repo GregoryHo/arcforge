@@ -10,6 +10,7 @@ const {
   appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
+  inspectCandidate,
   isLearningEnabled,
   loadCandidates,
   materializeCandidate,
@@ -865,6 +866,474 @@ describe('learning subsystem MVP-1', () => {
     }
     expect(exitCode).not.toBe(0);
     expect(stderr).toMatch(/only project candidate activation is supported/i);
+  });
+
+  describe('inspectCandidate (draft review workflow)', () => {
+    it('requires an explicit valid scope', () => {
+      expect(() =>
+        inspectCandidate('arc-releasing-20260501-001', { projectRoot, homeDir }),
+      ).toThrow(/scope must be one of/);
+      expect(() =>
+        inspectCandidate('arc-releasing-20260501-001', {
+          scope: 'invalid',
+          projectRoot,
+          homeDir,
+        }),
+      ).toThrow(/scope must be one of/);
+    });
+
+    it('throws candidate not found for unknown ids', () => {
+      expect(() =>
+        inspectCandidate('nonexistent-id', { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/candidate not found/i);
+    });
+
+    it('throws when stored candidate scope does not match requested scope', () => {
+      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+      fs.writeFileSync(
+        queuePath,
+        `${JSON.stringify(candidate({ status: 'approved', scope: 'global' }))}\n`,
+        'utf8',
+      );
+      expect(() =>
+        inspectCandidate('arc-releasing-20260501-001', {
+          scope: 'project',
+          projectRoot,
+          homeDir,
+        }),
+      ).toThrow(/scope must match/i);
+    });
+
+    it('throws invalid candidate when stored record fails schema validation', () => {
+      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+      fs.writeFileSync(
+        queuePath,
+        `${JSON.stringify({ id: 'broken-id', scope: 'project', status: 'materialized' })}\n`,
+        'utf8',
+      );
+      expect(() =>
+        inspectCandidate('broken-id', { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/invalid candidate/i);
+    });
+
+    it('returns review-safe summary for pending candidate (approve/reject first)', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(summary.scope).toBe('project');
+      expect(summary.candidate.id).toBe('arc-releasing-20260501-001');
+      expect(summary.candidate.status).toBe('pending');
+      expect(Array.isArray(summary.next_actions)).toBe(true);
+      const actionText = summary.next_actions.join(' ').toLowerCase();
+      expect(actionText).toMatch(/approve/);
+      expect(actionText).toMatch(/reject/);
+      expect(summary.artifacts).toBeDefined();
+    });
+
+    it('returns next_action materialize for approved candidate', () => {
+      appendCandidate(candidate({ status: 'approved' }), {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(summary.candidate.status).toBe('approved');
+      expect(summary.next_actions.join(' ').toLowerCase()).toMatch(/materialize/);
+    });
+
+    it('returns artifact paths with exists flags after materialization and guides explicit activation', () => {
+      appendCandidate(candidate({ status: 'approved' }), {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(summary.candidate.status).toBe('materialized');
+      expect(summary.artifacts.draft_paths).toEqual([
+        { path: 'skills/arc-releasing/SKILL.md.draft', exists: true },
+        { path: 'tests/skills/test_skill_arc_releasing.py.draft', exists: true },
+      ]);
+      expect(summary.artifacts.active_paths).toEqual([
+        { path: 'skills/arc-releasing/SKILL.md', exists: false },
+        { path: 'tests/skills/test_skill_arc_releasing.py', exists: false },
+      ]);
+      const actionText = summary.next_actions.join(' ').toLowerCase();
+      expect(actionText).toMatch(/review/);
+      expect(actionText).toMatch(/activate/);
+    });
+
+    it('does not embed file contents, unexpected raw candidate fields, or raw evidence payloads', () => {
+      appendCandidate(
+        candidate({
+          status: 'approved',
+          raw_tool_payload: 'raw terminal transcript should not be exposed in review summary',
+          evidence: [
+            {
+              session_id: 'session-abc',
+              source: 'observation',
+              reason: 'sanitized release evidence',
+              raw_tool_output: 'private terminal transcript should not be exposed',
+              nested: { token: 'private nested payload should not be exposed' },
+            },
+          ],
+        }),
+        {
+          scope: 'project',
+          projectRoot,
+          homeDir,
+        },
+      );
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const serialized = JSON.stringify(summary);
+      expect(serialized).not.toContain('Draft artifact only');
+      expect(serialized).not.toContain('## Workflow');
+      expect(serialized).not.toContain('raw terminal transcript');
+      expect(serialized).not.toContain('private terminal transcript');
+      expect(serialized).not.toContain('private nested payload');
+      expect(summary.candidate.raw_tool_payload).toBeUndefined();
+      expect(summary.candidate.evidence).toEqual([
+        {
+          session_id: 'session-abc',
+          source: 'observation',
+          reason: 'sanitized release evidence',
+        },
+      ]);
+      for (const entry of summary.artifacts.draft_paths) {
+        expect(Object.keys(entry).sort()).toEqual(['exists', 'path']);
+      }
+    });
+
+    it('does not probe project artifact paths when inspecting global candidates', () => {
+      const globalCandidate = candidate({ scope: 'global', status: 'materialized' });
+      appendCandidate(globalCandidate, { scope: 'global', projectRoot, homeDir });
+      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
+      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
+      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
+
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'global',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(summary.scope).toBe('global');
+      expect(summary.candidate.scope).toBe('global');
+      expect(summary.artifacts).toEqual({});
+      expect(JSON.stringify(summary)).not.toContain('skills/arc-releasing/SKILL.md.draft');
+    });
+
+    it('does not echo stored artifact path fields from the candidate payload', () => {
+      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+      fs.writeFileSync(
+        queuePath,
+        `${JSON.stringify(
+          candidate({
+            status: 'materialized',
+            draft_paths: ['../../outside/SKILL.md.draft'],
+            active_paths: ['../../outside/SKILL.md'],
+          }),
+        )}\n`,
+        'utf8',
+      );
+
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(summary.candidate.draft_paths).toBeUndefined();
+      expect(summary.candidate.active_paths).toBeUndefined();
+      expect(summary.artifacts.draft_paths).toEqual([
+        { path: 'skills/arc-releasing/SKILL.md.draft', exists: false },
+        { path: 'tests/skills/test_skill_arc_releasing.py.draft', exists: false },
+      ]);
+      expect(JSON.stringify(summary)).not.toContain('../../outside');
+    });
+
+    it('reports already active for activated candidates', () => {
+      appendCandidate(candidate({ status: 'approved' }), {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      activateCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(summary.candidate.status).toBe('activated');
+      expect(summary.next_actions.join(' ').toLowerCase()).toMatch(/already active/);
+      expect(summary.artifacts.active_paths).toEqual([
+        { path: 'skills/arc-releasing/SKILL.md', exists: true },
+        { path: 'tests/skills/test_skill_arc_releasing.py', exists: true },
+      ]);
+    });
+
+    it('reports rejected candidates as terminal with new-candidate guidance', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      transitionCandidate('arc-releasing-20260501-001', 'rejected', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const summary = inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(summary.candidate.status).toBe('rejected');
+      const actionText = summary.next_actions.join(' ').toLowerCase();
+      expect(actionText).toMatch(/new candidate|create.*new/);
+    });
+
+    it('does not write or persist anything when inspecting', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      const before = fs.readFileSync(
+        getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }),
+        'utf8',
+      );
+      inspectCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const after = fs.readFileSync(
+        getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }),
+        'utf8',
+      );
+      expect(after).toBe(before);
+      expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('CLI learn inspect / drafts', () => {
+    it('CLI learn inspect returns review summary for a materialized candidate', () => {
+      appendCandidate(candidate({ status: 'approved' }), {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      materializeCandidate('arc-releasing-20260501-001', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      const inspected = JSON.parse(
+        execFileSync(
+          'node',
+          [cli, 'learn', 'inspect', 'arc-releasing-20260501-001', '--project', '--json'],
+          { env, encoding: 'utf8' },
+        ),
+      );
+
+      expect(inspected.scope).toBe('project');
+      expect(inspected.candidate.id).toBe('arc-releasing-20260501-001');
+      expect(inspected.candidate.status).toBe('materialized');
+      expect(inspected.artifacts.draft_paths[0]).toEqual({
+        path: 'skills/arc-releasing/SKILL.md.draft',
+        exists: true,
+      });
+      expect(inspected.next_actions.join(' ').toLowerCase()).toMatch(/activate/);
+    });
+
+    it('CLI learn inspect requires a candidate id', () => {
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      let exitCode = 0;
+      let stderr = '';
+      try {
+        execFileSync('node', [cli, 'learn', 'inspect', '--project'], {
+          env,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status;
+        stderr = err.stderr ? err.stderr.toString() : '';
+      }
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toMatch(/candidate id/i);
+    });
+
+    it('CLI learn inspect fails closed without explicit scope', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      let exitCode = 0;
+      let stderr = '';
+      try {
+        execFileSync('node', [cli, 'learn', 'inspect', 'arc-releasing-20260501-001'], {
+          env,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status;
+        stderr = err.stderr ? err.stderr.toString() : '';
+      }
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toMatch(/--project or --global/i);
+    });
+
+    it('CLI learn drafts lists only materialized candidates and excludes other statuses', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+
+      const otherPending = candidate({
+        id: 'arc-releasing-20260601-002',
+        status: 'approved',
+        created_at: '2026-06-01T00:00:00Z',
+        updated_at: '2026-06-01T00:00:00Z',
+      });
+      appendCandidate(otherPending, { scope: 'project', projectRoot, homeDir });
+
+      materializeCandidate('arc-releasing-20260601-002', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      const rejected = candidate({
+        id: 'arc-releasing-20260701-003',
+        status: 'pending',
+        created_at: '2026-07-01T00:00:00Z',
+        updated_at: '2026-07-01T00:00:00Z',
+      });
+      appendCandidate(rejected, { scope: 'project', projectRoot, homeDir });
+      transitionCandidate('arc-releasing-20260701-003', 'rejected', {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      const drafts = JSON.parse(
+        execFileSync('node', [cli, 'learn', 'drafts', '--project', '--json'], {
+          env,
+          encoding: 'utf8',
+        }),
+      );
+
+      expect(drafts.scope).toBe('project');
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts).toHaveLength(1);
+      expect(drafts.drafts[0].candidate.id).toBe('arc-releasing-20260601-002');
+      expect(drafts.drafts[0].candidate.status).toBe('materialized');
+      expect(drafts.drafts[0].artifacts.draft_paths[0].path).toBe(
+        'skills/arc-releasing/SKILL.md.draft',
+      );
+    });
+
+    it('CLI learn drafts with global scope does not probe project-local artifact paths', () => {
+      appendCandidate(candidate({ scope: 'global', status: 'materialized' }), {
+        scope: 'global',
+        projectRoot,
+        homeDir,
+      });
+      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
+      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
+      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      const drafts = JSON.parse(
+        execFileSync('node', [cli, 'learn', 'drafts', '--global', '--json'], {
+          env,
+          encoding: 'utf8',
+        }),
+      );
+
+      expect(drafts.scope).toBe('global');
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].artifacts).toEqual({});
+      expect(JSON.stringify(drafts)).not.toContain('skills/arc-releasing/SKILL.md.draft');
+    });
+
+    it('CLI learn drafts returns an empty list when no materialized candidates exist', () => {
+      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      const drafts = JSON.parse(
+        execFileSync('node', [cli, 'learn', 'drafts', '--project', '--json'], {
+          env,
+          encoding: 'utf8',
+        }),
+      );
+
+      expect(drafts.count).toBe(0);
+      expect(drafts.drafts).toEqual([]);
+    });
+
+    it('CLI learn drafts requires explicit scope', () => {
+      const cli = path.join(__dirname, '../../scripts/cli.js');
+      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+      let exitCode = 0;
+      let stderr = '';
+      try {
+        execFileSync('node', [cli, 'learn', 'drafts'], {
+          env,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status;
+        stderr = err.stderr ? err.stderr.toString() : '';
+      }
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toMatch(/--project or --global/i);
+    });
   });
 
   it('CLI learn status/enable/disable uses explicit project scope', () => {

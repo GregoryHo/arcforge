@@ -422,6 +422,104 @@ function activateCandidate(
   return { scope, candidate: updated, active_paths: activeRelPaths };
 }
 
+function nextActionsFor(candidate) {
+  switch (candidate.status) {
+    case 'pending':
+      return ['approve or reject this candidate before any artifact is written'];
+    case 'approved':
+      return ['materialize the candidate to write inactive draft artifacts'];
+    case 'materialized':
+      return [
+        'review the draft artifacts at draft_paths',
+        'activate explicitly when satisfied to promote drafts to active artifacts',
+      ];
+    case 'activated':
+      return ['already active — no further action required'];
+    case 'rejected':
+      return ['rejected — no action available; create a new candidate if needed'];
+    default:
+      return [];
+  }
+}
+
+function safeArtifactPaths(candidate, getter) {
+  try {
+    return getter(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function reviewEvidence(evidence) {
+  return evidence.map((item) => ({
+    session_id: item.session_id,
+    source: item.source,
+    reason: item.reason,
+  }));
+}
+
+function reviewCandidate(candidate) {
+  return {
+    id: candidate.id,
+    scope: candidate.scope,
+    artifact_type: candidate.artifact_type,
+    name: candidate.name,
+    summary: candidate.summary,
+    trigger: candidate.trigger,
+    evidence: reviewEvidence(candidate.evidence),
+    confidence: candidate.confidence,
+    status: candidate.status,
+    created_at: candidate.created_at,
+    updated_at: candidate.updated_at,
+    ...(candidate.materialized_at ? { materialized_at: candidate.materialized_at } : {}),
+    ...(candidate.activated_at ? { activated_at: candidate.activated_at } : {}),
+  };
+}
+
+function inspectCandidate(id, { scope, projectRoot = process.cwd(), homeDir } = {}) {
+  assertScope(scope);
+  const candidates = loadCandidates({ scope, projectRoot, homeDir });
+  const found = candidates.find((c) => c.id === id);
+  if (!found) throw new Error(`candidate not found: ${id}`);
+
+  const validation = validateCandidate(found);
+  if (!validation.ok) {
+    throw new Error(`invalid candidate: ${validation.errors.join('; ')}`);
+  }
+  if (found.scope !== scope) {
+    throw new Error('candidate scope must match requested inspection scope');
+  }
+
+  const draftRel = safeArtifactPaths(found, getDraftArtifactPaths);
+  const activeRel = safeArtifactPaths(found, getActiveArtifactPaths);
+  const toEntry = (relativePath) => ({
+    path: relativePath,
+    exists: fs.existsSync(path.join(projectRoot, relativePath)),
+  });
+
+  const artifacts = {};
+  if (scope === 'project') {
+    if (draftRel) artifacts.draft_paths = draftRel.map(toEntry);
+    if (activeRel) artifacts.active_paths = activeRel.map(toEntry);
+  }
+
+  return {
+    scope,
+    candidate: reviewCandidate(found),
+    next_actions: nextActionsFor(found),
+    artifacts,
+  };
+}
+
+function listMaterializedDrafts({ scope, projectRoot = process.cwd(), homeDir } = {}) {
+  assertScope(scope);
+  const candidates = loadCandidates({ scope, projectRoot, homeDir });
+  const drafts = candidates
+    .filter((c) => c.status === 'materialized' && c.scope === scope)
+    .map((c) => inspectCandidate(c.id, { scope, projectRoot, homeDir }));
+  return { scope, count: drafts.length, drafts };
+}
+
 function readJsonLines(filePath) {
   if (!fs.existsSync(filePath)) return [];
   return fs
@@ -547,7 +645,9 @@ module.exports = {
   getLearningConfigPath,
   getObservationPath,
   getProjectId,
+  inspectCandidate,
   isLearningEnabled,
+  listMaterializedDrafts,
   loadCandidates,
   materializeCandidate,
   readLearningConfig,

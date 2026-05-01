@@ -25,7 +25,7 @@
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
- *   learn status|enable|disable|analyze|review|approve|reject|materialize|activate  Manage optional learning subsystem
+ *   learn status|enable|disable|analyze|review|drafts|inspect|approve|reject|materialize|activate  Manage optional learning subsystem
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
@@ -329,6 +329,10 @@ COMMANDS:
                                      Analyze enabled observations and queue candidate learnings.
   learn review --project|--global [--json]
                                      List queued learning candidates for review.
+  learn drafts --project|--global [--json]
+                                     List candidates with materialized drafts awaiting activation.
+  learn inspect <candidate-id> --project|--global [--json]
+                                     Read-only review summary for a candidate (paths and next actions).
   learn approve|reject <candidate-id> --project|--global [--json]
                                      Record user authorization decision for a candidate.
   learn materialize <candidate-id> --project|--global [--json]
@@ -1125,6 +1129,14 @@ async function main() {
           const scope = resolveLearningScope();
           const candidates = learning.loadCandidates({ scope, projectRoot });
           output({ scope, count: candidates.length, candidates }, asJson);
+        } else if (subcommand === 'inspect') {
+          const candidateId = args.positional[1];
+          if (!candidateId) throw new Error('learn inspect requires a candidate id');
+          const scope = resolveLearningScope();
+          output(learning.inspectCandidate(candidateId, { scope, projectRoot }), asJson);
+        } else if (subcommand === 'drafts') {
+          const scope = resolveLearningScope();
+          output(learning.listMaterializedDrafts({ scope, projectRoot }), asJson);
         } else if (subcommand === 'analyze') {
           const scope = resolveLearningScope();
           output(learning.analyzeLearning({ scope, projectRoot }), asJson);
@@ -1155,7 +1167,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [status|enable|disable|analyze|review|approve <id>|reject <id>|materialize <id>|activate <id>] [--project|--global]',
+            'Usage: arc learn [status|enable|disable|analyze|review|drafts|inspect <id>|approve <id>|reject <id>|materialize <id>|activate <id>] [--project|--global]',
           );
           process.exit(1);
         }
