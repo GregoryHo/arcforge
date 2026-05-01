@@ -54,3 +54,79 @@ def test_active_specs_do_not_require_global_1_percent_routing():
     assert "1% rule" not in content
     assert "bounded router" in content.lower()
     assert "not a global always-on invocation rule" in content.lower()
+
+
+def test_skills_reference_documents_living_sdd_responsibility_boundary():
+    """Skills reference must spell out who owns what in the Living SDD pipeline."""
+    content = _read("docs/guide/skills-reference.md")
+    lower = content.lower()
+
+    assert "living sdd responsibility boundary" in lower
+    # Each owner is named in the boundary section.
+    assert "arc-refining" in content
+    assert "arc-verifying" in content
+    assert "arc-syncing-spec" in content
+    # Future syncing-spec must be marked as separate/opt-in, not always-on.
+    assert "separate opt-in workflow skill" in lower
+    # SessionStart bootstrap and arc-using router are explicitly off-limits as carriers.
+    assert "sessionstart bootstrap" in lower
+    assert "arc-using" in content
+    assert "always-on" in lower
+
+
+def test_arc_refining_states_its_authoritative_spec_ownership():
+    """arc-refining must explicitly own formalization and disclaim verifying/syncing."""
+    content = _read("skills/arc-refining/SKILL.md")
+    lower = content.lower()
+
+    assert "## boundary" in lower
+    assert "authoritative" in lower
+    assert "spec.xml" in content
+    assert "details/*.xml" in content
+    # Explicitly not the verifier and not the syncer.
+    assert "arc-verifying" in content
+    assert "arc-syncing-spec" in content
+    assert "sessionstart bootstrap" in lower
+    assert "arc-using" in content
+
+
+def test_arc_verifying_disclaims_spec_authoring_and_drift_sync():
+    """arc-verifying must own completion-claim evidence and disclaim spec syncing."""
+    content = _read("skills/arc-verifying/SKILL.md")
+    lower = content.lower()
+
+    assert "## boundary" in lower
+    assert "fresh evidence" in lower
+    # Explicitly not the refiner and not the syncer.
+    assert "arc-refining" in content
+    assert "arc-syncing-spec" in content
+    assert "sessionstart bootstrap" in lower
+    assert "arc-using" in content
+
+
+def test_sessionstart_bootstrap_does_not_smuggle_spec_sync_or_routing_pressure():
+    """SessionStart hook must inject only minimal bootstrap — no spec-sync, no global routing."""
+    content = _read("hooks/inject-skills/main.sh")
+    lower = content.lower()
+
+    # Minimal-toolkit posture preserved.
+    assert "minimal, composable toolkit" in lower
+    assert "skills are tools, not laws" in lower
+    # Must not smuggle spec-sync responsibilities into the always-on bootstrap.
+    assert "arc-syncing-spec" not in content
+    assert "spec sync" not in lower
+    assert "spec drift" not in lower
+    assert "syncing-spec" not in content
+    # Must not reintroduce global routing pressure.
+    assert "1%" not in content
+    assert "before any" not in lower
+    assert "you must" not in lower
+
+
+def test_arc_using_router_does_not_route_to_unshipped_syncing_spec():
+    """arc-using must not pre-route to a skill that does not ship — keeps router bounded."""
+    content = _read("skills/arc-using/SKILL.md")
+
+    # Future arc-syncing-spec must not be wired into the bounded router yet.
+    assert "arc-syncing-spec" not in content
+    assert "syncing-spec" not in content

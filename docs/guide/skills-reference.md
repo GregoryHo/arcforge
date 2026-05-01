@@ -904,3 +904,15 @@ These principles keep ArcForge disciplined without making every task follow the 
 5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
 6. **Verify Before Implementing Review Feedback** — arc-receiving-review: technical rigor, not performative agreement
 7. **File Artifacts = Truth** — Don't rely on session memory; resume from file artifacts
+
+## Living SDD Responsibility Boundary
+
+ArcForge's Living SDD pipeline assigns each spec-related job to exactly one owner. None of these owners absorbs another's job, and none is folded into the SessionStart bootstrap or the `arc-using` router as global always-on policy.
+
+| Owner | Owns | Does not own |
+|-------|------|--------------|
+| `arc-refining` | Formalizing design docs into authoritative `specs/<spec-id>/spec.xml` + `details/*.xml` | Completion-claim verification; post-implementation spec sync |
+| `arc-verifying` | Producing fresh evidence before completion claims | Authoring spec artifacts; reconciling spec/code drift |
+| `arc-syncing-spec` (future, optional) | Post-implementation / drift sync of spec artifacts from code, tests, and decisions | Initial formalization; gating completion claims |
+
+`arc-syncing-spec` is not a shipped skill today. If and when it is added, it MUST ship as a separate opt-in workflow skill — never as language injected by the SessionStart bootstrap, the `arc-using` router, or any always-on instruction surface. The minimal-toolkit posture and harness/eval isolation depend on this boundary holding.
