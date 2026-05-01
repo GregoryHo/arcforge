@@ -13,8 +13,13 @@ def test_optional_automatic_learning_plan_exists():
 
 
 def test_plan_defines_optional_but_automatic_learning_contract():
-    text = _read_plan().lower()
+    plan = _read_plan()
+    text = plan.lower()
 
+    assert (
+        "Learning remains optional to enable, automatic once enabled, and conservative at the point of behavior change."
+        in plan
+    )
     assert "optional" in text
     assert "automatic once enabled" in text
     assert "observe daemon" in text
@@ -45,5 +50,19 @@ def test_plan_includes_release_flow_skill_golden_path():
     assert "release flow" in text
     assert "project skill" in text
     assert "natural language" in text
-    assert "skills/arc-releasing/skill.md" in text
+    assert "skills/arc-releasing/skill.md.draft" in text
+    assert "active `skills/arc-releasing/skill.md` path" in text
+    assert "no active skill exists yet" in text
     assert "quality gate" in text
+
+
+def test_plan_defines_conservative_draft_review_and_activation():
+    text = _read_plan().lower()
+
+    assert "skill.md.draft" in text
+    assert "learn inspect" in text
+    assert "learn drafts" in text
+    assert "read-only" in text
+    assert "explicit activation" in text
+    assert "global activation is not in mvp" in text
+    assert "global materialize/activate remain unsupported in mvp" in text

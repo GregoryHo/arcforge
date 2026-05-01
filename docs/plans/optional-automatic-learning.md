@@ -1,10 +1,12 @@
 # Optional Automatic Learning
 
 Design / implementation plan for ArcForge's session-learning pipeline.
-This is a planning document, not code. Implementation lands in later PRs
-once the contract here is agreed.
+This document records the product contract and implemented MVP lifecycle
+for optional learning.
 
 ## Product Contract
+
+Learning remains optional to enable, automatic once enabled, and conservative at the point of behavior change.
 
 Learning is **optional, but automatic once enabled.**
 
@@ -15,8 +17,8 @@ Learning is **optional, but automatic once enabled.**
   remember to run `/learn-from-session`, `/diary`, or any other command
   to feed the pipeline. Observation, candidate extraction, and queueing
   happen in the background. The only user-visible touchpoint is a
-  lightweight authorization step before a candidate becomes a real
-  skill.
+  lightweight authorization step before a candidate can produce drafts,
+  plus explicit activation before those drafts become active behavior.
 
 This rules out "learning only happens if the user remembers to invoke it"
 (too easy to forget) and "learning happens silently by default" (too
@@ -35,7 +37,11 @@ lightweight user authorization
    ↓
 materializer
    ↓
-future activation (next session that matches the trigger)
+read-only draft review
+   ↓
+explicit activation
+   ↓
+future skill routing (next session that matches the trigger)
 ```
 
 Each stage is a small, testable component. Stages communicate through
@@ -92,7 +98,7 @@ A simple on-disk queue at
 - Append-only.
 - Each entry: id, proposed skill name, scope, summary, evidence
   (session ids), status (`pending` | `approved` | `rejected` |
-  `materialized`).
+  `materialized` | `activated`).
 - The queue is the durable interface between the analyzer and the
   authorization step. Nothing further happens to a candidate until the
   user reviews it.
@@ -116,7 +122,7 @@ window.
 
 ### 5. Materializer
 
-Turns approved candidates into real skill files (and any supporting
+Turns approved candidates into inactive project-skill draft files (and any supporting
 artifacts: tests, references, hooks). Mirrors the methodology in
 `arc-writing-skills`:
 
@@ -126,17 +132,48 @@ artifacts: tests, references, hooks). Mirrors the methodology in
 
 Output:
 
-- New skill at `skills/arc-<name>/SKILL.md` (project) or in the
-  user-global skills directory.
-- Test file at `tests/skills/test_skill_arc_<name>.py`.
-- Queue entry flipped to `materialized` with a reference to the new
+- Inactive project-skill draft at `skills/arc-<name>/SKILL.md.draft`.
+- Inactive test draft at `tests/skills/test_skill_arc_<name>.py.draft`.
+- Queue entry flipped to `materialized` with a reference to the draft
   files.
 
-### 6. Future Activation
+The MVP materializer is project-scope only. Global materialization fails
+closed until global promotion has a safer product model.
 
-Once materialized, the new skill is loaded by ArcForge's normal skill
-discovery on the next session that matches its triggers. No special
-activation step — it is a regular skill from this point on.
+### 6. Read-only Draft Review
+
+Before activation, users can inspect materialized candidates without
+opening queue JSONL or reading draft files manually:
+
+```bash
+arcforge learn inspect <candidate-id> --project|--global [--json]
+arcforge learn drafts --project|--global [--json]
+```
+
+These commands are review affordances only. They do not mutate queue
+state, write artifacts, rename files, or activate behavior. Review
+output is allowlisted: it summarizes candidate metadata, safe evidence
+fields, next actions, and project-scope artifact existence. It does not
+embed draft file contents, raw observation payloads, unexpected candidate
+fields, or stored path fields from the queue. Global review does not
+probe project-local artifact paths.
+
+### 7. Explicit Activation
+
+Once the user has reviewed a materialized draft, activation is an
+explicit behavior-change step:
+
+```bash
+arcforge learn activate <candidate-id> --project [--json]
+```
+
+Activation is the point where `.draft` files become active skill/test
+files and normal skill discovery can route to them in a later matching
+session. Activation must fail closed if the candidate is malformed, not
+`materialized`, has scope mismatch, has unexpected draft paths, is missing
+draft files, or would overwrite existing active files.
+
+Global activation is not in MVP and fails closed.
 
 ## Scope Rules: Project-Level vs Global-Level
 
@@ -154,11 +191,10 @@ Rules:
 
 - **Default to project.** Every new candidate starts as project-level
   unless the analyzer has explicit signals that it generalizes.
-- **Global requires explicit user intent or cross-project evidence.**
-  The analyzer may *propose* global scope, but a candidate is only
-  materialized globally if the user explicitly approves global scope
-  during authorization, or if the analyzer has cross-project evidence
-  (see promotion rule).
+- **Global requires explicit user intent and a future global promotion
+  model.** The analyzer may *propose* global scope, but MVP
+  materialization and activation are project-scope only and fail closed
+  for global candidates.
 - **Promotion candidate**: when the same pattern has been observed in
   **2+ projects**, the analyzer flags it as a promotion candidate from
   project to global. The user still authorizes the promotion — it is
@@ -196,10 +232,12 @@ replays it.
 
 ### Shape of the proposed artifact
 
-The materialized artifact is a **project skill** at
-`skills/arc-releasing/SKILL.md`. Project skill, not global, because the
-exact release procedure is project-specific (commands, version-bump
-files, changelog conventions all differ).
+The materialized artifact is an inactive **project skill draft** at
+`skills/arc-releasing/SKILL.md.draft`, plus its draft quality-gate test.
+Project skill, not global, because the exact release procedure is
+project-specific (commands, version-bump files, changelog conventions all
+differ). After explicit activation, the reviewed draft is promoted to the
+active `skills/arc-releasing/SKILL.md` path.
 
 The skill must support **natural language** invocation. Users say
 "ship vX.Y.Z", "cut a release", "bump version", "ready to release",
@@ -209,7 +247,7 @@ router fires reliably.
 
 ### Quality gate / tests
 
-The materialized skill must ship with:
+The materialized draft must include:
 
 - A **quality gate** test asserting that the skill is invoked when the
   user uses any of the natural-language release phrasings.
@@ -232,10 +270,32 @@ because it lulls the user into trusting an incomplete procedure.
    emits a candidate `arc-releasing` (scope: project).
 3. **Authorize** — user reviews the candidate, sees the proposed
    trigger phrasings and the pre-flight checklist, approves.
-4. **Materialize** — pipeline writes `skills/arc-releasing/SKILL.md`
-   with natural-language triggers, plus the quality-gate test file.
-5. **Activate** — next time the user says "ship v2.2.0", the skill
-   fires and walks through the canonical release flow.
+4. **Materialize** — pipeline writes
+   `skills/arc-releasing/SKILL.md.draft` plus the quality-gate test
+   draft; no active skill exists yet.
+5. **Inspect** — user runs `arcforge learn inspect` or
+   `arcforge learn drafts` to review safe summary, evidence, next action,
+   and project-scope artifact existence.
+6. **Activate** — after explicit user authorization,
+   `arcforge learn activate` promotes the reviewed `.draft` artifacts to
+   active files. On the next matching request such as "ship v2.2.0", the
+   skill can fire and walk through the canonical release flow.
+
+## PR Readiness / Lifecycle Checklist
+
+- Product contract appears verbatim:
+  `Learning remains optional to enable, automatic once enabled, and conservative at the point of behavior change.`
+- Fresh installs and fresh projects keep learning disabled by default.
+- Project and global enablement are separate.
+- Observe/analyze may run automatically only after enablement.
+- Candidate queue records preserve safe provenance/evidence and suppress
+  duplicates.
+- Approve/reject are explicit lifecycle transitions.
+- Materialization writes inactive `.draft` artifacts only.
+- `learn inspect` and `learn drafts` are read-only and review-safe.
+- Activation is explicit and fails closed before any behavior change.
+- Global materialize/activate remain unsupported in MVP.
+- Import/export remains out of MVP.
 
 ## Open Questions
 

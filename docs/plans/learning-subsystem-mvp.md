@@ -12,13 +12,13 @@
 
 ## Product Contract
 
-Learning remains **optional to enable, automatic once enabled, and conservative at the point of behavior change**.
+Learning remains optional to enable, automatic once enabled, and conservative at the point of behavior change.
 
 - Disabled by default for fresh installs and fresh projects.
 - Project learning requires explicit enablement for that project.
 - Global learning requires separate explicit enablement.
 - Observation and candidate analysis may run automatically only after enablement.
-- Approval required before materialization or any future behavior activation.
+- Approval required before materialization; a separate explicit activation is required before active behavior changes.
 - Normal coding work must fail open if the learning subsystem errors.
 
 This is not a core always-on feature. It is an optional subsystem whose enabled state should feel automatic, not manual.
@@ -55,7 +55,9 @@ Responsibilities:
 - Append candidates to the candidate queue.
 - Present pending candidates for lightweight review.
 - Record approve/reject decisions.
-- Materialize approved candidates as drafts or gated artifacts.
+- Materialize approved candidates as inactive `.draft` artifacts.
+- Present materialized drafts for read-only, review-safe inspection.
+- Activate reviewed drafts only after an explicit behavior-change command.
 - Track provenance and deduplicate repeated candidates.
 
 This skill becomes the product surface for learning status, review, approval, rejection, and materialization.
@@ -143,7 +145,8 @@ Required statuses:
 - `pending` — proposed, waiting for review.
 - `approved` — user approved materialization.
 - `rejected` — user rejected; suppress duplicate resurfacing for a cooldown.
-- `materialized` — draft or gated artifact was produced.
+- `materialized` — inactive `.draft` artifacts were produced.
+- `activated` — reviewed drafts were explicitly promoted to active files.
 
 ### Authorization gate
 
@@ -165,16 +168,18 @@ Add tests for:
 - approve/reject transitions preserve provenance.
 - materialize rejects non-approved candidates.
 
-## MVP-2: Conservative Materializer Skeleton
+## MVP-2: Conservative Materializer, Review, and Activation Skeleton
 
-MVP-2 adds artifact creation after approval, but keeps the result inactive by default.
+MVP-2 adds artifact creation after approval, keeps the result inactive by default, exposes read-only draft review, and requires explicit activation before any behavior change.
 
 ### Scope
 
 - Materializer accepts only `approved` candidates.
-- Materializer produces draft artifacts first.
+- Materializer produces project-scope draft artifacts first.
+- Global materialization and activation fail closed in MVP.
 - Draft artifacts are not active behavior.
-- A separate explicit activation step promotes a draft to active files.
+- `learn inspect` and `learn drafts` provide read-only review-safe summaries.
+- A separate explicit activation step promotes a reviewed draft to active files.
 
 ### Draft output convention
 
@@ -194,7 +199,12 @@ Activation requires explicit approval after draft review.
 Allowed activation paths:
 
 - user says to activate the draft after review;
-- or a future `arcforge learn activate <candidate-id>` command performs the rename and runs tests.
+- or `arcforge learn activate <candidate-id> --project` performs the rename after validation.
+
+Activation validates the candidate schema and scope, requires recorded
+draft paths to match expected materialized artifacts, requires drafts to
+exist, and refuses to overwrite existing active files. Global activation
+is unsupported in MVP and fails closed.
 
 Not allowed:
 
@@ -202,12 +212,29 @@ Not allowed:
 - materializer silently activates a skill;
 - learning changes future behavior during the same session without explicit activation.
 
+### Read-only draft review
+
+Materialized drafts can be reviewed before activation with:
+
+```bash
+arcforge learn inspect <candidate-id> --project|--global [--json]
+arcforge learn drafts --project|--global [--json]
+```
+
+These commands must be read-only. They summarize allowlisted candidate
+metadata, safe evidence fields, next actions, and project-scope artifact
+existence. They do not embed draft contents, raw observation payloads,
+unexpected candidate fields, or stored path fields from the queue. Global
+review does not probe project-local artifact paths.
+
 ### Tests
 
 Add tests for:
 
 - materializer creates `.draft` outputs for approved candidates.
 - `.draft` outputs are not active skills.
+- inspect/drafts are read-only and do not leak raw candidate, evidence, or stored path payloads.
+- global inspect/drafts do not probe project-local artifact paths.
 - activation requires explicit approval.
 - queue entry records draft paths and later active paths.
 
@@ -278,7 +305,7 @@ Rules:
 - New candidates start as project-scoped unless the user explicitly asks for global or cross-project evidence exists.
 - A pattern seen in 2+ projects may become a promotion candidate.
 - Promotion candidate means "propose global scope for review," not automatic promotion.
-- Global materialization requires explicit approval.
+- Global materialization and activation are not in MVP and fail closed.
 - Project-to-global promotion must preserve provenance from all contributing projects.
 
 ## CLI / Skill Surface Proposal
@@ -291,10 +318,12 @@ arcforge learn enable --project
 arcforge learn disable --project
 arcforge learn analyze --project
 arcforge learn review --project
-arcforge learn approve <candidate-id>
-arcforge learn reject <candidate-id>
-arcforge learn materialize <candidate-id>
-arcforge learn activate <candidate-id>
+arcforge learn approve <candidate-id> --project
+arcforge learn reject <candidate-id> --project
+arcforge learn materialize <candidate-id> --project
+arcforge learn inspect <candidate-id> --project
+arcforge learn drafts --project
+arcforge learn activate <candidate-id> --project
 ```
 
 Skill behavior should mirror the same lifecycle for natural-language use:
@@ -304,6 +333,8 @@ Skill behavior should mirror the same lifecycle for natural-language use:
 - "approve this release-flow skill candidate"
 - "reject that candidate"
 - "materialize this as a draft"
+- "show me the materialized drafts"
+- "inspect this draft before activation"
 - "activate the reviewed draft"
 
 ## Implementation Task Breakdown
@@ -365,18 +396,20 @@ Acceptance:
 - Analyzer does not emit when confidence/evidence threshold is unmet.
 - Analyzer marks cross-project repeats as promotion candidates, not automatic global artifacts.
 
-### Task 5: Materializer draft skeleton
+### Task 5: Materializer, draft review, and activation skeleton
 
 Files:
 
-- Add materializer helper under `scripts/lib/` or `skills/arc-learning/scripts/`.
+- Add materializer/review/activation helpers under `scripts/lib/` or `skills/arc-learning/scripts/`.
 - Add tests.
 
 Acceptance:
 
 - Non-approved candidate cannot materialize.
-- Approved candidate creates `.draft` skill/test outputs.
+- Approved project candidate creates `.draft` skill/test outputs.
 - Draft paths are recorded on the queue entry.
+- Inspect/drafts are read-only, review-safe, and scope-isolated.
+- Activation validates candidate schema/scope/draft paths and refuses overwrite.
 - No active skill file is created before explicit activation.
 
 ### Task 6: Release-flow eval

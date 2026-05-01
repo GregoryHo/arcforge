@@ -30,12 +30,18 @@ def test_mvp1_defines_enablement_and_disabled_default():
     assert "disabled by default" in text
     assert "explicit enable" in text
     assert "observe" in text and "obey" in text and "config" in text
+    assert "observation and candidate analysis may run automatically only after enablement" in text
     assert "fail open" in text
 
 
 def test_candidate_queue_schema_and_authorization_gate_are_explicit():
-    text = _read_plan().lower()
+    plan = _read_plan()
+    text = plan.lower()
 
+    assert (
+        "Learning remains optional to enable, automatic once enabled, and conservative at the point of behavior change."
+        in plan
+    )
     for field in [
         "id",
         "scope",
@@ -85,3 +91,23 @@ def test_release_flow_golden_path_has_fixture_eval_plan():
     assert "arc-releasing" in text
     assert "natural language" in text
     assert "preflight" in text or "pre-flight" in text
+
+def test_mvp2_includes_read_only_draft_review_and_fail_closed_activation():
+    text = _read_plan().lower()
+
+    assert "learn inspect" in text
+    assert "learn drafts" in text
+    assert "read-only" in text
+    assert "review-safe" in text
+    assert "global" in text and "does not" in text and "probe project-local artifact paths" in text
+    assert "arcforge learn activate <candidate-id> --project" in text
+    assert "global activation" in text and "fails closed" in text
+
+
+def test_pr_readiness_lifecycle_is_documented():
+    text = _read_plan().lower()
+
+    assert "disabled by default" in text
+    assert "global materialization and activation are not in mvp" in text
+    assert "making learning core/default-on" in text
+    assert "import/export of learned skills" in text
