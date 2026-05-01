@@ -100,6 +100,116 @@ describe('learning subsystem MVP-1', () => {
     expect(result.errors).toContain('evidence must contain at least one item');
   });
 
+  it('rejects evidence items that are not plain objects with required string fields', () => {
+    const validItem = {
+      session_id: 'session-abc',
+      source: 'observation',
+      reason: 'release sequence repeated across sessions',
+    };
+
+    // Analyzer-shaped evidence with multiple items still passes.
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [
+            validItem,
+            { session_id: 'session-xyz', source: 'observation', reason: 'changelog edit' },
+          ],
+        }),
+      ).ok,
+    ).toBe(true);
+
+    // Non-object evidence item (array).
+    expect(validateCandidate(candidate({ evidence: [['not', 'an', 'object']] })).ok).toBe(false);
+
+    // Null evidence item.
+    expect(validateCandidate(candidate({ evidence: [null] })).ok).toBe(false);
+
+    // Primitive evidence item.
+    expect(validateCandidate(candidate({ evidence: ['just-a-string'] })).ok).toBe(false);
+
+    // Missing session_id.
+    expect(
+      validateCandidate(candidate({ evidence: [{ source: 'observation', reason: 'r' }] })).ok,
+    ).toBe(false);
+
+    // Missing source.
+    expect(validateCandidate(candidate({ evidence: [{ session_id: 's', reason: 'r' }] })).ok).toBe(
+      false,
+    );
+
+    // Missing reason.
+    expect(
+      validateCandidate(candidate({ evidence: [{ session_id: 's', source: 'observation' }] })).ok,
+    ).toBe(false);
+
+    // Blank string session_id (whitespace only).
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [{ session_id: '   ', source: 'observation', reason: 'r' }],
+        }),
+      ).ok,
+    ).toBe(false);
+
+    // Non-string source (number).
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [{ session_id: 's', source: 7, reason: 'r' }],
+        }),
+      ).ok,
+    ).toBe(false);
+
+    // Nested object as a required field value.
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [{ session_id: 's', source: 'observation', reason: { nested: 'payload' } }],
+        }),
+      ).ok,
+    ).toBe(false);
+
+    // Nested array as a required field value.
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [{ session_id: ['s'], source: 'observation', reason: 'r' }],
+        }),
+      ).ok,
+    ).toBe(false);
+
+    // Extra evidence fields are rejected so raw payloads cannot persist in durable candidate records.
+    expect(
+      validateCandidate(
+        candidate({
+          evidence: [
+            {
+              session_id: 's',
+              source: 'observation',
+              reason: 'r',
+              raw_tool_output: 'private terminal transcript',
+            },
+          ],
+        }),
+      ).ok,
+    ).toBe(false);
+
+    // Custom-prototype objects are not accepted as plain JSON evidence records.
+    const customPrototypeItem = Object.create({ inherited: 'payload' });
+    customPrototypeItem.session_id = 's';
+    customPrototypeItem.source = 'observation';
+    customPrototypeItem.reason = 'r';
+    expect(validateCandidate(candidate({ evidence: [customPrototypeItem] })).ok).toBe(false);
+
+    // Surface a representative error message so the contract stays explicit.
+    const result = validateCandidate(
+      candidate({ evidence: [{ session_id: '', source: 'observation', reason: 'r' }] }),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((msg) => /evidence/i.test(msg))).toBe(true);
+  });
+
   it('appends candidates to the project JSONL queue and loads them back', () => {
     const written = appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
@@ -992,8 +1102,6 @@ describe('learning subsystem MVP-1', () => {
               session_id: 'session-abc',
               source: 'observation',
               reason: 'sanitized release evidence',
-              raw_tool_output: 'private terminal transcript should not be exposed',
-              nested: { token: 'private nested payload should not be exposed' },
             },
           ],
         }),

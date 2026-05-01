@@ -124,6 +124,25 @@ function validateCandidate(candidate) {
   }
   if (!Array.isArray(candidate.evidence) || candidate.evidence.length === 0) {
     errors.push('evidence must contain at least one item');
+  } else {
+    candidate.evidence.forEach((item, index) => {
+      if (!item || typeof item !== 'object' || Object.getPrototypeOf(item) !== Object.prototype) {
+        errors.push(`evidence[${index}] must be a plain object`);
+        return;
+      }
+      const allowedFields = new Set(['session_id', 'source', 'reason']);
+      for (const field of Object.keys(item)) {
+        if (!allowedFields.has(field)) {
+          errors.push(`evidence[${index}] contains unsupported field: ${field}`);
+        }
+      }
+      for (const field of allowedFields) {
+        const value = item[field];
+        if (typeof value !== 'string' || value.trim() === '') {
+          errors.push(`evidence[${index}].${field} must be a non-empty string`);
+        }
+      }
+    });
   }
   if (
     typeof candidate.confidence !== 'number' ||
