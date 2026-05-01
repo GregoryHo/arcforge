@@ -11,7 +11,7 @@ description: Use when exploring ideas before implementation or when user wants t
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
-**REQUIRED BACKGROUND:** Run `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` before producing any design doc — it prints the canonical schema (required/forbidden sections, heading regexes, enforcement authority) directly from `scripts/lib/sdd-utils.js`'s rule constants. The same schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply — this is not a "mode" switch.
+**REQUIRED BACKGROUND:** Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/design.md` before producing any design doc — it carries the canonical schema (required/forbidden sections, heading regexes, enforcement authority), auto-generated from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`'s rule constants. The CLI alternative `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` produces equivalent content. The same schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply — this is not a "mode" switch.
 
 ## When NOT to Use
 
@@ -187,7 +187,7 @@ That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
 | `user_answer_verbatim` | string | Verbatim text of the user's answer — MUST NOT be paraphrased or summarized. |
 | `deferral_signal` | boolean | `true` when answer matches a canonical deferral phrase; `false` otherwise. |
 
-Missing any field is ERROR per the schema. See `scripts/lib/sdd-schemas/decision-log.md` for full schema documentation.
+Missing any field is ERROR per the schema. See `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` for full schema documentation.
 
 **q_id stability rule (fr-bs-009-ac3):**
 
@@ -212,11 +212,13 @@ The design doc carries a Context summary plus a natural-language Change Intent. 
 
 **Get the current schema (required reading before writing):**
 
+Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/design.md` directly (primary form), or invoke the equivalent CLI:
+
 ```bash
 node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design
 ```
 
-This prints the canonical design-doc schema — required sections, forbidden sections, heading regexes, and enforcement authority. This is the single source of truth; do NOT reconstruct the schema from memory, and do NOT copy schema content into this skill. The rules live in `scripts/lib/sdd-utils.js` (`DESIGN_DOC_RULES`) and the validator (`validateDesignDoc`) enforces them. If this skill and the validator ever disagree, the validator wins.
+Either form yields the canonical design-doc schema — required sections, forbidden sections, heading regexes, and enforcement authority. This is the single source of truth; do NOT reconstruct the schema from memory, and do NOT copy schema content into this skill. The rules live in `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js` (`DESIGN_DOC_RULES`) and the validator (`validateDesignDoc`) enforces them. If this skill and the validator ever disagree, the validator wins.
 
 **Validate before writing to disk:**
 

@@ -8,8 +8,9 @@ delta accumulation rules, two-pass write); this file covers the
 
 **When to load:** Phase 5 of arc-refining, just before building the
 in-memory spec. The authoritative schema is still
-`scripts/lib/sdd-schemas/spec.md` (enforced by `sdd-utils.js`); this
-reference is a working subset the refiner skill needs at hand.
+`${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md` (enforced by
+`${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`); this reference is a
+working subset the refiner skill needs at hand.
 
 ---
 
@@ -69,4 +70,4 @@ Requirements NOT affected by the design doc's Change Intent MUST remain unchange
 
 ## Authoritative source
 
-Anything this reference says is subordinate to `scripts/lib/sdd-schemas/spec.md` — the canonical schema doc enforced by `validateSpecHeader` in `sdd-utils.js`. If this file and the schema disagree, the schema wins.
+Anything this reference says is subordinate to `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md` — the canonical schema doc enforced by `validateSpecHeader` in `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. If this file and the schema disagree, the schema wins.

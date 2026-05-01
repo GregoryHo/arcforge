@@ -1,7 +1,7 @@
 epics:
   - id: epic-schema-axis
     name: Schema Auto-Gen Pipeline Completion
-    status: pending
+    status: completed
     spec_path: specs/spec-driven-refine/epics/epic-schema-axis/epic.md
     worktree: null
     depends_on: []
@@ -19,7 +19,7 @@ epics:
         source_requirement: fr-sd-016
       - id: schema-cli-access-pattern
         name: print-schema.js 4 targets + skill access pattern shift (direct read primary)
-        status: pending
+        status: completed
         depends_on:
           - schema-renderers
         source_requirement: fr-sd-011
