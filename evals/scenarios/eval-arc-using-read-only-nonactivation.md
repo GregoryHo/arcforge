@@ -29,6 +29,9 @@ This is a non-regression/non-interference eval: an unskilled baseline may also a
 ## Preflight
 skip
 
+## Verdict Policy
+non-regression
+
 ## Setup
 cat > README.md <<'EOF'
 # ArcForge

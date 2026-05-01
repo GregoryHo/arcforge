@@ -584,7 +584,7 @@ async function main() {
         };
 
         const printAbSummary = (label, opts) => {
-          const { baseline, treatment, delta, deltaCi, verdict } = opts;
+          const { baseline, treatment, delta, deltaCi, verdict, verdictPolicy } = opts;
           const bStats = opts.bStats ?? eval_.statsFromResults(baseline);
           const tStats = opts.tStats ?? eval_.statsFromResults(treatment);
           const showCI = bStats.count >= 5 && tStats.count >= 5;
@@ -597,6 +597,7 @@ async function main() {
           console.log(`${label}Treatment: ${fmtStats(tStats)}`);
           const ciStr = deltaCi && showCI ? ` CI[${deltaCi.lower}, ${deltaCi.upper}]` : '';
           console.log(`${label}Delta:     ${delta > 0 ? '+' : ''}${delta.toFixed(2)}${ciStr}`);
+          if (verdictPolicy) console.log(`${label}Policy:    ${verdictPolicy}`);
           console.log(`${label}Verdict:   ${verdict}`);
           const remediation = eval_.verdictMessage(verdict);
           if (remediation) console.log(`${label}Remediation: ${remediation}`);
@@ -903,7 +904,12 @@ async function main() {
             treatment: result.treatment,
             delta: result.delta,
             deltaCi: eval_.ciForDelta(result.baseline, result.treatment),
-            verdict: eval_.verdictFromDeltaCI(result.baseline, result.treatment),
+            verdict: eval_.verdictFromAbPolicy(
+              result.baseline,
+              result.treatment,
+              scenario.verdictPolicy,
+            ),
+            verdictPolicy: scenario.verdictPolicy,
           });
 
           // fr-gr-005: blind-comparator auto-trigger
@@ -974,6 +980,7 @@ async function main() {
             delta: comparison.delta,
             deltaCi: comparison.deltaCi,
             verdict: comparison.verdict,
+            verdictPolicy: comparison.verdictPolicy,
             bStats: comparison.baseline,
             tStats: comparison.treatment,
           });

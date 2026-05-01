@@ -32,6 +32,7 @@ const graders = require('./eval-graders');
  * @property {string} graderConfig - Grader-specific configuration
  * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
  * @property {string} [preflight] - Optional preflight policy ('skip' to bypass A/B preflight gate)
+ * @property {string} [verdictPolicy] - Optional A/B verdict policy ('non-regression' to judge treatment pass/fail instead of delta)
  */
 
 /**
@@ -162,6 +163,7 @@ function parseScenario(filePath, projectRoot) {
   const version = section('version');
   const target = section('target');
   const preflight = section('preflight').toLowerCase();
+  const verdictPolicy = section('verdict policy').toLowerCase();
 
   // Plugin Dir: resolve ${PROJECT_ROOT} or use absolute path
   const pluginDirRaw = section('plugin dir');
@@ -189,6 +191,7 @@ function parseScenario(filePath, projectRoot) {
     ...(trials && !Number.isNaN(trials) ? { trials } : {}),
     ...(version ? { version } : {}),
     ...(preflight ? { preflight } : {}),
+    ...(verdictPolicy ? { verdictPolicy } : {}),
     ...(pluginDir ? { pluginDir } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
@@ -1079,9 +1082,10 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
   const result = {
     delta,
     deltaCi,
-    verdict: stats.verdictFromDeltaCI(baseline, treatment),
+    verdict: stats.verdictFromAbPolicy(baseline, treatment, scenario.verdictPolicy),
     baseline: bStats,
     treatment: tStats,
+    ...(scenario.verdictPolicy ? { verdictPolicy: scenario.verdictPolicy } : {}),
     ...(baselineWarning ? { baselineWarning } : {}),
   };
 

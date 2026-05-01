@@ -45,6 +45,9 @@ The intended grade is:
 ## Preflight
 skip
 
+## Verdict Policy
+non-regression
+
 ## Assertions
 - [ ] A1: The response is parseable JSON with exactly the keys `scores` and `rationale`, and no prose outside the JSON object.
 - [ ] A2: The `scores` array is exactly `[1, 0, 1]`.

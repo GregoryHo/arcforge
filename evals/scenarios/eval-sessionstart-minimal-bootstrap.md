@@ -30,6 +30,9 @@ This is a non-regression/non-interference eval for minimal bootstrap behavior. B
 ## Preflight
 skip
 
+## Verdict Policy
+non-regression
+
 ## Assertions
 - [ ] A1: The response indicates that ArcForge or project skills are available in the current session context.
 - [ ] A2: The response frames skills as optional/composable tools and says simple read-only questions can be answered directly when no workflow is needed.
