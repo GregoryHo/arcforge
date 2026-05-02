@@ -1,79 +1,71 @@
 ---
 name: arc-learning
-description: Use when you have accumulated instincts and want to cluster related ones into higher-level skills, commands, or agents. Use when instinct evolve suggests candidates. Use when you want to consolidate behavioral patterns into reusable abstractions.
+description: Use when optional learning is enabled and observations should become reviewable candidates, inactive drafts, and explicitly activated artifacts.
 ---
 
-# Instinct Clustering
+# Optional Learning Candidate Lifecycle
 
 ## Overview
 
-Cluster related instincts into higher-level abstractions: skills, commands, or agents. This skill analyzes accumulated behavioral patterns (instincts) and identifies groups that can be consolidated into reusable components.
+`arc-learning` turns repeated project observations into reviewable learning candidates. Learning is **disabled by default**, **automatic once enabled**, and conservative at every behavior-change boundary.
 
-**Position:** `observe → instincts → cluster (this skill) → skills/commands/agents`
+**Position:** `observations → automatic analyzer → candidate queue → human review → inactive drafts → explicit activation → active artifacts`
+
+The default scope is project-local. Global materialization/activation is unsupported in this MVP; cross-project or global patterns should be proposed as promotion candidates, not silently promoted.
 
 ## Quick Reference
 
 | Task | Command |
-|------|---------|
-| **Scan instincts** | `node "${SKILL_ROOT}/scripts/learn.js" scan --project {p}` |
-| **Preview clusters** | `node "${SKILL_ROOT}/scripts/learn.js" preview --project {p}` |
-| **Generate artifact** | `node "${SKILL_ROOT}/scripts/learn.js" generate --cluster N --project {p} [--type skill\|command\|agent] [--name custom-name] [--dry-run]` |
-| **List evolved** | `node "${SKILL_ROOT}/scripts/learn.js" list --project {p}` |
+|---|---|
+| Check config | `arcforge learn status --json` |
+| Enable project learning | `arcforge learn enable --project` |
+| Disable project learning | `arcforge learn disable --project` |
+| Manually run analyzer | `arcforge learn analyze --project` |
+| Review queued candidates | `arcforge learn review --project` |
+| Approve a candidate | `arcforge learn approve <candidate-id> --project` |
+| Reject a candidate | `arcforge learn reject <candidate-id> --project` |
+| Write inactive draft artifacts | `arcforge learn materialize <candidate-id> --project` |
+| Inspect candidate and artifact state | `arcforge learn inspect <candidate-id> --project` |
+| List materialized drafts | `arcforge learn drafts --project` |
+| Promote reviewed drafts | `arcforge learn activate <candidate-id> --project` |
 
-## Infrastructure Commands
-
-**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
-```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-learning}"
-if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
-  exit 1
-fi
-```
+Use `--json` on any command when another tool or test needs machine-readable output.
 
 ## Workflow
 
-1. **Scan**: Load all instincts from `~/.arcforge/instincts/{project}/` and `global/`
-2. **Cluster**: Group by domain, then within each domain use trigger fingerprint similarity (Jaccard >= 0.6) to find sub-clusters
-3. **Filter**: Only process clusters with 3+ instincts, at least 1 with confidence >= 0.6
-4. **Preview**: Display candidate clusters with type recommendations and suggested names
-5. **Generate**: Create skill, command, or agent from a cluster (auto-classified or user-overridden)
-6. **Track**: Record evolution to `~/.arcforge/evolved/evolved.jsonl` for deduplication
-
-**Note:** Generated files are scaffolds — refine before deployment.
-
-## When to Use
-
-- `instinct evolve` suggests clustering candidates
-- 5+ instincts accumulated in the same domain
-- User wants to consolidate behavioral patterns into reusable components
-- User explicitly asks to cluster or organize instincts
-
-## When NOT to Use
-
-- Fewer than 3 instincts in any domain
-- User wants to save a single pattern (use /recall instead)
-- User wants to reflect on diaries (use /reflect instead)
-- User wants to confirm/contradict individual instincts (use arc-observing)
-
-## Generation Types
-
-Classification is hybrid: domain+threshold primary, keywords as tiebreaker.
-
-| Rule | Condition | Type |
-|------|-----------|------|
-| 1 | Domain is `workflow` or `automation` + avg confidence >= 0.7 | **command** |
-| 2 | Cluster size >= 3 + avg confidence >= 0.75 | **agent** |
-| 3 | Default (no primary rule matches) | **skill** |
-
-Tiebreaker: if behavioral tokens ("always", "prefer", "avoid") outnumber action tokens ("when starting", "when running") 2:1 → skill. Reverse → command.
-
-Commands always produce a backing skill (arcforge convention). Source instincts are left in place after evolution.
+1. **Confirm enablement.** Run `arcforge learn status --json`. Learning is disabled by default for both project and global scopes.
+2. **Enable only when requested.** Run `arcforge learn enable --project` for project-local learning. After enablement, the observe hook may automatically append sanitized observations and trigger the lightweight analyzer.
+3. **Automatic candidate queueing.** Once enabled, repeated release-flow observations can be queued as a **pending candidate**. The automatic trigger only appends candidate records; it does not approve, materialize, activate, tag, push, publish, or change runtime behavior.
+4. **Review.** Run `arcforge learn review --project` and inspect the summary, trigger, confidence, and redacted evidence.
+5. **Approve or reject.** Run `arcforge learn approve <candidate-id> --project` or `arcforge learn reject <candidate-id> --project`. Approval is required before any artifact is written.
+6. **Materialize as inactive drafts.** Run `arcforge learn materialize <candidate-id> --project`. This writes `.draft` files only, for example `skills/arc-releasing/SKILL.md.draft` and `tests/skills/test_skill_arc_releasing.py.draft`.
+7. **Inspect before activation.** Run `arcforge learn inspect <candidate-id> --project` or `arcforge learn drafts --project`. Inspection is read-only and review-safe.
+8. **Explicit activation.** Run `arcforge learn activate <candidate-id> --project` only after reviewing the draft artifacts. Activation promotes drafts to active artifacts and fails closed if drafts are missing or active files already exist.
 
 ## Key Principles
 
-- **User-driven**: Preview clusters and let user decide what to create
-- **Minimum cluster size**: 3+ instincts required per cluster
-- **Quality threshold**: At least 1 instinct must have confidence >= 0.6
-- **Source tracking**: Record which instincts were evolved via JSONL log
-- **No re-evolution**: `isAlreadyEvolved()` prevents duplicate generation
+- **No active behavior change without explicit activation.** Pending candidates and inactive drafts do not affect runtime behavior.
+- **Project scope first.** Project learning writes project-local config, queues, and drafts. Global materialization and activation are unsupported in this MVP.
+- **Human authorization at gates.** Automatic analysis may propose; users approve/reject, materialize, and activate.
+- **Redacted durable evidence.** Observations are sanitized before persistence; candidate evidence stores review-safe summaries, not raw tool payloads.
+- **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and refuses to overwrite existing active artifacts.
+- **Duplicate suppression.** Analyzer reruns should not append semantic duplicate candidates for the same learned behavior.
+
+## When to Use
+
+- The user explicitly asks to enable project learning.
+- Repeated observations suggest a reusable project workflow, especially a release/preflight/checklist skill.
+- You need to review, approve, reject, inspect, materialize, or activate a learning candidate.
+- You want a conservative self-improvement path that preserves human review before behavior changes.
+
+## When NOT to Use
+
+- Learning has not been explicitly enabled.
+- The user wants to save a single known preference or fact; use the appropriate memory/skill workflow instead.
+- The pattern is not supported by the current analyzer; keep it as a manual plan or skill change.
+- The candidate would require global activation; global activation is unsupported in this MVP.
+- The action would perform a destructive release step such as tag, push, package publish, or GitHub release creation without explicit user approval.
+
+## Legacy Compatibility
+
+`skills/arc-learning/scripts/learn.js` remains in the tree for older instinct-clustering tests and compatibility, but the supported MVP surface is the `arcforge learn ...` lifecycle above. Do not use the legacy script to bypass candidate approval, inactive draft materialization, or explicit activation gates.

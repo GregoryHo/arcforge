@@ -23,6 +23,11 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
+const {
+  getProjectId,
+  isLearningEnabled,
+  triggerAutomaticLearning,
+} = require('../../scripts/lib/learning');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -43,6 +48,20 @@ function getArchiveDir(project) {
 
 const getPidFile = getObserverPidFile;
 
+function shouldObserve({
+  projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
+  homeDir,
+} = {}) {
+  try {
+    return (
+      isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
+      isLearningEnabled({ scope: 'global', projectRoot, homeDir })
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ─────────────────────────────────────────────
 // Core Functions
 // ─────────────────────────────────────────────
@@ -53,6 +72,18 @@ const getPidFile = getObserverPidFile;
 function truncate(str, maxLen) {
   if (!str || str.length <= maxLen) return str || '';
   return `${str.substring(0, maxLen)}...[truncated]`;
+}
+
+function redactObservationText(value) {
+  return String(value || '')
+    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*"[^"]*"/gi, '$1="[REDACTED]"')
+    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*'[^']*'/gi, "$1='[REDACTED]'")
+    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*[^\s,}]+/gi, '$1=[REDACTED]')
+    .replace(/\bAuthorization\s*:\s*Bearer\s+[^\s,}]+/gi, 'Authorization: Bearer [REDACTED]');
+}
+
+function sanitizeObservationPayload(value, maxLen) {
+  return truncate(redactObservationText(value), maxLen);
 }
 
 /**
@@ -101,6 +132,16 @@ function signalDaemon() {
   }
 }
 
+function runAutomaticLearningTrigger(
+  projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
+) {
+  try {
+    triggerAutomaticLearning({ projectRoot });
+  } catch {
+    // Learning analysis is best-effort and must never block tool execution.
+  }
+}
+
 // ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
@@ -118,6 +159,10 @@ function main() {
     }
 
     const project = getProjectName();
+    if (!shouldObserve()) {
+      process.exit(0);
+      return;
+    }
     setSessionIdFromInput(input);
     const sessionId = getSessionId();
 
@@ -132,13 +177,14 @@ function main() {
       tool: toolName,
       session: sessionId,
       project,
+      project_id: getProjectId(process.env.CLAUDE_PROJECT_DIR || process.cwd()),
     };
 
     // Add input/output based on phase
     if (phase === 'pre' && input.tool_input) {
       const inputStr =
         typeof input.tool_input === 'string' ? input.tool_input : JSON.stringify(input.tool_input);
-      observation.input = truncate(inputStr, MAX_INPUT_LENGTH);
+      observation.input = sanitizeObservationPayload(inputStr, MAX_INPUT_LENGTH);
     }
 
     if (phase === 'post' && input.tool_output) {
@@ -146,7 +192,7 @@ function main() {
         typeof input.tool_output === 'string'
           ? input.tool_output
           : JSON.stringify(input.tool_output);
-      observation.output = truncate(outputStr, MAX_OUTPUT_LENGTH);
+      observation.output = sanitizeObservationPayload(outputStr, MAX_OUTPUT_LENGTH);
     }
 
     // Ensure directory exists
@@ -159,8 +205,10 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
-    // Signal daemon
+    // Signal daemon and run the lightweight automatic analyzer. The analyzer only
+    // appends pending candidates; it never materializes or activates artifacts.
     signalDaemon();
+    runAutomaticLearningTrigger(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   } catch {
     // Non-blocking — never fail the hook
   }
@@ -172,4 +220,11 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { truncate, getArchiveDir, getPidFile };
+module.exports = {
+  truncate,
+  redactObservationText,
+  getArchiveDir,
+  getPidFile,
+  shouldObserve,
+  runAutomaticLearningTrigger,
+};

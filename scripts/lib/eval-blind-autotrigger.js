@@ -154,10 +154,8 @@ function runBlindAutoTrigger(scenario, baseline, treatment, projectRoot, opts = 
   // Persist results
   const effectiveRunId =
     runId ||
-    (baseline[0] && baseline[0].runId) ||
-    (baseline[0] && baseline[0].timestamp
-      ? baseline[0].timestamp.slice(0, 10).replace(/-/g, '')
-      : 'unknown');
+    baseline[0]?.runId ||
+    (baseline[0]?.timestamp ? baseline[0].timestamp.slice(0, 10).replace(/-/g, '') : 'unknown');
 
   try {
     saveBlindResults(scenario.name, effectiveRunId, blindPreferences, projectRoot);

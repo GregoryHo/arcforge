@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "arcforge",
-      "description": "Skill-based workflow engine for AI coding agents: planning, TDD, worktree orchestration, and session learning",
-      "version": "2.1.0",
+      "description": "Minimal, composable skill toolkit for AI coding agents: intent-first routing, SDD, TDD, worktree coordination, opt-in session learning",
+      "version": "3.0.0-rc.1",
       "source": "./",
       "author": {
         "name": "Gregory Ho"

@@ -17,7 +17,7 @@ function Hero({theme}) {
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <Logo size={22} ember={t.ember} brass={t.brass}/>
           <span style={{fontFamily:'"Fraunces",serif',fontSize:18,letterSpacing:0,fontWeight:500,color:t.ink}}>arcforge</span>
-          <span style={{color:t.dim,marginLeft:6}}>v2.1.0</span>
+          <span style={{color:t.dim,marginLeft:6}}>v3.0.0-rc.1</span>
         </div>
         <div className="af-nav-links" style={{display:'flex',gap:28,color:t.dim,textTransform:'uppercase'}}>
           <a href="#pipeline" style={{color:'inherit',textDecoration:'none'}}>Pipeline</a>
@@ -42,8 +42,11 @@ function Hero({theme}) {
             agents.
           </h1>
           <p style={{marginTop:32,fontSize:16,lineHeight:1.7,color:t.mute,maxWidth:520,fontFamily:'"JetBrains Mono",ui-monospace,monospace'}}>
-            A skill-based autonomous workflow engine for Claude Code, Codex, Gemini CLI, and OpenCode. Hooks inject the right skill at the right moment — so design, planning, TDD, and review happen{' '}
-            <span style={{color:t.ink}}>because the workflow enforces them.</span>
+            A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws — your agent picks the{' '}
+            <span style={{color:t.ink}}>smallest useful workflow</span> for the task and runs direct when nothing more is needed.
+          </p>
+          <p style={{marginTop:14,fontSize:14,lineHeight:1.7,color:t.dim,maxWidth:520,fontFamily:'"Fraunces",serif',fontStyle:'italic'}}>
+            Simple on the surface. Strict underneath.
           </p>
 
           <div style={{marginTop:40,display:'flex',gap:14,alignItems:'center',flexWrap:'wrap'}}>
@@ -56,11 +59,11 @@ function Hero({theme}) {
           </div>
 
           <div style={{marginTop:56,display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}>
-            <Stamp label="SDD" sub="PIPELINE" color={t.ember}/>
-            <Stamp label="TDD" sub="ENFORCED" color={t.brass}/>
-            <Stamp label="EVAL" sub="GRADED" color={t.ember}/>
-            <Stamp label="WIKI" sub="OBSIDIAN" color={t.brass}/>
-            <Stamp label="LOOP" sub="CROSS-SESS" color={t.ember}/>
+            <Stamp label="INTENT" sub="ROUTED" color={t.ember}/>
+            <Stamp label="SKILLS" sub="GROUPED" color={t.brass}/>
+            <Stamp label="SESSIONS" sub="HANDOFF" color={t.ember}/>
+            <Stamp label="LEARNING" sub="OPT-IN" color={t.brass}/>
+            <Stamp label="EVAL" sub="GATED" color={t.ember}/>
           </div>
         </div>
 
@@ -78,7 +81,7 @@ function Hero({theme}) {
         fontFamily:'"JetBrains Mono",monospace',
       }}>
         <span>◆ CLAUDE CODE · CODEX · GEMINI · OPENCODE</span>
-        <span>SCALE 1:1 — DRAFT 04.21.26 — SHEET 01/08</span>
+        <span>SCALE 1:1 — DRAFT 05.02.26 — SHEET 01/08</span>
       </div>
     </section>
   );
@@ -161,7 +164,7 @@ function HeroSchematic({theme:t}) {
         </g>
         {[
           {name:'SessionStart',   sub:'inject-skills'},
-          {name:'UserPrompt',     sub:'arc-using routes'},
+          {name:'UserPrompt',     sub:'arc-using on demand'},
           {name:'Pre/Post Tool',  sub:'observe · quality'},
           {name:'Stop',           sub:'journal · compact'},
         ].map((o,i)=>(

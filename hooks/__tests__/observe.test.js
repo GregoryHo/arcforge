@@ -114,3 +114,60 @@ describe('observe: getPidFile', () => {
     );
   });
 });
+
+describe('observe: automatic learning trigger', () => {
+  const originalEnv = { ...process.env };
+  let testDir;
+  let projectRoot;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-learning-'));
+    projectRoot = path.join(testDir, 'project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    process.env.HOME = path.join(testDir, 'home');
+    process.env.CLAUDE_PROJECT_DIR = projectRoot;
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('queues only pending candidates when learning is enabled', () => {
+    const learning = require('../../scripts/lib/learning');
+    const { runAutomaticLearningTrigger } = require('../observe/main');
+    learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+    const observationPath = learning.getObservationPath({ projectRoot });
+    fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+    const projectId = learning.getProjectId(projectRoot);
+    fs.writeFileSync(
+      observationPath,
+      `${[
+        {
+          project_id: projectId,
+          session: 'release-a',
+          input: 'npm version patch && npm test && git tag v1.2.3',
+        },
+        {
+          project_id: projectId,
+          session: 'release-b',
+          input: 'release notes and full tests before tag and push',
+        },
+      ]
+        .map((record) => JSON.stringify(record))
+        .join('\n')}\n`,
+      'utf8',
+    );
+
+    runAutomaticLearningTrigger(projectRoot);
+
+    const queued = learning.loadCandidates({ scope: 'project', projectRoot });
+    assert.strictEqual(queued.length, 1);
+    assert.strictEqual(queued[0].status, 'pending');
+    assert.ok(!fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md')));
+  });
+});

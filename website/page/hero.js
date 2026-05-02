@@ -75,7 +75,7 @@ function Hero({
       color: t.dim,
       marginLeft: 6
     }
-  }, "v2.1.0")), /*#__PURE__*/React.createElement("div", {
+  }, "v3.0.0-rc.1")), /*#__PURE__*/React.createElement("div", {
     className: "af-nav-links",
     style: {
       display: 'flex',
@@ -163,11 +163,21 @@ function Hero({
       maxWidth: 520,
       fontFamily: '"JetBrains Mono",ui-monospace,monospace'
     }
-  }, "A skill-based autonomous workflow engine for Claude Code, Codex, Gemini CLI, and OpenCode. Hooks inject the right skill at the right moment \u2014 so design, planning, TDD, and review happen", ' ', /*#__PURE__*/React.createElement("span", {
+  }, "A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.ink
     }
-  }, "because the workflow enforces them.")), /*#__PURE__*/React.createElement("div", {
+  }, "smallest useful workflow"), " for the task and runs direct when nothing more is needed."), /*#__PURE__*/React.createElement("p", {
+    style: {
+      marginTop: 14,
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: t.dim,
+      maxWidth: 520,
+      fontFamily: '"Fraunces",serif',
+      fontStyle: 'italic'
+    }
+  }, "Simple on the surface. Strict underneath."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 40,
       display: 'flex',
@@ -205,24 +215,24 @@ function Hero({
       flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement(Stamp, {
-    label: "SDD",
-    sub: "PIPELINE",
+    label: "INTENT",
+    sub: "ROUTED",
     color: t.ember
   }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "TDD",
-    sub: "ENFORCED",
+    label: "SKILLS",
+    sub: "GROUPED",
+    color: t.brass
+  }), /*#__PURE__*/React.createElement(Stamp, {
+    label: "SESSIONS",
+    sub: "HANDOFF",
+    color: t.ember
+  }), /*#__PURE__*/React.createElement(Stamp, {
+    label: "LEARNING",
+    sub: "OPT-IN",
     color: t.brass
   }), /*#__PURE__*/React.createElement(Stamp, {
     label: "EVAL",
-    sub: "GRADED",
-    color: t.ember
-  }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "WIKI",
-    sub: "OBSIDIAN",
-    color: t.brass
-  }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "LOOP",
-    sub: "CROSS-SESS",
+    sub: "GATED",
     color: t.ember
   }))), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -251,7 +261,7 @@ function Hero({
       justifyContent: 'space-between',
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX \xB7 GEMINI \xB7 OPENCODE"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 04.21.26 \u2014 SHEET 01/08")));
+  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX \xB7 GEMINI \xB7 OPENCODE"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
 }
 function HeroSchematic({
   theme: t
@@ -431,7 +441,7 @@ function HeroSchematic({
     sub: 'inject-skills'
   }, {
     name: 'UserPrompt',
-    sub: 'arc-using routes'
+    sub: 'arc-using on demand'
   }, {
     name: 'Pre/Post Tool',
     sub: 'observe · quality'

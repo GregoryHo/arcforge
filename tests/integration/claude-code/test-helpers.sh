@@ -24,10 +24,24 @@ run_claude() {
         cmd_args+=(--allowed-tools="$allowed_tools")
     fi
 
-    # Run Claude in headless mode with timeout
+    # Run Claude in headless mode with timeout when GNU timeout is available.
     # --kill-after=10: send SIGKILL if SIGTERM doesn't work after 10s
     # </dev/null: prevent Claude CLI from hanging on stdin
-    if timeout --kill-after=10 "$timeout_val" claude "${cmd_args[@]}" </dev/null > "$output_file" 2>&1; then
+    local timeout_cmd=""
+    if command -v timeout >/dev/null 2>&1; then
+        timeout_cmd="timeout"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        timeout_cmd="gtimeout"
+    fi
+
+    local -a full_cmd
+    if [ -n "$timeout_cmd" ]; then
+        full_cmd=("$timeout_cmd" --kill-after=10 "$timeout_val" claude "${cmd_args[@]}")
+    else
+        full_cmd=(claude "${cmd_args[@]}")
+    fi
+
+    if (cd "$plugin_dir" && "${full_cmd[@]}" </dev/null > "$output_file" 2>&1); then
         cat "$output_file"
         rm -f "$output_file"
         return 0

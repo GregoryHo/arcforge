@@ -8,7 +8,7 @@ function BeforeAfter({theme:t}) {
         n="03"
         kicker="WHY IT MATTERS"
         title={<>The <em style={{color:t.brass,fontStyle:'italic'}}>before</em>, and the <em style={{color:t.ember,fontStyle:'italic'}}>after</em>.</>}
-        sub="What changes when the workflow is enforced by the session itself, not by your memory or willpower."
+        sub="What changes when discipline shows up by default — without forcing a workflow on every prompt."
         theme={t}
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:40}}>
@@ -51,8 +51,8 @@ function BeforeAfter({theme:t}) {
 // ─── Day in the life ───
 function DayInLife({theme:t}) {
   const steps = [
-    ['09:02', 'session start', 'SessionStart hooks fire. inject-skills loads the arc-using router. Previous session context injected.', t.brass],
-    ['09:04', '"add OAuth login"', 'arc-using detects a vague idea. Routes to arc-brainstorming.', t.ember],
+    ['09:02', 'session start', 'SessionStart hooks fire. inject-skills sets a minimal bootstrap. Previous session handover injected — five lines, not an archive.', t.brass],
+    ['09:04', '"add OAuth login"', 'Vague intent. arc-using suggests arc-brainstorming as the smallest useful starting point.', t.ember],
     ['09:12', 'brainstorm → refine', 'Design doc committed. Refiner produces spec.xml. Scope declared.', t.brass],
     ['09:24', 'plan → coordinate', 'DAG emits 12 tasks across 3 epics. arc-using-worktrees spins isolated branches.', t.brass],
     ['09:38', 'implement (TDD)', 'Subagent per task. Red tests first. Green. Then two-stage review: spec, then quality.', t.ember],
@@ -64,14 +64,14 @@ function DayInLife({theme:t}) {
   return (
     <PageSection theme={t} id="day">
       <SectionHeader
-        n="04"
-        kicker="A DAY IN THE LIFE"
+        n="05"
+        kicker="OPTIONAL WORKFLOW · COMPOSED SESSION"
         title={<>One prompt, <em style={{color:t.brass,fontStyle:'italic'}}>a whole shift.</em></>}
-        sub="Walk through a typical session with arcforge. Every transition is triggered by a skill or a hook — no commands to remember."
+        sub="A typical session: intent comes in, the smallest useful skill picks it up, larger workflows compose only when the work earns them."
         theme={t}
       />
       <div data-af-reveal style={{background:t.card,border:`1px solid ${t.line}`,position:'relative',paddingTop:48}}>
-        <div style={{position:'absolute',top:16,left:16,fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim}}>LOG · session_20260421.jsonl</div>
+        <div style={{position:'absolute',top:16,left:16,fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim}}>LOG · session_20260502.jsonl</div>
         {steps.map((s,i)=>(
           <div key={i} className="af-day-row" style={{
             display:'grid',gridTemplateColumns:'80px 1fr',alignItems:'stretch',
@@ -99,8 +99,8 @@ function Wiki({theme:t}) {
   return (
     <PageSection theme={t} id="wiki">
       <SectionHeader
-        n="05"
-        kicker="LLM WIKI"
+        n="06"
+        kicker="OPTIONAL WORKFLOW · KNOWLEDGE BASE"
         title={<>A knowledge base <em style={{color:t.brass,fontStyle:'italic'}}>the agent writes</em> and reads.</>}
         sub={<>Inspired by Karpathy's LLM-wiki pattern. Arcforge maintains a unified Obsidian vault that agents can ingest, query, and audit — with diagrams as first-class nodes.</>}
         theme={t}
@@ -175,10 +175,10 @@ function Evaluating({theme:t}) {
   return (
     <PageSection theme={t} id="eval">
       <SectionHeader
-        n="06"
-        kicker="EVAL"
-        title={<>Skills are <em style={{color:t.brass,fontStyle:'italic'}}>tested</em>, not just described.</>}
-        sub="arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs — not vibes."
+        n="08"
+        kicker="HARNESS + EVAL"
+        title={<>Trust comes from <em style={{color:t.brass,fontStyle:'italic'}}>behavior</em>, not promises.</>}
+        sub={<>Every skill is graded by what an agent <em style={{color:t.ink,fontStyle:'italic'}}>actually did</em> — parsed from transcript action logs, not vibes. Activation, non-activation, and harness isolation are all measured, so the simple surface stays simple and the strict gates stay strict.</>}
         theme={t}
       />
       <div data-af-reveal className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}}>
@@ -212,9 +212,9 @@ function SessionLearning({theme:t}) {
     <PageSection theme={t} id="session">
       <SectionHeader
         n="07"
-        kicker="SESSION · SELF-LEARNING"
-        title={<>Memory between sessions. <em style={{color:t.brass,fontStyle:'italic'}}>Instincts</em> that grow.</>}
-        sub="Session and Learning skills turn one-shot chats into a learning loop. The agent writes journals, reflects, and extracts reusable instincts."
+        kicker="OPTIONAL WORKFLOW · SESSION MEMORY"
+        title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
+        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -233,7 +233,7 @@ function SessionLearning({theme:t}) {
           {[
             {x:150,y:190,n:'journaling',d:'per-session reflection',c:t.ember},
             {x:400,y:90,n:'reflecting',d:'patterns across entries',c:t.brass},
-            {x:700,y:90,n:'learning',d:'reusable patterns',c:t.brass},
+            {x:700,y:90,n:'learning',d:'opt-in candidate queue',c:t.brass},
             {x:950,y:190,n:'recalling',d:'instinct creation',c:t.ember},
             {x:700,y:290,n:'observing',d:'tool-call watch',c:t.brass},
             {x:400,y:290,n:'managing-sessions',d:'save / resume',c:t.brass},
@@ -253,7 +253,7 @@ function SessionLearning({theme:t}) {
             );
           })}
           <g fontFamily="'Caveat',cursive" fontSize="18" fill={t.ember}>
-            <text x="490" y="210">instincts → next session</text>
+            <text x="485" y="210">handoff → resume → improve</text>
           </g>
         </svg>
       </div>
@@ -272,7 +272,7 @@ function Platforms({theme:t}) {
   return (
     <PageSection theme={t} id="platforms">
       <SectionHeader
-        n="08"
+        n="09"
         kicker="PLATFORMS"
         title={<>One toolkit, <em style={{color:t.brass,fontStyle:'italic'}}>four harnesses.</em></>}
         sub="Claude Code gets the deepest integration via the plugin marketplace. Codex, Gemini CLI, and OpenCode ship manually but share the same skill library."
@@ -299,63 +299,82 @@ function Platforms({theme:t}) {
 
 // ─── Skills Grid (all 33) ───
 function SkillsGrid({theme:t}) {
+  // Aligned to the seven functional categories in docs/guide/skills-reference.md.
+  // Meta is called out as project-level, not a normal user-facing skill.
+  const layers = [
+    ['Core toolkit', t.ember, '8 promoted skills', 'The small surface most users should learn first: router, design, specs, planning, TDD, debugging, verification, and eval.'],
+    ['Optional workflows', t.brass, '24 opt-in skills', 'Advanced orchestration for SDD, worktrees, reviews, sessions, learning, and knowledge work — only when scope earns them.'],
+    ['Harness + eval', t.dim, 'gated behavior', 'Activation, non-activation, instruction-strength, spec sync, drift, and reconstruction checks keep the layers honest.'],
+  ];
   const groups = [
-    ['Workflow', t.ember, [
-      ['arc-using','routing check for task scale'],
+    ['Planning', t.brass, [
       ['arc-brainstorming','design exploration'],
       ['arc-refining','spec generation'],
-      ['arc-planning','DAG breakdown'],
-      ['arc-coordinating','worktree management'],
-      ['arc-implementing','TDD implementation'],
-    ]],
-    ['Supporting', t.brass, [
-      ['arc-using-worktrees','isolated workspaces'],
-      ['arc-finishing-epic','epic completion'],
-      ['arc-finishing','branch completion'],
       ['arc-writing-tasks','break into tasks'],
-      ['arc-dispatching-parallel','parallel agent dispatch'],
-      ['arc-verifying','evidence before claims'],
-      ['arc-debugging','four-phase debug'],
-      ['arc-writing-skills','TDD for skills'],
-      ['arc-compacting','strategic /compact timing'],
+      ['arc-planning','DAG breakdown'],
     ]],
     ['Execution', t.ember, [
-      ['arc-tdd','RED → GREEN → REFACTOR'],
-      ['arc-agent-driven','subagent per task + review'],
       ['arc-executing-tasks','human-in-the-loop'],
+      ['arc-agent-driven','subagent per task + review'],
+      ['arc-implementing','epic orchestrator'],
+      ['arc-dispatching-parallel','parallel agent dispatch'],
       ['arc-dispatching-teammates','multi-epic teammates'],
       ['arc-looping','cross-session autonomy'],
     ]],
-    ['Session · Learning', t.brass, [
-      ['arc-journaling','pre-compaction reflection'],
-      ['arc-reflecting','insights from diaries'],
-      ['arc-learning','reusable patterns'],
-      ['arc-observing','tool-call observation'],
-      ['arc-recalling','instinct creation'],
-      ['arc-managing-sessions','save + resume'],
-      ['arc-researching','hypothesis experiments'],
+    ['Coordination', t.brass, [
+      ['arc-using','bounded router · skill index'],
+      ['arc-using-worktrees','isolated workspaces'],
+      ['arc-coordinating','worktree lifecycle'],
+      ['arc-finishing','branch completion'],
+      ['arc-finishing-epic','epic completion'],
+      ['arc-compacting','strategic /compact timing'],
+      ['arc-managing-sessions','handover + archive'],
     ]],
-    ['Knowledge · Wiki', t.ember, [
-      ['arc-maintaining-obsidian','vault lifecycle'],
-      ['arc-diagramming-obsidian','Excalidraw diagrams'],
-    ]],
-    ['Review · Eval', t.brass, [
+    ['Quality', t.ember, [
+      ['arc-tdd','RED → GREEN → REFACTOR'],
+      ['arc-debugging','four-phase debug'],
+      ['arc-verifying','evidence before claims'],
       ['arc-requesting-review','when to request review'],
       ['arc-receiving-review','handle feedback rigor'],
       ['arc-evaluating','measure behavioral change'],
-      ['arc-evaluating-workspace','workspace-level eval'],
+      ['arc-auditing-spec','read-only spec audit'],
+    ]],
+    ['Learning', t.brass, [
+      ['arc-journaling','pre-compaction reflection'],
+      ['arc-reflecting','insights from diaries'],
+      ['arc-learning','opt-in candidate lifecycle'],
+      ['arc-observing','tool-call observation'],
+      ['arc-recalling','instinct creation'],
+      ['arc-researching','hypothesis experiments'],
+    ]],
+    ['Knowledge Base', t.ember, [
+      ['arc-maintaining-obsidian','vault lifecycle'],
+      ['arc-diagramming-obsidian','Excalidraw diagrams'],
+    ]],
+    ['Meta · project-level', t.dim, [
+      ['arc-writing-skills','TDD for ArcForge\'s own skills'],
     ]],
   ];
   return (
     <PageSection theme={t} id="skills">
       <SectionHeader
-        n="09"
+        n="02"
         kicker="SKILLS"
-        title={<>The full library — <em style={{color:t.brass,fontStyle:'italic'}}>33 skills, 6 groups.</em></>}
-        sub="Skills trigger by context. The agent routes itself; you never memorize commands."
+        title={<>33 skills: <em style={{color:t.brass,fontStyle:'italic'}}>layer first</em>, category second.</>}
+        sub="ArcForge has a promoted Core toolkit, Optional workflows, and Harness/eval gates. The catalog below keeps the seven functional categories for lookup; Meta stays project-level for maintaining ArcForge itself."
         theme={t}
       />
       <div data-af-reveal style={{display:'flex',flexDirection:'column',gap:36}}>
+        <div className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:20}}>
+          {layers.map(([name,color,count,desc])=>(
+            <div key={name} style={{background:t.card,border:`1px solid ${color}`,padding:'24px 26px',position:'relative'}}>
+              <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color,marginBottom:10,textTransform:'uppercase'}}>{count}</div>
+              <h3 style={{fontFamily:'"Fraunces",serif',fontStyle:'italic',fontSize:24,color:t.ink,margin:'0 0 12px 0',fontWeight:400}}>{name}</h3>
+              <p style={{fontSize:13,color:t.mute,lineHeight:1.55,margin:0}}>{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>Functional lookup · seven categories</div>
         {groups.map(([name,color,items])=>(
           <div key={name}>
             <div style={{display:'flex',alignItems:'baseline',gap:16,marginBottom:18,paddingBottom:10,borderBottom:`1px dashed ${t.line}`}}>
@@ -389,7 +408,7 @@ function SkillRow({name,desc,color,t}) {
 // ─── Hooks ───
 function Hooks({theme:t}) {
   const hooks = [
-    ['SessionStart','inject-skills','Loads arc-using router + ARCFORGE_ROOT. Injects every session start.'],
+    ['SessionStart','inject-skills','Minimal bootstrap: sets ARCFORGE_ROOT and tells the agent skills are tools, not laws. No mandatory routing.'],
     ['SessionStart','session-tracker/start','Resets counters, initializes session state.'],
     ['SessionStart','session-tracker/inject-context','Loads previous session context + learned instincts.'],
     ['UserPromptSubmit','user-message-counter','Counts prompts for session evaluation.'],
@@ -403,7 +422,7 @@ function Hooks({theme:t}) {
     <PageSection theme={t} id="hooks">
       <SectionHeader
         n="10"
-        kicker="HOOKS"
+        kicker="IMPLEMENTATION DETAIL · HOOKS"
         title={<>Hooks are how skills <em style={{color:t.brass,fontStyle:'italic'}}>show up without being called.</em></>}
         sub="Claude Code hooks run at lifecycle events. Arcforge uses them to inject skills, track sessions, auto-format code, and suggest compaction before context fills."
         theme={t}
@@ -471,7 +490,7 @@ function Footer({theme:t}) {
             <Logo size={20} ember={t.ember} brass={t.brass}/>
             <span style={{fontFamily:'"Fraunces",serif',fontSize:16,color:t.ink,fontWeight:500}}>arcforge</span>
           </div>
-          <div style={{color:t.dim}}>MIT · v2.1.0 · By Gregory Ho</div>
+          <div style={{color:t.dim}}>MIT · v3.0.0-rc.1 · By Gregory Ho</div>
         </div>
         <div className="af-footer-links" style={{display:'flex',gap:48,letterSpacing:2,textTransform:'uppercase'}}>
           <a href="https://github.com/GregoryHo/arcforge" style={{color:t.ember,textDecoration:'none'}}>GitHub ↗</a>
