@@ -75,7 +75,7 @@ function Hero({
       color: t.dim,
       marginLeft: 6
     }
-  }, "v2.1.0")), /*#__PURE__*/React.createElement("div", {
+  }, "v3.0.0-rc.1")), /*#__PURE__*/React.createElement("div", {
     className: "af-nav-links",
     style: {
       display: 'flex',
@@ -251,7 +251,7 @@ function Hero({
       justifyContent: 'space-between',
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX \xB7 GEMINI \xB7 OPENCODE"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 04.21.26 \u2014 SHEET 01/08")));
+  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX \xB7 GEMINI \xB7 OPENCODE"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
 }
 function HeroSchematic({
   theme: t

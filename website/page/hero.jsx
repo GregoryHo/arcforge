@@ -17,7 +17,7 @@ function Hero({theme}) {
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <Logo size={22} ember={t.ember} brass={t.brass}/>
           <span style={{fontFamily:'"Fraunces",serif',fontSize:18,letterSpacing:0,fontWeight:500,color:t.ink}}>arcforge</span>
-          <span style={{color:t.dim,marginLeft:6}}>v2.1.0</span>
+          <span style={{color:t.dim,marginLeft:6}}>v3.0.0-rc.1</span>
         </div>
         <div className="af-nav-links" style={{display:'flex',gap:28,color:t.dim,textTransform:'uppercase'}}>
           <a href="#pipeline" style={{color:'inherit',textDecoration:'none'}}>Pipeline</a>
@@ -78,7 +78,7 @@ function Hero({theme}) {
         fontFamily:'"JetBrains Mono",monospace',
       }}>
         <span>◆ CLAUDE CODE · CODEX · GEMINI · OPENCODE</span>
-        <span>SCALE 1:1 — DRAFT 04.21.26 — SHEET 01/08</span>
+        <span>SCALE 1:1 — DRAFT 05.02.26 — SHEET 01/08</span>
       </div>
     </section>
   );

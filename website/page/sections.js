@@ -167,7 +167,7 @@ function DayInLife({
       letterSpacing: 2,
       color: t.dim
     }
-  }, "LOG \xB7 session_20260421.jsonl"), steps.map((s, i) => /*#__PURE__*/React.createElement("div", {
+  }, "LOG \xB7 session_20260502.jsonl"), steps.map((s, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
     className: "af-day-row",
     style: {
@@ -439,7 +439,12 @@ function Evaluating({
         fontStyle: 'italic'
       }
     }, "tested"), ", not just described."),
-    sub: "arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs \u2014 not vibes.",
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs \u2014 not vibes. ", /*#__PURE__*/React.createElement("em", {
+      style: {
+        color: t.ink,
+        fontStyle: 'italic'
+      }
+    }, "v3 hardens release-flow gates"), ": tag, push, and publish actions are eval-asserted to refuse without explicit maintainer authorization, even when learned-behavior skills are active."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -565,8 +570,13 @@ function SessionLearning({
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "Instincts"), " that grow."),
-    sub: "Session and Learning skills turn one-shot chats into a learning loop. The agent writes journals, reflects, and extracts reusable instincts.",
+    }, "Instincts"), " that grow \u2014 only when you say so."),
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Session and Learning skills turn one-shot chats into a learning loop. ", /*#__PURE__*/React.createElement("em", {
+      style: {
+        color: t.ink,
+        fontStyle: 'italic'
+      }
+    }, "Disabled by default."), " Opt in per project, then observation, candidate queueing, and review run automatically \u2014 three explicit gates stand between any pattern and active behavior."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -641,7 +651,7 @@ function SessionLearning({
     x: 700,
     y: 90,
     n: 'learning',
-    d: 'reusable patterns',
+    d: 'opt-in candidate queue',
     c: t.brass
   }, {
     x: 950,
@@ -700,9 +710,9 @@ function SessionLearning({
     fontSize: "18",
     fill: t.ember
   }, /*#__PURE__*/React.createElement("text", {
-    x: "490",
+    x: "470",
     y: "210"
-  }, "instincts \u2192 next session")))));
+  }, "approve \u2192 materialize \u2192 activate")))));
 }
 
 // ─── Platforms ───
@@ -804,7 +814,7 @@ function Platforms({
 function SkillsGrid({
   theme: t
 }) {
-  const groups = [['Workflow', t.ember, [['arc-using', 'routing check for task scale'], ['arc-brainstorming', 'design exploration'], ['arc-refining', 'spec generation'], ['arc-planning', 'DAG breakdown'], ['arc-coordinating', 'worktree management'], ['arc-implementing', 'TDD implementation']]], ['Supporting', t.brass, [['arc-using-worktrees', 'isolated workspaces'], ['arc-finishing-epic', 'epic completion'], ['arc-finishing', 'branch completion'], ['arc-writing-tasks', 'break into tasks'], ['arc-dispatching-parallel', 'parallel agent dispatch'], ['arc-verifying', 'evidence before claims'], ['arc-debugging', 'four-phase debug'], ['arc-writing-skills', 'TDD for skills'], ['arc-compacting', 'strategic /compact timing']]], ['Execution', t.ember, [['arc-tdd', 'RED → GREEN → REFACTOR'], ['arc-agent-driven', 'subagent per task + review'], ['arc-executing-tasks', 'human-in-the-loop'], ['arc-dispatching-teammates', 'multi-epic teammates'], ['arc-looping', 'cross-session autonomy']]], ['Session · Learning', t.brass, [['arc-journaling', 'pre-compaction reflection'], ['arc-reflecting', 'insights from diaries'], ['arc-learning', 'reusable patterns'], ['arc-observing', 'tool-call observation'], ['arc-recalling', 'instinct creation'], ['arc-managing-sessions', 'save + resume'], ['arc-researching', 'hypothesis experiments']]], ['Knowledge · Wiki', t.ember, [['arc-maintaining-obsidian', 'vault lifecycle'], ['arc-diagramming-obsidian', 'Excalidraw diagrams']]], ['Review · Eval', t.brass, [['arc-requesting-review', 'when to request review'], ['arc-receiving-review', 'handle feedback rigor'], ['arc-evaluating', 'measure behavioral change'], ['arc-evaluating-workspace', 'workspace-level eval']]]];
+  const groups = [['Workflow', t.ember, [['arc-using', 'routing check for task scale'], ['arc-brainstorming', 'design exploration'], ['arc-refining', 'spec generation'], ['arc-planning', 'DAG breakdown'], ['arc-coordinating', 'worktree management'], ['arc-implementing', 'TDD implementation']]], ['Supporting', t.brass, [['arc-using-worktrees', 'isolated workspaces'], ['arc-finishing-epic', 'epic completion'], ['arc-finishing', 'branch completion'], ['arc-writing-tasks', 'break into tasks'], ['arc-dispatching-parallel', 'parallel agent dispatch'], ['arc-verifying', 'evidence before claims'], ['arc-debugging', 'four-phase debug'], ['arc-writing-skills', 'TDD for skills'], ['arc-compacting', 'strategic /compact timing']]], ['Execution', t.ember, [['arc-tdd', 'RED → GREEN → REFACTOR'], ['arc-agent-driven', 'subagent per task + review'], ['arc-executing-tasks', 'human-in-the-loop'], ['arc-dispatching-teammates', 'multi-epic teammates'], ['arc-looping', 'cross-session autonomy']]], ['Session · Learning', t.brass, [['arc-journaling', 'pre-compaction reflection'], ['arc-reflecting', 'insights from diaries'], ['arc-learning', 'opt-in candidate lifecycle'], ['arc-observing', 'tool-call observation'], ['arc-recalling', 'instinct creation'], ['arc-managing-sessions', 'handover + archive'], ['arc-researching', 'hypothesis experiments']]], ['Knowledge · Wiki', t.ember, [['arc-maintaining-obsidian', 'vault lifecycle'], ['arc-diagramming-obsidian', 'Excalidraw diagrams']]], ['Review · Eval', t.brass, [['arc-requesting-review', 'when to request review'], ['arc-receiving-review', 'handle feedback rigor'], ['arc-evaluating', 'measure behavioral change'], ['arc-auditing-spec', 'read-only spec audit']]]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
     id: "skills"
@@ -1166,7 +1176,7 @@ function Footer({
     style: {
       color: t.dim
     }
-  }, "MIT \xB7 v2.1.0 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
+  }, "MIT \xB7 v3.0.0-rc.1 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
     className: "af-footer-links",
     style: {
       display: 'flex',

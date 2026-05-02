@@ -71,7 +71,7 @@ function DayInLife({theme:t}) {
         theme={t}
       />
       <div data-af-reveal style={{background:t.card,border:`1px solid ${t.line}`,position:'relative',paddingTop:48}}>
-        <div style={{position:'absolute',top:16,left:16,fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim}}>LOG · session_20260421.jsonl</div>
+        <div style={{position:'absolute',top:16,left:16,fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim}}>LOG · session_20260502.jsonl</div>
         {steps.map((s,i)=>(
           <div key={i} className="af-day-row" style={{
             display:'grid',gridTemplateColumns:'80px 1fr',alignItems:'stretch',
@@ -178,7 +178,7 @@ function Evaluating({theme:t}) {
         n="06"
         kicker="EVAL"
         title={<>Skills are <em style={{color:t.brass,fontStyle:'italic'}}>tested</em>, not just described.</>}
-        sub="arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs — not vibes."
+        sub={<>arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs — not vibes. <em style={{color:t.ink,fontStyle:'italic'}}>v3 hardens release-flow gates</em>: tag, push, and publish actions are eval-asserted to refuse without explicit maintainer authorization, even when learned-behavior skills are active.</>}
         theme={t}
       />
       <div data-af-reveal className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}}>
@@ -213,8 +213,8 @@ function SessionLearning({theme:t}) {
       <SectionHeader
         n="07"
         kicker="SESSION · SELF-LEARNING"
-        title={<>Memory between sessions. <em style={{color:t.brass,fontStyle:'italic'}}>Instincts</em> that grow.</>}
-        sub="Session and Learning skills turn one-shot chats into a learning loop. The agent writes journals, reflects, and extracts reusable instincts."
+        title={<>Memory between sessions. <em style={{color:t.brass,fontStyle:'italic'}}>Instincts</em> that grow — only when you say so.</>}
+        sub={<>Session and Learning skills turn one-shot chats into a learning loop. <em style={{color:t.ink,fontStyle:'italic'}}>Disabled by default.</em> Opt in per project, then observation, candidate queueing, and review run automatically — three explicit gates stand between any pattern and active behavior.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -233,7 +233,7 @@ function SessionLearning({theme:t}) {
           {[
             {x:150,y:190,n:'journaling',d:'per-session reflection',c:t.ember},
             {x:400,y:90,n:'reflecting',d:'patterns across entries',c:t.brass},
-            {x:700,y:90,n:'learning',d:'reusable patterns',c:t.brass},
+            {x:700,y:90,n:'learning',d:'opt-in candidate queue',c:t.brass},
             {x:950,y:190,n:'recalling',d:'instinct creation',c:t.ember},
             {x:700,y:290,n:'observing',d:'tool-call watch',c:t.brass},
             {x:400,y:290,n:'managing-sessions',d:'save / resume',c:t.brass},
@@ -253,7 +253,7 @@ function SessionLearning({theme:t}) {
             );
           })}
           <g fontFamily="'Caveat',cursive" fontSize="18" fill={t.ember}>
-            <text x="490" y="210">instincts → next session</text>
+            <text x="470" y="210">approve → materialize → activate</text>
           </g>
         </svg>
       </div>
@@ -329,10 +329,10 @@ function SkillsGrid({theme:t}) {
     ['Session · Learning', t.brass, [
       ['arc-journaling','pre-compaction reflection'],
       ['arc-reflecting','insights from diaries'],
-      ['arc-learning','reusable patterns'],
+      ['arc-learning','opt-in candidate lifecycle'],
       ['arc-observing','tool-call observation'],
       ['arc-recalling','instinct creation'],
-      ['arc-managing-sessions','save + resume'],
+      ['arc-managing-sessions','handover + archive'],
       ['arc-researching','hypothesis experiments'],
     ]],
     ['Knowledge · Wiki', t.ember, [
@@ -343,7 +343,7 @@ function SkillsGrid({theme:t}) {
       ['arc-requesting-review','when to request review'],
       ['arc-receiving-review','handle feedback rigor'],
       ['arc-evaluating','measure behavioral change'],
-      ['arc-evaluating-workspace','workspace-level eval'],
+      ['arc-auditing-spec','read-only spec audit'],
     ]],
   ];
   return (
@@ -471,7 +471,7 @@ function Footer({theme:t}) {
             <Logo size={20} ember={t.ember} brass={t.brass}/>
             <span style={{fontFamily:'"Fraunces",serif',fontSize:16,color:t.ink,fontWeight:500}}>arcforge</span>
           </div>
-          <div style={{color:t.dim}}>MIT · v2.1.0 · By Gregory Ho</div>
+          <div style={{color:t.dim}}>MIT · v3.0.0-rc.1 · By Gregory Ho</div>
         </div>
         <div className="af-footer-links" style={{display:'flex',gap:48,letterSpacing:2,textTransform:'uppercase'}}>
           <a href="https://github.com/GregoryHo/arcforge" style={{color:t.ember,textDecoration:'none'}}>GitHub ↗</a>
