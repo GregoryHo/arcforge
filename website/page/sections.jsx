@@ -301,6 +301,11 @@ function Platforms({theme:t}) {
 function SkillsGrid({theme:t}) {
   // Aligned to the seven functional categories in docs/guide/skills-reference.md.
   // Meta is called out as project-level, not a normal user-facing skill.
+  const layers = [
+    ['Core toolkit', t.ember, '8 promoted skills', 'The small surface most users should learn first: router, design, specs, planning, TDD, debugging, verification, and eval.'],
+    ['Optional workflows', t.brass, '24 opt-in skills', 'Advanced orchestration for SDD, worktrees, reviews, sessions, learning, and knowledge work — only when scope earns them.'],
+    ['Harness + eval', t.dim, 'gated behavior', 'Activation, non-activation, instruction-strength, spec sync, drift, and reconstruction checks keep the layers honest.'],
+  ];
   const groups = [
     ['Planning', t.brass, [
       ['arc-brainstorming','design exploration'],
@@ -355,11 +360,21 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="09"
         kicker="SKILLS"
-        title={<>33 skills, organized by <em style={{color:t.brass,fontStyle:'italic'}}>functional role.</em></>}
-        sub="Seven categories matching the docs reference. Call any skill directly when you know the path; let arc-using route on demand when you don't. Meta is project-level — for maintaining ArcForge itself, not normal product work."
+        title={<>33 skills: <em style={{color:t.brass,fontStyle:'italic'}}>layer first</em>, category second.</>}
+        sub="ArcForge has a promoted Core toolkit, Optional workflows, and Harness/eval gates. The catalog below keeps the seven functional categories for lookup; Meta stays project-level for maintaining ArcForge itself."
         theme={t}
       />
       <div data-af-reveal style={{display:'flex',flexDirection:'column',gap:36}}>
+        <div className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:20}}>
+          {layers.map(([name,color,count,desc])=>(
+            <div key={name} style={{background:t.card,border:`1px solid ${color}`,padding:'24px 26px',position:'relative'}}>
+              <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color,marginBottom:10,textTransform:'uppercase'}}>{count}</div>
+              <h3 style={{fontFamily:'"Fraunces",serif',fontStyle:'italic',fontSize:24,color:t.ink,margin:'0 0 12px 0',fontWeight:400}}>{name}</h3>
+              <p style={{fontSize:13,color:t.mute,lineHeight:1.55,margin:0}}>{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>Functional lookup · seven categories</div>
         {groups.map(([name,color,items])=>(
           <div key={name}>
             <div style={{display:'flex',alignItems:'baseline',gap:16,marginBottom:18,paddingBottom:10,borderBottom:`1px dashed ${t.line}`}}>

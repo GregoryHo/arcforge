@@ -816,6 +816,7 @@ function SkillsGrid({
 }) {
   // Aligned to the seven functional categories in docs/guide/skills-reference.md.
   // Meta is called out as project-level, not a normal user-facing skill.
+  const layers = [['Core toolkit', t.ember, '8 promoted skills', 'The small surface most users should learn first: router, design, specs, planning, TDD, debugging, verification, and eval.'], ['Optional workflows', t.brass, '24 opt-in skills', 'Advanced orchestration for SDD, worktrees, reviews, sessions, learning, and knowledge work — only when scope earns them.'], ['Harness + eval', t.dim, 'gated behavior', 'Activation, non-activation, instruction-strength, spec sync, drift, and reconstruction checks keep the layers honest.']];
   const groups = [['Planning', t.brass, [['arc-brainstorming', 'design exploration'], ['arc-refining', 'spec generation'], ['arc-writing-tasks', 'break into tasks'], ['arc-planning', 'DAG breakdown']]], ['Execution', t.ember, [['arc-executing-tasks', 'human-in-the-loop'], ['arc-agent-driven', 'subagent per task + review'], ['arc-implementing', 'epic orchestrator'], ['arc-dispatching-parallel', 'parallel agent dispatch'], ['arc-dispatching-teammates', 'multi-epic teammates'], ['arc-looping', 'cross-session autonomy']]], ['Coordination', t.brass, [['arc-using', 'bounded router · skill index'], ['arc-using-worktrees', 'isolated workspaces'], ['arc-coordinating', 'worktree lifecycle'], ['arc-finishing', 'branch completion'], ['arc-finishing-epic', 'epic completion'], ['arc-compacting', 'strategic /compact timing'], ['arc-managing-sessions', 'handover + archive']]], ['Quality', t.ember, [['arc-tdd', 'RED → GREEN → REFACTOR'], ['arc-debugging', 'four-phase debug'], ['arc-verifying', 'evidence before claims'], ['arc-requesting-review', 'when to request review'], ['arc-receiving-review', 'handle feedback rigor'], ['arc-evaluating', 'measure behavioral change'], ['arc-auditing-spec', 'read-only spec audit']]], ['Learning', t.brass, [['arc-journaling', 'pre-compaction reflection'], ['arc-reflecting', 'insights from diaries'], ['arc-learning', 'opt-in candidate lifecycle'], ['arc-observing', 'tool-call observation'], ['arc-recalling', 'instinct creation'], ['arc-researching', 'hypothesis experiments']]], ['Knowledge Base', t.ember, [['arc-maintaining-obsidian', 'vault lifecycle'], ['arc-diagramming-obsidian', 'Excalidraw diagrams']]], ['Meta · project-level', t.dim, [['arc-writing-skills', 'TDD for ArcForge\'s own skills']]]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
@@ -823,13 +824,13 @@ function SkillsGrid({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "09",
     kicker: "SKILLS",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "33 skills, organized by ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "33 skills: ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "functional role.")),
-    sub: "Seven categories matching the docs reference. Call any skill directly when you know the path; let arc-using route on demand when you don't. Meta is project-level \u2014 for maintaining ArcForge itself, not normal product work.",
+    }, "layer first"), ", category second."),
+    sub: "ArcForge has a promoted Core toolkit, Optional workflows, and Harness/eval gates. The catalog below keeps the seven functional categories for lookup; Meta stays project-level for maintaining ArcForge itself.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -838,7 +839,57 @@ function SkillsGrid({
       flexDirection: 'column',
       gap: 36
     }
-  }, groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "af-grid-3col",
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: 20
+    }
+  }, layers.map(([name, color, count, desc]) => /*#__PURE__*/React.createElement("div", {
+    key: name,
+    style: {
+      background: t.card,
+      border: `1px solid ${color}`,
+      padding: '24px 26px',
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '"JetBrains Mono",monospace',
+      fontSize: 10,
+      letterSpacing: 2,
+      color,
+      marginBottom: 10,
+      textTransform: 'uppercase'
+    }
+  }, count), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontFamily: '"Fraunces",serif',
+      fontStyle: 'italic',
+      fontSize: 24,
+      color: t.ink,
+      margin: '0 0 12px 0',
+      fontWeight: 400
+    }
+  }, name), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: t.mute,
+      lineHeight: 1.55,
+      margin: 0
+    }
+  }, desc)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '"JetBrains Mono",monospace',
+      fontSize: 10,
+      letterSpacing: 2,
+      color: t.dim,
+      textTransform: 'uppercase',
+      borderTop: `1px dashed ${t.line}`,
+      paddingTop: 18
+    }
+  }, "Functional lookup \xB7 seven categories"), groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
     key: name
   }, /*#__PURE__*/React.createElement("div", {
     style: {
