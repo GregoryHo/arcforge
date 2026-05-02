@@ -164,7 +164,7 @@ function HeroSchematic({theme:t}) {
         </g>
         {[
           {name:'SessionStart',   sub:'inject-skills'},
-          {name:'UserPrompt',     sub:'arc-using routes'},
+          {name:'UserPrompt',     sub:'arc-using on demand'},
           {name:'Pre/Post Tool',  sub:'observe · quality'},
           {name:'Stop',           sub:'journal · compact'},
         ].map((o,i)=>(

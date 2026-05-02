@@ -9,14 +9,22 @@ function SDDPipeline({
     id: "pipeline"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "02",
-    kicker: "SDD \xB7 THE SPINE",
+    kicker: "SDD \xB7 LIVING SPEC WIKI",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "A session that ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
     }, "designs"), " before it codes."),
-    sub: "Spec-driven development runs as two connected pipelines. Upstream explores, refines, and plans. Downstream implements, reviews, and learns. Skills advance the agent through each stage automatically.",
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Spec-driven development as a maintained spec wiki. ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: t.ink
+      }
+    }, "Humans"), " own intent, tradeoffs, and approvals; ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: t.ink
+      }
+    }, "LLM agents"), " maintain the artifacts \u2014 behavior scenarios, architecture, contracts, decision logs, open questions, and drift/sync bookkeeping. Upstream skills explore, refine, and plan; downstream skills implement, review, and learn."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,

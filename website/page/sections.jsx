@@ -299,51 +299,55 @@ function Platforms({theme:t}) {
 
 // ─── Skills Grid (all 33) ───
 function SkillsGrid({theme:t}) {
+  // Aligned to the seven functional categories in docs/guide/skills-reference.md.
+  // Meta is called out as project-level, not a normal user-facing skill.
   const groups = [
-    ['Workflow', t.ember, [
-      ['arc-using','routing check for task scale'],
+    ['Planning', t.brass, [
       ['arc-brainstorming','design exploration'],
       ['arc-refining','spec generation'],
-      ['arc-planning','DAG breakdown'],
-      ['arc-coordinating','worktree management'],
-      ['arc-implementing','TDD implementation'],
-    ]],
-    ['Supporting', t.brass, [
-      ['arc-using-worktrees','isolated workspaces'],
-      ['arc-finishing-epic','epic completion'],
-      ['arc-finishing','branch completion'],
       ['arc-writing-tasks','break into tasks'],
-      ['arc-dispatching-parallel','parallel agent dispatch'],
-      ['arc-verifying','evidence before claims'],
-      ['arc-debugging','four-phase debug'],
-      ['arc-writing-skills','TDD for skills'],
-      ['arc-compacting','strategic /compact timing'],
+      ['arc-planning','DAG breakdown'],
     ]],
     ['Execution', t.ember, [
-      ['arc-tdd','RED → GREEN → REFACTOR'],
-      ['arc-agent-driven','subagent per task + review'],
       ['arc-executing-tasks','human-in-the-loop'],
+      ['arc-agent-driven','subagent per task + review'],
+      ['arc-implementing','epic orchestrator'],
+      ['arc-dispatching-parallel','parallel agent dispatch'],
       ['arc-dispatching-teammates','multi-epic teammates'],
       ['arc-looping','cross-session autonomy'],
     ]],
-    ['Session · Learning', t.brass, [
+    ['Coordination', t.brass, [
+      ['arc-using','bounded router · skill index'],
+      ['arc-using-worktrees','isolated workspaces'],
+      ['arc-coordinating','worktree lifecycle'],
+      ['arc-finishing','branch completion'],
+      ['arc-finishing-epic','epic completion'],
+      ['arc-compacting','strategic /compact timing'],
+      ['arc-managing-sessions','handover + archive'],
+    ]],
+    ['Quality', t.ember, [
+      ['arc-tdd','RED → GREEN → REFACTOR'],
+      ['arc-debugging','four-phase debug'],
+      ['arc-verifying','evidence before claims'],
+      ['arc-requesting-review','when to request review'],
+      ['arc-receiving-review','handle feedback rigor'],
+      ['arc-evaluating','measure behavioral change'],
+      ['arc-auditing-spec','read-only spec audit'],
+    ]],
+    ['Learning', t.brass, [
       ['arc-journaling','pre-compaction reflection'],
       ['arc-reflecting','insights from diaries'],
       ['arc-learning','opt-in candidate lifecycle'],
       ['arc-observing','tool-call observation'],
       ['arc-recalling','instinct creation'],
-      ['arc-managing-sessions','handover + archive'],
       ['arc-researching','hypothesis experiments'],
     ]],
-    ['Knowledge · Wiki', t.ember, [
+    ['Knowledge Base', t.ember, [
       ['arc-maintaining-obsidian','vault lifecycle'],
       ['arc-diagramming-obsidian','Excalidraw diagrams'],
     ]],
-    ['Review · Eval', t.brass, [
-      ['arc-requesting-review','when to request review'],
-      ['arc-receiving-review','handle feedback rigor'],
-      ['arc-evaluating','measure behavioral change'],
-      ['arc-auditing-spec','read-only spec audit'],
+    ['Meta · project-level', t.dim, [
+      ['arc-writing-skills','TDD for ArcForge\'s own skills'],
     ]],
   ];
   return (
@@ -351,8 +355,8 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="09"
         kicker="SKILLS"
-        title={<>33 skills, organized by <em style={{color:t.brass,fontStyle:'italic'}}>how you work</em> — not what to memorize.</>}
-        sub="Grouped so the agent can pick the smallest useful one. Call any skill directly when you already know the path; let arc-using route when you don't."
+        title={<>33 skills, organized by <em style={{color:t.brass,fontStyle:'italic'}}>functional role.</em></>}
+        sub="Seven categories matching the docs reference. Call any skill directly when you know the path; let arc-using route on demand when you don't. Meta is project-level — for maintaining ArcForge itself, not normal product work."
         theme={t}
       />
       <div data-af-reveal style={{display:'flex',flexDirection:'column',gap:36}}>

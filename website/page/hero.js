@@ -441,7 +441,7 @@ function HeroSchematic({
     sub: 'inject-skills'
   }, {
     name: 'UserPrompt',
-    sub: 'arc-using routes'
+    sub: 'arc-using on demand'
   }, {
     name: 'Pre/Post Tool',
     sub: 'observe · quality'
