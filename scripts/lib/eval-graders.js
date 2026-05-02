@@ -212,6 +212,7 @@ function gradeWithCode(result, testCommand, projectRoot, assertionCount = 0) {
     : ['sh', ['-c', testCommand]];
   const env = { ...process.env };
   if (result.trialDir) env.TRIAL_DIR = result.trialDir;
+  if (result.transcript) env.TRANSCRIPT_PATH = result.transcript;
   env.PROJECT_ROOT = projectRoot;
   const cwd = result.trialDir || projectRoot;
   const { exitCode, stdout, stderr } = execCommand(cmd, args, { cwd, env });

@@ -344,6 +344,29 @@ describe('eval-graders.js', () => {
       expect(graded.passed).toBe(false);
     });
 
+    it('passes trial transcript path to code graders', () => {
+      const result = makeTrialResult({
+        grader: 'code',
+        trialDir: tempDir,
+        transcript: path.join(tempDir, 'trial-1.txt'),
+      });
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: 'A1:PASS\n', stderr: '', exitCode: 0 });
+
+      gradeWithCode(result, 'node grader.js', tempDir, 1);
+
+      expect(mockUtils.execCommand).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'node grader.js'],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            PROJECT_ROOT: tempDir,
+            TRIAL_DIR: tempDir,
+            TRANSCRIPT_PATH: path.join(tempDir, 'trial-1.txt'),
+          }),
+        }),
+      );
+    });
+
     it('fails closed when a label is missing for a scenario assertion', () => {
       const result = makeTrialResult({ grader: 'code', trialDir: tempDir });
       mockUtils.execCommand.mockReturnValueOnce({ stdout: 'A1:PASS\n', stderr: '', exitCode: 0 });
