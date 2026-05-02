@@ -23,7 +23,11 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
-const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
+const {
+  getProjectId,
+  isLearningEnabled,
+  triggerAutomaticLearning,
+} = require('../../scripts/lib/learning');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -128,6 +132,16 @@ function signalDaemon() {
   }
 }
 
+function runAutomaticLearningTrigger(
+  projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
+) {
+  try {
+    triggerAutomaticLearning({ projectRoot });
+  } catch {
+    // Learning analysis is best-effort and must never block tool execution.
+  }
+}
+
 // ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
@@ -191,8 +205,10 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
-    // Signal daemon
+    // Signal daemon and run the lightweight automatic analyzer. The analyzer only
+    // appends pending candidates; it never materializes or activates artifacts.
     signalDaemon();
+    runAutomaticLearningTrigger(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   } catch {
     // Non-blocking — never fail the hook
   }
@@ -210,4 +226,5 @@ module.exports = {
   getArchiveDir,
   getPidFile,
   shouldObserve,
+  runAutomaticLearningTrigger,
 };

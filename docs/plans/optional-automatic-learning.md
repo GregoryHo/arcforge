@@ -82,8 +82,7 @@ Reads observation records and looks for repeated structures: the same
 sequence of tool calls across multiple sessions, recurring corrections,
 recurring success paths, recurring failure modes.
 
-- Runs on a debounced schedule (every N session ends, or daily,
-  whichever comes first).
+- Runs automatically from the observe hook after enabled project observation writes, with duplicate suppression; `arcforge learn analyze --project` remains available as a manual backfill/debug command.
 - Output: zero or more **candidates** written to the candidate queue.
 - Each candidate carries provenance (which sessions it came from), a
   proposed name, a proposed scope (project vs global), and a confidence

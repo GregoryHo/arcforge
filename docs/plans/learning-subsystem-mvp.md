@@ -366,6 +366,7 @@ Acceptance:
 - Disabled learning prevents learning observation writes.
 - Enabled learning writes sanitized observations.
 - Hook errors never block tool execution.
+- Enabled project learning triggers lightweight candidate analysis automatically after observation writes; this may append pending candidates only and must not materialize or activate artifacts.
 
 ### Task 3: Candidate queue library
 
@@ -386,7 +387,7 @@ Acceptance:
 
 Files:
 
-- Extend `skills/arc-learning/scripts/learn.js` or create a focused analyzer helper.
+- Implement analyzer in `scripts/lib/learning.js` and expose it through `arcforge learn analyze --project` plus the observe-hook automatic trigger.
 - Add fixture observations.
 - Add tests.
 

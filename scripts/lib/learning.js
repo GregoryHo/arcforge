@@ -652,6 +652,18 @@ function analyzeLearning({
   };
 }
 
+function triggerAutomaticLearning({
+  projectRoot = process.cwd(),
+  homeDir,
+  now = new Date().toISOString(),
+} = {}) {
+  const project = analyzeLearning({ scope: 'project', projectRoot, homeDir, now });
+  const global = isLearningEnabled({ scope: 'global', projectRoot, homeDir })
+    ? analyzeLearning({ scope: 'global', projectRoot, homeDir, now })
+    : { scope: 'global', enabled: false, emitted: 0, candidates: [] };
+  return { project, global };
+}
+
 module.exports = {
   REQUIRED_CANDIDATE_FIELDS,
   VALID_SCOPES,
@@ -672,5 +684,6 @@ module.exports = {
   readLearningConfig,
   setLearningEnabled,
   transitionCandidate,
+  triggerAutomaticLearning,
   validateCandidate,
 };

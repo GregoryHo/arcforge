@@ -1,95 +1,97 @@
 """Tests for arc-learning skill.
 
-Verifies the skill document contains required elements for instinct clustering,
-including cluster workflow, key principles, and CLI commands.
+Verifies the skill document describes the optional learning lifecycle:
+observe -> automatic candidate queue -> review/approve -> draft materialize -> inspect -> explicit activate.
 """
 
 from pathlib import Path
 
 
 def _read_skill() -> str:
-    """Read skill file using relative path (consistent with existing test patterns)."""
     skill_path = Path("skills/arc-learning/SKILL.md")
     return skill_path.read_text(encoding="utf-8")
 
 
 def test_frontmatter_exists():
-    """Skill must have valid frontmatter."""
     text = _read_skill()
     assert text.startswith("---\n")
     assert "name: arc-learning" in text
     assert "description:" in text
 
 
-def test_description_mentions_clustering():
-    """Description should reference clustering instincts."""
+def test_description_mentions_optional_candidate_lifecycle():
+    text = _read_skill().lower()
+    assert "optional" in text
+    assert "candidate" in text
+    assert "lifecycle" in text
+
+
+def test_has_quick_reference_for_supported_arcforge_commands():
     text = _read_skill()
-    assert "cluster" in text.lower()
-    assert "instinct" in text.lower()
+    assert "## Quick Reference" in text
+    for command in [
+        "arcforge learn status",
+        "arcforge learn enable --project",
+        "arcforge learn disable --project",
+        "arcforge learn analyze --project",
+        "arcforge learn review --project",
+        "arcforge learn approve <candidate-id> --project",
+        "arcforge learn reject <candidate-id> --project",
+        "arcforge learn materialize <candidate-id> --project",
+        "arcforge learn inspect <candidate-id> --project",
+        "arcforge learn drafts --project",
+        "arcforge learn activate <candidate-id> --project",
+    ]:
+        assert command in text
 
 
-def test_has_workflow():
-    """Skill must document the clustering workflow."""
-    text = _read_skill()
-    assert "## Workflow" in text
-    assert "Scan" in text
-    assert "Cluster" in text
-    assert "Filter" in text
-    assert "Preview" in text
+def test_has_workflow_with_approval_and_activation_gates():
+    text = _read_skill().lower()
+    assert "## workflow" in text
+    assert "disabled by default" in text
+    assert "automatic once enabled" in text
+    assert "pending candidate" in text
+    assert "approve" in text
+    assert "reject" in text
+    assert "materialize" in text
+    assert ".draft" in text
+    assert "inspect" in text
+    assert "explicit activation" in text
 
 
-def test_has_key_principles():
-    """Skill must document key principles."""
-    text = _read_skill()
-    assert "## Key Principles" in text
-    assert "User-driven" in text
-    assert "Minimum cluster size" in text
-    assert "Quality threshold" in text
+def test_key_principles_enforce_conservative_learning():
+    text = _read_skill().lower()
+    assert "## key principles" in text
+    assert "no active behavior change without explicit activation" in text
+    assert "project scope first" in text
+    assert "global" in text and "unsupported" in text
+    assert "redacted" in text
 
 
-def test_has_cli_commands():
-    """Skill must document new CLI commands (scan, preview)."""
-    text = _read_skill()
-    assert "scan" in text
-    assert "preview" in text
-
-
-def test_no_old_commands():
-    """Skill must NOT reference old commands (save, confirm, contradict, check-duplicate)."""
-    text = _read_skill()
-    # These old commands should not appear as CLI commands
-    assert "check-duplicate" not in text
-    # save/confirm/contradict could appear in general text, but not as CLI command references
-    assert "learn.js save" not in text
-    assert "learn.js confirm" not in text
-    assert "learn.js contradict" not in text
-
-
-def test_has_when_to_use():
-    """Skill must have When to Use section."""
+def test_when_to_use_and_not_to_use_sections_exist():
     text = _read_skill()
     assert "## When to Use" in text
-
-
-def test_has_when_not_to_use():
-    """Skill must have When NOT to Use section."""
-    text = _read_skill()
     assert "## When NOT to Use" in text
 
 
-def test_has_quick_reference():
-    """Skill must have Quick Reference table."""
-    text = _read_skill()
-    assert "## Quick Reference" in text
+def test_no_legacy_direct_generation_guidance():
+    text = _read_skill().lower()
+    assert "generate artifact" not in text
+    assert "directly generate active" not in text
+    assert "learn.js generate" not in text
+    assert "check-duplicate" not in text
 
 
-def test_has_position():
-    """Skill must document its position in the workflow."""
-    text = _read_skill()
-    assert "Position:" in text
-    assert "instincts" in text.lower()
+def test_position_documents_queue_and_draft_path():
+    text = _read_skill().lower()
+    assert "position:" in text
+    assert "observations" in text
+    assert "candidate queue" in text
+    assert "inactive drafts" in text
+    assert "active artifacts" in text
 
 
-def test_scripts_exist():
-    """Learn CLI script must exist."""
+def test_scripts_exist_as_legacy_compatibility_only():
     assert Path("skills/arc-learning/scripts/learn.js").exists()
+    text = _read_skill().lower()
+    assert "legacy" in text

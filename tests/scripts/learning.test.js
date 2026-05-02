@@ -17,6 +17,7 @@ const {
   readLearningConfig,
   setLearningEnabled,
   transitionCandidate,
+  triggerAutomaticLearning,
   validateCandidate,
 } = require('../../scripts/lib/learning');
 
@@ -660,6 +661,47 @@ describe('learning subsystem MVP-1', () => {
     expect(analyzed.emitted).toBe(1);
     expect(analyzed.candidates[0].name).toBe('arc-releasing');
     expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(1);
+  });
+
+  it('automatically analyzes enabled project learning after new observations without activating artifacts', () => {
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-a',
+        project: path.basename(projectRoot),
+        input: 'npm version patch && npm test && git tag v1.2.3',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-release-b',
+        project: path.basename(projectRoot),
+        input: 'release notes and full tests before tag and push',
+      },
+    ]);
+
+    const result = triggerAutomaticLearning({
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T02:00:00Z',
+    });
+
+    expect(result.project.enabled).toBe(true);
+    expect(result.project.emitted).toBe(1);
+    const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      name: 'arc-releasing',
+      status: 'pending',
+    });
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
   });
 
   it('CLI learn review/approve/reject manages candidate lifecycle without deleting evidence', () => {
