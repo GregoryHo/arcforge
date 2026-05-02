@@ -6,9 +6,9 @@ function SDDPipeline({theme:t}) {
     <PageSection theme={t} id="pipeline">
       <SectionHeader
         n="04"
-        kicker="OPTIONAL WORKFLOW · LIVING SPEC WIKI"
-        title={<>A session that <em style={{color:t.brass,fontStyle:'italic'}}>designs</em> before it codes.</>}
-        sub={<>Spec-driven development as a maintained spec wiki. <span style={{color:t.ink}}>Humans</span> own intent, tradeoffs, and approvals; <span style={{color:t.ink}}>LLM agents</span> maintain the artifacts — behavior scenarios, architecture, contracts, decision logs, open questions, and drift/sync bookkeeping. Upstream skills explore, refine, and plan; downstream skills implement, review, and learn.</>}
+        kicker="V3 · LIVING SPEC WIKI · OPTIMIZATION LOOP"
+        title={<>A spec that <em style={{color:t.brass,fontStyle:'italic'}}>compounds</em>, agent after agent.</>}
+        sub={<>The optimization flow at the core of v3. <span style={{color:t.ink}}>Humans</span> contribute intent, tradeoffs, and approvals. <span style={{color:t.ink}}>LLMs</span> maintain the artifacts — behavior scenarios, contracts, decisions, drift warnings — so each cycle leaves the next agent (or your future session) with a sharper map. Reconstruction beats re-explanation.</>}
         theme={t}
       />
 
@@ -109,6 +109,117 @@ function SDDPipeline({theme:t}) {
             <text x="40" y="700" transform="rotate(-2 40 700)">one workflow, four gears — pick the one that fits the work</text>
           </g>
         </svg>
+      </div>
+
+      {/* V3 Living SDD loop — the optimization cycle */}
+      <div data-af-reveal style={{marginTop:72,background:t.card,border:`1px solid ${t.line}`,borderRadius:4,padding:'40px 48px 36px',position:'relative'}}>
+        <CornerMark pos={{top:8,left:8}} color={t.brass}/>
+        <CornerMark pos={{top:8,right:8}} flip color={t.brass}/>
+        <div style={{display:'flex',alignItems:'center',gap:14,fontSize:11,letterSpacing:3,color:t.brass,marginBottom:14,fontFamily:'"JetBrains Mono",monospace'}}>
+          <span style={{fontWeight:700}}>THE V3 LOOP</span>
+          <span style={{width:28,height:1,background:t.brass}}/>
+          <span style={{color:t.dim}}>INTENT → ARTIFACTS → BUILD → SYNC → RECONSTRUCT</span>
+        </div>
+        <h3 style={{fontFamily:'"Fraunces",serif',fontWeight:400,fontStyle:'italic',fontSize:30,letterSpacing:-.5,margin:'0 0 10px 0',color:t.ink}}>
+          Each cycle leaves the next agent a sharper map.
+        </h3>
+        <p style={{color:t.mute,fontSize:14,lineHeight:1.6,maxWidth:820,margin:'0 0 32px 0'}}>
+          Artifacts persist across sessions. When a new session starts — or a fresh agent inherits the work — the spec carries behavior, contracts, and decisions forward instead of re-asking. Code is reconstructable; intent and tradeoffs are not.
+        </p>
+
+        {/* horizontal stage strip */}
+        <div style={{display:'flex',flexWrap:'wrap',alignItems:'stretch',gap:0,marginBottom:32,borderTop:`1px dashed ${t.line}`,borderBottom:`1px dashed ${t.line}`,padding:'18px 0'}}>
+          {(() => {
+            const stages = [
+              ['intent','human signal',t.brass],
+              ['living spec wiki','LLM-maintained',t.brass],
+              ['dag · tasks','plan derived',t.brass],
+              ['implementation','build the thing',t.ember],
+              ['spec sync','LLM updates artifacts',t.ember],
+              ['verify · eval','evidence gate',t.ember],
+              ['resume · reconstruct','next agent inherits',t.brass],
+            ];
+            const out = [];
+            stages.forEach(([name,note,color],i) => {
+              out.push(
+                <div key={`s-${i}`} style={{flex:'1 1 130px',minWidth:120,padding:'4px 6px'}}>
+                  <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color,fontWeight:700}}>{name}</div>
+                  <div style={{fontSize:11,color:t.mute,fontStyle:'italic',fontFamily:'"Fraunces",serif',marginTop:3,lineHeight:1.4}}>{note}</div>
+                </div>
+              );
+              if (i < stages.length - 1) {
+                out.push(
+                  <div key={`a-${i}`} style={{display:'flex',alignItems:'center',color:t.dim,fontFamily:'"JetBrains Mono",monospace',fontSize:14,padding:'0 2px'}}>→</div>
+                );
+              }
+            });
+            return out;
+          })()}
+        </div>
+
+        {/* ownership split */}
+        <div className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:32}}>
+          <div>
+            <div style={{fontSize:10,letterSpacing:2.5,color:t.brass,fontWeight:700,marginBottom:10,fontFamily:'"JetBrains Mono",monospace'}}>HUMAN-OWNED</div>
+            <ul style={{margin:0,paddingLeft:18,color:t.mute,fontSize:13,lineHeight:1.7}}>
+              <li>Intent and product principles</li>
+              <li>Priority and tradeoff decisions</li>
+              <li>Approving (or correcting) LLM summaries</li>
+              <li>Open questions the agent must not invent answers for</li>
+            </ul>
+          </div>
+          <div>
+            <div style={{fontSize:10,letterSpacing:2.5,color:t.ember,fontWeight:700,marginBottom:10,fontFamily:'"JetBrains Mono",monospace'}}>LLM-OWNED</div>
+            <ul style={{margin:0,paddingLeft:18,color:t.mute,fontSize:13,lineHeight:1.7}}>
+              <li>Behavior scenarios, contracts, architecture notes</li>
+              <li>Decision log: what was decided and why</li>
+              <li>Spec sync from diffs, tests, and conversation</li>
+              <li>Drift warnings when code and spec diverge</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Living SDD artifacts */}
+      <div data-af-reveal style={{marginTop:48,background:t.bg2,border:`1px solid ${t.line}`,borderRadius:4,padding:'40px 48px 12px',position:'relative'}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,fontSize:11,letterSpacing:3,color:t.ember,marginBottom:14,fontFamily:'"JetBrains Mono",monospace'}}>
+          <span style={{fontWeight:700}}>ARTIFACTS · specs/&lt;id&gt;/</span>
+          <span style={{width:28,height:1,background:t.ember}}/>
+          <span style={{color:t.dim}}>WHAT THE AGENT MAINTAINS</span>
+        </div>
+        <h3 style={{fontFamily:'"Fraunces",serif',fontWeight:400,fontStyle:'italic',fontSize:24,letterSpacing:-.3,margin:'0 0 24px 0',color:t.ink}}>
+          A small set of pages a future agent can rebuild from.
+        </h3>
+        <div style={{display:'grid',gridTemplateColumns:'1fr',gap:0,borderTop:`1px solid ${t.line}`}}>
+          {[
+            ['intent.md','Why the product exists. Goals, non-goals, constraints, success criteria.'],
+            ['behavior.md','Workflows, scenarios, acceptance criteria, edge cases, failure modes.'],
+            ['architecture.md','Modules, boundaries, dependencies, invariants, rationale.'],
+            ['contracts.md','CLI commands, APIs, config schemas, file formats, hook contracts.'],
+            ['decisions.md','Decision log: choice, reason, alternatives, consequences, approval.'],
+            ['verification.md','How a future agent knows it rebuilt the system right — tests, smoke checks, evals.'],
+            ['open-questions.md','The only place unresolved human decisions accumulate. Agents ask, never invent.'],
+          ].map(([name,desc])=>(
+            <div key={name} style={{borderBottom:`1px solid ${t.line}`,padding:'16px 0',display:'grid',gridTemplateColumns:'200px 1fr',gap:16,alignItems:'baseline'}}>
+              <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.brass,fontWeight:600}}>{name}</div>
+              <div style={{fontSize:13,color:t.mute,lineHeight:1.55}}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SDD Lite vs Full SDD */}
+      <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24,marginTop:48}}>
+        <div style={{background:t.card,border:`1px solid ${t.line}`,padding:'28px 32px',borderRadius:3}}>
+          <div style={{fontSize:11,letterSpacing:3,color:t.brass,fontWeight:700,marginBottom:10,fontFamily:'"JetBrains Mono",monospace'}}>SDD LITE</div>
+          <div style={{fontFamily:'"Fraunces",serif',fontSize:20,fontStyle:'italic',color:t.ink,marginBottom:10,letterSpacing:-.3}}>For ordinary feature work.</div>
+          <p style={{color:t.mute,fontSize:13,lineHeight:1.6,margin:0}}>Low human effort, not low artifact value. The LLM extracts and updates the artifacts; you review summaries and answer the few decisions that matter. No DAG, no worktrees, no audit required.</p>
+        </div>
+        <div style={{background:t.card,border:`1px solid ${t.line}`,padding:'28px 32px',borderRadius:3}}>
+          <div style={{fontSize:11,letterSpacing:3,color:t.ember,fontWeight:700,marginBottom:10,fontFamily:'"JetBrains Mono",monospace'}}>FULL SDD</div>
+          <div style={{fontFamily:'"Fraunces",serif',fontSize:20,fontStyle:'italic',color:t.ink,marginBottom:10,letterSpacing:-.3}}>Only when scale or risk justifies it.</div>
+          <p style={{color:t.mute,fontSize:13,lineHeight:1.6,margin:0}}>Multi-epic work, parallel agents, long-lived changes, high-risk contracts, skill or harness work that needs eval evidence. Adds DAGs, epics, worktrees, audits, and eval matrices on top of the Lite artifacts.</p>
+        </div>
       </div>
 
       {/* upstream / downstream deep-dives */}
