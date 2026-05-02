@@ -163,11 +163,21 @@ function Hero({
       maxWidth: 520,
       fontFamily: '"JetBrains Mono",ui-monospace,monospace'
     }
-  }, "A skill-based autonomous workflow engine for Claude Code, Codex, Gemini CLI, and OpenCode. Hooks inject the right skill at the right moment \u2014 so design, planning, TDD, and review happen", ' ', /*#__PURE__*/React.createElement("span", {
+  }, "A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.ink
     }
-  }, "because the workflow enforces them.")), /*#__PURE__*/React.createElement("div", {
+  }, "smallest useful workflow"), " for the task and runs direct when nothing more is needed."), /*#__PURE__*/React.createElement("p", {
+    style: {
+      marginTop: 14,
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: t.dim,
+      maxWidth: 520,
+      fontFamily: '"Fraunces",serif',
+      fontStyle: 'italic'
+    }
+  }, "Simple on the surface. Strict underneath."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 40,
       display: 'flex',
@@ -205,24 +215,24 @@ function Hero({
       flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement(Stamp, {
-    label: "SDD",
-    sub: "PIPELINE",
+    label: "INTENT",
+    sub: "ROUTED",
     color: t.ember
   }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "TDD",
-    sub: "ENFORCED",
+    label: "SKILLS",
+    sub: "GROUPED",
+    color: t.brass
+  }), /*#__PURE__*/React.createElement(Stamp, {
+    label: "SESSIONS",
+    sub: "HANDOFF",
+    color: t.ember
+  }), /*#__PURE__*/React.createElement(Stamp, {
+    label: "LEARNING",
+    sub: "OPT-IN",
     color: t.brass
   }), /*#__PURE__*/React.createElement(Stamp, {
     label: "EVAL",
-    sub: "GRADED",
-    color: t.ember
-  }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "WIKI",
-    sub: "OBSIDIAN",
-    color: t.brass
-  }), /*#__PURE__*/React.createElement(Stamp, {
-    label: "LOOP",
-    sub: "CROSS-SESS",
+    sub: "GATED",
     color: t.ember
   }))), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,

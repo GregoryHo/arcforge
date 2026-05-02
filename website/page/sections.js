@@ -21,7 +21,7 @@ function BeforeAfter({
         fontStyle: 'italic'
       }
     }, "after"), "."),
-    sub: "What changes when the workflow is enforced by the session itself, not by your memory or willpower.",
+    sub: "What changes when discipline shows up by default \u2014 without forcing a workflow on every prompt.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -134,7 +134,7 @@ function BeforeAfter({
 function DayInLife({
   theme: t
 }) {
-  const steps = [['09:02', 'session start', 'SessionStart hooks fire. inject-skills loads the arc-using router. Previous session context injected.', t.brass], ['09:04', '"add OAuth login"', 'arc-using detects a vague idea. Routes to arc-brainstorming.', t.ember], ['09:12', 'brainstorm → refine', 'Design doc committed. Refiner produces spec.xml. Scope declared.', t.brass], ['09:24', 'plan → coordinate', 'DAG emits 12 tasks across 3 epics. arc-using-worktrees spins isolated branches.', t.brass], ['09:38', 'implement (TDD)', 'Subagent per task. Red tests first. Green. Then two-stage review: spec, then quality.', t.ember], ['11:20', 'compact suggested', 'compact-suggester hook fires at 50 tool calls. /compact runs, pre-compact checkpoints state.', t.dim], ['14:05', 'dispatch teammates', 'Epic B and Epic C run in parallel via Claude Code teammate agents. Lead keeps context.', t.ember], ['17:40', 'journal + reflect', 'arc-journaling captures the day\'s reflections before compaction. arc-reflecting surfaces patterns.', t.brass], ['17:45', 'finish + merge', 'arc-finishing-epic runs the merge decision. Worktrees collapse back into main.', t.ember]];
+  const steps = [['09:02', 'session start', 'SessionStart hooks fire. inject-skills sets a minimal bootstrap. Previous session handover injected — five lines, not an archive.', t.brass], ['09:04', '"add OAuth login"', 'Vague intent. arc-using suggests arc-brainstorming as the smallest useful starting point.', t.ember], ['09:12', 'brainstorm → refine', 'Design doc committed. Refiner produces spec.xml. Scope declared.', t.brass], ['09:24', 'plan → coordinate', 'DAG emits 12 tasks across 3 epics. arc-using-worktrees spins isolated branches.', t.brass], ['09:38', 'implement (TDD)', 'Subagent per task. Red tests first. Green. Then two-stage review: spec, then quality.', t.ember], ['11:20', 'compact suggested', 'compact-suggester hook fires at 50 tool calls. /compact runs, pre-compact checkpoints state.', t.dim], ['14:05', 'dispatch teammates', 'Epic B and Epic C run in parallel via Claude Code teammate agents. Lead keeps context.', t.ember], ['17:40', 'journal + reflect', 'arc-journaling captures the day\'s reflections before compaction. arc-reflecting surfaces patterns.', t.brass], ['17:45', 'finish + merge', 'arc-finishing-epic runs the merge decision. Worktrees collapse back into main.', t.ember]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
     id: "day"
@@ -147,7 +147,7 @@ function DayInLife({
         fontStyle: 'italic'
       }
     }, "a whole shift.")),
-    sub: "Walk through a typical session with arcforge. Every transition is triggered by a skill or a hook \u2014 no commands to remember.",
+    sub: "A typical session: intent comes in, the smallest useful skill picks it up, larger workflows compose only when the work earns them.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -433,18 +433,18 @@ function Evaluating({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "06",
     kicker: "EVAL",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "Skills are ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "Trust comes from ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "tested"), ", not just described."),
-    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs \u2014 not vibes. ", /*#__PURE__*/React.createElement("em", {
+    }, "behavior"), ", not promises."),
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Every skill is graded by what an agent ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.ink,
         fontStyle: 'italic'
       }
-    }, "v3 hardens release-flow gates"), ": tag, push, and publish actions are eval-asserted to refuse without explicit maintainer authorization, even when learned-behavior skills are active."),
+    }, "actually did"), " \u2014 parsed from transcript action logs, not vibes. Activation, non-activation, and harness isolation are all measured, so the simple surface stays simple and the strict gates stay strict."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -565,18 +565,18 @@ function SessionLearning({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "07",
     kicker: "SESSION \xB7 SELF-LEARNING",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "Memory between sessions. ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "Pick up where you ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "Instincts"), " that grow \u2014 only when you say so."),
-    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Session and Learning skills turn one-shot chats into a learning loop. ", /*#__PURE__*/React.createElement("em", {
+    }, "left off."), " Learn only when it earns it."),
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Lightweight handover by default \u2014 five-line \"you are here\" markers, not heavy archives. Opt-in learning is ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.ink,
         fontStyle: 'italic'
       }
-    }, "Disabled by default."), " Opt in per project, then observation, candidate queueing, and review run automatically \u2014 three explicit gates stand between any pattern and active behavior."),
+    }, "off until you turn it on per project"), "; once enabled, three explicit gates stand between any pattern and active behavior."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -710,9 +710,9 @@ function SessionLearning({
     fontSize: "18",
     fill: t.ember
   }, /*#__PURE__*/React.createElement("text", {
-    x: "470",
+    x: "485",
     y: "210"
-  }, "approve \u2192 materialize \u2192 activate")))));
+  }, "handoff \u2192 resume \u2192 improve")))));
 }
 
 // ─── Platforms ───
@@ -821,13 +821,13 @@ function SkillsGrid({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "09",
     kicker: "SKILLS",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "The full library \u2014 ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "33 skills, organized by ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "33 skills, 6 groups.")),
-    sub: "Skills trigger by context. The agent routes itself; you never memorize commands.",
+    }, "how you work"), " \u2014 not what to memorize."),
+    sub: "Grouped so the agent can pick the smallest useful one. Call any skill directly when you already know the path; let arc-using route when you don't.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -928,7 +928,7 @@ function SkillRow({
 function Hooks({
   theme: t
 }) {
-  const hooks = [['SessionStart', 'inject-skills', 'Loads arc-using router + ARCFORGE_ROOT. Injects every session start.'], ['SessionStart', 'session-tracker/start', 'Resets counters, initializes session state.'], ['SessionStart', 'session-tracker/inject-context', 'Loads previous session context + learned instincts.'], ['UserPromptSubmit', 'user-message-counter', 'Counts prompts for session evaluation.'], ['PreToolUse', 'observe', 'Captures tool calls for behavioral pattern detection.'], ['PostToolUse', 'quality-check', 'Auto-format (Prettier), type-check (TSC), console.log warnings on Edit.'], ['PostToolUse', 'compact-suggester', 'Suggests /compact at 50 tool calls, then every 25.'], ['PreCompact', 'pre-compact', 'Marks session file with compaction timestamp.'], ['Stop', 'session-tracker/end', 'Saves session metrics (JSON + Markdown summary).']];
+  const hooks = [['SessionStart', 'inject-skills', 'Minimal bootstrap: sets ARCFORGE_ROOT and tells the agent skills are tools, not laws. No mandatory routing.'], ['SessionStart', 'session-tracker/start', 'Resets counters, initializes session state.'], ['SessionStart', 'session-tracker/inject-context', 'Loads previous session context + learned instincts.'], ['UserPromptSubmit', 'user-message-counter', 'Counts prompts for session evaluation.'], ['PreToolUse', 'observe', 'Captures tool calls for behavioral pattern detection.'], ['PostToolUse', 'quality-check', 'Auto-format (Prettier), type-check (TSC), console.log warnings on Edit.'], ['PostToolUse', 'compact-suggester', 'Suggests /compact at 50 tool calls, then every 25.'], ['PreCompact', 'pre-compact', 'Marks session file with compaction timestamp.'], ['Stop', 'session-tracker/end', 'Saves session metrics (JSON + Markdown summary).']];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
     id: "hooks"

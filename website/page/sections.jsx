@@ -8,7 +8,7 @@ function BeforeAfter({theme:t}) {
         n="03"
         kicker="WHY IT MATTERS"
         title={<>The <em style={{color:t.brass,fontStyle:'italic'}}>before</em>, and the <em style={{color:t.ember,fontStyle:'italic'}}>after</em>.</>}
-        sub="What changes when the workflow is enforced by the session itself, not by your memory or willpower."
+        sub="What changes when discipline shows up by default — without forcing a workflow on every prompt."
         theme={t}
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:40}}>
@@ -51,8 +51,8 @@ function BeforeAfter({theme:t}) {
 // ─── Day in the life ───
 function DayInLife({theme:t}) {
   const steps = [
-    ['09:02', 'session start', 'SessionStart hooks fire. inject-skills loads the arc-using router. Previous session context injected.', t.brass],
-    ['09:04', '"add OAuth login"', 'arc-using detects a vague idea. Routes to arc-brainstorming.', t.ember],
+    ['09:02', 'session start', 'SessionStart hooks fire. inject-skills sets a minimal bootstrap. Previous session handover injected — five lines, not an archive.', t.brass],
+    ['09:04', '"add OAuth login"', 'Vague intent. arc-using suggests arc-brainstorming as the smallest useful starting point.', t.ember],
     ['09:12', 'brainstorm → refine', 'Design doc committed. Refiner produces spec.xml. Scope declared.', t.brass],
     ['09:24', 'plan → coordinate', 'DAG emits 12 tasks across 3 epics. arc-using-worktrees spins isolated branches.', t.brass],
     ['09:38', 'implement (TDD)', 'Subagent per task. Red tests first. Green. Then two-stage review: spec, then quality.', t.ember],
@@ -67,7 +67,7 @@ function DayInLife({theme:t}) {
         n="04"
         kicker="A DAY IN THE LIFE"
         title={<>One prompt, <em style={{color:t.brass,fontStyle:'italic'}}>a whole shift.</em></>}
-        sub="Walk through a typical session with arcforge. Every transition is triggered by a skill or a hook — no commands to remember."
+        sub="A typical session: intent comes in, the smallest useful skill picks it up, larger workflows compose only when the work earns them."
         theme={t}
       />
       <div data-af-reveal style={{background:t.card,border:`1px solid ${t.line}`,position:'relative',paddingTop:48}}>
@@ -177,8 +177,8 @@ function Evaluating({theme:t}) {
       <SectionHeader
         n="06"
         kicker="EVAL"
-        title={<>Skills are <em style={{color:t.brass,fontStyle:'italic'}}>tested</em>, not just described.</>}
-        sub={<>arc-evaluating measures whether a skill actually changes agent behavior. Behavioral assertions run against transcript action logs — not vibes. <em style={{color:t.ink,fontStyle:'italic'}}>v3 hardens release-flow gates</em>: tag, push, and publish actions are eval-asserted to refuse without explicit maintainer authorization, even when learned-behavior skills are active.</>}
+        title={<>Trust comes from <em style={{color:t.brass,fontStyle:'italic'}}>behavior</em>, not promises.</>}
+        sub={<>Every skill is graded by what an agent <em style={{color:t.ink,fontStyle:'italic'}}>actually did</em> — parsed from transcript action logs, not vibes. Activation, non-activation, and harness isolation are all measured, so the simple surface stays simple and the strict gates stay strict.</>}
         theme={t}
       />
       <div data-af-reveal className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}}>
@@ -213,8 +213,8 @@ function SessionLearning({theme:t}) {
       <SectionHeader
         n="07"
         kicker="SESSION · SELF-LEARNING"
-        title={<>Memory between sessions. <em style={{color:t.brass,fontStyle:'italic'}}>Instincts</em> that grow — only when you say so.</>}
-        sub={<>Session and Learning skills turn one-shot chats into a learning loop. <em style={{color:t.ink,fontStyle:'italic'}}>Disabled by default.</em> Opt in per project, then observation, candidate queueing, and review run automatically — three explicit gates stand between any pattern and active behavior.</>}
+        title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
+        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -253,7 +253,7 @@ function SessionLearning({theme:t}) {
             );
           })}
           <g fontFamily="'Caveat',cursive" fontSize="18" fill={t.ember}>
-            <text x="470" y="210">approve → materialize → activate</text>
+            <text x="485" y="210">handoff → resume → improve</text>
           </g>
         </svg>
       </div>
@@ -351,8 +351,8 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="09"
         kicker="SKILLS"
-        title={<>The full library — <em style={{color:t.brass,fontStyle:'italic'}}>33 skills, 6 groups.</em></>}
-        sub="Skills trigger by context. The agent routes itself; you never memorize commands."
+        title={<>33 skills, organized by <em style={{color:t.brass,fontStyle:'italic'}}>how you work</em> — not what to memorize.</>}
+        sub="Grouped so the agent can pick the smallest useful one. Call any skill directly when you already know the path; let arc-using route when you don't."
         theme={t}
       />
       <div data-af-reveal style={{display:'flex',flexDirection:'column',gap:36}}>
@@ -389,7 +389,7 @@ function SkillRow({name,desc,color,t}) {
 // ─── Hooks ───
 function Hooks({theme:t}) {
   const hooks = [
-    ['SessionStart','inject-skills','Loads arc-using router + ARCFORGE_ROOT. Injects every session start.'],
+    ['SessionStart','inject-skills','Minimal bootstrap: sets ARCFORGE_ROOT and tells the agent skills are tools, not laws. No mandatory routing.'],
     ['SessionStart','session-tracker/start','Resets counters, initializes session state.'],
     ['SessionStart','session-tracker/inject-context','Loads previous session context + learned instincts.'],
     ['UserPromptSubmit','user-message-counter','Counts prompts for session evaluation.'],

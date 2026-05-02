@@ -42,8 +42,11 @@ function Hero({theme}) {
             agents.
           </h1>
           <p style={{marginTop:32,fontSize:16,lineHeight:1.7,color:t.mute,maxWidth:520,fontFamily:'"JetBrains Mono",ui-monospace,monospace'}}>
-            A skill-based autonomous workflow engine for Claude Code, Codex, Gemini CLI, and OpenCode. Hooks inject the right skill at the right moment — so design, planning, TDD, and review happen{' '}
-            <span style={{color:t.ink}}>because the workflow enforces them.</span>
+            A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws — your agent picks the{' '}
+            <span style={{color:t.ink}}>smallest useful workflow</span> for the task and runs direct when nothing more is needed.
+          </p>
+          <p style={{marginTop:14,fontSize:14,lineHeight:1.7,color:t.dim,maxWidth:520,fontFamily:'"Fraunces",serif',fontStyle:'italic'}}>
+            Simple on the surface. Strict underneath.
           </p>
 
           <div style={{marginTop:40,display:'flex',gap:14,alignItems:'center',flexWrap:'wrap'}}>
@@ -56,11 +59,11 @@ function Hero({theme}) {
           </div>
 
           <div style={{marginTop:56,display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}>
-            <Stamp label="SDD" sub="PIPELINE" color={t.ember}/>
-            <Stamp label="TDD" sub="ENFORCED" color={t.brass}/>
-            <Stamp label="EVAL" sub="GRADED" color={t.ember}/>
-            <Stamp label="WIKI" sub="OBSIDIAN" color={t.brass}/>
-            <Stamp label="LOOP" sub="CROSS-SESS" color={t.ember}/>
+            <Stamp label="INTENT" sub="ROUTED" color={t.ember}/>
+            <Stamp label="SKILLS" sub="GROUPED" color={t.brass}/>
+            <Stamp label="SESSIONS" sub="HANDOFF" color={t.ember}/>
+            <Stamp label="LEARNING" sub="OPT-IN" color={t.brass}/>
+            <Stamp label="EVAL" sub="GATED" color={t.ember}/>
           </div>
         </div>
 
