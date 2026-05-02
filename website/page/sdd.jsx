@@ -5,8 +5,8 @@ function SDDPipeline({theme:t}) {
   return (
     <PageSection theme={t} id="pipeline">
       <SectionHeader
-        n="02"
-        kicker="SDD · LIVING SPEC WIKI"
+        n="04"
+        kicker="OPTIONAL WORKFLOW · LIVING SPEC WIKI"
         title={<>A session that <em style={{color:t.brass,fontStyle:'italic'}}>designs</em> before it codes.</>}
         sub={<>Spec-driven development as a maintained spec wiki. <span style={{color:t.ink}}>Humans</span> own intent, tradeoffs, and approvals; <span style={{color:t.ink}}>LLM agents</span> maintain the artifacts — behavior scenarios, architecture, contracts, decision logs, open questions, and drift/sync bookkeeping. Upstream skills explore, refine, and plan; downstream skills implement, review, and learn.</>}
         theme={t}

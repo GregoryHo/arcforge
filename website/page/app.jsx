@@ -60,15 +60,15 @@ function App() {
   return (
     <div style={{background:theme.bg,color:theme.ink,minHeight:'100vh',fontFamily:'"JetBrains Mono",monospace'}}>
       <Hero theme={theme}/>
-      <SDDPipeline theme={theme}/>
+      <SkillsGrid theme={theme}/>
       <BeforeAfter theme={theme}/>
+      <SDDPipeline theme={theme}/>
       <DayInLife theme={theme}/>
       <Wiki theme={theme}/>
-      <Evaluating theme={theme}/>
       <SessionLearning theme={theme}/>
+      <Evaluating theme={theme}/>
       <Platforms theme={theme}/>
       <Hooks theme={theme}/>
-      <SkillsGrid theme={theme}/>
       <Install theme={theme}/>
       <Footer theme={theme}/>
     </div>

@@ -8,8 +8,8 @@ function SDDPipeline({
     theme: t,
     id: "pipeline"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "02",
-    kicker: "SDD \xB7 LIVING SPEC WIKI",
+    n: "04",
+    kicker: "OPTIONAL WORKFLOW \xB7 LIVING SPEC WIKI",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "A session that ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,

@@ -94,23 +94,23 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(Hero, {
     theme: theme
-  }), /*#__PURE__*/React.createElement(SDDPipeline, {
+  }), /*#__PURE__*/React.createElement(SkillsGrid, {
     theme: theme
   }), /*#__PURE__*/React.createElement(BeforeAfter, {
+    theme: theme
+  }), /*#__PURE__*/React.createElement(SDDPipeline, {
     theme: theme
   }), /*#__PURE__*/React.createElement(DayInLife, {
     theme: theme
   }), /*#__PURE__*/React.createElement(Wiki, {
     theme: theme
-  }), /*#__PURE__*/React.createElement(Evaluating, {
-    theme: theme
   }), /*#__PURE__*/React.createElement(SessionLearning, {
+    theme: theme
+  }), /*#__PURE__*/React.createElement(Evaluating, {
     theme: theme
   }), /*#__PURE__*/React.createElement(Platforms, {
     theme: theme
   }), /*#__PURE__*/React.createElement(Hooks, {
-    theme: theme
-  }), /*#__PURE__*/React.createElement(SkillsGrid, {
     theme: theme
   }), /*#__PURE__*/React.createElement(Install, {
     theme: theme

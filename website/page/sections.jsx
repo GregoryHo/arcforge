@@ -64,8 +64,8 @@ function DayInLife({theme:t}) {
   return (
     <PageSection theme={t} id="day">
       <SectionHeader
-        n="04"
-        kicker="A DAY IN THE LIFE"
+        n="05"
+        kicker="OPTIONAL WORKFLOW · COMPOSED SESSION"
         title={<>One prompt, <em style={{color:t.brass,fontStyle:'italic'}}>a whole shift.</em></>}
         sub="A typical session: intent comes in, the smallest useful skill picks it up, larger workflows compose only when the work earns them."
         theme={t}
@@ -99,8 +99,8 @@ function Wiki({theme:t}) {
   return (
     <PageSection theme={t} id="wiki">
       <SectionHeader
-        n="05"
-        kicker="LLM WIKI"
+        n="06"
+        kicker="OPTIONAL WORKFLOW · KNOWLEDGE BASE"
         title={<>A knowledge base <em style={{color:t.brass,fontStyle:'italic'}}>the agent writes</em> and reads.</>}
         sub={<>Inspired by Karpathy's LLM-wiki pattern. Arcforge maintains a unified Obsidian vault that agents can ingest, query, and audit — with diagrams as first-class nodes.</>}
         theme={t}
@@ -175,8 +175,8 @@ function Evaluating({theme:t}) {
   return (
     <PageSection theme={t} id="eval">
       <SectionHeader
-        n="06"
-        kicker="EVAL"
+        n="08"
+        kicker="HARNESS + EVAL"
         title={<>Trust comes from <em style={{color:t.brass,fontStyle:'italic'}}>behavior</em>, not promises.</>}
         sub={<>Every skill is graded by what an agent <em style={{color:t.ink,fontStyle:'italic'}}>actually did</em> — parsed from transcript action logs, not vibes. Activation, non-activation, and harness isolation are all measured, so the simple surface stays simple and the strict gates stay strict.</>}
         theme={t}
@@ -212,7 +212,7 @@ function SessionLearning({theme:t}) {
     <PageSection theme={t} id="session">
       <SectionHeader
         n="07"
-        kicker="SESSION · SELF-LEARNING"
+        kicker="OPTIONAL WORKFLOW · SESSION MEMORY"
         title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
         sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior.</>}
         theme={t}
@@ -272,7 +272,7 @@ function Platforms({theme:t}) {
   return (
     <PageSection theme={t} id="platforms">
       <SectionHeader
-        n="08"
+        n="09"
         kicker="PLATFORMS"
         title={<>One toolkit, <em style={{color:t.brass,fontStyle:'italic'}}>four harnesses.</em></>}
         sub="Claude Code gets the deepest integration via the plugin marketplace. Codex, Gemini CLI, and OpenCode ship manually but share the same skill library."
@@ -358,7 +358,7 @@ function SkillsGrid({theme:t}) {
   return (
     <PageSection theme={t} id="skills">
       <SectionHeader
-        n="09"
+        n="02"
         kicker="SKILLS"
         title={<>33 skills: <em style={{color:t.brass,fontStyle:'italic'}}>layer first</em>, category second.</>}
         sub="ArcForge has a promoted Core toolkit, Optional workflows, and Harness/eval gates. The catalog below keeps the seven functional categories for lookup; Meta stays project-level for maintaining ArcForge itself."
@@ -422,7 +422,7 @@ function Hooks({theme:t}) {
     <PageSection theme={t} id="hooks">
       <SectionHeader
         n="10"
-        kicker="HOOKS"
+        kicker="IMPLEMENTATION DETAIL · HOOKS"
         title={<>Hooks are how skills <em style={{color:t.brass,fontStyle:'italic'}}>show up without being called.</em></>}
         sub="Claude Code hooks run at lifecycle events. Arcforge uses them to inject skills, track sessions, auto-format code, and suggest compaction before context fills."
         theme={t}

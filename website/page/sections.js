@@ -139,8 +139,8 @@ function DayInLife({
     theme: t,
     id: "day"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "04",
-    kicker: "A DAY IN THE LIFE",
+    n: "05",
+    kicker: "OPTIONAL WORKFLOW \xB7 COMPOSED SESSION",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "One prompt, ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
@@ -231,8 +231,8 @@ function Wiki({
     theme: t,
     id: "wiki"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "05",
-    kicker: "LLM WIKI",
+    n: "06",
+    kicker: "OPTIONAL WORKFLOW \xB7 KNOWLEDGE BASE",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "A knowledge base ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
@@ -431,8 +431,8 @@ function Evaluating({
     theme: t,
     id: "eval"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "06",
-    kicker: "EVAL",
+    n: "08",
+    kicker: "HARNESS + EVAL",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "Trust comes from ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
@@ -564,7 +564,7 @@ function SessionLearning({
     id: "session"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "07",
-    kicker: "SESSION \xB7 SELF-LEARNING",
+    kicker: "OPTIONAL WORKFLOW \xB7 SESSION MEMORY",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "Pick up where you ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
@@ -745,7 +745,7 @@ function Platforms({
     theme: t,
     id: "platforms"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "08",
+    n: "09",
     kicker: "PLATFORMS",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "One toolkit, ", /*#__PURE__*/React.createElement("em", {
       style: {
@@ -822,7 +822,7 @@ function SkillsGrid({
     theme: t,
     id: "skills"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
-    n: "09",
+    n: "02",
     kicker: "SKILLS",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "33 skills: ", /*#__PURE__*/React.createElement("em", {
       style: {
@@ -987,7 +987,7 @@ function Hooks({
     id: "hooks"
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "10",
-    kicker: "HOOKS",
+    kicker: "IMPLEMENTATION DETAIL \xB7 HOOKS",
     title: /*#__PURE__*/React.createElement(React.Fragment, null, "Hooks are how skills ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
