@@ -21,7 +21,7 @@
  *   grader=anything else → 'all-code'  (safe default)
  */
 function getScenarioGradingMode(scenario) {
-  const grader = (scenario && scenario.grader) || 'code';
+  const grader = scenario?.grader || 'code';
   if (grader === 'model') return 'all-model';
   if (grader === 'mixed') return 'mixed';
   return 'all-code';

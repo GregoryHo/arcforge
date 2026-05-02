@@ -10,10 +10,21 @@ echo "========================================"
 echo " Claude Code Skills Test Suite"
 echo "========================================"
 echo ""
-echo "Repository: $(cd ../.. && pwd)"
+echo "Repository: $(cd ../../.. && pwd)"
 echo "Test time: $(date)"
 echo "Claude version: $(claude --version 2>/dev/null || echo 'not found')"
 echo ""
+
+TIMEOUT_CMD=""
+if command -v timeout &> /dev/null; then
+    TIMEOUT_CMD="timeout"
+elif command -v gtimeout &> /dev/null; then
+    TIMEOUT_CMD="gtimeout"
+fi
+if [ -z "$TIMEOUT_CMD" ]; then
+    echo "Note: timeout/gtimeout not found; tests will run without per-test timeout."
+    echo ""
+fi
 
 # Check if Claude Code is available
 if ! command -v claude &> /dev/null; then
@@ -57,7 +68,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --help, -h           Show this help"
             echo ""
             echo "Tests:"
-            echo "  test-arc-agent-driven.sh         Test skill loading and requirements"
+            echo "  test-arc-agent-driven.sh         Test agent-driven skill loading and requirements"
+            echo "  test-arc-learning.sh             Test optional learning lifecycle and safety gates"
             echo ""
             echo "Integration Tests (use --integration):"
             echo "  test-subagent-driven-development-integration.sh  Full workflow execution"
@@ -74,6 +86,7 @@ done
 # List of skill tests to run (fast unit tests)
 tests=(
     "test-arc-agent-driven.sh"
+    "test-arc-learning.sh"
 )
 
 # Integration tests (slow, full execution)
@@ -118,7 +131,12 @@ for test in "${tests[@]}"; do
     start_time=$(date +%s)
 
     if [ "$VERBOSE" = true ]; then
-        if timeout "$TIMEOUT" bash "$test_path"; then
+        if [ -n "$TIMEOUT_CMD" ]; then
+            test_command=("$TIMEOUT_CMD" "$TIMEOUT" bash "$test_path")
+        else
+            test_command=(bash "$test_path")
+        fi
+        if "${test_command[@]}"; then
             end_time=$(date +%s)
             duration=$((end_time - start_time))
             echo ""
@@ -138,7 +156,12 @@ for test in "${tests[@]}"; do
         fi
     else
         # Capture output for non-verbose mode
-        if output=$(timeout "$TIMEOUT" bash "$test_path" 2>&1); then
+        if [ -n "$TIMEOUT_CMD" ]; then
+            test_command=("$TIMEOUT_CMD" "$TIMEOUT" bash "$test_path")
+        else
+            test_command=(bash "$test_path")
+        fi
+        if output=$("${test_command[@]}" 2>&1); then
             end_time=$(date +%s)
             duration=$((end_time - start_time))
             echo "  [PASS] (${duration}s)"

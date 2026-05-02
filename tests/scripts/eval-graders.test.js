@@ -21,9 +21,6 @@ const {
   gradeWithModel,
   gradeWithCode,
   gradeWithMixed,
-  gradeTrialResult,
-  validateGraderResponse,
-  snapScore,
   getGradingPath,
 } = require('../../scripts/lib/eval-graders');
 
