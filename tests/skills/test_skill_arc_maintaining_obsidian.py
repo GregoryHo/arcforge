@@ -397,3 +397,110 @@ def test_reference_search_strategies_exists():
     assert "QMD Route" in ref
     assert "Fallback Route" in ref
     assert "Output Format" in ref
+
+
+# --- Multi-Vault Support (Vault Resolution + Registry Maintenance) ---
+
+
+def _frontmatter_block(text: str) -> str:
+    """Return raw frontmatter body (between the two --- fences)."""
+    if not text.startswith("---\n"):
+        raise AssertionError("missing frontmatter start")
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        raise AssertionError("missing frontmatter end")
+    return text[4:end]
+
+
+def test_argument_hint_lists_registry_subcommands():
+    """argument-hint must advertise the 5 registry maintenance subcommands."""
+    text = _read_skill()
+    front = _frontmatter_block(text)
+    for sub in ["register", "list-vaults", "unregister", "set-default", "init-vault"]:
+        assert sub in front, f"argument-hint must mention `{sub}` subcommand"
+
+
+def test_argument_hint_mentions_vault_flag():
+    """argument-hint must surface the --vault override flag."""
+    text = _read_skill()
+    front = _frontmatter_block(text)
+    assert "--vault" in front, "argument-hint must mention --vault override flag"
+
+
+def test_skill_has_vault_resolution_section():
+    """SKILL.md must define vault resolution (replaces old 'Vault Path' section)."""
+    text = _read_skill()
+    assert "## Vault Resolution" in text or "### Vault Resolution" in text, (
+        "SKILL.md must have a 'Vault Resolution' section documenting the multi-vault cascade"
+    )
+
+
+def test_vault_resolution_documents_cascade():
+    """Vault Resolution must document the explicit override → active → session → default → ask cascade."""
+    text = _read_skill().lower()
+    assert "--vault" in text, "resolution must mention explicit override"
+    assert "active obsidian" in text or "obsidian-cli vault" in text, (
+        "resolution must mention active Obsidian detection"
+    )
+    assert "default" in text and "ask" in text, (
+        "resolution must mention default fallback and ask-the-user fallback"
+    )
+
+
+def test_skill_has_registry_maintenance_section():
+    """SKILL.md must document the registry maintenance subcommands."""
+    text = _read_skill()
+    assert "## Registry Maintenance" in text or "### Registry Maintenance" in text, (
+        "SKILL.md must have a 'Registry Maintenance' section"
+    )
+
+
+def test_registry_path_documented():
+    """SKILL.md must point at ~/.arcforge/obsidian-vaults.json registry location."""
+    text = _read_skill()
+    assert "obsidian-vaults.json" in text, "SKILL.md must reference the registry file"
+    assert ".arcforge" in text, "SKILL.md must reference the ~/.arcforge/ location"
+
+
+def test_registry_never_hand_edited():
+    """SKILL.md must state the registry is skill-managed, not hand-edited."""
+    text = _read_skill().lower()
+    assert "never" in text and ("hand-edit" in text or "hand edit" in text or "skill-managed" in text or "managed by" in text), (
+        "SKILL.md must state the registry is not hand-edited"
+    )
+
+
+def test_init_vault_documented():
+    """init-vault is the headline 'fast adopt' command — must be documented."""
+    text = _read_skill().lower()
+    assert "init-vault" in text
+    assert "starter" in text or "template" in text or "agents-md-template" in text
+
+
+def test_agents_md_template_reference_exists():
+    """The starter AGENTS.md template must exist as a reference file."""
+    ref = _read_reference("agents-md-template.md")
+    assert "<YYYY-MM-DD>" in ref, "template must contain date placeholder"
+    assert "<Vault Name>" in ref, "template must contain vault name placeholder"
+    assert "<TODO" in ref, "template must contain TODO markers for user customization"
+
+
+def test_agents_md_template_has_three_layer_structure():
+    """Template must mirror Karpathy's 3-layer pattern."""
+    ref = _read_reference("agents-md-template.md")
+    assert "Layer 1" in ref and "Raw Sources" in ref
+    assert "Layer 2" in ref and "Wiki" in ref
+    assert "Layer 3" in ref and "Schema" in ref
+
+
+def test_agents_md_template_lists_default_note_types():
+    """Template must list default note types so adopters know the starting set."""
+    ref = _read_reference("agents-md-template.md")
+    for note_type in ["Source", "Entity", "Synthesis", "MOC", "Decision", "Log"]:
+        assert note_type in ref, f"template must mention `{note_type}` note type"
+
+
+def test_agents_md_template_invites_divergence():
+    """Template must explicitly invite users to customize / diverge."""
+    ref = _read_reference("agents-md-template.md").lower()
+    assert "edit" in ref or "diverge" in ref or "customize" in ref or "extend" in ref
