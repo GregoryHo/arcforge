@@ -1,7 +1,7 @@
 ---
 name: arc-maintaining-obsidian
 description: Use when the user wants to create, query, or maintain their Obsidian vault. Trigger on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me about", "do I have notes on"), auditing vault health (missing links, orphan notes, stale content), ingesting raw files (Excalidraw, PDFs, screenshots) into wiki notes, or saying "file this back" / "save this insight" / "crystallize this". Also trigger on mentions of their wiki, knowledge base, or second brain — even casual "save this" or "what did I write about Y". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches, or explaining concepts the user doesn't have vault notes about.
-argument-hint: "help | ingest <url|text> [--batch] [--link] | query <question> | audit [link|lint|grow]"
+argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
 ---
 
 # arc-maintaining-obsidian
@@ -45,6 +45,16 @@ AUDIT (vault health):
   audit lint                Schema check + rebuild index.md
   audit grow                Gap analysis and suggestions
 
+REGISTRY (manage known vaults):
+  init-vault <path> --name <name>    Fast-adopt: AGENTS.md + CLAUDE.md + register + seed
+  register <path> --name <name>      Register existing vault [--default sets default]
+  list-vaults                        Show registered vaults
+  unregister <name>                  Remove from registry (does NOT delete files)
+  set-default <name>                 Update default vault
+
+GLOBAL FLAG (any mode):
+  --vault=<name>            Override vault auto-resolution
+
 Also accepts natural language: "file this back", "check my vault", "save this insight"
 ```
 
@@ -64,14 +74,56 @@ This is a gate, not a suggestion — the reference file contains information the
 
 ## Shared Context
 
-### Vault Path
+### Vault Resolution
 
-On first invocation:
-1. Check if `obsidian-cli` is available — ask it for vault location
-2. If Obsidian not running, ask the user for the vault path
-3. Store the path for subsequent invocations in the session
+The skill supports multiple registered vaults — each with its own AGENTS.md schema, QMD collection, and topic scope. On every invocation, resolve which vault to operate on using this 5-step cascade:
 
-If Obsidian is not running, fall back to direct file writes. Warn that LINK resolution and search require the CLI.
+1. **Explicit override** — if the invocation includes `--vault=<name>`, use that vault. Skip remaining steps.
+2. **Active Obsidian** — run `obsidian-cli vault`. If the returned `path` matches a vault in the registry, use that vault. Print `Operating on: <name> vault` so the user can abort if wrong.
+3. **Session cache** — if step 2 didn't resolve but the session has already picked a vault on a prior turn, reuse it.
+4. **Default** — if the registry has a `default` key, use that vault. Print resolved name.
+5. **Ask** — if registry is empty or has no default, prompt the user with the list of registered vaults.
+
+Once resolved, the vault choice is sticky for the session unless `--vault` overrides it.
+
+**First-run state:** If `~/.arcforge/obsidian-vaults.json` does not exist or has zero registered vaults, do NOT fall through to ad-hoc file writes. Instead, suggest `arc-maintaining-obsidian init-vault <path> --name <name>` (for a fresh wiki) or `register <path> --name <name>` (for an existing vault) before running any ingest/query/audit operation. Adoption flows through the registry, not around it.
+
+If Obsidian is not running for step 2, fall back to step 3 (session cache) → step 4 (default) → step 5 (ask). Warn once that LINK resolution and live search require the Obsidian CLI to be reachable.
+
+### Registry Maintenance
+
+The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill manages this file end-to-end — users never hand-edit it.** Schema:
+
+```json
+{
+  "default": "<vault-name>",
+  "vaults": [
+    {
+      "name": "<short-name>",
+      "path": "<absolute path to vault root>",
+      "qmd_collection": "obsidian-<short-name>",
+      "scope": "<one-line scope statement>"
+    }
+  ]
+}
+```
+
+Maintenance subcommands (all are skill-driven; the LLM reads/writes the JSON via standard file tools and the `obsidian:obsidian-cli` skill):
+
+| Subcommand | Behavior |
+|---|---|
+| `init-vault <path> --name <name>` | Fast-adopt path. Validates `<path>` is a directory. Writes a starter `AGENTS.md` from `references/agents-md-template.md` (substituting `<YYYY-MM-DD>`, `<Vault Name>`, `<auto-set by init-vault>`). Writes `CLAUDE.md` shim. Adds entry to registry. Creates QMD collection `obsidian-<name>`. Runs `audit lint` once to seed `index.md`. Prints next-step reminders (fill `<TODO ...>` markers in AGENTS.md). |
+| `register <path> --name <name> [--default]` | Adds an existing populated vault to the registry. Validates path contains `.md` files. Optionally creates the QMD collection (ask user if not already created). If `--default`, sets the registry default. **Does NOT auto-write AGENTS.md** for already-populated vaults — prints a reminder: *"Vault registered. Author AGENTS.md at `<path>/AGENTS.md` before first ingest."* |
+| `list-vaults` | Prints registered vaults (name, path, default marker, QMD collection). |
+| `unregister <name>` | Removes the entry from `vaults`. If the unregistered name was the `default`, clears the default key. Prompts: *"Also remove QMD collection `obsidian-<name>`? Vault files at `<path>` will NOT be touched."* |
+| `set-default <name>` | Updates the `default` key. Errors if `<name>` not registered. |
+
+**Never hand-edit `obsidian-vaults.json`.** The file is skill-managed because:
+- The schema is small but error-prone (typos in path break Vault Resolution silently).
+- Registry mutations should be paired with side effects (QMD collection create/destroy, AGENTS.md template write, audit lint seed) — `init-vault` and `unregister` bundle these atomically.
+- A user who hand-edits today drifts from the schema tomorrow when fields are added.
+
+If the registry file is missing or malformed, the skill recreates it from scratch via the next `register` or `init-vault` invocation rather than guessing.
 
 ### Vault Structure — Two Layers
 
