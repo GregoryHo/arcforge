@@ -142,6 +142,35 @@ tr:hover td { background: var(--surface); }
 .scenario-info-item { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
 .scenario-info-label { color: var(--text2); }
 .scenario-info-value { color: var(--text); font-weight: 600; }
+.dashboard-hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 18px; }
+.dashboard-kicker { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.dashboard-title { font-size: 22px; line-height: 1.2; font-weight: 750; letter-spacing: -0.02em; }
+.dashboard-subtitle { color: var(--text2); line-height: 1.5; margin-top: 8px; max-width: 760px; }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); gap: 12px; margin-bottom: 16px; }
+.health-card { background: linear-gradient(180deg, rgba(88,166,255,0.08), rgba(22,27,34,0.7)); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.health-value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.health-label { color: var(--text2); font-size: 11px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(280px,0.65fr); gap: 16px; margin-bottom: 16px; }
+.dashboard-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.panel-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.panel-title { font-size: 13px; font-weight: 700; }
+.panel-note { color: var(--text2); font-size: 11px; }
+.attention-list { display: grid; gap: 8px; }
+.attention-item { display: grid; gap: 3px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.attention-item:last-child { border-bottom: 0; }
+.attention-reason { color: var(--text2); font-size: 11px; line-height: 1.4; }
+.coverage-row { display: grid; grid-template-columns: 130px 1fr 48px; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.coverage-track { height: 7px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+.coverage-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.coverage-fill.warn { background: var(--needs-work); }
+.coverage-fill.bad { background: var(--blocked); }
+.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.filter-select, .filter-input { min-height: 32px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; padding: 6px 9px; }
+.filter-input { min-width: 260px; flex: 1; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.table-scroll table { min-width: 1120px; }
+.mono-muted { color: var(--text2); font-size: 11px; }
+@media (max-width: 860px) { .dashboard-hero, .dashboard-grid { display: block; } .dashboard-panel { margin-bottom: 12px; } }
 </style>
 </head>
 <body>
@@ -184,6 +213,27 @@ function fmtTime(ts) { return ts ? new Date(ts).toLocaleString() : '-'; }
 function fmtScore(n) { return n == null ? '-' : n.toFixed(2); }
 function fmtMs(n) { return n == null ? '-' : (n/1000).toFixed(2)+'s'; }
 function fmtNum(n) { return n == null ? '-' : Math.round(n).toLocaleString(); }
+function fmtPct(n) { return n == null ? '-' : Math.round(n*100)+'%'; }
+function fmtDelta(n, formatter) {
+  if (n == null) return '-';
+  const fmt = formatter || ((x) => Math.round(x).toLocaleString());
+  return (n>0?'+':'') + fmt(n);
+}
+function familyFromScenario(name) {
+  return (name || '')
+    .replace(/^eval-/, '')
+    .split('-')
+    .slice(0, 2)
+    .join('-') || 'unknown';
+}
+function statusCounts(scenarios) {
+  return scenarios.reduce((acc, s) => {
+    acc[s.status] = (acc[s.status] || 0) + 1;
+    return acc;
+  }, {});
+}
+function benchmarkEntry(benchmark, name) { return benchmark && benchmark.evals ? benchmark.evals[name] : null; }
+function comparedMetric(entry, metric) { return entry && entry.compared && entry.compared.metrics ? entry.compared.metrics[metric] : null; }
 
 async function api(path) {
   const res = await fetch(path);
@@ -245,7 +295,7 @@ const state = {
   outputsView: 'scenarios',
   scenario: null, runId: null, condition: null,
   trials: [], trialIdx: 0, scenarioMeta: null,
-  feedback: {}, liveLog: [],
+  feedback: {}, liveLog: [], benchmarkFilter: 'all', benchmarkSearch: '',
 };
 
 // SSE
@@ -538,29 +588,216 @@ async function renderBenchmark() {
   const content = $('#benchmark-content');
   content.textContent = 'Loading...';
   try {
-    const {scenarios} = await api('/api/scenarios');
+    const [{scenarios}, benchmark, rawSummary] = await Promise.all([
+      api('/api/scenarios'),
+      api('/api/benchmark'),
+      api('/api/benchmark/raw-summary').catch(() => ({ totalRows: 0, coverage: {} })),
+    ]);
     content.textContent = '';
     if (scenarios.length===0) { content.appendChild(h('div',{className:'empty'},'No scenarios found')); return; }
-    content.appendChild(h('h3',{style:'margin-bottom:16px;font-size:14px'},'Benchmark Overview'));
-    const tbody = h('tbody');
-    for (const s of scenarios) {
-      tbody.appendChild(h('tr',{className:'clickable',onclick:()=>showBenchmarkDetail(s.name)},
-        h('td',null,h('a',null,s.name)),
-        h('td',null,s.scope),h('td',null,s.grader),
-        h('td',null,String(s.resultCount)),
-        h('td',null,s.resultCount>0?scoreBar(s.passRate):h('span',null,'-')),
-        h('td',null,statusBadge(s.status)),
-        h('td',{style:'font-size:11px;color:var(--text2)'},fmtTime(s.lastRun))
-      ));
-    }
-    content.appendChild(h('table',null,
-      h('thead',null,h('tr',null,
-        h('th',null,'Scenario'),h('th',null,'Scope'),h('th',null,'Grader'),
-        h('th',null,'Trials'),h('th',null,'Pass Rate'),
-        h('th',null,'Status'),h('th',null,'Last Run')
-      )),tbody
-    ));
+
+    const rows = scenarios.map((s) => ({
+      scenario: s,
+      benchmark: benchmarkEntry(benchmark, s.name),
+      family: familyFromScenario(s.name),
+    }));
+    content.appendChild(buildBenchmarkHero(benchmark, scenarios, rows));
+    content.appendChild(buildBenchmarkHealth(scenarios, benchmark, rows));
+    const grid = h('div',{className:'dashboard-grid'},
+      buildAttentionQueue(rows),
+      buildDataQuality(rawSummary)
+    );
+    content.appendChild(grid);
+    content.appendChild(buildBenchmarkFilters(rows));
+    content.appendChild(buildBenchmarkTable(rows));
   } catch(err) { content.textContent = 'Error: '+err.message; }
+}
+
+function buildBenchmarkHero(benchmark, scenarios, rows) {
+  const covered = rows.filter((r) => r.benchmark).length;
+  return h('div',{className:'dashboard-hero'},
+    h('div',null,
+      h('div',{className:'dashboard-kicker'},'Benchmark Health'),
+      h('div',{className:'dashboard-title'},'Eval decision surface'),
+      h('div',{className:'dashboard-subtitle'},
+        'Readable release-gate view across scenario status, A/B result, metric deltas, and raw data coverage. '
+        + 'Use this page to spot drift, blocked scenarios, and operational regressions before trusting a snapshot.'
+      )
+    ),
+    h('div',{className:'mono-muted'},
+      'Generated: '+fmtTime(benchmark.generated)+' · Snapshot coverage: '+covered+'/'+scenarios.length
+    )
+  );
+}
+
+function buildBenchmarkHealth(scenarios, benchmark, rows) {
+  const counts = statusCounts(scenarios);
+  const covered = rows.filter((r) => r.benchmark).length;
+  const metricRegressionCount = rows.filter((r) => hasMetricRegression(r.benchmark)).length;
+  const totalTrials = Object.values(benchmark.evals || {}).reduce((sum, e) => sum + (e.trials || 0), 0);
+  const avgScore = covered>0
+    ? rows.filter((r) => r.benchmark).reduce((sum, r) => sum + (r.benchmark.avg_score || 0), 0) / covered
+    : null;
+  return h('div',{className:'health-grid'},
+    healthCard(String(scenarios.length),'Active scenarios'),
+    healthCard(String(covered),'In latest snapshot'),
+    healthCard(String(counts.SHIP || 0),'SHIP'),
+    healthCard(String((counts.BLOCKED || 0)+(counts['NEEDS WORK'] || 0)+(counts['NO RUNS'] || 0)),'Need attention'),
+    healthCard(String(metricRegressionCount),'Metric regressions'),
+    healthCard(fmtPct(avgScore),'Avg score'),
+    healthCard(String(totalTrials),'Snapshot trials')
+  );
+}
+
+function healthCard(value, label) {
+  return h('div',{className:'health-card'},
+    h('div',{className:'health-value'},value),
+    h('div',{className:'health-label'},label)
+  );
+}
+
+function buildAttentionQueue(rows) {
+  const items = rows
+    .map((row) => ({ row, reasons: attentionReasons(row) }))
+    .filter((item) => item.reasons.length>0)
+    .sort((a,b) => b.reasons.length - a.reasons.length || a.row.scenario.name.localeCompare(b.row.scenario.name))
+    .slice(0, 8);
+  const list = h('div',{className:'attention-list'});
+  if (items.length===0) list.appendChild(h('div',{className:'empty'},'No attention items in the current snapshot.'));
+  for (const item of items) {
+    list.appendChild(h('div',{className:'attention-item'},
+      h('a',{onclick:()=>showBenchmarkDetail(item.row.scenario.name)},item.row.scenario.name),
+      h('div',{className:'attention-reason'},item.reasons.join(' · '))
+    ));
+  }
+  return h('div',{className:'dashboard-panel'},
+    h('div',{className:'panel-header'},
+      h('div',{className:'panel-title'},'Attention Queue'),
+      h('div',{className:'panel-note'},items.length+' shown')
+    ),
+    list
+  );
+}
+
+function attentionReasons(row) {
+  const reasons = [];
+  if (row.scenario.status !== 'SHIP') reasons.push(row.scenario.status);
+  if (!row.benchmark) reasons.push('missing from latest benchmark');
+  if (row.benchmark?.compared?.verdict && row.benchmark.compared.verdict !== 'PASS') reasons.push('comparison '+row.benchmark.compared.verdict);
+  if (hasMetricRegression(row.benchmark)) reasons.push('metric regression');
+  return reasons;
+}
+
+function buildDataQuality(rawSummary) {
+  const coverage = rawSummary.coverage || {};
+  const panel = h('div',{className:'dashboard-panel'},
+    h('div',{className:'panel-header'},
+      h('div',{className:'panel-title'},'Data Quality'),
+      h('div',{className:'panel-note'},'Raw rows: '+fmtNum(rawSummary.totalRows || 0))
+    )
+  );
+  panel.appendChild(coverageRow('Duration', coverage.duration_ms));
+  panel.appendChild(coverageRow('Input tokens', coverage.input_tokens));
+  panel.appendChild(coverageRow('Output tokens', coverage.output_tokens));
+  panel.appendChild(coverageRow('Total tokens', coverage.total_tokens));
+  panel.appendChild(coverageRow('Transcript paths', coverage.transcript_path));
+  panel.appendChild(coverageRow('Artifact summaries', coverage.artifact_summary));
+  return panel;
+}
+
+function coverageRow(label, value) {
+  const pct = value == null ? 0 : value;
+  const cls = pct < 0.5 ? 'coverage-fill bad' : pct < 0.95 ? 'coverage-fill warn' : 'coverage-fill';
+  return h('div',{className:'coverage-row'},
+    h('span',null,label),
+    h('span',{className:'coverage-track'},h('span',{className:cls,style:'width:'+Math.round(pct*100)+'%'})),
+    h('span',{className:'mono-muted'},fmtPct(pct))
+  );
+}
+
+function buildBenchmarkFilters(rows) {
+  const families = Array.from(new Set(rows.map((r) => r.family))).sort();
+  const select = h('select',{className:'filter-select'});
+  const options = [
+    ['all','All scenarios'],
+    ['attention','Needs attention'],
+    ['benchmark-gap','Missing benchmark'],
+    ['metric-regressions','Metric regressions'],
+    ['ship','SHIP only'],
+    ['blocked','Blocked / needs work'],
+    ...families.map((f) => ['family:'+f,'Family: '+f]),
+  ];
+  for (const [value,label] of options) select.appendChild(h('option',{value},label));
+  select.value = state.benchmarkFilter;
+  select.onchange = () => { state.benchmarkFilter = select.value; renderBenchmark(); };
+  const search = h('input',{className:'filter-input',placeholder:'Search scenarios, family, scope, grader...'});
+  search.value = state.benchmarkSearch;
+  search.oninput = () => { state.benchmarkSearch = search.value; renderBenchmark(); };
+  return h('div',{className:'filter-bar'},
+    h('span',{className:'mono-muted'},'Filter'),
+    select,
+    search,
+    h('span',{className:'mono-muted'},'Showing '+filteredRows(rows).length+' / '+rows.length)
+  );
+}
+
+function filteredRows(rows) {
+  const q = (state.benchmarkSearch || '').toLowerCase();
+  return rows.filter((row) => {
+    const s = row.scenario;
+    const entry = row.benchmark;
+    const filter = state.benchmarkFilter || 'all';
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'attention' && attentionReasons(row).length>0) ||
+      (filter === 'benchmark-gap' && !entry) ||
+      (filter === 'metric-regressions' && hasMetricRegression(entry)) ||
+      (filter === 'ship' && s.status === 'SHIP') ||
+      (filter === 'blocked' && s.status !== 'SHIP') ||
+      (filter.startsWith('family:') && row.family === filter.slice('family:'.length));
+    const haystack = [s.name,row.family,s.scope,s.grader,s.status,entry?.claim_type,entry?.compared?.verdict].join(' ').toLowerCase();
+    return matchesFilter && (!q || haystack.includes(q));
+  });
+}
+
+function buildBenchmarkTable(rows) {
+  const tbody = h('tbody');
+  for (const row of filteredRows(rows)) {
+    const s = row.scenario;
+    const entry = row.benchmark;
+    const duration = comparedMetric(entry, 'duration_ms');
+    const output = comparedMetric(entry, 'output_tokens');
+    tbody.appendChild(h('tr',{className:'clickable',onclick:()=>showBenchmarkDetail(s.name)},
+      h('td',null,h('a',null,s.name),h('div',{className:'mono-muted'},row.family)),
+      h('td',null,s.scope),
+      h('td',null,s.grader),
+      h('td',null,statusBadge(s.status)),
+      h('td',null,entry ? fmtPct(entry.pass_rate)+' / '+fmtScore(entry.avg_score) : '-'),
+      h('td',null,entry?.compared ? h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-')) : h('span',{className:'mono-muted'},'no A/B')),
+      h('td',null,entry?.compared ? fmtDelta(entry.compared.delta, (n)=>n.toFixed(2)) : '-'),
+      h('td',null,metricDeltaText(duration, (n)=>(n/1000).toFixed(2)+'s')),
+      h('td',null,metricDeltaText(output, (n)=>Math.round(n).toLocaleString())),
+      h('td',{className:'mono-muted'},entry ? fmtTime(entry.last_run) : 'not in latest snapshot')
+    ));
+  }
+  return h('div',{className:'table-scroll'},h('table',null,
+    h('thead',null,h('tr',null,
+      h('th',null,'Scenario'),h('th',null,'Scope'),h('th',null,'Grader'),h('th',null,'Status'),
+      h('th',null,'Result'),h('th',null,'Compared'),h('th',null,'Score Δ'),
+      h('th',null,'Duration Δ'),h('th',null,'Output tokens Δ'),h('th',null,'Last run')
+    )),tbody
+  ));
+}
+
+function hasMetricRegression(entry) {
+  if (!entry?.compared?.metrics) return false;
+  return Object.values(entry.compared.metrics).some((m) => m && m.regression);
+}
+
+function metricDeltaText(metric, formatter) {
+  if (!metric) return '-';
+  const cls = metric.regression ? 'metric-delta-regression' : metric.delta>0 ? 'metric-delta-positive' : metric.delta<0 ? 'metric-delta-negative' : '';
+  return h('span',{className:cls},fmtDelta(metric.delta, formatter)+(metric.regression?' (!!)':''));
 }
 
 async function showBenchmarkDetail(scenario) {

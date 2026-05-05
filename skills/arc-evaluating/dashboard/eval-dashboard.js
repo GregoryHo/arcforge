@@ -393,6 +393,39 @@ function handleApiBenchmark(res, projectRoot) {
   sendJson(res, JSON.parse(fs.readFileSync(benchPath, 'utf8')));
 }
 
+function handleApiBenchmarkRawSummary(res, projectRoot) {
+  const rawPath = path.join(projectRoot, eval_.BENCHMARKS_DIR, 'raw', 'latest.json');
+  if (!fs.existsSync(rawPath)) {
+    return sendJson(res, { generated: null, totalRows: 0, coverage: {}, dataQuality: {} });
+  }
+
+  const raw = JSON.parse(fs.readFileSync(rawPath, 'utf8'));
+  const rows = Array.isArray(raw.rows) ? raw.rows : [];
+  const totalRows = rows.length;
+  const fields = [
+    'duration_ms',
+    'input_tokens',
+    'output_tokens',
+    'total_tokens',
+    'transcript_path',
+    'artifact_summary',
+  ];
+  const coverage = {};
+  for (const field of fields) {
+    const populated = rows.filter((row) => row[field] !== null && row[field] !== undefined && row[field] !== '').length;
+    coverage[field] = totalRows > 0 ? populated / totalRows : 0;
+  }
+
+  sendJson(res, {
+    generated: raw.generated || null,
+    schemaVersion: raw.schema_version || null,
+    rowSemantics: raw.row_semantics || null,
+    totalRows,
+    coverage: { ...(raw.data_quality?.metric_coverage || {}), ...coverage },
+    dataQuality: raw.data_quality || {},
+  });
+}
+
 function handleApiScenario(res, projectRoot, name) {
   const s = eval_.findScenario(name, projectRoot);
   if (!s) return sendError(res, 404, `Scenario "${name}" not found`);
@@ -506,6 +539,9 @@ function createRouter(projectRoot, cachedHtml) {
     if (pathname === '/api/events') return addSseClient(res);
     if (pathname === '/api/scenarios') return handleApiScenarios(res, projectRoot);
     if (pathname === '/api/benchmark') return handleApiBenchmark(res, projectRoot);
+    if (pathname === '/api/benchmark/raw-summary') {
+      return handleApiBenchmarkRawSummary(res, projectRoot);
+    }
 
     const scenarioMatch = pathname.match(/^\/api\/scenario\/(.+)$/);
     if (scenarioMatch) {

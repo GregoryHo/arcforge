@@ -311,6 +311,32 @@ describe('dashboard', () => {
       const result = callRouter(router, '/api/benchmark');
       expect(result.json().generated).toBe('2026-03-20T10:00:00Z');
     });
+
+    it('should summarize raw benchmark rows for dashboard data-quality coverage', () => {
+      const rawDir = path.join(tempDir, BENCHMARKS_DIR, 'raw');
+      fs.mkdirSync(rawDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(rawDir, 'latest.json'),
+        JSON.stringify({
+          schema_version: 1,
+          generated: '2026-03-20T10:00:00Z',
+          data_quality: { total_rows: 2, metric_coverage: { duration_ms: 1 } },
+          rows: [
+            { duration_ms: 100, input_tokens: 10, output_tokens: 20, transcript_path: 't1.md' },
+            { duration_ms: 200, input_tokens: 11, output_tokens: 21, artifact_summary: 'summary' },
+          ],
+        }),
+      );
+
+      const router = createRouter(tempDir, '');
+      const result = callRouter(router, '/api/benchmark/raw-summary');
+      expect(result.status).toBe(200);
+      const data = result.json();
+      expect(data.totalRows).toBe(2);
+      expect(data.coverage.duration_ms).toBe(1);
+      expect(data.coverage.transcript_path).toBe(0.5);
+      expect(data.coverage.artifact_summary).toBe(0.5);
+    });
   });
 
   // ── Feature: dashboard-scenario-fields ──────────────────────────
@@ -714,6 +740,24 @@ describe('dashboard', () => {
       expect(data.metricDeltas.durationDelta).toBe(500);
       // baseline mean input_tokens = 150, treatment mean = 170 → delta = +20
       expect(data.metricDeltas.inputTokensDelta).toBe(20);
+    });
+  });
+
+  // ── Dashboard decision surface ─────────────────────────────────
+  describe('dashboard UI — benchmark decision surface', () => {
+    it('uses benchmark snapshot data for health, filters, and data-quality review', () => {
+      const html = fs.readFileSync(path.join(__dirname, '../eval-dashboard-ui.html'), 'utf8');
+
+      expect(html).toContain("api('/api/benchmark')");
+      expect(html).toContain('Benchmark Health');
+      expect(html).toContain('Attention Queue');
+      expect(html).toContain('Data Quality');
+      expect(html).toContain('filter-select');
+      expect(html).toContain('familyFromScenario');
+      expect(html).toContain('Metric regressions');
+      expect(html).toContain('Raw rows');
+      expect(html).toContain('Transcript paths');
+      expect(html).toContain('Artifact summaries');
     });
   });
 
