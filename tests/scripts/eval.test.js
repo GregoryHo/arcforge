@@ -1348,6 +1348,62 @@ Do something.
       expect(data.compared.metrics.output_tokens.delta).toBe(25);
     });
 
+    it('should honor since filters for aggregate, A/B comparison, and raw benchmark rows', () => {
+      writeScenario(
+        tempDir,
+        'bounded-eval.md',
+        '# Eval: bounded-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Verdict Policy\nnon-regression\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        appendResult(
+          makeResult({
+            eval: `bounded-eval-${condition}`,
+            trial: 1,
+            k: 1,
+            passed: condition === 'baseline',
+            score: condition === 'baseline' ? 1 : 0,
+            timestamp: '2026-03-16T10:00:00Z',
+            runId: '20260316-100000',
+            version: '1',
+          }),
+          tempDir,
+        );
+        appendResult(
+          makeResult({
+            eval: `bounded-eval-${condition}`,
+            trial: 1,
+            k: 1,
+            passed: true,
+            score: 1,
+            duration_ms: condition === 'baseline' ? 1000 : 1200,
+            timestamp: '2026-03-17T10:00:00Z',
+            runId: '20260317-100000',
+            version: '1',
+          }),
+          tempDir,
+        );
+      }
+
+      const benchmark = generateBenchmark(tempDir, { since: '2026-03-17T00:00:00Z' });
+      const data = benchmark.evals['bounded-eval'];
+      expect(benchmark.result_filter).toEqual({ since: '2026-03-17T00:00:00Z' });
+      expect(data.trials).toBe(1);
+      expect(data.pass_rate).toBe(1);
+      expect(data.compared.verdict).toBe('PASS');
+      expect(data.compared.treatment.count).toBe(1);
+      expect(data.compared.metrics.duration_ms.delta).toBe(200);
+
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tempDir, BENCHMARKS_DIR, 'raw', 'latest.json'), 'utf8'),
+      );
+      expect(raw.result_filter).toEqual({ since: '2026-03-17T00:00:00Z' });
+      expect(raw.rows.map((r) => r.timestamp)).toEqual([
+        '2026-03-17T10:00:00Z',
+        '2026-03-17T10:00:00Z',
+      ]);
+    });
+
     it('should generate dashboard raw rows with per-trial metrics and provenance', () => {
       writeScenario(
         tempDir,

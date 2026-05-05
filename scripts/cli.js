@@ -19,7 +19,7 @@
  *   eval run <name> [--k N] [--model <name>] [--no-isolate] [--plugin-dir <path>] [--max-turns N]
  *   eval preflight <name>            Run baseline trials to check scenario discriminability
  *   eval lint <name>                 Validate scenario file structure
- *   eval report [name] [--model <name>]       Show eval benchmark report
+ *   eval report [name] [--model <name>] [--since ISO] Show eval benchmark report
  *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
@@ -314,7 +314,7 @@ COMMANDS:
       --plugin-dir   Plugin directory for treatment trials
       --max-turns    Max turns for treatment trials (overrides scenario)
   eval compare <name>                Compare A/B results
-  eval report [name]                 Benchmark report
+  eval report [name] [--since ISO]   Benchmark report, optionally bounded to recent result rows
   eval history                       List benchmark snapshots
   eval audit [--top N]               Audit grading history for promotion/retirement candidates
   eval dashboard [--port N]          Live web dashboard (default: 3333)
@@ -1031,7 +1031,9 @@ async function main() {
             }
           }
         } else if (subcommand === 'report') {
-          const benchmark = eval_.generateBenchmark(projectRoot);
+          const benchmark = eval_.generateBenchmark(projectRoot, {
+            since: args.options.since,
+          });
           const name = args.positional[1];
 
           if (name && benchmark.evals[name]) {

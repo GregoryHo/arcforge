@@ -18,6 +18,8 @@ Aggregate scenario entries include the behavioral result summary (`trials`, `pas
 
 Benchmark snapshots are summaries, not scenario definitions. A snapshot may reference scenarios that were later deleted or retired; treat those entries as historical records, not active test cases.
 
+`arc eval report --since <ISO timestamp>` generates a recency-bounded aggregate and raw export. Filtered snapshots include a top-level `result_filter` object, and both aggregate `compared` fields and raw rows are computed from the same filtered result window. Use this when old same-version rows would otherwise keep a non-regression scenario red after a grader or behavior hardening rerun; do not mix filtered and all-history snapshots without naming the distinction.
+
 Raw dashboard exports use `schema_version: 1` and a row-per-trial shape. Each `rows[]` entry intentionally omits assistant output/transcript bodies and keeps only dashboard-safe provenance/metrics:
 
 - identity/provenance: `scenario`, `condition`, `scope`, `claim_type`, `grader`, `version`, `run_id`, `timestamp`, `trial`, `k`, `model`

@@ -1096,9 +1096,16 @@ function deltaVsBaseline(value, baselineAvg) {
   return stats.round2(value - baselineAvg);
 }
 
-function rawRowsForScenario(scenario, projectRoot) {
+function benchmarkResultFilter(options = {}) {
+  const filter = {};
+  if (options.since) filter.since = options.since;
+  if (options.model) filter.model = options.model;
+  return filter;
+}
+
+function rawRowsForScenario(scenario, projectRoot, options = {}) {
   const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
-  const filterOpts = { version: scenario.version };
+  const filterOpts = { version: scenario.version, ...benchmarkResultFilter(options) };
   const conditions = isAb
     ? [
         { evalName: `${scenario.name}-baseline`, condition: 'baseline' },
@@ -1180,11 +1187,12 @@ function rawRowsForScenario(scenario, projectRoot) {
  * @param {string} [generated] - Timestamp to use for deterministic paired snapshots
  * @returns {Object} Dashboard-oriented raw benchmark data
  */
-function generateRawBenchmarkData(projectRoot, generated = getTimestamp()) {
+function generateRawBenchmarkData(projectRoot, generated = getTimestamp(), options = {}) {
+  const resultFilter = benchmarkResultFilter(options);
   const rows = [];
   for (const file of listScenarios(projectRoot)) {
     const scenario = parseScenario(file);
-    rows.push(...rawRowsForScenario(scenario, projectRoot));
+    rows.push(...rawRowsForScenario(scenario, projectRoot, resultFilter));
   }
 
   rows.sort((a, b) => {
@@ -1202,6 +1210,7 @@ function generateRawBenchmarkData(projectRoot, generated = getTimestamp()) {
     generated,
     row_semantics:
       'one row per scenario condition trial; transcript/output bodies are intentionally omitted',
+    ...(Object.keys(resultFilter).length > 0 ? { result_filter: resultFilter } : {}),
     data_quality: {
       total_rows: rows.length,
       metric_coverage: {
@@ -1276,18 +1285,22 @@ function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
 /**
  * Generate a benchmark summary from results
  * @param {string} projectRoot - Project root directory
+ * @param {Object} [options] - Result filters for benchmark generation
+ * @param {string} [options.since] - Only include result rows at or after this ISO timestamp
+ * @param {string} [options.model] - Only include result rows for this model
  * @returns {Object} Benchmark data
  */
-function generateBenchmark(projectRoot) {
+function generateBenchmark(projectRoot, options = {}) {
   const scenarioFiles = listScenarios(projectRoot);
   const benchmarks = {};
+  const resultFilter = benchmarkResultFilter(options);
 
   for (const file of scenarioFiles) {
     const scenario = parseScenario(file);
     // For A/B scopes (skill/workflow), prefer treatment results from A/B runs.
     // Fall back to plain name for single-condition runs (eval run, not eval ab).
     const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
-    const filterOpts = { version: scenario.version };
+    const filterOpts = { version: scenario.version, ...resultFilter };
     let results = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
     if (results.length === 0) {
       results = loadResults(scenario.name, projectRoot, filterOpts);
@@ -1340,6 +1353,7 @@ function generateBenchmark(projectRoot) {
 
   const benchmark = {
     generated: getTimestamp(),
+    ...(Object.keys(resultFilter).length > 0 ? { result_filter: resultFilter } : {}),
     by_claim_type: Object.entries(benchmarks).reduce((acc, [_name, data]) => {
       const type = data.claim_type || 'infra';
       acc[type] = acc[type] || { scenarios: 0, trials: 0 };
@@ -1350,7 +1364,7 @@ function generateBenchmark(projectRoot) {
     evals: benchmarks,
   };
 
-  const rawData = generateRawBenchmarkData(projectRoot, benchmark.generated);
+  const rawData = generateRawBenchmarkData(projectRoot, benchmark.generated, resultFilter);
   writeRawBenchmarkData(projectRoot, rawData);
 
   const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
