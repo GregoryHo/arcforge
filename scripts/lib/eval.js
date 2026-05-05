@@ -1066,8 +1066,34 @@ function assertionSummary(result) {
     : Array.isArray(result.assertionScores)
       ? result.assertionScores
       : [];
-  const passed = assertions.filter((a) => a && a.passed === true).length;
+  const passed = assertions.filter((a) => {
+    if (typeof a === 'number') return a >= 1;
+    if (typeof a === 'boolean') return a === true;
+    return a && a.passed === true;
+  }).length;
   return { assertion_count: assertions.length, assertion_passed_count: passed };
+}
+
+function totalTokensForResult(result) {
+  if (typeof result.input_tokens !== 'number' || typeof result.output_tokens !== 'number')
+    return null;
+  return result.input_tokens + result.output_tokens;
+}
+
+function resultMetricValue(result, key) {
+  if (key === 'total_tokens') return totalTokensForResult(result);
+  return typeof result[key] === 'number' ? result[key] : null;
+}
+
+function averageResultMetric(results, key) {
+  const values = results.map((r) => resultMetricValue(r, key)).filter((v) => typeof v === 'number');
+  if (values.length === 0) return null;
+  return stats.round2(values.reduce((sum, v) => sum + v, 0) / values.length);
+}
+
+function deltaVsBaseline(value, baselineAvg) {
+  if (typeof value !== 'number' || typeof baselineAvg !== 'number') return null;
+  return stats.round2(value - baselineAvg);
 }
 
 function rawRowsForScenario(scenario, projectRoot) {
@@ -1080,12 +1106,27 @@ function rawRowsForScenario(scenario, projectRoot) {
         { evalName: scenario.name, condition: 'results' },
       ]
     : [{ evalName: scenario.name, condition: 'results' }];
+  const conditionResults = conditions.map(({ evalName, condition }) => ({
+    condition,
+    results: loadResults(evalName, projectRoot, filterOpts),
+  }));
+  const baselineResults = conditionResults.find((c) => c.condition === 'baseline')?.results || [];
+  const baseline = {
+    score: averageResultMetric(baselineResults, 'score'),
+    duration_ms: averageResultMetric(baselineResults, 'duration_ms'),
+    input_tokens: averageResultMetric(baselineResults, 'input_tokens'),
+    output_tokens: averageResultMetric(baselineResults, 'output_tokens'),
+    total_tokens: averageResultMetric(baselineResults, 'total_tokens'),
+  };
   const rows = [];
 
-  for (const { evalName, condition } of conditions) {
-    const results = loadResults(evalName, projectRoot, filterOpts);
+  for (const { condition, results } of conditionResults) {
     for (const result of results) {
       const { assertion_count, assertion_passed_count } = assertionSummary(result);
+      const durationMs = resultMetricValue(result, 'duration_ms');
+      const inputTokens = resultMetricValue(result, 'input_tokens');
+      const outputTokens = resultMetricValue(result, 'output_tokens');
+      const totalTokens = resultMetricValue(result, 'total_tokens');
       rows.push({
         scenario: scenario.name,
         condition,
@@ -1100,9 +1141,24 @@ function rawRowsForScenario(scenario, projectRoot) {
         model: result.model || null,
         passed: result.passed,
         score: result.score,
-        duration_ms: typeof result.duration_ms === 'number' ? result.duration_ms : null,
-        input_tokens: typeof result.input_tokens === 'number' ? result.input_tokens : null,
-        output_tokens: typeof result.output_tokens === 'number' ? result.output_tokens : null,
+        duration_ms: durationMs,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: totalTokens,
+        cost_proxy_tokens: totalTokens,
+        baseline_score_avg: baseline.score,
+        baseline_duration_ms_avg: baseline.duration_ms,
+        baseline_input_tokens_avg: baseline.input_tokens,
+        baseline_output_tokens_avg: baseline.output_tokens,
+        baseline_total_tokens_avg: baseline.total_tokens,
+        score_delta_vs_baseline_avg: deltaVsBaseline(
+          resultMetricValue(result, 'score'),
+          baseline.score,
+        ),
+        duration_ms_delta_vs_baseline_avg: deltaVsBaseline(durationMs, baseline.duration_ms),
+        input_tokens_delta_vs_baseline_avg: deltaVsBaseline(inputTokens, baseline.input_tokens),
+        output_tokens_delta_vs_baseline_avg: deltaVsBaseline(outputTokens, baseline.output_tokens),
+        total_tokens_delta_vs_baseline_avg: deltaVsBaseline(totalTokens, baseline.total_tokens),
         infra_error: result.infraError || null,
         grade_error: result.gradeError || null,
         transcript_path: result.transcript_path || result.transcriptPath || null,
@@ -1152,6 +1208,7 @@ function generateRawBenchmarkData(projectRoot, generated = getTimestamp()) {
         duration_ms: metricCoverage(rows, 'duration_ms'),
         input_tokens: metricCoverage(rows, 'input_tokens'),
         output_tokens: metricCoverage(rows, 'output_tokens'),
+        total_tokens: metricCoverage(rows, 'total_tokens'),
       },
     },
     rows,

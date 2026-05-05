@@ -22,9 +22,10 @@ Raw dashboard exports use `schema_version: 1` and a row-per-trial shape. Each `r
 
 - identity/provenance: `scenario`, `condition`, `scope`, `claim_type`, `grader`, `version`, `run_id`, `timestamp`, `trial`, `k`, `model`
 - behavioral result: `passed`, `score`, `assertion_count`, `assertion_passed_count`
-- operational metrics: `duration_ms`, `input_tokens`, `output_tokens`
+- operational metrics: `duration_ms`, `input_tokens`, `output_tokens`, `total_tokens`, `cost_proxy_tokens`
+- drift/cost context: `baseline_score_avg`, `baseline_duration_ms_avg`, `baseline_input_tokens_avg`, `baseline_output_tokens_avg`, `baseline_total_tokens_avg`, plus `*_delta_vs_baseline_avg` fields for score, duration, input tokens, output tokens, and total tokens
 - diagnostics/drilldown: `infra_error`, `grade_error`, `transcript_path`, `artifact_summary`, `action_count`
-- coverage summary: `data_quality.metric_coverage.*` reports the fraction of raw rows with numeric duration/token metrics
+- coverage summary: `data_quality.metric_coverage.*` reports the fraction of raw rows with numeric duration/token/total-token metrics
 
 Active scenarios live in `evals/scenarios/`. Full raw per-trial JSONL and transcripts live in `evals/results/` and are ignored by git by default.
 

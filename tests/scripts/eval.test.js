@@ -1388,7 +1388,7 @@ Do something.
           model: 'treatment-model',
           runId: '20260317-100000',
           version: '2',
-          assertions: [{ label: 'A1', passed: true, score: 1 }],
+          assertionScores: [1],
         }),
         tempDir,
       );
@@ -1401,6 +1401,7 @@ Do something.
       expect(raw.data_quality.metric_coverage.duration_ms).toBe(1);
       expect(raw.data_quality.metric_coverage.input_tokens).toBe(1);
       expect(raw.data_quality.metric_coverage.output_tokens).toBe(1);
+      expect(raw.data_quality.metric_coverage.total_tokens).toBe(1);
       expect(raw.rows[0]).toMatchObject({
         scenario: 'raw-eval',
         condition: 'baseline',
@@ -1416,14 +1417,32 @@ Do something.
         duration_ms: 1000,
         input_tokens: 50,
         output_tokens: 80,
+        total_tokens: 130,
+        cost_proxy_tokens: 130,
+        baseline_score_avg: 0.5,
+        score_delta_vs_baseline_avg: 0,
+        duration_ms_delta_vs_baseline_avg: 0,
+        input_tokens_delta_vs_baseline_avg: 0,
+        output_tokens_delta_vs_baseline_avg: 0,
+        total_tokens_delta_vs_baseline_avg: 0,
         model: 'baseline-model',
         transcript_path: 'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
         assertion_count: 1,
         assertion_passed_count: 0,
       });
       expect(raw.rows[0].output).toBeUndefined();
-      expect(raw.rows[1].assertion_count).toBe(1);
-      expect(raw.rows[1].assertion_passed_count).toBe(1);
+      expect(raw.rows[1]).toMatchObject({
+        assertion_count: 1,
+        assertion_passed_count: 1,
+        total_tokens: 180,
+        cost_proxy_tokens: 180,
+        baseline_score_avg: 0.5,
+        score_delta_vs_baseline_avg: 0.5,
+        duration_ms_delta_vs_baseline_avg: 500,
+        input_tokens_delta_vs_baseline_avg: 10,
+        output_tokens_delta_vs_baseline_avg: 40,
+        total_tokens_delta_vs_baseline_avg: 50,
+      });
     });
 
     it('should write dashboard raw data snapshots alongside aggregate benchmarks', () => {

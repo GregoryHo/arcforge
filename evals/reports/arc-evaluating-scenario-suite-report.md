@@ -1,16 +1,28 @@
 # arc-evaluating scenario suite report
 
-Date: 2026-05-05  
-Branch: `chore/arcforge-eval-observation-audit`  
-Skill under eval: `skills/arc-evaluating/SKILL.md`  
+Date: 2026-05-05
+Branch: `chore/arcforge-eval-observation-audit`
+Skill under eval: `skills/arc-evaluating/SKILL.md`
 Benchmark snapshots: `evals/benchmarks/latest.json`, `evals/benchmarks/2026-05-05.json`
 Raw dashboard exports: `evals/benchmarks/raw/latest.json`, `evals/benchmarks/raw/2026-05-05.json`
 
 ## Scope
 
-This report summarizes the current expanded `arc-evaluating` eval suite. It is intentionally a suite-level review surface, separate from raw ignored per-trial rows under `evals/results/`.
+This report summarizes the expanded `arc-evaluating` eval suite. It is intentionally a suite-level review surface, separate from ignored full per-trial transcripts under `evals/results/`.
 
-The suite evaluates whether `arc-evaluating` gives disciplined eval-design guidance: weak-scenario detection, preflight/ceiling handling, grader selection, A/B uncertainty interpretation, metric-regression separation, workflow-vs-skill boundary decisions, and discovered-claims / weak-assertions lifecycle arbitration.
+The suite evaluates whether `arc-evaluating` gives disciplined eval-design guidance: weak-scenario detection, preflight/ceiling handling, grader selection, A/B uncertainty interpretation, metric-regression separation, workflow-vs-skill boundary decisions, discovered-claims / weak-assertions lifecycle arbitration, model-grader calibration, and adversarial proxy-grader rejection.
+
+## Goal / release-gate target
+
+The goal is **release-gate reliability**, not a literal mathematical proof. For this branch, "fully reliable / exhaustive / complete proof" is treated as an aspirational acceptance target with concrete guardrails:
+
+1. every major known eval-design failure mode has at least one scenario;
+2. treatment must pass the active non-regression suite with k >= 5 where applicable;
+3. discriminative claims must be separated from near-ceiling non-regression claims;
+4. raw dashboard metrics must expose per-trial score/pass/error/duration/token data and baseline-relative drift/cost fields;
+5. stale grader artifacts and weak assertions must be auditable instead of silently promoted into release claims.
+
+The current suite meets this branch's stronger gate for the covered surfaces. It still should not be described externally as exhaustive proof of every possible `arc-evaluating` behavior.
 
 ## Behavioral result table
 
@@ -23,6 +35,8 @@ The suite evaluates whether `arc-evaluating` gives disciplined eval-design guida
 | Metric regression separation | `eval-arc-evaluating-metric-regression-separation` | 5 | 100% / 1.00 | 100% / 1.00 | +0.00 | [0.00, 0.00] | PASS / non-regression |
 | Workflow-vs-skill boundary | `eval-arc-evaluating-workflow-vs-skill-boundary` | 5 | 0% / 0.75 | 100% / 1.00 | +0.25 | [0.25, 0.25] | PASS / non-regression |
 | Claim lifecycle arbitration | `eval-arc-evaluating-claim-lifecycle-arbitration` | 5 | 0% / 0.76 | 100% / 1.00 | +0.24 | [0.13, 0.35] | PASS / non-regression |
+| Model-grader calibration | `eval-arc-evaluating-model-grader-calibration` | 5 | 100% / 1.00 | 100% / 1.00 | +0.00 | [0.00, 0.00] | PASS / non-regression |
+| Adversarial proxy grader | `eval-arc-evaluating-adversarial-proxy-grader` | 5 | 20% / 0.76 | 100% / 1.00 | +0.24 | [0.03, 0.45] | PASS / non-regression |
 
 ## Metrics table
 
@@ -37,8 +51,10 @@ Metric deltas are treatment minus baseline, averaged per trial.
 | Metric regression separation | 17486.00ms | 18968.40ms | +1482.40ms | +0.00 | 794.80 | 992.40 | +197.60 |
 | Workflow-vs-skill boundary | 11977.20ms | 14760.00ms | +2782.80ms | +0.00 | 531.80 | 725.20 | +193.40 |
 | Claim lifecycle arbitration | 18958.00ms | 19145.40ms | +187.40ms | +0.00 | 911.20 | 1066.60 | +155.40 |
+| Model-grader calibration | 17574.00ms | 17295.40ms | -278.60ms | +0.00 | 826.20 | 898.20 | +72.00 |
+| Adversarial proxy grader | 21654.80ms | 21021.80ms | -633.00ms | +0.00 | 987.20 | 1003.60 | +16.40 |
 
-Current benchmark helper did not flag metric regressions for these scenarios. Operationally, treatment is often slower and more verbose; that cost should stay separate from behavioral correctness.
+Current benchmark helper did not flag metric regressions for these scenarios. Operationally, treatment is often slower and/or more verbose; that cost is reported separately from behavioral correctness.
 
 ## Benchmark field coverage
 
@@ -49,16 +65,15 @@ Current benchmark helper did not flag metric regressions for these scenarios. Op
 - A/B comparison: `compared.baseline`, `compared.treatment`, `compared.delta`, `compared.delta_ci`, `compared.verdict`, `compared.verdict_policy`;
 - A/B metric deltas: `compared.metrics.duration_ms`, `compared.metrics.input_tokens`, `compared.metrics.output_tokens` with baseline average, treatment average, delta, and regression flag.
 
-`evals/benchmarks/raw/latest.json` adds dashboard-ready per-trial rows. The current export has 929 rows with 100% duration/input-token/output-token metric coverage. Each row keeps scenario/condition/run/trial provenance, behavioral score/pass data, assertion counts, duration/token metrics, error fields, action count, and transcript-path drilldown; it intentionally omits assistant output bodies so the dashboard can aggregate metrics without duplicating transcripts.
+`evals/benchmarks/raw/latest.json` adds dashboard-ready per-trial rows. The current export has 949 rows with 100% duration/input-token/output-token/total-token metric coverage. Each row keeps scenario/condition/run/trial provenance, behavioral score/pass data, assertion counts, duration/token metrics, total token cost proxy, baseline averages, baseline-relative score/duration/token drift fields, error fields, action count, and transcript-path drilldown; it intentionally omits assistant output bodies so the dashboard can aggregate metrics without duplicating transcripts.
 
 ## Drift / comparison interpretation
 
 - The original weak-scenario audit remains near ceiling: treatment is 100%, baseline is already 97%, and CI crosses zero. Treat it as non-regression, not broad lift.
-- Preflight ceiling redesign and noisy-delta interpretation now pass after v2 grader regex adjustments. Their CIs still cross zero, so they mainly protect against overclaiming.
-- Grader selection and metric regression separation are useful regression guards but have no discriminative A/B lift because baseline is also perfect.
-- Workflow-vs-skill boundary has a clear discriminative signal: baseline 0% pass, treatment 100%, delta +0.25 with CI [0.25, 0.25].
-- Claim lifecycle arbitration closes the prior discovered-claims / weak-assertions gap: baseline 0% pass, treatment 100%, delta +0.24 with CI [0.13, 0.35]. This specifically tests that raw `discovered_claims` / `weak_assertions` become human-arbitrated audit candidates rather than automatic canonical skill edits.
-- Across the suite, the result claim is behavioral non-regression plus two clear boundary/lifecycle wins, not comprehensive proof that every `arc-evaluating` behavior is covered.
+- Preflight ceiling redesign and noisy-delta interpretation pass after grader adjustments. Their CIs still cross zero, so they mainly protect against overclaiming.
+- Grader selection, metric regression separation, and model-grader calibration are useful regression guards but have no discriminative A/B lift because baseline is also perfect.
+- Workflow-vs-skill boundary, claim lifecycle arbitration, and adversarial proxy-grader rejection show clear discriminative treatment wins.
+- Across the suite, the result claim is stronger major-surface coverage and non-regression, not comprehensive proof that every `arc-evaluating` behavior is covered.
 
 ## Scenario completeness assessment
 
@@ -70,20 +85,22 @@ The suite is meaningfully stronger than the original single audit scenario. It n
 4. noisy A/B deltas and CI-crosses-zero interpretation;
 5. metric/cost regression as a separate release risk;
 6. workflow/plugin/environment evals vs prompt-only `--skill-file` variation;
-7. discovered-claims / weak-assertions lifecycle arbitration for promotion, retirement, and historical grader artifact handling.
+7. discovered-claims / weak-assertions lifecycle arbitration for promotion, retirement, and historical grader artifact handling;
+8. model/human grader calibration: vague semantic scoring needs anchored rubrics, blind/human checks, and repeated evidence;
+9. adversarial proxy-grader failure: keyword/code proxies must not be mistaken for semantic analysis quality.
 
-This closes the main scenario gap identified in the previous audit. It is still not mathematical proof of every `arc-evaluating` behavior, but it is a credible path toward a release gate: the suite now combines near-ceiling non-regression guards with discriminative boundary/lifecycle scenarios and machine-reviewable raw metrics.
+This closes the concrete missing pieces called out in the previous audit. Remaining gaps are higher-order: cross-model / cross-version stability, real human-grader calibration datasets, dashboard alert thresholds over multiple dated snapshots, and scenario retirement/quarantine policy for stale historical results.
 
 ## Fully reliable / exhaustive target
 
 Treat `fully reliable / exhaustive / complete proof` as an aspirational gate target, not a literal claim from this dataset. To approach that target, the next required layers are:
 
-1. expand scenario families beyond these seven eval-design behaviors, especially model/human grader calibration and adversarial semantic judgment cases;
-2. add raw-dashboard drift monitors over per-trial duration/tokens/score/pass/error distributions, not only aggregate snapshot rows;
-3. require stable raw metric collection (`data_quality.metric_coverage.* == 1`) before interpreting cost deltas;
-4. periodically retire or quarantine stale scenario versions instead of mixing historical grader artifacts into current benchmark claims;
-5. keep behavioral correctness verdicts separate from operational-cost regressions and infra/grade errors.
+1. add cross-model and cross-provider replays for the highest-risk scenarios;
+2. add a small human-labeled calibration set for model/human graders;
+3. turn raw-dashboard drift fields into alert thresholds over score/pass/error/duration/token distributions;
+4. require stable raw metric collection (`data_quality.metric_coverage.* == 1`) before interpreting cost deltas;
+5. periodically retire or quarantine stale scenario versions instead of mixing historical grader artifacts into current benchmark claims.
 
 ## Recommendation
 
-Ready as a stronger non-regression benchmark/report update with raw dashboard data collection. The previously identified lifecycle gap now has a passing scenario, and the dashboard has per-trial metric rows for future drift/cost visualization. Keep the external claim conservative: the suite is credible for the major eval-design review behaviors covered here and is moving toward release-gate reliability, but it is not a literal exhaustive proof of every possible `arc-evaluating` behavior or grader-quality judgment.
+Ready as a stronger non-regression benchmark/report update with raw dashboard data collection. The previously identified lifecycle gap is covered, and two additional goal-oriented gaps — model-grader calibration and adversarial proxy graders — now have active scenarios. Keep the external claim conservative: credible major-surface release-gate coverage for `arc-evaluating`, not literal exhaustive proof.
