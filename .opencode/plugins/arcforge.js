@@ -79,7 +79,7 @@ ${content}
 
 export default {
   name: 'arcforge',
-  version: '3.0.0-rc.1',
+  version: '3.0.0-rc.2',
 
   'experimental.chat.system.transform': async (_input, output) => {
     const bootstrap = getBootstrapContent();
