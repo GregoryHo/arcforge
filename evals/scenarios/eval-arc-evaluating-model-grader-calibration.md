@@ -30,7 +30,7 @@ non-regression
 ## Assertions
 - [ ] A1: The response says one vague model-grader run is insufficient or noisy release evidence, not deterministic proof of improvement.
 - [ ] A2: The response requires a concrete calibrated rubric, anchors/examples, or task-derived criteria before trusting semantic scores.
-- [ ] A3: The response recommends blind comparison, human review/spot-check, or independent adjudication to reduce grader bias.
+- [ ] A3: The response positively recommends blind comparison, human review/spot-check, or independent adjudication to reduce grader bias; it must not reject those checks as unnecessary or too slow.
 - [ ] A4: The response requires repeated trials, CI/variance, agreement checks, or consistency across runs before claiming improvement.
 - [ ] A5: The response treats qualitative/model grading as semantic judgment with possible drift/noise rather than deterministic proof.
 
@@ -52,7 +52,18 @@ def emit(label, ok, reason=""):
 
 insufficient = re.search(r"\b(one|single|vague|noisy|insufficient|not enough|cannot|can't|do not|don't)\b", low) and re.search(r"\b(model[- ]grader|model grading|grader run|release evidence|proof|improvement)\b", low)
 rubric = re.search(r"\b(calibrat(?:e|ed|ion)|rubric|anchor|examples?|criteria|task[- ]derived|scoring guide)\b", low) and re.search(r"\b(concrete|explicit|specific|fixed|before|trust|semantic|quality)\b", low)
-blind_or_human = re.search(r"\b(blind|anonymi[sz]ed|human|review|spot[- ]check|adjudicat|independent|bias)\b", low)
+blind_or_human_terms = r"\b(blind|anonymi[sz]ed|human|review|spot[- ]check|adjudicat|independent|bias)\b"
+positive_review_action = (
+    re.search(r"\b(recommend|require|use|include|add|run|perform|need|should|must|validate|calibrate)\b[^.\n;]{0,120}" + blind_or_human_terms, low)
+    or re.search(blind_or_human_terms + r"[^.\n;]{0,120}\b(required|recommended|needed|necessary|should|must|reduce|mitigate|calibrat)\b", low)
+    or re.search(r"\b(blind comparison|human review|human spot[- ]check|independent adjudicat)\b", low)
+)
+negated_review = (
+    re.search(r"\b(skip|omit|avoid|bypass)\b[^.\n;]{0,80}" + blind_or_human_terms, low)
+    or re.search(blind_or_human_terms + r"[^.\n;]{0,80}\b(unnecessary|not necessary|no need|too slow|skip|omit|avoid|bypass)\b", low)
+)
+anti_negated_review = re.search(r"\b(do not|don't|never|must not|should not)\b\s+\b(skip|omit|avoid|bypass)\b[^.\n;]{0,80}" + blind_or_human_terms, low)
+blind_or_human = positive_review_action and (not negated_review or anti_negated_review)
 repeat = re.search(r"\b(repeated|multiple|trials?|k\s*[=>]|variance|ci|confidence interval|consistency|agreement|inter[- ]rater|across runs)\b", low)
 separate = re.search(r"\b(semantic|qualitative|quality|model[- ]grader|model grading|judgment)\b", low) and re.search(r"\b(noisy|noise|drift|not deterministic|not proof|not .*deterministic|cannot prove|can't prove|not calibrated|calibrat)\b", low)
 checks = [bool(insufficient), bool(rubric), bool(blind_or_human), bool(repeat), bool(separate)]
@@ -64,4 +75,4 @@ PY
 5
 
 ## Version
-2
+3

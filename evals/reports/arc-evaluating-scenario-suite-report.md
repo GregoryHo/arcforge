@@ -51,7 +51,7 @@ Metric deltas are treatment minus baseline, averaged per trial.
 | Metric regression separation | 17486.00ms | 18968.40ms | +1482.40ms | +0.00 | 794.80 | 992.40 | +197.60 |
 | Workflow-vs-skill boundary | 11977.20ms | 14760.00ms | +2782.80ms | +0.00 | 531.80 | 725.20 | +193.40 |
 | Claim lifecycle arbitration | 18958.00ms | 19145.40ms | +187.40ms | +0.00 | 911.20 | 1066.60 | +155.40 |
-| Model-grader calibration | 17574.00ms | 17295.40ms | -278.60ms | +0.00 | 826.20 | 898.20 | +72.00 |
+| Model-grader calibration | 17907.20ms | 15470.40ms | -2436.80ms | +0.00 | 868.80 | 763.80 | -105.00 |
 | Adversarial proxy grader | 21654.80ms | 21021.80ms | -633.00ms | +0.00 | 987.20 | 1003.60 | +16.40 |
 
 Current benchmark helper did not flag metric regressions for these scenarios. Operationally, treatment is often slower and/or more verbose; that cost is reported separately from behavioral correctness.
@@ -65,7 +65,7 @@ Current benchmark helper did not flag metric regressions for these scenarios. Op
 - A/B comparison: `compared.baseline`, `compared.treatment`, `compared.delta`, `compared.delta_ci`, `compared.verdict`, `compared.verdict_policy`;
 - A/B metric deltas: `compared.metrics.duration_ms`, `compared.metrics.input_tokens`, `compared.metrics.output_tokens` with baseline average, treatment average, delta, and regression flag.
 
-`evals/benchmarks/raw/latest.json` adds dashboard-ready per-trial rows. The current export has 949 rows with 100% duration/input-token/output-token/total-token metric coverage. Each row keeps scenario/condition/run/trial provenance, behavioral score/pass data, assertion counts, duration/token metrics, total token cost proxy, baseline averages, baseline-relative score/duration/token drift fields, error fields, action count, and transcript-path drilldown; it intentionally omits assistant output bodies so the dashboard can aggregate metrics without duplicating transcripts.
+`evals/benchmarks/raw/latest.json` adds dashboard-ready per-trial rows. The current export has 949 rows with 100% duration/input-token/output-token/total-token metric coverage. Each row keeps scenario/condition/run/trial provenance, behavioral score/pass data, assertion counts, duration/token metrics, total token cost proxy, baseline averages, baseline-relative score/duration/token drift fields, error fields, and action count. Transcript path fields are nullable in the raw export; full per-trial transcripts remain under ignored `evals/results/` artifacts rather than being duplicated into committed dashboard rows.
 
 ## Drift / comparison interpretation
 
@@ -104,3 +104,5 @@ Treat `fully reliable / exhaustive / complete proof` as an aspirational gate tar
 ## Recommendation
 
 Ready as a stronger non-regression benchmark/report update with raw dashboard data collection. The previously identified lifecycle gap is covered, and two additional goal-oriented gaps — model-grader calibration and adversarial proxy graders — now have active scenarios. Keep the external claim conservative: credible major-surface release-gate coverage for `arc-evaluating`, not literal exhaustive proof.
+
+Post-audit hardening note: `eval-arc-evaluating-model-grader-calibration` was tightened after a negated human-review false-positive was found. Its grader now requires a positive blind/human/independent review recommendation and rejects answers that skip or dismiss those checks. The versioned scenario was rerun at k=5/side and still passes under the tightened grader.

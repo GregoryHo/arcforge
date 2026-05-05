@@ -1673,6 +1673,61 @@ Do something.
         fs.rmSync(trialDir, { recursive: true, force: true });
       }
     });
+
+    it('should fail model-grader calibration scenario when human review is negated', () => {
+      const scenario = parseScenario(
+        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
+        process.cwd(),
+      );
+      const output = [
+        '[Assistant]',
+        'One vague model grader is insufficient proof. Use a calibrated rubric with concrete anchor examples and fixed criteria.',
+        'Skip human review and independent adjudication because it is too slow.',
+        'Run multiple trials, check variance, CI, and agreement across runs.',
+        'Semantic model grading is noisy and not deterministic proof.',
+      ].join('\n');
+      const transcript = path.join(tempDir, 'bad-model-grader-calibration-transcript.txt');
+      fs.writeFileSync(transcript, output);
+
+      const result = makeResult({ output, transcript });
+      const graded = gradeWithCode(
+        result,
+        scenario.graderConfig,
+        process.cwd(),
+        scenario.assertions.length,
+      );
+
+      expect(graded.passed).toBe(false);
+      expect(graded.assertionScores[2]).toBe(0);
+    });
+
+    it('should pass model-grader calibration scenario when human review is positively recommended', () => {
+      const scenario = parseScenario(
+        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
+        process.cwd(),
+      );
+      const output = [
+        '[Assistant]',
+        'One vague model grader is insufficient and noisy release evidence, not proof of improvement.',
+        'Use a concrete calibrated rubric with anchor examples and fixed task-derived criteria before trusting semantic scores.',
+        'Require blind comparison plus human spot-check review or independent adjudication to reduce grader bias.',
+        'Run repeated trials and inspect CI, variance, agreement, and consistency across runs.',
+        'Qualitative model grading is semantic judgment with drift and noise, not deterministic proof.',
+      ].join('\n');
+      const transcript = path.join(tempDir, 'good-model-grader-calibration-transcript.txt');
+      fs.writeFileSync(transcript, output);
+
+      const result = makeResult({ output, transcript });
+      const graded = gradeWithCode(
+        result,
+        scenario.graderConfig,
+        process.cwd(),
+        scenario.assertions.length,
+      );
+
+      expect(graded.passed).toBe(true);
+      expect(graded.assertionScores).toEqual([1, 1, 1, 1, 1]);
+    });
   });
 
   // ── parseAssertionLabels ─────────────────────────────────────

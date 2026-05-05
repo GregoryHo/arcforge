@@ -52,7 +52,7 @@ Raw per-trial JSONL rows and transcripts remain ignored under `evals/results/`. 
 | Metric regression separation | 17486.00 | 18968.40 | +1482.40 | 6.00 | 6.00 | +0.00 | 794.80 | 992.40 | +197.60 |
 | Workflow-vs-skill boundary | 11977.20 | 14760.00 | +2782.80 | 6.00 | 6.00 | +0.00 | 531.80 | 725.20 | +193.40 |
 | Claim lifecycle arbitration | 18958.00 | 19145.40 | +187.40 | 6.00 | 6.00 | +0.00 | 911.20 | 1066.60 | +155.40 |
-| Model-grader calibration | 17574.00 | 17295.40 | -278.60 | 6.00 | 6.00 | +0.00 | 826.20 | 898.20 | +72.00 |
+| Model-grader calibration | 17907.20 | 15470.40 | -2436.80 | 6.00 | 6.00 | +0.00 | 868.80 | 763.80 | -105.00 |
 | Adversarial proxy grader | 21654.80 | 21021.80 | -633.00 | 6.00 | 6.00 | +0.00 | 987.20 | 1003.60 | +16.40 |
 
 No metric regression flag tripped in the benchmark helper. Treatment is often slower and/or more verbose than baseline; these operational costs are reported separately from behavioral correctness.
@@ -94,10 +94,12 @@ The benchmark generator stores richer fields per eval:
 - `compared.delta`, `compared.delta_ci`, `compared.verdict`, `compared.verdict_policy`
 - `compared.metrics.*` with baseline/treatment means, deltas, and regression flags
 
-The raw dashboard export stores one row per scenario-condition-trial in `evals/benchmarks/raw/latest.json` and the matching date snapshot. Rows include scenario/condition/run/trial provenance, behavioral score/pass fields, assertion counts, duration/token metrics, `total_tokens`, `cost_proxy_tokens`, baseline averages, baseline-relative drift/cost deltas, infra/grade errors, action count, and transcript-path drilldown while omitting transcript bodies.
+The raw dashboard export stores one row per scenario-condition-trial in `evals/benchmarks/raw/latest.json` and the matching date snapshot. Rows include scenario/condition/run/trial provenance, behavioral score/pass fields, assertion counts, duration/token metrics, `total_tokens`, `cost_proxy_tokens`, baseline averages, baseline-relative drift/cost deltas, infra/grade errors, and action count while omitting transcript bodies. Transcript path fields are nullable in the committed raw export; full transcripts remain under ignored `evals/results/` artifacts.
 
 ## Decision
 
 Status: `PASS` for the expanded `arc-evaluating` non-regression suite.
 
 Do not overclaim literal exhaustive proof. The reportable claim is now: `arc-evaluating` passes a broader regression suite for eval-design review behaviors, with clear treatment advantages in workflow-vs-skill boundary handling, claim-lifecycle arbitration, and adversarial proxy-grader rejection, plus committed per-trial raw metrics for dashboard drift/cost analysis. This is credible major-surface coverage moving toward release-gate reliability, not complete proof of every possible skill behavior.
+
+Post-audit note: `eval-arc-evaluating-model-grader-calibration` was tightened to reject a negated human-review false positive. The versioned scenario was rerun at k=5/side and still passes under the tightened grader.
