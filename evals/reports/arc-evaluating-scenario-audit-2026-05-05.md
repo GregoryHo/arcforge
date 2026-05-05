@@ -36,6 +36,7 @@ Raw per-trial rows remain ignored under `evals/results/`; this report and the be
 | Noisy A/B delta interpretation | eval-arc-evaluating-ab-noisy-delta-interpretation | 5 | 40% | 0.85 | 100% | 1.00 | +0.15 | [-0.02, 0.32] | PASS |
 | Metric regression separation | eval-arc-evaluating-metric-regression-separation | 5 | 100% | 1.00 | 100% | 1.00 | +0.00 | [0.00, 0.00] | PASS |
 | Workflow-vs-skill boundary | eval-arc-evaluating-workflow-vs-skill-boundary | 5 | 0% | 0.75 | 100% | 1.00 | +0.25 | [0.25, 0.25] | PASS |
+| Claim lifecycle arbitration | eval-arc-evaluating-claim-lifecycle-arbitration | 5 | 0% | 0.76 | 100% | 1.00 | +0.24 | [0.13, 0.35] | PASS |
 
 ## Metrics
 
@@ -47,6 +48,7 @@ Raw per-trial rows remain ignored under `evals/results/`; this report and the be
 | Noisy A/B delta interpretation | 18142.20 | 14748.20 | -3394.00 | 6.00 | 6.00 | +0.00 | 784.40 | 734.80 | -49.60 |
 | Metric regression separation | 17486.00 | 18968.40 | +1482.40 | 6.00 | 6.00 | +0.00 | 794.80 | 992.40 | +197.60 |
 | Workflow-vs-skill boundary | 11977.20 | 14760.00 | +2782.80 | 6.00 | 6.00 | +0.00 | 531.80 | 725.20 | +193.40 |
+| Claim lifecycle arbitration | 18958.00 | 19145.40 | +187.40 | 6.00 | 6.00 | +0.00 | 911.20 | 1066.60 | +155.40 |
 
 No metric regression flag tripped in the benchmark helper. Treatment is generally slower and more verbose than baseline except for the noisy-delta scenario; these are reported separately from behavioral correctness.
 
@@ -57,7 +59,8 @@ No metric regression flag tripped in the benchmark helper. Treatment is generall
 - **Grader selection boundary:** both baseline and treatment pass 5/5. This scenario validates the behavior but has no discriminative lift; keep it as regression protection.
 - **Noisy A/B delta interpretation:** treatment passes 5/5 on v2 and correctly rejects overclaiming CI-crosses-zero deltas. Delta CI crosses zero; do not cite as lift.
 - **Metric regression separation:** both conditions pass; scenario confirms metrics are surfaced as a separate risk from behavior. Treatment is +1.48s and +197.6 output tokens on average.
-- **Workflow-vs-skill boundary:** treatment improves from baseline 0% pass to 100% pass, with delta +0.25 and CI [0.25, 0.25]. This is the strongest discriminative signal in the suite.
+- **Workflow-vs-skill boundary:** treatment improves from baseline 0% pass to 100% pass, with delta +0.25 and CI [0.25, 0.25]. This is a strong discriminative signal.
+- **Claim lifecycle arbitration:** treatment improves from baseline 0% pass to 100% pass, with delta +0.24 and CI [0.13, 0.35]. This closes the previous discovered-claims / weak-assertions lifecycle gap.
 
 ## Scenario completeness assessment
 
@@ -68,12 +71,13 @@ The suite is now materially more complete than the original single scenario. It 
 3. grader selection between structural code checks and semantic quality checks;
 4. noisy A/B delta interpretation;
 5. metric/cost regression separation;
-6. workflow/plugin/environment boundary vs prompt-only skill evals.
+6. workflow/plugin/environment boundary vs prompt-only skill evals;
+7. discovered-claims / weak-assertions promotion-retirement workflow with historical grader artifacts.
 
 Remaining limitations:
 
 - The suite is still mostly non-regression evidence; several scenarios are near ceiling for baseline.
-- It does not yet directly exercise discovered-claims / weak-assertions promotion-retirement workflow with historical grader artifacts.
+- The lifecycle gap is now directly exercised, but this remains code-graded semantic behavior rather than independent human/model judgment.
 - Cost metrics are duration/input/output tokens only because current raw JSONL rows do not store dollars or turn counts.
 
 ## Benchmark update
@@ -89,4 +93,4 @@ The benchmark generator now stores richer fields per eval:
 
 Status: `PASS` for the expanded `arc-evaluating` non-regression suite.
 
-Do not overclaim broad discriminative lift. The reportable claim is now: `arc-evaluating` passes a broader regression suite for eval-design review behaviors, and one scenario (`workflow-vs-skill-boundary`) shows a clear treatment advantage. Add discovered-claims / weak-assertions lifecycle scenarios before claiming full coverage of the entire skill.
+Do not overclaim broad discriminative lift. The reportable claim is now: `arc-evaluating` passes a broader regression suite for eval-design review behaviors, with clear treatment advantages in workflow-vs-skill boundary handling and claim-lifecycle arbitration. This is credible major-surface coverage, not exhaustive proof of every possible skill behavior.

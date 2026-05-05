@@ -1,9 +1,9 @@
 {
-  "generated": "2026-05-05T10:00:56.837Z",
+  "generated": "2026-05-05T11:13:25.723Z",
   "by_claim_type": {
     "non-regression": {
-      "scenarios": 15,
-      "trials": 201
+      "scenarios": 16,
+      "trials": 206
     },
     "infra": {
       "scenarios": 6,
@@ -110,6 +110,102 @@
             "baseline_avg": 784.4,
             "treatment_avg": 734.8,
             "delta": -49.6,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-arc-evaluating-claim-lifecycle-arbitration": {
+      "scope": "skill",
+      "claim_type": "non-regression",
+      "grader": "code",
+      "trials": 5,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-05-05T11:12:58.731Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 19145.4,
+          "min": 16774,
+          "max": 23412,
+          "total": 95727
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 6,
+          "min": 6,
+          "max": 6,
+          "total": 30
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 1066.6,
+          "min": 897,
+          "max": 1264,
+          "total": 5333
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.76,
+          "stddev": 0.09,
+          "min": 0.6,
+          "max": 0.8,
+          "ci95": {
+            "lower": 0.65,
+            "upper": 0.87,
+            "width": 0.22
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.24,
+        "delta_ci": {
+          "lower": 0.13,
+          "upper": 0.35,
+          "width": 0.22
+        },
+        "verdict": "PASS",
+        "verdict_policy": "non-regression",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 18958,
+            "treatment_avg": 19145.4,
+            "delta": 187.4,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 6,
+            "treatment_avg": 6,
+            "delta": 0,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 911.2,
+            "treatment_avg": 1066.6,
+            "delta": 155.4,
             "regression": false
           }
         }
