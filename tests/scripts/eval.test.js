@@ -25,6 +25,7 @@ const {
   passAllK,
   computeDelta,
   generateBenchmark,
+  generateRawBenchmarkData,
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
@@ -1345,6 +1346,115 @@ Do something.
         regression: false,
       });
       expect(data.compared.metrics.output_tokens.delta).toBe(25);
+    });
+
+    it('should generate dashboard raw rows with per-trial metrics and provenance', () => {
+      writeScenario(
+        tempDir,
+        'raw-eval.md',
+        '# Eval: raw-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Claim Type\ndiscriminative-lift\n\n## Version\n2\n',
+      );
+
+      appendResult(
+        makeResult({
+          eval: 'raw-eval-baseline',
+          trial: 1,
+          k: 2,
+          passed: false,
+          score: 0.5,
+          duration_ms: 1000,
+          input_tokens: 50,
+          output_tokens: 80,
+          model: 'baseline-model',
+          runId: '20260317-100000',
+          version: '2',
+          output: 'large transcript text should not be duplicated into dashboard raw metrics rows',
+          transcript_path:
+            'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
+          assertions: [{ label: 'A1', passed: false, score: 0 }],
+        }),
+        tempDir,
+      );
+      appendResult(
+        makeResult({
+          eval: 'raw-eval-treatment',
+          trial: 1,
+          k: 2,
+          passed: true,
+          score: 1,
+          duration_ms: 1500,
+          input_tokens: 60,
+          output_tokens: 120,
+          model: 'treatment-model',
+          runId: '20260317-100000',
+          version: '2',
+          assertions: [{ label: 'A1', passed: true, score: 1 }],
+        }),
+        tempDir,
+      );
+
+      const raw = generateRawBenchmarkData(tempDir);
+
+      expect(raw.schema_version).toBe(1);
+      expect(raw.rows).toHaveLength(2);
+      expect(raw.data_quality.total_rows).toBe(2);
+      expect(raw.data_quality.metric_coverage.duration_ms).toBe(1);
+      expect(raw.data_quality.metric_coverage.input_tokens).toBe(1);
+      expect(raw.data_quality.metric_coverage.output_tokens).toBe(1);
+      expect(raw.rows[0]).toMatchObject({
+        scenario: 'raw-eval',
+        condition: 'baseline',
+        scope: 'skill',
+        claim_type: 'discriminative-lift',
+        grader: 'code',
+        version: '2',
+        run_id: '20260317-100000',
+        trial: 1,
+        k: 2,
+        passed: false,
+        score: 0.5,
+        duration_ms: 1000,
+        input_tokens: 50,
+        output_tokens: 80,
+        model: 'baseline-model',
+        transcript_path: 'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
+        assertion_count: 1,
+        assertion_passed_count: 0,
+      });
+      expect(raw.rows[0].output).toBeUndefined();
+      expect(raw.rows[1].assertion_count).toBe(1);
+      expect(raw.rows[1].assertion_passed_count).toBe(1);
+    });
+
+    it('should write dashboard raw data snapshots alongside aggregate benchmarks', () => {
+      writeScenario(
+        tempDir,
+        'raw-file.md',
+        '# Eval: raw-file\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+      appendResult(
+        makeResult({
+          eval: 'raw-file',
+          trial: 1,
+          passed: true,
+          score: 1,
+          duration_ms: 321,
+          runId: '20260317-100000',
+        }),
+        tempDir,
+      );
+
+      const benchmark = generateBenchmark(tempDir);
+      const dateStr = benchmark.generated.split('T')[0];
+      const rawLatestPath = path.join(tempDir, BENCHMARKS_DIR, 'raw', 'latest.json');
+      const rawSnapshotPath = path.join(tempDir, BENCHMARKS_DIR, 'raw', `${dateStr}.json`);
+
+      expect(fs.existsSync(rawLatestPath)).toBe(true);
+      expect(fs.existsSync(rawSnapshotPath)).toBe(true);
+      const raw = JSON.parse(fs.readFileSync(rawLatestPath, 'utf8'));
+      expect(raw.rows).toEqual([
+        expect.objectContaining({ scenario: 'raw-file', condition: 'results', duration_ms: 321 }),
+      ]);
     });
 
     it('should skip scenarios with no results', () => {

@@ -4,6 +4,7 @@ Date: 2026-05-05
 Branch: `chore/arcforge-eval-observation-audit`  
 Skill under eval: `skills/arc-evaluating/SKILL.md`  
 Benchmark snapshots: `evals/benchmarks/latest.json`, `evals/benchmarks/2026-05-05.json`
+Raw dashboard exports: `evals/benchmarks/raw/latest.json`, `evals/benchmarks/raw/2026-05-05.json`
 
 ## Scope
 
@@ -48,6 +49,8 @@ Current benchmark helper did not flag metric regressions for these scenarios. Op
 - A/B comparison: `compared.baseline`, `compared.treatment`, `compared.delta`, `compared.delta_ci`, `compared.verdict`, `compared.verdict_policy`;
 - A/B metric deltas: `compared.metrics.duration_ms`, `compared.metrics.input_tokens`, `compared.metrics.output_tokens` with baseline average, treatment average, delta, and regression flag.
 
+`evals/benchmarks/raw/latest.json` adds dashboard-ready per-trial rows. The current export has 929 rows with 100% duration/input-token/output-token metric coverage. Each row keeps scenario/condition/run/trial provenance, behavioral score/pass data, assertion counts, duration/token metrics, error fields, action count, and transcript-path drilldown; it intentionally omits assistant output bodies so the dashboard can aggregate metrics without duplicating transcripts.
+
 ## Drift / comparison interpretation
 
 - The original weak-scenario audit remains near ceiling: treatment is 100%, baseline is already 97%, and CI crosses zero. Treat it as non-regression, not broad lift.
@@ -69,8 +72,18 @@ The suite is meaningfully stronger than the original single audit scenario. It n
 6. workflow/plugin/environment evals vs prompt-only `--skill-file` variation;
 7. discovered-claims / weak-assertions lifecycle arbitration for promotion, retirement, and historical grader artifact handling.
 
-This closes the main scenario gap identified in the previous audit. It is still not mathematically full coverage of `arc-evaluating`: remaining risks are mostly semantic judgment quality, model/human-grader calibration, and future drift in audit artifacts.
+This closes the main scenario gap identified in the previous audit. It is still not mathematical proof of every `arc-evaluating` behavior, but it is a credible path toward a release gate: the suite now combines near-ceiling non-regression guards with discriminative boundary/lifecycle scenarios and machine-reviewable raw metrics.
+
+## Fully reliable / exhaustive target
+
+Treat `fully reliable / exhaustive / complete proof` as an aspirational gate target, not a literal claim from this dataset. To approach that target, the next required layers are:
+
+1. expand scenario families beyond these seven eval-design behaviors, especially model/human grader calibration and adversarial semantic judgment cases;
+2. add raw-dashboard drift monitors over per-trial duration/tokens/score/pass/error distributions, not only aggregate snapshot rows;
+3. require stable raw metric collection (`data_quality.metric_coverage.* == 1`) before interpreting cost deltas;
+4. periodically retire or quarantine stale scenario versions instead of mixing historical grader artifacts into current benchmark claims;
+5. keep behavioral correctness verdicts separate from operational-cost regressions and infra/grade errors.
 
 ## Recommendation
 
-Ready as a stronger non-regression benchmark/report update. The previously identified lifecycle gap now has a passing scenario. Keep the claim conservative: the suite is credible for the major eval-design review behaviors covered here, but not exhaustive proof of every possible `arc-evaluating` behavior or grader-quality judgment.
+Ready as a stronger non-regression benchmark/report update with raw dashboard data collection. The previously identified lifecycle gap now has a passing scenario, and the dashboard has per-trial metric rows for future drift/cost visualization. Keep the external claim conservative: the suite is credible for the major eval-design review behaviors covered here and is moving toward release-gate reliability, but it is not a literal exhaustive proof of every possible `arc-evaluating` behavior or grader-quality judgment.

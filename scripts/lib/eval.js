@@ -1054,6 +1054,119 @@ function metricsFromResults(results) {
   };
 }
 
+function metricCoverage(rows, key) {
+  if (rows.length === 0) return null;
+  const present = rows.filter((r) => typeof r[key] === 'number').length;
+  return stats.round2(present / rows.length);
+}
+
+function assertionSummary(result) {
+  const assertions = Array.isArray(result.assertions)
+    ? result.assertions
+    : Array.isArray(result.assertionScores)
+      ? result.assertionScores
+      : [];
+  const passed = assertions.filter((a) => a && a.passed === true).length;
+  return { assertion_count: assertions.length, assertion_passed_count: passed };
+}
+
+function rawRowsForScenario(scenario, projectRoot) {
+  const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
+  const filterOpts = { version: scenario.version };
+  const conditions = isAb
+    ? [
+        { evalName: `${scenario.name}-baseline`, condition: 'baseline' },
+        { evalName: `${scenario.name}-treatment`, condition: 'treatment' },
+        { evalName: scenario.name, condition: 'results' },
+      ]
+    : [{ evalName: scenario.name, condition: 'results' }];
+  const rows = [];
+
+  for (const { evalName, condition } of conditions) {
+    const results = loadResults(evalName, projectRoot, filterOpts);
+    for (const result of results) {
+      const { assertion_count, assertion_passed_count } = assertionSummary(result);
+      rows.push({
+        scenario: scenario.name,
+        condition,
+        scope: scenario.scope,
+        claim_type: inferClaimType(scenario),
+        grader: result.grader || scenario.grader,
+        version: result.version || scenario.version || '1',
+        run_id: result.runId || compactDate(result.timestamp),
+        timestamp: result.timestamp,
+        trial: result.trial,
+        k: result.k,
+        model: result.model || null,
+        passed: result.passed,
+        score: result.score,
+        duration_ms: typeof result.duration_ms === 'number' ? result.duration_ms : null,
+        input_tokens: typeof result.input_tokens === 'number' ? result.input_tokens : null,
+        output_tokens: typeof result.output_tokens === 'number' ? result.output_tokens : null,
+        infra_error: result.infraError || null,
+        grade_error: result.gradeError || null,
+        transcript_path: result.transcript_path || result.transcriptPath || null,
+        artifact_summary: result.artifactSummary || null,
+        action_count: Array.isArray(result.actions) ? result.actions.length : null,
+        assertion_count,
+        assertion_passed_count,
+      });
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Generate per-trial raw benchmark rows for dashboards.
+ * Omits assistant output/transcript bodies; use transcript_path for drilldown.
+ * @param {string} projectRoot - Project root directory
+ * @param {string} [generated] - Timestamp to use for deterministic paired snapshots
+ * @returns {Object} Dashboard-oriented raw benchmark data
+ */
+function generateRawBenchmarkData(projectRoot, generated = getTimestamp()) {
+  const rows = [];
+  for (const file of listScenarios(projectRoot)) {
+    const scenario = parseScenario(file);
+    rows.push(...rawRowsForScenario(scenario, projectRoot));
+  }
+
+  rows.sort((a, b) => {
+    const scenarioCmp = a.scenario.localeCompare(b.scenario);
+    if (scenarioCmp) return scenarioCmp;
+    const runCmp = String(a.run_id || '').localeCompare(String(b.run_id || ''));
+    if (runCmp) return runCmp;
+    const conditionCmp = a.condition.localeCompare(b.condition);
+    if (conditionCmp) return conditionCmp;
+    return (a.trial || 0) - (b.trial || 0);
+  });
+
+  return {
+    schema_version: 1,
+    generated,
+    row_semantics:
+      'one row per scenario condition trial; transcript/output bodies are intentionally omitted',
+    data_quality: {
+      total_rows: rows.length,
+      metric_coverage: {
+        duration_ms: metricCoverage(rows, 'duration_ms'),
+        input_tokens: metricCoverage(rows, 'input_tokens'),
+        output_tokens: metricCoverage(rows, 'output_tokens'),
+      },
+    },
+    rows,
+  };
+}
+
+function writeRawBenchmarkData(projectRoot, rawData) {
+  const rawPath = path.join(projectRoot, BENCHMARKS_DIR, 'raw');
+  ensureDir(rawPath);
+  const json = `${JSON.stringify(rawData, null, 2)}\n`;
+  fs.writeFileSync(path.join(rawPath, 'latest.json'), json);
+  const dateStr = rawData.generated.split('T')[0];
+  fs.writeFileSync(path.join(rawPath, `${dateStr}.json`), json);
+}
+
 /**
  * Compute A/B comparison fields for benchmark snapshots when both conditions exist.
  * @param {EvalScenario} scenario - Parsed scenario
@@ -1180,6 +1293,9 @@ function generateBenchmark(projectRoot) {
     evals: benchmarks,
   };
 
+  const rawData = generateRawBenchmarkData(projectRoot, benchmark.generated);
+  writeRawBenchmarkData(projectRoot, rawData);
+
   const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
   ensureDir(benchmarkPath);
   const json = `${JSON.stringify(benchmark, null, 2)}\n`;
@@ -1279,6 +1395,7 @@ module.exports = {
   appendResult,
   loadResults,
   generateBenchmark,
+  generateRawBenchmarkData,
   compareResults,
   ensureEvalsDir,
   // Re-export graders for backward compatibility

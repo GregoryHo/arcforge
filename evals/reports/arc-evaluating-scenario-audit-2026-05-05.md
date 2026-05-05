@@ -9,8 +9,9 @@
 - Verdict policy: `non-regression`
 - Grader: deterministic `code`
 - Benchmark snapshots updated: `evals/benchmarks/latest.json`, `evals/benchmarks/2026-05-05.json`
+- Raw dashboard exports updated: `evals/benchmarks/raw/latest.json`, `evals/benchmarks/raw/2026-05-05.json`
 
-This suite evaluates whether `arc-evaluating` gives disciplined eval-design review rather than rubber-stamping weak release evidence. It now covers the original weak-scenario audit plus five focused boundary scenarios.
+This suite evaluates whether `arc-evaluating` gives disciplined eval-design review rather than rubber-stamping weak release evidence. It now covers the original weak-scenario audit plus six focused boundary/lifecycle scenarios.
 
 ## Commands
 
@@ -24,7 +25,7 @@ npm run lint
 npm test
 ```
 
-Raw per-trial rows remain ignored under `evals/results/`; this report and the benchmark snapshots are the reviewable committed summaries.
+Raw per-trial JSONL rows and transcripts remain ignored under `evals/results/`. Dashboard-oriented per-trial metrics are now committed under `evals/benchmarks/raw/`; current raw export has 929 rows and 100% duration/input-token/output-token metric coverage.
 
 ## Result summary
 
@@ -76,9 +77,12 @@ The suite is now materially more complete than the original single scenario. It 
 
 Remaining limitations:
 
-- The suite is still mostly non-regression evidence; several scenarios are near ceiling for baseline.
+- A literal `fully reliable / exhaustive / complete proof` claim still requires more than this dataset; treat it as an aspirational release-gate target.
+- The suite is still partly non-regression evidence; several scenarios are near ceiling for baseline.
 - The lifecycle gap is now directly exercised, but this remains code-graded semantic behavior rather than independent human/model judgment.
-- Cost metrics are duration/input/output tokens only because current raw JSONL rows do not store dollars or turn counts.
+- Cost metrics are duration/input/output tokens only; the new raw dashboard export preserves those per trial but still does not include dollars or turn counts.
+
+To keep moving toward exhaustive reliability, add model/human grader calibration scenarios, adversarial semantic-judgment cases, and dashboard drift monitors over raw score/pass/error/duration/token distributions.
 
 ## Benchmark update
 
@@ -89,8 +93,10 @@ The benchmark generator now stores richer fields per eval:
 - `compared.delta`, `compared.delta_ci`, `compared.verdict`, `compared.verdict_policy`
 - `compared.metrics.*` with baseline/treatment means, deltas, and regression flags
 
+The raw dashboard export stores one row per scenario-condition-trial in `evals/benchmarks/raw/latest.json` and the matching date snapshot. Rows include scenario/condition/run/trial provenance, behavioral score/pass fields, assertion counts, duration/token metrics, infra/grade errors, action count, and transcript-path drilldown while omitting transcript bodies.
+
 ## Decision
 
 Status: `PASS` for the expanded `arc-evaluating` non-regression suite.
 
-Do not overclaim broad discriminative lift. The reportable claim is now: `arc-evaluating` passes a broader regression suite for eval-design review behaviors, with clear treatment advantages in workflow-vs-skill boundary handling and claim-lifecycle arbitration. This is credible major-surface coverage, not exhaustive proof of every possible skill behavior.
+Do not overclaim literal exhaustive proof. The reportable claim is now: `arc-evaluating` passes a broader regression suite for eval-design review behaviors, with clear treatment advantages in workflow-vs-skill boundary handling and claim-lifecycle arbitration, plus committed per-trial raw metrics for dashboard drift/cost analysis. This is credible major-surface coverage moving toward release-gate reliability, not complete proof of every possible skill behavior.
