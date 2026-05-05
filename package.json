@@ -1,6 +1,6 @@
 {
   "name": "arcforge",
-  "version": "3.0.0-rc.1",
+  "version": "3.0.0-rc.2",
   "description": "Skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode",
   "license": "MIT",
   "author": {
