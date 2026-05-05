@@ -53,14 +53,13 @@ import sys
 scenario = "eval-sessionstart-minimal-bootstrap"
 root = Path(os.environ["PROJECT_ROOT"])
 
-def latest_transcript():
-    base = root / "evals" / "results" / scenario
-    files = list(base.glob("*/transcripts/*.txt"))
-    if not files:
-        return ""
-    return max(files, key=lambda p: p.stat().st_mtime).read_text(errors="replace")
+def trial_transcript():
+    transcript_path = os.environ.get("TRANSCRIPT_PATH")
+    if transcript_path and Path(transcript_path).exists():
+        return Path(transcript_path).read_text(errors="replace")
+    return ""
 
-txt = latest_transcript()
+txt = trial_transcript()
 low = txt.lower()
 
 def emit(label, ok, reason=""):

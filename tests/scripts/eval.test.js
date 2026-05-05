@@ -15,6 +15,8 @@ const mockUtils = require('../../scripts/lib/utils');
 const {
   parseEvalName,
   parseScenario,
+  normalizeClaimType,
+  inferClaimType,
   buildTrialPrompt,
   listScenarios,
   appendResult,
@@ -317,6 +319,35 @@ non-regression
       expect(scenario.verdictPolicy).toBeUndefined();
     });
 
+    it('should extract explicit claim type section', () => {
+      const content = `# Eval: smoke-claim
+## Scenario
+Do something.
+## Claim Type
+self-improvement/smoke
+`;
+      const filePath = writeScenario(tempDir, 'claim-type.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.claimType).toBe('self-improvement-smoke');
+    });
+
+    it('should default unknown claim type to inferred category', () => {
+      const content = `# Eval: invalid-claim
+## Scope
+skill
+## Scenario
+Do something.
+## Claim Type
+marketing
+`;
+      const filePath = writeScenario(tempDir, 'invalid-claim-type.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.claimType).toBeUndefined();
+      expect(inferClaimType(scenario)).toBe('discriminative-lift');
+    });
+
     it('should extract target section', () => {
       const content = `# Eval: with-target
 ## Scope
@@ -400,6 +431,31 @@ MARKER
       expect(scenario.setup).toContain('## Heading B');
       expect(scenario.setup).toContain("cat > file2.md << 'MARKER'");
       expect(scenario.assertions).toEqual(['Verify output']);
+    });
+  });
+
+  // ── claim type classification ─────────────────────────────────
+
+  describe('claim type classification', () => {
+    it('should normalize documented aliases', () => {
+      expect(normalizeClaimType('self-improvement/smoke')).toBe('self-improvement-smoke');
+      expect(normalizeClaimType('lift')).toBe('discriminative-lift');
+      expect(normalizeClaimType('infra/harness')).toBe('infra');
+    });
+
+    it('should infer non-regression before lift when verdict policy says so', () => {
+      expect(
+        inferClaimType({ name: 'safe', scope: 'skill', verdictPolicy: 'non-regression' }),
+      ).toBe('non-regression');
+    });
+
+    it('should infer self-improvement smoke and infra from scenario metadata', () => {
+      expect(inferClaimType({ name: 'eval-optional-learning-self-improvement-candidate' })).toBe(
+        'self-improvement-smoke',
+      );
+      expect(
+        inferClaimType({ name: 'eval-plugin-dir-other-skill-isolation', scope: 'skill' }),
+      ).toBe('infra');
     });
   });
 
@@ -1234,12 +1290,13 @@ Do something.
 
       const benchmark = generateBenchmark(tempDir);
 
-      expect(benchmark.evals['my-eval']).toBeDefined();
+      expect(benchmark.evals['my-eval'].claim_type).toBe('infra');
       expect(benchmark.evals['my-eval'].trials).toBe(3);
       expect(benchmark.evals['my-eval'].pass_rate).toBeCloseTo(0.67, 1);
       expect(benchmark.evals['my-eval'].avg_score).toBeCloseTo(0.67, 1);
       expect(benchmark.evals['my-eval'].pass_at_k).toBe(true);
       expect(benchmark.evals['my-eval'].pass_all_k).toBe(false);
+      expect(benchmark.by_claim_type.infra).toEqual({ scenarios: 1, trials: 3 });
     });
 
     it('should skip scenarios with no results', () => {

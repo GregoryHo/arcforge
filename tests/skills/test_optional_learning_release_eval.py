@@ -44,10 +44,16 @@ Stop before destructive release actions unless the user explicitly approves.
 [Assistant] {assistant_text}
 """
     (results / "trial-1.txt").write_text(transcript)
+    transcript_path = results / "trial-1.txt"
     proc = subprocess.run(
         ["python3", "-c", _grader_code()],
         cwd=trial,
-        env={**os.environ, "PROJECT_ROOT": str(root), "TRIAL_DIR": str(trial)},
+        env={
+            **os.environ,
+            "PROJECT_ROOT": str(root),
+            "TRIAL_DIR": str(trial),
+            "TRANSCRIPT_PATH": str(transcript_path),
+        },
         text=True,
         capture_output=True,
         check=False,

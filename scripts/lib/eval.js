@@ -33,6 +33,7 @@ const graders = require('./eval-graders');
  * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
  * @property {string} [preflight] - Optional preflight policy ('skip' to bypass A/B preflight gate)
  * @property {string} [verdictPolicy] - Optional A/B verdict policy ('non-regression' to judge treatment pass/fail instead of delta)
+ * @property {string} [claimType] - Evidence claim type ('non-regression' | 'discriminative-lift' | 'self-improvement-smoke' | 'infra')
  */
 
 /**
@@ -64,6 +65,55 @@ const EVALS_DIR = 'evals';
 const SCENARIOS_DIR = path.join(EVALS_DIR, 'scenarios');
 const RESULTS_DIR = path.join(EVALS_DIR, 'results');
 const BENCHMARKS_DIR = path.join(EVALS_DIR, 'benchmarks');
+
+const CLAIM_TYPES = new Set([
+  'non-regression',
+  'discriminative-lift',
+  'self-improvement-smoke',
+  'infra',
+]);
+
+function normalizeClaimType(raw) {
+  if (!raw) return undefined;
+  const value = String(raw).trim().toLowerCase().replace(/_/g, '-');
+  const aliases = {
+    lift: 'discriminative-lift',
+    discriminative: 'discriminative-lift',
+    'self-improvement': 'self-improvement-smoke',
+    smoke: 'self-improvement-smoke',
+    'self-improvement/smoke': 'self-improvement-smoke',
+    harness: 'infra',
+    infrastructure: 'infra',
+    'infra/harness': 'infra',
+  };
+  return aliases[value] || (CLAIM_TYPES.has(value) ? value : undefined);
+}
+
+function inferClaimType(scenario = {}) {
+  const explicit = normalizeClaimType(scenario.claimType);
+  if (explicit) return explicit;
+
+  const identity = [scenario.name, scenario.target].filter(Boolean).join('\n').toLowerCase();
+
+  if (identity.includes('self-improvement') || identity.includes('optional-learning')) {
+    return 'self-improvement-smoke';
+  }
+  if (
+    identity.includes('harness') ||
+    identity.includes('plugin-dir') ||
+    identity.includes('sessionstart') ||
+    scenario.scope === 'agent'
+  ) {
+    return 'infra';
+  }
+  if (scenario.verdictPolicy === 'non-regression' || scenario.preflight === 'skip') {
+    return 'non-regression';
+  }
+  if (scenario.scope === 'skill' || scenario.scope === 'workflow') {
+    return 'discriminative-lift';
+  }
+  return 'infra';
+}
 
 /**
  * Extract compact YYYYMMDD date from an ISO timestamp.
@@ -164,6 +214,7 @@ function parseScenario(filePath, projectRoot) {
   const target = section('target');
   const preflight = section('preflight').toLowerCase();
   const verdictPolicy = section('verdict policy').toLowerCase();
+  const claimType = normalizeClaimType(section('claim type'));
 
   // Plugin Dir: resolve ${PROJECT_ROOT} or use absolute path
   const pluginDirRaw = section('plugin dir');
@@ -192,6 +243,7 @@ function parseScenario(filePath, projectRoot) {
     ...(version ? { version } : {}),
     ...(preflight ? { preflight } : {}),
     ...(verdictPolicy ? { verdictPolicy } : {}),
+    ...(claimType ? { claimType } : {}),
     ...(pluginDir ? { pluginDir } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
@@ -1019,8 +1071,10 @@ function generateBenchmark(projectRoot) {
       };
     }
 
+    const claimType = inferClaimType(scenario);
     benchmarks[scenario.name] = {
       scope: scenario.scope,
+      claim_type: claimType,
       grader: scenario.grader,
       trials: s.count,
       pass_rate: s.passRate,
@@ -1037,6 +1091,13 @@ function generateBenchmark(projectRoot) {
 
   const benchmark = {
     generated: getTimestamp(),
+    by_claim_type: Object.entries(benchmarks).reduce((acc, [_name, data]) => {
+      const type = data.claim_type || 'infra';
+      acc[type] = acc[type] || { scenarios: 0, trials: 0 };
+      acc[type].scenarios += 1;
+      acc[type].trials += data.trials || 0;
+      return acc;
+    }, {}),
     evals: benchmarks,
   };
 
@@ -1117,6 +1178,8 @@ module.exports = {
   // Orchestration
   parseEvalName,
   parseScenario,
+  normalizeClaimType,
+  inferClaimType,
   listScenarios,
   findScenario,
   createTrialDir,
