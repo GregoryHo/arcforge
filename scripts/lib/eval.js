@@ -1029,6 +1029,81 @@ function loadResults(evalName, projectRoot, options = {}) {
 }
 
 /**
+ * Compute benchmark-level execution metrics from trial results.
+ * @param {TrialResult[]} results - Trial results
+ * @returns {{duration_ms: Object, input_tokens: Object, output_tokens: Object}}
+ */
+function metricsFromResults(results) {
+  const summarize = (key) => {
+    const values = results.map((r) => r[key]).filter((v) => typeof v === 'number');
+    if (values.length === 0) return { count: 0, avg: null, min: null, max: null, total: null };
+    const total = values.reduce((sum, v) => sum + v, 0);
+    return {
+      count: values.length,
+      avg: stats.round2(total / values.length),
+      min: Math.min(...values),
+      max: Math.max(...values),
+      total,
+    };
+  };
+
+  return {
+    duration_ms: summarize('duration_ms'),
+    input_tokens: summarize('input_tokens'),
+    output_tokens: summarize('output_tokens'),
+  };
+}
+
+/**
+ * Compute A/B comparison fields for benchmark snapshots when both conditions exist.
+ * @param {EvalScenario} scenario - Parsed scenario
+ * @param {string} projectRoot - Project root directory
+ * @param {Object} filterOpts - loadResults filters
+ * @returns {Object|null}
+ */
+function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
+  const baseline = loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts);
+  const treatment = loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts);
+  if (baseline.length === 0 || treatment.length === 0) return null;
+
+  const bStats = stats.statsFromResults(baseline);
+  const tStats = stats.statsFromResults(treatment);
+  const delta = stats.computeDelta(baseline, treatment);
+  const deltaCi = stats.ciForDelta(baseline, treatment);
+  const verdict = stats.verdictFromAbPolicy(baseline, treatment, scenario.verdictPolicy);
+  const metricDeltas = stats.computeMetricDeltas(baseline, treatment);
+  const roundMetric = (value) => (typeof value === 'number' ? stats.round2(value) : null);
+  return {
+    baseline: bStats,
+    treatment: tStats,
+    delta: stats.round2(delta),
+    delta_ci: deltaCi,
+    verdict,
+    ...(scenario.verdictPolicy ? { verdict_policy: scenario.verdictPolicy } : {}),
+    metrics: {
+      duration_ms: {
+        baseline_avg: roundMetric(metricDeltas.baselineMeans.duration_ms),
+        treatment_avg: roundMetric(metricDeltas.treatmentMeans.duration_ms),
+        delta: roundMetric(metricDeltas.durationDelta),
+        regression: metricDeltas.durationRegression,
+      },
+      input_tokens: {
+        baseline_avg: roundMetric(metricDeltas.baselineMeans.input_tokens),
+        treatment_avg: roundMetric(metricDeltas.treatmentMeans.input_tokens),
+        delta: roundMetric(metricDeltas.inputTokensDelta),
+        regression: metricDeltas.inputTokensRegression,
+      },
+      output_tokens: {
+        baseline_avg: roundMetric(metricDeltas.baselineMeans.output_tokens),
+        treatment_avg: roundMetric(metricDeltas.treatmentMeans.output_tokens),
+        delta: roundMetric(metricDeltas.outputTokensDelta),
+        regression: metricDeltas.outputTokensRegression,
+      },
+    },
+  };
+}
+
+/**
  * Generate a benchmark summary from results
  * @param {string} projectRoot - Project root directory
  * @returns {Object} Benchmark data
@@ -1072,6 +1147,8 @@ function generateBenchmark(projectRoot) {
     }
 
     const claimType = inferClaimType(scenario);
+    const metrics = metricsFromResults(results);
+    const comparison = isAb ? comparisonFromAbResults(scenario, projectRoot, filterOpts) : null;
     benchmarks[scenario.name] = {
       scope: scenario.scope,
       claim_type: claimType,
@@ -1084,6 +1161,8 @@ function generateBenchmark(projectRoot) {
       pass_at_k: stats.passAtK(results),
       pass_all_k: stats.passAllK(results),
       last_run: results[results.length - 1].timestamp,
+      metrics,
+      ...(comparison ? { compared: comparison } : {}),
       ...(warning ? { warning } : {}),
       ...(Object.keys(byModel).length > 0 ? { by_model: byModel } : {}),
     };

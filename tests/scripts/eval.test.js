@@ -1297,6 +1297,54 @@ Do something.
       expect(benchmark.evals['my-eval'].pass_at_k).toBe(true);
       expect(benchmark.evals['my-eval'].pass_all_k).toBe(false);
       expect(benchmark.by_claim_type.infra).toEqual({ scenarios: 1, trials: 3 });
+      expect(benchmark.evals['my-eval'].metrics).toEqual({
+        duration_ms: { count: 0, avg: null, min: null, max: null, total: null },
+        input_tokens: { count: 0, avg: null, min: null, max: null, total: null },
+        output_tokens: { count: 0, avg: null, min: null, max: null, total: null },
+      });
+    });
+
+    it('should include execution metrics and A/B comparison details for skill benchmarks', () => {
+      writeScenario(
+        tempDir,
+        'ab-eval.md',
+        '# Eval: ab-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Verdict Policy\nnon-regression\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        for (let i = 1; i <= 5; i++) {
+          appendResult(
+            makeResult({
+              eval: `ab-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: true,
+              score: condition === 'baseline' && i === 1 ? 0.8 : 1,
+              duration_ms: condition === 'baseline' ? 1000 : 1500,
+              input_tokens: 10,
+              output_tokens: condition === 'baseline' ? 100 : 125,
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+      }
+
+      const benchmark = generateBenchmark(tempDir);
+      const data = benchmark.evals['ab-eval'];
+      expect(data.metrics.duration_ms.avg).toBe(1500);
+      expect(data.metrics.output_tokens.total).toBe(625);
+      expect(data.compared.verdict).toBe('PASS');
+      expect(data.compared.verdict_policy).toBe('non-regression');
+      expect(data.compared.delta).toBeCloseTo(0.04);
+      expect(data.compared.metrics.duration_ms).toEqual({
+        baseline_avg: 1000,
+        treatment_avg: 1500,
+        delta: 500,
+        regression: false,
+      });
+      expect(data.compared.metrics.output_tokens.delta).toBe(25);
     });
 
     it('should skip scenarios with no results', () => {
