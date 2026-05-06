@@ -1,6 +1,6 @@
 ---
 name: arc-releasing
-description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 5-file version bump → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
+description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 9-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
 ---
 
 # arc-releasing
@@ -124,7 +124,7 @@ Include only sections that have entries. Order: Fixed → Changed → Added → 
 
 **Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. This is the text that shows up on the marketplace release page; treat it as a user-facing artifact.
 
-### 4. Bump the version in **all 5 canonical locations**
+### 4. Bump the version in **all 9 canonical locations**
 
 | File | Where in the file |
 |---|---|
@@ -133,23 +133,37 @@ Include only sections that have entries. Order: Fixed → Changed → Added → 
 | `.claude-plugin/marketplace.json` | `plugins[0].version` |
 | `.opencode/plugins/arcforge.js` | `version:` property inside the default export |
 | `README.md` | version badge URL (shields.io, near line 3) |
+| `website/page/hero.jsx` | hero version label (`vX.Y.Z` near top of component) |
+| `website/page/sections.jsx` | footer line (`MIT · vX.Y.Z · By ...`) |
+| `website/page/hero.js` | babel build artifact — regenerate, do not hand-edit |
+| `website/page/sections.js` | babel build artifact — regenerate, do not hand-edit |
 
-Verify with a single grep after bumping:
+After editing the two `.jsx` files, regenerate the `.js` artifacts:
 
 ```bash
-grep -rn "X\.Y\.Z" package.json .claude-plugin/ .opencode/plugins/arcforge.js README.md
+npm run build:website
 ```
 
-Expect **exactly 5 hits**. Fewer means a split-brain bump (dangerous — different platforms disagree about the current version). More means a stale copy elsewhere that also needs attention.
+The babel output is committed to the repo (no separate publish pipeline reads it from a build cache), so `.jsx` and `.js` must match in the same commit. Don't hand-edit the `.js` files — the babel transform also touches surrounding output and an out-of-band edit drifts from what `build:website` would produce next time.
+
+Verify with a single grep after bumping + building:
+
+```bash
+grep -rn "X\.Y\.Z" package.json .claude-plugin/ .opencode/plugins/arcforge.js README.md website/page/
+```
+
+Expect **exactly 9 hits**. Fewer means a split-brain bump (dangerous — different platforms or the website disagree about the current version). More means a stale copy elsewhere that also needs attention.
 
 `package-lock.json` top-level `"version"` is known-stale at an older value. Leave it unless you're doing a dedicated lockfile refresh; never combine that with a release commit, since mixed diffs make rollback painful.
+
+For releases that change **shipped surface area** (new skill, removed CLI flag, new marketing claim), also audit the website **content** — `website/page/hero.jsx`, `sections.jsx`, and `sdd.jsx` carry the project framing. Patch releases usually just need the version label bumped; minor/major releases often need copy adjustments too. Confirm with the user before rewriting hero copy or feature lists.
 
 ### 5. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
-- Stage exactly the 6 release files (5 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
+- Stage exactly the 10 release files (9 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 5-location grep returned exactly 5 hits
+- `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 9-location grep returned exactly 9 hits
 
 ### 6. After PR merges to main — tag it
 
@@ -169,6 +183,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 
 - **Ingest before bump.** Once the version flips, the "why" narrative is harder to reconstruct for the vault. That's why it's step 1, not step 5.
 - **`.opencode/plugins/arcforge.js`.** The only non-JSON, non-README version location. It doesn't pattern-match "config file" in a search, so it gets missed.
+- **Website version labels + babel rebuild.** `website/page/hero.jsx` and `sections.jsx` both carry the version, and the committed `.js` siblings must be regenerated via `npm run build:website` to match — easy to miss because the website looks like a "doc only" surface but `.jsx` ≠ `.js` in a single commit is a real defect.
 - **README badge URL.** The shields.io badge is image-cached; stale numbers visually persist even after every other file is correct. Worth an extra explicit mention.
 - **The six install-surface files.** `.codex/INSTALL.md`, `.gemini/INSTALL.md`, `.opencode/INSTALL.md` plus the three `docs/README.{codex,gemini,opencode}.md` files are sibling-flat and don't light up in normal "what did this release touch" diffs. Step 2 covers the audit details.
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
@@ -177,10 +192,10 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 
 ## Anti-Patterns (from real arcforge release incidents)
 
-- **Silent version drift** — v1.4.0 discovered `.claude-plugin/marketplace.json` had been stuck two versions behind. The 5-location grep is designed to catch exactly this.
+- **Silent version drift** — v1.4.0 discovered `.claude-plugin/marketplace.json` had been stuck two versions behind. The 9-location grep is designed to catch exactly this. v3.0.1 expanded the surface to include `website/page/{hero,sections}.{jsx,js}` after the website was found to have been silently bumped manually during v3.0.0.
 - **Version bump without CHANGELOG entry** — the marketplace release cache is version-keyed. A bump with no CHANGELOG entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG *before* version bump) enforces pairing them.
 - **Editing past CHANGELOG entries** — downstream users and vault Decision notes depend on past entries being stable. Add corrections to the current entry; never stealth-edit the past.
-- **Partial bump shipped** — bumping 3 of 5 locations produces a release where Claude Code, OpenCode, and the marketplace JSON disagree about the current version. Always use the 5-location grep as a post-bump gate.
+- **Partial bump shipped** — bumping a subset of the 9 locations produces a release where Claude Code, OpenCode, the marketplace JSON, or the website disagree about the current version. Always use the 9-location grep as a post-bump gate.
 - **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 6 release files. Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
 - **Skipping the post-merge tag** — without the tag, the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. Missing tags cause the *next* release to either drop entries or include already-shipped ones.
 
