@@ -87,6 +87,57 @@ function sanitizeObservationPayload(value, maxLen) {
 }
 
 /**
+ * Extract the skill name from a Skill tool invocation. Returns null when the
+ * tool is not Skill, the input is missing, or the skill field is absent.
+ * Only the skill name is returned — never the args payload — so this remains
+ * a metadata-only signal.
+ */
+function extractSkillName(toolName, toolInput) {
+  if (toolName !== 'Skill') return null;
+  if (!toolInput || typeof toolInput !== 'object') return null;
+  const raw = toolInput.skill;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  // Skill names are bounded; cap defensively to avoid storing arbitrary text.
+  return trimmed.slice(0, 128);
+}
+
+/**
+ * Classify the coarse outcome of a tool call from its response metadata.
+ * Returns one of 'success' | 'error' | 'unknown'. Inspects only structural
+ * fields (is_error, error) — never the response body content.
+ */
+function classifyOutcome(toolResponse) {
+  if (toolResponse === undefined || toolResponse === null) return 'unknown';
+  if (typeof toolResponse !== 'object') return 'success';
+  if (toolResponse.is_error === true) return 'error';
+  if (toolResponse.error) return 'error';
+  return 'success';
+}
+
+/**
+ * Compute the byte size of a tool response payload without storing it.
+ * Returns 0 when the response is missing.
+ */
+function responseByteSize(toolResponse) {
+  if (toolResponse === undefined || toolResponse === null) return 0;
+  try {
+    const str = typeof toolResponse === 'string' ? toolResponse : JSON.stringify(toolResponse);
+    return Buffer.byteLength(str || '', 'utf8');
+  } catch {
+    return 0;
+  }
+}
+
+function buildObservedToolInput(toolName, toolInput) {
+  if (!toolInput || typeof toolInput !== 'object') return toolInput;
+  if (toolName !== 'Skill') return toolInput;
+  const skillName = extractSkillName(toolName, toolInput);
+  return skillName ? { skill: skillName } : {};
+}
+
+/**
  * Archive observations file if it exceeds MAX_FILE_SIZE.
  */
 function archiveIfNeeded(obsPath, project) {
@@ -180,19 +231,30 @@ function main() {
       project_id: getProjectId(process.env.CLAUDE_PROJECT_DIR || process.cwd()),
     };
 
+    // Coarse skill-usage signal: when the call is a Skill invocation, record
+    // only the skill name. This lets us answer "are non-learning skills used?"
+    // without storing the args payload.
+    const skillName = extractSkillName(toolName, input.tool_input);
+    if (skillName) observation.skill = skillName;
+
     // Add input/output based on phase
     if (phase === 'pre' && input.tool_input) {
+      const observedInput = buildObservedToolInput(toolName, input.tool_input);
       const inputStr =
-        typeof input.tool_input === 'string' ? input.tool_input : JSON.stringify(input.tool_input);
+        typeof observedInput === 'string' ? observedInput : JSON.stringify(observedInput);
       observation.input = sanitizeObservationPayload(inputStr, MAX_INPUT_LENGTH);
     }
 
-    if (phase === 'post' && input.tool_output) {
-      const outputStr =
-        typeof input.tool_output === 'string'
-          ? input.tool_output
-          : JSON.stringify(input.tool_output);
-      observation.output = sanitizeObservationPayload(outputStr, MAX_OUTPUT_LENGTH);
+    // PostToolUse uses `tool_response` per the Claude hook schema; older
+    // payloads may still carry `tool_output`. Accept either.
+    const toolResponse =
+      input.tool_response !== undefined ? input.tool_response : input.tool_output;
+    if (phase === 'post') {
+      observation.outcome = classifyOutcome(toolResponse);
+      observation.output_bytes = responseByteSize(toolResponse);
+      // Do not persist response bodies for outcome telemetry. The byte count and
+      // structural outcome are enough for usage analysis and keep PostToolUse
+      // observations lightweight.
     }
 
     // Ensure directory exists
@@ -223,8 +285,15 @@ if (require.main === module) {
 module.exports = {
   truncate,
   redactObservationText,
+  sanitizeObservationPayload,
+  extractSkillName,
+  classifyOutcome,
+  responseByteSize,
+  buildObservedToolInput,
   getArchiveDir,
   getPidFile,
   shouldObserve,
   runAutomaticLearningTrigger,
+  MAX_INPUT_LENGTH,
+  MAX_OUTPUT_LENGTH,
 };

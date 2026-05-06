@@ -107,7 +107,13 @@ Three graders: **code** (deterministic checks), **model** (intent/quality/reason
 
 **Grader selection principle:** Structured output (JSON, typed fields) does not make semantic quality deterministic. An agent can return valid JSON while producing poor analysis. Code-grade structure; model-grade quality.
 
+**Model/human grader calibration:** One vague model-grader preference is not release evidence. For semantic release claims, use a task-derived rubric with anchors, repeated trials, CI/variance/agreement checks, and blind comparison, human spot-check, or independent adjudication. Treat model-grader output as noisy semantic evidence, not deterministic proof.
+
+**Deterministic proxy warning:** Keyword, regex, and JSON-schema checks cover facts/fields, not critique quality. If a proxy can pass a shallow or adversarial answer, tighten it with negative fixtures/traps or model/human-grade the quality claim.
+
 ### Step 6: Report
+
+Report behavior separately from operational cost. A treatment can be correct but slower, more verbose, or pricier. Preserve duration/token/cost deltas when available, and do not hide operational regressions behind a passing behavioral verdict.
 
 | Verdict | Meaning |
 |---------|---------|

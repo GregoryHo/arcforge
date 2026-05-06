@@ -15,6 +15,8 @@ const mockUtils = require('../../scripts/lib/utils');
 const {
   parseEvalName,
   parseScenario,
+  normalizeClaimType,
+  inferClaimType,
   buildTrialPrompt,
   listScenarios,
   appendResult,
@@ -23,6 +25,7 @@ const {
   passAllK,
   computeDelta,
   generateBenchmark,
+  generateRawBenchmarkData,
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
@@ -317,6 +320,35 @@ non-regression
       expect(scenario.verdictPolicy).toBeUndefined();
     });
 
+    it('should extract explicit claim type section', () => {
+      const content = `# Eval: smoke-claim
+## Scenario
+Do something.
+## Claim Type
+self-improvement/smoke
+`;
+      const filePath = writeScenario(tempDir, 'claim-type.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.claimType).toBe('self-improvement-smoke');
+    });
+
+    it('should default unknown claim type to inferred category', () => {
+      const content = `# Eval: invalid-claim
+## Scope
+skill
+## Scenario
+Do something.
+## Claim Type
+marketing
+`;
+      const filePath = writeScenario(tempDir, 'invalid-claim-type.md', content);
+      const scenario = parseScenario(filePath);
+
+      expect(scenario.claimType).toBeUndefined();
+      expect(inferClaimType(scenario)).toBe('discriminative-lift');
+    });
+
     it('should extract target section', () => {
       const content = `# Eval: with-target
 ## Scope
@@ -400,6 +432,31 @@ MARKER
       expect(scenario.setup).toContain('## Heading B');
       expect(scenario.setup).toContain("cat > file2.md << 'MARKER'");
       expect(scenario.assertions).toEqual(['Verify output']);
+    });
+  });
+
+  // ── claim type classification ─────────────────────────────────
+
+  describe('claim type classification', () => {
+    it('should normalize documented aliases', () => {
+      expect(normalizeClaimType('self-improvement/smoke')).toBe('self-improvement-smoke');
+      expect(normalizeClaimType('lift')).toBe('discriminative-lift');
+      expect(normalizeClaimType('infra/harness')).toBe('infra');
+    });
+
+    it('should infer non-regression before lift when verdict policy says so', () => {
+      expect(
+        inferClaimType({ name: 'safe', scope: 'skill', verdictPolicy: 'non-regression' }),
+      ).toBe('non-regression');
+    });
+
+    it('should infer self-improvement smoke and infra from scenario metadata', () => {
+      expect(inferClaimType({ name: 'eval-optional-learning-self-improvement-candidate' })).toBe(
+        'self-improvement-smoke',
+      );
+      expect(
+        inferClaimType({ name: 'eval-plugin-dir-other-skill-isolation', scope: 'skill' }),
+      ).toBe('infra');
     });
   });
 
@@ -1234,12 +1291,245 @@ Do something.
 
       const benchmark = generateBenchmark(tempDir);
 
-      expect(benchmark.evals['my-eval']).toBeDefined();
+      expect(benchmark.evals['my-eval'].claim_type).toBe('infra');
       expect(benchmark.evals['my-eval'].trials).toBe(3);
       expect(benchmark.evals['my-eval'].pass_rate).toBeCloseTo(0.67, 1);
       expect(benchmark.evals['my-eval'].avg_score).toBeCloseTo(0.67, 1);
       expect(benchmark.evals['my-eval'].pass_at_k).toBe(true);
       expect(benchmark.evals['my-eval'].pass_all_k).toBe(false);
+      expect(benchmark.by_claim_type.infra).toEqual({ scenarios: 1, trials: 3 });
+      expect(benchmark.evals['my-eval'].metrics).toEqual({
+        duration_ms: { count: 0, avg: null, min: null, max: null, total: null },
+        input_tokens: { count: 0, avg: null, min: null, max: null, total: null },
+        output_tokens: { count: 0, avg: null, min: null, max: null, total: null },
+      });
+    });
+
+    it('should include execution metrics and A/B comparison details for skill benchmarks', () => {
+      writeScenario(
+        tempDir,
+        'ab-eval.md',
+        '# Eval: ab-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Verdict Policy\nnon-regression\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        for (let i = 1; i <= 5; i++) {
+          appendResult(
+            makeResult({
+              eval: `ab-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: true,
+              score: condition === 'baseline' && i === 1 ? 0.8 : 1,
+              duration_ms: condition === 'baseline' ? 1000 : 1500,
+              input_tokens: 10,
+              output_tokens: condition === 'baseline' ? 100 : 125,
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+      }
+
+      const benchmark = generateBenchmark(tempDir);
+      const data = benchmark.evals['ab-eval'];
+      expect(data.metrics.duration_ms.avg).toBe(1500);
+      expect(data.metrics.output_tokens.total).toBe(625);
+      expect(data.compared.verdict).toBe('PASS');
+      expect(data.compared.verdict_policy).toBe('non-regression');
+      expect(data.compared.delta).toBeCloseTo(0.04);
+      expect(data.compared.metrics.duration_ms).toEqual({
+        baseline_avg: 1000,
+        treatment_avg: 1500,
+        delta: 500,
+        regression: false,
+      });
+      expect(data.compared.metrics.output_tokens.delta).toBe(25);
+    });
+
+    it('should honor since filters for aggregate, A/B comparison, and raw benchmark rows', () => {
+      writeScenario(
+        tempDir,
+        'bounded-eval.md',
+        '# Eval: bounded-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Verdict Policy\nnon-regression\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        appendResult(
+          makeResult({
+            eval: `bounded-eval-${condition}`,
+            trial: 1,
+            k: 1,
+            passed: condition === 'baseline',
+            score: condition === 'baseline' ? 1 : 0,
+            timestamp: '2026-03-16T10:00:00Z',
+            runId: '20260316-100000',
+            version: '1',
+          }),
+          tempDir,
+        );
+        appendResult(
+          makeResult({
+            eval: `bounded-eval-${condition}`,
+            trial: 1,
+            k: 1,
+            passed: true,
+            score: 1,
+            duration_ms: condition === 'baseline' ? 1000 : 1200,
+            timestamp: '2026-03-17T10:00:00Z',
+            runId: '20260317-100000',
+            version: '1',
+          }),
+          tempDir,
+        );
+      }
+
+      const benchmark = generateBenchmark(tempDir, { since: '2026-03-17T00:00:00Z' });
+      const data = benchmark.evals['bounded-eval'];
+      expect(benchmark.result_filter).toEqual({ since: '2026-03-17T00:00:00Z' });
+      expect(data.trials).toBe(1);
+      expect(data.pass_rate).toBe(1);
+      expect(data.compared.verdict).toBe('PASS');
+      expect(data.compared.treatment.count).toBe(1);
+      expect(data.compared.metrics.duration_ms.delta).toBe(200);
+
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tempDir, BENCHMARKS_DIR, 'raw', 'latest.json'), 'utf8'),
+      );
+      expect(raw.result_filter).toEqual({ since: '2026-03-17T00:00:00Z' });
+      expect(raw.rows.map((r) => r.timestamp)).toEqual([
+        '2026-03-17T10:00:00Z',
+        '2026-03-17T10:00:00Z',
+      ]);
+    });
+
+    it('should generate dashboard raw rows with per-trial metrics and provenance', () => {
+      writeScenario(
+        tempDir,
+        'raw-eval.md',
+        '# Eval: raw-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Claim Type\ndiscriminative-lift\n\n## Version\n2\n',
+      );
+
+      appendResult(
+        makeResult({
+          eval: 'raw-eval-baseline',
+          trial: 1,
+          k: 2,
+          passed: false,
+          score: 0.5,
+          duration_ms: 1000,
+          input_tokens: 50,
+          output_tokens: 80,
+          model: 'baseline-model',
+          runId: '20260317-100000',
+          version: '2',
+          output: 'large transcript text should not be duplicated into dashboard raw metrics rows',
+          transcript_path:
+            'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
+          assertions: [{ label: 'A1', passed: false, score: 0 }],
+        }),
+        tempDir,
+      );
+      appendResult(
+        makeResult({
+          eval: 'raw-eval-treatment',
+          trial: 1,
+          k: 2,
+          passed: true,
+          score: 1,
+          duration_ms: 1500,
+          input_tokens: 60,
+          output_tokens: 120,
+          model: 'treatment-model',
+          runId: '20260317-100000',
+          version: '2',
+          assertionScores: [1],
+        }),
+        tempDir,
+      );
+
+      const raw = generateRawBenchmarkData(tempDir);
+
+      expect(raw.schema_version).toBe(1);
+      expect(raw.rows).toHaveLength(2);
+      expect(raw.data_quality.total_rows).toBe(2);
+      expect(raw.data_quality.metric_coverage.duration_ms).toBe(1);
+      expect(raw.data_quality.metric_coverage.input_tokens).toBe(1);
+      expect(raw.data_quality.metric_coverage.output_tokens).toBe(1);
+      expect(raw.data_quality.metric_coverage.total_tokens).toBe(1);
+      expect(raw.rows[0]).toMatchObject({
+        scenario: 'raw-eval',
+        condition: 'baseline',
+        scope: 'skill',
+        claim_type: 'discriminative-lift',
+        grader: 'code',
+        version: '2',
+        run_id: '20260317-100000',
+        trial: 1,
+        k: 2,
+        passed: false,
+        score: 0.5,
+        duration_ms: 1000,
+        input_tokens: 50,
+        output_tokens: 80,
+        total_tokens: 130,
+        cost_proxy_tokens: 130,
+        baseline_score_avg: 0.5,
+        score_delta_vs_baseline_avg: 0,
+        duration_ms_delta_vs_baseline_avg: 0,
+        input_tokens_delta_vs_baseline_avg: 0,
+        output_tokens_delta_vs_baseline_avg: 0,
+        total_tokens_delta_vs_baseline_avg: 0,
+        model: 'baseline-model',
+        transcript_path: 'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
+        assertion_count: 1,
+        assertion_passed_count: 0,
+      });
+      expect(raw.rows[0].output).toBeUndefined();
+      expect(raw.rows[1]).toMatchObject({
+        assertion_count: 1,
+        assertion_passed_count: 1,
+        total_tokens: 180,
+        cost_proxy_tokens: 180,
+        baseline_score_avg: 0.5,
+        score_delta_vs_baseline_avg: 0.5,
+        duration_ms_delta_vs_baseline_avg: 500,
+        input_tokens_delta_vs_baseline_avg: 10,
+        output_tokens_delta_vs_baseline_avg: 40,
+        total_tokens_delta_vs_baseline_avg: 50,
+      });
+    });
+
+    it('should write dashboard raw data snapshots alongside aggregate benchmarks', () => {
+      writeScenario(
+        tempDir,
+        'raw-file.md',
+        '# Eval: raw-file\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+      appendResult(
+        makeResult({
+          eval: 'raw-file',
+          trial: 1,
+          passed: true,
+          score: 1,
+          duration_ms: 321,
+          runId: '20260317-100000',
+        }),
+        tempDir,
+      );
+
+      const benchmark = generateBenchmark(tempDir);
+      const dateStr = benchmark.generated.split('T')[0];
+      const rawLatestPath = path.join(tempDir, BENCHMARKS_DIR, 'raw', 'latest.json');
+      const rawSnapshotPath = path.join(tempDir, BENCHMARKS_DIR, 'raw', `${dateStr}.json`);
+
+      expect(fs.existsSync(rawLatestPath)).toBe(true);
+      expect(fs.existsSync(rawSnapshotPath)).toBe(true);
+      const raw = JSON.parse(fs.readFileSync(rawLatestPath, 'utf8'));
+      expect(raw.rows).toEqual([
+        expect.objectContaining({ scenario: 'raw-file', condition: 'results', duration_ms: 321 }),
+      ]);
     });
 
     it('should skip scenarios with no results', () => {
@@ -1438,6 +1728,61 @@ Do something.
       } finally {
         fs.rmSync(trialDir, { recursive: true, force: true });
       }
+    });
+
+    it('should fail model-grader calibration scenario when human review is negated', () => {
+      const scenario = parseScenario(
+        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
+        process.cwd(),
+      );
+      const output = [
+        '[Assistant]',
+        'One vague model grader is insufficient proof. Use a calibrated rubric with concrete anchor examples and fixed criteria.',
+        'Skip human review and independent adjudication because it is too slow.',
+        'Run multiple trials, check variance, CI, and agreement across runs.',
+        'Semantic model grading is noisy and not deterministic proof.',
+      ].join('\n');
+      const transcript = path.join(tempDir, 'bad-model-grader-calibration-transcript.txt');
+      fs.writeFileSync(transcript, output);
+
+      const result = makeResult({ output, transcript });
+      const graded = gradeWithCode(
+        result,
+        scenario.graderConfig,
+        process.cwd(),
+        scenario.assertions.length,
+      );
+
+      expect(graded.passed).toBe(false);
+      expect(graded.assertionScores[2]).toBe(0);
+    });
+
+    it('should pass model-grader calibration scenario when human review is positively recommended', () => {
+      const scenario = parseScenario(
+        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
+        process.cwd(),
+      );
+      const output = [
+        '[Assistant]',
+        'One vague model grader is insufficient and noisy release evidence, not proof of improvement.',
+        'Use a concrete calibrated rubric with anchor examples and fixed task-derived criteria before trusting semantic scores.',
+        'Require blind comparison plus human spot-check review or independent adjudication to reduce grader bias.',
+        'Run repeated trials and inspect CI, variance, agreement, and consistency across runs.',
+        'Qualitative model grading is semantic judgment with drift and noise, not deterministic proof.',
+      ].join('\n');
+      const transcript = path.join(tempDir, 'good-model-grader-calibration-transcript.txt');
+      fs.writeFileSync(transcript, output);
+
+      const result = makeResult({ output, transcript });
+      const graded = gradeWithCode(
+        result,
+        scenario.graderConfig,
+        process.cwd(),
+        scenario.assertions.length,
+      );
+
+      expect(graded.passed).toBe(true);
+      expect(graded.assertionScores).toEqual([1, 1, 1, 1, 1]);
     });
   });
 
