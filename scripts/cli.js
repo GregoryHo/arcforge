@@ -1036,70 +1036,65 @@ async function main() {
           });
           const name = args.positional[1];
 
+          const pickModelData = (data) =>
+            model && data.by_model?.[model] ? data.by_model[model] : data;
+
           if (name && benchmark.evals[name]) {
             const data = benchmark.evals[name];
+            const display = pickModelData(data);
             if (asJson) {
-              if (model && data.by_model && data.by_model[model]) {
-                output({ ...data.by_model[model], claim_type: data.claim_type }, true);
-              } else {
-                output(data, true);
-              }
+              output(display === data ? data : { ...display, claim_type: data.claim_type }, true);
             } else {
               console.log(`Claim type: ${data.claim_type || 'infra'}`);
               console.log(
                 'Note: SHIP in non-regression, self-improvement-smoke, or infra only supports that claim type; it is not evidence of discriminative lift.',
               );
-              output(
-                model && data.by_model && data.by_model[model] ? data.by_model[model] : data,
-                false,
-              );
+              output(display, false);
             }
+          } else if (Object.keys(benchmark.evals).length === 0) {
+            console.log('No eval results yet. Run: arc eval run <scenario>');
+          } else if (asJson) {
+            output(benchmark, true);
           } else {
-            if (Object.keys(benchmark.evals).length === 0) {
-              console.log('No eval results yet. Run: arc eval run <scenario>');
-            } else if (asJson) {
-              output(benchmark, true);
-            } else {
-              console.log(
-                'Note: SHIP outside discriminative-lift only supports that claim type; do not cite it as value lift.',
+            console.log(
+              'Note: SHIP outside discriminative-lift only supports that claim type; do not cite it as value lift.',
+            );
+            const claimOrder = [
+              'discriminative-lift',
+              'non-regression',
+              'self-improvement-smoke',
+              'infra',
+            ];
+            for (const claimType of claimOrder) {
+              const entries = Object.entries(benchmark.evals).filter(
+                ([_evalName, data]) => (data.claim_type || 'infra') === claimType,
               );
-              const claimOrder = [
-                'discriminative-lift',
-                'non-regression',
-                'self-improvement-smoke',
-                'infra',
-              ];
-              for (const claimType of claimOrder) {
-                const entries = Object.entries(benchmark.evals).filter(
-                  ([_evalName, data]) => (data.claim_type || 'infra') === claimType,
+              if (entries.length === 0) continue;
+              console.log(`\n${claimType}:`);
+              for (const [evalName, data] of entries) {
+                const displayData = pickModelData(data);
+                let verdict;
+                if (data.grader === 'model' && displayData.trials >= 5) {
+                  const scenarioFile = eval_.findScenario(evalName, projectRoot);
+                  const results = eval_.loadResults(evalName, projectRoot, {
+                    version: scenarioFile?.version,
+                    ...(model ? { model } : {}),
+                  });
+                  verdict =
+                    results.length >= 5
+                      ? eval_.verdictFromCI(results)
+                      : eval_.verdictFromRate(displayData.pass_rate);
+                } else {
+                  verdict = eval_.verdictFromRate(displayData.pass_rate);
+                }
+                console.log(
+                  `  ${evalName}: ${(displayData.pass_rate * 100).toFixed(0)}% (${displayData.trials} trials) — ${verdict}`,
                 );
-                if (entries.length === 0) continue;
-                console.log(`\n${claimType}:`);
-                for (const [evalName, data] of entries) {
-                  const displayData = model && data.by_model?.[model] ? data.by_model[model] : data;
-                  let verdict;
-                  if (data.grader === 'model' && displayData.trials >= 5) {
-                    const scenarioFile = eval_.findScenario(evalName, projectRoot);
-                    const results = eval_.loadResults(evalName, projectRoot, {
-                      version: scenarioFile?.version,
-                      ...(model ? { model } : {}),
-                    });
-                    verdict =
-                      results.length >= 5
-                        ? eval_.verdictFromCI(results)
-                        : eval_.verdictFromRate(displayData.pass_rate);
-                  } else {
-                    verdict = eval_.verdictFromRate(displayData.pass_rate);
-                  }
-                  console.log(
-                    `  ${evalName}: ${(displayData.pass_rate * 100).toFixed(0)}% (${displayData.trials} trials) — ${verdict}`,
+                if (!model && data.by_model) {
+                  const parts = Object.entries(data.by_model).map(
+                    ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,
                   );
-                  if (!model && data.by_model) {
-                    const parts = Object.entries(data.by_model).map(
-                      ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,
-                    );
-                    console.log(`    ${parts.join(' | ')}`);
-                  }
+                  console.log(`    ${parts.join(' | ')}`);
                 }
               }
             }
