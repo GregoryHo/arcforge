@@ -4,98 +4,18 @@ paths:
   - "tests/skills/**"
 ---
 
-# Skills
+# Skills (contributor quick reference)
 
-## Naming
+The canonical authoring methodology lives in `skills/arc-writing-skills/SKILL.md` — naming, frontmatter (required + optional fields), Iron Law TDD, word-count tiers, skill type taxonomy (composition: Workflow / Discipline / Meta — content: Technique / Pattern / Reference), and design anti-patterns. Read it before creating or editing any skill.
 
-- Prefix: `arc-` required for all skills
-- Case: kebab-case
-- Voice: verb-first, gerund (-ing) for process skills
-- Structure: `arc-<action>[-<object>[-<scope>]]`
-- Good: `arc-brainstorming`, `arc-writing-tasks`, `arc-using-worktrees`
-- Bad: `arc-coordinator` (agent-noun), `arc-debug` (bare verb), `arc-task-writer` (noun-first)
+This file holds only the contributor-side conventions that don't belong in shipped skill surface.
 
-## Frontmatter
+## Test File Convention
 
-- Only two fields: `name` and `description`
-- Max 1024 characters total
-- `name`: letters, numbers, and hyphens only
-- `description`: must start with "Use when..." — triggers only, NOT workflow summary
-- Never summarize the skill's workflow in the description — Claude may follow description instead of reading full skill
+- Location: `tests/skills/test_skill_arc_<name>.py` (one test file per skill)
+- Runner: pytest — validates frontmatter + content structure
+- Pattern: follow existing tests (e.g., `test_skill_arc_brainstorming.py`)
 
-## Skill Types
+## Iron Law applies to skill EDITS, not just creation
 
-Every skill belongs to one of three types. The type determines how it gets triggered and how it composes with other skills.
-
-| Type | Trigger Mechanism | Composition | Example |
-|------|-------------------|-------------|---------|
-| **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
-| **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
-| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
-
-### When Creating a New Skill
-
-1. **Determine its type** — Is it a pipeline step (Workflow), a cross-cutting quality gate (Discipline), or a system management tool (Meta)?
-2. **Workflow skills** MUST have an "After This Skill" section with explicit next-step guidance
-3. **Discipline skills** MUST be added to `arc-using`'s "Discipline Skills — Conditional Triggers" table
-4. **Meta skills** need no routing — they are invoked directly when needed. `arc-writing-skills` is project-level meta for maintaining ArcForge's own skills and tests, not a general user-facing promoted skill.
-
-### Why This Matters
-
-Discipline skills without routing entries are easy to miss, but routing must stay bounded: use concrete conditions, preserve harness/eval isolation, and avoid global "always invoke" language. Workflow skills without handoff sections create dead-ends in autonomous mode.
-
-## Design Anti-Patterns
-
-These were discovered through eval and should not be repeated:
-
-- **"Mindset" skills** — AI agents don't internalize mindsets. A skill that says "embed me in everything" relies on copy-paste, which is unreliable. Use bounded routing conditions to trigger discipline skills instead.
-- **Self-contradicting invocation** — Never write "don't invoke me" in a skill that's registered in the routing table. The routing table says "invoke it"; the skill says "don't invoke me" → agent obeys the prohibition.
-- **Embedded-only verification** — Verification embedded in other skills (arc-finishing Step 1, arc-tdd Verify RED/GREEN) is defense-in-depth, not the primary mechanism. The primary trigger is the routing table.
-
-## Iron Law
-
-```
-NO SKILL WITHOUT A FAILING TEST FIRST
-```
-
-TDD for documentation:
-1. **RED** — Run pressure scenarios WITHOUT the skill. Document baseline behavior and rationalizations verbatim.
-2. **GREEN** — Write the skill addressing those specific failures. Re-run WITH the skill. Agent should now comply.
-3. **REFACTOR** — Find new rationalizations, add explicit counters, re-test until bulletproof.
-
-If you wrote the skill before testing, delete it and start over.
-
-## Cross-Referencing
-
-- Use `**REQUIRED BACKGROUND:** ...` to reference other skills
-- Never use `@`-file syntax (force-loads context into memory)
-
-## Word Count Tiers (soft guidance)
-
-| Tier | Limit |
-|------|-------|
-| Lean | <500w |
-| Standard | <1000w |
-| Comprehensive | <1800w |
-| Meta | <2500w |
-
-**Progressive disclosure over raising limits.** Keep SKILL.md focused on decision logic and routing. Extract detailed examples, API docs, and lengthy tables to `references/` for on-demand loading.
-
-## File Layout
-
-```
-skills/
-  arc-<name>/
-    SKILL.md              # Main skill file (required)
-    supporting-file.*     # Only if needed (heavy reference, scripts)
-```
-
-## Testing
-
-- Test file: `tests/skills/test_skill_arc_<name>.py`
-- Uses pytest — validate frontmatter + content structure
-- Follow patterns in existing test files (e.g., `test_skill_arc_brainstorming.py`)
-
-## Reference
-
-Follow `skills/arc-writing-skills/SKILL.md` when creating or editing skills — it contains the complete methodology.
+The Iron Law in `arc-writing-skills` says "delete it, start over" if you wrote a skill before testing. The same applies to **edits** — if you change a skill's behavioral spec without re-running its eval, that change is untested and shouldn't ship. "Just adding a section" / "small clarification" / "documentation only" are not exemptions.

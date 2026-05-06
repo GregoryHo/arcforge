@@ -62,14 +62,36 @@ Do not use it as a default workflow for non-ArcForge product implementation. For
 
 ## Skill Types
 
-### Technique
-Concrete method with steps to follow (e.g., condition-based-waiting)
+Two orthogonal axes are useful when designing a skill — composition (how it gets triggered) and content (what it teaches). Pick deliberately on each.
 
-### Pattern
-Way of thinking about problems (e.g., flatten-with-flags)
+### By composition (how it's triggered)
 
-### Reference
-API docs, syntax guides, tool documentation
+| Type | Trigger Mechanism | Composition | Example |
+|------|-------------------|-------------|---------|
+| **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
+| **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
+| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
+
+When creating a new skill:
+
+1. **Determine its composition type** — pipeline step (Workflow), cross-cutting quality gate (Discipline), or system management tool (Meta)?
+2. **Workflow skills** MUST have an "After This Skill" section with explicit next-step guidance. Workflow without handoff = dead-end in autonomous mode.
+3. **Discipline skills** MUST be added to `arc-using`'s "Discipline Skills — Conditional Triggers" table — and the routing condition must be concrete (no global "always invoke" language; preserve harness/eval isolation).
+4. **Meta skills** need no routing — they are invoked directly when needed.
+
+### By content (what the skill teaches)
+
+- **Technique** — Concrete method with steps to follow (e.g., condition-based-waiting)
+- **Pattern** — Way of thinking about problems (e.g., flatten-with-flags)
+- **Reference** — API docs, syntax guides, tool documentation
+
+## Design Anti-Patterns
+
+Discovered through eval — don't repeat:
+
+- **"Mindset" skills** — AI agents don't internalize mindsets. A skill that says "embed me in everything" relies on copy-paste, which is unreliable. Use bounded routing conditions to trigger discipline skills instead.
+- **Self-contradicting invocation** — Never write "don't invoke me" in a skill that's registered in the routing table. The routing table says "invoke it"; the skill says "don't invoke me" → agent obeys the prohibition.
+- **Embedded-only verification** — Verification embedded in other skills (arc-finishing Step 1, arc-tdd Verify RED/GREEN) is defense-in-depth, not the primary mechanism. The primary trigger is the routing table.
 
 ## Directory Structure
 
@@ -147,13 +169,26 @@ CI lint scans `skills/**/SKILL.md`, `skills/**/references/**/*.md`, `templates/*
 ## SKILL.md Structure
 
 **Frontmatter (YAML):**
-- Only two fields: `name` and `description`
-- Max 1024 characters total
+
+Required fields:
 - `name`: Letters, numbers, and hyphens only
 - `description`: Third-person, describes ONLY when to use (NOT what it does)
   - Start with "Use when..."
   - Include specific symptoms, situations, contexts
   - **NEVER summarize the skill's process or workflow**
+
+Combined `name` + `description` must stay under 1024 characters.
+
+Optional fields (use only when they earn their place):
+
+| Field | Use when |
+|---|---|
+| `argument-hint` | Skill takes CLI-style arguments and you want them surfaced in the slash-command palette (e.g., `arc-maintaining-obsidian`). Pure UX — no triggering effect. |
+| `allowed-tools` | You want to constrain which tools the skill may use. Encouraged for skills that don't need full tool access — defense in depth at the skill layer rather than relying on the harness default. |
+| `disable-model-invocation` | Skill must be **user-invocable only**, never auto-triggered by the model. |
+| `user-invocable` | Skill should appear in the slash command list. |
+
+Avoid `model`, `context`, `agent`, `hooks` in skill frontmatter unless you have a concrete reason — those couple the skill to runtime/harness concerns better managed at the plugin or settings level.
 
 ```markdown
 ---
@@ -522,7 +557,7 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 
 **GREEN Phase - Write Minimal Skill:**
 - [ ] Name uses only letters, numbers, hyphens
-- [ ] YAML frontmatter with only name and description (max 1024 chars)
+- [ ] YAML frontmatter has required `name` + `description` (combined under 1024 chars); any optional fields used per the Frontmatter section
 - [ ] Description starts with "Use when..." (triggers only, no workflow)
 - [ ] Description written in third person
 - [ ] Keywords throughout for search (errors, symptoms, tools)
