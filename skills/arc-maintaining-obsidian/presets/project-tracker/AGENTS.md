@@ -9,11 +9,7 @@ raw_source: not-adopted
 
 # <Vault Name> — Agent Runtime Contract (Project Tracker)
 
-A project-tracking vault: agents help maintain Tasks, Milestones,
-Decisions, and Sprints. Unlike knowledge-base presets, this vault does
-NOT adopt the Raw Source pattern — work items are authored directly,
-not derived from external sources. AGENTS.md governs runtime behavior;
-types live in `SCHEMA.md`.
+A project-tracking vault: agents help maintain Tasks, Milestones, Decisions, Sprints, and Projects. Unlike knowledge-base presets, this vault does NOT adopt the Raw Source pattern — work items are authored directly, not derived from immutable external sources. This AGENTS.md file stays thin: runtime identity, scope, language, paths, integration capabilities, and schema authority. Domain schema and policy live in `SCHEMA.md`.
 
 ## Schema Authority
 
@@ -26,142 +22,65 @@ types live in `SCHEMA.md`.
 
 ## Identity
 
-- Agent helps create / update Task, Milestone, Decision, Sprint, Project notes.
-- Agent reports on status (active sprints, overdue tasks, blocked items).
+- Agent helps create / update Task, Milestone, Decision, Sprint, and Project notes.
+- Agent reports on active sprints, overdue tasks, blocked items, and milestone risks.
 - Agent does NOT decide priority or assignment — those are human decisions.
-- Human owns task state; agent suggests state transitions but waits for confirmation on mutations.
+- Human owns task state; agent suggests state transitions and waits for confirmation on mutations.
 
-## Layer 1 — No Raw Sources (this preset does not adopt the pattern)
+## Layer 1 — No Raw Sources
 
-Project work items are authored directly; there are no immutable external
-originals to ingest. Skip Raw Source frontmatter, sha256 hashing, and
-Source Drift Check for this vault.
+This preset does not adopt the Raw Source pattern. Project work items are authored directly; skip Raw Source frontmatter, sha256 hashing, and Source Drift Check for this vault.
 
-If you later realize you DO want to attach raw documentation (specs,
-external research) to project items, edit AGENTS.md to set
-`raw_source: adopted` and SCHEMA.md to declare the relevant frontmatter.
+If the vault later needs immutable external specs or research, edit AGENTS.md to set `raw_source: adopted` and update SCHEMA.md with the relevant Raw Source/domain rules.
 
-## Layer 2 — Wiki (LLM-owned)
+## Layer 2 — Typed Notes
 
-Five typed notes — see `SCHEMA.md`:
-- **Task** — atomic work item.
-- **Milestone** — checkpoint with target date and tasks rolled up.
-- **Decision** — trade-off record (status: proposed / accepted / superseded).
-- **Sprint** — time-boxed work cycle.
-- **Project** — top-level container with charter and milestone roll-up.
+Five typed notes live in the domain layer: Task / Milestone / Decision / Sprint / Project. Their frontmatter, body templates, status enums, tag taxonomy, audit thresholds, and Visual Guidance are in `SCHEMA.md`.
 
-## Layer 3 — Schema files
+## Layer 3 — Contract Files
 
-- `AGENTS.md` (this file) — operational policy + schema authority
-- `SCHEMA.md` — note types, frontmatter, body templates
-- `CLAUDE.md` — Claude Code entry shim
+- `AGENTS.md` (this file) — thin runtime contract + schema authority.
+- `SCHEMA.md` — domain schema and policy.
+- `CLAUDE.md` — Claude Code entry shim.
 - `index.md` — content catalog. Rebuilt by `audit lint`.
-- `log.md` — append-only operations log
-- `_audits/audit-YYYY-MM-DD-<scope>.md` — audit reports
+- `log.md` — append-only operations log.
+- `_audits/` — default audit report folder unless SCHEMA.md declares another path.
 
 ## Scope
 
 This vault tracks: <Vault Scope>
 
-<TODO: list specific projects, teams, or initiatives this vault covers.
-Be specific so agents can route incoming task requests correctly.
+<TODO: list specific projects, teams, or initiatives this vault covers. Be specific so agents can route incoming task requests correctly.
 
-Out of scope: list neighbouring vaults if any (e.g., personal todo lists
-in another vault).>
+Out of scope: list neighbouring vaults if any, e.g. personal todo lists in another vault.>
 
 ## Language Policy
 
-Single language: <TODO: declare e.g., English | 中文>. Note bodies in
-declared language; no callouts.
+Single language: <TODO: declare e.g., English | 中文>. Note bodies in declared language; no callouts.
 
-Frontmatter values stay canonical English regardless: status enums
-(`todo`, `in-progress`, `done`, `blocked`), priority codes, type names.
+Frontmatter values stay canonical English regardless: status enums (`todo`, `in-progress`, `done`, `blocked`), priority codes, and type names.
 
-## Tag Taxonomy
+## Domain Policy
 
-Top-level tags (do not invent new top-levels during ingest unless the
-user approves or this list is updated):
+Read `SCHEMA.md` for domain-specific rules: Task / Milestone / Decision / Sprint / Project schemas, status enums and state machines, tag taxonomy, stale/overdue thresholds, milestone/sprint audit rules, GROW thresholds, and Visual Guidance. Do not duplicate those rules here.
 
-<TODO: list 10-20 top-level tags. Project-tracker-typical examples:
-- area: `frontend`, `backend`, `infra`, `design`, `docs`
-- type-of-work: `feature`, `bug`, `chore`, `research`
-- urgency: `p0`, `p1`, `p2`
-- size: `xs`, `s`, `m`, `l`, `xl`
-- meta: `blocked`, `unblocked`, `at-risk`>
+## Integration Capabilities
 
-Audit checks (LINT) for this vault:
-- Unknown top-level tags → flag.
-- Tags used 10+ times but missing from the taxonomy → EVOLVE suggestion.
-- Near-duplicate tags → flag.
+- Search baseline: filesystem search/read over Markdown files.
+- Optional QMD: not required. If enabled in the registry, use it as semantic/hybrid acceleration and sync it after ingest/audit LINK.
+- Obsidian runtime: optional. Use `obsidian-cli` for active vault detection, Daily Notes append, plugin state, and live search when available; ordinary Markdown maintenance must work with Obsidian closed.
 
-## Status Enums (canonical state machine)
-
-The Task state machine — `status:` field on Task notes:
-
-```
-todo → in-progress → done
-   ↘     ↘
-    blocked → in-progress (when unblocked)
-              done (if no longer needed)
-```
-
-The Sprint state machine — `status:` field on Sprint notes:
-```
-planned → active → completed
-                 ↘ cancelled
-```
-
-The Decision state machine — `status:` field on Decision notes:
-```
-proposed → accepted → superseded
-        ↘ rejected
-```
-
-Audit LINT validates each note's `status:` against these enums.
-
-## Audit Thresholds
-
-LINT additions for this vault — the audit pipeline must honor these:
-
-- **Stale tasks:** `in-progress` Task notes with no update in **7 days** → flag for status check.
-- **Overdue tasks:** Task notes with `due_date` past and `status: != done` → flag.
-- **Blocked tasks unattended:** `blocked` Task notes with no update in **3 days** → flag.
-- **Sprint cadence:** `active` Sprint notes past their `end_date` → flag for retro / close.
-- **Milestone slippage:** Milestone notes with `target_date` past and < 80% of linked Tasks `done` → flag.
-- **Decision in limbo:** `proposed` Decision notes older than **14 days** → flag for resolution.
-- **Index size:** any `index.md` section > **40 notes** → group by area/status.
-- **Log rotation:** `log.md` > **400 entries** OR > **80 KB** → rotate to `log-YYYY-Qn.md` (quarter-based archive).
-
-GROW thresholds (skill detects clusters; vault declares N):
-- **Tasks without milestone:** 5+ Tasks in the same area with no Milestone linkage → suggest creating Milestone.
-- **Sprints without retrospective:** completed Sprint with no retrospective notes → suggest writing one.
-- **Recurring blockers:** same blocker name appearing on 3+ Tasks → suggest extracting as a Decision or escalation note.
-
-### Audit scope — folders excluded
-
-| Folder | Reason for exclusion |
-|---|---|
-| `_audits/` | Audit reports |
-| `_dailies/` | Standup logs (intentionally untyped) |
-| `archive/` | Closed projects / completed sprints |
-| `.obsidian/` | Plugin config |
-
-## Maintenance workflows
+## Maintenance Workflows
 
 | Mode | When | Pipeline |
 |---|---|---|
-| ingest | New Task / Decision / Milestone request | Classify → Confirm → Create → Index → Propagate (link to Sprint/Milestone) → Log |
+| ingest | New Task / Decision / Milestone request | Classify → Confirm → Create → Index → Propagate → Log |
 | query | "what's blocked", "show this sprint", "decisions about X" | Orient → Search → Read → Synthesize |
-| audit | Daily standup support + on-demand | LINK → LINT (status enum check) → GROW |
+| audit | Daily standup support + on-demand | LINK → LINT → GROW (mechanics from skill; domain policy from SCHEMA.md) |
 
-### Maintenance cadence
+## Maintenance Cadence
 
-- After every Task creation/update → skill auto-updates `index.md` and appends to `log.md`.
-- Daily (standup time) → `audit lint` (stale tasks, blockers, overdue).
-- End of sprint → `audit grow` (milestone progress, suggest retrospectives).
-- Quarterly → review log size and rotate.
-
-### Search backend
-
-QMD collection `<QMD Collection>`. Run `qmd update -c <QMD Collection> &&
-qmd embed` after each ingest cycle.
+- After every Task creation/update → skill updates `index.md` and appends to `log.md`.
+- Daily standup → `audit lint` for stale tasks, blockers, overdue work.
+- End of sprint → `audit grow` for milestone progress and retrospective suggestions.
+- Quarterly → review log size and rotate if thresholds in SCHEMA.md are met.

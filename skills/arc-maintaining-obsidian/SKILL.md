@@ -71,14 +71,14 @@ All `references/` and `presets/` paths in this file are **skill-relative**. The 
 
 ### Mode Entry Gate
 
-Each mode depends on **mechanism references** the skill ships, plus the **vault contract** (AGENTS.md + SCHEMA.md). Read in this order:
+For every vault-level mode, run **Domain Contract Orientation first**. The contract determines the vault's scope, capabilities, note types, domain policy, and whether optional integrations such as QMD or Obsidian runtime access are available. Then read the mode-specific **mechanism reference** shipped by this skill.
 
-| Mode | Read first (mechanism) | Then (vault contract) |
-|---|---|---|
-| **init-vault** | `references/bootstrap-workflow.md` (11-step bootstrap, preset selection, worked example) | n/a — there is no vault to read yet; the workflow writes one |
-| **Ingest** | `references/page-templates.md` (Raw Source mechanism, sha256, extraction methods) | `AGENTS.md` (runtime rules) + `SCHEMA.md` (types, frontmatter, body templates) |
-| **Query** | `references/search-strategies.md` (route selection, output adaptation) | `AGENTS.md` (scope, citation rules) + `SCHEMA.md` (types — for type-aware grouping) |
-| **Audit** | `references/audit-checks.md` (LINK/LINT/GROW primitives, Source Drift, vault-declared LINT) | `AGENTS.md` (thresholds, taxonomy, declared LINT) + `SCHEMA.md` (schema compliance target) |
+| Mode | Order |
+|---|---|
+| **init-vault** | Exception: read `references/bootstrap-workflow.md` first because no vault contract exists yet; the workflow authors one. |
+| **Ingest** | Resolve vault → Domain Contract Orientation (`AGENTS.md` + `SCHEMA.md`) → read `references/page-templates.md` for Raw Source / sha256 / extraction mechanisms if the contract adopts them. |
+| **Query** | Resolve vault → Domain Contract Orientation → read `references/search-strategies.md` for route selection and output adaptation. |
+| **Audit** | Resolve vault → Domain Contract Orientation → read `references/audit-checks.md` for LINK / LINT / GROW mechanics; apply vault-declared domain policy from SCHEMA.md. |
 
 The skill's `references/` files describe **mechanism** (algorithms, tool routing); vault AGENTS.md + SCHEMA.md describe **domain** (what types exist, what rules apply). The vault contract wins where they overlap.
 
@@ -104,8 +104,8 @@ If Obsidian is not running for step 2, fall back to step 3 → step 4 → step 5
 
 After resolving the vault and BEFORE entering any mode, read the **paired contract**:
 
-1. Read `<vault>/AGENTS.md` — agent runtime contract: scope, language policy, tag taxonomy, audit thresholds, citation rules, schema authority meta-rules.
-2. Read `<vault>/SCHEMA.md` — domain schema: note types, frontmatter fields, body templates, Visual Guidance per type.
+1. Read `<vault>/AGENTS.md` — thin runtime contract: scope, language policy, raw-source adoption, integration capabilities, schema authority meta-rules.
+2. Read `<vault>/SCHEMA.md` — domain schema and policy: note types, frontmatter fields, body templates, Visual Guidance per type, tag taxonomy, creation thresholds, audit/GROW thresholds.
 3. If AGENTS.md declares an index path, read `<vault>/index.md`.
 4. If AGENTS.md declares a log path, read the **last 20-30 entries** of `<vault>/log.md`.
 5. Treat AGENTS.md + SCHEMA.md as authoritative. The skill's `references/` files are mechanism only; the vault contract wins where they overlap.
@@ -129,7 +129,12 @@ The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill mana
     {
       "name": "<short-name>",
       "path": "<absolute path to vault root>",
-      "qmd_collection": "obsidian-<short-name>",
+      "search": {
+        "baseline": "filesystem",
+        "preferred": "filesystem",
+        "qmd_collection": null,
+        "fallbacks": ["filesystem", "obsidian-cli"]
+      },
       "scope": "<one-line scope statement>",
       "preset": "<preset-name-used-at-init>"
     }
@@ -142,14 +147,14 @@ Maintenance subcommands (LLM-driven via standard file tools and `obsidian:obsidi
 | Subcommand | Behavior |
 |---|---|
 | `init-vault <path> --name <name> [--preset=<name>]` | Run the **init-vault Bootstrap** workflow below. |
-| `register <path> --name <name> [--default]` | Adds an existing populated vault. Validates path. Optionally creates QMD collection. **Does NOT auto-write AGENTS.md or SCHEMA.md** — prints reminder: *"Vault registered. Author AGENTS.md (runtime contract) + SCHEMA.md (domain schema) at `<path>/` before first ingest/audit."* |
-| `list-vaults` | Prints registered vaults (name, path, default marker, preset, QMD collection). |
-| `unregister <name>` | Removes the entry. If `default` was the unregistered name, clears default. Prompts: *"Also remove QMD collection `obsidian-<name>`? Vault files at `<path>` untouched."* |
+| `register <path> --name <name> [--default]` | Adds an existing populated vault. Validates path. Records filesystem search as the baseline. Optionally enables QMD if the user asks. **Does NOT auto-write AGENTS.md or SCHEMA.md** — prints reminder: *"Vault registered. Author AGENTS.md (runtime contract) + SCHEMA.md (domain schema) at `<path>/` before first ingest/audit."* |
+| `list-vaults` | Prints registered vaults (name, path, default marker, preset, search baseline, optional QMD collection). |
+| `unregister <name>` | Removes the entry. If `default` was the unregistered name, clears default. If a QMD collection is registered, prompts: *"Also remove QMD collection `<collection>`? Vault files at `<path>` untouched."* |
 | `set-default <name>` | Updates `default`. Errors if `<name>` not registered. |
 
 To inspect a registered vault without switching to it, use **bare invoke** with `--vault=<name>` — Domain Contract Orientation runs and prints the named vault's name / scope / types / last activity, no mode entered.
 
-**Why never hand-edit `obsidian-vaults.json`:** the schema is small but error-prone; mutations should be paired with side effects (preset write, QMD collection lifecycle, audit lint seed); a user who hand-edits today drifts from schema tomorrow when fields are added.
+**Why never hand-edit `obsidian-vaults.json`:** the schema is small but error-prone; mutations should be paired with side effects (preset write, optional QMD collection lifecycle, audit lint seed); a user who hand-edits today drifts from schema tomorrow when fields are added.
 
 ### init-vault Bootstrap
 
@@ -179,15 +184,16 @@ After every operation, append to `log.md` in vault root:
 
 Operations: `create | [type] | [filename]`, `query | [question summary]`, `audit | [scope]`, `drift | [filename]`, `init-vault | preset=<preset>`.
 
-Dual-write: `log.md` for LLM scanning (`grep "^## [" log.md | tail -10`), daily notes for human browsing via `obsidian-cli daily:append`. On first use in a session, verify the Daily Notes plugin is configured: `obsidian eval code="app.internalPlugins.plugins['daily-notes']?.instance?.options?.folder"`. If unconfigured, skip daily:append and log to `log.md` only.
+Dual-write: `log.md` is the contractual operation log. Daily Notes append is an optional best-effort Obsidian runtime side effect via `obsidian-cli daily:append` for human browsing. On first use in a session, check whether the Daily Notes plugin is configured: `obsidian eval code="app.internalPlugins.plugins['daily-notes']?.instance?.options?.folder"`. If Obsidian is closed or unconfigured, skip daily:append silently and log to `log.md` only.
 
 ### Delegation
 
-**Search:** Prefer QMD (hybrid keyword + semantic + reranking). Fall back to `obsidian-cli search` (keyword only). Read `references/search-strategies.md` Route Selection on first search; the QMD route includes `qmd update && qmd embed` (~3s incremental) after each ingest or audit.
+**Search:** Filesystem search/read is the baseline and must always work. Prefer optional QMD when the vault registry has a configured collection and the index is healthy (hybrid keyword + semantic + reranking). Fall back to `obsidian-cli search` only when Obsidian runtime search is available and useful, then to filesystem search. Read `references/search-strategies.md` Route Selection on first search. The QMD route includes optional `qmd update && qmd embed` after ingest or audit; skip it when QMD is not configured.
 
 **Read/write:**
-- Vault operations → `obsidian:obsidian-cli`
-- Markdown formatting → `obsidian:obsidian-markdown`
+- Markdown read/write/index/log maintenance → filesystem tools or deterministic Markdown tools. Ordinary vault maintenance must work with the Obsidian app closed.
+- Obsidian runtime integration → `obsidian:obsidian-cli` for active vault detection, Daily Notes plugin state, best-effort `daily:append`, plugin/config inspection, and live Obsidian search when available.
+- Markdown formatting → `obsidian:obsidian-markdown` if available; otherwise ordinary file edits.
 - Canvas creation → `obsidian:json-canvas`
 - Excalidraw diagrams → `arc-diagramming-obsidian`
 - URL content extraction → `obsidian:defuddle` (Defuddle first, WebFetch only for APIs/raw text)
@@ -338,7 +344,7 @@ Only LINK modifies existing notes. LINT and GROW never modify.
 
 Read `references/audit-checks.md` for mechanical primitives: schema compliance (validates against vault SCHEMA.md), orphan detection, untyped notes, basic tag hygiene, **Source Drift** (sha256 mismatch — only for vaults adopting Raw Source pattern), and EVOLVE pattern detection (field usage, type fit, tag drift).
 
-**Vault-declared LINT.** The audit pipeline reads vault AGENTS.md `## Audit Thresholds` and `## Tag Taxonomy` (and any other declared check sections) and applies the additional checks declared there. Treat vault thresholds as authoritative — the skill never invents numbers.
+**Vault-declared LINT.** The audit pipeline reads SCHEMA.md domain-policy sections such as `## Tag Taxonomy`, `## Audit Thresholds`, and type-specific validation rules, then applies only those additional checks. Treat vault thresholds as authoritative — the skill never invents numbers.
 
 **Verify before fix:** LINT findings are hypotheses, not facts. Before fixing any reported issue, read the actual file. Common false positive: YAML multi-line lists (`tags:\n  - a\n  - b`) look empty to line-by-line extraction but contain values on indented lines. Always verify frontmatter by reading the file, not by trusting extraction output.
 
@@ -412,7 +418,7 @@ Available: ingest, query, audit. What would you like to do?
 ```
 ✅ Bootstrapped [vault name] (preset: [preset])
    Registered at: [path]
-   QMD collection: [obsidian-<name>] (or "skipped")
+   QMD collection: [collection name] (or "not configured")
    Next: ingest a source, run query, or check capabilities via bare invoke.
 ```
 

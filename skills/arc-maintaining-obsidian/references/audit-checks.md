@@ -3,7 +3,7 @@
 The skill ships only the **mechanical** audit primitives that work on any
 Obsidian vault. Domain choices — what's stale, which tags are allowed,
 which thresholds trigger Internal/External GROW suggestions, how big the
-log can grow before rotation — are declared per vault in `AGENTS.md` and
+log can grow before rotation — are declared per vault in `SCHEMA.md` and
 applied at runtime via "Vault-Declared LINT" at the bottom. The skill
 never invents thresholds the vault hasn't declared.
 
@@ -13,8 +13,8 @@ The auditor operates on the **wiki layer** — typed Markdown notes with
 frontmatter. Raw Sources are subjected only to the Source Drift Check.
 
 ### What to scan
-- All `.md` files declared as wiki-layer types by the resolved vault's
-  AGENTS.md `## Schema` (or its sibling SCHEMA.md when split).
+- All `.md` files declared as typed-note/domain-layer types by the resolved
+  vault's `SCHEMA.md`.
 
 ### What to skip
 - **Plugin-managed folders** — Detect dynamically via
@@ -46,9 +46,9 @@ frontmatter. Raw Sources are subjected only to the Source Drift Check.
 ### Schema Compliance
 
 Validate each note's frontmatter against the type's frontmatter declared
-by the vault's AGENTS.md `## Schema` (or its SCHEMA.md sibling). The skill
-loaded the schema at Domain Contract Orientation; cross-check each `type:`
-field against its declared shape.
+by the vault's `SCHEMA.md`. The skill loaded the schema at Domain
+Contract Orientation; cross-check each `type:` field against its declared
+shape.
 
 **YAML format caution:** Obsidian uses two equivalent list formats. Both
 are valid — check for both before reporting "missing" or "empty":
@@ -111,7 +111,7 @@ taxonomy.
 ## GROW — Pattern Detection (mechanism)
 
 The mechanical patterns the skill detects. **All thresholds are
-vault-declared in AGENTS.md `## Audit Thresholds`** — the skill never
+vault-declared in SCHEMA.md `## Audit Thresholds`** — the skill never
 invents numbers.
 
 ### Internal Patterns (suggest creating an artifact)
@@ -119,7 +119,7 @@ invents numbers.
 The skill detects clustering / coverage patterns; the vault declares
 which note types play "leaf" vs "aggregator" roles, and what threshold
 triggers a suggestion. Examples in the table use generic phrasing — the
-preset's AGENTS.md maps these to its types (LLM-Wiki: Source/Synthesis,
+preset's SCHEMA.md maps these to its types (LLM-Wiki: Source/Synthesis,
 news: Article/DailyAggregate, project-tracker: Task/Milestone, etc.).
 
 | Pattern | Skill detects | Vault declares |
@@ -151,7 +151,7 @@ notes. Skip the suggestion if a near-match exists.
 
 ## Vault-Declared LINT (extensibility)
 
-The audit pipeline reads vault `AGENTS.md` at Domain Contract Orientation
+The audit pipeline reads vault `SCHEMA.md` at Domain Contract Orientation
 and applies the additional checks declared there in addition to the
 mechanical primitives above. The skill never invents thresholds the vault
 hasn't declared.
@@ -172,7 +172,7 @@ Common categories a vault may declare:
 | Reading status (papers) | "queued >14d", "skimmed >30d" |
 | Claim consistency (papers) | "uncontested conflict", "evidence asymmetry" |
 
-Honoring vault-declared LINT means: read the vault AGENTS.md sections,
+Honoring vault-declared LINT means: read the vault SCHEMA.md sections,
 apply the rules, include findings in the audit report under appropriately
 named subsections.
 

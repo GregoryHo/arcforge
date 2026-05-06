@@ -8,14 +8,9 @@ schema_path: SCHEMA.md
 
 # <Vault Name> — Agent Runtime Contract
 
-This file declares **how agents should behave** in this vault: scope,
-language, tag taxonomy, audit thresholds, and the rules that govern
-SCHEMA.md authority. Note-type templates, frontmatter fields, and body
-structure live in `SCHEMA.md`. The skill `arc-maintaining-obsidian` reads
-both files at Domain Contract Orientation before any mode runs.
+This file is the vault's thin runtime contract. It tells agents what this vault owns, which language to use, which paths and optional integrations exist, and how to treat SCHEMA.md. Domain schema and policy — note types, frontmatter, body templates, tag taxonomy, thresholds, status enums, citation rules — live in `SCHEMA.md`.
 
-This is the **minimal** preset — a clean scaffold. Most sections are
-TODO; fill them in as the vault evolves.
+This is the **minimal** preset: a clean scaffold. Fill in the TODOs as the vault evolves.
 
 ## Schema Authority
 
@@ -28,68 +23,43 @@ TODO; fill them in as the vault evolves.
 
 ## Identity
 
-<TODO: who owns the wiki layer? Common pattern: "The LLM owns typed notes;
-the human curates inputs and asks queries."
+<TODO: who owns the typed-note layer? Common pattern: "The LLM owns typed notes; the human curates inputs and asks queries.">
 
-If this vault has a Raw Source layer (immutable originals + derived
-typed notes), declare it here. If not, omit — the skill skips Raw Source
-behavior when not declared.>
+If this vault has a Raw Source layer (immutable originals + derived typed notes), declare it here. If not, omit — the skill skips Raw Source behavior when not declared.
 
 ## Scope
 
 This vault owns: <Vault Scope>
 
-<TODO: list specific topics this vault owns. Be specific so agents can
-classify ambiguous incoming material.
+<TODO: list specific topics this vault owns. Be specific so agents can classify ambiguous incoming material.
 
-Topics out of scope: list any neighbouring vaults and what content
-belongs there. Cross-vault wikilinks do not resolve — use plain text
-references with vault name when unavoidable.>
+Topics out of scope: list any neighbouring vaults and what content belongs there. Cross-vault wikilinks do not resolve — use plain text references with vault name when unavoidable.>
 
 ## Language Policy
 
 <TODO: declare the vault's language policy.
 - "Single language: English." — note bodies in English; no callouts.
-- "Bilingual: English + 中文." — every typed note has `langs: [en, zh]`
-  and uses `> [!multi-lang-en]` + `> [!multi-lang-zh]` callouts. Define
-  the callout structure in SCHEMA.md `## Bilingual Format`. Raw Sources
-  (if adopted) are NOT bilingual.>
+- "Bilingual: English + 中文." — every typed note has `langs: [en, zh]` and uses `> [!multi-lang-en]` + `> [!multi-lang-zh]` callouts. Define the callout structure in SCHEMA.md `## Bilingual Format`. Raw Sources (if adopted) are NOT bilingual.>
 
-## Tag Taxonomy
+## Domain Policy
 
-<TODO: list 10-20 top-level tags that organize this vault. Sub-tag
-convention: `<top-level>/<sub>` (e.g., `arcforge/skills`).>
+Read `SCHEMA.md` for all domain-specific rules: allowed note types, tag taxonomy, frontmatter fields, body templates, Visual Guidance, audit thresholds, and creation/splitting rules. Do not duplicate those rules here.
 
-Audit checks (LINT) for this vault:
-- Unknown top-level tags (not in this list, not registered as sub-tags) → flag.
-- Tags used 10+ times but missing from the taxonomy → EVOLVE suggestion.
-- Near-duplicate tags (`ai` vs `AI` vs `artificial-intelligence`) → flag.
+## Paths and Integrations
 
-## Audit Thresholds
+- `index.md` — content catalog; query mode reads it first when present.
+- `log.md` — append-only operation log.
+- `_audits/` — default audit report folder unless SCHEMA.md declares another path.
+- Search baseline: filesystem search/read.
+- Optional QMD: not configured by default. If enabled later, record the collection in the vault registry.
+- Obsidian runtime: optional; use `obsidian-cli` only for active-vault detection, Daily Notes append, plugin state, and live Obsidian search when available.
 
-<TODO: tune to vault size and growth. Skill does NOT invent thresholds —
-audit applies only what's declared here.
+## Maintenance Workflows
 
-Common thresholds:
-- Index size: `index.md` section > N notes → group by tag/type/topic.
-- MOC trigger: total typed notes > N → suggest creating MOC / topic-map.
-- Index split: total notes > N → split into per-type index files.
-- Log rotation: `log.md` > N entries OR > N KB → rotate to `log-YYYY.md`.
-- Stale detection: typed notes older than N days without updates.
-- GROW thresholds: sources-without-synthesis count, mentions-without-entity
-  count, notes-without-MOC count.>
-
-## Maintenance workflows
-
-Use the `arc-maintaining-obsidian` skill (arcforge) for ingest, query, and
-audit. Bare invocation (no mode arg) runs Domain Contract Orientation
-and reports name / scope / types / last activity.
+Use the `arc-maintaining-obsidian` skill (arcforge) for ingest, query, and audit. Bare invocation runs Domain Contract Orientation and reports name / scope / types / last activity.
 
 | Mode | When | Pipeline |
 |---|---|---|
 | ingest | New source / file-back | Classify → Confirm → Create → Visuals → Index → Propagate → Log |
 | query | Search / synthesize | Orient → Search → Read → Synthesize |
-| audit | Health check | LINK → LINT → GROW (generic + this vault's declared LINT) |
-
-Search backend: QMD collection `<QMD Collection>`. Run
-`qmd update -c <QMD Collection> && qmd embed` after each ingest cycle.
+| audit | Health check | LINK → LINT → GROW (mechanics from skill; domain policy from SCHEMA.md) |

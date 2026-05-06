@@ -8,8 +8,7 @@ preset: project-tracker
 # <Vault Name> — Domain Schema (Project Tracker)
 
 Five typed notes for project tracking: Task, Milestone, Decision,
-Sprint, Project. AGENTS.md governs runtime behavior including status
-state machines; this file declares the data shapes.
+Sprint, Project. AGENTS.md governs the thin runtime contract; this file declares domain schema and policy: data shapes, status state machines, tag taxonomy, audit thresholds, and validation rules.
 
 ## Universal Frontmatter
 
@@ -40,7 +39,7 @@ project: ""                # wikilink-resolvable Project name (or "")
 due_date: null             # YYYY-MM-DD or null
 estimate: ""               # xs | s | m | l | xl, or hour count
 blockers: []               # plain text list of blocker descriptions
-tags: []                   # area / type-of-work tags from AGENTS.md
+tags: []                   # area / type-of-work tags from SCHEMA.md
 aliases: []
 ---
 ```
@@ -257,6 +256,86 @@ Link to external charter doc if there is one.]
 - **Canvas (suggest for complex projects):** When milestones, decisions,
   and stakeholder relationships warrant spatial mapping.
 - **Embed:** Project banner / org chart if relevant.
+
+## Tag Taxonomy
+
+Top-level tags:
+
+- `project` — Project notes and cross-project views
+- `task` — Task notes
+- `milestone` — Milestone notes
+- `sprint` — Sprint notes
+- `decision` — Decision records
+- `area` — product or technical area (`area/frontend`, `area/infra`, ...)
+- `work` — type of work (`work/bug`, `work/feature`, `work/docs`, ...)
+- `priority` — priority class (`priority/p0`, `priority/p1`, ...)
+- `risk` — delivery or dependency risk
+- `blocked` — active blocker tracking
+
+Sub-tag convention: `<top-level>/<specific>`.
+
+LINT checks:
+- Unknown top-level tags → flag.
+- Task missing a work/area tag when the project has a declared taxonomy → flag.
+- Priority tag inconsistent with `priority:` frontmatter → flag.
+- Type tag inconsistent with `type:` frontmatter → flag.
+
+## Status State Machines
+
+Task:
+- `todo` → `in-progress` → `done`
+- `todo` → `cancelled`
+- `in-progress` → `blocked` → `in-progress`
+- `blocked` → `cancelled`
+- Reopening `done` requires explicit user confirmation.
+
+Milestone:
+- `planned` → `active` → `done`
+- `planned` / `active` → `missed`
+- A missed milestone should keep its original `target_date` and add a status update explaining the miss.
+
+Decision:
+- `proposed` → `accepted` | `rejected`
+- `accepted` → `superseded` only when `superseded_by` is set.
+- Do not mutate proposed/accepted/rejected without user confirmation.
+
+Sprint:
+- `planned` → `active` → `completed`
+- `planned` / `active` → `cancelled`
+- Sprints past `end_date` with open tasks require audit attention before `completed`.
+
+Project:
+- `active` → `paused` | `completed` | `cancelled`
+- `paused` → `active` | `cancelled`
+- Completing a project requires all non-cancelled milestones to be `done` or explicitly excluded.
+
+## Validation Rules
+
+- Every Task with `status: blocked` must have at least one blocker in `blockers:` or `## Blockers`.
+- Every Task with `status: done` should have all Acceptance Criteria checked or an update explaining why not.
+- Every Task assigned to a Sprint should also link to a Project unless the Sprint itself links to the Project.
+- Every Milestone should have a `project:` and at least one success criterion.
+- Every Sprint should have `start_date`, `end_date`, and at least one goal.
+- Every Decision with `status: superseded` must set `superseded_by`.
+- Every Project should list active Milestones or explicitly state that no milestones are defined yet.
+
+## Audit Thresholds
+
+- `in-progress` Task with no update for 7 days → stale task.
+- `blocked` Task with no update for 3 days → unattended blocker.
+- Task with past `due_date` and status not `done`/`cancelled` → overdue.
+- Decision with `status: proposed` for more than 14 days → limbo.
+- Sprint past `end_date` and status not `completed`/`cancelled` → sprint closure needed.
+- Milestone past `target_date` and status not `done`/`missed` → milestone slippage.
+- Project with 10+ Tasks and no Milestone → suggest milestone planning.
+- `log.md` > 200 entries or > 200 KB → suggest log rotation.
+
+## GROW Rules
+
+- 5+ Tasks referencing the same blocker text → suggest a Decision or Milestone risk note.
+- 5+ Tasks under one Project without Sprint/Milestone grouping → suggest creating Sprint or Milestone notes.
+- 3+ Decisions affecting the same Project area → suggest a Project section update or MOC-style summary.
+- Repeated stale tasks in one area → suggest a risk review rather than silently editing statuses.
 
 ## Audit Report
 

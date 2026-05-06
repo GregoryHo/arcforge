@@ -7,10 +7,7 @@ preset: minimal
 
 # <Vault Name> — Domain Schema
 
-This file declares this vault's **data shape**: note types, their
-frontmatter, and body structure. The companion `AGENTS.md` declares this
-vault's **agent runtime contract** (rules, thresholds, taxonomy) and
-governs how agents treat this file.
+This file declares this vault's **data shape and domain policy**: note types, frontmatter, body structure, tag taxonomy, thresholds, and type-specific validation rules. The companion `AGENTS.md` declares the thin runtime contract: scope, paths, language policy, integration capabilities, and schema authority.
 
 The skill `arc-maintaining-obsidian` reads both files at Domain Contract
 Orientation. Generic Raw Source primitives (sha256 hashing, extraction
@@ -73,6 +70,30 @@ aliases: []
 
 When you've added at least one type, ingest mode can classify and create
 notes against this schema.>
+
+## Tag Taxonomy
+
+<TODO: list 10-20 top-level tags that organize this vault. Sub-tag convention: `<top-level>/<sub>` (e.g., `project/area`).>
+
+LINT checks for this vault:
+- Unknown top-level tags → flag.
+- Tags used repeatedly but missing from the taxonomy → EVOLVE suggestion.
+- Near-duplicate tags → flag.
+
+## Audit Thresholds
+
+<TODO: declare thresholds before relying on audit behavior. The skill does not invent numbers.
+
+Common examples:
+- Index size: `index.md` section > N notes → group by tag/type/topic.
+- MOC/map trigger: total typed notes > N → suggest creating a map/index note.
+- Log rotation: `log.md` > N entries OR > N KB → rotate.
+- Stale detection: typed notes older than N days without updates.
+- GROW thresholds: notes-without-synthesis count, mentions-without-entity count, notes-without-map count.>
+
+## Domain Rules
+
+<TODO: declare any creation thresholds, split/archive rules, citation rules, status enums, or type-specific validations that audit/ingest should honor.>
 
 ## Bilingual Format (delete if monolingual)
 

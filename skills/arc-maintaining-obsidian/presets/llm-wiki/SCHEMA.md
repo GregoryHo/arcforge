@@ -7,9 +7,7 @@ preset: llm-wiki
 
 # <Vault Name> — Domain Schema
 
-This vault uses the Karpathy LLM Wiki pattern: 6 typed notes in the
-Wiki layer, immutable Raw Sources separately. AGENTS.md governs runtime
-behavior; this file declares the data shapes.
+This vault uses the Karpathy LLM Wiki pattern: 6 typed notes in the Wiki layer, immutable Raw Sources separately. AGENTS.md governs the thin runtime contract; this file declares domain schema and policy: data shapes, tag taxonomy, thresholds, citation rules, and type-specific validation.
 
 ## Universal Frontmatter
 
@@ -246,7 +244,7 @@ aliases: []
 > ## Evidence
 > [Supporting points from sources — for syntheses with 3+ sources, end
 > key factual paragraphs with [[Source-Note]] wikilink markers per
-> AGENTS.md Synthesis Citation Rules.]
+> `## Synthesis Citation Rules` in this SCHEMA.md.]
 >
 > ## Open Questions
 > - [What remains unresolved or worth exploring]
@@ -424,6 +422,50 @@ Body is hashed AFTER frontmatter (UTF-8, line endings normalized to
 (unchanged) or flag drift (changed) per
 `references/page-templates.md`. Audit's Source Drift Check re-applies
 this rule across the vault.
+
+## Tag Taxonomy
+
+Top-level tags:
+
+- `source` — Source notes and extracted source material
+- `entity` — concepts, people, organizations, tools, methods
+- `synthesis` — multi-source explanations or arguments
+- `moc` — map/index notes
+- `decision` — durable decisions and rationale
+- `log` — chronological activity records
+- `paper` — academic paper Source variant
+- `claim` — explicit paper or source claims
+- `method` — technical methods, algorithms, processes
+- `open-question` — unresolved questions worth revisiting
+
+Sub-tag convention: `<top-level>/<specific>` when useful (e.g., `entity/model`, `source/paper`).
+
+LINT checks:
+- Unknown top-level tags → flag.
+- Tags used repeatedly but missing from this taxonomy → EVOLVE suggestion.
+- Near-duplicate tags → flag.
+
+## Entity Creation Rules
+
+Create an `Entity` note when a concept/person/org/tool/method appears in 3+ Sources or 2+ Syntheses, or when the user explicitly asks for a reference page. Prefer updating an existing Entity if an alias or title match exists. Do not create stubs from a single unresolved mention unless the user approves.
+
+## Synthesis Citation Rules
+
+A `Synthesis` with 3+ sources must cite key factual paragraphs with `[[Source-Note]]` wikilinks. If a paragraph combines evidence from multiple sources, include multiple source links at paragraph end. Do not cite Raw Sources directly when a typed Source note exists; cite the Source note.
+
+## Split and Archive Rules
+
+- Split an Entity when it covers two unrelated concepts with separate evidence trails.
+- Split a Synthesis when it has more than three major theses or cannot be summarized in one paragraph.
+- Archive stale notes by setting `status: archived`; do not delete without explicit user approval.
+
+## Audit Thresholds
+
+- Index section > 25 notes → regroup by tag or type.
+- More than 5 unresolved mentions of the same term → suggest creating/updating an Entity.
+- More than 5 Sources on the same question without a Synthesis → suggest a Synthesis.
+- More than 20 notes in one topic without a MOC → suggest a MOC.
+- `log.md` > 200 entries or > 200 KB → suggest log rotation.
 
 ## Audit Report
 

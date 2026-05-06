@@ -356,7 +356,7 @@ def test_reference_page_templates_exists():
 
 def test_reference_audit_checks_exists():
     """audit-checks.md ships only mechanical primitives — LINK / LINT / GROW
-    pattern detection. Thresholds and domain choices live in vault AGENTS.md."""
+    pattern detection. Thresholds and domain choices live in vault SCHEMA.md."""
     ref = _read_reference("audit-checks.md")
     assert "## LINK" in ref, "audit-checks must document LINK mechanism"
     assert "## LINT" in ref, "audit-checks must document LINT mechanism"
@@ -882,33 +882,93 @@ def test_audit_checks_has_source_drift():
 
 
 def test_audit_checks_documents_vault_declared_lint():
-    """Audit pipeline must read vault AGENTS.md and apply declared LINT thresholds."""
+    """Audit pipeline must read vault SCHEMA.md and apply declared LINT thresholds."""
     ref = _read_reference("audit-checks.md").lower()
     assert "vault-declared" in ref or "declared in" in ref or "vault declares" in ref, (
         "audit-checks must document vault-declared LINT extensibility"
     )
-    assert "agents.md" in ref, "audit-checks must reference reading vault AGENTS.md for thresholds"
+    assert "schema.md" in ref, "audit-checks must reference reading vault SCHEMA.md for thresholds"
 
 
 # --- llm-wiki preset operational policy (the wiki-specific rules now live here) ---
 
 
-def test_llm_wiki_preset_has_operational_policy_sections():
-    """Wiki-specific operational policy must live in llm-wiki/AGENTS.md, not in skill core."""
+def test_llm_wiki_domain_policy_lives_in_schema_not_agents():
+    """Wiki-specific domain policy belongs in SCHEMA.md, not a thick AGENTS.md."""
     agents = _read_preset("llm-wiki", "AGENTS.md")
-    required_sections = [
-        "Audit Thresholds",
+    schema = _read_preset("llm-wiki", "SCHEMA.md")
+    domain_policy_sections = [
         "Tag Taxonomy",
         "Entity Creation Rules",
-        "Split & Archive",
-        "Synthesis Citation",
-        "Language Policy",
+        "Split and Archive Rules",
+        "Synthesis Citation Rules",
+        "Audit Thresholds",
     ]
-    for section in required_sections:
-        assert section in agents, (
-            f"presets/llm-wiki/AGENTS.md must include `{section}` section "
-            "(moved from skill core in the preset refactor)"
+    for section in domain_policy_sections:
+        assert section not in agents, (
+            f"presets/llm-wiki/AGENTS.md must stay thin; move `{section}` to SCHEMA.md"
         )
+        assert section in schema, (
+            f"presets/llm-wiki/SCHEMA.md must carry wiki-domain policy `{section}`"
+        )
+
+
+def test_all_preset_agents_are_thin_runtime_contracts():
+    """Preset AGENTS.md files should orient runtime behavior and point to SCHEMA.md for domain rules."""
+    forbidden = ["## Tag Taxonomy", "## Audit Thresholds", "## Status Enums", "## Source Validation Rules"]
+    for preset in PRESETS:
+        agents = _read_preset(preset, "AGENTS.md")
+        for heading in forbidden:
+            assert heading not in agents, (
+                f"{preset}/AGENTS.md should not include domain-policy heading `{heading}`"
+            )
+        assert "SCHEMA.md" in agents
+        assert "Domain Policy" in agents or "Domain policy" in agents
+
+
+def test_qmd_is_optional_and_filesystem_is_baseline():
+    """QMD accelerates search but must not be required for ordinary vault operation."""
+    text = _read_skill()
+    bootstrap = _read_reference("bootstrap-workflow.md")
+    search = _read_reference("search-strategies.md")
+    combined = "\n".join([text, bootstrap, search]).lower()
+    assert "filesystem" in combined, "filesystem search/read/write must be documented as baseline"
+    assert "optional qmd" in combined or "qmd optional" in combined, (
+        "QMD must be described as optional, not required"
+    )
+    assert "qmd_collection" not in text or "null" in text or "optional" in text.lower()
+    assert "default yes" not in bootstrap.lower(), "bootstrap must not default-enable QMD"
+
+
+def test_obsidian_cli_is_runtime_integration_not_storage_backbone():
+    """Deterministic Markdown maintenance must not depend on the Obsidian app or CLI."""
+    text = _read_skill()
+    lower = text.lower()
+    assert "vault operations → `obsidian:obsidian-cli`" not in text
+    assert "markdown read/write" in lower or "filesystem tools" in lower, (
+        "SKILL.md must name filesystem/Markdown tools as the baseline for note maintenance"
+    )
+    assert "runtime" in lower and "obsidian-cli" in lower, (
+        "obsidian-cli should be scoped to runtime integration"
+    )
+    assert "ordinary vault maintenance" in lower and "obsidian app" in lower and "closed" in lower
+
+
+def test_vault_contract_orientation_precedes_mechanism_references():
+    """Vault-level modes must read AGENTS.md + SCHEMA.md before mode-specific mechanism refs."""
+    text = _read_skill()
+    assert "Read first (mechanism)" not in text
+    assert "Domain Contract Orientation first" in text
+    gate_idx = text.find("### Mode Entry Gate")
+    orient_idx = text.find("### Domain Contract Orientation")
+    assert gate_idx != -1 and orient_idx != -1
+    gate = text[gate_idx:orient_idx]
+    assert "init-vault" in gate and "exception" in gate.lower()
+
+
+def test_serena_project_config_is_not_part_of_obsidian_refine_branch():
+    """Serena local project metadata should not be shipped in this skill refactor."""
+    assert not Path(".serena/project.yml").exists()
 
 
 # --- New vault-level modes (status, capabilities) ---

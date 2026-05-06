@@ -9,8 +9,7 @@ preset: news
 
 Four typed notes for a news vault: Article (per-source), DailyAggregate
 (per-day roll-up), WeeklyAggregate (per-week themes), Topic (ongoing
-story thread). AGENTS.md governs runtime behavior; this file declares
-the data shapes.
+story thread). AGENTS.md governs the thin runtime contract; this file declares domain schema and policy: data shapes, tag taxonomy, source validation, aggregation rules, and audit thresholds.
 
 ## Universal Frontmatter
 
@@ -38,7 +37,7 @@ source_author: ""            # publisher / outlet (e.g., "Bloomberg", "Reuters")
 source_language: en          # ISO code if differs from vault language
 authors: []                  # bylines, if available
 topic: ""                    # wikilink-resolvable Topic name (or empty for standalone)
-tags: []                     # taxonomy tags from AGENTS.md
+tags: []                     # taxonomy tags from SCHEMA.md
 aliases: []
 ---
 ```
@@ -215,6 +214,49 @@ updated post-publication).
 For news, drift is meaningful: news outlets sometimes edit articles
 post-publication. A drift detection lets the agent surface "the article
 you ingested has been edited" — important for record-keeping.
+
+## Tag Taxonomy
+
+Top-level tags:
+
+- `news` — Article notes and source-derived news items
+- `aggregate` — DailyAggregate and WeeklyAggregate notes
+- `topic` — ongoing story threads
+- `source` — raw/captured source material
+- `region` — geographic scope tags (`region/us`, `region/eu`, ...)
+- `sector` — industry or policy sector (`sector/ai`, `sector/finance`, ...)
+- `actor` — organizations, governments, named people
+- `event` — discrete happenings or announcements
+- `analysis` — interpretive / explainer material
+- `priority` — editorial priority (`priority/high`, `priority/watch`)
+
+Sub-tag convention: `<top-level>/<specific>`.
+
+LINT checks:
+- Unknown top-level tags → flag.
+- Article missing at least one scope/topic tag → flag.
+- DailyAggregate / WeeklyAggregate missing `aggregate` tag → flag.
+
+## Source Validation Policy
+
+- Every Article must link to exactly one Raw Source unless the user approves a synthesized multi-source Article.
+- Keep publisher, byline, published date, canonical URL, and source language when available.
+- If extraction confidence is low, mark the Article `status: needs-review` or add an explicit note in the body.
+- Do not rewrite Raw Sources; re-ingest produces drift reports.
+
+## Aggregation Rules
+
+- Suggest a DailyAggregate when a date has 3+ Articles or the user asks for a daily roll-up.
+- Suggest a WeeklyAggregate when a week has 10+ Articles, 3+ DailyAggregates, or the user asks for a weekly summary.
+- Promote a Topic when the same story appears in 3+ Articles across at least 2 days, or when the user explicitly asks to track it.
+
+## Audit Thresholds
+
+- Topic stale after 14 days with no new linked Article unless `status: dormant`.
+- Date with 3+ Articles and no DailyAggregate → flag.
+- Week with 10+ Articles and no WeeklyAggregate → flag.
+- Article not referenced by any DailyAggregate or Topic after 7 days → flag as freshness orphan.
+- `log.md` > 200 entries or > 200 KB → suggest log rotation.
 
 ## Audit Report
 
