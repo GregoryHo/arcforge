@@ -117,6 +117,28 @@ function atomicWriteFile(destPath, content, options = { encoding: 'utf8' }) {
 }
 
 /**
+ * Read and parse a JSON file. Returns the fallback on any read or parse
+ * failure (missing file, malformed JSON). Use for optional state files
+ * where "no file yet" is a normal condition.
+ */
+function readJsonFile(filePath, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Write a JSON file atomically. Creates parent directories. Trailing
+ * newline + 2-space indent is the project convention.
+ */
+function writeJsonFile(filePath, data) {
+  atomicWriteFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
+  return filePath;
+}
+
+/**
  * Get cross-platform temp directory
  */
 function getTempDir() {
@@ -606,6 +628,8 @@ module.exports = {
   readFileSafe,
   writeFileSafe,
   atomicWriteFile,
+  readJsonFile,
+  writeJsonFile,
   getTempDir,
   findUpwards,
   commandExists,

@@ -93,30 +93,43 @@ First entry:
 
 (Real values, not placeholders.)
 
-### 9. Register in `~/.arcforge/obsidian-vaults.json`
+### 9. Register via the arcforge CLI (mechanical, not LLM-authored)
 
-Add the entry with these fields:
+Registry mutation goes through `${ARCFORGE_ROOT}/scripts/cli.js`, not
+hand-written JSON. Run:
 
-```json
-{
-  "name": "<name>",
-  "path": "<absolute-path>",
-  "search": {
-    "baseline": "filesystem",
-    "preferred": "filesystem",
-    "qmd_collection": null,
-    "fallbacks": ["filesystem", "obsidian-cli"]
-  },
-  "scope": "<scope from question 3>",
-  "preset": "<preset>"
-}
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" obsidian register \
+  --name <name> \
+  --path <absolute-path> \
+  --preset <preset> \
+  --scope "<scope from question 3>" \
+  --json
 ```
 
-If this is the first registered vault, set it as `default` automatically and tell the user.
+The CLI:
+- writes a fully-formed entry into `~/.arcforge/obsidian-vaults.json` (default `search` config: filesystem baseline, no QMD collection, fallbacks `[filesystem, obsidian-cli]`)
+- promotes the first-registered vault to `default` automatically
+- holds a file lock for the duration of the write
+- atomically replaces the registry file
+
+Print the JSON result to the user (it includes `becameDefault: true|false`). Do NOT hand-edit `obsidian-vaults.json` — there is no scenario in this workflow where the LLM should construct that file directly. If step 10 enables QMD, run a follow-up `obsidian set-default` only if the user explicitly asked to switch defaults; otherwise leave the registry alone.
 
 ### 10. Optional QMD collection
 
-QMD is optional QMD acceleration, not a prerequisite. Ask the user: `Enable QMD semantic search?` Default is **no** unless the user has already requested semantic/hybrid search. If enabled, run `qmd create -c obsidian-<name>` and set `search.preferred = "qmd"`, `search.qmd_collection = "obsidian-<name>"`. If skipped or unavailable, leave filesystem as the baseline and note that the skill falls back to filesystem search/read operations, with `obsidian-cli search` as an optional runtime route when Obsidian is available.
+QMD is optional acceleration, not a prerequisite. Step 3 already
+captured the user's QMD preference. If they accepted:
+
+1. Run `qmd create -c obsidian-<name>` to create the collection.
+2. Pass `--qmd-collection obsidian-<name>` (which implies
+   `--search-preferred qmd`) to step 9's `obsidian register` command —
+   no separate registry edit. **Step 10 is folded into step 9 when QMD
+   is enabled.**
+
+If skipped or unavailable, leave filesystem as the baseline and note
+that the skill falls back to filesystem search/read operations, with
+`obsidian-cli search` as an optional runtime route when Obsidian is
+available.
 
 ### 11. Print available commands
 
@@ -141,7 +154,7 @@ If any step fails (file write error, registry write error, QMD failure), undo pr
 Specifically:
 - If step 4 / 5 fails after step 1 / 2, no files were written — clean.
 - If step 6 fails after step 4 / 5 succeeded, leave AGENTS.md + SCHEMA.md (they're useful even without CLAUDE.md), warn user.
-- If step 9 (register) fails after files are written, files stay; tell user to register manually via `register <path> --name <name>`.
+- If step 9 (register) fails after files are written, files stay; tell user to retry `node ${ARCFORGE_ROOT}/scripts/cli.js obsidian register --name <name> --path <path>` once the failure cause is addressed.
 
 ## Worked Example
 
