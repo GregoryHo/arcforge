@@ -512,6 +512,36 @@ def test_each_preset_agents_has_schema_authority_baseline():
             )
 
 
+def _extract_schema_authority(text: str) -> str:
+    """Pull the `## Schema Authority` block (until next H2) from a preset AGENTS.md."""
+    import re
+    m = re.search(r"(## Schema Authority\n.*?)\n## ", text, re.DOTALL)
+    assert m is not None, "Schema Authority section must be followed by another H2"
+    return m.group(1).strip()
+
+
+def test_schema_authority_section_byte_identical_across_presets():
+    """The Schema Authority baseline is the stable contract that governs how
+    agents treat SCHEMA.md. It MUST be byte-identical across all 4 presets so
+    that a contributor changing one wording cannot silently leave the others
+    out of sync. If you want to change it, change all 4 files in the same diff."""
+    sections = {
+        preset: _extract_schema_authority(_read_preset(preset, "AGENTS.md"))
+        for preset in PRESETS
+    }
+    canonical_preset = "minimal"
+    canonical = sections[canonical_preset]
+    drift = {
+        preset: section
+        for preset, section in sections.items()
+        if section != canonical
+    }
+    assert not drift, (
+        "Schema Authority drift detected — these presets diverged from minimal:\n"
+        + "\n\n".join(f"--- {p} ---\n{s}" for p, s in drift.items())
+    )
+
+
 def test_each_preset_agents_has_preset_field_in_frontmatter():
     """Each preset's AGENTS.md frontmatter declares which preset bootstrapped the vault."""
     for preset in PRESETS:
@@ -772,39 +802,48 @@ def test_argument_hint_includes_preset_flag():
     )
 
 
-def test_init_vault_bootstrap_workflow_documented():
-    """SKILL.md must describe init-vault as a multi-step workflow, not just template substitution."""
+def test_skill_points_to_bootstrap_reference():
+    """SKILL.md's init-vault section must point at references/bootstrap-workflow.md
+    for the full 11-step workflow."""
     text = _read_skill()
-    # Anchor on the heading specifically (not the earlier table-cell mention).
     bs_idx = text.find("### init-vault Bootstrap")
     assert bs_idx != -1, "init-vault Bootstrap section heading must exist"
     end_idx = text.find("\n### ", bs_idx + len("### init-vault Bootstrap"))
-    if end_idx == -1:
-        end_idx = text.find("\n## ", bs_idx + len("### init-vault Bootstrap"))
-    block = text[bs_idx:end_idx if end_idx != -1 else len(text)].lower()
-    for phase in ["validate", "preset", "register", "log.md", "qmd"]:
-        assert phase in block, f"init-vault Bootstrap workflow must mention `{phase}` step"
+    block = text[bs_idx:end_idx if end_idx != -1 else len(text)]
+    assert "references/bootstrap-workflow.md" in block, (
+        "SKILL.md init-vault Bootstrap section must point at references/bootstrap-workflow.md"
+    )
 
 
-def test_init_vault_bootstrap_authors_not_copies():
+def test_bootstrap_workflow_reference_documents_full_workflow():
+    """references/bootstrap-workflow.md owns the full 11-step bootstrap; verify all phases are documented."""
+    ref = _read_reference("bootstrap-workflow.md").lower()
+    for phase in ["validate", "preset", "register", "log.md", "qmd", "agents.md", "schema.md"]:
+        assert phase in ref, (
+            f"references/bootstrap-workflow.md must document the `{phase}` step"
+        )
+
+
+def test_bootstrap_workflow_reference_authors_not_copies():
     """Bootstrap workflow must frame preset use as 'author from guidance', not 'copy + substitute'."""
-    text = _read_skill()
-    # Anchor on the heading so we don't pick up earlier prose mentions.
-    bs_idx = text.find("### init-vault Bootstrap")
-    assert bs_idx != -1, "init-vault Bootstrap section heading must exist"
-    end_idx = text.find("\n### ", bs_idx + len("### init-vault Bootstrap"))
-    if end_idx == -1:
-        end_idx = text.find("\n## ", bs_idx + len("### init-vault Bootstrap"))
-    block = text[bs_idx:end_idx if end_idx != -1 else len(text)].lower()
-    assert "author" in block, (
-        "Bootstrap workflow must use 'author' (LLM authors vault contract from preset guidance)"
+    ref = _read_reference("bootstrap-workflow.md").lower()
+    assert "author" in ref, (
+        "bootstrap-workflow.md must use 'author' (LLM authors vault contract from preset guidance)"
     )
     assert (
-        "one-shot" in block
-        or "not a template to copy" in block
-        or "not stamping templates" in block
+        "one-shot" in ref
+        or "not a template to copy" in ref
+        or "not stamping templates" in ref
     ), (
-        "Bootstrap workflow must clarify presets are one-shot authoring guidance, not stamping templates"
+        "bootstrap-workflow.md must clarify presets are one-shot authoring guidance, not stamping templates"
+    )
+
+
+def test_bootstrap_workflow_reference_has_worked_example():
+    """The 'author from preset' framing is hard to internalize from rules alone — it needs a concrete worked example."""
+    ref = _read_reference("bootstrap-workflow.md").lower()
+    assert "worked example" in ref, (
+        "bootstrap-workflow.md must include a worked example showing 'author from preset' concretely"
     )
 
 

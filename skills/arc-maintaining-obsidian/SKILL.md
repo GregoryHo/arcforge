@@ -1,6 +1,6 @@
 ---
 name: arc-maintaining-obsidian
-description: Use when the user wants to create, query, or maintain their Obsidian vault. Trigger on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me about", "do I have notes on"), auditing vault health (missing links, orphan notes, stale content), ingesting raw files (Excalidraw, PDFs, screenshots) into wiki notes, or saying "file this back" / "save this insight" / "crystallize this". Also trigger on mentions of their wiki, knowledge base, or second brain — even casual "save this" or "what did I write about Y". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches, or explaining concepts the user doesn't have vault notes about.
+description: Use when the user wants to create, query, audit, or initialize an Obsidian vault — wiki / knowledge base / second brain, project tracker, news pipeline, journal, or any typed-note vault. Trigger on saving notes, capturing ideas / decisions / sources, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me"), auditing vault health (missing links, orphans, stale content, source drift), ingesting raw files (PDFs, Excalidraw, screenshots, articles), logging tasks / milestones / decisions, queueing articles into aggregates, journaling, "init a new vault", "set up a project vault", or "file this back" / "save this insight" / "track this". Also trigger on mentions of any registered Obsidian vault, wiki, knowledge base, second brain, task tracker — even casual "save this" or "what did I write". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches.
 argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>] | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
 ---
 
@@ -65,12 +65,17 @@ Also accepts natural language: "file this back", "check my vault", "save this in
 "what's in this vault", etc.
 ```
 
+### Path Convention
+
+All `references/` and `presets/` paths in this file are **skill-relative**. The Claude Code Skill harness provides the absolute skill base directory at every invocation (the LLM sees `Base directory for this skill: <abs-path>`). Construct absolute paths by prepending that base. The skill never relies on the user's CWD.
+
 ### Mode Entry Gate
 
 Each mode depends on **mechanism references** the skill ships, plus the **vault contract** (AGENTS.md + SCHEMA.md). Read in this order:
 
 | Mode | Read first (mechanism) | Then (vault contract) |
 |---|---|---|
+| **init-vault** | `references/bootstrap-workflow.md` (11-step bootstrap, preset selection, worked example) | n/a — there is no vault to read yet; the workflow writes one |
 | **Ingest** | `references/page-templates.md` (Raw Source mechanism, sha256, extraction methods) | `AGENTS.md` (runtime rules) + `SCHEMA.md` (types, frontmatter, body templates) |
 | **Query** | `references/search-strategies.md` (route selection, output adaptation) | `AGENTS.md` (scope, citation rules) + `SCHEMA.md` (types — for type-aware grouping) |
 | **Audit** | `references/audit-checks.md` (LINK/LINT/GROW primitives, Source Drift, vault-declared LINT) | `AGENTS.md` (thresholds, taxonomy, declared LINT) + `SCHEMA.md` (schema compliance target) |
@@ -148,52 +153,11 @@ To inspect a registered vault without switching to it, use **bare invoke** with 
 
 ### init-vault Bootstrap
 
-When the user runs `init-vault <path> --name <name>`, run this multi-step workflow. The skill drives the conversation; do not skip steps.
+When the user runs `init-vault <path> --name <name>` (with or without `--preset=<name>`), the skill drives an 11-step conversation: validate path → pick preset → ask minimal questions → **author** AGENTS.md + SCHEMA.md from the preset (do not copy verbatim) → seed index/log → register → advertise commands.
 
-1. **Validate path.** Confirm `<path>` exists and is a directory. Refuse if it's already in the registry, or already contains `AGENTS.md` (would overwrite) — direct the user to `register` instead.
+**Read `references/bootstrap-workflow.md` before running any step.** That file owns the full workflow including a worked example showing how "author from preset" plays out concretely. Presets are one-shot authoring guidance, not stamping templates.
 
-2. **Pick preset.** If `--preset=<name>` was supplied, use it. Otherwise list options and ask:
-
-   | Preset | Best for |
-   |---|---|
-   | `minimal` | Empty scaffold; you'll author types from scratch. |
-   | `llm-wiki` | Karpathy-style second brain (Source / Entity / Synthesis / MOC / Decision / Log). |
-   | `news` | News pipeline: article ingest + daily / weekly aggregates. |
-   | `project-tracker` | Tasks / Milestones / Decisions / Sprints. |
-
-   Each preset ships under `presets/<name>/AGENTS.md` + `presets/<name>/SCHEMA.md` in this skill. **Presets are one-shot authoring guidance, not stamping templates** — read them to understand the shape, then author the user's vault contract with their actual values.
-
-3. **Ask preset-specific minimal questions.** Common questions for any preset:
-   - Vault scope statement (one line — what this vault owns).
-   - QMD collection name (default `obsidian-<name>`).
-   - Bilingual? (only if the preset supports it; e.g., llm-wiki may go bilingual or mono).
-
-   Preset-specific questions live in the preset's `AGENTS.md` as `<TODO ...>` markers — surface them and prompt.
-
-4. **Author `<path>/AGENTS.md`.** Read `presets/<preset>/AGENTS.md` to understand the canonical shape of this domain's runtime contract — Schema Authority baseline, identity, language policy, tag taxonomy, audit thresholds, etc. Then **write a fresh AGENTS.md** for the user's vault, filling in their actual values from the questions above (real `name`, real `scope`, real language choice — not placeholder strings). The preset is **one-shot reading guidance**, not a template to copy verbatim. Skip preset sections that don't apply to the user's situation (e.g., if user said monolingual, drop the bilingual block); rephrase or extend where the user's case warrants.
-
-5. **Author `<path>/SCHEMA.md`.** Same pattern: read `presets/<preset>/SCHEMA.md` for the canonical type set + frontmatter + Visual Guidance shapes, then **author** the user's SCHEMA.md with their actual choices. Leave `<TODO ...>` markers ONLY for fields the user explicitly deferred (tag taxonomy details, custom-type additions). Do not leave unsubstituted placeholders like `<Vault Name>` in the written file — those are pedagogical aids in the preset, not literal output.
-
-6. **Write `<path>/CLAUDE.md` shim** — a one-paragraph redirect: "This vault uses arc-maintaining-obsidian; see AGENTS.md for runtime contract and SCHEMA.md for note-type schema."
-
-7. **Seed `<path>/index.md`** — empty starter:
-   ```markdown
-   # <Vault Name> Index
-   Last updated: YYYY-MM-DD
-   ```
-
-8. **Seed `<path>/log.md`** — first entry:
-   ```
-   ## [YYYY-MM-DD] init-vault | preset=<preset> name=<name>
-   ```
-
-9. **Register in `~/.arcforge/obsidian-vaults.json`** — add the entry (name, path, qmd_collection, scope, preset). If this is the first vault, set as default automatically and tell the user.
-
-10. **Create QMD collection** — ask user (default yes): `qmd create -c obsidian-<name>`. If declined, note that semantic search won't work until they enable it later.
-
-11. **Print available commands** — ingest / query / audit + a one-line note that bare invocation gives a vault summary anytime.
-
-If any step fails, undo prior steps when reasonable (don't leave half-written files in the user's vault) and report the failure clearly.
+Available presets: `minimal`, `llm-wiki`, `news`, `project-tracker`. Each ships its paired starter under `presets/<name>/AGENTS.md` + `presets/<name>/SCHEMA.md`.
 
 ### Vault Structure — Two Layers
 

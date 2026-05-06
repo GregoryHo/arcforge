@@ -17,11 +17,11 @@ templates live in `SCHEMA.md`.
 ## Schema Authority
 
 - `schema_path: SCHEMA.md` — load it after this file at Domain Contract Orientation.
-- **Read SCHEMA.md before mutating content.** Mutating modes (ingest, audit) MUST read SCHEMA.md after AGENTS.md and before any vault write.
-- **SCHEMA.md governs note types and content structure.** Frontmatter, body sections, and per-type Visual Guidance — sourced from SCHEMA.md.
+- **Read SCHEMA.md before mutating content.** Mutating modes (ingest, audit) MUST read SCHEMA.md after AGENTS.md.
+- **SCHEMA.md governs note types and content structure.**
 - **Do not invent new note types** unless the user approves or SCHEMA.md is updated.
 - **If AGENTS.md and SCHEMA.md conflict, stop and ask the user.**
-- **Schema changes require a log entry.** Append `## [YYYY-MM-DD] schema | <change summary>` to `log.md`. Major shifts also bump `version:` in this file's frontmatter.
+- **Schema changes require a log entry.** Append `## [YYYY-MM-DD] schema | <change summary>` to `log.md`.
 
 ## Identity
 

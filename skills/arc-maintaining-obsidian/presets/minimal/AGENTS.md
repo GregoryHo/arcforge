@@ -19,21 +19,12 @@ TODO; fill them in as the vault evolves.
 
 ## Schema Authority
 
-These six rules govern how agents treat SCHEMA.md. They are stable across
-presets and vaults:
-
-- `schema_path: SCHEMA.md` — the sibling file; load it after this one.
-- **Read SCHEMA.md before mutating content.** Mutating modes (ingest,
-  audit) MUST read SCHEMA.md after AGENTS.md and before any vault write.
-- **SCHEMA.md governs note types and content structure.** Frontmatter,
-  body sections, type-specific Visual Guidance — all sourced from SCHEMA.md.
-- **Do not invent new note types** unless the user approves or SCHEMA.md
-  is updated to declare them. Stub types create unsourced sprawl.
-- **If AGENTS.md and SCHEMA.md conflict, stop and ask the user.** Conflicts
-  are not auto-resolved.
-- **Schema changes require a log entry.** Append `## [YYYY-MM-DD] schema
-  | <change summary>` to `log.md`. Major shifts also bump the AGENTS.md
-  frontmatter `version:` field.
+- `schema_path: SCHEMA.md` — load it after this file at Domain Contract Orientation.
+- **Read SCHEMA.md before mutating content.** Mutating modes (ingest, audit) MUST read SCHEMA.md after AGENTS.md.
+- **SCHEMA.md governs note types and content structure.**
+- **Do not invent new note types** unless the user approves or SCHEMA.md is updated.
+- **If AGENTS.md and SCHEMA.md conflict, stop and ask the user.**
+- **Schema changes require a log entry.** Append `## [YYYY-MM-DD] schema | <change summary>` to `log.md`.
 
 ## Identity
 
