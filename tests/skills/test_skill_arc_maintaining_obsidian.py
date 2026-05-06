@@ -162,13 +162,13 @@ def test_ingest_visuals_excalidraw_needs_confirmation():
     assert "not auto-create" in text or "do not auto-create" in text or "suggest to user" in text
 
 
-def test_page_templates_have_visual_guidance():
-    """Each standalone page type in page-templates must have Visual Guidance."""
-    ref = _read_reference("page-templates.md")
-    for page_type in ["Source", "Paper", "Entity", "Synthesis", "MOC", "Decision", "Log"]:
-        assert f"Visual Guidance — {page_type}" in ref, (
-            f"page-templates.md must have Visual Guidance for {page_type}"
-        )
+def test_skill_does_not_ship_single_schema_template():
+    """The single legacy schema-md-template.md was replaced by per-preset SCHEMA.md starters."""
+    p = Path("skills/arc-maintaining-obsidian/references/schema-md-template.md")
+    assert not p.exists(), (
+        "references/schema-md-template.md must not exist — types live in "
+        "per-preset SCHEMA.md under presets/<name>/SCHEMA.md"
+    )
 
 
 # --- Query Mode ---
@@ -341,54 +341,30 @@ def test_has_completion_and_blocked_formats():
 # --- Bilingual Format ---
 
 
-def test_page_templates_has_bilingual_format():
-    """Page templates must define bilingual format rules."""
-    ref = _read_reference("page-templates.md")
-    assert "langs: [en, zh]" in ref, "universal frontmatter must include langs"
-    assert "## Bilingual Format" in ref, "must have bilingual format section"
-    assert "multi-lang-en" in ref, "must define English callout"
-    assert "multi-lang-zh" in ref, "must define Chinese callout"
-
-
-def test_page_templates_bilingual_in_universal_frontmatter():
-    """langs field must be in the Universal Frontmatter section, not buried later."""
-    ref = _read_reference("page-templates.md")
-    universal_section_end = ref.find("## Source")
-    universal_section = ref[:universal_section_end]
-    assert "langs: [en, zh]" in universal_section, "langs must be in Universal Frontmatter, not a per-type afterthought"
-
-
-def test_all_standalone_page_type_templates_have_bilingual():
-    """Every standalone page type template must include callout structure.
-    Log is excluded — it appends to daily notes, not a standalone file."""
-    ref = _read_reference("page-templates.md")
-    for page_type in ["Source", "Entity", "Synthesis", "MOC", "Decision"]:
-        section_start = ref.find(f"## {page_type}")
-        assert section_start != -1, f"missing section for {page_type}"
-        next_section = ref.find("\n## ", section_start + 1)
-        section = ref[section_start:next_section] if next_section != -1 else ref[section_start:]
-        assert "multi-lang-en" in section, f"{page_type} template must have English callout"
-        assert "multi-lang-zh" in section, f"{page_type} template must have Chinese callout"
+# (schema-md-template removed — bilingual + per-type templates are vault-specific.)
 
 
 # --- Reference Files Exist ---
 
 
 def test_reference_page_templates_exists():
+    """page-templates.md is now the generic Raw Source primitives reference."""
     ref = _read_reference("page-templates.md")
-    assert "## Source" in ref
-    assert "## Entity" in ref
-    assert "## Synthesis" in ref
-    assert "## MOC" in ref
-    assert "## Decision" in ref
-    assert "## Log" in ref
+    assert "Raw Source" in ref, "page-templates must document Raw Source ingest"
+    assert "sha256" in ref, "page-templates must document sha256 hashing"
 
 
 def test_reference_audit_checks_exists():
+    """audit-checks.md ships only mechanical primitives — LINK / LINT / GROW
+    pattern detection. Thresholds and domain choices live in vault AGENTS.md."""
     ref = _read_reference("audit-checks.md")
-    assert "## LINK Checks" in ref
-    assert "## LINT Checks" in ref
-    assert "## GROW Thresholds" in ref
+    assert "## LINK" in ref, "audit-checks must document LINK mechanism"
+    assert "## LINT" in ref, "audit-checks must document LINT mechanism"
+    assert "## GROW" in ref, "audit-checks must document GROW pattern detection"
+    # Confirm the "mechanism vs domain" framing is explicit
+    assert "mechanism" in ref.lower() or "vault-declared" in ref.lower(), (
+        "audit-checks must signal mechanism / vault-declared split"
+    )
 
 
 def test_reference_search_strategies_exists():
@@ -477,30 +453,430 @@ def test_init_vault_documented():
     assert "starter" in text or "template" in text or "agents-md-template" in text
 
 
-def test_agents_md_template_reference_exists():
-    """The starter AGENTS.md template must exist as a reference file."""
-    ref = _read_reference("agents-md-template.md")
-    assert "<YYYY-MM-DD>" in ref, "template must contain date placeholder"
-    assert "<Vault Name>" in ref, "template must contain vault name placeholder"
-    assert "<TODO" in ref, "template must contain TODO markers for user customization"
+# --- Preset system: 4 paired starters under presets/ ---
 
 
-def test_agents_md_template_has_three_layer_structure():
-    """Template must mirror Karpathy's 3-layer pattern."""
-    ref = _read_reference("agents-md-template.md")
-    assert "Layer 1" in ref and "Raw Sources" in ref
-    assert "Layer 2" in ref and "Wiki" in ref
-    assert "Layer 3" in ref and "Schema" in ref
+PRESETS = ["minimal", "llm-wiki", "news", "project-tracker"]
 
 
-def test_agents_md_template_lists_default_note_types():
-    """Template must list default note types so adopters know the starting set."""
-    ref = _read_reference("agents-md-template.md")
+def _read_preset(preset: str, file: str) -> str:
+    p = Path(f"skills/arc-maintaining-obsidian/presets/{preset}/{file}")
+    return p.read_text(encoding="utf-8")
+
+
+def test_presets_directory_has_index_readme():
+    p = Path("skills/arc-maintaining-obsidian/presets/README.md")
+    assert p.exists(), "presets/README.md (index) must exist"
+    text = p.read_text(encoding="utf-8")
+    for preset in PRESETS:
+        assert preset in text, f"presets/README.md must list `{preset}`"
+
+
+def test_each_preset_has_agents_and_schema():
+    """Each preset ships paired AGENTS.md + SCHEMA.md."""
+    for preset in PRESETS:
+        agents = Path(f"skills/arc-maintaining-obsidian/presets/{preset}/AGENTS.md")
+        schema = Path(f"skills/arc-maintaining-obsidian/presets/{preset}/SCHEMA.md")
+        assert agents.exists(), f"presets/{preset}/AGENTS.md must exist"
+        assert schema.exists(), f"presets/{preset}/SCHEMA.md must exist"
+
+
+def test_each_preset_has_substitution_placeholders():
+    """init-vault substitutes <YYYY-MM-DD>, <Vault Name>, etc. before writing."""
+    for preset in PRESETS:
+        for fname in ("AGENTS.md", "SCHEMA.md"):
+            ref = _read_preset(preset, fname)
+            assert "<YYYY-MM-DD>" in ref, (
+                f"presets/{preset}/{fname} must contain date placeholder"
+            )
+            assert "<Vault Name>" in ref, (
+                f"presets/{preset}/{fname} must contain vault name placeholder"
+            )
+
+
+def test_each_preset_agents_has_schema_authority_baseline():
+    """Every preset's AGENTS.md must ship the Schema Authority baseline rules."""
+    required_phrases = [
+        "Schema Authority",
+        "schema_path",
+        "Read SCHEMA.md before mutating",
+        "Do not invent new note types",
+        "conflict",
+        "log entry",
+    ]
+    for preset in PRESETS:
+        agents = _read_preset(preset, "AGENTS.md")
+        for phrase in required_phrases:
+            assert phrase in agents, (
+                f"presets/{preset}/AGENTS.md must contain Schema Authority rule mentioning `{phrase}`"
+            )
+
+
+def test_each_preset_agents_has_preset_field_in_frontmatter():
+    """Each preset's AGENTS.md frontmatter declares which preset bootstrapped the vault."""
+    for preset in PRESETS:
+        agents = _read_preset(preset, "AGENTS.md")
+        front = _frontmatter_block(agents)
+        assert f"preset: {preset}" in front, (
+            f"presets/{preset}/AGENTS.md frontmatter must declare `preset: {preset}`"
+        )
+
+
+def test_minimal_preset_is_scaffold_with_todo():
+    """Minimal preset is intentionally TODO-heavy — no preloaded types or thresholds."""
+    schema = _read_preset("minimal", "SCHEMA.md")
+    agents = _read_preset("minimal", "AGENTS.md")
+    assert "<TODO" in schema, "minimal/SCHEMA.md must be TODO-driven"
+    assert "<TODO" in agents, "minimal/AGENTS.md must be TODO-driven"
+
+
+def test_llm_wiki_preset_declares_six_canonical_types():
+    """llm-wiki preset's SCHEMA.md must define the Karpathy 6 types."""
+    schema = _read_preset("llm-wiki", "SCHEMA.md")
     for note_type in ["Source", "Entity", "Synthesis", "MOC", "Decision", "Log"]:
-        assert note_type in ref, f"template must mention `{note_type}` note type"
+        assert f"## {note_type}" in schema, (
+            f"presets/llm-wiki/SCHEMA.md must define `## {note_type}` type"
+        )
 
 
-def test_agents_md_template_invites_divergence():
-    """Template must explicitly invite users to customize / diverge."""
-    ref = _read_reference("agents-md-template.md").lower()
-    assert "edit" in ref or "diverge" in ref or "customize" in ref or "extend" in ref
+def test_llm_wiki_preset_has_paper_variant():
+    schema = _read_preset("llm-wiki", "SCHEMA.md")
+    assert "Paper Variant" in schema or "Paper variant" in schema, (
+        "llm-wiki/SCHEMA.md must document the Source Paper variant"
+    )
+
+
+def test_llm_wiki_preset_adopts_raw_source_pattern():
+    agents = _read_preset("llm-wiki", "AGENTS.md")
+    front = _frontmatter_block(agents)
+    assert "raw_source: adopted" in front, (
+        "llm-wiki/AGENTS.md frontmatter must declare raw_source: adopted"
+    )
+
+
+def test_llm_wiki_preset_has_bilingual_callout_structure():
+    schema = _read_preset("llm-wiki", "SCHEMA.md")
+    assert "multi-lang-en" in schema, "llm-wiki/SCHEMA.md must define English callout"
+    assert "multi-lang-zh" in schema, "llm-wiki/SCHEMA.md must define Chinese callout"
+
+
+def test_news_preset_declares_news_types():
+    schema = _read_preset("news", "SCHEMA.md")
+    for note_type in ["Article", "DailyAggregate", "WeeklyAggregate", "Topic"]:
+        assert f"## {note_type}" in schema, (
+            f"presets/news/SCHEMA.md must define `## {note_type}` type"
+        )
+
+
+def test_news_preset_adopts_raw_source_pattern():
+    agents = _read_preset("news", "AGENTS.md")
+    front = _frontmatter_block(agents)
+    assert "raw_source: adopted" in front, (
+        "news/AGENTS.md frontmatter must declare raw_source: adopted"
+    )
+
+
+def test_project_tracker_preset_declares_project_types():
+    schema = _read_preset("project-tracker", "SCHEMA.md")
+    for note_type in ["Task", "Milestone", "Decision", "Sprint", "Project"]:
+        assert f"## {note_type}" in schema, (
+            f"presets/project-tracker/SCHEMA.md must define `## {note_type}` type"
+        )
+
+
+def test_project_tracker_preset_does_not_adopt_raw_source():
+    agents = _read_preset("project-tracker", "AGENTS.md")
+    front = _frontmatter_block(agents)
+    assert "raw_source: not-adopted" in front, (
+        "project-tracker/AGENTS.md must declare raw_source: not-adopted "
+        "(work items are authored, not ingested from external originals)"
+    )
+
+
+def test_old_agents_md_template_no_longer_in_references():
+    """The single-template agents-md-template.md was replaced by the presets system."""
+    p = Path("skills/arc-maintaining-obsidian/references/agents-md-template.md")
+    assert not p.exists(), (
+        "references/agents-md-template.md must not exist — replaced by per-preset starters under presets/"
+    )
+
+
+# --- Domain Contract Orientation (AGENTS.md + SCHEMA.md dual-contract model) ---
+
+
+def test_skill_has_domain_contract_orientation_section():
+    """SKILL.md must define a Domain Contract Orientation gate after vault resolution."""
+    text = _read_skill()
+    assert "Domain Contract Orientation" in text, (
+        "SKILL.md must have a Domain Contract Orientation section that runs after Vault Resolution"
+    )
+
+
+def test_domain_contract_reads_agents_and_schema():
+    """Orientation must read AGENTS.md and (when referenced) SCHEMA.md."""
+    text = _read_skill()
+    assert "AGENTS.md" in text and "SCHEMA.md" in text, (
+        "Domain Contract Orientation must mention both AGENTS.md and SCHEMA.md"
+    )
+
+
+def test_domain_contract_reads_recent_log_entries():
+    """Orientation must read recent log.md entries (last 20-30) to load context."""
+    text = _read_skill().lower()
+    assert "20-30" in text or "last 20" in text or "last 30" in text, (
+        "Domain Contract Orientation must specify reading the last 20-30 log entries"
+    )
+
+
+def _find_agents_missing_block(text: str) -> int:
+    """Find the index of the AGENTS.md-missing handling block in SKILL.md."""
+    lower = text.lower()
+    for needle in ("agents.md is missing", "missing agents.md", "agents.md missing"):
+        idx = lower.find(needle)
+        if idx != -1:
+            return idx
+    return -1
+
+
+def test_missing_agents_md_blocks_mutating_modes():
+    """When AGENTS.md is missing, ingest and audit must be blocked."""
+    text = _read_skill()
+    idx = _find_agents_missing_block(text)
+    assert idx != -1, "SKILL.md must discuss the AGENTS.md missing scenario"
+    block = text[idx:idx + 1200].lower()
+    assert "block" in block, "missing AGENTS.md must block at least one mode"
+    assert "ingest" in block, "missing AGENTS.md handling must mention ingest"
+    assert "audit" in block, "missing AGENTS.md handling must mention audit"
+
+
+def test_missing_agents_md_allows_readonly_with_warning():
+    """Read-only modes (query/help/bare invoke) must still run with warning."""
+    text = _read_skill()
+    # Anchor at the H3 heading so we get the Orientation section body, not an
+    # earlier reference in the Mode Selection prose.
+    dco_idx = text.find("### Domain Contract Orientation")
+    if dco_idx == -1:
+        dco_idx = text.find("## Domain Contract Orientation")
+    assert dco_idx != -1, "Domain Contract Orientation section heading must exist"
+    block = text[dco_idx:dco_idx + 4000].lower()
+    assert "query" in block, (
+        "Domain Contract Orientation must mention query as a mode that degrades gracefully"
+    )
+    assert "warn" in block, (
+        "missing AGENTS.md must trigger a warning rather than a hard error for read-only modes"
+    )
+    assert "agents.md missing" in block or "agents.md is missing" in block, (
+        "AGENTS.md missing scenario must be in the Orientation section"
+    )
+
+
+def test_missing_schema_md_blocks_mutating_modes():
+    """When SCHEMA.md is missing, ingest and audit must also be blocked.
+    AGENTS.md + SCHEMA.md form a paired contract; both are required for mutation."""
+    text = _read_skill()
+    # The orientation table covers both files; check SCHEMA.md missing guidance
+    assert "SCHEMA.md missing" in text or "SCHEMA.md is missing" in text, (
+        "SKILL.md must document SCHEMA.md missing scenario (paired contract)"
+    )
+    # Find Domain Contract Orientation block and check for SCHEMA.md blocking
+    dco_idx = text.find("Domain Contract Orientation")
+    assert dco_idx != -1
+    block = text[dco_idx:dco_idx + 4000].lower()
+    assert "schema.md" in block and ("block" in block or "ingest" in block), (
+        "SCHEMA.md missing scenario must indicate mutating-mode behavior"
+    )
+
+
+# --- Command Split: Registry-level vs Vault-level ---
+
+
+def test_argument_hint_does_not_advertise_orient_only_modes():
+    """status / capabilities / describe-vault have been collapsed into bare-invoke
+    orientation. The skill exposes only ingest / query / audit as vault-level modes,
+    plus the 5 registry-level subcommands."""
+    text = _read_skill()
+    front = _frontmatter_block(text)
+    for removed in ["status", "capabilities", "describe-vault"]:
+        assert removed not in front, (
+            f"argument-hint must not advertise `{removed}` — that role is served "
+            "by bare invocation + Domain Contract Orientation."
+        )
+
+
+def test_skill_documents_three_universal_modes_only():
+    """Mode Selection table must list exactly ingest / query / audit, not status/capabilities."""
+    text = _read_skill()
+    ms_idx = text.find("## Mode Selection")
+    assert ms_idx != -1
+    # Read until the next H2
+    next_h2 = text.find("\n## ", ms_idx + 1)
+    section = text[ms_idx:next_h2] if next_h2 != -1 else text[ms_idx:]
+    assert "**ingest**" in section
+    assert "**query**" in section
+    assert "**audit**" in section
+    assert "**status**" not in section, "Mode Selection must not list status"
+    assert "**capabilities**" not in section, "Mode Selection must not list capabilities"
+
+
+def test_bare_invoke_orient_response_documented():
+    """Bare invocation must trigger Domain Contract Orientation and an orient response."""
+    text = _read_skill().lower()
+    assert "bare invoke" in text or "bare invocation" in text, (
+        "SKILL.md must document the bare-invoke (no mode arg) behavior"
+    )
+    # Must explicitly tie bare invoke to Orientation, not to asking the user
+    bare_idx = text.find("bare invoc")
+    if bare_idx == -1:
+        bare_idx = text.find("bare invoke")
+    assert bare_idx != -1
+    nearby = text[bare_idx:bare_idx + 600]
+    assert "orient" in nearby, "bare invoke must run Domain Contract Orientation"
+
+
+def test_help_section_splits_registry_and_vault_level():
+    """Help section must split commands into Registry-level vs Vault-level groups."""
+    text = _read_skill()
+    assert "REGISTRY-LEVEL" in text or "Registry-level" in text, (
+        "Help section must label the registry-level command group"
+    )
+    assert "VAULT-LEVEL" in text or "Vault-level" in text, (
+        "Help section must label the vault-level command group"
+    )
+
+
+# --- Init-vault dual-write (AGENTS.md + SCHEMA.md) ---
+
+
+def test_init_vault_writes_both_agents_and_schema_from_preset():
+    """init-vault writes paired AGENTS.md + SCHEMA.md from the chosen preset."""
+    text = _read_skill()
+    bs_idx = text.find("init-vault Bootstrap")
+    assert bs_idx != -1, "SKILL.md must document the init-vault Bootstrap workflow"
+    block = text[bs_idx:]
+    # Both files written
+    assert "AGENTS.md" in block, "Bootstrap must mention writing AGENTS.md"
+    assert "SCHEMA.md" in block, "Bootstrap must mention writing SCHEMA.md"
+    # Preset-driven
+    assert "preset" in block.lower(), "Bootstrap must mention preset selection"
+    # All four canonical preset names appear somewhere in SKILL.md
+    for preset in ["minimal", "llm-wiki", "news", "project-tracker"]:
+        assert preset in text, f"SKILL.md must surface preset `{preset}`"
+
+
+def test_argument_hint_includes_preset_flag():
+    """init-vault argument-hint must advertise --preset=<name>."""
+    text = _read_skill()
+    front = _frontmatter_block(text)
+    assert "--preset" in front, (
+        "argument-hint must advertise --preset=<name> for init-vault"
+    )
+
+
+def test_init_vault_bootstrap_workflow_documented():
+    """SKILL.md must describe init-vault as a multi-step workflow, not just template substitution."""
+    text = _read_skill()
+    # Anchor on the heading specifically (not the earlier table-cell mention).
+    bs_idx = text.find("### init-vault Bootstrap")
+    assert bs_idx != -1, "init-vault Bootstrap section heading must exist"
+    end_idx = text.find("\n### ", bs_idx + len("### init-vault Bootstrap"))
+    if end_idx == -1:
+        end_idx = text.find("\n## ", bs_idx + len("### init-vault Bootstrap"))
+    block = text[bs_idx:end_idx if end_idx != -1 else len(text)].lower()
+    for phase in ["validate", "preset", "register", "log.md", "qmd"]:
+        assert phase in block, f"init-vault Bootstrap workflow must mention `{phase}` step"
+
+
+def test_init_vault_bootstrap_authors_not_copies():
+    """Bootstrap workflow must frame preset use as 'author from guidance', not 'copy + substitute'."""
+    text = _read_skill()
+    # Anchor on the heading so we don't pick up earlier prose mentions.
+    bs_idx = text.find("### init-vault Bootstrap")
+    assert bs_idx != -1, "init-vault Bootstrap section heading must exist"
+    end_idx = text.find("\n### ", bs_idx + len("### init-vault Bootstrap"))
+    if end_idx == -1:
+        end_idx = text.find("\n## ", bs_idx + len("### init-vault Bootstrap"))
+    block = text[bs_idx:end_idx if end_idx != -1 else len(text)].lower()
+    assert "author" in block, (
+        "Bootstrap workflow must use 'author' (LLM authors vault contract from preset guidance)"
+    )
+    assert (
+        "one-shot" in block
+        or "not a template to copy" in block
+        or "not stamping templates" in block
+    ), (
+        "Bootstrap workflow must clarify presets are one-shot authoring guidance, not stamping templates"
+    )
+
+
+# --- Raw Source sha256 hashing ---
+
+
+def test_page_templates_raw_source_has_sha256_field():
+    ref = _read_reference("page-templates.md")
+    assert "sha256" in ref, "page-templates must declare sha256 in Raw Source frontmatter"
+    assert "ingested" in ref, "page-templates must declare ingested date in Raw Source frontmatter"
+
+
+def test_page_templates_documents_hashing_rule():
+    ref = _read_reference("page-templates.md").lower()
+    assert "hash" in ref and ("after frontmatter" in ref or "after the frontmatter" in ref), (
+        "page-templates must explain that the body is hashed after the frontmatter is stripped"
+    )
+
+
+def test_skill_mentions_raw_source_hashing():
+    text = _read_skill().lower()
+    assert "hash" in text and "frontmatter" in text and "sha256" in text, (
+        "SKILL.md must mention the hash-body-after-frontmatter rule and sha256"
+    )
+
+
+# --- Audit: Source Drift + vault-declared LINT extensibility ---
+
+
+def test_audit_checks_has_source_drift():
+    ref = _read_reference("audit-checks.md").lower()
+    assert "source drift" in ref or "drift check" in ref, (
+        "audit-checks must document a Source Drift check"
+    )
+    assert "sha256" in ref, "Source Drift check must rely on sha256 comparison"
+
+
+def test_audit_checks_documents_vault_declared_lint():
+    """Audit pipeline must read vault AGENTS.md and apply declared LINT thresholds."""
+    ref = _read_reference("audit-checks.md").lower()
+    assert "vault-declared" in ref or "declared in" in ref or "vault declares" in ref, (
+        "audit-checks must document vault-declared LINT extensibility"
+    )
+    assert "agents.md" in ref, "audit-checks must reference reading vault AGENTS.md for thresholds"
+
+
+# --- llm-wiki preset operational policy (the wiki-specific rules now live here) ---
+
+
+def test_llm_wiki_preset_has_operational_policy_sections():
+    """Wiki-specific operational policy must live in llm-wiki/AGENTS.md, not in skill core."""
+    agents = _read_preset("llm-wiki", "AGENTS.md")
+    required_sections = [
+        "Audit Thresholds",
+        "Tag Taxonomy",
+        "Entity Creation Rules",
+        "Split & Archive",
+        "Synthesis Citation",
+        "Language Policy",
+    ]
+    for section in required_sections:
+        assert section in agents, (
+            f"presets/llm-wiki/AGENTS.md must include `{section}` section "
+            "(moved from skill core in the preset refactor)"
+        )
+
+
+# --- New vault-level modes (status, capabilities) ---
+
+
+def test_skill_does_not_define_status_or_capabilities_modes():
+    """status and capabilities are not separate modes — they collapse into bare-invoke orient."""
+    text = _read_skill()
+    assert "## Mode: Status" not in text, "status must not be a separate mode"
+    assert "## Mode: Capabilities" not in text, "capabilities must not be a separate mode"

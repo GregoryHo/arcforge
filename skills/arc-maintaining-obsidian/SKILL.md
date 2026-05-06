@@ -1,18 +1,18 @@
 ---
 name: arc-maintaining-obsidian
 description: Use when the user wants to create, query, or maintain their Obsidian vault. Trigger on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about", "search my vault", "remind me about", "do I have notes on"), auditing vault health (missing links, orphan notes, stale content), ingesting raw files (Excalidraw, PDFs, screenshots) into wiki notes, or saying "file this back" / "save this insight" / "crystallize this". Also trigger on mentions of their wiki, knowledge base, or second brain — even casual "save this" or "what did I write about Y". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code implementation, debugging, PR reviews, web searches, or explaining concepts the user doesn't have vault notes about.
-argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
+argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>] | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
 ---
 
 # arc-maintaining-obsidian
 
-One skill, three modes — the LLM incrementally builds and maintains a persistent, compounding wiki. The human curates sources, asks questions, and directs analysis. The LLM does all the bookkeeping.
+A **vault interface**: the skill resolves which Obsidian vault to operate on, reads that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema), and dispatches the requested action. Different vaults serve different domains — wiki / news / project tracker / journal / etc. — and the contract files declare each vault's specific behavior. The skill stays domain-agnostic; presets bootstrap new vaults into a chosen domain.
 
-The core insight: wikis die from maintenance burden, not lack of content. This skill eliminates that burden by handling ingest, query, and lint as a single agent with shared vault awareness.
+The skill owns: vault resolution + registry, init-vault bootstrap workflow, generic ingest/query/audit pipelines, mechanical primitives (sha256 hashing, LINK/LINT/GROW algorithms, search routing). Each vault's AGENTS.md + SCHEMA.md owns: types, thresholds, taxonomy, language policy, citation rules.
 
 ## Mode Selection
 
-Determine the mode from user intent:
+Three universal vault actions — every vault grows (ingest), reads (query), and benefits from periodic health checks (audit). Determine the mode from user intent:
 
 | User Intent | Mode | Pipeline |
 |---|---|---|
@@ -20,79 +20,102 @@ Determine the mode from user intent:
 | Ask, search, "what do I know about", query | **query** | Orient → Search → Read → Synthesize → (File Back) |
 | Audit, link, lint, grow, "check my vault" | **audit** | LINK → LINT → GROW |
 
-When intent is ambiguous, ask: "Do you want to create a note, search your vault, or run an audit?"
+**Bare invocation** (no mode argument, no clear intent) — do **not** ask "which mode?" blindly. Run Domain Contract Orientation first, then respond with what this vault is and what's available. Example response shape:
+
+```
+Operating on: <vault name>
+Scope: <one-line scope from AGENTS.md>
+Types: <comma-separated note types declared in SCHEMA.md>
+Last activity: <most recent log.md entry>
+Available: ingest, query, audit. What would you like to do?
+```
+
+Only ask "ingest / query / audit?" when the user's intent words exist but are ambiguous (e.g., "I want to do something with my vault").
 
 ### Help
 
-If the argument is `help`, display this usage summary and stop:
+If the argument is `help`, display this summary and stop:
 
 ```
-arc-maintaining-obsidian — Obsidian wiki lifecycle manager
+arc-maintaining-obsidian — vault interface for Obsidian-based knowledge bases
 
-INGEST (create notes):
-  ingest <url>              Ingest URL as Source note (paper auto-detected)
-  ingest <text>             Classify and create from description
-  ingest --batch            Batch ingest a folder of raw files
-  ingest --link             Create + immediately resolve wikilinks
+REGISTRY-LEVEL (manage the vault registry; vault-agnostic):
+  help                                Print this help
+  list-vaults                         Show registered vaults
+  init-vault <path> --name <name> [--preset=<name>]
+                                      Bootstrap a new vault from a preset:
+                                        minimal | llm-wiki | news | project-tracker
+  register <path> --name <name>       Register existing vault [--default sets default]
+  unregister <name>                   Remove from registry (files untouched)
+  set-default <name>                  Change default vault
 
-QUERY (search vault):
-  query <question>          Search vault and synthesize answer
-  "what do I know about X"  Natural language query
+VAULT-LEVEL (operate on a resolved vault; respect --vault=<name>):
+  ingest <url|text> [--batch] [--link]   Create notes from sources
+  query <question>                       Search & synthesize from vault
+  audit [link|lint|grow]                 Vault health (LINK + LINT + GROW + vault-declared)
 
-AUDIT (vault health):
-  audit                     Run all three: LINK → LINT → GROW
-  audit link                Resolve plain-text mentions → wikilinks
-  audit lint                Schema check + rebuild index.md
-  audit grow                Gap analysis and suggestions
-
-REGISTRY (manage known vaults):
-  init-vault <path> --name <name>    Fast-adopt: AGENTS.md + CLAUDE.md + register + seed
-  register <path> --name <name>      Register existing vault [--default sets default]
-  list-vaults                        Show registered vaults
-  unregister <name>                  Remove from registry (does NOT delete files)
-  set-default <name>                 Update default vault
-
-GLOBAL FLAG (any mode):
+GLOBAL FLAG (any vault-level mode):
   --vault=<name>            Override vault auto-resolution
 
-Also accepts natural language: "file this back", "check my vault", "save this insight"
+BARE INVOKE (no mode):
+  Run Domain Contract Orientation, then respond with what this vault is
+  (name, scope, declared types, last activity) and ask what to do.
+
+Also accepts natural language: "file this back", "check my vault", "save this insight",
+"what's in this vault", etc.
 ```
 
 ### Mode Entry Gate
 
-Each mode depends on reference knowledge that isn't in the SKILL.md body — extraction methods, search strategies, audit checks. Reading the wrong reference (or none) causes cascading errors: wrong schemas, skipped pipeline steps, mishandled sources.
+Each mode depends on **mechanism references** the skill ships, plus the **vault contract** (AGENTS.md + SCHEMA.md). Read in this order:
 
-Before executing any mode, read its reference file:
-
-| Mode | Read first | What it provides |
+| Mode | Read first (mechanism) | Then (vault contract) |
 |---|---|---|
-| **Ingest** | `references/page-templates.md` | Frontmatter schemas, extraction methods per file type, Raw Source ingest flow |
-| **Query** | `references/search-strategies.md` | Search strategy by question type, output format adaptation |
-| **Audit** | `references/audit-checks.md` | Full check list, GROW thresholds, EVOLVE checks |
+| **Ingest** | `references/page-templates.md` (Raw Source mechanism, sha256, extraction methods) | `AGENTS.md` (runtime rules) + `SCHEMA.md` (types, frontmatter, body templates) |
+| **Query** | `references/search-strategies.md` (route selection, output adaptation) | `AGENTS.md` (scope, citation rules) + `SCHEMA.md` (types — for type-aware grouping) |
+| **Audit** | `references/audit-checks.md` (LINK/LINT/GROW primitives, Source Drift, vault-declared LINT) | `AGENTS.md` (thresholds, taxonomy, declared LINT) + `SCHEMA.md` (schema compliance target) |
 
-This is a gate, not a suggestion — the reference file contains information the mode needs to execute correctly. Skip it and you'll improvise schemas, miss pipeline steps, or use the wrong extraction method.
+The skill's `references/` files describe **mechanism** (algorithms, tool routing); vault AGENTS.md + SCHEMA.md describe **domain** (what types exist, what rules apply). The vault contract wins where they overlap.
 
 ## Shared Context
 
 ### Vault Resolution
 
-The skill supports multiple registered vaults — each with its own AGENTS.md schema, QMD collection, and topic scope. On every invocation, resolve which vault to operate on using this 5-step cascade:
+The skill supports multiple registered vaults. On every invocation, resolve which vault to operate on using this 5-step cascade:
 
 1. **Explicit override** — if the invocation includes `--vault=<name>`, use that vault. Skip remaining steps.
-2. **Active Obsidian** — run `obsidian-cli vault`. If the returned `path` matches a vault in the registry, use that vault. Print `Operating on: <name> vault` so the user can abort if wrong.
+2. **Active Obsidian** — run `obsidian-cli vault`. If the returned `path` matches a registry entry, use it. Print `Operating on: <name> vault` so the user can abort if wrong.
 3. **Session cache** — if step 2 didn't resolve but the session has already picked a vault on a prior turn, reuse it.
 4. **Default** — if the registry has a `default` key, use that vault. Print resolved name.
 5. **Ask** — if registry is empty or has no default, prompt the user with the list of registered vaults.
 
-Once resolved, the vault choice is sticky for the session unless `--vault` overrides it.
+Once resolved, the choice is sticky for the session unless `--vault` overrides it.
 
-**First-run state:** If `~/.arcforge/obsidian-vaults.json` does not exist or has zero registered vaults, do NOT fall through to ad-hoc file writes. Instead, suggest `arc-maintaining-obsidian init-vault <path> --name <name>` (for a fresh wiki) or `register <path> --name <name>` (for an existing vault) before running any ingest/query/audit operation. Adoption flows through the registry, not around it.
+**First-run state:** If `~/.arcforge/obsidian-vaults.json` does not exist or has zero registered vaults, do NOT fall through to ad-hoc file writes. Suggest `init-vault <path> --name <name> --preset=<name>` (bootstrap from a preset) or `register <path> --name <name>` (existing vault, author AGENTS.md + SCHEMA.md manually) before any operation.
 
-If Obsidian is not running for step 2, fall back to step 3 (session cache) → step 4 (default) → step 5 (ask). Warn once that LINK resolution and live search require the Obsidian CLI to be reachable.
+If Obsidian is not running for step 2, fall back to step 3 → step 4 → step 5. Warn once that LINK resolution and live search require the Obsidian CLI.
+
+### Domain Contract Orientation
+
+After resolving the vault and BEFORE entering any mode, read the **paired contract**:
+
+1. Read `<vault>/AGENTS.md` — agent runtime contract: scope, language policy, tag taxonomy, audit thresholds, citation rules, schema authority meta-rules.
+2. Read `<vault>/SCHEMA.md` — domain schema: note types, frontmatter fields, body templates, Visual Guidance per type.
+3. If AGENTS.md declares an index path, read `<vault>/index.md`.
+4. If AGENTS.md declares a log path, read the **last 20-30 entries** of `<vault>/log.md`.
+5. Treat AGENTS.md + SCHEMA.md as authoritative. The skill's `references/` files are mechanism only; the vault contract wins where they overlap.
+
+The two files are paired and required:
+
+| Missing | Bare invoke / `query` / `help` | `ingest`, `audit` (mutating) |
+|---|---|---|
+| **AGENTS.md missing** | Allow with warning: "vault has no AGENTS.md — running with skill defaults only." Bare invoke prints stub orientation (registry entry only). | **Block.** Suggest: run `init-vault <path> --name <name> --preset=<name>` or author the contract manually. |
+| **SCHEMA.md missing** | Allow with warning: "vault has no SCHEMA.md — type-aware behavior degraded." | **Block.** Without SCHEMA.md the skill can't classify (ingest) or validate schema compliance (audit). |
+| **AGENTS.md ↔ SCHEMA.md conflict** | Stop and ask the user before any mode runs. Per AGENTS.md schema authority rules, conflicts are not auto-resolved. | Same — block until user clarifies. |
 
 ### Registry Maintenance
 
-The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill manages this file end-to-end — users never hand-edit it.** Schema:
+The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill manages this file end-to-end — never hand-edit.** Schema:
 
 ```json
 {
@@ -102,71 +125,110 @@ The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill mana
       "name": "<short-name>",
       "path": "<absolute path to vault root>",
       "qmd_collection": "obsidian-<short-name>",
-      "scope": "<one-line scope statement>"
+      "scope": "<one-line scope statement>",
+      "preset": "<preset-name-used-at-init>"
     }
   ]
 }
 ```
 
-Maintenance subcommands (all are skill-driven; the LLM reads/writes the JSON via standard file tools and the `obsidian:obsidian-cli` skill):
+Maintenance subcommands (LLM-driven via standard file tools and `obsidian:obsidian-cli`):
 
 | Subcommand | Behavior |
 |---|---|
-| `init-vault <path> --name <name>` | Fast-adopt path. Validates `<path>` is a directory. Writes a starter `AGENTS.md` from `references/agents-md-template.md` (substituting `<YYYY-MM-DD>`, `<Vault Name>`, `<auto-set by init-vault>`). Writes `CLAUDE.md` shim. Adds entry to registry. Creates QMD collection `obsidian-<name>`. Runs `audit lint` once to seed `index.md`. Prints next-step reminders (fill `<TODO ...>` markers in AGENTS.md). |
-| `register <path> --name <name> [--default]` | Adds an existing populated vault to the registry. Validates path contains `.md` files. Optionally creates the QMD collection (ask user if not already created). If `--default`, sets the registry default. **Does NOT auto-write AGENTS.md** for already-populated vaults — prints a reminder: *"Vault registered. Author AGENTS.md at `<path>/AGENTS.md` before first ingest."* |
-| `list-vaults` | Prints registered vaults (name, path, default marker, QMD collection). |
-| `unregister <name>` | Removes the entry from `vaults`. If the unregistered name was the `default`, clears the default key. Prompts: *"Also remove QMD collection `obsidian-<name>`? Vault files at `<path>` will NOT be touched."* |
-| `set-default <name>` | Updates the `default` key. Errors if `<name>` not registered. |
+| `init-vault <path> --name <name> [--preset=<name>]` | Run the **init-vault Bootstrap** workflow below. |
+| `register <path> --name <name> [--default]` | Adds an existing populated vault. Validates path. Optionally creates QMD collection. **Does NOT auto-write AGENTS.md or SCHEMA.md** — prints reminder: *"Vault registered. Author AGENTS.md (runtime contract) + SCHEMA.md (domain schema) at `<path>/` before first ingest/audit."* |
+| `list-vaults` | Prints registered vaults (name, path, default marker, preset, QMD collection). |
+| `unregister <name>` | Removes the entry. If `default` was the unregistered name, clears default. Prompts: *"Also remove QMD collection `obsidian-<name>`? Vault files at `<path>` untouched."* |
+| `set-default <name>` | Updates `default`. Errors if `<name>` not registered. |
 
-**Never hand-edit `obsidian-vaults.json`.** The file is skill-managed because:
-- The schema is small but error-prone (typos in path break Vault Resolution silently).
-- Registry mutations should be paired with side effects (QMD collection create/destroy, AGENTS.md template write, audit lint seed) — `init-vault` and `unregister` bundle these atomically.
-- A user who hand-edits today drifts from the schema tomorrow when fields are added.
+To inspect a registered vault without switching to it, use **bare invoke** with `--vault=<name>` — Domain Contract Orientation runs and prints the named vault's name / scope / types / last activity, no mode entered.
 
-If the registry file is missing or malformed, the skill recreates it from scratch via the next `register` or `init-vault` invocation rather than guessing.
+**Why never hand-edit `obsidian-vaults.json`:** the schema is small but error-prone; mutations should be paired with side effects (preset write, QMD collection lifecycle, audit lint seed); a user who hand-edits today drifts from schema tomorrow when fields are added.
+
+### init-vault Bootstrap
+
+When the user runs `init-vault <path> --name <name>`, run this multi-step workflow. The skill drives the conversation; do not skip steps.
+
+1. **Validate path.** Confirm `<path>` exists and is a directory. Refuse if it's already in the registry, or already contains `AGENTS.md` (would overwrite) — direct the user to `register` instead.
+
+2. **Pick preset.** If `--preset=<name>` was supplied, use it. Otherwise list options and ask:
+
+   | Preset | Best for |
+   |---|---|
+   | `minimal` | Empty scaffold; you'll author types from scratch. |
+   | `llm-wiki` | Karpathy-style second brain (Source / Entity / Synthesis / MOC / Decision / Log). |
+   | `news` | News pipeline: article ingest + daily / weekly aggregates. |
+   | `project-tracker` | Tasks / Milestones / Decisions / Sprints. |
+
+   Each preset ships under `presets/<name>/AGENTS.md` + `presets/<name>/SCHEMA.md` in this skill. **Presets are one-shot authoring guidance, not stamping templates** — read them to understand the shape, then author the user's vault contract with their actual values.
+
+3. **Ask preset-specific minimal questions.** Common questions for any preset:
+   - Vault scope statement (one line — what this vault owns).
+   - QMD collection name (default `obsidian-<name>`).
+   - Bilingual? (only if the preset supports it; e.g., llm-wiki may go bilingual or mono).
+
+   Preset-specific questions live in the preset's `AGENTS.md` as `<TODO ...>` markers — surface them and prompt.
+
+4. **Author `<path>/AGENTS.md`.** Read `presets/<preset>/AGENTS.md` to understand the canonical shape of this domain's runtime contract — Schema Authority baseline, identity, language policy, tag taxonomy, audit thresholds, etc. Then **write a fresh AGENTS.md** for the user's vault, filling in their actual values from the questions above (real `name`, real `scope`, real language choice — not placeholder strings). The preset is **one-shot reading guidance**, not a template to copy verbatim. Skip preset sections that don't apply to the user's situation (e.g., if user said monolingual, drop the bilingual block); rephrase or extend where the user's case warrants.
+
+5. **Author `<path>/SCHEMA.md`.** Same pattern: read `presets/<preset>/SCHEMA.md` for the canonical type set + frontmatter + Visual Guidance shapes, then **author** the user's SCHEMA.md with their actual choices. Leave `<TODO ...>` markers ONLY for fields the user explicitly deferred (tag taxonomy details, custom-type additions). Do not leave unsubstituted placeholders like `<Vault Name>` in the written file — those are pedagogical aids in the preset, not literal output.
+
+6. **Write `<path>/CLAUDE.md` shim** — a one-paragraph redirect: "This vault uses arc-maintaining-obsidian; see AGENTS.md for runtime contract and SCHEMA.md for note-type schema."
+
+7. **Seed `<path>/index.md`** — empty starter:
+   ```markdown
+   # <Vault Name> Index
+   Last updated: YYYY-MM-DD
+   ```
+
+8. **Seed `<path>/log.md`** — first entry:
+   ```
+   ## [YYYY-MM-DD] init-vault | preset=<preset> name=<name>
+   ```
+
+9. **Register in `~/.arcforge/obsidian-vaults.json`** — add the entry (name, path, qmd_collection, scope, preset). If this is the first vault, set as default automatically and tell the user.
+
+10. **Create QMD collection** — ask user (default yes): `qmd create -c obsidian-<name>`. If declined, note that semantic search won't work until they enable it later.
+
+11. **Print available commands** — ingest / query / audit + a one-line note that bare invocation gives a vault summary anytime.
+
+If any step fails, undo prior steps when reasonable (don't leave half-written files in the user's vault) and report the failure clearly.
 
 ### Vault Structure — Two Layers
 
-The vault has two layers of content. Never mix them:
+Generic pattern (vault AGENTS.md / SCHEMA.md may extend or replace):
 
-**Raw Sources (`Raw/` and format-specific folders like `Excalidraw/`)** — Immutable originals. Articles, PDFs, screenshots, Excalidraw drawings, HTML exports. The LLM reads but never modifies. These are the source of truth.
+**Raw Sources** (`Raw/` and format-specific folders) — Immutable originals when the vault adopts the Raw Source pattern (most knowledge-base presets do). The LLM reads but never modifies these. Whether a vault uses this pattern is declared in its AGENTS.md.
 
-**Wiki Layer (everything else)** — LLM-generated typed notes with frontmatter schema. Source notes, Entity notes, Synthesis notes, MOCs, Decisions. The LLM owns this layer entirely.
+**Wiki / Domain Layer** (everything else) — Typed notes per the vault's SCHEMA.md.
 
-When a Raw Source is ingested, the original stays where it is — a new Source note is created in the wiki layer with `source_url` pointing back to the original. Knowledge flows from Raw → Wiki as text.
-
-**First-time setup:** If the vault has no `Raw/` folder or has Raw Sources scattered outside it, note this in the audit report but do not reorganize — the user decides folder structure. The skill works with Raw Sources wherever they are.
+When a Raw Source is ingested, the original stays where it is — a new typed note is created with `source_url` pointing back. Knowledge flows Raw → Wiki as text. See `references/page-templates.md` for the Raw Source frontmatter schema, sha256 hashing rule, extraction methods, and Paper URL chain.
 
 ### Session Log
 
-After every operation (create, query, or audit), append to `log.md` in vault root:
+After every operation, append to `log.md` in vault root:
 
 ```
 ## [YYYY-MM-DD] <operation> | <detail>
 ```
 
-Operations: `create | [type] | [filename]`, `query | [question summary]`, `audit | [scope]`
+Operations: `create | [type] | [filename]`, `query | [question summary]`, `audit | [scope]`, `drift | [filename]`, `init-vault | preset=<preset>`.
 
-This dual-write pattern serves two audiences: `log.md` for LLM scanning (`grep "^## [" log.md | tail -10`), daily notes for human browsing via `obsidian-cli daily:append`.
-
-**Daily notes folder:** `daily:append` respects Obsidian's Daily Notes plugin settings (folder, date format). On first use in a session, verify the plugin is configured: `obsidian eval code="app.internalPlugins.plugins['daily-notes']?.instance?.options?.folder"`. If it returns a folder path, daily:append will write there. If unconfigured or the plugin is disabled, skip daily:append and log to `log.md` only — do not create date-stamped files at vault root.
+Dual-write: `log.md` for LLM scanning (`grep "^## [" log.md | tail -10`), daily notes for human browsing via `obsidian-cli daily:append`. On first use in a session, verify the Daily Notes plugin is configured: `obsidian eval code="app.internalPlugins.plugins['daily-notes']?.instance?.options?.folder"`. If unconfigured, skip daily:append and log to `log.md` only.
 
 ### Delegation
 
-**Search:** Prefer QMD — it provides hybrid search (keyword + semantic + reranking) that finds both exact matches and conceptually related notes. Fall back to `obsidian-cli search` (keyword only) when QMD is unavailable. Read `references/search-strategies.md` Route Selection on first search to confirm availability, then follow the active route for all operations: query, propagate, LINK resolution, and index sync. The QMD route includes an Index Sync step (`qmd update && qmd embed`, ~3s incremental) that runs after each ingest or audit cycle to keep newly created notes searchable.
+**Search:** Prefer QMD (hybrid keyword + semantic + reranking). Fall back to `obsidian-cli search` (keyword only). Read `references/search-strategies.md` Route Selection on first search; the QMD route includes `qmd update && qmd embed` (~3s incremental) after each ingest or audit.
 
-**Read/Write (vault operations):**
-- Vault operations (read, create, append, properties) → `obsidian:obsidian-cli`
+**Read/write:**
+- Vault operations → `obsidian:obsidian-cli`
 - Markdown formatting → `obsidian:obsidian-markdown`
 - Canvas creation → `obsidian:json-canvas`
 - Excalidraw diagrams → `arc-diagramming-obsidian`
 - URL content extraction → `obsidian:defuddle` (Defuddle first, WebFetch only for APIs/raw text)
 
-**obsidian-cli path safety:** Use `file=` (name-based, like wikilinks) for notes with special characters (`&`, spaces, CJK). Use `path=` only for clean paths without shell-sensitive characters.
-
-**obsidian-cli pipe safety:** Never pipe `obsidian read` through `head` or `tail` — the CLI doesn't handle SIGPIPE and the process hangs indefinitely. Read the full output without piping, or use the Read tool with the vault filesystem path for partial reads.
-
-**obsidian-cli create syntax:** `create` uses `name=` (filename only, no slashes) or `path=` (full path with folder). Never use `file=` with create — it's silently ignored and produces `Untitled.md`. For subfolder placement: `obsidian create path="ai/My-Note.md" content="..."`. Use `name=` only for vault-root notes without subdirectories.
+**obsidian-cli path safety:** `file=` (name-based, like wikilinks) for notes with special characters; `path=` only for clean paths. Never use `file=` with `create` (silently ignored, produces `Untitled.md`). For subfolder placement: `obsidian create path="folder/My-Note.md" content="..."`. Never pipe `obsidian read` through `head`/`tail` — the CLI doesn't handle SIGPIPE and hangs.
 
 ## Mode: Ingest
 
@@ -178,135 +240,92 @@ Classify → Confirm → Create → Visuals → Index → Propagate → Log
 
 ### Classify
 
-Determine which of 6 page types fits the user's input. Use judgment, not keyword matching.
-
-| Type | Trigger Signal |
-|---|---|
-| **Source** | User shares URL, article, paper, reference material |
-| **Entity** | User discusses person, tool, concept, company, framework |
-| **Synthesis** | User connects ideas, asks "how does X relate to Y" |
-| **MOC** | User wants topic overview, asks "what do I know about X" |
-| **Decision** | User weighs trade-offs, compares options, announces choice |
-| **Log** | User captures something timestamped — meeting notes, events |
-
-Read `references/page-templates.md` for full frontmatter schema and templates for each type.
-
-**Paper detection:** When the source is a PDF with Abstract/References sections, or the user says "paper"/"論文", use the **Paper variant** of the Source template (see `references/page-templates.md`). Paper variant adds: `reading_status`, `methodology`, `venue`, `year`, `cites`, `cited_by`, and a structured Claims section. Default `reading_status` to `queued` if user just drops the paper without discussion, `deep-read` if they ask for analysis.
+Determine which note type the user's input fits. The set of types comes from the vault's SCHEMA.md. Use judgment, not keyword matching. If the vault declares specialized types (Paper variant, DailyAggregate, Sprint, etc.), follow their detection criteria.
 
 ### Confirm
 
 Tell the user: "This looks like a **[type]** note — agree?" Wait for confirmation.
 
-**Fast path:** Skip when classification is unambiguous (e.g., "log this meeting" → Log). When in doubt, confirm — false confidence wastes more time than one extra question.
+**Fast path:** Skip confirmation when classification is unambiguous. When in doubt, confirm — false confidence wastes more time than one extra question.
 
 ### Create
 
-Apply the template from `references/page-templates.md`, write to vault. Write relationships as plain text, not wikilinks — Propagate and audit mode resolve these later.
+Apply the type's template from vault SCHEMA.md, write to vault. Write relationships as plain text, not wikilinks — Propagate and audit mode resolve these later. Honor the vault's language policy per AGENTS.md.
 
-**Raw Source Ingest — Raw first, wiki second.** When the source is a URL, file, or non-Markdown artifact, the pipeline has two distinct writes:
+#### Raw Source Ingest (when the vault adopts the pattern)
 
-1. **Save the raw content** to `Raw/` (or leave it where it is if already in the vault). This is the immutable original — the thing you can diff against later when the source is updated.
-2. **Create the wiki Source note** with `source_url` pointing back to the Raw file. This is your summary and extraction — the wiki layer's interpretation of the original.
+If the vault's AGENTS.md declares Raw Source adoption, ingest of a URL / file / non-Markdown artifact is two distinct writes:
 
-Skipping step 1 and writing directly to the wiki layer conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `references/page-templates.md` for extraction methods per file type and the exact `source_url` schema.
+1. **Save the raw content** to `Raw/` (or leave it if already in the vault). Immutable original.
+2. **Create the typed wiki note** with `source_url` pointing back, plus `sha256` of the body bytes after frontmatter.
+
+Skipping step 1 conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later.
+
+See `references/page-templates.md` for the Raw Source frontmatter schema, the **hash body after frontmatter** rule (UTF-8, line endings normalized to `\n`), re-ingest behavior (drift detected → prompt before overwrite), and extraction methods per file type.
+
+If the vault does NOT adopt the Raw Source pattern (e.g., project-tracker may not), Create writes only the typed note and skips the immutable-original step.
 
 ### Visuals
 
-After creating the note, assess whether it benefits from visual elements. This step reads the note content you just wrote and applies a decision framework — you need the content to exist before you can judge its structure.
-
-**Decision tree:**
+After creating the note, decide whether it benefits from visual elements. Vault SCHEMA.md may declare per-type Visual Guidance — follow it. Generic decision tree (use when the vault is silent on the type):
 
 ```
 Q1: Does the raw source contain an image or diagram?
-    → Yes → Embed reference: ![[filename.png]] in the note body. Always do this — no judgment needed.
-    → No  → Continue to Q2.
-
+    → Yes → Embed: ![[filename]]. Deterministic — no judgment needed.
+    → No  → Continue.
 Q2: Does the note content have 3+ named entities with directional relationships?
     → No  → Skip visuals. Text is sufficient.
-    → Yes → Continue to Q3.
-
-Q3: Is the insight primarily ABOUT how entities relate — hierarchies, flows,
-    cycles, dependencies, abstraction layers, pipelines, or state transitions?
-    Test: if you removed the relationship description from the prose, would
-    the insight collapse? If yes, the shape IS the insight.
-    → Yes → Mermaid by default. Continue to Q4 only if considering Excalidraw.
-    → No  → The content is explanatory (definitions, reasoning, narrative).
-             Skip visuals — text carries explanations better than diagrams.
-
-Q4: Is the spatial/architectural layout complex enough to warrant manual
-    positioning (freeform architecture sketches, not auto-layoutable graphs)?
+    → Yes → Continue.
+Q3: Is the insight ABOUT how entities relate (hierarchies, flows, cycles, dependencies)?
+    Test: if you removed the relationship description, would the insight collapse?
+    → Yes → Mermaid by default. Continue to Q4 only if Excalidraw seems warranted.
+    → No  → Explanatory content; skip visuals.
+Q4: Is the spatial/architectural layout complex enough to warrant manual positioning?
     → No  → Stay with Mermaid (text-based, diffable, LLM-generatable).
-    → Yes → Suggest Excalidraw delegation to user: "This has complex spatial
-             layout — want me to create an Excalidraw diagram?" Do not auto-create.
+    → Yes → Suggest Excalidraw delegation: "This has complex spatial layout — want me to create an Excalidraw diagram?" Do not auto-create.
 ```
 
 **Tier outputs:**
 
-| Tier | Output | When | LLM Judgment? |
+| Tier | Output | When | LLM judgment? |
 |---|---|---|---|
-| **Embed** | `![[image.png]]` in note body | Raw source has image/diagram | No — deterministic |
-| **Mermaid** | Fenced `mermaid` block in note | 3+ entities with relationships | Yes — conservative |
+| **Embed** (Markdown) | `![[image.png]]` in note body | Raw source has image/diagram | No — deterministic |
+| **Mermaid** | Fenced `mermaid` block | 3+ entities with relationships | Yes — conservative |
 | **Canvas** | Separate `.canvas` file | MOC with 8+ notes in scope | Yes — suggest to user |
 | **Excalidraw** | Delegate to `arc-diagramming-obsidian` | Complex spatial/architectural content | Yes — suggest to user |
 
-**Default behavior, not conservative skipping:**
-
-The decision tree should produce a clear answer for most notes. Two common failure modes to avoid:
-
-1. **Over-generation** — adding Mermaid to purely explanatory content (definitions, reasoning, narratives). A bullet list is faster to read than a diagram for these.
-2. **Under-generation** — skipping Mermaid when the content IS relational because you're "not 100% sure." For relational content (Q3 = yes), the shape carries the insight — prefer Mermaid even under uncertainty.
-
-If you reach Q3 = yes, generate Mermaid. Do not second-guess with "but text could also work" — text always *could* work, the question is whether the shape communicates faster. Mermaid is cheap: text-based, easy to revise, costs only a few tokens. Canvas and Excalidraw are the expensive tiers that wait for user approval.
-
-**Placement:** See `references/page-templates.md` Visual Guidance sections for where each visual type goes within each note template (inside/outside callouts, which section).
+If you reach Q3 = yes, generate Mermaid. Do not second-guess with "but text could also work" — the question is whether the shape communicates faster. Mermaid is cheap; Canvas and Excalidraw are expensive tiers that wait for user approval.
 
 ### Index
 
-Add the new note to `index.md` — the vault's table of contents. Every new note gets registered in the catalog so subsequent queries and human browsing reflect the current state.
+Add the new note to `index.md`. Read it, find the section matching the note's type (per SCHEMA.md), add `- [[Note Title]] — one-line summary`, update `Last updated:`. No user confirmation (this is catalog registration, not a content decision). If `index.md` doesn't exist, suggest: *"No index yet — run audit lint to generate one."*
 
-1. Read `index.md`, find the section matching the note's type (Sources, Entities, Syntheses, MOCs, Decisions)
-2. Add one line: `- [[Note Title]] — one-line summary`
-3. Update the `Last updated:` date
-4. Write directly — no user confirmation needed (this is catalog registration, not a content decision)
-
-If `index.md` doesn't exist, suggest: *"No index yet — run audit lint to generate one, or I can create a starter index now."*
-
-Audit LINT does a full index rebuild (scanning all notes). This step does an incremental add — one note at a time, keeping the index current between audits.
+Audit LINT does the full rebuild; this step is the incremental add.
 
 ### Propagate
 
-After creating the new note, update related existing pages — one source typically touches 5-15 pages across the wiki.
+After creating the new note, update related existing pages — one source typically touches a handful of pages.
 
-1. **Search** — Find vault pages related to the new note's concepts (see search-strategies.md, Propagate section for the active route)
-2. **Match** — Determine what each related page needs:
+1. **Search** for vault pages related to the new note's concepts (see search-strategies.md, Propagate section).
+2. **Match** — the actions per related page type are vault-specific (see vault SCHEMA.md / AGENTS.md).
+3. **Propose** — present all updates in one summary: *"This source would update N pages: [[Page A]] (...), [[Page B]] (...). Apply all / select / skip?"*
+4. **Apply** approved updates.
 
-| Existing Page Type | Update Action |
-|---|---|
-| Entity | Add new properties or relationships from the source |
-| Synthesis | Add new evidence (supporting or contradicting) |
-| MOC | Add the new note if it matches the MOC's scope |
-| Source | Cross-reference if both discuss same topic |
-
-3. **Propose** — Present all updates in one summary: *"This source would update 3 pages: [[Docker]] (new security properties), [[Container Security]] (new evidence), [[DevOps MOC]] (add to index). Apply all / select / skip?"*
-4. **Apply** — User approves (all, some, or none) → apply approved updates
-
-**Contradiction detection:** During step 2, if new source claims conflict with existing page content, flag: *"⚠️ Conflict: new source says X, [[Entity]] says Y — update, keep existing, or note both?"*
+**Contradiction detection:** If new claims conflict with existing page content, flag: *"⚠️ Conflict: new source says X, [[Entity]] says Y — update, keep existing, or note both?"*
 
 **Scope guard:** Cap at 10 pages per ingest. If more related, update top 10 by relevance, report: *"10 pages updated, N more potentially related — run audit for full pass."*
 
-**Citation-aware propagation (papers only):** For paper Source notes at `deep-read` or `extracted` status, Propagation has an additional step: parse the `## Related Work (Graph Seeds)` section for cited paper titles. For each cited paper, search the vault — if found, add a `[[wikilink]]` to the new paper's `cites:` and update the found paper's `cited_by:`. If not found, leave as plain text in `cites:` — audit GROW will surface high-impact missing papers later.
-
-**Claim-level contradiction (papers only):** During Propagation step 2, if the new paper's Claims conflict with Claims in existing paper Source notes, flag at claim level: *"⚠️ Paper A claims X (strong evidence), but [[Paper B]] claims Y (moderate evidence) — mark contested on both?"* Update claim `Status` fields on approval.
+Vault AGENTS.md may declare additional propagation rules (e.g., citation-aware propagation for paper types). Honor them.
 
 ### Special Modes
 
-**Query-as-Ingest:** When user says "file this back," "save this insight," "crystallize this" — skip Classify. Context determines type: trade-off → Decision, otherwise → Synthesis. Go straight to Create.
+**Query-as-Ingest:** When user says "file this back," "save this insight," "crystallize this" — skip Classify. Context determines type per vault contract (typically Synthesis or Decision in LLM-Wiki vaults; might be a Reflection in journal vaults). Go straight to Create.
 
-**Batch mode (`--batch`):** Process a folder of raw files with fast-path-only classification. Skip Confirm unless ambiguous. **Skip Index and Propagate during batch** — audit LINT rebuilds the full index afterward: *"Batch complete: N notes created. Run audit to link, index, and propagate?"*
+**Batch mode (`--batch`):** Process a folder of raw files with fast-path classification. **Skip Index and Propagate during batch** — audit LINT rebuilds afterward: *"Batch complete: N notes created. Run audit to link, index, and propagate?"*
 
-**Parallel batch caveat:** When batch ingest uses parallel agents (e.g., 4 agents ingesting 7 papers simultaneously), each agent cannot cross-reference notes being created by other agents — they don't exist yet. This leaves `cites:`/`cited_by:` fields as plain text for vault papers being created in the same batch. A post-batch `audit link` pass is **mandatory** after parallel ingest to resolve these cross-references. State this explicitly when reporting batch completion.
+**Parallel batch caveat:** When parallel agents ingest in the same batch, cross-references between notes being created concurrently can't resolve (they don't exist yet). A post-batch `audit link` pass is **mandatory** to resolve them.
 
-**LINK-on-Create (`--link`):** After Create, trigger audit mode's LINK on the new note only for immediate graph connectivity.
+**LINK-on-Create (`--link`):** After Create, trigger audit LINK on the new note only for immediate graph connectivity.
 
 ## Mode: Query
 
@@ -316,18 +335,18 @@ After creating the new note, update related existing pages — one source typica
 Orient → Search → Read → Synthesize → (File Back)
 ```
 
-1. **Orient** — Read `index.md` for vault map. If none exists, suggest: *"No index — run audit lint to generate one."*
-2. **Search** — Search the vault using the active route. Read `references/search-strategies.md` for strategy by question type.
+1. **Orient** — Read `index.md` for the vault map. If none exists, suggest: *"No index — run audit lint to generate one."*
+2. **Search** — Use the active route (see `references/search-strategies.md`).
 3. **Read** — Drill into matching notes. Read frontmatter first (understand type), then content. Follow `sources:` arrays for provenance.
 4. **Synthesize** — Answer with inline `[[citations]]`. Every key claim references its source note.
 
 Read `references/search-strategies.md` for output format adaptation (prose, tables, timelines, Marp, Canvas).
 
-**Vault-only answers — including surrounding commentary.** Never fall back to general knowledge, not just in the direct answer but in any framing, insights, or comparisons you provide around it. If the vault has notes on topic A but not topic B, don't fill in B from general knowledge and present a comparison — that creates a false sense of completeness. Instead, name the gap: *"Your vault covers A but has nothing on B. Want to add sources for B via ingest?"* Gaps feed the audit GROW cycle and are more valuable surfaced than papered over.
+**Vault-only answers — including surrounding commentary.** Never fall back to general knowledge, not just in the direct answer but in framing, insights, or comparisons. If the vault has notes on topic A but not topic B, don't fill in B from general knowledge — name the gap: *"Your vault covers A but has nothing on B. Want to add sources for B via ingest?"* Gaps feed the audit GROW cycle.
 
 ### File Back
 
-If the answer is substantive (comparison, analysis, discovered connection), suggest filing back: *"This connects several notes in a new way — file as a Synthesis note?"*
+If the answer is substantive (comparison, analysis, discovered connection), suggest filing back: *"This connects several notes in a new way — file as a Synthesis note?"* (Or whichever cross-cutting type the vault SCHEMA.md declares.)
 
 File Back triggers ingest mode internally — same skill, same context, no handoff. Uses Query-as-Ingest (skip Classify).
 
@@ -341,13 +360,11 @@ Always state your file-back decision: either suggest it, or explain why not (e.g
 LINK → LINT → GROW
 ```
 
-Invoke with arguments: `audit link`, `audit lint`, `audit grow`, or no argument for all three.
-
-Every audit sub-command (link, lint, grow, or full) produces an audit report note — this gives the user a persistent record of what was found and fixed, and allows future sessions to reference past audit results. Use the Audit Report template below. Name the file `audit-YYYY-MM-DD-<subcommand>.md`.
+Invoke with `audit link`, `audit lint`, `audit grow`, or no argument for all three. Every audit sub-command produces a typed audit report at `_audits/audit-YYYY-MM-DD-<scope>.md` so future sessions can reference past results.
 
 ### LINK — Resolve Relationships
 
-Scan notes with plain-text `## Relationships` sections. For each mention, search vault for matching titles/aliases. Replace with `[[wikilinks]]`, add backlinks to targets, update MOCs.
+Scan notes with plain-text `## Relationships` sections. For each mention, search vault for matching titles/aliases. Replace with `[[wikilinks]]`, add backlinks to targets, update MOCs (if the vault declares them).
 
 **Single-file mode (`audit link --file=<path>`):** Run on one note only — used by ingest's `--link` flag.
 
@@ -355,32 +372,28 @@ Only LINK modifies existing notes. LINT and GROW never modify.
 
 ### LINT — Health Check
 
-Read `references/audit-checks.md` for the full check list. Core checks: schema compliance, orphan detection, stale sources, tag hygiene, untyped notes, index.md generation, log.md consistency, and EVOLVE checks (field usage analysis, type fit analysis, tag drift).
+Read `references/audit-checks.md` for mechanical primitives: schema compliance (validates against vault SCHEMA.md), orphan detection, untyped notes, basic tag hygiene, **Source Drift** (sha256 mismatch — only for vaults adopting Raw Source pattern), and EVOLVE pattern detection (field usage, type fit, tag drift).
 
-**Verify before fix:** LINT findings are hypotheses, not facts. Before fixing any reported issue, read the actual file to confirm. Common false positive: YAML multi-line lists (`tags:\n  - a\n  - b`) look empty to line-by-line extraction but contain values on subsequent indented lines. Always verify frontmatter by reading the file, not by trusting extraction output.
+**Vault-declared LINT.** The audit pipeline reads vault AGENTS.md `## Audit Thresholds` and `## Tag Taxonomy` (and any other declared check sections) and applies the additional checks declared there. Treat vault thresholds as authoritative — the skill never invents numbers.
 
-**Broken wikilink resolution:** When LINT finds links to non-existent notes, choose based on context:
+**Verify before fix:** LINT findings are hypotheses, not facts. Before fixing any reported issue, read the actual file. Common false positive: YAML multi-line lists (`tags:\n  - a\n  - b`) look empty to line-by-line extraction but contain values on indented lines. Always verify frontmatter by reading the file, not by trusting extraction output.
+
+**Broken wikilink resolution:** when LINT finds links to non-existent notes:
 - **Has Raw Source backing** → create the entity via ingest (the link reflects real knowledge)
-- **No Raw Source, referenced from 3+ notes** → flag for user decision (may warrant a new source)
+- **No Raw Source, referenced from 3+ notes** → flag for user decision
 - **No Raw Source, referenced from 1-2 notes** → convert to plain text (preserves relationship without creating unsourced stubs)
-Never create stub entity notes without source backing — these were identified as an anti-pattern in prior audits.
 
-LINT generates/updates `index.md` in vault root — organized by page type, one wikilink per note with summary. This is what query mode reads first in Orient.
+Never create stub entity notes without source backing — this was identified as an anti-pattern in prior audits.
+
+LINT generates/updates `index.md` in vault root — organized per vault-declared note types. This is what query mode reads first in Orient.
 
 ### GROW — Gap Analysis
 
-Read `references/audit-checks.md` for thresholds. Two categories:
+Read `references/audit-checks.md` for generic gap patterns. Vault AGENTS.md declares the thresholds (synthesis triggers, entity triggers, MOC triggers, stale topic days, etc.) — honor those.
 
-**Internal** (create these artifacts):
-- 5+ sources on topic without synthesis → suggest synthesis
-- 3+ mentions without entity note → suggest entity
-- 8+ notes without MOC → suggest MOC
-- LINK failures (unresolved mentions) → suggest entity notes
+**Internal** suggestions create artifacts when patterns exceed declared thresholds.
 
-**External** (investigate these topics):
-- Topic with only 1-2 sources → suggest search terms for more
-- Synthesis with open questions → surface as research leads
-- Stale sources (>90 days) → suggest checking for updates
+**External** suggestions investigate topics (thin coverage, open questions in Synthesis notes, stale topics).
 
 GROW proposes — never auto-creates, never auto-fetches. User approves, then ingest mode creates.
 
@@ -390,7 +403,7 @@ Default: 50 most recently modified notes. Full scan: `--all`. Report scope at st
 
 ### Audit Report
 
-Save as typed vault note:
+Save as typed vault note at `_audits/audit-YYYY-MM-DD-<scope>.md`. The vault SCHEMA.md may declare an `audit-report` type with vault-specific extensions. The generic shell:
 
 ```yaml
 ---
@@ -418,8 +431,25 @@ tags: [audit]
 ```
 ✅ Audit complete → [audit-report-path]
 - LINK: resolved N relationships
-- LINT: found N issues
-- GROW: N suggestions (M internal, K external)
+- LINT: found N issues (M Source Drift)
+- GROW: N suggestions (P internal, Q external)
+```
+
+**Bare invoke (orient response):**
+```
+Operating on: [vault name]
+Scope: [one-line]
+Types: [list]
+Last activity: [latest log entry]
+Available: ingest, query, audit. What would you like to do?
+```
+
+**init-vault:**
+```
+✅ Bootstrapped [vault name] (preset: [preset])
+   Registered at: [path]
+   QMD collection: [obsidian-<name>] (or "skipped")
+   Next: ingest a source, run query, or check capabilities via bare invoke.
 ```
 
 ## Blocked Format
