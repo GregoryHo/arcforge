@@ -301,9 +301,10 @@ describe('observe: event shape on PreToolUse', () => {
     const entry = JSON.parse(lines[lines.length - 1]);
     assert.strictEqual(entry.event, 'tool_start');
     assert.strictEqual(entry.skill, 'arc-debugging');
-    assert.ok(entry.input.includes('arc-debugging'));
-    assert.ok(!entry.input.includes('private task details'));
-    assert.ok(!entry.input.includes('sk-12345'));
+    assert.ok(!('input' in entry), 'pre-event must not persist raw tool input');
+    assert.strictEqual(entry.semantic.skill_name, 'arc-debugging');
+    assert.ok(!JSON.stringify(entry).includes('private task details'));
+    assert.ok(!JSON.stringify(entry).includes('sk-12345'));
   });
 });
 
@@ -422,6 +423,117 @@ describe('observe: event shape on PostToolUse', () => {
     const entry = JSON.parse(lines[lines.length - 1]);
     assert.strictEqual(entry.outcome, 'error');
     assert.ok(!('skill' in entry), 'non-Skill calls must not record a skill field');
+  });
+});
+
+describe('observe: semantic summaries', () => {
+  beforeEach(() => {
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  it('classifies known bash command kinds without storing the command line', () => {
+    const { summarizeToolInput } = require('../observe/main');
+    assert.deepStrictEqual(summarizeToolInput('Bash', { command: 'npm test' }), {
+      tool: 'Bash',
+      payload_saved: false,
+      operation: 'shell',
+      command_kind: 'test',
+    });
+    assert.strictEqual(summarizeToolInput('Bash', { command: 'git status' }).command_kind, 'git');
+    assert.strictEqual(
+      summarizeToolInput('Bash', { command: 'npm run lint' }).command_kind,
+      'lint',
+    );
+  });
+
+  it('classifies file-targeted tools by path class without storing file path', () => {
+    const { summarizeToolInput } = require('../observe/main');
+    const summary = summarizeToolInput('Edit', { file_path: 'tests/scripts/foo.test.js' });
+    assert.strictEqual(summary.path_class, 'test');
+    assert.strictEqual(summary.file_kind, 'js');
+    assert.strictEqual(summary.payload_saved, false);
+    assert.ok(!('file_path' in summary), 'file path must not be persisted in summary');
+  });
+
+  it('maps unknown file suffixes to a bounded enum', () => {
+    const { summarizeToolInput } = require('../observe/main');
+    const summary = summarizeToolInput('Read', {
+      file_path: 'notes/customer-acme.secretprojectcodename',
+    });
+    assert.strictEqual(summary.file_kind, 'other');
+    assert.ok(!JSON.stringify(summary).includes('secretprojectcodename'));
+  });
+
+  it('records skill name in summary when tool is Skill', () => {
+    const { summarizeToolInput } = require('../observe/main');
+    const summary = summarizeToolInput('Skill', { skill: 'arc-debugging', args: 'private' });
+    assert.strictEqual(summary.skill_name, 'arc-debugging');
+    assert.ok(!('args' in summary), 'skill args must not be persisted in summary');
+  });
+
+  it('falls back to the unknown classifications when unfamiliar tool is supplied', () => {
+    const { summarizeToolInput } = require('../observe/main');
+    const summary = summarizeToolInput('SomeNewTool', { x: 1 });
+    assert.strictEqual(summary.operation, 'other');
+    assert.strictEqual(summary.payload_saved, false);
+  });
+});
+
+describe('observe: pre-event persists semantic summary', () => {
+  const originalEnv = { ...process.env };
+  let testDir;
+  let projectRoot;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-semantic-'));
+    projectRoot = path.join(testDir, 'project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    process.env.HOME = path.join(testDir, 'home');
+    process.env.CLAUDE_PROJECT_DIR = projectRoot;
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('writes a bounded semantic field on tool_start observations', () => {
+    const learning = require('../../scripts/lib/learning');
+    const sessionUtils = require('../../scripts/lib/session-utils');
+    const { spawnSync } = require('node:child_process');
+
+    learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+
+    const hookInput = {
+      session_id: 'sem-session',
+      hook_event_name: 'PreToolUse',
+      cwd: projectRoot,
+      tool_name: 'Bash',
+      tool_input: { command: 'npm test', description: 'run tests' },
+    };
+    const scriptPath = path.join(__dirname, '..', 'observe', 'main.js');
+    const result = spawnSync('node', [scriptPath, 'pre'], {
+      input: JSON.stringify(hookInput),
+      env: { ...process.env, HOME: process.env.HOME, CLAUDE_PROJECT_DIR: projectRoot },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+
+    const obsPath = sessionUtils.getObservationsPath(path.basename(projectRoot));
+    const lines = fs.readFileSync(obsPath, 'utf8').trim().split('\n');
+    const entry = JSON.parse(lines[lines.length - 1]);
+    assert.ok(entry.semantic, 'semantic summary must be present on pre events');
+    assert.strictEqual(entry.semantic.tool, 'Bash');
+    assert.strictEqual(entry.semantic.command_kind, 'test');
+    assert.strictEqual(entry.semantic.payload_saved, false);
+    assert.ok(!('input' in entry), 'pre-event must not persist raw tool input');
+    assert.ok(!JSON.stringify(entry).includes('npm test'));
+    assert.ok(!JSON.stringify(entry).includes('run tests'));
   });
 });
 

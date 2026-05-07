@@ -6,6 +6,18 @@ const { readJsonFile, writeJsonFile } = require('./utils');
 
 const VALID_SCOPES = new Set(['project', 'global']);
 const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'materialized', 'activated']);
+const VALID_ARTIFACT_TYPES = new Set([
+  'skill',
+  'instinct',
+  'command',
+  'agent',
+  'eval',
+  'repo_convention_patch',
+]);
+// Artifact types that are draft-only — materialization writes a draft, but
+// activation must remain a manual review step (e.g., a patch against AGENTS.md
+// or another shared file). Activation refuses these explicitly.
+const DRAFT_ONLY_ARTIFACT_TYPES = new Set(['repo_convention_patch']);
 const REQUIRED_CANDIDATE_FIELDS = [
   'id',
   'scope',
@@ -109,6 +121,9 @@ function validateCandidate(candidate) {
   }
   if ('status' in candidate && !VALID_STATUSES.has(candidate.status)) {
     errors.push(`status must be one of: ${[...VALID_STATUSES].join(', ')}`);
+  }
+  if ('artifact_type' in candidate && !VALID_ARTIFACT_TYPES.has(candidate.artifact_type)) {
+    errors.push(`artifact_type must be one of: ${[...VALID_ARTIFACT_TYPES].join(', ')}`);
   }
   if (!Array.isArray(candidate.evidence) || candidate.evidence.length === 0) {
     errors.push('evidence must contain at least one item');
@@ -238,15 +253,88 @@ function assertSafeSkillName(name) {
   }
 }
 
-function getDraftArtifactPaths(candidate) {
-  if (candidate.artifact_type !== 'skill') {
-    throw new Error('only skill candidate materialization is supported');
+function assertSafeArtifactName(name) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) {
+    throw new Error('candidate name must be lowercase kebab-case');
   }
-  assertSafeSkillName(candidate.name);
-  return [
-    path.join('skills', candidate.name, 'SKILL.md.draft'),
-    path.join('tests', 'skills', `${skillTestName(candidate.name)}.draft`),
-  ];
+}
+
+// Path mapping per artifact type. Draft paths must be relative, normalized
+// (no `..`), and stay under the intended directory. Active paths drop the
+// `.draft` suffix. Skill is intentionally a special case (two files).
+const ARTIFACT_PATHS = {
+  skill: (name) => ({
+    draft: [
+      path.join('skills', name, 'SKILL.md.draft'),
+      path.join('tests', 'skills', `${skillTestName(name)}.draft`),
+    ],
+    active: [
+      path.join('skills', name, 'SKILL.md'),
+      path.join('tests', 'skills', skillTestName(name)),
+    ],
+  }),
+  instinct: (name) => ({
+    draft: [path.join('.arcforge', 'learning', 'instincts', `${name}.md.draft`)],
+    active: [path.join('.arcforge', 'learning', 'instincts', `${name}.md`)],
+  }),
+  command: (name) => ({
+    draft: [path.join('commands', `${name}.md.draft`)],
+    active: [path.join('commands', `${name}.md`)],
+  }),
+  agent: (name) => ({
+    draft: [path.join('agents', `${name}.md.draft`)],
+    active: [path.join('agents', `${name}.md`)],
+  }),
+  eval: (name) => ({
+    draft: [path.join('evals', name, 'EVAL.md.draft')],
+    active: [path.join('evals', name, 'EVAL.md')],
+  }),
+  repo_convention_patch: (name) => ({
+    // Draft only — activation refuses for this type.
+    draft: [path.join('.arcforge', 'learning', 'patches', `${name}.patch.draft`)],
+    active: [],
+  }),
+};
+
+function ensureArtifactType(candidate) {
+  if (!VALID_ARTIFACT_TYPES.has(candidate.artifact_type)) {
+    throw new Error(`unsupported artifact_type: ${candidate.artifact_type}`);
+  }
+  if (candidate.artifact_type === 'skill') {
+    assertSafeSkillName(candidate.name);
+  } else {
+    assertSafeArtifactName(candidate.name);
+  }
+}
+
+function assertNormalizedRelativePath(relativePath) {
+  if (typeof relativePath !== 'string' || relativePath.length === 0) {
+    throw new Error('artifact path must be a non-empty string');
+  }
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(`artifact path must be relative: ${relativePath}`);
+  }
+  const normalized = path.normalize(relativePath);
+  if (normalized !== relativePath) {
+    throw new Error(`artifact path is not normalized: ${relativePath}`);
+  }
+  if (normalized.split(path.sep).includes('..')) {
+    throw new Error(`artifact path may not traverse parent directories: ${relativePath}`);
+  }
+}
+
+function getDraftArtifactPaths(candidate) {
+  ensureArtifactType(candidate);
+  const paths = ARTIFACT_PATHS[candidate.artifact_type](candidate.name).draft;
+  paths.forEach(assertNormalizedRelativePath);
+  return paths;
+}
+
+function getActiveArtifactPaths(candidate) {
+  ensureArtifactType(candidate);
+  const paths = ARTIFACT_PATHS[candidate.artifact_type](candidate.name).active;
+  paths.forEach(assertNormalizedRelativePath);
+  return paths;
 }
 
 function oneLine(value) {
@@ -307,6 +395,160 @@ def test_${safeName}_draft_frontmatter_mentions_candidate():
 `;
 }
 
+function renderInstinctDraft(candidate) {
+  return `---
+name: ${candidate.name}
+description: ${JSON.stringify(`Instinct learned from observation: ${oneLine(candidate.summary)}`)}
+artifact_type: instinct
+status: draft
+---
+
+# ${candidate.name}
+
+> Draft instinct — inactive until explicitly activated.
+
+Generated from learning candidate: ${candidate.id}
+
+## Trigger
+
+${candidate.trigger}
+
+## Behavior
+
+${candidate.summary}
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderCommandDraft(candidate) {
+  return `---
+name: ${candidate.name}
+description: ${JSON.stringify(`Use when ${oneLine(candidate.trigger)}`)}
+artifact_type: command
+status: draft
+---
+
+# /${candidate.name}
+
+> Draft command — inactive until explicitly activated.
+
+Generated from learning candidate: ${candidate.id}
+
+## Trigger
+
+${candidate.trigger}
+
+## Behavior
+
+${candidate.summary}
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderAgentDraft(candidate) {
+  return `---
+name: ${candidate.name}
+description: ${JSON.stringify(`Use when ${oneLine(candidate.trigger)}`)}
+artifact_type: agent
+status: draft
+---
+
+# ${candidate.name} agent
+
+> Draft agent definition — inactive until explicitly activated.
+
+Generated from learning candidate: ${candidate.id}
+
+## Trigger
+
+${candidate.trigger}
+
+## Mission
+
+${candidate.summary}
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderEvalDraft(candidate) {
+  return `---
+name: ${candidate.name}
+description: ${JSON.stringify(`Eval scaffold for ${oneLine(candidate.summary)}`)}
+artifact_type: eval
+status: draft
+---
+
+# ${candidate.name} eval
+
+> Draft eval — inactive until explicitly activated.
+
+Generated from learning candidate: ${candidate.id}
+
+## Hypothesis
+
+${candidate.summary}
+
+## Trigger
+
+${candidate.trigger}
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderRepoConventionPatchDraft(candidate) {
+  // Draft is a human-readable proposal, not an actual unified diff. Activation
+  // is intentionally refused for this type — the user must apply it manually
+  // after review.
+  return `# Proposed repo convention patch (draft only — apply manually)
+
+Candidate: ${candidate.id}
+Target: ${candidate.target || 'AGENTS.md'}
+
+## Trigger
+
+${candidate.trigger}
+
+## Proposed change
+
+${candidate.summary}
+
+## Evidence
+
+${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.session_id})`).join('\n')}
+`;
+}
+
+function renderDraft(candidate) {
+  switch (candidate.artifact_type) {
+    case 'skill':
+      return [renderSkillDraft(candidate), renderSkillTestDraft(candidate)];
+    case 'instinct':
+      return [renderInstinctDraft(candidate)];
+    case 'command':
+      return [renderCommandDraft(candidate)];
+    case 'agent':
+      return [renderAgentDraft(candidate)];
+    case 'eval':
+      return [renderEvalDraft(candidate)];
+    case 'repo_convention_patch':
+      return [renderRepoConventionPatchDraft(candidate)];
+    default:
+      throw new Error(`unsupported artifact_type: ${candidate.artifact_type}`);
+  }
+}
+
 function materializeCandidate(
   id,
   { scope = 'project', projectRoot = process.cwd(), homeDir, now = new Date().toISOString() } = {},
@@ -329,14 +571,16 @@ function materializeCandidate(
   }
   assertCanMaterialize(candidate);
   const draftPaths = getDraftArtifactPaths(candidate);
-  const [skillDraftPath, testDraftPath] = draftPaths.map((relativePath) =>
-    path.join(projectRoot, relativePath),
-  );
+  const draftAbsPaths = draftPaths.map((relativePath) => path.join(projectRoot, relativePath));
+  const draftBodies = renderDraft(candidate);
+  if (draftBodies.length !== draftAbsPaths.length) {
+    throw new Error('internal error: draft renderer produced mismatched body count');
+  }
 
-  fs.mkdirSync(path.dirname(skillDraftPath), { recursive: true });
-  fs.writeFileSync(skillDraftPath, renderSkillDraft(candidate), 'utf8');
-  fs.mkdirSync(path.dirname(testDraftPath), { recursive: true });
-  fs.writeFileSync(testDraftPath, renderSkillTestDraft(candidate), 'utf8');
+  for (let i = 0; i < draftAbsPaths.length; i++) {
+    fs.mkdirSync(path.dirname(draftAbsPaths[i]), { recursive: true });
+    fs.writeFileSync(draftAbsPaths[i], draftBodies[i], 'utf8');
+  }
 
   const updated = {
     ...candidate,
@@ -347,17 +591,6 @@ function materializeCandidate(
   candidates[index] = updated;
   rewriteCandidates(candidates, { scope, projectRoot, homeDir });
   return { scope, candidate: updated, draft_paths: draftPaths };
-}
-
-function getActiveArtifactPaths(candidate) {
-  if (candidate.artifact_type !== 'skill') {
-    throw new Error('only skill candidate activation is supported');
-  }
-  assertSafeSkillName(candidate.name);
-  return [
-    path.join('skills', candidate.name, 'SKILL.md'),
-    path.join('tests', 'skills', skillTestName(candidate.name)),
-  ];
 }
 
 function assertRecordedDraftPaths(candidate, expectedDraftPaths) {
@@ -395,10 +628,20 @@ function activateCandidate(
   if (candidate.status !== 'materialized') {
     throw new Error('candidate must be materialized before activation');
   }
+  if (DRAFT_ONLY_ARTIFACT_TYPES.has(candidate.artifact_type)) {
+    throw new Error(
+      `${candidate.artifact_type} candidates are draft-only — review and apply the draft manually; automatic activation is refused`,
+    );
+  }
 
   const draftRelPaths = getDraftArtifactPaths(candidate);
   assertRecordedDraftPaths(candidate, draftRelPaths);
   const activeRelPaths = getActiveArtifactPaths(candidate);
+  if (activeRelPaths.length === 0) {
+    throw new Error(
+      `no active artifact paths defined for artifact_type: ${candidate.artifact_type}`,
+    );
+  }
   const draftAbsPaths = draftRelPaths.map((rel) => path.join(projectRoot, rel));
   const activeAbsPaths = activeRelPaths.map((rel) => path.join(projectRoot, rel));
 
@@ -440,6 +683,12 @@ function nextActionsFor(candidate) {
     case 'approved':
       return ['materialize the candidate to write inactive draft artifacts'];
     case 'materialized':
+      if (DRAFT_ONLY_ARTIFACT_TYPES.has(candidate.artifact_type)) {
+        return [
+          'review the draft proposal at draft_paths',
+          'apply manually after review; automatic activation is refused for this artifact type',
+        ];
+      }
       return [
         'review the draft artifacts at draft_paths',
         'activate explicitly when satisfied to promote drafts to active artifacts',
@@ -716,6 +965,87 @@ function collectWorkflowPatterns(
   return assignUniqueSlugs(sorted);
 }
 
+function latestTimestampScore(pattern, now) {
+  const timestamps = [...pattern.sessions.values()]
+    .map((observation) => Date.parse(observation.ts || ''))
+    .filter((value) => Number.isFinite(value));
+  if (timestamps.length === 0) return 0.5;
+  const nowMs = Number.isFinite(Date.parse(now || '')) ? Date.parse(now) : Date.now();
+  const newestMs = Math.max(...timestamps);
+  const ageDays = Math.max(0, (nowMs - newestMs) / 86_400_000);
+  return Math.max(0, 1 - ageDays / 90);
+}
+
+function patternOutcomeScore(pattern) {
+  const outcomes = [...pattern.sessions.values()]
+    .map((observation) => observation.outcome)
+    .filter(Boolean);
+  if (outcomes.length === 0) return 0.5;
+  const successes = outcomes.filter((outcome) => outcome === 'success').length;
+  const errors = outcomes.filter((outcome) => outcome === 'error').length;
+  return Math.max(
+    0,
+    Math.min(1, 0.5 + successes / outcomes.length / 2 - errors / outcomes.length / 2),
+  );
+}
+
+function userConfirmationScore(pattern) {
+  return [...pattern.sessions.values()].some((observation) => observation.user_confirmed === true)
+    ? 1
+    : 0.5;
+}
+
+function contradictionScore(pattern) {
+  return [...pattern.sessions.values()].some(
+    (observation) => observation.contradiction === true || observation.negative_evidence === true,
+  )
+    ? 0
+    : 1;
+}
+
+function projectSpecificityScore(pattern) {
+  // Higher diversity means lower project-specificity risk.
+  return Math.min(1, pattern.projects.size / 3);
+}
+
+function privacyRiskScore(pattern) {
+  const hasRawPayload = [...pattern.sessions.values()].some(
+    (observation) =>
+      typeof observation.input === 'string' ||
+      typeof observation.output === 'string' ||
+      typeof observation.command === 'string',
+  );
+  return hasRawPayload ? 0.2 : 1;
+}
+
+function computeGlobalScore(pattern, { now }) {
+  const factors = {
+    project_diversity: Math.min(1, pattern.projects.size / 3),
+    session_diversity: Math.min(1, pattern.sessions.size / 6),
+    recency: latestTimestampScore(pattern, now),
+    outcome: patternOutcomeScore(pattern),
+    user_confirmation: userConfirmationScore(pattern),
+    contradiction_absence: contradictionScore(pattern),
+    project_specificity: projectSpecificityScore(pattern),
+    privacy_risk: privacyRiskScore(pattern),
+  };
+  const score =
+    factors.project_diversity * 0.22 +
+    factors.session_diversity * 0.18 +
+    factors.recency * 0.14 +
+    factors.outcome * 0.12 +
+    factors.user_confirmation * 0.1 +
+    factors.contradiction_absence * 0.1 +
+    factors.project_specificity * 0.07 +
+    factors.privacy_risk * 0.07;
+  return {
+    score: Number(Math.min(1, score).toFixed(3)),
+    factors: Object.fromEntries(
+      Object.entries(factors).map(([key, value]) => [key, Number(value.toFixed(3))]),
+    ),
+  };
+}
+
 function buildWorkflowCandidate(pattern, { scope, now }) {
   const global = scope === 'global';
   const id = `arc-learned-${scope}-${pattern.slug}-workflow`;
@@ -734,7 +1064,9 @@ function buildWorkflowCandidate(pattern, { scope, now }) {
     0.55 + pattern.sessions.size * 0.05 + pattern.projects.size * 0.05,
   );
 
-  return {
+  const scoring = global ? computeGlobalScore(pattern, { now }) : null;
+
+  const candidate = {
     id,
     scope,
     artifact_type: 'skill',
@@ -752,6 +1084,15 @@ function buildWorkflowCandidate(pattern, { scope, now }) {
     created_at: now,
     updated_at: now,
   };
+
+  if (global) {
+    candidate.distinct_project_count = pattern.projects.size;
+    candidate.session_count = pattern.sessions.size;
+    candidate.score = scoring.score;
+    candidate.score_factors = scoring.factors;
+  }
+
+  return candidate;
 }
 
 function appendAnalyzerCandidates(candidates, { scope, projectRoot, homeDir }) {
@@ -837,14 +1178,272 @@ function triggerAutomaticLearning({
   return { project, global };
 }
 
+// ---------------------------------------------------------------------------
+// Outcome-aware learning
+//
+// Look for sessions where an error tool_end was followed by an Edit and then
+// a Bash success — a small, common "fix-and-rerun" signal. Emits an instinct
+// candidate. All evidence stays bounded ("test command passed after edit").
+// ---------------------------------------------------------------------------
+
+function findOutcomeRepairSessions(observations, { includeProjectIdentity = false } = {}) {
+  const ordered = [...observations].sort((a, b) =>
+    String(a.ts || '').localeCompare(String(b.ts || '')),
+  );
+  const sessions = new Map();
+  for (const obs of ordered) {
+    const key = sessionKey(obs, { includeProjectIdentity });
+    if (!sessions.has(key)) sessions.set(key, []);
+    sessions.get(key).push(obs);
+  }
+
+  const matches = [];
+  for (const [sessionId, events] of sessions.entries()) {
+    let phase = 'await_error';
+    let pendingRerunKind = null;
+    for (const event of events) {
+      const tool = normalizeToolName(event.tool);
+      const toolSlug = toolSlugComponent(tool);
+      if (event.event === 'tool_end' && event.outcome === 'error') {
+        if (phase === 'await_error') phase = 'await_edit';
+        pendingRerunKind = null;
+      } else if (event.event === 'tool_start' && (toolSlug === 'edit' || toolSlug === 'write')) {
+        if (phase === 'await_edit') phase = 'await_success';
+        pendingRerunKind = null;
+      } else if (event.event === 'tool_start' && toolSlug === 'bash') {
+        const commandKind = oneLine(event.semantic?.command_kind || 'unknown');
+        pendingRerunKind = commandKind === 'test' || commandKind === 'build' ? commandKind : null;
+      } else if (event.event === 'tool_end' && event.outcome === 'success' && toolSlug === 'bash') {
+        if (phase === 'await_success' && pendingRerunKind) {
+          matches.push({
+            sessionId,
+            project: observationProjectName(event),
+            project_id: projectIdentity(event, observationProjectName(event)),
+            command_kind: pendingRerunKind,
+            ts: oneLine(event.ts || ''),
+          });
+          break;
+        }
+        pendingRerunKind = null;
+      }
+    }
+  }
+  return matches;
+}
+
+function buildOutcomeRepairCandidate(matches, { scope, now }) {
+  if (matches.length === 0) return null;
+  const slug = 'outcome-repair-edit-then-test';
+  const id = `arc-learned-${scope}-${slug}-instinct`;
+  const evidence = matches.slice(0, 8).map((match) => ({
+    session_id: match.sessionId || 'unknown',
+    source: scope === 'global' ? `project:${match.project}` : 'observation',
+    reason: 'test command passed after edit following error',
+  }));
+  const confidence = Math.min(0.8, 0.5 + 0.05 * matches.length);
+  return {
+    id,
+    scope,
+    artifact_type: 'instinct',
+    name: `arc-learned-${slug}`,
+    summary: `Recurring fix loop: an error was followed by an edit and a successful re-run.`,
+    trigger:
+      'when a tool errored and the next response was an edit followed by a successful test/build command',
+    evidence,
+    confidence,
+    status: 'pending',
+    pattern_key: `outcome:${slug}`,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function analyzeOutcomeRepair({
+  scope = 'project',
+  projectRoot = process.cwd(),
+  homeDir,
+  now = new Date().toISOString(),
+} = {}) {
+  assertScope(scope);
+  if (!isLearningEnabled({ scope, projectRoot, homeDir })) {
+    return { scope, enabled: false, emitted: 0, candidates: [] };
+  }
+  const observations =
+    scope === 'global'
+      ? readGlobalObservations({ homeDir })
+      : readObservationFiles(getObservationPath({ projectRoot, homeDir })).filter(
+          (observation) => observation.project_id === getProjectId(projectRoot),
+        );
+  const matches = findOutcomeRepairSessions(observations, {
+    includeProjectIdentity: scope === 'global',
+  });
+  const candidate = buildOutcomeRepairCandidate(matches, { scope, now });
+  const written = candidate
+    ? appendAnalyzerCandidates([candidate], { scope, projectRoot, homeDir })
+    : [];
+  return { scope, enabled: true, emitted: written.length, candidates: written };
+}
+
+// ---------------------------------------------------------------------------
+// Transcript habit extraction
+//
+// Parses a Claude Code transcript JSONL file and emits privacy-safe instinct
+// or repo_convention_patch candidates from corrections / strong preferences.
+// Never persists raw user/assistant text.
+// ---------------------------------------------------------------------------
+
+const HABIT_PATTERNS = [
+  {
+    kind: 'instinct',
+    regex: /\bdon'?t\s+([a-zA-Z][a-zA-Z\s-]{2,40})/i,
+    prefix: 'user correction observed',
+  },
+  {
+    kind: 'instinct',
+    regex: /\bnever\s+([a-zA-Z][a-zA-Z\s-]{2,40})/i,
+    prefix: 'user correction observed',
+  },
+  {
+    kind: 'instinct',
+    regex: /\bstop\s+([a-zA-Z][a-zA-Z\s-]{2,40})/i,
+    prefix: 'user correction observed',
+  },
+  {
+    kind: 'instinct',
+    regex: /\balways\s+([a-zA-Z][a-zA-Z\s-]{2,40})/i,
+    prefix: 'user preference observed',
+  },
+  {
+    kind: 'repo_convention_patch',
+    regex: /\bfrom\s+now\s+on[,:]?\s+([a-zA-Z][a-zA-Z\s-]{2,60})/i,
+    prefix: 'repo convention preference observed',
+  },
+  {
+    kind: 'instinct',
+    regex: /(?:不要|別|不要再)\s*([^\n]{2,80})/u,
+    prefix: 'user correction observed',
+  },
+  {
+    kind: 'repo_convention_patch',
+    regex: /(?:以後|下次|預設)\s*([^\n]{2,80})/u,
+    prefix: 'repo convention preference observed',
+  },
+];
+
+function extractUserMessageText(line) {
+  if (!line) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (!parsed || parsed.type !== 'user' || !parsed.message) return null;
+  const content = parsed.message.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text)
+      .join('\n');
+  }
+  return null;
+}
+
+function safeHabitSummary(prefix, fingerprint) {
+  // Do not echo transcript content, even bounded. Persist only a category plus a
+  // short source-event fingerprint so reviewers can correlate duplicate habits
+  // without storing or hashing private conversation text.
+  return `${prefix} (source_fingerprint:${fingerprint})`;
+}
+
+function extractTranscriptHabits(transcriptPath) {
+  if (!fs.existsSync(transcriptPath)) return [];
+  const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean);
+  const habits = [];
+  lines.forEach((line, lineIndex) => {
+    const text = extractUserMessageText(line);
+    if (!text) return;
+    HABIT_PATTERNS.forEach(({ kind, regex, prefix }, patternIndex) => {
+      const match = text.match(regex);
+      if (!match) return;
+      const sourceKey = `${kind}:${prefix}:line-${lineIndex}:pattern-${patternIndex}`;
+      const fingerprint = shortHash(sourceKey);
+      const summary = safeHabitSummary(prefix, fingerprint);
+      const slug = `habit-${fingerprint}`;
+      habits.push({ kind, summary, slug, prefix });
+    });
+  });
+  return habits;
+}
+
+function buildHabitCandidate(habit, { scope, sessionId, now }) {
+  const slugBase = `habit-${habit.kind === 'repo_convention_patch' ? 'convention' : 'instinct'}-${habit.slug}`;
+  const id = `arc-learned-${scope}-${slugBase}`;
+  return {
+    id,
+    scope,
+    artifact_type: habit.kind,
+    name: `arc-learned-${slugBase}`,
+    summary: habit.summary,
+    trigger: `when ${habit.prefix} appears in conversation`,
+    evidence: [
+      {
+        session_id: sessionId,
+        source: 'transcript',
+        reason: habit.summary,
+      },
+    ],
+    confidence: 0.6,
+    status: 'pending',
+    pattern_key: `transcript:${habit.kind}:${habit.slug}`,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function analyzeTranscriptHabits({
+  transcriptPath,
+  sessionId = 'unknown',
+  scope = 'project',
+  projectRoot = process.cwd(),
+  homeDir,
+  now = new Date().toISOString(),
+} = {}) {
+  assertScope(scope);
+  if (!isLearningEnabled({ scope, projectRoot, homeDir })) {
+    return { scope, enabled: false, emitted: 0, candidates: [] };
+  }
+  if (!transcriptPath) {
+    throw new Error('analyzeTranscriptHabits requires a transcriptPath');
+  }
+  const habits = extractTranscriptHabits(transcriptPath);
+  // Deduplicate by slug+kind so a single transcript run does not flood the queue.
+  const seen = new Set();
+  const candidates = [];
+  for (const habit of habits) {
+    const key = `${habit.kind}:${habit.slug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(buildHabitCandidate(habit, { scope, sessionId, now }));
+  }
+  const written = appendAnalyzerCandidates(candidates, { scope, projectRoot, homeDir });
+  return { scope, enabled: true, emitted: written.length, candidates: written };
+}
+
 module.exports = {
   REQUIRED_CANDIDATE_FIELDS,
   VALID_SCOPES,
   VALID_STATUSES,
+  VALID_ARTIFACT_TYPES,
+  DRAFT_ONLY_ARTIFACT_TYPES,
   activateCandidate,
   appendCandidate,
   assertCanMaterialize,
   analyzeLearning,
+  analyzeOutcomeRepair,
+  analyzeTranscriptHabits,
+  extractTranscriptHabits,
   getCandidateQueuePath,
   getLearningConfigPath,
   getObservationPath,

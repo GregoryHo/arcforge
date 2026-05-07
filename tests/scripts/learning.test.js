@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const crypto = require('node:crypto');
 
 const {
   activateCandidate,
@@ -2020,5 +2021,649 @@ describe('learning subsystem MVP-1', () => {
       }),
     );
     expect(disabled.enabled).toBe(false);
+  });
+});
+
+describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts', () => {
+  let testDir;
+  let projectRoot;
+  let homeDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-learning-mvp2-'));
+    projectRoot = path.join(testDir, 'project');
+    homeDir = path.join(testDir, 'home');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(homeDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function baseCandidate(overrides = {}) {
+    return {
+      id: 'arc-learned-project-test-001',
+      scope: 'project',
+      artifact_type: 'instinct',
+      name: 'arc-learned-test',
+      summary: 'Test learned habit summary.',
+      trigger: 'when this scenario recurs',
+      evidence: [
+        { session_id: 'session-1', source: 'observation', reason: 'recurs across sessions' },
+      ],
+      confidence: 0.6,
+      status: 'pending',
+      created_at: '2026-05-01T00:00:00Z',
+      updated_at: '2026-05-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  describe('artifact_type validation', () => {
+    it('accepts the five new artifact types and rejects unknown ones', () => {
+      const learning = require('../../scripts/lib/learning');
+      for (const t of ['skill', 'instinct', 'command', 'agent', 'eval', 'repo_convention_patch']) {
+        expect(
+          learning.validateCandidate(baseCandidate({ artifact_type: t, name: 'arc-test' })).ok,
+        ).toBe(true);
+      }
+      const invalid = learning.validateCandidate(
+        baseCandidate({ artifact_type: 'arbitrary-type' }),
+      );
+      expect(invalid.ok).toBe(false);
+      expect(invalid.errors.some((m) => /artifact_type/.test(m))).toBe(true);
+    });
+  });
+
+  describe('materialization across artifact types', () => {
+    function approvedCandidate(artifactType, name) {
+      return baseCandidate({
+        id: `arc-learned-project-${artifactType}-${name}`,
+        artifact_type: artifactType,
+        name,
+        status: 'approved',
+      });
+    }
+
+    it('materializes an instinct candidate as a draft markdown file under the instincts dir', () => {
+      const learning = require('../../scripts/lib/learning');
+      const c = approvedCandidate('instinct', 'arc-learned-instinct-x');
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      const result = learning.materializeCandidate(c.id, {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.candidate.draft_paths).toEqual([
+        '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft',
+      ]);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft'),
+        ),
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md'),
+        ),
+      ).toBe(false);
+    });
+
+    it('materializes command/agent/eval candidates as inactive drafts under their dirs', () => {
+      const learning = require('../../scripts/lib/learning');
+      const cases = [
+        { type: 'command', name: 'arc-learned-cmd', expected: 'commands/arc-learned-cmd.md.draft' },
+        { type: 'agent', name: 'arc-learned-agent', expected: 'agents/arc-learned-agent.md.draft' },
+        {
+          type: 'eval',
+          name: 'arc-learned-eval',
+          expected: 'evals/arc-learned-eval/EVAL.md.draft',
+        },
+      ];
+      for (const c of cases) {
+        const cand = approvedCandidate(c.type, c.name);
+        learning.appendCandidate(cand, { scope: 'project', projectRoot, homeDir });
+        const result = learning.materializeCandidate(cand.id, {
+          scope: 'project',
+          projectRoot,
+          homeDir,
+        });
+        expect(result.candidate.draft_paths).toEqual([c.expected]);
+        expect(fs.existsSync(path.join(projectRoot, c.expected))).toBe(true);
+        // Active path must not exist after materialization.
+        expect(fs.existsSync(path.join(projectRoot, c.expected.replace('.draft', '')))).toBe(false);
+      }
+    });
+
+    it('materializes repo_convention_patch candidates only as draft text proposals', () => {
+      const learning = require('../../scripts/lib/learning');
+      const c = approvedCandidate('repo_convention_patch', 'arc-learned-convention-x');
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      const result = learning.materializeCandidate(c.id, {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.candidate.draft_paths).toEqual([
+        '.arcforge/learning/patches/arc-learned-convention-x.patch.draft',
+      ]);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-x.patch.draft'),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe('activation across artifact types', () => {
+    function setupMaterialized(artifactType, name) {
+      const learning = require('../../scripts/lib/learning');
+      const c = baseCandidate({
+        id: `arc-learned-project-${artifactType}-${name}`,
+        artifact_type: artifactType,
+        name,
+        status: 'approved',
+      });
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      learning.materializeCandidate(c.id, { scope: 'project', projectRoot, homeDir });
+      return c.id;
+    }
+
+    it('activates instinct/command/agent/eval drafts by promoting to active artifacts', () => {
+      const learning = require('../../scripts/lib/learning');
+      const cases = [
+        {
+          type: 'instinct',
+          name: 'arc-learned-instinct-y',
+          active: '.arcforge/learning/instincts/arc-learned-instinct-y.md',
+        },
+        { type: 'command', name: 'arc-learned-cmd-y', active: 'commands/arc-learned-cmd-y.md' },
+        { type: 'agent', name: 'arc-learned-agent-y', active: 'agents/arc-learned-agent-y.md' },
+        { type: 'eval', name: 'arc-learned-eval-y', active: 'evals/arc-learned-eval-y/EVAL.md' },
+      ];
+      for (const c of cases) {
+        const id = setupMaterialized(c.type, c.name);
+        const result = learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir });
+        expect(result.candidate.status).toBe('activated');
+        expect(result.candidate.active_paths).toEqual([c.active]);
+        expect(fs.existsSync(path.join(projectRoot, c.active))).toBe(true);
+        expect(fs.existsSync(path.join(projectRoot, `${c.active}.draft`))).toBe(false);
+      }
+    });
+
+    it('refuses activation for repo_convention_patch — draft-only artifact type', () => {
+      const learning = require('../../scripts/lib/learning');
+      const id = setupMaterialized('repo_convention_patch', 'arc-learned-convention-y');
+      expect(() =>
+        learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/draft-only|cannot be activated|refus/i);
+      // Draft must remain on disk.
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-y.patch.draft'),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe('path safety', () => {
+    it('refuses activation when the candidate name escapes the artifact dir', () => {
+      const learning = require('../../scripts/lib/learning');
+      // Inject a hostile candidate directly into the queue file (skipping append validation
+      // which already rejects bad names).
+      const queuePath = learning.getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+      fs.writeFileSync(
+        queuePath,
+        `${JSON.stringify(
+          baseCandidate({
+            id: 'evil-1',
+            artifact_type: 'instinct',
+            name: '../../escape',
+            status: 'materialized',
+            draft_paths: ['../../escape.md.draft'],
+          }),
+        )}\n`,
+        'utf8',
+      );
+      expect(() =>
+        learning.activateCandidate('evil-1', { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/lowercase kebab-case|relative|parent|normalized/i);
+    });
+  });
+
+  describe('global scoring metadata', () => {
+    it('attaches distinct_project_count, session_count, and score to global candidates', () => {
+      const learning = require('../../scripts/lib/learning');
+      const alphaRoot = path.join(testDir, 'alpha');
+      const betaRoot = path.join(testDir, 'beta');
+      for (const item of [
+        { root: alphaRoot, project: 'alpha', session: 'alpha-session' },
+        { root: betaRoot, project: 'beta', session: 'beta-session' },
+      ]) {
+        const dir = path.join(homeDir, '.arcforge', 'observations', item.project);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, 'observations.jsonl'),
+          `${[
+            {
+              project_id: learning.getProjectId(item.root),
+              ts: '2026-05-01T00:00:00Z',
+              event: 'tool_start',
+              tool: 'Read',
+              session: item.session,
+              project: item.project,
+            },
+            {
+              project_id: learning.getProjectId(item.root),
+              ts: '2026-05-01T00:01:00Z',
+              event: 'tool_start',
+              tool: 'Edit',
+              session: item.session,
+              project: item.project,
+            },
+          ]
+            .map((r) => JSON.stringify(r))
+            .join('\n')}\n`,
+          'utf8',
+        );
+      }
+      learning.setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+
+      const result = learning.analyzeLearning({ scope: 'global', projectRoot, homeDir });
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0].distinct_project_count).toBe(2);
+      expect(result.candidates[0].session_count).toBe(2);
+      expect(result.candidates[0].score).toBeGreaterThan(0);
+      expect(result.candidates[0].score_factors).toMatchObject({
+        project_diversity: expect.any(Number),
+        session_diversity: expect.any(Number),
+        recency: expect.any(Number),
+        outcome: expect.any(Number),
+        user_confirmation: expect.any(Number),
+        contradiction_absence: expect.any(Number),
+        project_specificity: expect.any(Number),
+        privacy_risk: expect.any(Number),
+      });
+      expect(result.candidates[0].status).toBe('pending');
+    });
+  });
+
+  describe('outcome-aware learning', () => {
+    it('emits an instinct candidate from an error → edit → success workflow', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      const events = [
+        // session 1 — error then edit then bash success
+        {
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's1',
+          project_id: projectId,
+          semantic: { command_kind: 'test', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T00:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's1',
+          project_id: projectId,
+        },
+        // session 2 — same shape
+        {
+          ts: '2026-05-01T01:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's2',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T01:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's2',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T01:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's2',
+          project_id: projectId,
+          semantic: { command_kind: 'build', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T01:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's2',
+          project_id: projectId,
+        },
+      ];
+      fs.writeFileSync(
+        observationPath,
+        `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
+        'utf8',
+      );
+
+      const result = learning.analyzeOutcomeRepair({
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-01T02:00:00Z',
+      });
+
+      expect(result.emitted).toBe(1);
+      const c = result.candidates[0];
+      expect(c.artifact_type).toBe('instinct');
+      expect(c.status).toBe('pending');
+      expect(c.evidence.length).toBeGreaterThanOrEqual(2);
+      // Privacy: no raw payload words allowed in evidence reasons.
+      const evidenceText = JSON.stringify(c.evidence);
+      expect(evidenceText).not.toContain('npm');
+      expect(evidenceText).toMatch(/test command passed after edit/);
+    });
+
+    it('does not emit when there is no error→edit→success sequence', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      fs.writeFileSync(
+        observationPath,
+        `${JSON.stringify({
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_start',
+          tool: 'Read',
+          session: 's1',
+          project_id: projectId,
+        })}\n`,
+        'utf8',
+      );
+      const result = learning.analyzeOutcomeRepair({ scope: 'project', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+    it('does not emit when a non-test bash command succeeds after the edit', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      const events = [
+        {
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's1',
+          project_id: projectId,
+          semantic: { command_kind: 'git', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T00:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's1',
+          project_id: projectId,
+        },
+      ];
+      fs.writeFileSync(
+        observationPath,
+        `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
+        'utf8',
+      );
+      const result = learning.analyzeOutcomeRepair({ scope: 'project', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+
+    it('does not merge same session ids across projects in global outcome learning', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      const root = path.join(homeDir, '.arcforge', 'observations');
+      const alphaPath = path.join(root, 'alpha', 'observations.jsonl');
+      const betaPath = path.join(root, 'beta', 'observations.jsonl');
+      fs.mkdirSync(path.dirname(alphaPath), { recursive: true });
+      fs.mkdirSync(path.dirname(betaPath), { recursive: true });
+      fs.writeFileSync(
+        alphaPath,
+        `${[
+          {
+            ts: '2026-05-01T00:00:00Z',
+            event: 'tool_end',
+            tool: 'Bash',
+            outcome: 'error',
+            session: 'same',
+          },
+          { ts: '2026-05-01T00:00:30Z', event: 'tool_start', tool: 'Edit', session: 'same' },
+        ]
+          .map((e) => JSON.stringify(e))
+          .join('\n')}\n`,
+        'utf8',
+      );
+      fs.writeFileSync(
+        betaPath,
+        `${[
+          {
+            ts: '2026-05-01T00:00:45Z',
+            event: 'tool_start',
+            tool: 'Bash',
+            session: 'same',
+            semantic: { command_kind: 'test', payload_saved: false },
+          },
+          {
+            ts: '2026-05-01T00:01:00Z',
+            event: 'tool_end',
+            tool: 'Bash',
+            outcome: 'success',
+            session: 'same',
+          },
+        ]
+          .map((e) => JSON.stringify(e))
+          .join('\n')}\n`,
+        'utf8',
+      );
+
+      const result = learning.analyzeOutcomeRepair({ scope: 'global', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+  });
+
+  describe('transcript habit extraction', () => {
+    function writeTranscript(lines) {
+      const transcriptPath = path.join(testDir, 'transcript.jsonl');
+      fs.writeFileSync(transcriptPath, lines.map((l) => JSON.stringify(l)).join('\n'), 'utf8');
+      return transcriptPath;
+    }
+
+    it('extracts privacy-safe instinct candidates from corrections in user messages', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: "don't push to main without review" } },
+        { type: 'assistant', message: { content: [{ type: 'text', text: 'understood' }] } },
+        { type: 'user', message: { content: 'always run tests before commit' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-x',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-01T00:00:00Z',
+      });
+
+      expect(result.emitted).toBe(2);
+      const types = result.candidates.map((c) => c.artifact_type);
+      expect(types).toEqual(['instinct', 'instinct']);
+      const reasons = result.candidates.flatMap((c) => c.evidence.map((item) => item.reason));
+      // Evidence reasons stay bounded — no full text echoes.
+      for (const r of reasons) expect(r.length).toBeLessThan(220);
+      for (const c of result.candidates) {
+        expect(c.evidence[0].source).toBe('transcript');
+        expect(c.status).toBe('pending');
+      }
+    });
+
+    it('emits a repo_convention_patch candidate for "from now on" preferences', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: 'from now on, prefer kebab-case for filenames' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-x',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(result.emitted).toBe(1);
+      expect(result.candidates[0].artifact_type).toBe('repo_convention_patch');
+      expect(result.candidates[0].status).toBe('pending');
+    });
+
+    it('extracts Traditional Chinese correction and preference habits', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: '不要自動重啟 Hermes gateway' } },
+        { type: 'user', message: { content: '以後 repo convention 要先提出 AGENTS.md patch' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-zh',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(result.emitted).toBe(2);
+      expect(result.candidates.map((c) => c.artifact_type)).toEqual([
+        'instinct',
+        'repo_convention_patch',
+      ]);
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('Hermes gateway');
+      expect(serialized).not.toContain('AGENTS.md patch');
+    });
+
+    it('does not persist raw transcript text in candidate evidence', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const secret = "don't leak super-secret-token-abcdef123";
+      const transcriptPath = writeTranscript([{ type: 'user', message: { content: secret } }]);
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('super-secret-token-abcdef123');
+      const contentHash = crypto
+        .createHash('sha256')
+        .update('leak super-secret-token-abcdef123')
+        .digest('hex')
+        .slice(0, 8);
+      expect(serialized).not.toContain(contentHash);
+      expect(result.candidates[0].id).toMatch(
+        /arc-learned-project-habit-instinct-habit-[a-f0-9]{8}$/,
+      );
+      expect(result.candidates[0].pattern_key).toMatch(/^transcript:instinct:habit-[a-f0-9]{8}$/);
+    });
+
+    it('does not derive transcript candidate identifiers from captured text', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const firstTranscript = writeTranscript([
+        { type: 'user', message: { content: "don't expose alpha-secret-value" } },
+      ]);
+      const first = learning.analyzeTranscriptHabits({
+        transcriptPath: firstTranscript,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      fs.rmSync(path.join(projectRoot, '.arcforge', 'learning', 'candidates'), {
+        recursive: true,
+        force: true,
+      });
+      const secondTranscript = writeTranscript([
+        { type: 'user', message: { content: "don't expose beta-secret-value" } },
+      ]);
+      const second = learning.analyzeTranscriptHabits({
+        transcriptPath: secondTranscript,
+        sessionId: 's2',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(first.candidates[0].id).toBe(second.candidates[0].id);
+      expect(first.candidates[0].name).toBe(second.candidates[0].name);
+      expect(first.candidates[0].pattern_key).toBe(second.candidates[0].pattern_key);
+    });
+
+    it('does nothing when learning is disabled', () => {
+      const learning = require('../../scripts/lib/learning');
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: 'never use arrow functions' } },
+      ]);
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.enabled).toBe(false);
+      expect(result.emitted).toBe(0);
+    });
   });
 });

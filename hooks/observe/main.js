@@ -137,6 +137,119 @@ function buildObservedToolInput(toolName, toolInput) {
   return skillName ? { skill: skillName } : {};
 }
 
+// ---------------------------------------------------------------------------
+// Semantic summaries
+//
+// Privacy-safe, bounded shape derived from the tool input. We never persist
+// raw command lines, file contents, search queries, or skill args. We classify
+// the call into a small vocabulary so the analyzer can reason about workflows
+// without the redacted text. The contract: the persisted `semantic` object
+// only contains short enums and `payload_saved=false`.
+// ---------------------------------------------------------------------------
+
+const PATH_CLASSES = [
+  { key: 'test', regex: /(^|\/)tests?(\/|$)|\.test\.|_test\.|test_/ },
+  { key: 'docs', regex: /(^|\/)docs?(\/|$)|\.md$/i },
+  { key: 'config', regex: /\.(json|ya?ml|toml|ini)$/i },
+  { key: 'script', regex: /^scripts\/|\.sh$/ },
+  { key: 'source', regex: /^(src|lib|scripts)\//i },
+];
+
+function classifyPath(rawPath) {
+  if (typeof rawPath !== 'string' || rawPath.length === 0) return 'unknown';
+  for (const { key, regex } of PATH_CLASSES) if (regex.test(rawPath)) return key;
+  if (/\.(js|ts|py|go|rs|java|rb|c|cpp|h|hpp)$/i.test(rawPath)) return 'source';
+  return 'other';
+}
+
+const ALLOWED_FILE_KINDS = new Set([
+  'js',
+  'ts',
+  'jsx',
+  'tsx',
+  'py',
+  'md',
+  'json',
+  'yaml',
+  'yml',
+  'toml',
+  'sh',
+  'txt',
+]);
+
+function fileKindFromPath(rawPath) {
+  if (typeof rawPath !== 'string') return 'unknown';
+  const match = rawPath.match(/\.([a-z0-9]+)$/i);
+  if (!match) return 'none';
+  const ext = match[1].toLowerCase();
+  return ALLOWED_FILE_KINDS.has(ext) ? ext : 'other';
+}
+
+function classifyBashCommand(rawCommand) {
+  if (typeof rawCommand !== 'string' || rawCommand.trim() === '') return 'unknown';
+  const head = rawCommand.trim().split(/\s+/)[0] || '';
+  const lower = head.toLowerCase();
+  if (/^(npm|yarn|pnpm|bun)$/.test(lower)) {
+    if (/\btest\b/.test(rawCommand)) return 'test';
+    if (/\b(lint|format|biome|eslint)\b/.test(rawCommand)) return 'lint';
+    if (/\b(build|compile|tsc)\b/.test(rawCommand)) return 'build';
+    return 'package';
+  }
+  if (/^(jest|pytest|mocha|vitest|cargo|go)$/.test(lower) && /test/.test(rawCommand)) return 'test';
+  if (/^(jest|pytest|mocha|vitest)$/.test(lower)) return 'test';
+  if (/^(biome|eslint|prettier|black|flake8|ruff)$/.test(lower)) return 'lint';
+  if (/^(git)$/.test(lower)) return 'git';
+  if (/^(grep|rg|find|ls|cat|head|tail|wc)$/.test(lower)) return 'inspect';
+  if (/^(node|python3?|deno|bun)$/.test(lower)) return 'run';
+  if (/^(make|cargo|go|gcc|clang)$/.test(lower)) return 'build';
+  if (/^(curl|wget|http)$/.test(lower)) return 'network';
+  return 'other';
+}
+
+function summarizeToolInput(toolName, toolInput) {
+  if (!toolInput || typeof toolInput !== 'object') {
+    return { tool: toolName, payload_saved: false };
+  }
+  const base = { tool: toolName, payload_saved: false };
+  switch (toolName) {
+    case 'Bash':
+      return {
+        ...base,
+        operation: 'shell',
+        command_kind: classifyBashCommand(toolInput.command),
+      };
+    case 'Read':
+      return {
+        ...base,
+        operation: 'read',
+        path_class: classifyPath(toolInput.file_path),
+        file_kind: fileKindFromPath(toolInput.file_path),
+      };
+    case 'Edit':
+    case 'Write':
+      return {
+        ...base,
+        operation: toolName.toLowerCase(),
+        path_class: classifyPath(toolInput.file_path),
+        file_kind: fileKindFromPath(toolInput.file_path),
+      };
+    case 'Grep':
+      return {
+        ...base,
+        operation: 'search',
+        path_class: classifyPath(toolInput.path || toolInput.glob || ''),
+      };
+    case 'Glob':
+      return { ...base, operation: 'glob' };
+    case 'Skill': {
+      const skillName = extractSkillName(toolName, toolInput);
+      return { ...base, operation: 'skill', ...(skillName ? { skill_name: skillName } : {}) };
+    }
+    default:
+      return { ...base, operation: 'other' };
+  }
+}
+
 /**
  * Archive observations file if it exceeds MAX_FILE_SIZE.
  */
@@ -237,12 +350,15 @@ function main() {
     const skillName = extractSkillName(toolName, input.tool_input);
     if (skillName) observation.skill = skillName;
 
-    // Add input/output based on phase
+    // Add semantic input summary based on phase. PreToolUse deliberately does
+    // not persist raw tool input (commands, file paths, file contents, queries,
+    // or skill args). The bounded semantic object is the durable payload.
     if (phase === 'pre' && input.tool_input) {
-      const observedInput = buildObservedToolInput(toolName, input.tool_input);
-      const inputStr =
-        typeof observedInput === 'string' ? observedInput : JSON.stringify(observedInput);
-      observation.input = sanitizeObservationPayload(inputStr, MAX_INPUT_LENGTH);
+      try {
+        observation.semantic = summarizeToolInput(toolName, input.tool_input);
+      } catch {
+        // Summary is best-effort; never block the observation.
+      }
     }
 
     // PostToolUse uses `tool_response` per the Claude hook schema; older
@@ -290,6 +406,10 @@ module.exports = {
   classifyOutcome,
   responseByteSize,
   buildObservedToolInput,
+  summarizeToolInput,
+  classifyPath,
+  classifyBashCommand,
+  fileKindFromPath,
   getArchiveDir,
   getPidFile,
   shouldObserve,
