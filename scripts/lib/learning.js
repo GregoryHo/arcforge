@@ -160,7 +160,11 @@ function appendCandidate(
   }
   const queuePath = getCandidateQueuePath({ scope, projectRoot, homeDir });
   const existing = loadCandidates({ scope, projectRoot, homeDir }).find(
-    (candidate) => candidate.id === record.id,
+    (candidate) =>
+      candidate.id === record.id ||
+      (record.pattern_key &&
+        candidate.scope === record.scope &&
+        candidate.pattern_key === record.pattern_key),
   );
   if (existing) {
     return { path: queuePath, candidate: existing, duplicate: true };
@@ -275,9 +279,9 @@ ${candidate.summary}
 ## Workflow
 
 1. Confirm the user's request matches the trigger.
-2. Run the project preflight checks before changing release state.
-3. Check version, changelog or release notes, tests, tags, and push/PR handoff.
-4. Stop before destructive or irreversible release actions unless the user explicitly approves.
+2. Review the evidence below and adapt the learned behavior to the current task.
+3. Apply the workflow only when it fits the active project context.
+4. Verify the result with the strongest relevant project checks before reporting completion.
 
 ## Evidence
 
@@ -543,53 +547,268 @@ function readJsonLines(filePath) {
     .filter(Boolean);
 }
 
-function releaseSignalScore(observation) {
-  const text = `${observation.input || ''}\n${observation.output || ''}`.toLowerCase();
-  let score = 0;
-  if (/\b(release|ship|cut a release|prepare release)\b|發版/.test(text)) score += 2;
-  if (/\b(changelog|release notes?)\b/.test(text)) score += 1;
-  if (/\b(version|npm version|bump)\b/.test(text)) score += 1;
-  if (/\b(git tag|tag v?\d|tag and push)\b/.test(text)) score += 1;
-  if (/\b(npm test|npm run test|full tests?|npm run lint|preflight)\b/.test(text)) score += 1;
-  if (/\b(push|handoff|pr preparation)\b/.test(text)) score += 1;
-  return score;
-}
+function listObservationFiles(observationPath) {
+  const files = [];
+  if (fs.existsSync(observationPath)) files.push(observationPath);
 
-function releaseReason(observation) {
-  const parts = [];
-  const text = `${observation.input || ''}\n${observation.output || ''}`.toLowerCase();
-  if (/\b(release|ship|cut a release|prepare release)\b|發版/.test(text))
-    parts.push('release request');
-  if (/\b(changelog|release notes?)\b/.test(text)) parts.push('changelog or release notes');
-  if (/\b(version|npm version|bump)\b/.test(text)) parts.push('version bump');
-  if (/\b(git tag|tag v?\d|tag and push)\b/.test(text)) parts.push('tagging');
-  if (/\b(npm test|npm run test|full tests?|npm run lint|preflight)\b/.test(text)) {
-    parts.push('tests or lint');
+  const archiveDir = path.join(path.dirname(observationPath), 'archive');
+  if (fs.existsSync(archiveDir)) {
+    for (const entry of fs.readdirSync(archiveDir).sort()) {
+      if (entry.endsWith('.jsonl')) files.push(path.join(archiveDir, entry));
+    }
   }
-  if (/\b(push|handoff|pr preparation)\b/.test(text)) parts.push('push or handoff');
-  return parts.join(', ');
+  return files;
 }
 
-function buildReleaseCandidate(observations, { scope, now }) {
-  const date = now.slice(0, 10).replace(/-/g, '');
-  const evidence = observations.map((observation) => ({
-    session_id: observation.session || 'unknown',
-    source: 'observation',
-    reason: releaseReason(observation),
+function readObservationFiles(observationPath) {
+  return listObservationFiles(observationPath).flatMap((filePath) => readJsonLines(filePath));
+}
+
+function getObservationRoot({ homeDir } = {}) {
+  return path.join(homePath(homeDir), '.arcforge', 'observations');
+}
+
+function normalizeToolName(tool) {
+  return oneLine(tool || 'unknown') || 'unknown';
+}
+
+function toolSlugComponent(tool) {
+  return (
+    normalizeToolName(tool)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'unknown'
+  );
+}
+
+function toolDisplayName(tool) {
+  const words = normalizeToolName(tool)
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^a-z0-9 ]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!words) return 'Unknown';
+  return words
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function sequenceKey(tools) {
+  return JSON.stringify(tools.map(toolSlugComponent));
+}
+
+function sequenceSlug(tools) {
+  return tools.map(toolSlugComponent).join('-');
+}
+
+function sequenceStableSlug(tools) {
+  const key = sequenceKey(tools);
+  return `${sequenceSlug(tools)}-${shortHash(key)}`;
+}
+
+function sequenceDisplay(tools) {
+  return tools.map(toolDisplayName).join(' → ');
+}
+
+function projectIdentity(observation, fallback) {
+  return oneLine(
+    observation.__arcforge_project_id ||
+      observation.project_id ||
+      observation.__arcforge_project ||
+      fallback,
+  );
+}
+
+function observationProjectName(observation, fallback) {
+  return oneLine(
+    observation.__arcforge_project || fallback || observation.project || 'unknown-project',
+  );
+}
+
+function sessionKey(observation, { includeProjectIdentity = false } = {}) {
+  const key = oneLine(observation.session || observation.session_id || 'unknown');
+  if (!includeProjectIdentity) return key;
+  return `${projectIdentity(observation, observationProjectName(observation))}:${key}`;
+}
+
+function startedToolObservations(observations) {
+  return observations
+    .filter((observation) => observation.event === 'tool_start' && observation.tool)
+    .sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
+}
+
+function groupBySession(observations, options = {}) {
+  const groups = new Map();
+  for (const observation of observations) {
+    const key = sessionKey(observation, options);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(observation);
+  }
+  return groups;
+}
+
+function collapseConsecutiveTools(observations) {
+  const tools = [];
+  for (const observation of observations) {
+    const tool = normalizeToolName(observation.tool);
+    if (toolSlugComponent(tools[tools.length - 1]) !== toolSlugComponent(tool)) tools.push(tool);
+  }
+  return tools;
+}
+
+function shortHash(value) {
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 8);
+}
+
+function assignUniqueSlugs(patterns) {
+  const counts = new Map();
+  for (const pattern of patterns) {
+    counts.set(pattern.slug, (counts.get(pattern.slug) || 0) + 1);
+  }
+  return patterns.map((pattern) => ({
+    ...pattern,
+    slug: counts.get(pattern.slug) > 1 ? `${pattern.slug}-${shortHash(pattern.key)}` : pattern.slug,
   }));
+}
+
+function collectWorkflowPatterns(
+  observations,
+  { minSessions = 2, requireDistinctProjects = false, includeProjectInSession = false } = {},
+) {
+  const patterns = new Map();
+  const sessions = groupBySession(startedToolObservations(observations), {
+    includeProjectIdentity: includeProjectInSession,
+  });
+
+  for (const [sessionId, sessionObservations] of sessions.entries()) {
+    const tools = collapseConsecutiveTools(sessionObservations).slice(0, 4);
+    if (tools.length < 2) continue;
+
+    const key = sequenceKey(tools);
+    if (!patterns.has(key)) {
+      patterns.set(key, {
+        key,
+        slug: sequenceStableSlug(tools),
+        tools,
+        display: sequenceDisplay(tools),
+        sessions: new Map(),
+        projects: new Set(),
+      });
+    }
+
+    const first = sessionObservations[0];
+    const pattern = patterns.get(key);
+    pattern.sessions.set(sessionId, first);
+    pattern.projects.add(projectIdentity(first, observationProjectName(first)));
+  }
+
+  const sorted = [...patterns.values()]
+    .filter((pattern) => pattern.sessions.size >= minSessions)
+    .filter((pattern) => !requireDistinctProjects || pattern.projects.size >= 2)
+    .sort((a, b) => {
+      if (b.projects.size !== a.projects.size) return b.projects.size - a.projects.size;
+      if (b.sessions.size !== a.sessions.size) return b.sessions.size - a.sessions.size;
+      if (b.tools.length !== a.tools.length) return b.tools.length - a.tools.length;
+      return a.key.localeCompare(b.key);
+    });
+
+  return assignUniqueSlugs(sorted);
+}
+
+function buildWorkflowCandidate(pattern, { scope, now }) {
+  const global = scope === 'global';
+  const id = `arc-learned-${scope}-${pattern.slug}-workflow`;
+  const name = global
+    ? `arc-global-${pattern.slug}-workflow`
+    : `arc-learned-${pattern.slug}-workflow`;
+  const evidence = [...pattern.sessions.entries()].map(([sessionId, observation]) => ({
+    session_id: oneLine(observation.session || observation.session_id || sessionId),
+    source: global ? `project:${observationProjectName(observation)}` : 'observation',
+    reason: global
+      ? `Repeated ${pattern.display} workflow appears across projects`
+      : `Repeated ${pattern.display} workflow in project observations`,
+  }));
+  const confidence = Math.min(
+    0.85,
+    0.55 + pattern.sessions.size * 0.05 + pattern.projects.size * 0.05,
+  );
+
   return {
-    id: `arc-releasing-${date}-001`,
+    id,
     scope,
     artifact_type: 'skill',
-    name: 'arc-releasing',
-    summary: 'Project release flow repeated across multiple sessions.',
-    trigger: 'when the user asks to cut, ship, bump, prepare, or complete a release',
+    name,
+    summary: global
+      ? `Global behavior repeated across ${pattern.projects.size} projects and ${pattern.sessions.size} sessions: ${pattern.display}.`
+      : `Project behavior repeated across ${pattern.sessions.size} sessions: ${pattern.display}.`,
+    trigger: global
+      ? `when work across projects repeatedly follows the ${pattern.display} tool workflow`
+      : `when this project work repeatedly follows the ${pattern.display} tool workflow`,
     evidence,
-    confidence: 0.72,
+    confidence,
     status: 'pending',
+    pattern_key: pattern.key,
     created_at: now,
     updated_at: now,
   };
+}
+
+function appendAnalyzerCandidates(candidates, { scope, projectRoot, homeDir }) {
+  const written = [];
+  for (const candidate of candidates) {
+    const result = appendCandidate(candidate, { scope, projectRoot, homeDir });
+    if (!result.duplicate) written.push(result.candidate);
+  }
+  return written;
+}
+
+function analyzeProjectLearning({ projectRoot = process.cwd(), homeDir, now }) {
+  const projectId = getProjectId(projectRoot);
+  const observations = readObservationFiles(getObservationPath({ projectRoot, homeDir })).filter(
+    (observation) => observation.project_id === projectId,
+  );
+  const patterns = collectWorkflowPatterns(observations, { minSessions: 2 });
+  const candidates = patterns.map((pattern) =>
+    buildWorkflowCandidate(pattern, { scope: 'project', now }),
+  );
+  const written = appendAnalyzerCandidates(candidates, { scope: 'project', projectRoot, homeDir });
+  return { scope: 'project', enabled: true, emitted: written.length, candidates: written };
+}
+
+function readGlobalObservations({ homeDir } = {}) {
+  const root = getObservationRoot({ homeDir });
+  if (!fs.existsSync(root)) return [];
+
+  const observations = [];
+  for (const projectName of fs.readdirSync(root).sort()) {
+    const projectDir = path.join(root, projectName);
+    if (!fs.statSync(projectDir).isDirectory()) continue;
+    const records = readObservationFiles(path.join(projectDir, 'observations.jsonl'));
+    for (const record of records) {
+      observations.push({
+        ...record,
+        project: projectName,
+        __arcforge_project: projectName,
+        __arcforge_project_id: projectName,
+      });
+    }
+  }
+  return observations;
+}
+
+function analyzeGlobalLearning({ projectRoot = process.cwd(), homeDir, now }) {
+  const observations = readGlobalObservations({ homeDir });
+  const patterns = collectWorkflowPatterns(observations, {
+    minSessions: 2,
+    requireDistinctProjects: true,
+    includeProjectInSession: true,
+  });
+  const candidates = patterns.map((pattern) =>
+    buildWorkflowCandidate(pattern, { scope: 'global', now }),
+  );
+  const written = appendAnalyzerCandidates(candidates, { scope: 'global', projectRoot, homeDir });
+  return { scope: 'global', enabled: true, emitted: written.length, candidates: written };
 }
 
 function analyzeLearning({
@@ -602,42 +821,8 @@ function analyzeLearning({
   if (!isLearningEnabled({ scope, projectRoot, homeDir })) {
     return { scope, enabled: false, emitted: 0, candidates: [] };
   }
-  if (scope !== 'project') {
-    return { scope, enabled: true, emitted: 0, candidates: [] };
-  }
-
-  const observations = readJsonLines(getObservationPath({ projectRoot, homeDir }));
-  const projectId = getProjectId(projectRoot);
-  const existing = loadCandidates({ scope, projectRoot, homeDir }).find(
-    (candidate) =>
-      candidate.scope === scope &&
-      candidate.artifact_type === 'skill' &&
-      candidate.name === 'arc-releasing',
-  );
-  if (existing) {
-    return { scope, enabled: true, emitted: 0, candidates: [existing] };
-  }
-
-  const releaseBySession = new Map();
-  for (const observation of observations) {
-    if (observation.project_id !== projectId) continue;
-    if (releaseSignalScore(observation) < 2) continue;
-    const session = observation.session || 'unknown';
-    if (!releaseBySession.has(session)) releaseBySession.set(session, observation);
-  }
-
-  if (releaseBySession.size < 2) {
-    return { scope, enabled: true, emitted: 0, candidates: [] };
-  }
-
-  const candidate = buildReleaseCandidate([...releaseBySession.values()], { scope, now });
-  const written = appendCandidate(candidate, { scope, projectRoot, homeDir });
-  return {
-    scope,
-    enabled: true,
-    emitted: written.duplicate ? 0 : 1,
-    candidates: [written.candidate],
-  };
+  if (scope === 'global') return analyzeGlobalLearning({ projectRoot, homeDir, now });
+  return analyzeProjectLearning({ projectRoot, homeDir, now });
 }
 
 function triggerAutomaticLearning({

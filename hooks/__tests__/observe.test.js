@@ -459,13 +459,31 @@ describe('observe: automatic learning trigger', () => {
       `${[
         {
           project_id: projectId,
-          session: 'release-a',
-          input: 'npm version patch && npm test && git tag v1.2.3',
+          session: 'workflow-a',
+          event: 'tool_start',
+          tool: 'Read',
+          input: '{}',
         },
         {
           project_id: projectId,
-          session: 'release-b',
-          input: 'release notes and full tests before tag and push',
+          session: 'workflow-a',
+          event: 'tool_start',
+          tool: 'Edit',
+          input: '{}',
+        },
+        {
+          project_id: projectId,
+          session: 'workflow-b',
+          event: 'tool_start',
+          tool: 'Read',
+          input: '{}',
+        },
+        {
+          project_id: projectId,
+          session: 'workflow-b',
+          event: 'tool_start',
+          tool: 'Edit',
+          input: '{}',
         },
       ]
         .map((record) => JSON.stringify(record))
@@ -478,6 +496,6 @@ describe('observe: automatic learning trigger', () => {
     const queued = learning.loadCandidates({ scope: 'project', projectRoot });
     assert.strictEqual(queued.length, 1);
     assert.strictEqual(queued[0].status, 'pending');
-    assert.ok(!fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, 'skills', queued[0].name, 'SKILL.md')));
   });
 });
