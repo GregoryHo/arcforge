@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ArcForge — Learning suggestions</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #111;
+        --muted: #666;
+        --card-bg: #fff;
+        --border: #e0e0e0;
+        --accent: #0b6cff;
+        --danger: #b32424;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161616;
+          --fg: #f1f1f1;
+          --muted: #a8a8a8;
+          --card-bg: #1f1f1f;
+          --border: #2c2c2c;
+          --accent: #5aa6ff;
+          --danger: #ff6f6f;
+        }
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      header {
+        padding: 24px 32px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      header p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .toolbar {
+        padding: 12px 32px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .toolbar select,
+      .toolbar button {
+        font: inherit;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--fg);
+        border-radius: 6px;
+      }
+      main {
+        padding: 16px 32px 64px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card .meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .card .name {
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .card .summary {
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      .card .next {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .actions button {
+        font: inherit;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .actions button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .actions button.danger {
+        color: var(--danger);
+      }
+      .actions button[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: var(--muted);
+        padding: 48px 0;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--border);
+        color: var(--fg);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ArcForge learning</h1>
+      <p>Lightweight suggestions from the optional learning loop. Nothing here changes your project until you say so.</p>
+    </header>
+    <div class="toolbar">
+      <label>
+        Scope:
+        <select id="scope">
+          <option value="project" selected>This project</option>
+          <option value="global">Across projects</option>
+        </select>
+      </label>
+      <button id="refresh">Refresh</button>
+      <span id="counts" class="badge"></span>
+    </div>
+    <main id="cards"></main>
+    <script>
+      const DASHBOARD_TOKEN = '__ARCFORGE_DASHBOARD_TOKEN__';
+      const cardsEl = document.getElementById('cards');
+      const scopeEl = document.getElementById('scope');
+      const refreshEl = document.getElementById('refresh');
+      const countsEl = document.getElementById('counts');
+
+      function render(model) {
+        cardsEl.innerHTML = '';
+        countsEl.textContent = `${model.count} suggestion${model.count === 1 ? '' : 's'}`;
+        if (!model.candidates || model.candidates.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Nothing to review yet. Keep coding — ArcForge will surface suggestions here.';
+          cardsEl.appendChild(empty);
+          return;
+        }
+        for (const c of model.candidates) {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          const type = document.createElement('span');
+          type.textContent = c.artifact_type_label || 'Suggestion';
+          const status = document.createElement('span');
+          status.className = 'badge';
+          status.textContent = c.status_label || 'Unknown';
+          meta.append(type, status);
+
+          const name = document.createElement('div');
+          name.className = 'name';
+          name.textContent = c.name || '(unnamed)';
+
+          const summary = document.createElement('div');
+          summary.className = 'summary';
+          summary.textContent = c.summary || '';
+
+          const next = document.createElement('div');
+          next.className = 'next';
+          next.textContent = c.next_user_action || '';
+
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          actions.append(
+            actionButton('draft', 'Save draft', '', c.can_draft),
+            actionButton('dismiss', 'Dismiss', 'danger', c.can_dismiss),
+          );
+
+          card.append(meta, name, summary, next, actions);
+          for (const btn of card.querySelectorAll('button[data-act]')) {
+            btn.addEventListener('click', () => act(c.id, btn.dataset.act, btn));
+          }
+          cardsEl.appendChild(card);
+        }
+      }
+
+      function actionButton(action, label, className, enabled) {
+        const button = document.createElement('button');
+        button.dataset.act = action;
+        button.textContent = label;
+        if (className) button.className = className;
+        if (!enabled) button.disabled = true;
+        return button;
+      }
+
+      function renderError(message) {
+        cardsEl.innerHTML = '';
+        countsEl.textContent = 'Error';
+        const error = document.createElement('div');
+        error.className = 'empty';
+        error.textContent = message;
+        cardsEl.appendChild(error);
+      }
+
+      async function load() {
+        const scope = scopeEl.value;
+        try {
+          const res = await fetch(`/api/learning?scope=${encodeURIComponent(scope)}`);
+          const model = await res.json();
+          if (!res.ok) throw new Error(model.error || 'Failed to load suggestions');
+          render(model);
+        } catch {
+          renderError('Could not load learning suggestions. Refresh or restart the dashboard.');
+        }
+      }
+
+      async function act(id, action, button) {
+        const scope = scopeEl.value;
+        if (button) button.disabled = true;
+        try {
+          const res = await fetch(
+            `/api/candidates/${encodeURIComponent(id)}/${action}?scope=${encodeURIComponent(scope)}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-ArcForge-Dashboard': '1',
+                'X-ArcForge-Dashboard-Token': DASHBOARD_TOKEN,
+              },
+              body: '{}',
+            },
+          );
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            alert(data.error || 'Action failed');
+          }
+        } catch {
+          alert('Action failed');
+        } finally {
+          await load();
+        }
+      }
+
+      scopeEl.addEventListener('change', load);
+      refreshEl.addEventListener('click', load);
+      load();
+    </script>
+  </body>
+</html>

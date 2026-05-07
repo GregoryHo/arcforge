@@ -28,6 +28,10 @@ const {
   isLearningEnabled,
   triggerAutomaticLearning,
 } = require('../../scripts/lib/learning');
+const {
+  buildLearningNotification,
+  writeLearningNotification,
+} = require('../../scripts/lib/learning-dashboard');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -300,7 +304,15 @@ function runAutomaticLearningTrigger(
   projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
 ) {
   try {
-    triggerAutomaticLearning({ projectRoot });
+    const result = triggerAutomaticLearning({ projectRoot });
+    const notification = buildLearningNotification({
+      result,
+      projectId: getProjectId(projectRoot),
+    });
+    if (notification) {
+      writeLearningNotification(notification, { projectRoot });
+      console.log(notification.message);
+    }
   } catch {
     // Learning analysis is best-effort and must never block tool execution.
   }

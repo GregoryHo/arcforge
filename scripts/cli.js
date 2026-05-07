@@ -26,6 +26,7 @@
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
  *   learn status|enable|disable|analyze|inbox|review|drafts|inspect|approve|reject|accept|materialize|activate  Manage optional learning subsystem
+ *   learn dashboard [--port N]       Start localhost learning review dashboard (default: 3334)
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
@@ -343,6 +344,10 @@ COMMANDS:
                                      Write approved candidate drafts without activating behavior.
   learn activate <candidate-id> --project|--global [--json]
                                      Promote materialized drafts to active artifacts (project scope only).
+  learn dashboard [--port N]
+                                     Start a localhost review dashboard for learning suggestions
+                                     (default port: 3334). User-friendly alternative to the
+                                     analyze/inbox/inspect/accept/activate CLI flow.
 
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
@@ -1153,7 +1158,16 @@ async function main() {
           throw new Error('learn command requires --project or --global');
         };
 
-        if (subcommand === 'status') {
+        if (subcommand === 'dashboard') {
+          const { startServer } = require('./lib/learning-dashboard');
+          const rawPort = args.options.port;
+          const port = rawPort === undefined ? 3334 : Number(rawPort);
+          if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error('learn dashboard --port must be an integer from 1 to 65535');
+          }
+          startServer({ projectRoot, port });
+          return;
+        } else if (subcommand === 'status') {
           output(learning.readLearningConfig({ projectRoot }), asJson);
         } else if (subcommand === 'enable' || subcommand === 'disable') {
           const scope = resolveLearningScope();
@@ -1215,7 +1229,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [status|enable|disable|analyze|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
+            'Usage: arc learn [dashboard [--port N]|status|enable|disable|analyze|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
           );
           process.exit(1);
         }

@@ -577,9 +577,11 @@ function materializeCandidate(
     throw new Error('internal error: draft renderer produced mismatched body count');
   }
 
-  for (let i = 0; i < draftAbsPaths.length; i++) {
-    fs.mkdirSync(path.dirname(draftAbsPaths[i]), { recursive: true });
-    fs.writeFileSync(draftAbsPaths[i], draftBodies[i], 'utf8');
+  const existingDrafts = draftAbsPaths.filter((p) => fs.existsSync(p));
+  if (existingDrafts.length > 0) {
+    throw new Error(
+      `cannot materialize: draft artifact already exists: ${existingDrafts.map((p) => path.relative(projectRoot, p)).join(', ')}`,
+    );
   }
 
   const updated = {
@@ -590,6 +592,31 @@ function materializeCandidate(
   };
   candidates[index] = updated;
   rewriteCandidates(candidates, { scope, projectRoot, homeDir });
+
+  const writtenDrafts = [];
+  try {
+    for (let i = 0; i < draftAbsPaths.length; i++) {
+      fs.mkdirSync(path.dirname(draftAbsPaths[i]), { recursive: true });
+      fs.writeFileSync(draftAbsPaths[i], draftBodies[i], { encoding: 'utf8', flag: 'wx' });
+      writtenDrafts.push(draftAbsPaths[i]);
+    }
+  } catch (err) {
+    for (const p of writtenDrafts.reverse()) {
+      try {
+        fs.unlinkSync(p);
+      } catch {
+        // Best-effort cleanup; surface the original failure.
+      }
+    }
+    const latest = loadCandidates({ scope, projectRoot, homeDir });
+    const latestIndex = latest.findIndex((c) => c.id === id);
+    if (latestIndex !== -1 && latest[latestIndex].status === 'materialized') {
+      latest[latestIndex] = candidate;
+      rewriteCandidates(latest, { scope, projectRoot, homeDir });
+    }
+    throw err;
+  }
+
   return { scope, candidate: updated, draft_paths: draftPaths };
 }
 
@@ -880,7 +907,17 @@ function acceptCandidate(
   }
   if (candidate.status === 'pending') {
     transitionCandidate(id, 'approved', { scope, projectRoot, homeDir, now });
-    return materializeCandidate(id, { scope, projectRoot, homeDir, now });
+    try {
+      return materializeCandidate(id, { scope, projectRoot, homeDir, now });
+    } catch (err) {
+      const latest = loadCandidates({ scope, projectRoot, homeDir });
+      const latestIndex = latest.findIndex((c) => c.id === id);
+      if (latestIndex !== -1 && latest[latestIndex].status === 'approved') {
+        latest[latestIndex] = candidate;
+        rewriteCandidates(latest, { scope, projectRoot, homeDir });
+      }
+      throw err;
+    }
   }
   if (candidate.status === 'approved') {
     return materializeCandidate(id, { scope, projectRoot, homeDir, now });
