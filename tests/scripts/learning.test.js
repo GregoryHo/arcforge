@@ -7,12 +7,14 @@ const { execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 
 const {
+  acceptCandidate,
   activateCandidate,
   appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
   inspectCandidate,
   isLearningEnabled,
+  listLearningInbox,
   loadCandidates,
   materializeCandidate,
   readLearningConfig,
@@ -1234,6 +1236,132 @@ describe('learning subsystem MVP-1', () => {
     );
     expect(approved.status).toBe('approved');
     expect(approved.evidence[0].session_id).toBe('session-abc');
+  });
+
+  it('lists an actionable learning inbox grouped by status and artifact type', () => {
+    appendCandidate(
+      candidate({ id: 'pending-instinct', artifact_type: 'instinct', name: 'prefer-tests' }),
+      {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      },
+    );
+    appendCandidate(
+      candidate({
+        id: 'approved-command',
+        artifact_type: 'command',
+        name: 'arc-fast-review',
+        status: 'approved',
+        confidence: 0.91,
+      }),
+      { scope: 'project', projectRoot, homeDir },
+    );
+    appendCandidate(
+      candidate({
+        id: 'rejected-skill',
+        artifact_type: 'skill',
+        name: 'obsolete-flow',
+        status: 'rejected',
+        confidence: 0.99,
+      }),
+      { scope: 'project', projectRoot, homeDir },
+    );
+
+    const inbox = listLearningInbox({ scope: 'project', projectRoot, homeDir });
+
+    expect(inbox.counts).toEqual({ pending: 1, approved: 1, rejected: 1 });
+    expect(inbox.groups.by_status.pending).toEqual(['pending-instinct']);
+    expect(inbox.groups.by_artifact_type.command).toEqual(['approved-command']);
+    expect(inbox.candidates.map((entry) => entry.id)).toEqual([
+      'approved-command',
+      'pending-instinct',
+      'rejected-skill',
+    ]);
+    expect(inbox.candidates[0]).toMatchObject({
+      id: 'approved-command',
+      next_command: 'arc learn materialize approved-command --project',
+    });
+    expect(inbox.candidates[0].evidence).toBeUndefined();
+  });
+
+  it('accepts a pending project candidate by approving and materializing drafts without activation', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+
+    const result = acceptCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T00:05:00Z',
+    });
+
+    expect(result.scope).toBe('project');
+    expect(result.candidate.status).toBe('materialized');
+    expect(result.candidate.draft_paths).toEqual([
+      'skills/arc-releasing/SKILL.md.draft',
+      'tests/skills/test_skill_arc_releasing.py.draft',
+    ]);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+  });
+
+  it('keeps the accept shortcut project-only and fails closed for global candidates', () => {
+    appendCandidate(candidate({ scope: 'global' }), { scope: 'global', projectRoot, homeDir });
+
+    expect(() =>
+      acceptCandidate('arc-releasing-20260501-001', {
+        scope: 'global',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow('only project candidate accept flow is supported');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
+  });
+
+  it('points approved global inbox entries to inspection instead of unsupported materialization', () => {
+    appendCandidate(candidate({ scope: 'global', status: 'approved' }), {
+      scope: 'global',
+      projectRoot,
+      homeDir,
+    });
+
+    const inbox = listLearningInbox({ scope: 'global', projectRoot, homeDir });
+
+    expect(inbox.candidates[0]).toMatchObject({
+      id: 'arc-releasing-20260501-001',
+      next_command: 'arc learn inspect arc-releasing-20260501-001 --global',
+    });
+  });
+
+  it('CLI learn inbox and accept support the compact review flow', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    const inbox = JSON.parse(
+      execFileSync('node', [cli, 'learn', 'inbox', '--project', '--json'], {
+        env,
+        encoding: 'utf8',
+      }),
+    );
+    expect(inbox.candidates[0].next_command).toBe(
+      'arc learn approve arc-releasing-20260501-001 --project',
+    );
+
+    const accepted = JSON.parse(
+      execFileSync(
+        'node',
+        [cli, 'learn', 'accept', 'arc-releasing-20260501-001', '--project', '--json'],
+        {
+          env,
+          encoding: 'utf8',
+        },
+      ),
+    );
+    expect(accepted.candidate.status).toBe('materialized');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
   });
 
   it('activates a materialized project candidate by promoting drafts to active artifacts', () => {

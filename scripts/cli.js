@@ -25,7 +25,7 @@
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
- *   learn status|enable|disable|analyze|review|drafts|inspect|approve|reject|materialize|activate  Manage optional learning subsystem
+ *   learn status|enable|disable|analyze|inbox|review|drafts|inspect|approve|reject|accept|materialize|activate  Manage optional learning subsystem
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
 
@@ -327,6 +327,8 @@ COMMANDS:
                                      Disable new learning observations/analyzer runs for a scope.
   learn analyze --project|--global [--json]
                                      Analyze enabled observations and queue candidate learnings.
+  learn inbox --project|--global [--json]
+                                     Compact grouped review queue with next commands.
   learn review --project|--global [--json]
                                      List queued learning candidates for review.
   learn drafts --project|--global [--json]
@@ -335,6 +337,8 @@ COMMANDS:
                                      Read-only review summary for a candidate (paths and next actions).
   learn approve|reject <candidate-id> --project|--global [--json]
                                      Record user authorization decision for a candidate.
+  learn accept <candidate-id> --project [--json]
+                                     Approve and materialize drafts in one step; never activates.
   learn materialize <candidate-id> --project|--global [--json]
                                      Write approved candidate drafts without activating behavior.
   learn activate <candidate-id> --project|--global [--json]
@@ -1165,6 +1169,9 @@ async function main() {
           const scope = resolveLearningScope();
           const candidates = learning.loadCandidates({ scope, projectRoot });
           output({ scope, count: candidates.length, candidates }, asJson);
+        } else if (subcommand === 'inbox') {
+          const scope = resolveLearningScope();
+          output(learning.listLearningInbox({ scope, projectRoot }), asJson);
         } else if (subcommand === 'inspect') {
           const candidateId = args.positional[1];
           if (!candidateId) throw new Error('learn inspect requires a candidate id');
@@ -1181,6 +1188,11 @@ async function main() {
           if (!candidateId) throw new Error('learn materialize requires a candidate id');
           const scope = resolveLearningScope();
           output(learning.materializeCandidate(candidateId, { scope, projectRoot }), asJson);
+        } else if (subcommand === 'accept') {
+          const candidateId = args.positional[1];
+          if (!candidateId) throw new Error('learn accept requires a candidate id');
+          const scope = resolveLearningScope();
+          output(learning.acceptCandidate(candidateId, { scope, projectRoot }), asJson);
         } else if (subcommand === 'activate') {
           const candidateId = args.positional[1];
           if (!candidateId) throw new Error('learn activate requires a candidate id');
@@ -1203,7 +1215,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [status|enable|disable|analyze|review|drafts|inspect <id>|approve <id>|reject <id>|materialize <id>|activate <id>] [--project|--global]',
+            'Usage: arc learn [status|enable|disable|analyze|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
           );
           process.exit(1);
         }

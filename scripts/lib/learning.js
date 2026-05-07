@@ -780,6 +780,117 @@ function listMaterializedDrafts({ scope, projectRoot = process.cwd(), homeDir } 
   return { scope, count: drafts.length, drafts };
 }
 
+function commandScopeFlag(scope) {
+  return scope === 'global' ? '--global' : '--project';
+}
+
+function nextCommandFor(candidate) {
+  const base = 'arc learn';
+  const scopeFlag = commandScopeFlag(candidate.scope);
+  if (candidate.scope === 'global' && candidate.status !== 'pending') {
+    return `${base} inspect ${candidate.id} ${scopeFlag}`;
+  }
+  switch (candidate.status) {
+    case 'pending':
+      return `${base} approve ${candidate.id} ${scopeFlag}`;
+    case 'approved':
+      return `${base} materialize ${candidate.id} ${scopeFlag}`;
+    case 'materialized':
+      if (DRAFT_ONLY_ARTIFACT_TYPES.has(candidate.artifact_type)) {
+        return `${base} inspect ${candidate.id} ${scopeFlag}`;
+      }
+      return `${base} activate ${candidate.id} ${scopeFlag}`;
+    case 'activated':
+    case 'rejected':
+      return `${base} inspect ${candidate.id} ${scopeFlag}`;
+    default:
+      return `${base} inspect ${candidate.id} ${scopeFlag}`;
+  }
+}
+
+function inboxStatusRank(status) {
+  return (
+    {
+      approved: 0,
+      pending: 1,
+      materialized: 2,
+      activated: 3,
+      rejected: 4,
+    }[status] ?? 99
+  );
+}
+
+function listLearningInbox({ scope, projectRoot = process.cwd(), homeDir } = {}) {
+  assertScope(scope);
+  const candidates = loadCandidates({ scope, projectRoot, homeDir }).filter(
+    (c) => c.scope === scope,
+  );
+  const counts = {};
+  const groups = { by_status: {}, by_artifact_type: {} };
+
+  for (const candidate of candidates) {
+    counts[candidate.status] = (counts[candidate.status] || 0) + 1;
+    if (!groups.by_status[candidate.status]) groups.by_status[candidate.status] = [];
+    groups.by_status[candidate.status].push(candidate.id);
+    if (!groups.by_artifact_type[candidate.artifact_type]) {
+      groups.by_artifact_type[candidate.artifact_type] = [];
+    }
+    groups.by_artifact_type[candidate.artifact_type].push(candidate.id);
+  }
+
+  const compactCandidates = candidates
+    .slice()
+    .sort((a, b) => {
+      const rank = inboxStatusRank(a.status) - inboxStatusRank(b.status);
+      if (rank !== 0) return rank;
+      const confidence = (b.confidence || 0) - (a.confidence || 0);
+      if (confidence !== 0) return confidence;
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    })
+    .map((candidate) => ({
+      id: candidate.id,
+      scope: candidate.scope,
+      artifact_type: candidate.artifact_type,
+      name: candidate.name,
+      summary: candidate.summary,
+      confidence: candidate.confidence,
+      status: candidate.status,
+      created_at: candidate.created_at,
+      updated_at: candidate.updated_at,
+      next_command: nextCommandFor(candidate),
+      next_actions: nextActionsFor(candidate),
+    }));
+
+  return { scope, count: candidates.length, counts, groups, candidates: compactCandidates };
+}
+
+function acceptCandidate(
+  id,
+  { scope = 'project', projectRoot = process.cwd(), homeDir, now = new Date().toISOString() } = {},
+) {
+  assertScope(scope);
+  if (scope !== 'project') {
+    throw new Error('only project candidate accept flow is supported');
+  }
+  const candidates = loadCandidates({ scope, projectRoot, homeDir });
+  const candidate = candidates.find((c) => c.id === id);
+  if (!candidate) throw new Error(`candidate not found: ${id}`);
+  if (candidate.scope !== scope) {
+    throw new Error('candidate scope must match requested accept scope');
+  }
+  if (candidate.status === 'pending') {
+    transitionCandidate(id, 'approved', { scope, projectRoot, homeDir, now });
+    return materializeCandidate(id, { scope, projectRoot, homeDir, now });
+  }
+  if (candidate.status === 'approved') {
+    return materializeCandidate(id, { scope, projectRoot, homeDir, now });
+  }
+  if (candidate.status === 'materialized') {
+    return { scope, candidate, draft_paths: candidate.draft_paths || [] };
+  }
+  throw new Error('candidate must be pending, approved, or materialized to accept');
+}
+
 function readJsonLines(filePath) {
   if (!fs.existsSync(filePath)) return [];
   return fs
@@ -1437,6 +1548,7 @@ module.exports = {
   VALID_STATUSES,
   VALID_ARTIFACT_TYPES,
   DRAFT_ONLY_ARTIFACT_TYPES,
+  acceptCandidate,
   activateCandidate,
   appendCandidate,
   assertCanMaterialize,
@@ -1450,6 +1562,7 @@ module.exports = {
   getProjectId,
   inspectCandidate,
   isLearningEnabled,
+  listLearningInbox,
   listMaterializedDrafts,
   loadCandidates,
   materializeCandidate,
