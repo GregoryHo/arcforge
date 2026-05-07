@@ -1,18 +1,19 @@
 # Search Strategies
 
-Search is used by all three modes (query, ingest propagate, audit LINK). The skill supports two search backends — select the route once per session, then follow that route's section for all operations.
+Search is used by all three modes (query, ingest propagate, audit LINK). Filesystem search/read is the baseline because ordinary Markdown vault maintenance must work without QMD and without the Obsidian app open. QMD is optional QMD acceleration; `obsidian-cli search` is an optional Obsidian runtime route.
 
 ## Route Selection
 
-On first search operation, determine which backend to use:
+On first search operation, determine which route to use:
 
-1. Run `qmd status`
-2. If QMD reports collections with indexed files → **QMD Route**
-3. If QMD is not installed, reports 0 documents, or has no collections → **Fallback Route**
+1. If the registry's `search.qmd_collection` is set, run `qmd status`.
+2. If QMD is installed, the collection exists, and files are indexed → **QMD Route**.
+3. Else if Obsidian is running and `obsidian-cli search` works for this vault → **Obsidian Runtime Route**.
+4. Else → **Filesystem Fallback Route** using normal file search/read tools.
 
-When using fallback, warn once: *"QMD not available — search quality will be reduced (keyword-only, no semantic matching). Run `qmd collection add <vault-path> --name obsidian-vault && qmd embed` to enable hybrid search."*
+When QMD is unavailable, warn once only if the user expected semantic search: *"QMD is not configured — using filesystem/keyword search. Semantic matching and reranking are unavailable until you enable optional QMD."*
 
-The route stays the same for the entire session. Don't re-check between operations.
+The route stays the same for the entire session unless the user changes registry/config.
 
 ---
 
@@ -104,9 +105,9 @@ Without sync, newly created notes are invisible to QMD until the next manual upd
 
 ---
 
-## Fallback Route: obsidian-cli
+## Obsidian Runtime Route: obsidian-cli
 
-When QMD is unavailable, use `obsidian-cli search` for all search operations. This provides keyword-only BM25 matching — no semantic search, no query expansion, no reranking.
+When optional QMD is unavailable but Obsidian is running, `obsidian-cli search` provides keyword matching through Obsidian's runtime. This route is useful for active-vault awareness and plugin-backed search, but it is not required for ordinary Markdown maintenance.
 
 ### Query Mode
 
@@ -141,19 +142,56 @@ Without QMD's semantic layer, resolve mentions with a multi-step cascade:
 
 ### Index Sync
 
-No sync needed — `obsidian-cli search` reads the vault filesystem directly and always reflects the current state.
+No sync needed — `obsidian-cli search` reads the vault filesystem through Obsidian runtime and reflects current state when the app is healthy.
+
+---
+
+## Filesystem Fallback Route
+
+Filesystem fallback is the baseline. Use regular file search/read tools over Markdown files in the resolved vault. This route is keyword-only but deterministic and works when both QMD and Obsidian runtime are absent.
+
+### Query Mode
+
+Search filenames, frontmatter, headings, aliases, and body text. Run several narrow searches instead of one broad semantic query:
+
+| Question Type | Strategy |
+|---|---|
+| "What do I know about X?" | Search for `X` in filenames, aliases, tags, headings, and body text. Read `index.md` first if present. |
+| "How does X relate to Y?" | Search `X`, search `Y`, then read overlapping notes / MOCs / Syntheses. |
+| "Summarize everything about X" | Search `X`, then expand through wikilinks and `sources:` fields from the strongest hits. |
+| "Do I have notes on X?" | Count matching files and list the most relevant titles. |
+| "What papers cite / are cited by X?" | Read paper Source frontmatter and follow `cites:` / `cited_by:` arrays directly. |
+
+### Propagate Search (Ingest Mode)
+
+1. Extract key concepts from the new note.
+2. Search exact names, aliases, tags, and important noun phrases across Markdown files.
+3. Union and deduplicate results.
+4. Filter and prioritize according to the vault's SCHEMA.md types.
+5. Cap at 10 results.
+
+### LINK Resolution (Audit Mode)
+
+1. Search exact note titles and aliases first.
+2. Search partial key words if exact/alias search fails.
+3. Use frontmatter aliases and H1 headings to choose the target.
+4. If ambiguous, leave unresolved and report for GROW; do not create a stub.
+
+### Index Sync
+
+No sync is needed. Filesystem search reads current Markdown files directly.
 
 ### What You Lose
 
-| Capability | QMD | Fallback |
-|---|---|---|
-| Keyword matching (BM25) | Yes | Yes |
-| Semantic matching (vector) | Yes | No |
-| Query expansion | Yes | No |
-| LLM reranking | Yes | No |
-| Single-query LINK resolution | Yes | No (multi-step cascade) |
-| Structured queries (lex+vec) | Yes | No |
-| Hypothetical doc search (hyde) | Yes | No |
+| Capability | QMD | Obsidian Runtime | Filesystem Fallback |
+|---|---|---|---|
+| Keyword matching | Yes | Yes | Yes |
+| Semantic matching | Yes | No | No |
+| Query expansion | Yes | No | Manual only |
+| LLM reranking | Yes | No | No |
+| Single-query LINK resolution | Yes | No | No |
+| Structured queries (lex+vec) | Yes | No | No |
+| Works without Obsidian open | Yes | No | Yes |
 
 ---
 

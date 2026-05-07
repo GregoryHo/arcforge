@@ -1229,7 +1229,7 @@ function Footer({
     style: {
       color: t.dim
     }
-  }, "MIT \xB7 v3.0.0 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
+  }, "MIT \xB7 v3.0.1 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
     className: "af-footer-links",
     style: {
       display: 'flex',

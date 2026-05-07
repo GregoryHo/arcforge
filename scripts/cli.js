@@ -343,6 +343,15 @@ COMMANDS:
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
 
+  obsidian register --path <p> --name <n> [--default] [--preset <p>] [--scope "..."]
+                          [--search-preferred filesystem|qmd|obsidian-cli] [--qmd-collection <name>]
+                                     Add a vault to the registry at ~/.arcforge/obsidian-vaults.json.
+                                     First-registered vault becomes default automatically.
+                                     --qmd-collection implies --search-preferred=qmd.
+  obsidian unregister <name>         Remove the named vault entry (vault files untouched).
+  obsidian set-default <name>        Set the default vault.
+  obsidian list-vaults [--json]      List registered vaults.
+
 ENVIRONMENT:
   CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
 
@@ -1218,6 +1227,93 @@ async function main() {
           );
           process.exit(1);
         }
+        break;
+      }
+
+      case 'obsidian': {
+        const subcommand = args.positional[0];
+        const registry = require('./lib/obsidian-registry');
+
+        if (subcommand === 'register') {
+          const name = args.options.name;
+          const vaultPath = args.options.path;
+          if (!name || !vaultPath) {
+            console.error(
+              'Usage: arc obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."]',
+            );
+            process.exit(1);
+          }
+          const search = {};
+          if (args.options['search-preferred']) {
+            search.preferred = args.options['search-preferred'];
+          }
+          if (args.options['qmd-collection']) {
+            search.qmd_collection = args.options['qmd-collection'];
+            if (!search.preferred) search.preferred = 'qmd';
+          }
+          const result = registry.addVault(
+            {
+              name,
+              path: vaultPath,
+              preset: args.options.preset || '',
+              scope: args.options.scope || '',
+              ...(Object.keys(search).length ? { search } : {}),
+            },
+            { makeDefault: !!args.flags.default },
+          );
+          output(
+            {
+              registered: result.entry.name,
+              path: result.entry.path,
+              becameDefault: result.becameDefault,
+            },
+            asJson,
+          );
+          break;
+        }
+
+        if (subcommand === 'unregister') {
+          const name = args.positional[1];
+          if (!name) {
+            console.error('Usage: arc obsidian unregister <name>');
+            process.exit(1);
+          }
+          const result = registry.removeVault(name);
+          output({ removed: result.removedName, clearedDefault: result.clearedDefault }, asJson);
+          break;
+        }
+
+        if (subcommand === 'set-default') {
+          const name = args.positional[1];
+          if (!name) {
+            console.error('Usage: arc obsidian set-default <name>');
+            process.exit(1);
+          }
+          const result = registry.setDefault(name);
+          output({ default: result.defaultName }, asJson);
+          break;
+        }
+
+        if (subcommand === 'list-vaults') {
+          const reg = registry.readRegistry();
+          if (asJson) {
+            output(reg, true);
+          } else if (reg.vaults.length === 0) {
+            console.log('No vaults registered. Run: arc obsidian register --name X --path Y');
+          } else {
+            for (const v of reg.vaults) {
+              const tag = reg.default === v.name ? ' (default)' : '';
+              const preset = v.preset ? ` [${v.preset}]` : '';
+              console.log(`  ${v.name}${tag}${preset} → ${v.path}`);
+            }
+          }
+          break;
+        }
+
+        console.error(
+          'Usage: arc obsidian <register|unregister|set-default|list-vaults> [...args]',
+        );
+        process.exit(1);
         break;
       }
 

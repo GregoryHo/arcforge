@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { readJsonFile, writeJsonFile } = require('./utils');
 
 const VALID_SCOPES = new Set(['project', 'global']);
 const VALID_STATUSES = new Set(['pending', 'approved', 'rejected', 'materialized', 'activated']);
@@ -59,14 +60,6 @@ function getObservationPath({ projectRoot = process.cwd(), homeDir } = {}) {
   );
 }
 
-function readJsonFile(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return fallback;
-  }
-}
-
 function defaultScopeConfig(scope) {
   return { scope, enabled: false };
 }
@@ -86,11 +79,6 @@ function readLearningConfig({ projectRoot = process.cwd(), homeDir } = {}) {
 
 function isLearningEnabled({ scope = 'project', projectRoot = process.cwd(), homeDir } = {}) {
   return readScopeConfig({ scope, projectRoot, homeDir }).enabled === true;
-}
-
-function writeJsonFile(filePath, data) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
 function setLearningEnabled({

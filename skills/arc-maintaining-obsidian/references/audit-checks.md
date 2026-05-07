@@ -1,186 +1,184 @@
-# Audit Checks
+# Audit Checks (mechanism)
+
+The skill ships only the **mechanical** audit primitives that work on any
+Obsidian vault. Domain choices — what's stale, which tags are allowed,
+which thresholds trigger Internal/External GROW suggestions, how big the
+log can grow before rotation — are declared per vault in `SCHEMA.md` and
+applied at runtime via "Vault-Declared LINT" at the bottom. The skill
+never invents thresholds the vault hasn't declared.
 
 ## Scope
 
-The auditor operates on the **wiki layer** — plain Markdown notes (`.md`) that represent processed knowledge.
+The auditor operates on the **wiki layer** — typed Markdown notes with
+frontmatter. Raw Sources are subjected only to the Source Drift Check.
 
 ### What to scan
-- All `.md` files that are user-created knowledge artifacts
+- All `.md` files declared as typed-note/domain-layer types by the resolved
+  vault's `SCHEMA.md`.
 
 ### What to skip
-- **Plugin-managed folders** — Detect dynamically. If the Excalidraw plugin is installed, read its script folder via `obsidian eval code="app.plugins.plugins['obsidian-excalidraw-plugin'].settings.scriptFolderPath"` and exclude that folder. Apply the same pattern for any plugin that stores non-note files.
-- **Raw Source files** — Non-Markdown files (`.excalidraw.md`, `.html`, `.pdf`, `.png`, `.jpg`, `.canvas`) are Raw Sources, not wiki-layer notes.
-- **Excalidraw drawings stored as `.md`** — Some Excalidraw drawings use plain `.md` extension instead of `.excalidraw.md`. Detect by checking frontmatter for `excalidraw-plugin: parsed`. These are Raw Sources, not wiki-layer notes — skip them in LINT and exclude from the index. During GROW, treat them the same as `.excalidraw.md` files (check for un-ingested content via `## Text Elements`).
+- **Plugin-managed folders** — Detect dynamically via
+  `obsidian eval code="app.plugins.plugins['<id>'].settings.scriptFolderPath"`
+  and exclude. Excalidraw plugin is the common case.
+- **Raw Source files** — Non-Markdown (`.excalidraw.md`, `.html`, `.pdf`,
+  `.png`, `.jpg`, `.canvas`). Subject to Source Drift Check (LINT) and
+  Un-ingested detection (GROW), not schema compliance.
+- **Excalidraw drawings stored as `.md`** — Detect by `excalidraw-plugin: parsed`
+  in frontmatter. Skip in LINT, exclude from index.
+- **Folders the vault AGENTS.md declares out of scope** — read AGENTS.md
+  for the exclusion list.
 
-## LINK Checks
+## LINK — Relationship Resolution (mechanism)
 
-### Relationship Resolution
-- Find notes with `## Relationships` sections containing plain text (no `[[` links)
-- For each mention, search vault using `qmd query` — the semantic layer resolves mentions even when titles don't exactly match the plain text (e.g., "Karpathy's wiki idea" → matches note titled "LLM-Wiki-Mechanism")
-- Replace plain text with `[[wikilinks]]` where matches are found
-- Add backlink references to target notes: append "Referenced by: `[[source note]]`"
-- Update MOC notes when new notes match their declared scope
+- Find notes with plain-text `## Relationships` sections (no `[[` links).
+- For each mention, search vault using `qmd query` — semantic match
+  resolves mentions even when titles don't match (e.g., "Karpathy's wiki
+  idea" → matches "LLM-Wiki-Mechanism").
+- Replace plain text with `[[wikilinks]]` where matches are found.
+- Add backlink references to target notes: append "Referenced by:
+  `[[source note]]`".
+- Update aggregator notes (e.g., MOC / Topic / Milestone / DailyAggregate, per vault SCHEMA.md) when new notes match their declared `scope:` or roll-up criteria.
+- Collect unresolved mentions → pass to GROW as entity candidates.
+- Single-file mode: `link --file=<path>` runs LINK on one note only.
 
-### Unresolved Mentions
-- Collect all plain-text mentions where no vault match was found
-- Pass to GROW as high-confidence entity candidates
-
-### Single-File Mode
-When invoked with `link --file=<path>`, run LINK on only that one note. Same resolution logic, scoped to one file.
-
-## LINT Checks
+## LINT — Mechanical Checks
 
 ### Schema Compliance
-- Every note with a `type` field must have the required frontmatter for that type:
-  - Source: `type`, `created`, `source_url`, `tags`, `aliases`
-  - Entity: `type`, `created`, `entity_type`, `tags`, `aliases`
-  - Synthesis: `type`, `created`, `sources`, `tags`, `aliases`
-  - MOC: `type`, `created`, `scope`, `tags`, `aliases`
-  - Decision: `type`, `created`, `status`, `tags`, `aliases`
 
-**YAML format caution:** Obsidian uses two equivalent list formats. Both are valid — check for both before reporting "missing" or "empty" fields:
+Validate each note's frontmatter against the type's frontmatter declared
+by the vault's `SCHEMA.md`. The skill loaded the schema at Domain
+Contract Orientation; cross-check each `type:` field against its declared
+shape.
+
+**YAML format caution:** Obsidian uses two equivalent list formats. Both
+are valid — check for both before reporting "missing" or "empty":
+
 ```yaml
-# Inline (single line)
+# Inline
 tags: [arcforge, tdd]
 
-# Block (multi-line, indented with -)
+# Block (multi-line, indented)
 tags:
   - arcforge
   - tdd
 ```
-A field like `tags:` with no inline value is NOT empty if the next lines are indented `  - ` items. Read the full frontmatter block, not just the key's line.
+
+A field with no inline value is NOT empty if the next lines are indented
+`  - ` items. Read the full frontmatter block.
 
 ### Orphan Detection
-- Notes with zero inbound or outbound links
-
-### Stale Detection
-- Source notes older than 30 days with no synthesis note referencing them
-
-### Tag Hygiene
-- Unused tags (defined but never used)
-- Inconsistent naming (e.g., `#AI` vs `#ai`)
-- Missing tags (notes with no tags at all)
+- Notes with zero inbound or outbound links.
 
 ### Untyped Notes
-- Notes without a `type` field in frontmatter
-- Report but never auto-fix — list under "Untyped" in reports
-
-### Index Freshness
-Auto-generate or update `index.md` in vault root every LINT pass:
-
-```markdown
-# Vault Index
-Last updated: YYYY-MM-DD
-
-## Sources
-- [[Note Title]] — one-line summary
-
-## Entities
-- [[Note Title]] — one-line summary
-
-## Syntheses
-- [[Note Title]] — one-line summary
-
-## Maps of Content
-- [[Note Title]] — one-line summary
-
-## Decisions
-- [[Note Title]] — one-line summary
-
-## Untyped
-- [[Note Title]] — (no type)
-```
-
-Only include typed wiki-layer notes (skip Raw Sources, audit reports, plugin-managed files).
+- Notes without a `type` field. Report under "Untyped"; never auto-fix.
 
 ### Log Consistency
-- Verify `log.md` entries reference existing vault files
-- For notes with `created:` date newer than first `log.md` entry, flag missing log entries
+- Verify `log.md` entries reference existing vault files.
+- For notes with `created:` newer than their first `log.md` entry, flag
+  missing log entries.
 
-### EVOLVE Checks (Schema Evolution)
+### Source Drift Check (uses sha256)
 
-These checks detect schema drift — patterns in actual usage that suggest the schema should evolve:
+For each Raw Source:
 
-| Check | What It Detects | Example |
-|---|---|---|
-| **Field usage analysis** | Fields that are 90%+ empty across a type, or extra fields appearing in 80%+ of a type | "`source_author` is empty in 90% of Source notes" |
-| **Type fit analysis** | Notes whose section structure doesn't match their declared type | "12 Entity notes have `## Steps` sections — tutorial pattern?" |
-| **Tag drift** | Tags used 10+ times that aren't in any schema definition | "#distributed-systems used in 15 notes — formalize?" |
+1. **Local raw files (no URL):** re-hash the body bytes (after frontmatter,
+   UTF-8, line endings normalized to `\n`) per `references/page-templates.md`.
+2. **Remote URLs:** if fetchable, re-fetch and compute body sha256.
+3. Compare to stored `sha256`:
 
-Report in the Schema Issues section of the audit report. These are observations, not errors — the user decides whether to evolve the schema.
-
-## GROW Thresholds
-
-### Internal Suggestions (create artifacts)
-
-| Pattern | Threshold | Suggestion |
-|---|---|---|
-| Sources without synthesis | 5+ source notes reference a topic with no synthesis | "Consider a synthesis note connecting these sources" |
-| Mentions without entity | 3+ notes mention an entity with no entity note | "Consider an entity note for [name]" |
-| Notes without MOC | 8+ notes in a topic area with no MOC | "Consider a Map of Content for [topic]" |
-| Referenced entities missing | Source notes reference entities that don't exist | "These entities appear in sources but have no notes: [list]" |
-| LINK failures | Unresolved plain-text mentions from LINK | "LINK couldn't resolve these — consider creating entity notes: [list]" |
-
-### External Suggestions (investigate topics)
-
-| Pattern | Suggestion |
+| State | Action |
 |---|---|
-| Thin coverage (1-2 sources on a topic) | "Thin coverage — consider searching for more. Try: [2-3 search terms]" |
-| Concept referenced but unexplored | "[Concept] appears in N sources but has no dedicated note or external sources — worth investigating?" |
-| Open questions in Synthesis notes | "These open questions might be answerable with research: [list from ## Open Questions sections]" |
-| Stale topics (>90 days, no updates) | "These topics may have new developments worth checking: [list]" |
+| New == stored | Fresh. No log line. |
+| New ≠ stored | **Drift.** Append `drift | <filename> | sha=<old>→<new>` to log.md. Report under "Source Drift". Informational. |
+| Stored is empty | **Unhashed.** Compute and write sha256 + `ingested`. Offer batch backfill via `audit lint --backfill-sha256`. |
+
+Drift never auto-fixes the wiki layer.
+
+### EVOLVE Pattern Detection
+
+Detect schema drift — patterns in actual usage suggesting the vault's
+declared schema should evolve:
+
+| Check | Pattern Detected | Example |
+|---|---|---|
+| **Field usage analysis** | Fields 90%+ empty across a type, or extra fields appearing in 80%+ of a type | "`source_author` empty in 90% of Source notes" |
+| **Type fit analysis** | Section structure doesn't match declared type | "12 Entity notes have `## Steps` — tutorial pattern?" |
+| **Tag drift** | Tags used 10+ times not in vault's tag taxonomy | "#distributed-systems used 15× — formalize?" |
+
+Observations, not errors. The user decides whether to evolve schema /
+taxonomy.
+
+## GROW — Pattern Detection (mechanism)
+
+The mechanical patterns the skill detects. **All thresholds are
+vault-declared in SCHEMA.md `## Audit Thresholds`** — the skill never
+invents numbers.
+
+### Internal Patterns (suggest creating an artifact)
+
+The skill detects clustering / coverage patterns; the vault declares
+which note types play "leaf" vs "aggregator" roles, and what threshold
+triggers a suggestion. Examples in the table use generic phrasing — the
+preset's SCHEMA.md maps these to its types (LLM-Wiki: Source/Synthesis,
+news: Article/DailyAggregate, project-tracker: Task/Milestone, etc.).
+
+| Pattern | Skill detects | Vault declares |
+|---|---|---|
+| Leaves without aggregator | Topic clusters of leaf-type notes lacking a roll-up note | Leaf type, aggregator type, threshold count |
+| Recurring mentions without dedicated note | Plain-text mentions repeated across notes with no note for that mention | Mention-handling note type (Entity / Topic / etc.), threshold count |
+| Note clusters without index/MOC | Topics with N+ notes lacking a map-of-content | Index type, threshold N |
+| LINK failures | Unresolved plain-text mentions from LINK | (always reports) |
+
+### External Patterns (suggest external research / investigation)
+
+| Pattern | Skill detects | Vault declares |
+|---|---|---|
+| Thin coverage | Topics with 1-2 sources — suggest search terms to investigate | (informational) |
+| Concept referenced but unexplored | Names appearing in N sources, no dedicated note | (informational) |
+| Open questions | Listed in `## Open Questions` sections (per vault SCHEMA.md) | (informational) |
+| Stale topics | Modified > N days ago | Threshold N |
 
 ### Un-ingested Raw Sources
 
-During GROW, detect non-Markdown files with meaningful content but no corresponding Source note:
-
-| File Type | Meaningful content signal |
-|---|---|
-| `.excalidraw.md` | Has `## Text Elements` with text content |
-| `.html` | File size > 1KB |
-| `.pdf` | Exists in vault |
-| `.png` / `.jpg` | Not inside a plugin-managed folder |
-
-Suggest: "These files have content that hasn't been ingested — consider running ingest to create Source notes from them."
+During GROW, detect non-Markdown files with content but no corresponding
+Source note (per `references/page-templates.md` "Detecting Un-ingested
+Raw Sources").
 
 ### Duplicate Detection
 
-Before suggesting new artifacts, check for potential duplicates (80%+ title match with existing note). Skip the suggestion if a near-match exists.
+Before suggesting a new artifact, check 80%+ title match with existing
+notes. Skip the suggestion if a near-match exists.
 
-### Citation Graph Checks (Paper Sources)
+## Vault-Declared LINT (extensibility)
 
-These checks apply only to Source notes with `reading_status` in their frontmatter (i.e., paper variants).
+The audit pipeline reads vault `SCHEMA.md` at Domain Contract Orientation
+and applies the additional checks declared there in addition to the
+mechanical primitives above. The skill never invents thresholds the vault
+hasn't declared.
 
-| Check | What It Detects | Action |
-|---|---|---|
-| **Citation orphans** | `cites:` entries that are plain text (not wikilinks to vault notes) | GROW suggestion: "This paper cites [title] which isn't in your vault — ingest it?" Prioritize by: how many vault papers cite the same missing paper |
-| **Reverse citation updates** | A newly ingested paper cites an existing vault paper, but the existing paper's `cited_by:` doesn't include it | Auto-fix: add to `cited_by:` (this is a LINK-level fix, not GROW) |
-| **High-impact missing papers** | A paper appears in 3+ vault papers' `cites:` but has no vault note | High-priority GROW: "N papers in your vault cite [title] — strongly consider ingesting" |
-| **Citation island** | A paper has empty `cites:` and `cited_by:` despite being `deep-read` or `extracted` | Flag: "This paper has no citation connections — was Related Work parsed?" |
+Common categories a vault may declare:
 
-### Reading Status Checks
+| Category | Examples |
+|---|---|
+| Index size / split | "any `index.md` section > 50 → group", "total > 500 → per-type files" |
+| MOC trigger | "total typed notes > 200 → suggest MOC" |
+| Log rotation | "log.md > 500 entries → rotate to `log-YYYY.md`" |
+| Tag taxonomy | "unknown top-level → flag", "near-duplicates → flag" |
+| Entity creation | "central / 3+ refs / explicit only" |
+| Split & archive | "notes > 200-250 lines → split candidate" |
+| Synthesis citation | "3+ sources → inline `[[wikilink]]` cite required" |
+| Stale detection | "Source notes > 30 days without synthesis" |
+| Citation graph (papers) | "high-impact missing paper appears in 3+ vault `cites:`" |
+| Reading status (papers) | "queued >14d", "skimmed >30d" |
+| Claim consistency (papers) | "uncontested conflict", "evidence asymmetry" |
 
-| Check | What It Detects | Suggestion |
-|---|---|---|
-| **Queued backlog** | Papers in `queued` status for >14 days | Report count: "N papers queued for >2 weeks" |
-| **Priority queue** | `queued` papers with high `cited_by` count in vault | "These queued papers are cited by N vault papers — prioritize reading: [list]" |
-| **Stale skimmed** | Papers in `skimmed` status for >30 days | "N papers skimmed but never deep-read — promote or archive?" |
-| **Incomplete extraction** | Papers in `deep-read` with empty `cites:` | "These papers were deep-read but Related Work wasn't parsed — run extraction to complete?" |
-
-### Claim Consistency Checks
-
-Scan all paper Source notes with `## Claims` sections:
-
-| Check | What It Detects | Report |
-|---|---|---|
-| **Uncontested conflicts** | Two papers make contradictory claims but neither has `Status: contested` | "⚠️ Claim conflict: Paper A says X, Paper B says Y — neither is marked contested" |
-| **Evidence asymmetry** | A `contested` claim has weaker evidence than the contesting paper's claim | Note in report: "Paper A's claim (weak evidence) contested by Paper B (strong evidence) — consider marking superseded" |
-| **Stale supported claims** | Claims marked `supported` from papers >1 year old with no recent corroboration | "These claims haven't been corroborated by recent papers — worth checking" |
-
-Claim checks are observations — flag in the audit report but never auto-modify claim statuses. The user decides.
+Honoring vault-declared LINT means: read the vault SCHEMA.md sections,
+apply the rules, include findings in the audit report under appropriately
+named subsections.
 
 ## Batch Mode
 
-- **Default**: 50 most recently modified notes
-- **Full scan**: `--all` flag
-- Report scope at start: "Scanning 50 most recent notes (use --all for full vault)."
+- **Default**: 50 most recently modified notes.
+- **Full scan**: `--all` flag.
+- Report scope at start: "Scanning 50 most recent notes (use `--all` for
+  full vault)."
