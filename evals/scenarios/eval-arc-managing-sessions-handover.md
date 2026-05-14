@@ -1,4 +1,4 @@
-# Eval: eval-arc-managing-sessions-quick-handover
+# Eval: eval-arc-managing-sessions-handover
 
 ## Scope
 skill
@@ -11,16 +11,17 @@ We just finished a short read-only Q&A session about why a CI badge was stale. N
 
 The user says: "Wrap this up with a handover for next time."
 
-Respond with the handover only.
+Respond inline with the handover.
 
 Constraints:
 - Do not edit files.
+- Do not invoke the handover CLI command (it writes a file; this trivial Q&A wrap-up does not warrant one).
 - Do not create an archive or saved session.
 - Keep the response concise.
-- Include whether archiving is recommended and why.
+- Include whether archiving (the `save` path) is recommended and why.
 
 ## Context
-This is a lightweight behavioral eval for `arc-managing-sessions`. The target behavior is choosing quick handover over durable archive for a pure Q&A/read-only wrap-up.
+This is a lightweight behavioral eval for `arc-managing-sessions`. The target behavior is producing a brief inline handover for a pure Q&A wrap-up while explicitly noting that durable archive (the `save` command) is not warranted. The `handover` CLI writes a file and is meant for real work-in-flight with a concrete next step; pure Q&A does not have one.
 
 This is a non-regression eval: baseline agents may produce a reasonable summary, so the treatment is judged directly against the contract rather than by requiring a large baseline delta.
 
@@ -31,10 +32,10 @@ skip
 non-regression
 
 ## Assertions
-- [ ] A1: The response provides a concise quick handover with current context and next step.
+- [ ] A1: The response provides a concise handover with current context and next step.
 - [ ] A2: The response says archive is not recommended, using an explicit archive recommendation of no or equivalent.
 - [ ] A3: The response gives a reason tied to pure Q&A, read-only inspection, no durable decision, or immediate continuity only.
-- [ ] A4: The response does not create or claim to create an archive/session file.
+- [ ] A4: The response does not create or claim to create an archive/saved session file.
 
 ## Grader
 code
@@ -46,7 +47,7 @@ import os
 import re
 import sys
 
-scenario = "eval-arc-managing-sessions-quick-handover"
+scenario = "eval-arc-managing-sessions-handover"
 root = Path(os.environ["PROJECT_ROOT"])
 trial = Path(os.environ["TRIAL_DIR"])
 
@@ -66,11 +67,13 @@ def emit(label, ok, reason=""):
 handover_terms = re.search(r"handover|context|next step|next time|resume|pick up", low)
 concise = len(re.findall(r"(?m)^\s*[-*]\s+", out)) <= 8 and len(out.split()) <= 220
 a1 = bool(handover_terms and concise and re.search(r"next", low))
-emit("A1", a1, "missing concise quick handover with next step")
+emit("A1", a1, "missing concise handover with next step")
 
 archive_no = (
-    re.search(r"archive (recommendation|recommended)\??(?:\*\*)?\s*:?(?:\*\*)?\s*(no|not recommended|不要|不建議)", low)
-    or re.search(r"(do not|don't|not)\s+archive|archive\s+(is\s+)?not\s+recommended|不建議.*archive", low)
+    # "archive ... recommendation/recommended ... no/not-recommended" — lazy, tolerates arbitrary
+    # separators between tokens (parens, slashes, backticks, markdown bold), within 30+15 chars.
+    re.search(r"archive[\s\S]{0,30}?(recommendation|recommended)[\s\S]{0,15}?\**\s*(no|not recommended|不要|不建議)", low)
+    or re.search(r"(do not|don't|not)\s+archive|archive\s+(is\s+)?not\s+recommended|archive[\s\S]{0,40}not\s+recommended|不建議.*archive", low)
 )
 a2 = bool(archive_no)
 emit("A2", a2, "missing explicit no archive recommendation")
@@ -80,9 +83,10 @@ a3 = bool(reason)
 emit("A3", a3, "missing reason for not archiving")
 
 created_claim = re.search(
-    r"\b(i|we)\s+(created|saved|archived|wrote|written).{0,40}(file|archive|session)|"
-    r"\b(created|saved|archived|wrote|written)\s+(an?\s+)?(archive|session file)|"
-    r"~/.arcforge|session-.*\.md",
+    # First-person claim of having actually created/saved/etc. an artifact
+    r"\b(i|we)\s+(created|saved|archived|wrote|written|stored)\b.{0,40}(file|archive|session)|"
+    # Explicit storage path / filename mention (real evidence of file creation)
+    r"~/\.?arcforge|session-[a-z0-9_\-]+\.md|handover-[a-z0-9_\-]+\.md",
     low,
 )
 # Ignore harness-created hidden files such as .git and .claude/settings.json.
@@ -97,4 +101,4 @@ PY
 5
 
 ## Version
-1
+4

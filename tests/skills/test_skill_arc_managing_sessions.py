@@ -77,14 +77,25 @@ def test_arc_managing_sessions_has_wait_rule():
     assert "wait" in text.lower() and "confirm" in text.lower()
 
 
-def test_arc_managing_sessions_documents_handover_modes():
-    """Lightweight handover must be the default session continuity path."""
+def test_arc_managing_sessions_documents_handover():
+    """Handover command must be a lean, file-writing primary path — no modes."""
     text = _read_skill().lower()
 
-    assert "quick handover" in text
-    assert "full context summary" in text
-    assert "tail handover" in text or "continue-from-here" in text
-    assert "archive snapshot" in text
+    # Old mode vocabulary must be gone — handover is now a single command, not three modes.
+    assert "quick handover" not in text, "old mode label 'quick handover' must be removed"
+    assert "full context summary" not in text, "old mode label 'full context summary' must be removed"
+    assert "tail handover" not in text, "old mode label 'tail handover' must be removed"
+    assert "continue-from-here" not in text, "old mode label 'continue-from-here' must be removed"
+    assert "archive snapshot" not in text, "old mode label 'archive snapshot' must be removed"
+
+    # Required new content: the handover artifact and command surface.
+    assert "# handover:" in text, "missing example handover artifact title"
+    assert "## what to do next" in text, "missing 'What to do next' section in handover artifact"
+    assert "--next-step" in text, "missing --next-step CLI flag in docs"
+    assert "--focus" in text, "missing --focus CLI flag in docs"
+    assert "handover-{slug}.md" in text, "missing handover file naming convention"
+
+    # Framing principle: handover is the frequent path, archive (save) is the rare one.
     assert "default = handover, not archive" in text
 
 

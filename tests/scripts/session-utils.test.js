@@ -10,6 +10,7 @@ const {
   getProcessedLogPath,
   parseProcessedLog,
   updateProcessedLog,
+  generateHandover,
 } = require('../../scripts/lib/session-utils');
 
 describe('session-utils', () => {
@@ -111,6 +112,73 @@ describe('session-utils', () => {
       const content = fs.readFileSync(logPath, 'utf-8');
       expect(content).toContain('diary-new.md');
       expect(content).toContain('reflection-1.md');
+    });
+  });
+
+  describe('generateHandover', () => {
+    const baseOpts = {
+      date: '2026-05-14',
+      sessionId: 'session-abc123',
+      cwd: '/Users/test/project',
+    };
+
+    it('emits only required sections when only nextStep provided', () => {
+      const out = generateHandover({
+        ...baseOpts,
+        nextStep: 'Continue editing X',
+      });
+
+      expect(out).toContain('# Handover: continue from where we left off');
+      expect(out).toContain('**From:** 2026-05-14 / session-abc123');
+      expect(out).toContain('**Cwd:** /Users/test/project');
+      expect(out).toContain('## What to do next');
+      expect(out).toContain('Continue editing X');
+      expect(out).not.toContain('## Context');
+      expect(out).not.toContain('## Pointers');
+      expect(out).not.toContain("## Don't redo");
+      expect(out).not.toContain('TO BE ENRICHED');
+    });
+
+    it('uses focus in title and renders all four sections when full opts provided', () => {
+      const out = generateHandover({
+        ...baseOpts,
+        focus: 'phases 4-5 of runtime plan',
+        nextStep: 'Continue at docs/plans/X.md from Phase 4',
+        context: 'Plan has 5 phases; 1-3 done.',
+        pointers: 'docs/plans/X.md:80-160',
+        dontRedo: 'Phase 3 tried Z; abandoned for W.',
+        branch: 'feat/runtime-plan',
+      });
+
+      expect(out).toContain('# Handover: phases 4-5 of runtime plan');
+      expect(out).toContain('**Branch:** feat/runtime-plan');
+      expect(out).toContain('## What to do next');
+      expect(out).toContain('## Context');
+      expect(out).toContain('## Pointers');
+      expect(out).toContain("## Don't redo");
+      // Order: What to do next → Context → Pointers → Don't redo
+      const order = [
+        out.indexOf('## What to do next'),
+        out.indexOf('## Context'),
+        out.indexOf('## Pointers'),
+        out.indexOf("## Don't redo"),
+      ];
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    });
+
+    it('omits the Branch line when branch is null', () => {
+      const out = generateHandover({
+        ...baseOpts,
+        nextStep: 'do thing',
+        branch: null,
+      });
+
+      expect(out).not.toContain('**Branch:**');
+      expect(out).toContain('**Cwd:**');
+    });
+
+    it('throws when nextStep is missing', () => {
+      expect(() => generateHandover({ ...baseOpts, focus: 'x' })).toThrow(/next.?step/i);
     });
   });
 });

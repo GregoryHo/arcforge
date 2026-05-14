@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { buildTriggerFingerprint } = require('./fingerprint');
+const { kebabSlug } = require('./utils');
 
 // ─────────────────────────────────────────────
 // Instinct Accessors
@@ -140,21 +141,12 @@ function generateName(cluster, type) {
     raw = sorted.join(' ');
   }
 
-  // Clean: strip leading "when ", sanitize to kebab-case
-  let cleaned = raw
-    .toLowerCase()
-    .replace(/^when\s+/i, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  // Truncate to 30 chars (accounting for arc- prefix for skills)
-  const maxLen = type === 'skill' ? 26 : 30; // arc- is 4 chars
-  if (cleaned.length > maxLen) {
-    cleaned = cleaned.substring(0, maxLen).replace(/-+$/, '');
-  }
+  // Skill names are namespaced `arc-{slug}`, so the slug budget shrinks by 4 chars.
+  const maxLen = type === 'skill' ? 26 : 30;
+  let cleaned = kebabSlug(raw.replace(/^when\s+/i, ''), maxLen);
 
   if (!cleaned) {
-    cleaned = (cluster.domain || 'evolved').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    cleaned = kebabSlug(cluster.domain || 'evolved', maxLen);
   }
 
   return type === 'skill' ? `arc-${cleaned}` : cleaned;

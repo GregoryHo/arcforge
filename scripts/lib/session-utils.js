@@ -490,6 +490,51 @@ function getEvolvedLogPath() {
   return path.join(getArcforgeHome(), 'evolved', 'evolved.jsonl');
 }
 
+/**
+ * Render a lightweight handover artifact whose content IS the next session's
+ * opening prompt. Conditional sections (Context / Pointers / Don't redo) are
+ * fully omitted when absent — no placeholders.
+ *
+ * @param {Object} opts
+ * @param {string} opts.nextStep       - Required. Concrete first action for the next session.
+ * @param {string} [opts.focus]        - Optional. Used in the title; absence → tail handover.
+ * @param {string} [opts.context]      - Optional. Background needed to act on nextStep.
+ * @param {string} [opts.pointers]     - Optional. File paths, line ranges, commits.
+ * @param {string} [opts.dontRedo]     - Optional. Abandoned approaches to avoid.
+ * @param {string|null} [opts.branch]  - Current git branch; null/empty → line omitted.
+ * @param {string} [opts.cwd]          - Working directory; defaults to process.cwd().
+ * @param {string} [opts.date]         - Session date (YYYY-MM-DD).
+ * @param {string} [opts.sessionId]    - Session id.
+ * @returns {string} Markdown content
+ * @throws {Error} If nextStep is missing.
+ */
+function generateHandover(opts = {}) {
+  const nextStep = opts.nextStep?.trim();
+  if (!nextStep) {
+    throw new Error('generateHandover: nextStep is required');
+  }
+
+  const focus = opts.focus?.trim();
+  const branch = opts.branch?.trim();
+  const context = opts.context?.trim();
+  const pointers = opts.pointers?.trim();
+  const dontRedo = opts.dontRedo?.trim();
+
+  const lines = [
+    `# Handover: ${focus || 'continue from where we left off'}`,
+    '',
+    `**From:** ${opts.date || new Date().toISOString().split('T')[0]} / ${opts.sessionId || 'unknown'}`,
+  ];
+  if (branch) lines.push(`**Branch:** ${branch}`);
+  lines.push(`**Cwd:** ${opts.cwd || process.cwd()}`, '', '## What to do next', nextStep, '');
+
+  if (context) lines.push('## Context', context, '');
+  if (pointers) lines.push('## Pointers', pointers, '');
+  if (dontRedo) lines.push("## Don't redo", dontRedo, '');
+
+  return lines.join('\n');
+}
+
 module.exports = {
   getDiaryPath,
   saveDiary,
@@ -503,6 +548,7 @@ module.exports = {
   listSessions,
   getSessionById,
   generateSession,
+  generateHandover,
   formatSessionBriefing,
   parseSessionSections,
   // Observation & Instinct paths

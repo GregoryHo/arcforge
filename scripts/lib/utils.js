@@ -524,6 +524,27 @@ function sanitizeFilename(name) {
 }
 
 /**
+ * Lowercase, replace non-alphanumeric runs with `-`, strip leading/trailing
+ * dashes, and truncate to `maxLen` (then re-strip trailing dashes if the cut
+ * landed mid-separator). Empty string in → empty string out.
+ *
+ * @param {string} text
+ * @param {number} [maxLen=30]
+ * @returns {string}
+ */
+function kebabSlug(text, maxLen = 30) {
+  if (typeof text !== 'string') return '';
+  let s = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (s.length > maxLen) {
+    s = s.substring(0, maxLen).replace(/-+$/, '');
+  }
+  return s;
+}
+
+/**
  * Normalize a value into an array.
  * Handles the various forms that depends_on can take from YAML parsing:
  * - falsy (null, undefined, '') → []
@@ -666,6 +687,7 @@ module.exports = {
   getDiaryedDir,
   getCompactionLogPath,
   ensureDir,
+  kebabSlug,
   normalizeArray,
   sanitizeFilename,
   createSessionCounter,

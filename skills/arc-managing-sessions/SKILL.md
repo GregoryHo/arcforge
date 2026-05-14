@@ -7,124 +7,121 @@ description: Use when ending a session and handing off to a future session, summ
 
 ## Overview
 
-Lightweight, user-controlled session continuity. Most handoffs need a short
-handover, not a durable archive. Reach for archive only when the work has
-lasting value beyond the next session.
+Two operations:
 
-**Default = handover, not archive.** Archives are heavier, take more
-enrichment, and are intended as durable knowledge — most session endings do
-not warrant one.
+- **`handover`** — light, frequent. Produces a markdown file whose content **is** the next session's opening prompt. One command, no modes.
+- **`save`** — heavy, rare. Produces a durable archive with full enrichment for re-reading weeks later.
 
-## Handover vs Archive
+**Default = handover, not archive.** Most cross-session continuity is `handover` material. Reach for `save` only when the work has lasting value (see Archive Recommendation below).
 
-- **Handover is for immediate continuity** — the next session (often the
-  next day, or a context-window restart) needs to pick up where this one
-  left off. Cheap to produce, short-lived.
-- **Archive is for durable future reference** — the session contains
-  decisions, patterns, or operational knowledge worth preserving and
-  re-reading weeks or months later.
+**Handover is for immediate continuity** — the next session needs to pick up work currently in flight. Cheap to produce. Frequent.
 
-If you are unsure, do a handover. Handovers can always be promoted into an
-archive later.
+**Archive is for durable future reference** — the session contains decisions, playbooks, or patterns worth preserving and re-reading later. Heavy enrichment. Rare.
 
-## Handover Modes
+For trivial wrap-ups (pure Q&A, read-only inspection, no concrete next step), neither command is appropriate — just respond inline.
 
-Pick the lightest mode that gets the next session unstuck.
+## Handover
 
-### Quick Handover (default)
+The handover command writes a file whose content is the next session's opening prompt. The user pastes it in, or a future SessionStart hook auto-injects it.
 
-A 5–10 line bullet list covering: current goal, last concrete step taken,
-what's next, and any open blocker. No file written by default — just paste
-into the next session, or save as `handover-{slug}.md` if asked.
+### Command
 
-Use when the user says "let's pick this up next time," "wrap up," "end
-session," or asks for a brief handoff.
+```bash
+: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-managing-sessions}"
 
-### Full Context Summary
+node "${SKILL_ROOT}/scripts/sessions.js" handover \
+  --next-step "Concrete first action for the next session" \
+  [--focus "what the next session should focus on"] \
+  [--context "background needed to act on next step"] \
+  [--pointers "files / paths / commits to point at"] \
+  [--dont-redo "abandoned approaches to avoid"]
+```
 
-A structured paragraph-plus-bullets summary: goal, decisions made so far,
-open questions, files touched, next step. Longer than a quick handover,
-but still a summary — not a transcript.
+`--next-step` is required — refusing skeleton output is what kills the placeholder failure mode. Optional sections are omitted entirely when empty.
 
-Use when the next session will be picked up by a different person or
-agent, or when the goal has multiple moving parts.
+### Artifact
 
-### Tail Handover / Continue-From-Here
+```markdown
+# Handover: {focus or "continue from where we left off"}
 
-The lightest mode. Capture only the last few exchanges and the immediate
-next step — a "you are here" marker. No goal recap, no decision log.
+**From:** {date} / {sessionId}
+**Branch:** {git branch — line omitted if not in a repo}
+**Cwd:** {process.cwd()}
 
-Use when the user explicitly wants short context only, or when the
-current turn was clearly the middle of one task and we just need to
-resume that exact task.
+## What to do next
+{nextStep}
 
-### Archive Snapshot
+## Context        ← only if provided
+## Pointers       ← only if provided
+## Don't redo     ← only if provided
+```
 
-A full session save with enrichment (see `save` below). Produces a
-durable Markdown file under `~/.arcforge/sessions/...`. Heaviest mode.
+File path: `~/.arcforge/sessions/{project}/{date}/handover-{slug}.md`. Slug is kebab-case from `--focus` (truncated to 30 chars), or `HHMMSS` timestamp when no focus.
 
-Use when the archive recommendation heuristics below say the work is
-worth preserving.
+### Two worked examples
 
-## Archive Recommendation
+**Case A — continuing a multi-phase plan.** Did 3 of 5 phases of a runtime plan; next session does 4–5.
 
-Default = handover, not archive. Only escalate to archive when at least
-one of these holds.
+```bash
+node "${SKILL_ROOT}/scripts/sessions.js" handover \
+  --focus "phases 4-5 of runtime plan" \
+  --next-step "Continue at docs/plans/X.md from Phase 4 (data layer)" \
+  --pointers "docs/plans/X.md:80-160; commits abc123, def456, ghi789" \
+  --dont-redo "Phase 3 tried approach Z and failed because of W; Phases 4-5 should not revisit Z."
+```
 
-**Archive when:**
+**Case B — clean follow-up after finishing a phase.** Done with phase 5; a new follow-up surfaced; next session focuses only on the follow-up.
 
-- The user explicitly asks to archive, save, snapshot, or "remember this
-  session for later."
-- **High decision density** — multiple non-obvious decisions, tradeoffs,
-  or rejected alternatives that future sessions will want to look up.
-- **High operational value** — playbooks, recovery steps, migration
-  procedures, or one-off operations that other sessions or contributors
-  will need to replay.
-- **Long-running multi-session work** — the same epic or feature has
-  spanned several sessions and is likely to span more.
-- **Learning value** — the session surfaced a reusable pattern, antipattern,
-  or insight worth reflecting on later.
+```bash
+node "${SKILL_ROOT}/scripts/sessions.js" handover \
+  --focus "extract Y from cache layer" \
+  --next-step "Refactor Y out of src/cache/index.js into its own module" \
+  --context "Discovered during phase 5 wrap-up that Y is used in 3 places — warrants extraction." \
+  --pointers "src/cache/index.js:120-180; usage in src/handler.js, src/worker.js, src/api.js"
+```
 
-**Do not archive when:**
+Case B's handover deliberately omits everything about phase 5 — the focus IS the follow-up, and the new session only needs what it will act on.
 
-- The session was pure Q&A or read-only inspection.
-- The session was a trivial fix (typo, format, one-line bug) with nothing
-  to learn from.
-- The next step is just immediate tail continuity ("continue what we were
-  doing 5 minutes ago").
-- The user has explicitly asked for short context only or a quick wrap.
+### Reflection over mechanics
 
-In all "do not archive" cases, produce a handover instead.
+Don't run `handover` mechanically. Before invoking:
 
-## Quick Reference
+1. Decide what the new session genuinely needs to know to act — strip everything else.
+2. Make `--next-step` concrete: a path, a line, a command, an exact first action.
+3. Only fill `--context`, `--pointers`, `--dont-redo` when they're load-bearing for the next step.
 
-| Task                         | Command                                                                    |
-| ---------------------------- | -------------------------------------------------------------------------- |
-| **Quick handover**           | `/arc-managing-sessions handover [--mode quick\|full\|tail]`               |
-| **Archive (save) session**   | `/arc-managing-sessions save [alias]`                                      |
-| **Resume archived session**  | `/arc-managing-sessions resume [alias]`                                    |
-| **List sessions**            | `/arc-managing-sessions list [--limit N] [--date YYYY-MM-DD] [--query id]` |
-| **Create alias**             | `/arc-managing-sessions alias <id> <name>`                                 |
-| **List aliases**             | `/arc-managing-sessions aliases`                                           |
+If there is nothing concrete for next-step (pure Q&A, read-only investigation), do not invoke the command at all — respond inline with a brief wrap and note that archive (`save`) is not recommended.
 
-## Handover Workflow
+## Archive — save / resume / list / alias
 
-1. Decide the mode (quick / full / tail). Default to quick.
-2. Reflect on the conversation — write the handover content yourself.
-   Mechanical templating without reflection produces useless handovers.
-3. Output the handover inline. Only write a file if the user asks
-   ("save this handover" or `--save`).
-4. If the user asks to escalate to an archive, fall through to `save`
-   below.
+Heavier path for durable archive. Use only when at least one Archive Recommendation heuristic holds.
 
-## Archive (Advanced) — save / resume / list / alias
-
-These remain available for the durable archive path. Set `SKILL_ROOT`
-before running scripts:
+Set `SKILL_ROOT` before running scripts:
 
 ```bash
 : "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-managing-sessions}"
 ```
+
+### Archive Recommendation
+
+Default = handover, not archive. Only escalate to archive when at least one of these holds.
+
+**Archive when:**
+
+- The user explicitly asks to archive, save, snapshot, or "remember this session for later."
+- **High decision density** — multiple non-obvious decisions, tradeoffs, or rejected alternatives that future sessions will want to look up.
+- **High operational value** — playbooks, recovery steps, migration procedures, or one-off operations that other sessions or contributors will need to replay.
+- **Long-running multi-session work** — the same epic or feature has spanned several sessions and is likely to span more.
+- **Learning value** — the session surfaced a reusable pattern, antipattern, or insight worth reflecting on later.
+
+**Do not archive when:**
+
+- The session was pure Q&A or read-only inspection.
+- The session was a trivial fix (typo, format, one-line bug) with nothing to learn from.
+- The next step is just immediate tail continuity ("continue what we were doing 5 minutes ago") — use `handover` instead.
+- The user has explicitly asked for short context only.
+
+In all "do not archive" cases, do a handover (or for trivial wrap-ups, respond inline).
 
 ### `save [alias]`
 
@@ -147,10 +144,7 @@ Archive the current session with enrichment.
 node "${SKILL_ROOT}/scripts/sessions.js" save <alias> [summary] [whatWorked] [whatFailed] [blockers] [nextStep]
 ```
 
-**Important:** Do NOT just run the script mechanically. Reflect on the
-conversation and write the enrichment content first, then call the script
-with those values (or write the session file directly and fill in every
-`<!-- TO BE ENRICHED -->` placeholder).
+**Important:** Do NOT just run the script mechanically. Reflect on the conversation and write the enrichment content first, then call the script with those values (or write the session file directly and fill in every `<!-- TO BE ENRICHED -->` placeholder).
 
 ### `resume [alias]`
 
@@ -167,13 +161,13 @@ Load an archived session and present a structured briefing.
 node "${SKILL_ROOT}/scripts/sessions.js" resume [alias]
 ```
 
-**Critical:** After showing the briefing, do NOT start working
-automatically. Wait for the user to confirm what to do next.
+**Critical:** After showing the briefing, do NOT start working automatically. Wait for the user to confirm what to do next.
+
+Handover files (`handover-*.md`) are NOT resumable through `resume` — they're meant to be pasted into a new session as the opening prompt.
 
 ### `list`
 
-Browse sessions with metadata. Shows both auto-tracked sessions (from
-hooks) and user-archived sessions.
+Browse sessions with metadata. Shows auto-tracked sessions (from hooks) and user-archived sessions. Handover files are not listed.
 
 Options:
 
@@ -187,7 +181,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [-
 
 ### `alias <id> <name>` / `aliases`
 
-Create an alias for easy reference, or list all aliases.
+Create an alias for easy reference to a saved session, or list all aliases. Handover files are not registered in the alias system.
 
 ```bash
 node "${SKILL_ROOT}/scripts/sessions.js" alias <session-path> <name>
@@ -198,32 +192,26 @@ node "${SKILL_ROOT}/scripts/sessions.js" aliases
 
 ```
 ~/.arcforge/sessions/{project}/
-├── aliases.json                          # Project-scoped alias registry
+├── aliases.json                         # Project-scoped alias registry (save only)
 ├── {YYYY-MM-DD}/
-│   ├── {sessionId}.json                  # Auto-saved session metrics
-│   ├── session-{alias}.md                # User-archived session (from save)
-│   ├── handover-{slug}.md                # Optional handover file (from handover --save)
-│   ├── diary-{sessionId}.md              # Diary entry (from /diary)
+│   ├── {sessionId}.json                 # Auto-tracked session metrics
+│   ├── handover-{slug}.md               # Lightweight handover (frequent)
+│   ├── session-{alias}.md               # User-archived session via save (rare)
+│   ├── diary-{sessionId}.md             # Diary entry (from /diary)
 ```
 
 ## Common Mistakes
 
-- Archiving every session by default — most endings only need a handover.
-- Running `save` without reflecting first — always write enrichment based
-  on conversation context before invoking the script.
-- Starting work after `resume` without waiting for user confirmation.
-- Leaving `<!-- TO BE ENRICHED -->` placeholders — fill in every section.
-- Producing a "handover" that is actually a transcript dump — handovers
-  are summaries, not logs.
+- **Reaching for `save` when `handover` will do** — most cross-session pickups are handover material, not archive material.
+- **Running `handover` or `save` without reflecting** — both require thinking about session content, not template-fill.
+- **Leaving `<!-- TO BE ENRICHED -->` placeholders** in saved sessions — fill every section before considering done.
+- **Starting work after `resume` without waiting for user confirmation.**
+- **Invoking `handover` for trivial Q&A wrap-ups** — no concrete next step means no command; just respond inline.
 
 ## Key Principles
 
-1. **Default to handover.** Archive only when the heuristics say so.
-2. **User-controlled.** Sessions are saved or archived only when asked —
-   no auto-injection of stale context.
-3. **Reflection over mechanics.** Both handover and archive require the
-   agent to think about the session, not just template-fill.
-4. **Wait before working.** After `resume`, always wait for user
-   confirmation.
-5. **No native memory overlap.** This skill handles continuity; auto-
-   memory handles preferences and feedback.
+1. **Default to handover.** Archive (save) is the rare case — only when Archive Recommendation says so.
+2. **User-controlled.** Sessions are saved or handed over only when asked — no auto-injection of stale context.
+3. **Reflection over mechanics.** Both handover and save require thinking about session content, not template-fill.
+4. **Wait before working.** After `resume`, always wait for user confirmation.
+5. **No native memory overlap.** This skill handles continuity; auto-memory handles preferences and feedback.

@@ -7,6 +7,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const {
   getProjectName,
@@ -15,9 +16,11 @@ const {
   getSessionDir,
   loadSession,
   writeFileSafe,
+  kebabSlug,
 } = require('../../../scripts/lib/utils');
 const {
   generateSession,
+  generateHandover,
   listSessions,
   formatSessionBriefing,
   parseSessionSections,
@@ -102,8 +105,73 @@ function parseFlags(args) {
     if (args[i] === '--limit' && args[i + 1]) flags.limit = parseInt(args[i + 1], 10);
     if (args[i] === '--date' && args[i + 1]) flags.date = args[i + 1];
     if (args[i] === '--query' && args[i + 1]) flags.query = args[i + 1];
+    if (args[i] === '--focus' && args[i + 1]) flags.focus = args[i + 1];
+    if (args[i] === '--next-step' && args[i + 1]) flags.nextStep = args[i + 1];
+    if (args[i] === '--context' && args[i + 1]) flags.context = args[i + 1];
+    if (args[i] === '--pointers' && args[i + 1]) flags.pointers = args[i + 1];
+    if (args[i] === '--dont-redo' && args[i + 1]) flags.dontRedo = args[i + 1];
   }
   return flags;
+}
+
+function captureBranch() {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+    }).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+function cmdHandover(args) {
+  const flags = parseFlags(args);
+
+  if (!flags.nextStep) {
+    console.error('Error: --next-step is required.');
+    console.error('');
+    console.error('Usage: handover --next-step "..." [--focus "..."] [--context "..."] [--pointers "..."] [--dont-redo "..."]');
+    process.exit(1);
+  }
+
+  const project = getProjectName();
+  const date = getDateString();
+  const sessionId = getSessionId();
+
+  let slug = kebabSlug(flags.focus || '', 30);
+  if (!slug) {
+    const now = new Date();
+    slug = [now.getHours(), now.getMinutes(), now.getSeconds()]
+      .map((n) => String(n).padStart(2, '0'))
+      .join('');
+  }
+
+  const content = generateHandover({
+    focus: flags.focus,
+    nextStep: flags.nextStep,
+    context: flags.context,
+    pointers: flags.pointers,
+    dontRedo: flags.dontRedo,
+    branch: captureBranch(),
+    cwd: process.cwd(),
+    date,
+    sessionId,
+    project,
+  });
+
+  const handoverPath = path.join(
+    getSessionDir(project, date),
+    `handover-${slug}.md`,
+  );
+
+  if (!writeFileSafe(handoverPath, content)) {
+    console.error(`Error: failed to write handover to ${handoverPath}`);
+    process.exit(1);
+  }
+
+  console.log(`Handover written: ${handoverPath}`);
 }
 
 function cmdList(args) {
@@ -193,6 +261,9 @@ function main() {
   const rest = args.slice(1);
 
   switch (command) {
+    case 'handover':
+      cmdHandover(rest);
+      break;
     case 'save':
       cmdSave(rest);
       break;
@@ -212,6 +283,8 @@ function main() {
       console.log('Sessions CLI — Session management\n');
       console.log('Usage: sessions.js <command> [options]\n');
       console.log('Commands:');
+      console.log('  handover --next-step "..." [--focus "..."] [--context "..."]');
+      console.log('           [--pointers "..."] [--dont-redo "..."]   Light boot prompt for next session');
       console.log('  save [alias] [summary] [whatWorked] [whatFailed] [blockers] [nextStep]');
       console.log('  resume [alias]         Load saved session and show briefing');
       console.log('  list [--limit N] [--date YYYY-MM-DD] [--query id]  List sessions');
@@ -222,6 +295,7 @@ function main() {
 }
 
 module.exports = {
+  cmdHandover,
   cmdSave,
   cmdResume,
   cmdList,

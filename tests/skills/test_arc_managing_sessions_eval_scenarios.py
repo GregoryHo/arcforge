@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 SCENARIOS = [
-    "eval-arc-managing-sessions-quick-handover.md",
+    "eval-arc-managing-sessions-handover.md",
     "eval-arc-managing-sessions-archive-recommendation.md",
     "eval-arc-managing-sessions-resume-wait.md",
 ]
@@ -28,13 +28,14 @@ def test_arc_managing_sessions_eval_scenarios_target_skill_and_non_regression_po
 
 
 def test_arc_managing_sessions_eval_scenarios_cover_core_behaviors():
-    quick = _read("eval-arc-managing-sessions-quick-handover.md").lower()
+    handover = _read("eval-arc-managing-sessions-handover.md").lower()
     archive = _read("eval-arc-managing-sessions-archive-recommendation.md").lower()
     resume = _read("eval-arc-managing-sessions-resume-wait.md").lower()
 
-    assert "quick handover" in quick
-    assert "archive is not recommended" in quick or "archive recommendation of no" in quick
-    assert "pure q&a" in quick or "read-only" in quick
+    assert "handover" in handover
+    assert "quick handover" not in handover, "old mode label must be removed"
+    assert "archive is not recommended" in handover or "archive recommendation of no" in handover
+    assert "pure q&a" in handover or "read-only" in handover
 
     assert "high decision density" in archive
     assert "explicitly recommends archive" in archive

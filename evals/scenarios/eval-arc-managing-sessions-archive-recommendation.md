@@ -75,8 +75,9 @@ a1 = bool(has_decisions and has_next and re.search(r"handover|summary|context|�
 emit("A1", a1, "missing decision-rich handover or next step")
 
 archive_yes = (
-    re.search(r"archive (recommendation|recommended)\??(?:\*\*)?\s*:?(?:\*\*)?\s*(yes|recommended|建議|是)", low)
-    or re.search(r"recommend\s+archiv|should\s+be\s+archived|yes\s*[—-]\s*archive|yes.{0,30}archive this session|建議.*archive", low)
+    # archive [(optional parenthetical)] recommendation [punct] [**] yes/recommended/...
+    re.search(r"archive\s*(?:\([^)]*\)\s*)?(recommendation|recommended)\??(?:\*\*)?\s*:?\s*\**\s*(yes|recommended|建議|是)", low)
+    or re.search(r"recommend\s+(?:to\s+)?archiv|should\s+be\s+archived|yes\s*[—,\-:]\s*archive|yes[.,]?\s*archive(?:\s+(?:this|it))?\b|建議.*archive", low)
 )
 a2 = bool(archive_yes)
 emit("A2", a2, "missing explicit archive recommendation yes")
@@ -86,9 +87,10 @@ a3 = bool(reason)
 emit("A3", a3, "archive reason does not cite durable decision value")
 
 created_claim = re.search(
-    r"\b(i|we)\s+(created|saved|wrote|written).{0,40}(archive|session|file)|"
-    r"\b(created|saved|wrote|written)\s+(an?\s+)?(archive|session file)|"
-    r"~/.arcforge|session-.*\.md",
+    # First-person claim of having actually created/saved/etc. an artifact
+    r"\b(i|we)\s+(created|saved|archived|wrote|written|stored)\b.{0,40}(archive|session|file)|"
+    # Explicit storage path / filename mention (real evidence of file creation)
+    r"~/\.?arcforge|session-[a-z0-9_\-]+\.md|handover-[a-z0-9_\-]+\.md",
     low,
 )
 # Ignore harness-created hidden files such as .git and .claude/settings.json.
@@ -103,4 +105,4 @@ PY
 5
 
 ## Version
-1
+2

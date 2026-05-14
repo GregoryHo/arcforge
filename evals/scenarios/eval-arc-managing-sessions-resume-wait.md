@@ -92,7 +92,12 @@ before_work = re.search(
     r"before (i|we) (start|do|work|proceed|continue|take any action)|"
     r"before doing any work|before doing anything|before proceeding|before taking any action|"
     r"won't start|will not start|not start|haven't started|have not started|holding here|wait here|"
-    r"haven't .*touched .*files|won't touch files|will not touch files",
+    r"haven't .*touched .*files|won't touch files|will not touch files|"
+    # "Ready to proceed when you confirm" / "proceed when you say" — agent defers start to user signal
+    r"ready\s+(?:to\s+\w+\s+)?when\s+you\b|"
+    r"(?:proceed|start|begin|continue|move)\s+when\s+you\s+(?:confirm|say|tell|approve|are ready|give|signal|kick)|"
+    # Interrogative offer rather than statement of intent: "Want me to start ...?" / "Shall I begin?"
+    r"(?:want\s+me\s+to|shall\s+i|should\s+i)\s+(?:start|begin|proceed|draft|create|implement)\b[^?]*\?",
     low,
 )
 a3 = bool(wait and before_work)
@@ -118,4 +123,4 @@ PY
 5
 
 ## Version
-1
+2
