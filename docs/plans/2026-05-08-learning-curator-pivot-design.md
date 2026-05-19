@@ -23,6 +23,36 @@ The 3.0 pipeline produces weak template-filled drafts (verified by eval Scenario
 
 This document captures the consolidated direction: **return to ECC's LLM-curation spirit, keep arcforge 2.0's diary/reflect/recall additions, repurpose 3.0's dashboard / 4 gates as the human-review entry point, remove all auto-anything**.
 
+This is an **architecture design document**, not the step-by-step implementation plan. The implementation plan should be a separate file after this architecture is reviewed and locked.
+
+Companion schema contract: [`2026-05-09-learning-curator-schema-contracts.md`](./2026-05-09-learning-curator-schema-contracts.md). Use it to maintain layer-by-layer schemas, producer/consumer responsibilities, persisted-vs-derived field boundaries, and dashboard/LLM visibility contracts without bloating this architecture document. When this design document and schema references differ, the schema references are the source of truth for implementation fields, first-slice defaults, and allowed producer/consumer boundaries.
+
+Companion topology artifacts:
+- [`2026-05-08-learning-curator-pivot-flow.html`](./2026-05-08-learning-curator-pivot-flow.html) — reviewer-facing flow emphasizing data-save timing, dashboard gates, and behavior-change boundaries.
+- [`2026-05-08-learning-curator-pivot-flow-detailed.html`](./2026-05-08-learning-curator-pivot-flow-detailed.html) — detailed scenario/timeline draft.
+- [`2026-05-08-learning-curator-pivot-flow-topology-v1.html`](./2026-05-08-learning-curator-pivot-flow-topology-v1.html) — topology sketch for component and plane relationships.
+
+Use the topology artifacts before writing the implementation plan. The current reviewer-facing draft intentionally emphasizes the physical Manual Activate boundary: Materialize creates an inactive draft only, and only explicit Dashboard Activate may cross into the Active Surface.
+
+## Product Goal
+
+The learning subsystem should answer one product question:
+
+> From Claude Code sessions, what durable behaviors or workflows are worth proposing back to the user as reviewable candidates?
+
+The system therefore has three jobs:
+
+1. **Collect enough session evidence** to understand both user habits and LLM-generated behaviors without storing unnecessary sensitive payloads.
+2. **Distill noisy traces into meaningful candidates** using LLM curation, diaries, reflection, and bounded evidence — not regex/template-only statistics.
+3. **Let the dashboard be the control plane** where the user decides whether a candidate should be dismissed, promoted, evolved, materialized, or activated.
+
+Non-goals:
+
+- Automatically changing Claude behavior from raw observations.
+- Automatically promoting project-local patterns to global behavior.
+- Treating statistical frequency as sufficient evidence of a good skill.
+- Preserving compatibility with experimental pre-3.1 learning data formats.
+
 ## Verified Findings (from code & git diff)
 
 ### Finding 1 — 2.0 LLM-curation infrastructure is fully intact in 3.0
@@ -188,14 +218,140 @@ Desired                = 2.0 full set (diary/reflect/recall unchanged)
                           ↳ all LLM influence requires explicit human gate
 ```
 
+## Target Architecture
+
+3.1 should collapse learning into one lifecycle instead of running multiple partially-overlapping systems:
+
+```text
+Claude Code session
+  ├─ hook observations: bounded tool/session events
+  ├─ session transcript / summaries: user intent + assistant behavior
+  └─ diary / reflect / recall: LLM-authored session memory and manual notes
+        ↓
+Observation store + session evidence store
+        ↓
+Curator daemon (LLM distillation, with deterministic validation wrapper)
+        ↓
+Candidate queue (validated JSONL, no behavior change)
+        ↓
+Dashboard review
+  ├─ dismiss
+  ├─ promote project → global candidate
+  ├─ evolve instincts → skill / command / agent candidate
+  ├─ materialize inactive draft
+  └─ activate only after explicit user approval
+        ↓
+Active behavior surface
+  ├─ skill: active `skills/<name>/SKILL.md`
+  └─ claude_md_addition: draft-only patch for manual apply
+```
+
+### Data Planes
+
+Keep the planes separate so later implementation cannot accidentally re-create 3.0's parallel behavior:
+
+| Plane | Purpose | Source | Allowed effect |
+|---|---|---|---|
+| Observation plane | Low-level bounded tool/session evidence | Claude Code hooks | Feeds curator only |
+| Transcript/diary plane | Higher-level intent, outcomes, and reflections | session tracker, transcript summaries, `/diary`, `/reflect`, `/recall` | Feeds curator and reviewer context |
+| Candidate plane | Reviewable distilled suggestions | curator daemon, recall/reflect, dashboard evolve | No behavior change |
+| Draft plane | Inactive generated artifacts | dashboard materialize | User-visible review only |
+| Active behavior plane | Real behavior-changing artifacts | explicit activation | Claude Code may use active skills / manual CLAUDE.md edits |
+
+The hard boundary is: **observations, transcripts, diaries, instincts, candidates, and drafts do not directly influence Claude behavior. Only explicitly activated behavior surfaces do.**
+
+### Transcript and Observation Collection Model
+
+The system needs enough signal to distinguish two learning classes:
+
+1. **User habit / preference signals** — repeated commands, review style, project workflow, preferred tools, recurring manual corrections.
+2. **LLM behavior signals** — repeated assistant mistakes, self-repairs, skipped verification, useful generated workflow, failed automation pattern.
+
+Collection should therefore combine:
+
+- **Hook observations** for structured event facts: tool name, phase, session id, project id, outcome, byte counts, bounded command/path metadata.
+- **Transcript-derived summaries** for semantic intent and assistant behavior: what the user asked, what the assistant attempted, what failed, what was corrected, what final verification happened.
+- **Diaries/reflections/recall** for higher-signal LLM-authored and user-authored memory: session summaries, repeated patterns, manually saved instincts.
+
+Do not restore unrestricted raw `tool_input`. Instead, use a **per-tool collection contract**:
+
+| Tool class | Persisted evidence | Explicitly not persisted |
+|---|---|---|
+| Bash | sanitized command, command kind, exit/outcome, bounded description | environment dumps, unredacted secrets |
+| Read/Grep/Glob | sanitized path/pattern/glob, path class, file kind | file contents |
+| Edit/Write/NotebookEdit | sanitized target path, operation kind, outcome | `content`, `old_string`, `new_string`, full patch bodies by default |
+| Skill | skill name only | skill args payload |
+| Web/network-like tools | sanitized URL/domain and outcome | cookies, auth headers, request/response bodies |
+| PostToolUse | outcome + output byte count | raw response body |
+
+Transcript summaries should follow the same rule: store bounded semantic summaries and evidence pointers, not raw full transcripts by default. If full transcript capture is later needed for a local-only debug mode, it must be opt-in, separately retained, and excluded from dashboard wire output.
+
+### Distillation Model
+
+The curator should not be a frequency counter. Frequency is an input signal, not a verdict. Distillation should combine:
+
+- repeated observations across sessions;
+- diary/reflection patterns;
+- explicit user corrections or confirmations;
+- outcome evidence (error → repair → success, repeated failed path, repeated verification command);
+- scope evidence (project-local vs cross-project);
+- recency and contradiction signals;
+- privacy/safety quality of the evidence.
+
+The curator daemon should output candidate JSON through a deterministic validator, not directly write active instincts or append arbitrary JSONL. The desired flow is:
+
+```text
+collect evidence → assemble curator prompt → LLM proposes candidates → validator normalizes / rejects → queue append → dashboard nudge
+```
+
+Candidate quality should be explicit. A candidate with sparse evidence should look different from one backed by hundreds or thousands of observations. Decision 8's `evidence_quality` belongs in the candidate model and dashboard display.
+
+### Candidate Review and Promotion Model
+
+The dashboard is the primary user interface for learning. It should answer:
+
+- What did the system learn?
+- Why does it believe this is useful?
+- What evidence supports it?
+- What will change if I approve/materialize/activate it?
+- Is this project-local, global, or only a draft suggestion?
+
+Candidate actions:
+
+| Action | Meaning | Behavior-changing? |
+|---|---|---|
+| Dismiss | Mark as not useful | No |
+| Promote | Copy/transform project candidate into global candidate queue | No |
+| Evolve | Use selected instinct candidates to produce a higher-level skill/command/agent candidate | No |
+| Approve | User agrees the candidate is worth drafting | No |
+| Materialize | Write inactive draft artifact(s) for review | No |
+| Activate | Move reviewed draft to active behavior surface | Yes, explicit only |
+
+Global candidates should not be directly activatable. They must be reviewed and materialized into a specific project or user-approved active surface.
+
+### Compatibility and Fresh-Start Policy
+
+"No migration" means no compatibility import from experimental formats. It does **not** mean old raw data should stay live. Before 3.1 learning is enabled:
+
+- old observation files should be quarantined or deleted;
+- old candidate queues from the statistical analyzer should be quarantined or deleted;
+- quarantine paths must be outside normal reader globs;
+- file permissions should be restrictive;
+- retention should be explicit, ideally with 30-day purge for raw observation archives.
+
+3.1 should treat the first healthy daemon run as a fresh production data boundary.
+
 ## Locked Decisions
 
 These were settled during the design conversation:
 
-### Decision 1 — Restore raw observation input
-- Observations re-include `tool_input` / `command` / `file_path`
-- Privacy contract still holds: observations stay local, dashboard sanitizes wire model
-- Wire-up uses the existing `sanitizeObservationPayload` (currently dead code in `hooks/observe/main.js:89`); see Decision 5 for keyword expansion
+### Decision 1 — Restore useful transcript evidence, not unrestricted raw payloads
+- Observations re-include enough sanitized command/path/operation metadata for LLM curation
+- Full `tool_input` is **not** persisted wholesale; persistence is governed by the per-tool collection contract above
+- `Skill` invocations persist only skill name, never args payload
+- `Edit` / `Write` style tools persist target path and operation kind by default, not file contents or replacement text
+- Privacy contract still holds: evidence stays local, dashboard sanitizes wire model, and raw transcript capture (if ever added) is opt-in debug-only
+- Wire-up uses a shared sanitizer/redactor module derived from the existing `sanitizeObservationPayload` path; see Decision 5 for keyword expansion
 
 ### Decision 2 — `instinct` is the learning atom, not the LLM-influence unit
 - Activated instinct lands at `~/.arcforge/instincts/<project>/<id>.md`
@@ -204,6 +360,7 @@ These were settled during the design conversation:
   - `skill` (Claude Code auto-discovery from `skills/`)
   - `claude_md_addition` (manual append to CLAUDE.md, draft-only contract)
 - Instinct's role: building block awaiting evolution into a skill
+- Therefore SessionStart instinct auto-load and global auto-promote must be removed/disabled before new instinct activation is enabled
 
 ### Decision 3 — Diary auto-generation already exists, untouched
 - Stop hook + PreCompact hook already trigger `auto-diary.js` and Haiku enricher
@@ -211,17 +368,17 @@ These were settled during the design conversation:
 - No design change here; verify the existing pipeline is healthy
 
 ### Decision 4 — `semantic` enum is a derived view, not a persisted field
-- Hook persists raw `tool_input` only (post-Decision-1 + sanitization)
+- Hook persists only allowlisted sanitized evidence (post-Decision-1 + sanitization)
 - Components that need enum buckets (Bash `command_kind`, path classification, file kind) compute them on-the-fly via `summarizeToolInput()` at read time
 - Removes ~30-50% jsonl bloat; enum stays available as a runtime computation for dashboard rendering and daemon prompt assembly
 - Affects: dashboard wire model, daemon prompt assembly, any future statistical retries
 
-### Decision 5 — Restore raw input must come with broader scrub keyword set
-- Wire `sanitizeObservationPayload` (already in `hooks/observe/main.js:89`) into `main()`
-- Expand `redactObservationText` regex keywords from current `(api_key|secret|password|passwd|token)` to also cover ECC's set: `authorization`, `credentials?`, `auth`
-- Keep arcforge-specific patterns already in place (`Authorization: Bearer X`, three-quote-form variants)
-- Net coverage union: `api_key, api-key, secret, password, passwd, token, authorization, credentials, credential, auth` plus explicit `Authorization: Bearer`
-- Keyword tuning happens at the same commit as the rewire — never restore raw without scrubbing
+### Decision 5 — Restoring richer evidence must come with broader scrub coverage
+- Wire a shared `sanitizeObservationPayload` / `redactObservationText` module into hook, daemon prompt assembly, and dashboard sanitization paths
+- Expand keyword coverage from current `(api_key|secret|password|passwd|token)` to the union: `api_key`, `api-key`, suffixed env vars like `OPENAI_API_KEY` / `GITHUB_TOKEN` / `FOO_TOKEN`, `secret`, `password`, `passwd`, `token`, `authorization`, `credentials?`, `auth`, `cookie`, `set-cookie`, and `x-api-key`
+- Cover common value forms: JSON, YAML, dotenv, shell `export`, quoted/unquoted assignment, `Authorization: Bearer`, `Authorization: Basic`, URL credentials, JWT-looking strings, and private key blocks
+- Keep arcforge-specific patterns already in place (`Authorization: Bearer ***`, three-quote-form variants)
+- Keyword tuning happens at the same commit as the evidence restore — never persist richer evidence without adversarial scrub tests
 
 ### Decision 6 — Project ID stays path-based SHA-256
 - Current arcforge uses `crypto.createHash('sha256').update(absolute_path).slice(0,16)` (`scripts/lib/learning.js:39-40`)
@@ -245,13 +402,30 @@ These were settled during the design conversation:
 - Dashboard renders `⚠ low signal` chip on `low` cards
 - Empirical justification: backlog scan showed cc-pulseline (21k obs) vs trial dirs (30-50 obs) span 3 orders of magnitude. Candidates synthesized from sparse projects deserve different reviewer trust than candidates synthesized from saturated projects. Without this signal, dashboard treats all candidates uniformly, which masks the largest reliability variance in the system.
 
+### Decision 9 — One canonical candidate schema
+- Daemon output, `/recall`, `/reflect`, dashboard `[Evolve]`, CLI inspection, materialization, and activation all use the same candidate schema
+- Use `artifact_type` (not a parallel `kind`) to match existing materialization concepts
+- Preserve LLM-authored content in `body` / `body_source`, instead of regenerating template-only drafts from `summary`
+- Evidence entries are structured objects, not raw strings
+- Queue append happens only after deterministic schema validation and sanitization
+- Dashboard wire responses remain allowlisted summaries; raw evidence, body text, transcript excerpts, and local paths stay out of default dashboard payloads
+
+### Decision 10 — 3.0 statistical analyzer is retired as a product path
+- Removing hook auto-trigger is not enough; CLI/dashboard/product paths must not keep the failed statistical analyzer as an alternative learning system
+- Statistical helper code may remain temporarily as dev-only or fixture support, but it must not emit production candidates during normal `arc learn` / dashboard flows
+- Useful 3.0 dashboard lifecycle code and eval ideas are retained; template/statistical candidate generation is not
+
 ## Concrete Change List
 
-### Remove
+### Remove / disable as product paths
 ```js
 // hooks/observe/main.js:401
 - runAutomaticLearningTrigger(process.env.CLAUDE_PROJECT_DIR || process.cwd());
 ```
+
+- Disable `arc learn analyze` as a production candidate generator, or repurpose it to daemon/queue inspection
+- Remove SessionStart auto-loading of high-confidence instincts
+- Disable global auto-promote / bubble-up behavior; use dashboard `[Promote]` only
 
 ### Retire (keep code, no callers)
 - `scripts/lib/learning.js`:
@@ -263,13 +437,13 @@ These were settled during the design conversation:
 
 ### Modify
 
-**Restore raw observation in `hooks/observe/main.js`** (per Decision 1, 4, 5):
+**Restore bounded observation evidence in `hooks/observe/main.js`** (per Decision 1, 4, 5):
 ```js
 if (phase === 'pre' && input.tool_input) {
-  const raw = typeof input.tool_input === 'string'
-    ? input.tool_input
-    : JSON.stringify(input.tool_input);
-  observation.input = sanitizeObservationPayload(raw, MAX_INPUT_LENGTH);
+  const evidence = buildObservedEvidence(toolName, input.tool_input);
+  if (evidence.input) observation.input = sanitizeObservationPayload(evidence.input, MAX_INPUT_LENGTH);
+  if (evidence.path) observation.path = sanitizeObservationPayload(evidence.path, MAX_PATH_LENGTH);
+  if (evidence.operation_kind) observation.operation_kind = evidence.operation_kind;
   // semantic enum no longer persisted (Decision 4) — derived on-the-fly via
   // summarizeToolInput() when dashboard or daemon needs it
 }
@@ -283,27 +457,34 @@ function redactObservationText(value) {
     .replace(/\b(api[_-]?key|secret|password|passwd|token|authorization|credentials?|auth)\b\s*[:=]\s*"[^"]*"/gi, '$1="[REDACTED]"')
     .replace(/\b(api[_-]?key|secret|password|passwd|token|authorization|credentials?|auth)\b\s*[:=]\s*'[^']*'/gi, "$1='[REDACTED]'")
     .replace(/\b(api[_-]?key|secret|password|passwd|token|authorization|credentials?|auth)\b\s*[:=]\s*[^\s,}]+/gi, '$1=[REDACTED]')
-    .replace(/\bAuthorization\s*:\s*Bearer\s+[^\s,}]+/gi, 'Authorization: Bearer [REDACTED]');
+    .replace(/\bAuthorization\s*:\s*(Bearer|Basic)\s+[^\s,}]+/gi, 'Authorization: $1 ***');
 }
 ```
 
 **Daemon writes to candidate queue** (`skills/arc-observing/scripts/observer-daemon.sh` + `observer-prompt.md`):
 - Replace direct write to `~/.arcforge/instincts/<project>/<id>.md`
 - Output: append candidate to `.arcforge/learning/candidates/queue.jsonl`
-- Candidate shape:
-  ```json
+- Candidate shape (illustrative only; the canonical implementation contract lives in [`references/learning-curator-schema/layer-5-candidate-queue-lifecycle.md`](./references/learning-curator-schema/layer-5-candidate-queue-lifecycle.md)):
+  ```jsonc
   {
+    "schema_version": 1,
     "id": "...",
-    "kind": "instinct" | "skill" | "claude_md_addition",
+    "artifact_type": "instinct" | "skill" | "claude_md_addition",
+    "name": "...",
     "trigger": "...",
+    "summary": "...",
     "body": "<LLM-authored>",
+    "body_source": "llm_curator",
     "domain": "workflow | tool-preference | error-handling | code-style",
     "confidence": 0.5,
-    "evidence": ["session_id", "diary_path"],
+    "evidence": [{ "session_id": "...", "source": "observation", "reason": "...", "project_obs_count": 123 }],
+    "evidence_quality": "high" | "medium" | "low",
     "scope": "project",
     "status": "pending"
   }
   ```
+
+The daemon should not directly append arbitrary LLM output to the queue. It should hand candidate JSON to a deterministic Node validator/helper that normalizes, redacts, deduplicates, atomically appends, and emits the dashboard nudge.
 
 **Daemon prompt addition** — read recent diaries as additional context:
 ```
@@ -316,8 +497,8 @@ function redactObservationText(value) {
 - Surface message: `"N learning candidates ready for review — arc learn dashboard"`
 
 **Dashboard additions** — `scripts/lib/learning-dashboard.js`:
-- New action: `[Promote]` (project candidate → global candidate, all manual)
-- New action: `[Evolve]` (select N+ instinct candidates → emit a skill candidate with LLM-written body)
+- New action: `[Promote]` (project candidate → global candidate, all manual; full architecture only — first-slice behavior is governed by Layer 6 schema defaults and may fail closed until implemented)
+- New action: `[Evolve]` (select N+ instinct candidates → emit a skill/command/agent candidate; first-slice behavior is governed by Layer 7 schema defaults and may support only skill/instinct paths initially)
 - Keep existing `[Approve] / [Materialize] / [Activate] / [Dismiss]` flow
 
 **Activation routing** — `scripts/lib/learning.js` `getActiveArtifactPaths`:
@@ -327,21 +508,25 @@ function redactObservationText(value) {
 
 ### Eval coverage restoration
 
-- Restore `evals/scenarios/instinct-adherence.md` (test activated instinct's behavioral influence — but only for the new path: instinct → evolved skill)
-- Restore `evals/scenarios/reflect-pattern-detection.md` (test /reflect's pattern detection)
-- Drop `evals/scenarios/eval-optional-learning-*.md` (×4) since they test the retired statistical pipeline
-- Keep new evals only if they test the consolidated pipeline (rewrite as needed)
+- Restore `evals/scenarios/instinct-adherence.md`, but rewrite the assertion for the new path: instinct/candidate → evolved skill → explicitly activated skill influences future behavior
+- Restore `evals/scenarios/reflect-pattern-detection.md` to protect /reflect's 3+ pattern threshold
+- Do not wholesale delete every `eval-optional-learning-*` scenario by filename. Keep/rewrite the scenarios that test still-valid gates:
+  - pending candidate must not influence behavior
+  - activated skill may influence behavior
+  - closed-loop self-improvement requires full lifecycle evidence
+- Drop or rewrite only the scenarios whose assertion depends on statistical/template candidate generation
+- Add new consolidated-path evals for daemon candidate generation, dashboard promote/evolve, and eval-trial observation exclusion
 
 ## Open Questions (still need decisions)
 
 1. **Daemon prompt redesign for LLM-written candidates**
    - Current `observer-prompt.md` outputs YAML instincts directly
-   - New design needs daemon to output JSON candidates (with `kind`, `body`, etc.)
+   - New design needs daemon to output CandidateV1-compatible JSON (`artifact_type`, `body`, structured evidence, etc.)
    - Question: rewrite `observer-prompt.md` from scratch, or layer a translator?
 
 2. **Daemon-emitted skill candidates vs evolve-emitted skill candidates**
-   - Daemon could emit `kind: skill` directly when it sees enough convergent evidence
-   - Or daemon only emits `kind: instinct` and `[Evolve]` button is the only path to skills
+   - Daemon could emit `artifact_type: skill` directly when it sees enough convergent evidence
+   - Or daemon only emits `artifact_type: instinct` and `[Evolve]` button is the only path to skills
    - Question: which is cleaner? (recommend: daemon only emits instinct; skills come from explicit evolve)
 
 3. **Confidence lifecycle for queue candidates**
@@ -352,7 +537,7 @@ function redactObservationText(value) {
 4. **What happens to existing 142-project / 62 MB observation backlog?** *(resolved 2026-05-08, no migration concern)*
    - **arcforge dev repo**: quarantined to `~/.arcforge/observations/arcforge/observations.jsonl.quarantine.<ts>` (chmod 600). 7.24 MB / 15,265 lines / 101 suspect (0.66%).
    - **All-project scan summary**: 142 projects, 67,547 lines, 210 suspect (0.31%); 36 dirty, 106 clean. Top offenders by suspect-line count: cc-pulseline (73), platform-web (28), gmux (13), gregho (12), dotfiles (11). Top keywords: `token (158), auth (74), password (35), authorization (21), secret (19), credential (17)`.
-   - **No migration is required** (per Context framing — no prior version was production). Backlog can be batch-deleted, batch-quarantined, or left as-is. Daemon will create fresh `observations.jsonl` per project after health restoration; old files are inert.
+   - **No migration is required** (per Context framing — no prior version was production). Backlog should be batch-deleted or batch-quarantined before 3.1 daemon health is enabled. It should not remain in normal reader globs.
    - Recommended action for 3.1 launch: batch-quarantine all 142 to `.quarantine.<ts>` before flipping daemon health on, then delete on a quiet day.
 
 5. **`skill` vs `command` vs `agent` from evolve**
@@ -360,10 +545,15 @@ function redactObservationText(value) {
    - Should the dashboard let user choose, or auto-classify?
    - Question: keep the heuristic, or simplify to "everything evolves to skill"?
 
+6. **Transcript summary storage depth**
+   - Hook observations are not enough to infer intent or LLM behavior quality
+   - Full raw transcript storage is privacy-heavy and should not be the default
+   - Question: should 3.1 store only bounded session summaries by default, with full transcript capture as explicit local debug mode?
+
 ## Out of Scope (explicit)
 
-- The diary/reflect/recall pipeline — verified intact, no design change
-- Privacy guarantees — local-only observations, dashboard wire-model sanitization, draft-only patches all stay
+- Rebuilding diary/reflect/recall from scratch — verified existing pieces stay, but their outputs must be integrated into the unified candidate/evolve lifecycle
+- Privacy guarantees — local-only evidence, dashboard wire-model sanitization, draft-only patches, and explicit activation all stay
 - **Migration tooling from older versions** — none of v1, v2.x, or v3.0.x was production; 3.1 is the first production target. No `arc learn migrate` command, no schema versioning headers, no compat shims. Old observations are deleted or quarantined, not migrated.
 - **Cross-machine learning portability** — Decision 6 keeps path-based project ID; instincts learned on one machine do not auto-apply on another even with same git remote.
 - The `repo_convention_patch` artifact type and its draft-only contract — keep as-is
@@ -375,31 +565,39 @@ After this pivot, the eval matrix becomes:
 
 | Eval | Tests | Status |
 |---|---|---|
-| `instinct-adherence` (restored) | activated instinct in `~/.arcforge/instincts/...` is read and applied by /evolve flow | TODO |
-| `reflect-pattern-detection` (restored) | /reflect detects 3+ patterns from diaries | TODO |
+| `instinct-adherence` (restored/reworked) | candidate/instinct evolves into an explicitly activated skill that changes later behavior | TODO |
+| `reflect-pattern-detection` (restored) | /reflect detects 3+ patterns from diaries without over-triggering | TODO |
+| `daemon-candidate-generation` (NEW) | fixture observations + fake LLM output validate and append a pending candidate | TODO |
+| `pending-candidate-boundary` (keep/rewrite) | pending candidates do not influence behavior | TODO |
+| `activated-skill-behavior` (keep/rewrite) | activated learned skill can influence behavior after explicit activation | TODO |
 | `evolve-quality` (NEW) | LLM-written evolved skill body produces meaningful agent behavior | TODO |
-| `dashboard-promote-gate` (NEW) | Dashboard promote/evolve actions write correctly to queue | TODO |
-| `eval-optional-learning-*` (×4) | Statistical pipeline behavior | DROP (pipeline retired) |
+| `dashboard-promote-gate` (NEW) | Dashboard promote/evolve actions write correctly to queue and do not activate | TODO |
+| `eval-trial-observation-exclusion` (NEW) | eval trial dirs are never observed | TODO |
+| `eval-optional-learning-*` statistical/template assertions | Statistical pipeline behavior | DROP/REWRITE |
 
 ## Risk Notes
 
-- **Existing 3.0 dashboard tests pass against the statistical pipeline** — once retired, those tests need rewrite to test daemon-emitted candidates
-- **The privacy regression risk**: restoring raw `input` re-introduces the storage of raw commands in observation logs. Mitigations: stays local, never persisted to wire model, dashboard sanitization layer holds.
+- **Existing 3.0 dashboard tests pass against the statistical pipeline** — once retired, those tests need rewrite to test daemon-emitted candidates and dashboard gates
+- **The privacy regression risk**: richer evidence collection can re-introduce raw commands, paths, or snippets into observation logs. Mitigations: per-tool allowlist, shared redaction, local-only storage, no raw dashboard wire output, and explicit retention/quarantine policy.
 - **Daemon health is governed by the audit findings above, not by enum-only starvation alone**. Original hypothesis blamed the 3.0 enum-only switch. The audit shows the daemon was already missing self-loop guards (#1), re-entrancy protection (#5), watchdog (#11), and ran with `--max-turns 3` (#15) — all from the 2.x port, all unfixed in 3.0. Enum-only is the most recent stressor; the foundational issues predate this branch. See "ECC v2.1 Implementation Audit" section for the full breakdown.
+- **Old behavior-changing paths can silently violate the pivot** — SessionStart auto-load, global auto-promote, direct daemon writes to active instincts, and `arc learn analyze` candidate generation must be disabled before claiming the system is dashboard-gated.
+- **Schema drift is an integration risk** — daemon, recall/reflect, dashboard, CLI, and materializer must share one candidate schema. Parallel `kind` vs `artifact_type` or template-only render paths will recreate the 3.0 integration failure.
 
-## Migration Order (suggested)
+## Migration Order (architecture-level)
 
-0. **Patch high-risk daemon drift first** (per ECC audit): add 5-layer skip equivalent (#1) including `ARCFORGE_SKIP_OBSERVE` env that the daemon sets when spawning Haiku, add `ANALYZING` re-entrancy flag (#5), wrap Haiku spawn with 120s watchdog (#11), raise `--max-turns` from 3 to 15-20 (#15). Without these, downstream changes will inherit the same daemon health problems.
-1. Restore raw observation in hook (Decision 1)
-2. Verify daemon produces instincts on a fresh observation stream (run a representative work session with raw observations enabled; target: ≥ 1 instinct per analysis cycle on a 100-obs minimum sample; if zero after Step 0+1, root cause is the daemon prompt or `--max-turns`, not data quality — backlog is gone, no fallback to old data)
-3. Remove `runAutomaticLearningTrigger` from hook line 401
-4. Update daemon prompt to write candidate JSON (not YAML/MD instinct directly)
-5. Update dashboard to render LLM-authored candidates correctly
-6. Add `[Promote]` and `[Evolve]` dashboard actions
-7. Restore evals for instinct-adherence + reflect-pattern-detection
-8. Retire 4 statistical-pipeline eval scenarios
-9. (Optional) Patch medium-risk daemon drift: session lease (#3), session-guardian.sh (#6), 30-day auto-purge (#8), lazy-start daemon (#14)
-10. Document in user-facing skill files (arc-observing, arc-learning)
+Implementation details belong in a separate plan, but the architecture imposes this order:
+
+0. **Stop old behavior-changing paths first**: remove SessionStart instinct auto-load, disable global auto-promote / bubble-up, stop daemon direct writes to active instinct files, and retire statistical analyzer product entrypoints.
+1. **Patch high-risk daemon drift** (per ECC audit): add skip filters including eval-trial/project skip paths and `ARCFORGE_SKIP_OBSERVE`, add `ANALYZING` re-entrancy guard, wrap Haiku spawn with watchdog, raise `--max-turns` from 3 to 15-20.
+2. **Install safe evidence collection**: shared sanitizer/redactor, per-tool observation allowlist, derived semantic summaries, no raw PostToolUse body, no Skill args.
+3. **Define and validate CandidateV1**: one schema for daemon, recall/reflect, evolve, dashboard, CLI, materialization, and activation.
+4. **Rewire daemon to validated candidate queue**: LLM proposes candidates; deterministic helper validates, normalizes, deduplicates, atomically appends, and emits dashboard nudge.
+5. **Make dashboard the control plane**: implement dismiss/promote/evolve/approve/materialize/activate semantics with no direct global activation and no default raw evidence/body leakage.
+6. **Restore/rewrite eval coverage before broad rollout**: daemon candidate generation, pending boundary, activated skill behavior, reflect pattern detection, dashboard promote/evolve, eval trial exclusion.
+7. **Fresh-start data boundary**: quarantine/delete old observations and statistical candidate queues before enabling 3.1 daemon health in normal use.
+8. **Document user-facing skills and commands**: `arc-observing`, `arc-learning`, dashboard docs, and any slash-command nudges.
+
+The implementation plan should break each architecture step above into TDD slices with exact files, tests, and verification commands.
 
 ## References
 

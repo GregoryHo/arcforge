@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learning Curator Pivot — Flow Observer</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --panel-soft: #fafbfd;
+      --ink: #111827;
+      --ink-soft: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --line-strong: #cbd5e1;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #15803d;
+      --green-soft: #dcfce7;
+      --amber: #b45309;
+      --amber-soft: #fef3c7;
+      --red: #b91c1c;
+      --red-soft: #fee2e2;
+      --gate: #d97706;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.05), 0 1px 4px rgba(15, 23, 42, 0.04);
+      --lane-runtime: rgba(59, 130, 246, 0.05);
+      --lane-privacy: rgba(14, 165, 233, 0.05);
+      --lane-evidence: rgba(16, 185, 129, 0.05);
+      --lane-learning: rgba(20, 184, 166, 0.06);
+      --lane-review: rgba(249, 115, 22, 0.06);
+      --lane-activation: rgba(34, 197, 94, 0.05);
+      --lane-quarantine: rgba(220, 38, 38, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, -apple-system, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--blue); }
+
+    .page {
+      max-width: 2200px;
+      margin: 0 auto;
+      padding: 20px 24px 32px;
+    }
+
+    header.intro {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .intro-text { max-width: 80ch; }
+    .intro h1 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .intro .subtitle {
+      color: var(--muted);
+      margin: 0;
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+    .intro .crumbs {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 6px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+    .intro .crumbs code {
+      background: #eef2f7;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    .focus-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      padding: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+    .focus-bar .label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0 8px;
+    }
+    .chip {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink-soft);
+      font-size: 0.83rem;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+    .chip:hover { background: #f3f4f6; }
+    .chip:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+    .chip.active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .chip .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-left: auto;
+      padding-right: 4px;
+    }
+    .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend .swatch {
+      width: 18px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .legend .swatch.dashed {
+      height: 0;
+      border-top: 3px dashed currentColor;
+    }
+    .legend .swatch.thick { height: 5px; }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+    .toolbar .group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .toolbar button.icon {
+      border: 0;
+      background: transparent;
+      color: var(--ink-soft);
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 5px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .toolbar button.icon:hover { background: #f3f4f6; }
+    .toolbar button.icon:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 1px;
+    }
+    .toolbar button.icon[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .toolbar .kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      margin-left: 4px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      background: #f3f4f6;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+    .toolbar .toggle {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .toolbar .toggle input { accent-color: var(--blue); }
+    .toolbar .status {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding-left: 4px;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .graph-shell {
+      overflow: auto;
+      padding: 0;
+      background:
+        radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.05) 1px, transparent 0);
+      background-size: 24px 24px;
+      background-color: #fcfcfd;
+    }
+
+    svg.flow {
+      display: block;
+      min-width: 100%;
+      width: 1880px;
+      height: 940px;
+    }
+
+    /* Lanes */
+    .lane-bg { stroke: none; }
+    .lane-title {
+      font-size: 11px;
+      font-weight: 700;
+      fill: #6b7280;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .lane-divider {
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    /* Manual Activate boundary wall */
+    .gate-wall {
+      fill: url(#hatch-amber);
+      stroke: var(--gate);
+      stroke-width: 2;
+      stroke-dasharray: 6 5;
+    }
+    .gate-wall-label {
+      fill: var(--amber);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .gate-wall-note {
+      fill: var(--amber);
+      font-size: 11px;
+      font-weight: 500;
+      font-style: italic;
+    }
+
+    /* Blocked stop indicator */
+    .blocked-stop {
+      fill: #fff;
+      stroke: var(--red);
+      stroke-width: 2.5;
+    }
+    .blocked-stop-bar {
+      stroke: var(--red);
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    /* Nodes */
+    .node { cursor: pointer; }
+    .node-rect {
+      fill: #fff;
+      stroke: #94a3b8;
+      stroke-width: 1.4;
+      rx: 10;
+      ry: 10;
+      transition: stroke-width 150ms ease, stroke 150ms ease;
+    }
+    .node:hover .node-rect { stroke: var(--ink); stroke-width: 2; }
+    .node-title {
+      font-size: 13px;
+      font-weight: 700;
+      fill: var(--ink);
+      pointer-events: none;
+    }
+    .node-sub {
+      font-size: 11px;
+      fill: var(--muted);
+      pointer-events: none;
+    }
+    .node-tag {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .node.gate-node .node-rect {
+      fill: var(--amber-soft);
+      stroke: var(--gate);
+      stroke-width: 2.5;
+    }
+    .node.gate-node .node-title { fill: var(--amber); }
+    .node.gate-node .node-tag { fill: var(--amber); }
+
+    .node.activation-node .node-rect {
+      fill: var(--green-soft);
+      stroke: var(--green);
+      stroke-width: 2;
+    }
+    .node.activation-node .node-tag { fill: var(--green); }
+
+    .node.draft-node .node-rect {
+      fill: #fff;
+      stroke: var(--gate);
+      stroke-width: 1.6;
+      stroke-dasharray: 5 4;
+    }
+    .node.draft-node .node-tag { fill: var(--gate); }
+
+    .node.dashboard-node .node-rect {
+      fill: #fff;
+      stroke: var(--blue);
+      stroke-width: 2;
+    }
+    .node.dashboard-node .node-tag { fill: var(--blue); }
+
+    .node.quarantine-node .node-rect {
+      fill: var(--red-soft);
+      stroke: var(--red);
+      stroke-width: 1.4;
+      opacity: 0.85;
+    }
+
+    .node.selected .node-rect {
+      stroke: var(--ink);
+      stroke-width: 2.4;
+      filter: drop-shadow(0 0 0 2px rgba(15,23,42,0.06));
+    }
+
+    /* Edges */
+    .edge {
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      transition: opacity 150ms ease, stroke-width 150ms ease;
+    }
+    .edge-main { stroke: var(--blue); stroke-width: 2; }
+    .edge-review { stroke: var(--blue); stroke-dasharray: 6 4; }
+    .edge-activate { stroke: var(--green); stroke-width: 3.4; }
+    .edge-blocked { stroke: var(--red); stroke-dasharray: 4 5; stroke-width: 1.8; opacity: 0.55; }
+    .edge-quarantine { stroke: var(--red); stroke-dasharray: 3 4; stroke-width: 1.6; opacity: 0.7; }
+
+    .edge-label {
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      font-size: 10px;
+      font-weight: 600;
+      fill: var(--muted);
+      pointer-events: none;
+    }
+    .edge-label.activate { fill: var(--green); font-weight: 700; }
+    .edge-label.blocked { fill: var(--red); }
+    .edge-label.quarantine { fill: var(--red); }
+
+    .token {
+      fill: var(--blue);
+      stroke: #fff;
+      stroke-width: 2;
+      filter: drop-shadow(0 1px 4px rgba(37,99,235,0.45));
+    }
+
+    /* Dim states for focus modes & step playback */
+    .dimmed { opacity: 0.18; }
+    .edge.dimmed { opacity: 0.08; }
+    .highlight { opacity: 1 !important; }
+    .edge.highlight {
+      stroke-width: 3;
+      filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.35));
+    }
+    .edge.highlight.edge-activate { stroke-width: 4.6; filter: drop-shadow(0 0 6px rgba(21, 128, 61, 0.4)); }
+    .edge.highlight.edge-blocked  { stroke-width: 2.4; opacity: 0.85 !important; }
+
+    /* Compact mode hides sub-labels and tags */
+    .compact .node-sub,
+    .compact .node-tag { display: none; }
+
+    /* Side panel */
+    .side {
+      padding: 16px;
+      max-height: 940px;
+      overflow: auto;
+    }
+    .side h2 {
+      margin: 0 0 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .side h2:not(:first-child) { margin-top: 18px; }
+
+    .invariants {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 4px;
+    }
+    .invariants li {
+      font-size: 0.83rem;
+      color: var(--ink-soft);
+      padding-left: 18px;
+      position: relative;
+      line-height: 1.45;
+    }
+    .invariants li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+    }
+    .invariants li.amber::before { background: var(--gate); }
+    .invariants li.green::before { background: var(--green); }
+    .invariants li.red::before   { background: var(--red); }
+
+    .steps {
+      display: grid;
+      gap: 6px;
+    }
+    .step {
+      display: flex;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      background: #fff;
+      align-items: flex-start;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+    .step:hover { border-color: var(--line-strong); background: #fafbfd; }
+    .step.active {
+      border-color: var(--ink);
+      background: #f5f7fa;
+      box-shadow: inset 2px 0 0 var(--blue);
+    }
+    .step .num {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      width: 16px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .step .text { font-size: 0.84rem; line-height: 1.4; }
+
+    .inspector {
+      padding: 12px 12px 14px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .inspector .ttl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin: 0 0 4px;
+    }
+    .inspector .lane-tag {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .inspector .desc {
+      margin: 6px 0 0;
+      color: var(--ink-soft);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+    .inspector .meta {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    @media (max-width: 1200px) {
+      .main { grid-template-columns: 1fr; }
+      .side { max-height: none; }
+      svg.flow { height: 720px; }
+      header.intro { flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .edge, .node-rect, .chip, .step { transition: none; }
+      .token { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="intro">
+      <div class="intro-text">
+        <h1>Learning Curator Pivot — Flow Observer</h1>
+        <p class="subtitle">
+          Reviewer-facing architecture map for the 3.1 learning subsystem. The
+          happy path runs left-to-right through privacy, evidence, and curation
+          into the Dashboard control plane. <strong>Materialize</strong> only
+          produces an inactive Draft; only <strong>explicit Activate</strong>
+          crosses the Manual Activate Boundary into runtime-affecting surfaces.
+        </p>
+        <div class="crumbs">
+          design: <code>docs/plans/2026-05-08-learning-curator-pivot-design.md</code> ·
+          schema: <code>docs/plans/2026-05-09-learning-curator-schema-contracts.md</code>
+        </div>
+      </div>
+    </header>
+
+    <div class="focus-bar" role="toolbar" aria-label="Focus modes">
+      <span class="label">Focus</span>
+      <button class="chip active" data-focus="all" aria-pressed="true">All</button>
+      <button class="chip" data-focus="happy" aria-pressed="false">
+        <span class="dot" style="background:var(--blue)"></span> Happy path
+      </button>
+      <button class="chip" data-focus="boundary" aria-pressed="false">
+        <span class="dot" style="background:var(--gate)"></span> Manual gate
+      </button>
+      <button class="chip" data-focus="blocked" aria-pressed="false">
+        <span class="dot" style="background:var(--red)"></span> Blocked shortcuts
+      </button>
+      <button class="chip" data-focus="quarantine" aria-pressed="false">
+        <span class="dot" style="background:var(--red)"></span> Quarantine
+      </button>
+
+      <div class="legend" aria-label="Edge legend">
+        <span class="item" style="color:var(--blue)"><span class="swatch" style="background:var(--blue)"></span>main flow</span>
+        <span class="item" style="color:var(--blue)"><span class="swatch dashed"></span>review action</span>
+        <span class="item" style="color:var(--green)"><span class="swatch thick" style="background:var(--green)"></span>explicit activate</span>
+        <span class="item" style="color:var(--red)"><span class="swatch dashed"></span>blocked / quarantine</span>
+      </div>
+    </div>
+
+    <div class="main">
+      <section class="card">
+        <div class="toolbar" role="toolbar" aria-label="Step playback">
+          <div class="group" aria-label="Step controls">
+            <button class="icon" id="prev" aria-label="Previous step (Left arrow)" title="Previous step (←)">‹</button>
+            <button class="icon" id="next" aria-label="Next step (Right arrow)" title="Next step (→)">›</button>
+            <button class="icon" id="play" aria-label="Play steps (Space)" title="Play (Space)">▶</button>
+            <button class="icon" id="pause" aria-label="Pause (Space)" title="Pause (Space)" disabled>❚❚</button>
+            <button class="icon" id="reset" aria-label="Reset (R)" title="Reset (R)">↺</button>
+          </div>
+          <span class="status" id="status">Step 1 / 8</span>
+
+          <label class="toggle">
+            <input type="checkbox" id="compact" />
+            Compact node labels
+          </label>
+        </div>
+        <div class="graph-shell">
+          <svg class="flow" id="flow" viewBox="0 0 1880 940" xmlns="http://www.w3.org/2000/svg" aria-label="Learning Curator pivot flow diagram">
+            <defs>
+              <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                <path d="M1,1 L9,5 L1,9 Z" fill="#2563eb" />
+              </marker>
+              <marker id="arrow-green" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+                <path d="M1,1 L10,5.5 L1,10 Z" fill="#15803d" />
+              </marker>
+              <marker id="arrow-red" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M1,1 L8,4.5 L1,8 Z" fill="#b91c1c" />
+              </marker>
+              <pattern id="hatch-amber" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                <rect width="8" height="8" fill="rgba(217, 119, 6, 0.06)" />
+                <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(217, 119, 6, 0.25)" stroke-width="2" />
+              </pattern>
+            </defs>
+            <g id="viewport"></g>
+          </svg>
+        </div>
+      </section>
+
+      <aside class="card side" aria-label="Inspector and notes">
+        <h2>Invariants</h2>
+        <ul class="invariants">
+          <li class="amber">Materialize creates an inactive Draft only — never writes runtime context.</li>
+          <li class="green">Activate is the single bridge that affects runtime behavior, and requires an explicit human click.</li>
+          <li>Curator and Queue cannot reach the Active Surface directly. Dashboard review is mandatory.</li>
+          <li>One canonical schema: CandidateV1. The Schema Gate rejects malformed proposals.</li>
+          <li class="red">Legacy 3.0 / incompatible payloads are batch-quarantined; no compatibility import.</li>
+          <li class="red">No auto-load of raw observations; no auto-promote of candidates.</li>
+        </ul>
+
+        <h2>Walkthrough</h2>
+        <div class="steps" id="steps" role="listbox" aria-label="Flow walkthrough steps"></div>
+
+        <h2>Inspector</h2>
+        <div class="inspector">
+          <div class="ttl"><span id="selTitle">Click a node</span></div>
+          <div class="lane-tag" id="selLane">—</div>
+          <p class="desc" id="selText">Pick any node in the diagram to read the owner's responsibility and what data crosses through it.</p>
+          <div class="meta" id="selMeta"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------
+    // Layout constants
+    // ---------------------------------------------------------------------
+    const W = 1880;
+    const H = 940;
+
+    // Lane bands. The first six are vertical columns for the main flow.
+    // Quarantine is a clearly separated horizontal strip below.
+    const lanes = [
+      { id: 'runtime',     label: 'Runtime',           x:   30, w: 200, kind: 'main' },
+      { id: 'privacy',     label: 'Privacy Boundary',  x:  240, w: 240, kind: 'main' },
+      { id: 'evidence',    label: 'Evidence Stores',   x:  500, w: 240, kind: 'main' },
+      { id: 'learning',    label: 'Learning Engine',   x:  760, w: 200, kind: 'main' },
+      { id: 'review',      label: 'Review Control',    x:  980, w: 380, kind: 'main' },
+      { id: 'activation',  label: 'Active Surface',    x: 1620, w: 230, kind: 'main' },
+      { id: 'quarantine',  label: 'Quarantine — Legacy 3.0 / incompatible (excluded from main path)',
+                                                       x:  500, w: 480, kind: 'quarantine' }
+    ];
+
+    const MAIN_TOP = 60;
+    const MAIN_BOTTOM = 740;
+    const QUAR_TOP = 800;
+    const QUAR_BOTTOM = 920;
+
+    // The wall lives between Review and Activation, with the Activate Gate
+    // visually punching through it.
+    const WALL_X = 1390;
+    const WALL_W = 220;
+
+    const nodes = [
+      { id: 'runtime_user',       lane: 'runtime',    title: 'User',           sub: 'intent + commands',
+        x:  50, y: 130, w: 160, h: 64,
+        respons: 'Human actor in the Claude Code session. Produces the original tool requests, prompts, and corrections that everything downstream observes.' },
+      { id: 'runtime_claude',     lane: 'runtime',    title: 'Claude Runtime', sub: 'assistant context',
+        x:  50, y: 400, w: 170, h: 70,
+        respons: 'Active assistant session. Executes tool calls and emits operational signals. The runtime is read-only with respect to the learning system — it never sees Drafts or Candidates.' },
+
+      { id: 'privacy_hooks',      lane: 'privacy',    title: 'Hooks',          sub: 'event interception',
+        x: 260, y: 110, w: 200, h: 70,
+        respons: 'Claude Code hook surface. Intercepts tool/session events and forwards only allowlisted event shapes downstream.' },
+      { id: 'privacy_collector',  lane: 'privacy',    title: 'Collector',      sub: 'normalize + classify',
+        x: 260, y: 270, w: 200, h: 72,
+        respons: 'Builds canonical evidence objects from raw hook events. Tags uncertain or partial fields so downstream stages can reject or downweight them.' },
+      { id: 'privacy_sanitizer',  lane: 'privacy',    title: 'Sanitizer',      sub: 'allowlist + redaction',
+        x: 260, y: 430, w: 200, h: 72, tag: 'PRIVACY GATE',
+        respons: 'Per-tool sanitization contract: keeps bounded metadata (path class, command kind, outcome), strips secrets, blocks unallowed inputs. Incompatible payloads are diverted to Quarantine.' },
+
+      { id: 'evidence_obs',       lane: 'evidence',   title: 'Observations',   sub: 'sanitized evidence',
+        x: 520, y: 120, w: 200, h: 68,
+        respons: 'Bounded tool/session evidence with retention policy. Feeds the Curator only — never auto-loaded into Claude.' },
+      { id: 'evidence_diary',     lane: 'evidence',   title: 'Diary / Reflect', sub: 'session reflections',
+        x: 520, y: 270, w: 200, h: 70,
+        respons: 'Higher-level summaries from session tracker, /diary, /reflect. Provides semantic intent and outcome context to the Curator.' },
+      { id: 'evidence_recall',    lane: 'evidence',   title: 'Recall Index',   sub: 'searchable retrieval',
+        x: 520, y: 430, w: 200, h: 72,
+        respons: 'Auditable pointers into evidence. Lets the Curator stay bounded and lets reviewers trace any candidate back to its evidence.' },
+
+      { id: 'learning_curator',   lane: 'learning',   title: 'Curator',        sub: 'LLM proposer (daemon)',
+        x: 780, y: 170, w: 180, h: 78,
+        respons: 'Curator daemon. Distills evidence into CandidateV1 proposals using the LLM. Frequency is an input signal, not a verdict. Never writes runtime.' },
+      { id: 'learning_gate',      lane: 'learning',   title: 'Schema Gate',    sub: 'CandidateV1 validator',
+        x: 780, y: 360, w: 180, h: 72,
+        respons: 'Deterministic validator. Normalizes shape, rejects malformed candidates. Single canonical schema — no parallel formats.' },
+
+      { id: 'review_queue',       lane: 'review',     title: 'Candidate Queue', sub: 'awaits human review',
+        x: 1000, y: 130, w: 220, h: 72,
+        respons: 'Validated candidates park here with provenance and evidence_quality. Cannot self-promote. The reviewer is the only consumer.' },
+      { id: 'review_dashboard',   lane: 'review',     title: 'Dashboard',      sub: 'human control plane',
+        x: 1000, y: 290, w: 240, h: 100, tag: 'DECIDE',
+        respons: 'The only control plane for behavior change. Reviewer can dismiss, evolve, promote, approve, materialize (Draft), or activate. Activate is the one action that crosses the boundary.' },
+      { id: 'review_draft',       lane: 'review',     title: 'Draft Artifact', sub: 'inactive preview',
+        x: 1000, y: 510, w: 220, h: 78, tag: 'NO RUNTIME EFFECT',
+        respons: 'Materialized preview of a candidate (skill / command / agent / CLAUDE.md edit). Sits in a draft location. Never auto-activates and never affects runtime.' },
+      { id: 'activation_gate',    lane: 'review',     title: 'Activate Gate',  sub: 'explicit click',
+        x: 1410, y: 295, w: 180, h: 110, tag: 'ONLY BRIDGE',
+        respons: 'The Manual Activate Boundary. A deliberate human click in the Dashboard is the single way to move a Draft into the Active Surface. Curator, Queue, and Draft cannot bypass this gate.' },
+
+      { id: 'activation_surface', lane: 'activation', title: 'Active Surface', sub: 'skills / commands / CLAUDE.md',
+        x: 1635, y: 305, w: 200, h: 90, tag: 'RUNTIME EFFECT',
+        respons: 'The behavior-changing layer Claude actually consumes: activated skills, commands, agents, and explicitly-edited CLAUDE.md. Writes only ever happen here after an explicit Activate.' },
+
+      { id: 'quarantine_block',   lane: 'quarantine', title: 'Legacy 3.0 Batch', sub: 'incompatible payloads',
+        x: 530, y: 830, w: 210, h: 70,
+        respons: 'Old observation files and statistical-analyzer queues from 3.0. Quarantined to a path outside normal reader globs.' },
+      { id: 'quarantine_hold',    lane: 'quarantine', title: 'Incompatible Store', sub: 'no auto-import',
+        x: 770, y: 830, w: 200, h: 70,
+        respons: 'Final holding location. There is no compatibility migration. 3.1 treats its first healthy daemon run as a fresh production data boundary.' }
+    ];
+
+    const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+    // ---------------------------------------------------------------------
+    // Edges
+    // Anchor sides: 'r' (right), 'l' (left), 't' (top), 'b' (bottom).
+    // Routing is computed in pathFor(); some edges declare via points or
+    // a stop point (for blocked edges that must die at the wall).
+    // ---------------------------------------------------------------------
+    const edges = [
+      { id: 'e1',  from: 'runtime_user',     to: 'privacy_hooks',     type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e2',  from: 'runtime_claude',   to: 'privacy_collector', type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e3',  from: 'privacy_hooks',    to: 'privacy_collector', type: 'main',  fromSide: 'b', toSide: 't' },
+      { id: 'e4',  from: 'privacy_collector',to: 'privacy_sanitizer', type: 'main',  fromSide: 'b', toSide: 't' },
+      { id: 'e5',  from: 'privacy_sanitizer',to: 'evidence_obs',      type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e6',  from: 'privacy_sanitizer',to: 'evidence_diary',    type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e7',  from: 'privacy_sanitizer',to: 'evidence_recall',   type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e8',  from: 'evidence_obs',     to: 'learning_curator',  type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e9',  from: 'evidence_diary',   to: 'learning_curator',  type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e9b', from: 'evidence_recall',  to: 'learning_curator',  type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e10', from: 'learning_curator', to: 'learning_gate',     type: 'main',  fromSide: 'b', toSide: 't' },
+      { id: 'e11', from: 'learning_gate',    to: 'review_queue',      type: 'main',  fromSide: 'r', toSide: 'l' },
+      { id: 'e12', from: 'review_queue',     to: 'review_dashboard',  type: 'review', fromSide: 'b', toSide: 't', label: 'review queue' },
+      { id: 'e13', from: 'review_dashboard', to: 'review_draft',      type: 'review', fromSide: 'b', toSide: 't', label: 'materialize → inactive' },
+
+      // Explicit activate path (the only bridge across the wall)
+      { id: 'e17a', from: 'review_dashboard', to: 'activation_gate',   type: 'activate', fromSide: 'r', toSide: 'l', label: '1. explicit click' },
+      { id: 'e17',  from: 'activation_gate',  to: 'activation_surface',type: 'activate', fromSide: 'r', toSide: 'l', label: '2. writes runtime' },
+
+      // Blocked shortcut attempts — each one dies at the wall, never crosses.
+      { id: 'e15', from: 'review_queue',     to: 'activation_surface', type: 'blocked',
+        fromSide: 'r', stop: { x: WALL_X - 12, y: 165 }, label: 'queue cannot self-activate' },
+      { id: 'e16', from: 'learning_curator', to: 'activation_surface', type: 'blocked',
+        fromSide: 'r', stop: { x: WALL_X - 12, y: 215 }, via: [[1310, 215]], label: 'curator cannot self-activate' },
+      { id: 'e14', from: 'review_draft',     to: 'activation_surface', type: 'blocked',
+        fromSide: 'r', stop: { x: WALL_X - 12, y: 555 }, label: 'draft has no runtime authority' },
+
+      // Quarantine diversion + intra-quarantine flow
+      { id: 'e19', from: 'privacy_sanitizer', to: 'quarantine_block',  type: 'quarantine',
+        fromSide: 'b', toSide: 't', via: [[360, 780]], label: 'incompatible → quarantine' },
+      { id: 'e18', from: 'quarantine_block',  to: 'quarantine_hold',   type: 'quarantine',
+        fromSide: 'r', toSide: 'l', label: 'isolated — no migration' }
+    ];
+
+    // ---------------------------------------------------------------------
+    // Steps
+    // ---------------------------------------------------------------------
+    const steps = [
+      { id: 1, text: 'Runtime emits user + assistant events',
+        nodes: ['runtime_user', 'runtime_claude', 'privacy_hooks', 'privacy_collector'],
+        edges: ['e1', 'e2', 'e3'] },
+      { id: 2, text: 'Hooks → Collector → Sanitizer enforce the privacy contract',
+        nodes: ['privacy_collector', 'privacy_sanitizer'],
+        edges: ['e4'] },
+      { id: 3, text: 'Sanitized evidence lands in Observations / Diary / Recall',
+        nodes: ['privacy_sanitizer', 'evidence_obs', 'evidence_diary', 'evidence_recall'],
+        edges: ['e5', 'e6', 'e7'] },
+      { id: 4, text: 'Curator distills evidence and emits a CandidateV1',
+        nodes: ['evidence_obs', 'evidence_diary', 'evidence_recall', 'learning_curator', 'learning_gate'],
+        edges: ['e8', 'e9', 'e9b', 'e10'] },
+      { id: 5, text: 'Schema Gate validates; valid candidates park in the Queue',
+        nodes: ['learning_gate', 'review_queue'],
+        edges: ['e11'] },
+      { id: 6, text: 'Dashboard reviews; Materialize creates an inactive Draft only',
+        nodes: ['review_queue', 'review_dashboard', 'review_draft'],
+        edges: ['e12', 'e13'] },
+      { id: 7, text: 'Explicit Activate is the only path across the boundary',
+        nodes: ['review_dashboard', 'activation_gate', 'activation_surface'],
+        edges: ['e17a', 'e17'] },
+      { id: 8, text: 'Legacy 3.0 / incompatible payloads stay quarantined',
+        nodes: ['privacy_sanitizer', 'quarantine_block', 'quarantine_hold'],
+        edges: ['e19', 'e18'] }
+    ];
+
+    // ---------------------------------------------------------------------
+    // Focus modes — preset filters for nodes/edges
+    // ---------------------------------------------------------------------
+    const focusModes = {
+      all: { nodes: null, edges: null },
+      happy: {
+        nodes: new Set([
+          'runtime_user', 'runtime_claude',
+          'privacy_hooks', 'privacy_collector', 'privacy_sanitizer',
+          'evidence_obs', 'evidence_diary', 'evidence_recall',
+          'learning_curator', 'learning_gate',
+          'review_queue', 'review_dashboard', 'activation_gate', 'activation_surface'
+        ]),
+        edges: new Set([
+          'e1','e2','e3','e4','e5','e6','e7','e8','e9','e9b',
+          'e10','e11','e12','e17a','e17'
+        ])
+      },
+      boundary: {
+        nodes: new Set(['review_dashboard', 'review_draft', 'activation_gate', 'activation_surface', 'review_queue', 'learning_curator']),
+        edges: new Set(['e13', 'e17a', 'e17', 'e14', 'e15', 'e16'])
+      },
+      blocked: {
+        nodes: new Set(['review_queue', 'review_draft', 'learning_curator', 'activation_surface', 'activation_gate']),
+        edges: new Set(['e14', 'e15', 'e16'])
+      },
+      quarantine: {
+        nodes: new Set(['privacy_sanitizer', 'quarantine_block', 'quarantine_hold']),
+        edges: new Set(['e18', 'e19'])
+      }
+    };
+
+    // ---------------------------------------------------------------------
+    // Rendering
+    // ---------------------------------------------------------------------
+    const svg = d3.select('#flow');
+    const viewport = svg.select('#viewport');
+
+    const laneFill = {
+      runtime:    'rgba(59, 130, 246, 0.05)',
+      privacy:    'rgba(14, 165, 233, 0.05)',
+      evidence:   'rgba(16, 185, 129, 0.05)',
+      learning:   'rgba(20, 184, 166, 0.06)',
+      review:     'rgba(249, 115, 22, 0.06)',
+      activation: 'rgba(34, 197, 94, 0.05)',
+      quarantine: 'rgba(220, 38, 38, 0.05)'
+    };
+
+    // Lanes
+    const gLanes = viewport.append('g').attr('class', 'lanes');
+    lanes.forEach(lane => {
+      const isQuar = lane.kind === 'quarantine';
+      const y = isQuar ? QUAR_TOP : MAIN_TOP;
+      const h = isQuar ? (QUAR_BOTTOM - QUAR_TOP) : (MAIN_BOTTOM - MAIN_TOP);
+      const fill = laneFill[lane.id] || '#f1f5f9';
+      gLanes.append('rect')
+        .attr('class', 'lane-bg')
+        .attr('x', lane.x)
+        .attr('y', y)
+        .attr('width', lane.w)
+        .attr('height', h)
+        .attr('fill', fill)
+        .attr('rx', 8);
+      gLanes.append('text')
+        .attr('class', 'lane-title')
+        .attr('x', lane.x + 12)
+        .attr('y', y + 18)
+        .text(lane.label);
+    });
+
+    // Manual Activate Boundary wall — drawn between Review and Activation lanes
+    gLanes.append('rect')
+      .attr('class', 'gate-wall')
+      .attr('x', WALL_X)
+      .attr('y', MAIN_TOP)
+      .attr('width', WALL_W)
+      .attr('height', MAIN_BOTTOM - MAIN_TOP)
+      .attr('rx', 8);
+    gLanes.append('text')
+      .attr('class', 'gate-wall-label')
+      .attr('x', WALL_X + 12)
+      .attr('y', MAIN_TOP + 18)
+      .text('Manual Activate Boundary');
+    gLanes.append('text')
+      .attr('class', 'gate-wall-note')
+      .attr('x', WALL_X + 12)
+      .attr('y', MAIN_BOTTOM - 12)
+      .text('only the Activate Gate may cross');
+
+    // Edges
+    const gEdges = viewport.append('g').attr('class', 'edges');
+    const pathById = {};
+
+    function anchor(node, side) {
+      switch (side) {
+        case 'r': return [node.x + node.w, node.y + node.h / 2];
+        case 'l': return [node.x,           node.y + node.h / 2];
+        case 't': return [node.x + node.w / 2, node.y];
+        case 'b': return [node.x + node.w / 2, node.y + node.h];
+        default:  return [node.x + node.w / 2, node.y + node.h / 2];
+      }
+    }
+
+    function pathFor(edge) {
+      const s = nodeMap[edge.from];
+      const t = edge.to ? nodeMap[edge.to] : null;
+      const fromSide = edge.fromSide || 'r';
+      const toSide = edge.toSide || 'l';
+      const [sx, sy] = anchor(s, fromSide);
+      const target = edge.stop || (t ? { x: anchor(t, toSide)[0], y: anchor(t, toSide)[1] } : null);
+      const tx = target.x;
+      const ty = target.y;
+
+      // Multi-segment via points: orthogonal-ish polyline
+      if (edge.via && edge.via.length) {
+        const pts = [[sx, sy], ...edge.via, [tx, ty]];
+        return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+      }
+
+      // Vertical-dominant (same lane, stacked)
+      if (Math.abs(tx - sx) < 30 && Math.abs(ty - sy) > 20) {
+        const midY = (sy + ty) / 2;
+        return `M ${sx} ${sy} C ${sx} ${midY}, ${tx} ${midY}, ${tx} ${ty}`;
+      }
+
+      // Horizontal-dominant: bezier with side handles
+      const dx = tx - sx;
+      const handle = Math.max(40, Math.abs(dx) * 0.45);
+      const c1x = (fromSide === 'r') ? sx + handle : (fromSide === 'l' ? sx - handle : sx);
+      const c1y = (fromSide === 't' || fromSide === 'b') ? sy + (ty - sy) * 0.4 : sy;
+      const c2x = (toSide === 'l') ? tx - handle : (toSide === 'r' ? tx + handle : tx);
+      const c2y = (toSide === 't' || toSide === 'b') ? ty - (ty - sy) * 0.4 : ty;
+      return `M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tx} ${ty}`;
+    }
+
+    function markerFor(type) {
+      if (type === 'main' || type === 'review') return 'url(#arrow-blue)';
+      if (type === 'activate') return 'url(#arrow-green)';
+      return 'url(#arrow-red)';
+    }
+
+    const edgeRows = gEdges.selectAll('g.edge-row')
+      .data(edges, d => d.id)
+      .enter().append('g')
+      .attr('class', 'edge-row')
+      .attr('data-id', d => d.id);
+
+    edgeRows.each(function (d) {
+      const path = pathFor(d);
+      pathById[d.id] = path;
+      const row = d3.select(this);
+
+      row.append('path')
+        .attr('id', `path-${d.id}`)
+        .attr('d', path)
+        .attr('class', `edge edge-${d.type}`)
+        .attr('marker-end', d.type === 'blocked' ? null : markerFor(d.type));
+
+      // Blocked stop indicator
+      if (d.type === 'blocked' && d.stop) {
+        const stop = row.append('g').attr('transform', `translate(${d.stop.x}, ${d.stop.y})`);
+        stop.append('circle').attr('class', 'blocked-stop').attr('r', 7);
+        stop.append('line').attr('class', 'blocked-stop-bar')
+          .attr('x1', -4).attr('y1', 0).attr('x2', 4).attr('y2', 0);
+      }
+
+      // Edge label
+      if (d.label) {
+        const labelClass = `edge-label ${d.type}`;
+        const point = labelPosition(path, d);
+        row.append('text')
+          .attr('class', labelClass)
+          .attr('x', point[0])
+          .attr('y', point[1])
+          .attr('text-anchor', 'middle')
+          .text(d.label);
+      }
+    });
+
+    function labelPosition(pathStr, edge) {
+      const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      tmp.setAttribute('d', pathStr);
+      const len = tmp.getTotalLength();
+      const t = edge.labelT ?? 0.5;
+      const p = tmp.getPointAtLength(len * t);
+      return [p.x, p.y - 8];
+    }
+
+    // Nodes
+    const gNodes = viewport.append('g').attr('class', 'nodes');
+
+    const nodeSel = gNodes.selectAll('g.node')
+      .data(nodes, d => d.id)
+      .enter().append('g')
+      .attr('class', d => {
+        const cls = ['node'];
+        if (d.id === 'activation_gate')    cls.push('gate-node');
+        if (d.id === 'activation_surface') cls.push('activation-node');
+        if (d.id === 'review_draft')       cls.push('draft-node');
+        if (d.id === 'review_dashboard')   cls.push('dashboard-node');
+        if (d.lane === 'quarantine')       cls.push('quarantine-node');
+        return cls.join(' ');
+      })
+      .attr('transform', d => `translate(${d.x}, ${d.y})`)
+      .attr('data-id', d => d.id)
+      .attr('tabindex', 0)
+      .attr('role', 'button')
+      .attr('aria-label', d => `${d.title} — ${d.sub}`)
+      .on('click', (_, d) => selectNode(d.id))
+      .on('keydown', (event, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectNode(d.id);
+        }
+      });
+
+    nodeSel.append('rect')
+      .attr('class', 'node-rect')
+      .attr('width', d => d.w)
+      .attr('height', d => d.h);
+
+    nodeSel.append('text')
+      .attr('class', 'node-title')
+      .attr('x', 12)
+      .attr('y', 22)
+      .text(d => d.title);
+
+    nodeSel.append('text')
+      .attr('class', 'node-sub')
+      .attr('x', 12)
+      .attr('y', 38)
+      .text(d => d.sub);
+
+    nodeSel.filter(d => d.tag).append('text')
+      .attr('class', 'node-tag')
+      .attr('x', 12)
+      .attr('y', d => d.h - 10)
+      .text(d => d.tag);
+
+    // Animated token (suppressed under prefers-reduced-motion via CSS)
+    const token = viewport.append('circle')
+      .attr('class', 'token')
+      .attr('r', 0)
+      .attr('cx', 0)
+      .attr('cy', 0);
+
+    // ---------------------------------------------------------------------
+    // Interaction state
+    // ---------------------------------------------------------------------
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let activeStep = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let currentFocus = 'all';
+    let selectedNodeId = null;
+
+    // Build step list UI
+    const stepsContainer = document.getElementById('steps');
+    steps.forEach((step, i) => {
+      const el = document.createElement('div');
+      el.className = 'step';
+      el.dataset.index = i;
+      el.setAttribute('role', 'option');
+      el.tabIndex = 0;
+      el.innerHTML = `<span class="num">${i + 1}.</span><span class="text">${step.text}</span>`;
+      el.addEventListener('click', () => { stopPlay(); goToStep(i); });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stopPlay(); goToStep(i); }
+      });
+      stepsContainer.appendChild(el);
+    });
+
+    function selectNode(id) {
+      selectedNodeId = id;
+      const n = nodeMap[id];
+      const lane = lanes.find(l => l.id === n.lane);
+      document.getElementById('selTitle').textContent = n.title;
+      document.getElementById('selLane').textContent = lane ? lane.label : '';
+      document.getElementById('selText').textContent = n.respons;
+      document.getElementById('selMeta').textContent = `id: ${n.id}`;
+      d3.selectAll('.node').classed('selected', d => d.id === id);
+    }
+
+    function applyFocus(modeKey) {
+      currentFocus = modeKey;
+      document.querySelectorAll('.chip[data-focus]').forEach(c => {
+        const active = c.dataset.focus === modeKey;
+        c.classList.toggle('active', active);
+        c.setAttribute('aria-pressed', active);
+      });
+      const f = focusModes[modeKey];
+      const nodeFilter = f.nodes;
+      const edgeFilter = f.edges;
+      d3.selectAll('.node')
+        .classed('dimmed', d => nodeFilter ? !nodeFilter.has(d.id) : false);
+      d3.selectAll('.edge-row')
+        .each(function (d) {
+          const dim = edgeFilter ? !edgeFilter.has(d.id) : false;
+          d3.select(this).select('path').classed('dimmed', dim);
+          d3.select(this).selectAll('.edge-label, .blocked-stop, .blocked-stop-bar').classed('dimmed', dim);
+        });
+      // Re-apply current step on top of focus
+      highlightStep(activeStep, /*token*/ false);
+    }
+
+    function highlightStep(idx, animateToken) {
+      const s = steps[idx];
+      const stepNodes = new Set(s.nodes);
+      const stepEdges = new Set(s.edges);
+
+      d3.selectAll('.node')
+        .classed('highlight', d => stepNodes.has(d.id));
+      d3.selectAll('.edge-row')
+        .each(function (d) {
+          d3.select(this).select('path').classed('highlight', stepEdges.has(d.id));
+        });
+
+      document.querySelectorAll('.step').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+      });
+      document.getElementById('status').textContent = `Step ${idx + 1} / ${steps.length}`;
+
+      // auto-select first node of step for inspector context
+      if (s.nodes && s.nodes.length) selectNode(s.nodes[0]);
+
+      if (animateToken && !reduceMotion && stepEdges.size) {
+        animateAlongEdges(Array.from(stepEdges));
+      } else {
+        token.interrupt().attr('r', 0);
+      }
+    }
+
+    function goToStep(idx) {
+      activeStep = ((idx % steps.length) + steps.length) % steps.length;
+      highlightStep(activeStep, true);
+    }
+
+    function animateAlongEdges(edgeIds) {
+      let i = 0;
+      const playNext = () => {
+        if (i >= edgeIds.length) { token.interrupt().attr('r', 0); return; }
+        const pathEl = document.getElementById(`path-${edgeIds[i]}`);
+        if (!pathEl) { i++; playNext(); return; }
+        const total = pathEl.getTotalLength();
+        const start = pathEl.getPointAtLength(0);
+        token.interrupt().raise()
+          .attr('r', 6)
+          .attr('cx', start.x).attr('cy', start.y)
+          .transition()
+          .duration(700)
+          .ease(d3.easeLinear)
+          .attrTween('cx', () => t => pathEl.getPointAtLength(total * t).x)
+          .attrTween('cy', () => t => pathEl.getPointAtLength(total * t).y)
+          .on('end', () => { i++; playNext(); });
+      };
+      playNext();
+    }
+
+    function stopPlay() {
+      isPlaying = false;
+      clearTimeout(playTimer);
+      document.getElementById('play').disabled = false;
+      document.getElementById('pause').disabled = true;
+      token.interrupt().attr('r', 0);
+    }
+
+    function startPlay() {
+      if (isPlaying) return;
+      isPlaying = true;
+      document.getElementById('play').disabled = true;
+      document.getElementById('pause').disabled = false;
+      let idx = activeStep;
+      const tick = () => {
+        if (!isPlaying) return;
+        activeStep = idx;
+        highlightStep(activeStep, true);
+        idx++;
+        if (idx >= steps.length) {
+          stopPlay();
+          return;
+        }
+        playTimer = setTimeout(tick, reduceMotion ? 1500 : 1900);
+      };
+      tick();
+    }
+
+    // Wire up controls
+    document.querySelectorAll('.chip[data-focus]').forEach(chip => {
+      chip.addEventListener('click', () => applyFocus(chip.dataset.focus));
+    });
+    document.getElementById('next').addEventListener('click', () => { stopPlay(); goToStep(activeStep + 1); });
+    document.getElementById('prev').addEventListener('click', () => { stopPlay(); goToStep(activeStep - 1); });
+    document.getElementById('play').addEventListener('click', startPlay);
+    document.getElementById('pause').addEventListener('click', stopPlay);
+    document.getElementById('reset').addEventListener('click', () => { stopPlay(); applyFocus('all'); goToStep(0); });
+
+    document.getElementById('compact').addEventListener('change', (e) => {
+      svg.classed('compact', e.target.checked);
+    });
+
+    // Keyboard shortcuts (when not focused inside a form control)
+    document.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); stopPlay(); goToStep(activeStep + 1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); stopPlay(); goToStep(activeStep - 1); }
+      else if (e.key === ' ') { e.preventDefault(); isPlaying ? stopPlay() : startPlay(); }
+      else if (e.key === 'r' || e.key === 'R') { stopPlay(); applyFocus('all'); goToStep(0); }
+      else if (e.key === '1') applyFocus('all');
+      else if (e.key === '2') applyFocus('happy');
+      else if (e.key === '3') applyFocus('boundary');
+      else if (e.key === '4') applyFocus('blocked');
+      else if (e.key === '5') applyFocus('quarantine');
+    });
+
+    // Initialize
+    applyFocus('all');
+    goToStep(0);
+    selectNode('review_dashboard');
+  </script>
+</body>
+</html>

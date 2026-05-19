@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learning Curator Pivot — Topology</title>
+  <style>
+    :root {
+      --bg: #080b12;
+      --surface: #0e1420;
+      --surface-2: #121a2a;
+      --ink: #eef4ff;
+      --muted: #9aa8bd;
+      --faint: #65748a;
+      --line: #26344d;
+      --blue: #60a5fa;
+      --cyan: #67e8f9;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --orange: #fb923c;
+      --pink: #f472b6;
+      --red: #fb7185;
+      --violet: #a78bfa;
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(96, 165, 250, .15), transparent 34rem),
+        radial-gradient(circle at 86% 8%, rgba(244, 114, 182, .11), transparent 28rem),
+        var(--bg);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(148, 163, 184, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, .055) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(to bottom, black, transparent 88%);
+    }
+
+    .page {
+      width: min(1560px, calc(100vw - 44px));
+      margin: 0 auto;
+      padding: 30px 0 42px;
+      position: relative;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 58px);
+      line-height: .96;
+      letter-spacing: -.055em;
+    }
+    .subtitle {
+      margin: 13px 0 0;
+      max-width: 900px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .chip {
+      border: 1px solid rgba(148, 163, 184, .18);
+      background: rgba(15, 23, 42, .72);
+      color: #dbeafe;
+      border-radius: 999px;
+      padding: 8px 11px;
+      font: 12px/1 var(--mono);
+      white-space: nowrap;
+    }
+    .chip.danger { color: #fecdd3; border-color: rgba(251, 113, 133, .42); }
+    .chip.ok { color: #bbf7d0; border-color: rgba(74, 222, 128, .42); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(760px, 1fr) 430px;
+      gap: 18px;
+      align-items: start;
+    }
+    .panel {
+      border: 1px solid rgba(148, 163, 184, .15);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, .88), rgba(15, 23, 42, .62));
+      box-shadow: 0 28px 80px rgba(0, 0, 0, .32);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, .12);
+      background: rgba(2, 6, 23, .25);
+    }
+    .toolbar-title { font: 760 12px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: #bfdbfe; }
+    .focus-buttons { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
+    .focus-button {
+      min-height: 34px;
+      border: 1px solid rgba(148, 163, 184, .17);
+      background: rgba(15, 23, 42, .72);
+      color: #cbd5e1;
+      border-radius: 999px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font: 12px/1 var(--mono);
+    }
+    .focus-button:hover, .focus-button.active { border-color: rgba(96, 165, 250, .65); color: #eff6ff; }
+
+    .topology {
+      position: relative;
+      min-height: 680px;
+      padding: 26px;
+    }
+    .topology svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .edge {
+      stroke: rgba(148, 163, 184, .34);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrow);
+      transition: stroke .18s ease, stroke-width .18s ease, opacity .18s ease;
+    }
+    .edge.dim { opacity: .16; }
+    .edge.hot { stroke: rgba(96, 165, 250, .92); stroke-width: 3; }
+    .edge.blocked { stroke: rgba(251, 113, 133, .62); stroke-dasharray: 8 8; }
+
+    .grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(118px, 1fr));
+      grid-template-rows: repeat(5, 108px);
+      gap: 18px;
+    }
+    .component {
+      position: relative;
+      min-width: 0;
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-top-color: color-mix(in srgb, var(--accent) 80%, white 8%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, rgba(15, 23, 42, .88)), rgba(2, 6, 23, .56));
+      border-radius: 18px;
+      padding: 13px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--ink);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, .16);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease, opacity .18s ease;
+    }
+    .component:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 65%, white 12%); }
+    .component.active {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--accent) 78%, white 18%);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 22px 56px rgba(0,0,0,.26);
+    }
+    .component.dim { opacity: .38; }
+    .type {
+      display: inline-flex;
+      max-width: 100%;
+      border-radius: 999px;
+      padding: 4px 7px;
+      background: rgba(2, 6, 23, .42);
+      color: color-mix(in srgb, var(--accent) 70%, white 22%);
+      font: 10px/1 var(--mono);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .component h2 {
+      margin: 11px 0 0;
+      font-size: 16px;
+      line-height: 1.08;
+      letter-spacing: -.025em;
+    }
+    .component p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .component .when {
+      position: absolute;
+      left: 13px;
+      right: 13px;
+      bottom: 10px;
+      color: #cbd5e1;
+      font: 11px/1.2 var(--mono);
+      opacity: .82;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .detail {
+      position: sticky;
+      top: 18px;
+      padding: 20px;
+    }
+    .detail-kicker { color: var(--muted); font: 740 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .12em; }
+    .detail h2 { margin: 10px 0 8px; font-size: 28px; letter-spacing: -.04em; }
+    .detail .summary { color: #d7e3f7; line-height: 1.5; margin: 0 0 16px; }
+    .section { border-top: 1px solid rgba(148, 163, 184, .13); padding-top: 14px; margin-top: 14px; }
+    .section h3 { margin: 0 0 9px; font-size: 13px; color: #bfdbfe; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+    ul { margin: 0; padding-left: 19px; color: var(--muted); line-height: 1.52; font-size: 14px; }
+    li + li { margin-top: 5px; }
+    .invariant {
+      border: 1px solid rgba(74, 222, 128, .25);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(20, 83, 45, .13);
+      color: #d1fae5;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .warning {
+      border: 1px solid rgba(251, 113, 133, .28);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(127, 29, 29, .14);
+      color: #ffe4e6;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 16px 16px;
+      border-top: 1px solid rgba(148, 163, 184, .12);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 18px var(--accent); flex: 0 0 auto; }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 13px;
+    }
+    code { color: #c7d2fe; font-family: var(--mono); font-size: .93em; }
+
+    @media (max-width: 1180px) {
+      header, .layout { grid-template-columns: 1fr; }
+      .chips { justify-content: flex-start; }
+      .detail { position: relative; top: auto; }
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto; }
+      .component { min-height: 122px; }
+      .topology { min-height: auto; }
+      .topology svg { display: none; }
+      .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .page { width: calc(100vw - 24px); padding-top: 18px; }
+      .grid, .legend { grid-template-columns: 1fr; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>Learning System Topology</h1>
+        <p class="subtitle">更像 topology：先看元件和資料流。點任何區塊後，右側才顯示該元件的職責、何時存檔、存什麼、不能做什麼。這版刻意不放長 timeline。</p>
+      </div>
+      <div class="chips">
+        <span class="chip danger">No auto-load</span>
+        <span class="chip danger">No auto-promote</span>
+        <span class="chip ok">Dashboard-gated</span>
+        <span class="chip ok">CandidateV1</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="toolbar">
+          <div class="toolbar-title">Click a component</div>
+          <div class="focus-buttons" id="focusButtons"></div>
+        </div>
+        <div class="topology">
+          <svg viewBox="0 0 1000 680" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="rgba(96,165,250,.85)"></path></marker>
+            </defs>
+            <path class="edge" data-edge="user-claude" d="M80,90 C150,90 160,90 225,90"></path>
+            <path class="edge" data-edge="claude-hooks" d="M320,90 C375,90 390,90 445,90"></path>
+            <path class="edge" data-edge="hooks-collector" d="M540,90 C592,90 610,90 668,90"></path>
+            <path class="edge" data-edge="collector-obs" d="M745,137 C745,185 745,200 745,252"></path>
+            <path class="edge" data-edge="hooks-diary" d="M500,137 C500,188 500,200 500,252"></path>
+            <path class="edge" data-edge="obs-daemon" d="M735,335 C700,380 658,392 612,421"></path>
+            <path class="edge" data-edge="diary-daemon" d="M500,335 C500,374 512,390 548,421"></path>
+            <path class="edge" data-edge="daemon-validator" d="M455,470 C385,470 368,470 295,470"></path>
+            <path class="edge" data-edge="validator-queue" d="M205,520 C205,565 205,580 205,622"></path>
+            <path class="edge" data-edge="queue-dashboard" d="M285,622 C365,622 390,622 470,622"></path>
+            <path class="edge" data-edge="dashboard-draft" d="M575,585 C618,548 635,533 680,500"></path>
+            <path class="edge" data-edge="draft-active" d="M790,470 C850,470 870,470 930,470"></path>
+            <path class="edge blocked" data-edge="blocked-direct" d="M715,335 C792,368 840,390 930,430"></path>
+          </svg>
+
+          <div class="grid" id="topologyGrid">
+            <button class="component" data-id="user" style="--accent: var(--cyan); grid-column: 1; grid-row: 1;"><span class="type">Actor</span><h2>User</h2><p>發起工作、修正偏好、最後 review。</p><span class="when">writes: explicit decisions</span></button>
+            <button class="component" data-id="claude" style="--accent: var(--violet); grid-column: 2; grid-row: 1;"><span class="type">Runtime</span><h2>Claude Code</h2><p>執行工具與 session lifecycle。</p><span class="when">emits: tool/session events</span></button>
+            <button class="component" data-id="hooks" style="--accent: var(--green); grid-column: 3; grid-row: 1;"><span class="type">Boundary</span><h2>Hooks</h2><p>Pre/Post tool、Stop、PreCompact、SessionStart。</p><span class="when">captures: event timing</span></button>
+            <button class="component" data-id="collector" style="--accent: var(--green); grid-column: 4; grid-row: 1;"><span class="type">Filter</span><h2>Collector / Sanitizer</h2><p>per-tool allowlist + 統一 redaction。</p><span class="when">before every persist</span></button>
+
+            <button class="component" data-id="diary" style="--accent: var(--amber); grid-column: 3; grid-row: 3;"><span class="type">Store</span><h2>Session / Diary Store</h2><p>session summary、diary、reflect、recall。</p><span class="when">Stop / PreCompact / manual</span></button>
+            <button class="component" data-id="observations" style="--accent: var(--amber); grid-column: 4; grid-row: 3;"><span class="type">Store</span><h2>Observation Store</h2><p>bounded tool facts；不是 raw transcript。</p><span class="when">PreToolUse / PostToolUse</span></button>
+            <button class="component" data-id="quarantine" style="--accent: var(--red); grid-column: 5; grid-row: 3;"><span class="type">Excluded</span><h2>Quarantine</h2><p>舊 experimental backlog 移出 reader glob。</p><span class="when">before 3.1 fresh start</span></button>
+
+            <button class="component" data-id="daemon" style="--accent: var(--orange); grid-column: 3; grid-row: 4;"><span class="type">Analyzer</span><h2>Curator Daemon</h2><p>LLM distills evidence into proposed candidates。</p><span class="when">scheduled / signaled</span></button>
+            <button class="component" data-id="validator" style="--accent: var(--orange); grid-column: 2; grid-row: 4;"><span class="type">Guard</span><h2>CandidateV1 Writer</h2><p>validate、redact、dedupe、atomic append。</p><span class="when">after LLM proposal</span></button>
+            <button class="component" data-id="queue" style="--accent: var(--amber); grid-column: 2; grid-row: 5;"><span class="type">Queue</span><h2>Candidate Queue</h2><p>pending review backlog；不改行為。</p><span class="when">status=pending</span></button>
+            <button class="component" data-id="dashboard" style="--accent: var(--blue); grid-column: 4; grid-row: 5;"><span class="type">Control Plane</span><h2>Dashboard</h2><p>Dismiss / Promote / Evolve / Materialize / Activate。</p><span class="when">user opens dashboard</span></button>
+            <button class="component" data-id="drafts" style="--accent: var(--blue); grid-column: 5; grid-row: 4;"><span class="type">Draft</span><h2>Draft Artifacts</h2><p>可 review 的 inactive 檔案。</p><span class="when">after Materialize</span></button>
+            <button class="component" data-id="active" style="--accent: var(--pink); grid-column: 6; grid-row: 4;"><span class="type">Effect</span><h2>Active Behavior Surface</h2><p>唯一會影響未來 Claude 的地方。</p><span class="when">only after Activate</span></button>
+          </div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><span class="dot" style="--accent: var(--cyan)"></span>Actor / user decision</div>
+          <div class="legend-item"><span class="dot" style="--accent: var(--green)"></span>Capture / privacy boundary</div>
+          <div class="legend-item"><span class="dot" style="--accent: var(--amber)"></span>Local store / queue</div>
+          <div class="legend-item"><span class="dot" style="--accent: var(--pink)"></span>Behavior-changing surface</div>
+        </div>
+      </section>
+
+      <aside class="panel detail" id="detailPanel" aria-live="polite">
+        <div class="detail-kicker" id="detailType">Component</div>
+        <h2 id="detailTitle">User</h2>
+        <p class="summary" id="detailSummary"></p>
+
+        <div class="section"><h3>職責</h3><ul id="detailResponsibilities"></ul></div>
+        <div class="section"><h3>何時發生</h3><ul id="detailWhen"></ul></div>
+        <div class="section"><h3>存 / 讀什麼</h3><ul id="detailData"></ul></div>
+        <div class="section"><h3>不能做什麼</h3><div class="warning" id="detailMustNot"></div></div>
+        <div class="section"><h3>Invariant</h3><div class="invariant" id="detailInvariant"></div></div>
+      </aside>
+    </div>
+
+    <p class="footer">紅色虛線代表禁止的 shortcut：evidence / daemon / candidate 不能繞過 dashboard 直接進 active behavior。舊詳細 timeline 版本已保留為 <code>2026-05-08-learning-curator-pivot-flow-detailed.html</code>。</p>
+  </div>
+
+  <script>
+    const components = {
+      user: {
+        type: "Actor",
+        title: "User",
+        summary: "唯一能決定 learning 是否 materialize / activate 的角色。系統可以提案，但不能替 user 採用。",
+        responsibilities: ["發起 Claude Code 工作 session", "在 dashboard review learning candidates", "決定 dismiss、promote、evolve、materialize、activate"],
+        when: ["工作開始時提供 intent", "Dashboard review 時做明確決策", "Activation 前做最後人工確認"],
+        data: ["寫入：explicit dashboard action / manual recall", "讀取：safe summary、evidence quality、candidate diff", "不需要看 raw observations 才能做第一輪判斷"],
+        mustNot: "不能被系統用 heuristic 代替決策；沒有 user action 就沒有 activation。",
+        invariant: "Human gate 是唯一 behavior-changing gate。",
+        edges: ["user-claude", "queue-dashboard", "dashboard-draft", "draft-active"]
+      },
+      claude: {
+        type: "Runtime",
+        title: "Claude Code",
+        summary: "產生工具事件與 session lifecycle。未來只有 active behavior surface 能影響它。",
+        responsibilities: ["執行 user request", "呼叫 Bash/Read/Edit 等工具", "觸發 Claude Code hooks"],
+        when: ["每次 tool use", "SessionStart / Stop / PreCompact", "未來 session 啟動時讀取已啟用行為"],
+        data: ["輸出 tool/session events 給 hooks", "未直接讀 pending candidate queue", "只可能讀 active skills 或手動套用的 CLAUDE.md policy"],
+        mustNot: "不能自動讀 pending instincts、candidate、draft artifacts。SessionStart 只能 nudge，不能 auto-load。",
+        invariant: "Pending learning 不等於 Claude context。",
+        edges: ["user-claude", "claude-hooks", "draft-active"]
+      },
+      hooks: {
+        type: "Boundary",
+        title: "Hooks",
+        summary: "系統的收集入口，負責判斷什麼時候發生事件；真正寫入前必須經 collector/sanitizer。",
+        responsibilities: ["接收 PreToolUse / PostToolUse", "接收 Stop / PreCompact / SessionStart", "觸發 daemon signal 或 dashboard nudge"],
+        when: ["tool call 前後", "session 結束或 compact 前", "session start 顯示待 review 提醒"],
+        data: ["傳遞事件 metadata 給 collector", "Stop/PreCompact 觸發 diary/summary path", "SessionStart 只讀 pending count 類型提醒"],
+        mustNot: "不能 inline 跑 statistical analyzer 產生 production candidates；不能把 high-confidence instinct auto-load。",
+        invariant: "Hooks 是 capture boundary，不是 learning decision maker。",
+        edges: ["claude-hooks", "hooks-collector", "hooks-diary"]
+      },
+      collector: {
+        type: "Filter",
+        title: "Collector / Sanitizer",
+        summary: "所有 evidence persist 前的 privacy boundary。3.1 要恢復有用 evidence，但不是恢復 unrestricted raw payload。",
+        responsibilities: ["根據 tool class 做 allowlist", "統一 redaction secret/token/auth/cookie", "輸出 bounded observation evidence"],
+        when: ["每次 observation 寫入前", "daemon prompt assembly 前", "dashboard wire model 前"],
+        data: ["可存：sanitized command/path、operation kind、outcome、byte count", "不可存：Skill args、Edit/Write body、PostToolUse raw body", "semantic enum 改成 read-time derived view"],
+        mustNot: "不能 JSON.stringify(tool_input) 全量落盤；不能讓 dashboard 預設暴露 raw evidence/local path。",
+        invariant: "Richer evidence 必須和 stronger scrub 同 commit 出現。",
+        edges: ["hooks-collector", "collector-obs"]
+      },
+      observations: {
+        type: "Store",
+        title: "Observation Store",
+        summary: "低階工具與 session facts，只餵 curator，不直接影響 Claude。",
+        responsibilities: ["保存 bounded tool facts", "提供 daemon 近期 evidence", "保留 project/session id 與 outcome"],
+        when: ["PreToolUse / PostToolUse 後", "daemon analysis 前被讀取", "fresh-start 後從乾淨 stream 開始"],
+        data: ["tool、phase、timestamp、project/session id", "sanitized command/path metadata", "outcome、exit/status、byte counts"],
+        mustNot: "不能保存 raw transcript、完整 command secrets、Edit body、eval trial fixture payload。",
+        invariant: "Observation plane feeds curator only；不 feeding active behavior。",
+        edges: ["collector-obs", "obs-daemon", "blocked-direct"]
+      },
+      diary: {
+        type: "Store",
+        title: "Session / Diary Store",
+        summary: "較高階的 intent/outcome/reflection evidence，補足 observation 無法理解語意的缺口。",
+        responsibilities: ["保存 bounded session summaries", "保存 diary drafts / reflect patterns", "保存 manual recall notes"],
+        when: ["Stop hook", "PreCompact threshold", "User manual /recall 或 /reflect"],
+        data: ["user intent、assistant attempt、failure/repair/outcome summary", "diary / reflect / recall", "最近 sessions 的 bounded context"],
+        mustNot: "不能把未 review 的 diary/reflection 當成 future Claude behavior rule。",
+        invariant: "Diary 是 evidence，不是 policy。",
+        edges: ["hooks-diary", "diary-daemon"]
+      },
+      quarantine: {
+        type: "Excluded",
+        title: "Quarantine",
+        summary: "舊 experimental backlog 的隔離區。no migration 不是留著給新系統讀。",
+        responsibilities: ["移出舊 observations / statistical candidates", "放到 normal reader globs 之外", "必要時 chmod restrictive / 設 retention"],
+        when: ["3.1 daemon health 啟用前", "fresh production boundary 建立前", "舊 eval fixture 污染被發現時"],
+        data: ["舊 2.x/3.0 experimental observation files", "舊 statistical candidate queue", "可保留 audit summary，但不 import"],
+        mustNot: "不能讓 daemon/dashboard normal readers 掃到 quarantine；不能做 compat migration。",
+        invariant: "3.1 starts from fresh evidence stream。",
+        edges: []
+      },
+      daemon: {
+        type: "Analyzer",
+        title: "Curator Daemon",
+        summary: "LLM curation path。它分析 evidence，提案 candidates，但不直接寫 active artifacts。",
+        responsibilities: ["讀 observations + diaries + recall", "用 LLM distill durable behavior candidates", "把 proposed JSON 交給 deterministic writer"],
+        when: ["hook signal", "scheduled polling", "manual daemon run / dashboard evolve request"],
+        data: ["讀：sanitized evidence + bounded summaries", "寫：proposed CandidateV1 JSON to validator", "考慮 evidence_quality、scope、recency、contradiction"],
+        mustNot: "不能直接 append arbitrary JSONL；不能直接寫 ~/.arcforge/instincts 或 skills。",
+        invariant: "Curator proposes；Validator records；Dashboard decides。",
+        edges: ["obs-daemon", "diary-daemon", "daemon-validator", "blocked-direct"]
+      },
+      validator: {
+        type: "Guard",
+        title: "CandidateV1 Writer",
+        summary: "把 LLM proposal 轉成可信 queue entry 的 deterministic guard。這是防 schema drift 的核心。",
+        responsibilities: ["Schema validation", "Redaction / normalization", "Deduplication / atomic append"],
+        when: ["daemon 每次提出 candidate 後", "recall/reflect/evolve 要寫 queue 時", "dashboard action 產生新 candidate 時"],
+        data: ["CandidateV1 fields：artifact_type、name、summary、body、scope、evidence、evidence_quality、status", "拒絕 missing schema_version 或 unsafe body", "保留 body_source"],
+        mustNot: "不能讓 daemon、dashboard、CLI 各自寫不同 JSON shape。",
+        invariant: "One canonical candidate schema across all paths。",
+        edges: ["daemon-validator", "validator-queue"]
+      },
+      queue: {
+        type: "Queue",
+        title: "Candidate Queue",
+        summary: "review backlog。它可以累積 learning proposal，但本身不改變任何 future behavior。",
+        responsibilities: ["保存 pending/dismissed/approved/materialized/activated status", "提供 dashboard list", "提供 materializer input"],
+        when: ["validator append 後", "dashboard 更新狀態時", "CLI inspection 時"],
+        data: ["CandidateV1 JSONL", "status transitions", "evidence pointers / quality signal"],
+        mustNot: "不能被 Claude Code 自動讀取成 prompt；global candidate 不能直接 activate。",
+        invariant: "Candidate ≠ behavior。",
+        edges: ["validator-queue", "queue-dashboard"]
+      },
+      dashboard: {
+        type: "Control Plane",
+        title: "Dashboard",
+        summary: "learning 系統唯一主要控制面。使用者在這裡看候選項並做明確 action。",
+        responsibilities: ["顯示 candidate summary / scope / evidence_quality", "執行 Dismiss / Promote / Evolve", "執行 Approve / Materialize / Activate"],
+        when: ["User 主動打開 dashboard", "SessionStart nudge 後 user 點進來", "需要把 candidate 轉 draft 或 active 時"],
+        data: ["讀：safe queue summaries", "寫：candidate status、global pending candidate、materialize/activate action", "不預設暴露 raw evidence/body/local paths"],
+        mustNot: "不能把 Promote 當 Activate；不能讓 Materialize 偷偷落到 active auto-discovery path。",
+        invariant: "Dashboard action must make behavior change explicit and reversible/reviewable。",
+        edges: ["queue-dashboard", "dashboard-draft", "draft-active"]
+      },
+      drafts: {
+        type: "Draft",
+        title: "Draft Artifacts",
+        summary: "materialized but inactive 的 review files。用來讓人看實際會生成什麼。",
+        responsibilities: ["保存 inactive skill/command/agent/CLAUDE.md addition draft", "讓 user diff/review", "作為 activate 前的最後審查內容"],
+        when: ["Dashboard Approve + Materialize 後", "Activate 前", "需要人工修改 draft 時"],
+        data: ["LLM-written body", "artifact metadata", "review path / diff"],
+        mustNot: "不能放到會被 Claude Code auto-discover 的 active path；CLAUDE.md addition 仍是 manual patch。",
+        invariant: "Materialize ≠ Activate。",
+        edges: ["dashboard-draft", "draft-active"]
+      },
+      active: {
+        type: "Effect",
+        title: "Active Behavior Surface",
+        summary: "整個系統唯一允許影響未來 Claude behavior 的平面。必須來自 explicit activation。",
+        responsibilities: ["保存 active SKILL.md 或已人工套用 policy", "在未來 Claude Code session 中生效", "讓啟用結果可追蹤回 candidate"],
+        when: ["User 在 dashboard 明確 Activate 後", "人工套用 CLAUDE.md patch 後", "未來 session 啟動/工具使用時被 Claude 使用"],
+        data: ["active skills/<name>/SKILL.md", "manual CLAUDE.md addition", "activation metadata / provenance"],
+        mustNot: "不能由 daemon、queue、promote、materialize 直接寫入；不能 auto-promote global behavior。",
+        invariant: "Activate is the first behavior-changing step。",
+        edges: ["draft-active", "blocked-direct"]
+      }
+    };
+
+    const flows = {
+      all: { label: "All", ids: Object.keys(components), edges: Object.values(components).flatMap(c => c.edges) },
+      capture: { label: "Capture", ids: ["user", "claude", "hooks", "collector", "observations", "diary"], edges: ["user-claude", "claude-hooks", "hooks-collector", "collector-obs", "hooks-diary"] },
+      curate: { label: "Curate", ids: ["observations", "diary", "daemon", "validator", "queue"], edges: ["obs-daemon", "diary-daemon", "daemon-validator", "validator-queue"] },
+      review: { label: "Review", ids: ["queue", "dashboard", "drafts", "active", "user"], edges: ["queue-dashboard", "dashboard-draft", "draft-active"] },
+      privacy: { label: "Privacy", ids: ["collector", "observations", "diary", "quarantine", "dashboard"], edges: ["collector-obs", "hooks-diary"] }
+    };
+
+    const detail = {
+      type: document.getElementById("detailType"),
+      title: document.getElementById("detailTitle"),
+      summary: document.getElementById("detailSummary"),
+      responsibilities: document.getElementById("detailResponsibilities"),
+      when: document.getElementById("detailWhen"),
+      data: document.getElementById("detailData"),
+      mustNot: document.getElementById("detailMustNot"),
+      invariant: document.getElementById("detailInvariant")
+    };
+
+    function list(items) { return items.map(item => `<li>${item}</li>`).join(""); }
+
+    function showComponent(id, flowId = null) {
+      const c = components[id];
+      if (!c) return;
+      detail.type.textContent = c.type;
+      detail.title.textContent = c.title;
+      detail.summary.textContent = c.summary;
+      detail.responsibilities.innerHTML = list(c.responsibilities);
+      detail.when.innerHTML = list(c.when);
+      detail.data.innerHTML = list(c.data);
+      detail.mustNot.textContent = c.mustNot;
+      detail.invariant.textContent = c.invariant;
+
+      const activeIds = flowId && flowId !== "all" ? new Set(flows[flowId].ids) : null;
+      const hotEdges = new Set(c.edges || []);
+      document.querySelectorAll(".component").forEach(node => {
+        const isActive = node.dataset.id === id;
+        const inFlow = !activeIds || activeIds.has(node.dataset.id);
+        node.classList.toggle("active", isActive);
+        node.classList.toggle("dim", !inFlow && !isActive);
+      });
+      document.querySelectorAll(".edge").forEach(edge => {
+        const inFlow = !flowId || flowId === "all" || flows[flowId].edges.includes(edge.dataset.edge);
+        edge.classList.toggle("hot", hotEdges.has(edge.dataset.edge));
+        edge.classList.toggle("dim", !inFlow && !hotEdges.has(edge.dataset.edge));
+      });
+      localStorage.setItem("learning-topology-component", id);
+    }
+
+    function setFlow(flowId) {
+      const flow = flows[flowId] || flows.all;
+      document.querySelectorAll(".focus-button").forEach(button => button.classList.toggle("active", button.dataset.flow === flowId));
+      document.querySelectorAll(".component").forEach(node => node.classList.toggle("dim", !flow.ids.includes(node.dataset.id)));
+      document.querySelectorAll(".edge").forEach(edge => edge.classList.toggle("dim", !flow.edges.includes(edge.dataset.edge)));
+      const first = flow.ids[0] || "user";
+      showComponent(first, flowId);
+      localStorage.setItem("learning-topology-flow", flowId);
+    }
+
+    document.getElementById("focusButtons").innerHTML = Object.entries(flows).map(([id, flow]) => `<button class="focus-button" data-flow="${id}">${flow.label}</button>`).join("");
+    document.getElementById("topologyGrid").addEventListener("click", event => {
+      const node = event.target.closest(".component");
+      if (!node) return;
+      const currentFlow = localStorage.getItem("learning-topology-flow") || "all";
+      showComponent(node.dataset.id, currentFlow);
+    });
+    document.getElementById("focusButtons").addEventListener("click", event => {
+      const button = event.target.closest("button[data-flow]");
+      if (!button) return;
+      setFlow(button.dataset.flow);
+    });
+
+    setFlow(localStorage.getItem("learning-topology-flow") || "all");
+    showComponent(localStorage.getItem("learning-topology-component") || "user", localStorage.getItem("learning-topology-flow") || "all");
+  </script>
+</body>
+</html>
