@@ -304,7 +304,7 @@ type CuratorBatchScope = {
 };
 ```
 
-Global batches should not be introduced until global source, review, promotion, and activation contracts are designed. Manual project-to-global promotion belongs to later lifecycle layers, not to Layer 3 in 3.1 schema v1.
+Global curator batches are not needed for the first slice. Layer 3 stays project-batch oriented for daemon curation; first-slice global candidates are created later by explicit dashboard promotion through Layer 6 → Layer 5, not by global batch assembly.
 
 ### Selection policy
 

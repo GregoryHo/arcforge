@@ -220,7 +220,7 @@ type CandidateProposalDraft = {
 
 Use `name`, not `title`, to avoid avoidable drift between Layer 4 proposals and later canonical candidate records.
 
-For the first 3.1 daemon-curator policy, `proposed_scope.kind` is `"project"`. Global candidate proposals should come from later explicit promotion/review flows, not from the default production Layer 4 daemon-curator path.
+For the first 3.1 daemon-curator policy, `proposed_scope.kind` is `"project"`. Global candidate proposals come from explicit first-slice dashboard promotion/review flows through Layer 6 → Layer 5, not from the default production Layer 4 daemon-curator path.
 
 ## Evidence citation contract
 

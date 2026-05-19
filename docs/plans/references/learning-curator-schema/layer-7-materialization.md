@@ -89,6 +89,8 @@ Layer 7 must validate that:
 - candidate current lifecycle status is `approved`;
 - requested artifact type, if present, matches candidate `artifact_type`;
 - candidate body is present and passes safety checks;
+- project-scoped and global-scoped candidates are both accepted when their Layer 5 scope records are valid;
+- global-scoped candidates preserve `promoted_from_candidate_id` / `promoted_from_project_id` metadata in draft metadata;
 - destination paths are draft-only and inside allowed draft roots;
 - no active path will be written.
 
@@ -281,6 +283,8 @@ type DraftArtifactMetadata = {
   body_source: CandidateQueueRecord["body_source"];
 
   scope: CandidateScope;
+  promoted_from_candidate_id?: string;
+  promoted_from_project_id?: string;
   evidence_quality: "high" | "medium" | "low";
 
   generated_at: string;
@@ -463,12 +467,13 @@ Materialized Draft → Claude Runtime Context      BLOCKED until Layer 8 activat
 11. Failed materialization writes no draft artifacts and creates no `materialized` lifecycle event.
 12. `claude_md_addition` remains a manual patch/snippet and is not automatically applied.
 13. Materialized candidates do not influence Claude runtime behavior.
+14. Global-scoped candidates can be materialized as inactive drafts without becoming active global behavior.
 
 ## First-slice defaults
 
 The first 3.1 implementation slice uses these defaults unless a later reviewed plan changes them:
 
-1. Materialization supports **`instinct` drafts only**. `skill`, `command`, `agent`, and `claude_md_addition` remain schema-reserved until the explicit evolve/activation path is implemented and reviewed.
+1. Materialization supports **`instinct` drafts** for both project-scoped and global-scoped candidates. Global drafts must carry promotion provenance and remain inactive until explicit Layer 8 activation.
 2. Draft roots live only under `~/.arcforge/learning/drafts/<candidate_id>/<materialization_id>/`. Project-local `.arcforge/` draft roots are deferred to avoid accidental runtime discovery or repo pollution.
 3. A duplicate materialization request returns the latest existing draft only when the candidate record hash and render policy version match. If either changed, Layer 7 creates a new `materialization_id` and draft record.
 4. Draft previews are served through bounded Layer 7 read endpoints consumed by Layer 6. The dashboard must not read arbitrary local files and must not send raw draft paths to the browser by default.

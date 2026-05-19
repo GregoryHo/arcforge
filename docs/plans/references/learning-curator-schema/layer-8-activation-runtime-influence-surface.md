@@ -155,6 +155,7 @@ type ActivationPolicy = {
 ```ts
 type ActivationActiveRoots = {
   instincts_root: string; // ~/.arcforge/instincts/<project>/
+  global_instincts_root?: string; // ~/.arcforge/instincts/global/
   skills_root?: string;   // repo or user-approved skills root
   commands_root?: string;
   agents_root?: string;
@@ -168,7 +169,7 @@ The exact active root must be explicit and allowlisted. Layer 8 must not infer a
 
 | Candidate `artifact_type` | Activation target | Runtime influence contract |
 |---|---|---|
-| `instinct` | `~/.arcforge/instincts/<project>/<id>.md` | Active instinct record only; must not auto-load into Claude context. |
+| `instinct` | `~/.arcforge/instincts/<project>/<id>.md` or `~/.arcforge/instincts/global/<id>.md` according to candidate scope | Active instinct record only; must not auto-load into Claude context. |
 | `skill` | allowed `skills/<name>/SKILL.md` active root | May influence future Claude behavior through normal skill discovery only after activation. |
 | `command` | allowed active command root | May influence command availability only after activation. |
 | `agent` | allowed active agent root | May influence agent availability only after activation. |
@@ -474,7 +475,7 @@ claude_md_addition → auto-edit CLAUDE.md  BLOCKED
 
 The first 3.1 implementation slice uses these defaults unless a later reviewed plan changes them:
 
-1. Activation supports **`instinct` targets only**, written under `~/.arcforge/instincts/<project>/`. No active skills root is enabled by default. Future skill activation must require an explicit dashboard-selected, allowlisted skills root.
+1. Activation supports **`instinct` targets only**, written under `~/.arcforge/instincts/<project>/` for project-scoped candidates or `~/.arcforge/instincts/global/` for global-scoped candidates. Global instinct activation is first-slice behavior but still does not auto-load into Claude context. No active skills root is enabled by default. Future skill activation must require an explicit dashboard-selected, allowlisted skills root.
 2. `command` and `agent` activation are **reserved** until skill activation is implemented, reviewed, and proven safe. `claude_md_addition` remains manual-only and is never auto-applied.
 3. Activated instincts are consumed by dashboard/history/evolve surfaces only in the first slice. They must not be auto-loaded into Claude context at SessionStart and must not become direct runtime instructions.
 4. Deactivation uses `move_to_disabled_archive` with a backup record. The first dashboard UX exposes deactivate status and backup metadata; full rollback/supersede UX is deferred.

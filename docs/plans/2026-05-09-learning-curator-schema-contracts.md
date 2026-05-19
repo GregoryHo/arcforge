@@ -25,8 +25,8 @@ Use these terms consistently in this document:
 
 - **Primary architecture path**: the intended end-to-end product flow from evidence collection through explicit activation.
 - **Default production path**: behavior enabled without debug, audit/replay, migration/import, emergency repair, or experimental flags.
-- **3.1 schema v1**: the first production contract for this layered learning architecture. It is not the historical arcforge v1/v2/v3 learning system. It prioritizes a project-scoped, dashboard-gated lifecycle and excludes future feedback lanes unless explicitly designed.
-- **First 3.1 implementation slice**: the initial implementation subset used to ship the primary architecture path safely. A source adapter or action can be deferred from the first slice while still being required to target the same canonical Layer 5 schema when implemented.
+- **3.1 schema v1**: the first production contract for this layered learning architecture. It is not the historical arcforge v1/v2/v3 learning system. It prioritizes a dashboard-gated lifecycle with project-scoped curator proposals and explicit dashboard promotion to global candidates.
+- **First 3.1 implementation slice**: the initial implementation subset used to ship the primary architecture path safely. It includes explicit dashboard `[Promote]` project → global candidate creation through Layer 5. Any source adapter or action left for later must still target the same canonical Layer 5 schema when implemented.
 
 ## Layer numbering convention
 
@@ -79,7 +79,7 @@ This file is the schema contract index and governance document. It is not the so
 3. The default production path excludes debug/audit/replay, migration/import, emergency repair, and experimental flows unless explicitly named.
 4. Layer 3 and Layer 4 are one-way in 3.1 schema v1; they must not read Layer 5-8 lifecycle state unless a future feedback lane is explicitly designed.
 5. Layer 4 output is untrusted proposal data until Layer 5 validates, sanitizes, normalizes, deduplicates, assigns lifecycle identity, computes final evidence quality, and appends queue state.
-6. Layer 5 is the canonical candidate authority for all candidate-producing entrypoints. Deferred source adapters must still target the same canonical Layer 5 schema when implemented.
+6. Layer 5 is the canonical candidate authority for all candidate-producing entrypoints. First-slice dashboard promotion must create global candidates through Layer 5, and later source adapters must still target the same canonical Layer 5 schema when implemented.
 7. Runtime influence is forbidden before explicit Layer 8 activation. Pending, approved, and materialized artifacts must not alter Claude runtime behavior.
 8. Debug artifacts are local-only, retention-bound, excluded from default production readers, and never primary evidence for future learning runs.
 

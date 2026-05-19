@@ -70,11 +70,12 @@ type CandidateQueueInput =
   | Layer4CandidateProposalInput
   | ManualRecallCandidateInput
   | ReflectCandidateInput
+  | DashboardPromoteCandidateInput
   | DashboardEvolveCandidateInput
   | FutureImportOrRepairCandidateInput;
 ```
 
-The first 3.1 implementation slice requires the Layer 4 source adapter:
+The first 3.1 implementation slice requires both the Layer 4 source adapter and the dashboard promotion source adapter:
 
 ```ts
 type Layer4CandidateProposalInput = {
@@ -84,9 +85,18 @@ type Layer4CandidateProposalInput = {
   batch_manifest: CuratorBatchManifest;
   proposal_payload: CandidateProposalPayload;
 };
+
+type DashboardPromoteCandidateInput = {
+  source_type: "dashboard_promote";
+  action_id: string;
+  source_candidate_id: string;
+  expected_source_scope: { kind: "project"; project_id: string };
+  target_scope: { kind: "global" };
+  reason?: string;
+};
 ```
 
-Deferred adapters must still target the same canonical candidate schema:
+Additional adapters must still target the same canonical candidate schema. Manual recall, reflect, dashboard evolve, and import/repair adapters may be implemented in later slices without changing the Layer 5 record shape:
 
 ```ts
 type ManualRecallCandidateInput = {
@@ -146,6 +156,17 @@ For Layer 4 proposals, Layer 5 validates:
 - no activation claim is present;
 - no file-write claim is present;
 - dedupe key is not already occupied by a non-terminal candidate.
+
+For dashboard promotion inputs, Layer 5 validates:
+
+- source candidate exists in the current Layer 5 view;
+- source candidate scope is `project` and matches `expected_source_scope.project_id`;
+- target scope is exactly `global`;
+- source candidate is non-terminal unless the dashboard explicitly allows promoting from terminal states in a later policy;
+- source candidate body and safety metadata are still valid for copying into a global candidate;
+- no existing non-terminal global candidate has the same dedupe key;
+- promotion relationship is not already recorded for the same source candidate;
+- promotion creates a new candidate ID and does not overwrite the source candidate.
 
 Layer 4 advisory fields never auto-transition lifecycle state:
 
@@ -337,6 +358,7 @@ type CandidateSourceRef = {
     | "layer4_llm_curator"
     | "manual_recall"
     | "reflect"
+    | "dashboard_promote"
     | "dashboard_evolve"
     | "future_import_or_repair";
 
@@ -364,6 +386,13 @@ type CandidateSourceRef = {
     source_candidate_ids: string[];
   };
 
+  promote?: {
+    action_id: string;
+    source_candidate_id: string;
+    source_candidate_hash: string;
+    source_project_id: string;
+  };
+
   import_or_repair?: {
     import_id: string;
   };
@@ -372,22 +401,10 @@ type CandidateSourceRef = {
 
 ## Scope
 
-For 3.1 schema v1, accepted candidates are project-scoped only:
+For 3.1 schema v1, accepted candidates may be project-scoped or global-scoped:
 
 ```ts
-type CandidateScope = {
-  kind: "project";
-  project: string;
-  project_id: string;
-};
-```
-
-Daemon / Layer 4 proposals must not directly create global candidates.
-
-Future global promotion should be explicit and dashboard-mediated, for example:
-
-```ts
-type FutureCandidateScope =
+type CandidateScope =
   | {
       kind: "project";
       project: string;
@@ -396,10 +413,21 @@ type FutureCandidateScope =
   | {
       kind: "global";
       promoted_from_candidate_id: string;
+      promoted_from_project_id: string;
     };
 ```
 
-Do not enable global scope until Layer 6 promotion, Layer 5 relationship, Layer 7 materialization, and Layer 8 activation contracts are designed for it.
+Daemon / Layer 4 proposals must create project-scoped candidates only. Global candidates are first-slice product behavior, but they are created only by an explicit Layer 6 dashboard `[Promote]` action through the `dashboard_promote` source adapter.
+
+Promotion creates a new canonical candidate record with:
+
+- `scope.kind: "global"`;
+- `source.source_type: "dashboard_promote"`;
+- `source.promote.source_candidate_id` and `source.promote.source_project_id`;
+- `relationships.promoted_from_candidate_id` on the global candidate;
+- `relationships.promoted_to_candidate_id` recorded on the source project candidate through a `candidate.related` event.
+
+Promotion does not activate behavior, does not materialize files, and does not mutate the original candidate body except for deterministic scope/relationship metadata required by the global candidate record.
 
 ## Evidence normalization
 
@@ -1035,6 +1063,8 @@ Candidate Queue → CLAUDE.md
 18. Rejection records are retention-bound and never future learning evidence.
 19. Dashboard candidate lists do not read `rejections.jsonl` as candidates.
 20. Malformed rejection log lines cannot block candidate queue operation.
+21. Explicit dashboard promotion creates a canonical global candidate through Layer 5, not a parallel store.
+22. Daemon / Layer 4 proposals cannot directly create global candidates.
 
 ## First-slice defaults
 
@@ -1050,10 +1080,12 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
    - `trigger`: 600 chars
    - `body`: 6,000 chars
    - rejection `detail`: 500 chars
-5. Duplicate detection compares all non-terminal candidates plus dismissed candidates from the last **30 days**. Older dismissed candidates do not block insertion, but may be surfaced as weak relationship/audit hints only after an explicit design.
+5. Dashboard `[Promote]` is enabled in the first slice. A valid project-scoped source candidate may create a new global-scoped candidate with `relationships.promoted_from_candidate_id`; the source project candidate receives `relationships.promoted_to_candidate_id` via a `candidate.related` event. Promotion remains non-runtime and does not imply approval, materialization, or activation.
+6. Duplicate detection compares all non-terminal candidates plus dismissed candidates from the last **30 days**. Older dismissed candidates do not block insertion, but may be surfaced as weak relationship/audit hints only after an explicit design.
 
 ## Deferred decisions
 
 1. Long-term queue rotation/compaction policy for larger installations.
 2. Whether `needs_more_evidence` may be assigned by future deterministic evidence-aging rules after a candidate has already entered the queue.
 3. Whether dedupe should consider superseded/deactivated historical candidates beyond the first-slice dismissed-window rule.
+4. Cross-machine global candidate portability beyond the local queue and explicit dashboard promotion model.

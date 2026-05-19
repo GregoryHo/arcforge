@@ -298,13 +298,13 @@ Layer 6 routes actions by responsibility:
 | `dismiss` | Validate request and ask Layer 5 for `dismissed` transition | Layer 5 |
 | `needs_more_evidence` | Validate request and ask Layer 5 for transition | Layer 5 |
 | `approve` | Validate request and ask Layer 5 for `approved` transition | Layer 5 |
-| `promote` | Create an explicit promotion request / future Layer 5 source input | Layer 5 once global scope is enabled |
+| `promote` | Create an explicit promotion request that becomes a Layer 5 `dashboard_promote` source input | Layer 5 |
 | `evolve` | Create bounded evolve request; resulting proposal must enter Layer 5 | Layer 5 source adapter + optional LLM evolve adapter |
 | `request_materialize` | Dispatch request to Layer 7; no file writes in Layer 6 | Layer 7 |
 | `request_activate` | Dispatch request to Layer 8; no runtime writes in Layer 6 | Layer 8 |
 | `request_deactivate` | Dispatch request to Layer 8; no runtime writes in Layer 6 | Layer 8 |
 
-For 3.1 schema v1, if Layer 5 still restricts accepted candidates to project scope, `promote` must fail closed with a clear unsupported-action result rather than inventing a parallel global candidate store. Global promotion becomes enabled only after Layer 5 `CandidateScope`, Layer 7 target selection, and Layer 8 activation contracts are updated consistently.
+For 3.1 schema v1, `[Promote]` is required first-slice behavior. It must create no side effects directly in Layer 6: the dashboard validates the reviewer request, records audit metadata, and dispatches to Layer 5 so Layer 5 can create the canonical global candidate and relationship events. Invalid promotion requests still fail closed, but absence of global promotion support is not an acceptable first-slice default.
 
 ## Action validation
 
@@ -441,7 +441,7 @@ Rejected Proposal → Dashboard Candidate Card    BLOCKED
 7. `request_materialize` dispatches to Layer 7 and does not write files in Layer 6.
 8. `request_activate` / `request_deactivate` dispatch to Layer 8 and do not write runtime files in Layer 6.
 9. `promote` and `evolve` must target Layer 5 canonical schema; no parallel candidate store is allowed.
-10. If global scope is not enabled in Layer 5, `promote` fails closed rather than creating ad-hoc global state.
+10. `promote` is enabled for first-slice project → global candidate creation through Layer 5 `dashboard_promote`; invalid source state or scope mismatches fail closed.
 11. Pending, approved, and materialized candidates are never injected into Claude runtime context by the dashboard.
 12. Layer 6 action audit logs do not become candidate source of truth.
 
@@ -450,12 +450,12 @@ Rejected Proposal → Dashboard Candidate Card    BLOCKED
 The first 3.1 implementation slice uses these defaults unless a later reviewed plan changes them:
 
 1. `DashboardCandidateDetail.body_preview` is **enabled only on explicit detail view**, never in list/card payloads. It is capped at **1,500 chars**, derived only from the Layer 5 canonical candidate body, and must remain sanitized/bounded.
-2. Global promotion is **explicitly deferred**. `promote` fails closed with `unsupported_scope` until Layer 5 scope, Layer 7 target selection, and Layer 8 activation contracts are updated together.
+2. Global promotion is **enabled** in the first slice. `[Promote]` accepts a project-scoped source candidate and dispatches a `dashboard_promote` source input to Layer 5, which creates a global-scoped candidate and records source/global relationships. Promotion does not approve, materialize, activate, or create runtime influence.
 3. `actions.jsonl` is retained for as long as the corresponding candidate lifecycle history is retained. It is audit/control-plane state, not source of truth, and can be rebuilt only where Layer 5 lifecycle evidence is sufficient.
 4. Layer 3 / Layer 4 manifest diagnostics stay **CLI/debug-only** in the first slice. The dashboard may show safe IDs/counts already present in Layer 5 records, but it must not expose manifest bodies, raw prompts, raw responses, or full batch snapshots.
 
 ## Deferred decisions
 
 1. Rich dashboard diagnostics for Layer 3 / Layer 4 run manifests.
-2. Global promotion UX and scope migration.
+2. Bulk/multi-select promotion UX beyond one explicit project candidate → one global candidate action.
 3. Separate retention/compaction policy for dashboard action audit logs if candidate lifecycle history becomes large.

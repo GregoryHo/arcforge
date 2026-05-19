@@ -497,8 +497,8 @@ The daemon should not directly append arbitrary LLM output to the queue. It shou
 - Surface message: `"N learning candidates ready for review — arc learn dashboard"`
 
 **Dashboard additions** — `scripts/lib/learning-dashboard.js`:
-- New action: `[Promote]` (project candidate → global candidate, all manual; full architecture only — first-slice behavior is governed by Layer 6 schema defaults and may fail closed until implemented)
-- New action: `[Evolve]` (select N+ instinct candidates → emit a skill/command/agent candidate; first-slice behavior is governed by Layer 7 schema defaults and may support only skill/instinct paths initially)
+- New action: `[Promote]` (project candidate → global candidate, all manual; required in the first 3.1 slice, with Layer 5 canonical global scope and relationship metadata)
+- New action: `[Evolve]` (select N+ instinct candidates → emit a skill/command/agent candidate; first-slice artifact support is governed by Layer 7/8 schema defaults)
 - Keep existing `[Approve] / [Materialize] / [Activate] / [Dismiss]` flow
 
 **Activation routing** — `scripts/lib/learning.js` `getActiveArtifactPaths`:
