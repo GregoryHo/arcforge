@@ -1,5 +1,7 @@
 # Eval: eval-optional-learning-self-improvement-candidate
 
+**Status**: Pending Slice E rewrite after the learning curator pivot. This scenario was designed against the pre-3.1 statistical/auto-load lifecycle. Slice E will replace or update the assertions to match the daemon-curator + dashboard-gated flow.
+
 ## Scope
 skill
 

@@ -537,13 +537,13 @@ describe('observe: pre-event persists semantic summary', () => {
   });
 });
 
-describe('observe: automatic learning trigger', () => {
+describe('observe: statistical auto-trigger is retired', () => {
   const originalEnv = { ...process.env };
   let testDir;
   let projectRoot;
 
   beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-learning-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-no-autotrigger-'));
     projectRoot = path.join(testDir, 'project');
     fs.mkdirSync(projectRoot, { recursive: true });
     process.env.HOME = path.join(testDir, 'home');
@@ -559,55 +559,62 @@ describe('observe: automatic learning trigger', () => {
     Object.assign(process.env, originalEnv);
   });
 
-  it('queues only pending candidates when learning is enabled', () => {
+  it('does not invoke the statistical pipeline from the observe hook', () => {
     const learning = require('../../scripts/lib/learning');
-    const { runAutomaticLearningTrigger } = require('../observe/main');
+    const { spawnSync } = require('node:child_process');
     learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+
+    // Seed enough observations that the retired analyzer WOULD have queued
+    // a candidate. After retirement, running the hook must not add anything
+    // to the candidate queue.
     const observationPath = learning.getObservationPath({ projectRoot });
     fs.mkdirSync(path.dirname(observationPath), { recursive: true });
     const projectId = learning.getProjectId(projectRoot);
-    fs.writeFileSync(
-      observationPath,
-      `${[
-        {
+    const seed = ['workflow-a', 'workflow-b']
+      .flatMap((session) =>
+        ['Read', 'Edit'].map((tool) => ({
           project_id: projectId,
-          session: 'workflow-a',
+          session,
           event: 'tool_start',
-          tool: 'Read',
+          tool,
           input: '{}',
-        },
-        {
-          project_id: projectId,
-          session: 'workflow-a',
-          event: 'tool_start',
-          tool: 'Edit',
-          input: '{}',
-        },
-        {
-          project_id: projectId,
-          session: 'workflow-b',
-          event: 'tool_start',
-          tool: 'Read',
-          input: '{}',
-        },
-        {
-          project_id: projectId,
-          session: 'workflow-b',
-          event: 'tool_start',
-          tool: 'Edit',
-          input: '{}',
-        },
-      ]
-        .map((record) => JSON.stringify(record))
-        .join('\n')}\n`,
-      'utf8',
+        })),
+      )
+      .map((record) => JSON.stringify(record))
+      .join('\n');
+    fs.writeFileSync(observationPath, `${seed}\n`, 'utf8');
+
+    const queuedBefore = learning.loadCandidates({ scope: 'project', projectRoot });
+
+    const hookInput = {
+      session_id: 'no-autotrigger',
+      hook_event_name: 'PreToolUse',
+      cwd: projectRoot,
+      tool_name: 'Read',
+      tool_input: { file_path: 'README.md' },
+    };
+    const scriptPath = path.join(__dirname, '..', 'observe', 'main.js');
+    const result = spawnSync('node', [scriptPath, 'pre'], {
+      input: JSON.stringify(hookInput),
+      env: { ...process.env, HOME: process.env.HOME, CLAUDE_PROJECT_DIR: projectRoot },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+
+    const queuedAfter = learning.loadCandidates({ scope: 'project', projectRoot });
+    assert.strictEqual(
+      queuedAfter.length,
+      queuedBefore.length,
+      'observe hook must not create candidates via the retired statistical pipeline',
     );
+  });
 
-    runAutomaticLearningTrigger(projectRoot);
-
-    const queued = learning.loadCandidates({ scope: 'project', projectRoot });
-    assert.strictEqual(queued.length, 1);
-    assert.strictEqual(queued[0].status, 'pending');
-    assert.ok(!fs.existsSync(path.join(projectRoot, 'skills', queued[0].name, 'SKILL.md')));
+  it('does not export runAutomaticLearningTrigger from the observe hook module', () => {
+    const observeModule = require('../observe/main');
+    assert.strictEqual(
+      observeModule.runAutomaticLearningTrigger,
+      undefined,
+      'runAutomaticLearningTrigger must be removed from observe hook exports',
+    );
   });
 });

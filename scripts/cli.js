@@ -25,7 +25,8 @@
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)
- *   learn status|enable|disable|analyze|inbox|review|drafts|inspect|approve|reject|accept|materialize|activate  Manage optional learning subsystem
+ *   learn status|enable|disable|inbox|review|drafts|inspect|approve|reject|accept|materialize|activate  Manage optional learning subsystem
+ *   (learn analyze is DEPRECATED — use the dashboard for candidate review)
  *   learn dashboard [--port N]       Start localhost learning review dashboard (default: 3334)
  *   research dashboard [--results path] [--config path] [--port N]  Start live research dashboard
  */
@@ -1195,8 +1196,11 @@ async function main() {
           const scope = resolveLearningScope();
           output(learning.listMaterializedDrafts({ scope, projectRoot }), asJson);
         } else if (subcommand === 'analyze') {
-          const scope = resolveLearningScope();
-          output(learning.analyzeLearning({ scope, projectRoot }), asJson);
+          console.error(
+            'arc learn analyze is deprecated. The statistical analyzer has been retired; ' +
+              'candidate review now lives in the dashboard. Run: arc learn dashboard',
+          );
+          process.exit(1);
         } else if (subcommand === 'materialize') {
           const candidateId = args.positional[1];
           if (!candidateId) throw new Error('learn materialize requires a candidate id');
@@ -1229,7 +1233,7 @@ async function main() {
           );
         } else {
           console.error(
-            'Usage: arc learn [dashboard [--port N]|status|enable|disable|analyze|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
+            'Usage: arc learn [dashboard [--port N]|status|enable|disable|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
           );
           process.exit(1);
         }
