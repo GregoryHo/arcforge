@@ -350,7 +350,7 @@ Derived semantic view is not primary persisted observation data. It is a read-ti
 type DerivedSemanticView = {
   tool: string;
 
-  operation?:
+  operation_kind?:
     | "shell"
     | "read"
     | "write"
@@ -405,7 +405,7 @@ Examples:
 ```json
 {
   "tool": "Bash",
-  "operation": "shell",
+  "operation_kind": "shell",
   "command_kind": "test"
 }
 ```
@@ -413,7 +413,7 @@ Examples:
 ```json
 {
   "tool": "Read",
-  "operation": "read",
+  "operation_kind": "read",
   "path_class": "docs",
   "file_kind": "md"
 }

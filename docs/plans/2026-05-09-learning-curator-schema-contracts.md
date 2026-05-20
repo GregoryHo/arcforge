@@ -83,6 +83,37 @@ This file is the schema contract index and governance document. It is not the so
 7. Runtime influence is forbidden before explicit Layer 8 activation. Pending, approved, and materialized artifacts must not alter Claude runtime behavior.
 8. Debug artifacts are local-only, retention-bound, excluded from default production readers, and never primary evidence for future learning runs.
 
+## Persistence root organization
+
+The learning subsystem persists state under two roots with deliberately different retention contracts:
+
+- `~/.arcforge/observations/` holds **raw evidence**. Files here (`<project>/observations.jsonl`) are subject to retention/purge/quarantine policies and may be deleted without violating any product invariant. Observation data is local-only and is not a candidate or product-truth artifact.
+- `~/.arcforge/learning/` holds **curator artifacts** that constitute Layer 3-8 product truth — curator batch manifests, curator run manifests, the candidate queue, rejection audits, materialization records, activation records, dashboard audit logs, and optional debug artifacts. These follow append-only / event-log / atomic-overwrite semantics and have stricter retention than raw observations.
+
+Implementers must respect this split: an observation in `~/.arcforge/observations/` may be retired aggressively; a candidate event in `~/.arcforge/learning/candidates/queue.jsonl` is product state and must not be silently dropped. The split is not an organizational accident — it expresses different retention contracts and different relationships to runtime influence.
+
+## Artifact terminology (Manifest / Record / Event)
+
+Three artifact patterns appear across layers and must be named consistently:
+
+- **Manifest** — pre-handoff metadata describing the *input* a layer received. Examples: Layer 3 `CuratorBatchManifest` (what evidence went into the batch), Layer 4 `CuratorRunManifest` (what batch + policy went into the LLM run).
+- **Record** — post-side-effect proof a layer wrote. Examples: Layer 7 `MaterializationRecord` (what draft files were written), Layer 8 `ActivationRecord` (what active surface was changed).
+- **Event** — append-only lifecycle line in Layer 5's `queue.jsonl`. Captures `candidate.created`, `candidate.transitioned`, `candidate.updated`, `candidate.related`.
+
+The three concepts are genuinely different (input metadata, output proof, lifecycle log line). Use the right noun for the right artifact. Do not call a Layer 7 materialization output a "manifest", and do not call a Layer 5 lifecycle event a "record".
+
+## Daemon role
+
+The bash daemon (`skills/arc-observing/scripts/observer-daemon.sh`) is a Layer 3+4 orchestrator and a Layer 5 consumer. It is not a schema authority at any layer.
+
+Specifically, the daemon:
+
+- triggers Layer 3 batch assembly (Node CLI call);
+- triggers Layer 4 prompt assembly + LLM curator invocation (bash spawns `claude -p`, wrapped in a watchdog);
+- hands the LLM proposal payload to Layer 5 (Node CLI call) for validation, sanitization, dedupe, and queue append.
+
+The daemon does not own validation logic, schema definitions, sanitizer rules, or lifecycle state. Those live in shared Node modules (`scripts/lib/sanitize-observation.js`, `scripts/lib/learning-curator/*.js`) that other entrypoints — `/recall`, `/reflect`, dashboard `[Evolve]` — also call. See the implementation plan's "Daemon Redesign Depth" section for the full division of responsibility.
+
 ## Reference file layout
 
 ```text

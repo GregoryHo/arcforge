@@ -289,6 +289,8 @@ type DashboardSafetyAcknowledgement = {
 
 Action requests are durable audit inputs, not proof that the action succeeded. The target layer must validate current state again before side effects.
 
+**Action × Status legality** — the legality of each `action` value against the current `expected_current_status` (and the candidate's actual status at handling time) is defined canonically in Layer 5's "Action × Status legality matrix (canonical)" section. Layer 6 must reject requests that violate the matrix locally (to give immediate feedback) and Layer 5 must reject them again at handling time. Do not duplicate the matrix in Layer 6 — link to and consult the Layer 5 canonical source.
+
 ## Action routing contract
 
 Layer 6 routes actions by responsibility:
