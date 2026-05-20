@@ -268,12 +268,9 @@ function main() {
   const contextParts = [];
   const userParts = [];
 
-  // Active instincts
-  const { text: instinctsContext, count: instinctCount } = loadAutoInstincts(project);
-  if (instinctsContext) {
-    contextParts.push(instinctsContext);
-    userParts.push(`${instinctCount} instinct${instinctCount !== 1 ? 's' : ''} active`);
-  }
+  // loadAutoInstincts is intentionally not called — SessionStart must not
+  // auto-inject instinct text into Claude context. Influence reaches the
+  // model only through explicit activation.
 
   // Pending action notifications
   const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project);

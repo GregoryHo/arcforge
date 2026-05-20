@@ -159,7 +159,9 @@ describe('E2E: session-tracker/inject-context.js', () => {
     assert.strictEqual(result.stdout.trim(), '', 'No instincts = no stdout');
   });
 
-  it('should inject high-confidence instincts into stdout', () => {
+  it('does not auto-inject high-confidence instincts into stdout', () => {
+    // Invariant: SessionStart must not surface instinct text in Claude
+    // context regardless of confidence. Influence requires explicit activation.
     const projectName = path.basename(testDir);
     const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
@@ -181,80 +183,17 @@ describe('E2E: session-tracker/inject-context.js', () => {
     const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-    assert.ok(result.stdout.trim().length > 0, 'Should produce stdout with instincts');
-
-    const parsed = JSON.parse(result.stdout);
-    const ctx = parsed.hookSpecificOutput.additionalContext;
-    assert.ok(ctx.includes('test-instinct'), 'Should include instinct ID');
-    assert.ok(ctx.includes('85%'), 'Should include confidence percentage');
-  });
-
-  it('should NOT inject instincts below 0.70 threshold', () => {
-    const projectName = path.basename(testDir);
-    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
-    fs.mkdirSync(instinctsDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(instinctsDir, 'low.md'),
-      [
-        '---',
-        'id: low-confidence',
-        'confidence: 0.30',
-        'trigger: Test',
-        '---',
-        '',
-        '## Action',
-        'Skip',
-      ].join('\n'),
-    );
-
-    const input = makeSessionStartInput('startup');
-    const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
-
-    assert.strictEqual(result.exitCode, 0);
-    if (result.stdout.trim()) {
-      assert.ok(
-        !result.stdout.includes('low-confidence'),
-        'Should not include low-confidence instinct',
-      );
-    }
-  });
-
-  it('should output both systemMessage and hookSpecificOutput for high-confidence instincts', () => {
-    const projectName = path.basename(testDir);
-    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
-    fs.mkdirSync(instinctsDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(instinctsDir, 'dual-test.md'),
-      [
-        '---',
-        'id: dual-test',
-        'confidence: 0.90',
-        'trigger: When editing files',
-        '---',
-        '',
-        '## Action',
-        'Run linter first',
-      ].join('\n'),
-    );
-
-    const input = makeSessionStartInput('startup');
-    const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-
-    const parsed = JSON.parse(result.stdout);
-    assert.ok(parsed.systemMessage, 'Should have systemMessage for user');
     assert.ok(
-      parsed.systemMessage.includes('1 instinct active'),
-      `systemMessage should show count. Got: "${parsed.systemMessage}"`,
+      !result.stdout.includes('Active Behavioral Instincts'),
+      'Auto-load header must not appear in SessionStart output',
     );
     assert.ok(
-      parsed.hookSpecificOutput?.additionalContext,
-      'Should have additionalContext for Claude',
+      !result.stdout.includes('test-instinct'),
+      'Instinct id must not appear in SessionStart output',
     );
     assert.ok(
-      parsed.hookSpecificOutput.additionalContext.includes('dual-test'),
-      'additionalContext should include instinct ID',
+      !result.stdout.includes('instinct active'),
+      'Instinct count must not appear in systemMessage',
     );
   });
 });

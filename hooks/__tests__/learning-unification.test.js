@@ -171,6 +171,75 @@ describe('inject-context loads instincts', () => {
 });
 
 // ─────────────────────────────────────────────
+// 5b. SessionStart does NOT auto-inject instincts into Claude context
+// ─────────────────────────────────────────────
+
+describe('SessionStart does not auto-inject instincts', () => {
+  let testDir;
+  let projectRoot;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-sessionstart-no-autoload-'));
+    projectRoot = path.join(testDir, 'project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    process.env.HOME = testDir;
+    process.env.CLAUDE_PROJECT_DIR = projectRoot;
+
+    // Seed a high-confidence instinct that the retired auto-loader would have
+    // injected into Claude context. After Slice A, SessionStart must not
+    // surface it.
+    const projectName = path.basename(projectRoot);
+    const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
+    fs.mkdirSync(instinctsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(instinctsDir, 'high-conf-test.md'),
+      `---\nid: high-conf-test\nconfidence: 0.9\ntrigger: high-confidence test trigger\ndomain: workflow\n---\n\n## Action\nshould never appear in SessionStart output\n`,
+      'utf-8',
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('does not emit Active Behavioral Instincts header in SessionStart output', () => {
+    const { spawnSync } = require('node:child_process');
+    const hookInput = {
+      session_id: 'no-autoload',
+      hook_event_name: 'SessionStart',
+      source: 'startup',
+      cwd: projectRoot,
+      transcript_path: path.join(testDir, 'transcript.jsonl'),
+    };
+    const scriptPath = path.join(__dirname, '..', 'session-tracker', 'inject-context.js');
+    const result = spawnSync('node', [scriptPath], {
+      input: JSON.stringify(hookInput),
+      env: { ...process.env, HOME: testDir, CLAUDE_PROJECT_DIR: projectRoot },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+
+    // The auto-loader prepended this exact header. If it ever re-appears in
+    // stdout, the auto-load behavior has regressed.
+    assert.ok(
+      !result.stdout.includes('Active Behavioral Instincts'),
+      `SessionStart must not auto-inject instincts. Got stdout: ${result.stdout}`,
+    );
+    assert.ok(
+      !result.stdout.includes('high-conf-test'),
+      `SessionStart must not surface seeded instinct ID. Got stdout: ${result.stdout}`,
+    );
+    assert.ok(
+      !result.stdout.includes('high-confidence test trigger'),
+      `SessionStart must not surface instinct trigger text. Got stdout: ${result.stdout}`,
+    );
+  });
+});
+
+// ─────────────────────────────────────────────
 // 6. inject-context does NOT load learned skills
 // ─────────────────────────────────────────────
 

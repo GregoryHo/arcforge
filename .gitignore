@@ -50,3 +50,8 @@ hooks/.claude/
 
 # Implementation task lists — contributor-only, ephemeral (per .claude/rules/dev-context.md)
 docs/tasks/
+
+# Local arcforge runtime state at repo root (learning config, candidate queue, etc.).
+# This is per-checkout user state, not source code; ~/.arcforge is the canonical
+# location, but project-scoped flows write to ./.arcforge/.
+.arcforge/

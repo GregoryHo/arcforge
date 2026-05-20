@@ -230,8 +230,8 @@ Each file: {id}.md with YAML frontmatter + markdown body.
   # Archive processed observations
   archive_observations "$project"
 
-  # Check bubble-up to global
-  check_bubble_up "$project"
+  # Bubble-up to global has been retired (pivot Slice A). Project → global
+  # promotion now requires an explicit dashboard [Promote] action.
 }
 
 archive_observations() {
@@ -248,15 +248,6 @@ archive_observations() {
   timestamp=$(date '+%Y%m%d-%H%M%S')
   mv "$obs_file" "${archive_dir}/observations-${timestamp}.jsonl"
   log_msg "Archived observations for ${project}"
-}
-
-check_bubble_up() {
-  local project="$1"
-
-  # Delegate to Node.js for unified bubble-up logic
-  node "${SCRIPT_DIR}/../../../scripts/lib/global-index.js" --check-promote --project "$project" 2>&1 | while read -r line; do
-    log_msg "$line"
-  done
 }
 
 analyze_all_projects() {

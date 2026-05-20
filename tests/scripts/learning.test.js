@@ -812,55 +812,25 @@ describe('learning subsystem MVP-1', () => {
     expect(queued[0].id).toMatch(/^arc-learned-project-read-edit-[a-f0-9]{8}-workflow$/);
   });
 
-  it('CLI learn analyze queues broad candidates from enabled project observations', () => {
+  it('CLI learn analyze is deprecated and exits non-zero with a dashboard pointer', () => {
     setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
-    writeObservations([
-      {
-        ts: '2026-05-01T00:00:00Z',
-        event: 'tool_start',
-        tool: 'Read',
-        session: 'session-workflow-a',
-        project: path.basename(projectRoot),
-        input: '{}',
-      },
-      {
-        ts: '2026-05-01T00:01:00Z',
-        event: 'tool_start',
-        tool: 'Edit',
-        session: 'session-workflow-a',
-        project: path.basename(projectRoot),
-        input: '{}',
-      },
-      {
-        ts: '2026-05-01T01:00:00Z',
-        event: 'tool_start',
-        tool: 'Read',
-        session: 'session-workflow-b',
-        project: path.basename(projectRoot),
-        input: '{}',
-      },
-      {
-        ts: '2026-05-01T01:01:00Z',
-        event: 'tool_start',
-        tool: 'Edit',
-        session: 'session-workflow-b',
-        project: path.basename(projectRoot),
-        input: '{}',
-      },
-    ]);
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
-    const analyzed = JSON.parse(
-      execFileSync('node', [cli, 'learn', 'analyze', '--project', '--json'], {
-        env,
-        encoding: 'utf8',
-      }),
-    );
+    let stderr = '';
+    let exitCode = 0;
+    try {
+      execFileSync('node', [cli, 'learn', 'analyze', '--project'], { env, encoding: 'utf8' });
+    } catch (err) {
+      exitCode = err.status;
+      stderr = err.stderr || '';
+    }
 
-    expect(analyzed.emitted).toBe(1);
-    expect(analyzed.candidates[0].name).toMatch(/^arc-learned-read-edit-[a-f0-9]{8}-workflow$/);
-    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(1);
+    expect(exitCode).toBe(1);
+    expect(stderr).toMatch(/deprecated/i);
+    expect(stderr).toMatch(/arc learn dashboard/);
+    // After deprecation, the analyzer must not silently enqueue candidates.
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
   });
 
   it('global analyzer emits cross-project learned behavior candidates', () => {

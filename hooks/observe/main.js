@@ -23,15 +23,7 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
-const {
-  getProjectId,
-  isLearningEnabled,
-  triggerAutomaticLearning,
-} = require('../../scripts/lib/learning');
-const {
-  buildLearningNotification,
-  writeLearningNotification,
-} = require('../../scripts/lib/learning-dashboard');
+const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -300,24 +292,6 @@ function signalDaemon() {
   }
 }
 
-function runAutomaticLearningTrigger(
-  projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
-) {
-  try {
-    const result = triggerAutomaticLearning({ projectRoot });
-    const notification = buildLearningNotification({
-      result,
-      projectId: getProjectId(projectRoot),
-    });
-    if (notification) {
-      writeLearningNotification(notification, { projectRoot });
-      console.log(notification.message);
-    }
-  } catch {
-    // Learning analysis is best-effort and must never block tool execution.
-  }
-}
-
 // ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
@@ -395,10 +369,8 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
-    // Signal daemon and run the lightweight automatic analyzer. The analyzer only
-    // appends pending candidates; it never materializes or activates artifacts.
+    // Wake the LLM-curation daemon; statistical auto-trigger retired (Slice A).
     signalDaemon();
-    runAutomaticLearningTrigger(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   } catch {
     // Non-blocking — never fail the hook
   }
@@ -425,7 +397,6 @@ module.exports = {
   getArchiveDir,
   getPidFile,
   shouldObserve,
-  runAutomaticLearningTrigger,
   MAX_INPUT_LENGTH,
   MAX_OUTPUT_LENGTH,
 };
