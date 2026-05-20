@@ -435,6 +435,8 @@ Daemon / Layer 4 proposals must create project-scoped candidates only. Global ca
 
 **Cross-layer invariant — promotion source linkage lives in relationships, not in scope.** `CandidateScope` describes the candidate's *current* scope (project or global). Lineage from a source candidate is a relationship and must be stored only on `CandidateRelationships`. Do not re-introduce `promoted_from_candidate_id` or `promoted_from_project_id` on `CandidateScope`.
 
+**Where this invariant is enforced.** The implicit follow-on rule — "a candidate with `scope.kind === 'global'` and `source.source_type === 'dashboard_promote'` must have `relationships.promoted_from_candidate_id` set" — is **enforced by adapter unit tests, not by a Layer 5 validator rule**. The reason is that this rule lives inside the same trust domain (Node adapter code under our control); the only realistic violation is a programmer bug in a new or modified adapter, which a test on the adapter catches directly. Layer 5 validator rules are reserved for cross-trust-boundary checks (e.g. LLM proposals from Layer 4, future import/repair adapters). Do not add this invariant as a Layer 5 reject code.
+
 Promotion creates a new canonical candidate record with:
 
 - `scope.kind: "global"` (no extra scope fields — lineage lives elsewhere);
