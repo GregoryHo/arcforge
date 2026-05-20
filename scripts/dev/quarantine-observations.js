@@ -18,10 +18,10 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
+const { getArcforgeHome } = require('../lib/utils');
 
 function defaultRoot() {
-  return path.join(os.homedir(), '.arcforge', 'observations');
+  return path.join(getArcforgeHome(), 'observations');
 }
 
 function compactTimestamp(date = new Date()) {
@@ -32,14 +32,24 @@ function compactTimestamp(date = new Date()) {
 }
 
 function listProjectObservationFiles(root) {
-  if (!fs.existsSync(root)) return [];
-  const projects = fs.readdirSync(root, { withFileTypes: true });
+  let projects;
+  try {
+    projects = fs.readdirSync(root, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
   const out = [];
   for (const entry of projects) {
     if (!entry.isDirectory()) continue;
     const obsPath = path.join(root, entry.name, 'observations.jsonl');
-    if (!fs.existsSync(obsPath)) continue;
-    const stat = fs.statSync(obsPath);
+    let stat;
+    try {
+      stat = fs.statSync(obsPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') continue;
+      throw err;
+    }
     out.push({ project: entry.name, path: obsPath, size: stat.size });
   }
   return out;
@@ -101,19 +111,19 @@ function main() {
   }
 
   const ts = compactTimestamp();
+  const targetSuffix = `.quarantine.${ts}`;
   const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
   const mode = opts.apply ? 'APPLY' : 'DRY-RUN';
 
   console.log(`[${mode}] Quarantine plan for ${opts.root}`);
   console.log(`  Projects: ${files.length}`);
   console.log(`  Total:    ${formatBytes(totalBytes)}`);
-  if (opts.apply) console.log(`  Suffix:   .quarantine.${ts}`);
+  if (opts.apply) console.log(`  Suffix:   ${targetSuffix}`);
   console.log('');
 
   let quarantined = 0;
   let bytesMoved = 0;
   for (const file of files) {
-    const targetSuffix = `.quarantine.${ts}`;
     if (opts.apply) {
       try {
         const target = quarantineFile(file.path, ts);
@@ -147,6 +157,5 @@ module.exports = {
   compactTimestamp,
   listProjectObservationFiles,
   quarantineFile,
-  formatBytes,
   parseArgs,
 };

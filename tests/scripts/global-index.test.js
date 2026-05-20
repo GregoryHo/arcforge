@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 const {
   appendToIndex,
@@ -26,7 +27,6 @@ describe('global-index', () => {
 
   describe('CLI --check-promote is deprecated', () => {
     it('exits non-zero with a dashboard pointer regardless of args', () => {
-      const { execFileSync } = require('node:child_process');
       const cli = path.join(__dirname, '../../scripts/lib/global-index.js');
 
       let stderr = '';

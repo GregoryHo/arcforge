@@ -369,9 +369,7 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
-    // Signal the LLM-curation daemon. The statistical auto-trigger that used
-    // to run inline has been retired; candidate generation lives entirely
-    // behind the daemon + Layer 5 validator + explicit dashboard review now.
+    // Wake the LLM-curation daemon; statistical auto-trigger retired (Slice A).
     signalDaemon();
   } catch {
     // Non-blocking — never fail the hook

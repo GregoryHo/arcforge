@@ -10,6 +10,12 @@ const {
   parseArgs,
 } = require('../../scripts/dev/quarantine-observations');
 
+const originalHome = process.env.HOME;
+afterAll(() => {
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+});
+
 const SCRIPT = path.join(__dirname, '../../scripts/dev/quarantine-observations.js');
 
 describe('quarantine-observations', () => {

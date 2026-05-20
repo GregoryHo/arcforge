@@ -130,13 +130,7 @@ function promoteToGlobal(sourcePath, globalDir, indexPath) {
   return targetPath;
 }
 
-/**
- * CLI entry point — the --check-promote auto-promote path is DEPRECATED.
- * Project → global promotion now happens only via explicit dashboard
- * `[Promote]` (Layer 6 → Layer 5 dashboard_promote adapter). The function
- * `checkBubbleUpForProject` remains exported for legacy direct-call tests
- * but has no production callers.
- */
+// CLI --check-promote is retired; promotion now requires explicit dashboard [Promote].
 function main() {
   console.error(
     'global-index.js --check-promote is deprecated. Auto-promotion of project ' +

@@ -160,9 +160,8 @@ describe('E2E: session-tracker/inject-context.js', () => {
   });
 
   it('does not auto-inject high-confidence instincts into stdout', () => {
-    // Pivot Decision 2: SessionStart no longer auto-loads instincts into
-    // Claude context regardless of confidence. Influence reaches the model
-    // only via explicit activation.
+    // Invariant: SessionStart must not surface instinct text in Claude
+    // context regardless of confidence. Influence requires explicit activation.
     const projectName = path.basename(testDir);
     const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
