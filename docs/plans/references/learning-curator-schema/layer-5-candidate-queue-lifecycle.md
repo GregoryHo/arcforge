@@ -232,6 +232,7 @@ type CandidateRejectionReason = {
     | "missing_required_field"
     | "field_too_long"
     | "evidence_ref_missing"
+    | "evidence_ref_omitted_upstream"
     | "evidence_type_mismatch"
     | "too_few_evidence_refs"
     | "too_many_evidence_refs"
@@ -250,6 +251,21 @@ type CandidateRejectionReason = {
 ```
 
 `detail` must be sanitized and bounded. It must not contain raw prompt text, raw response text, raw evidence bodies, transcript bodies, hook payloads, file contents, or secrets.
+
+### Upstream evidence-status mapping
+
+Layer 2 / Layer 3 produce `evidence_status ∈ { "present", "omitted_no_input", "omitted_unsupported_tool", "omitted_safety" }` on each evidence item. When Layer 5 validates a proposal's `evidence_refs`, it dereferences each cited `evidence_id` to its source batch item and reads that item's `evidence_status`. The mapping below converts upstream status into Layer 5 rejection outcomes:
+
+| Upstream `evidence_status` | Layer 5 outcome |
+|---|---|
+| `present` | The evidence is citable. Proceed with normal validation. |
+| `omitted_no_input` | Reject with `evidence_ref_omitted_upstream` (`detail` indicates "no input upstream"). |
+| `omitted_unsupported_tool` | Reject with `evidence_ref_omitted_upstream` (`detail` indicates "tool not in allowlist"). |
+| `omitted_safety` | Reject with `evidence_ref_omitted_upstream` (`detail` indicates "upstream omitted for safety"). |
+
+`evidence_ref_omitted_upstream` is distinct from `evidence_ref_missing` (which means the cited `evidence_id` does not exist in the batch at all). The new code closes the gap where a proposal could cite an evidence item that Layer 2/3 already omitted, which a non-mapped Layer 5 would otherwise silently accept.
+
+A proposal whose **every** cited evidence ref resolves to `evidence_status ≠ "present"` must be rejected. A proposal with mixed status may still be valid if the remaining `present` refs satisfy `min_evidence_refs_per_proposal`.
 
 ```ts
 type RejectionSafetyMetadata = {
@@ -412,19 +428,19 @@ type CandidateScope =
     }
   | {
       kind: "global";
-      promoted_from_candidate_id: string;
-      promoted_from_project_id: string;
     };
 ```
 
 Daemon / Layer 4 proposals must create project-scoped candidates only. Global candidates are first-slice product behavior, but they are created only by an explicit Layer 6 dashboard `[Promote]` action through the `dashboard_promote` source adapter.
 
+**Cross-layer invariant — promotion source linkage lives in relationships, not in scope.** `CandidateScope` describes the candidate's *current* scope (project or global). Lineage from a source candidate is a relationship and must be stored only on `CandidateRelationships`. Do not re-introduce `promoted_from_candidate_id` or `promoted_from_project_id` on `CandidateScope`.
+
 Promotion creates a new canonical candidate record with:
 
-- `scope.kind: "global"`;
+- `scope.kind: "global"` (no extra scope fields — lineage lives elsewhere);
 - `source.source_type: "dashboard_promote"`;
-- `source.promote.source_candidate_id` and `source.promote.source_project_id`;
-- `relationships.promoted_from_candidate_id` on the global candidate;
+- `source.promote.source_candidate_id` and `source.promote.source_project_id` (audit provenance of the creation event);
+- `relationships.promoted_from_candidate_id` on the global candidate (single source of truth for the linkage);
 - `relationships.promoted_to_candidate_id` recorded on the source project candidate through a `candidate.related` event.
 
 Promotion does not activate behavior, does not materialize files, and does not mutate the original candidate body except for deterministic scope/relationship metadata required by the global candidate record.
@@ -497,6 +513,10 @@ project_obs_count >= 1000  → high
 project_obs_count < 100  → low
 ```
 
+**3.1 v1 rule consumes `project_obs_count` only.** All other `basis` fields (cited_evidence_count, cited_evidence_by_type, has_user_correction, has_manual_recall, has_reflect_pattern, has_error_repair_sequence) are **future-extension fields**. They may be populated by the calculator for audit/debug, but the v1 quality formula must not read them. Layer 3 transcript summary support is deferred; until Layer 3 emits transcript summaries, the calculator may leave `cited_evidence_by_type.session_summary` as 0 without affecting quality.
+
+This pin closes the back-door dependency where Layer 5 quality could silently change behavior based on whether Layer 3 transcript summaries existed. Future formula upgrades are additive and must be versioned via `rule_version`.
+
 Layer 5 also stores the rule basis:
 
 ```ts
@@ -504,7 +524,10 @@ type EvidenceQualityMetadata = {
   rule_version: string;
 
   basis: {
+    // Consumed by v1 formula:
     project_obs_count: number;
+
+    // Recorded for audit / future formula versions only — NOT consumed by v1:
     cited_evidence_count: number;
 
     cited_evidence_by_type: {
@@ -677,6 +700,29 @@ return validation error
 ```
 
 Layer 5 may record successful `materialized`, `activated`, `deactivated`, and `superseded` transitions reported by later layers, but it must not perform those side effects itself.
+
+### Action × Status legality matrix (canonical)
+
+Layer 6 dashboard actions and CLI lifecycle actions must consult this matrix. Layer 5 is the canonical authority — any action handler at any layer must reject requests that violate it. `✓` = action is legal from this status; `✗` = action must be rejected with `policy_violation`.
+
+```text
+status \ action       │ dismiss │ approve │ materialize │ activate │ promote │ evolve
+─────────────────────────────────────────────────────────────────────────────────────
+pending_review        │   ✓     │   ✓     │     ✗       │    ✗     │   ✓     │   ✓
+needs_more_evidence   │   ✓     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+approved              │   ✗     │   ✗     │     ✓       │    ✗     │   ✓     │   ✓
+materialized          │   ✗     │   ✗     │     ✗       │    ✓     │   ✗     │   ✗
+activated             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+deactivated           │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗
+dismissed             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+superseded            │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+```
+
+Notes:
+
+- `promote` and `evolve` are candidate-producing actions, not status transitions on the source candidate. They create a new candidate (global-scoped for `promote`; evolved skill candidate for `evolve`) and add a relationship event on the source. The source candidate's lifecycle status does not change.
+- `materialize` and `activate` require the prior state to be `approved` and `materialized` respectively. The deactivated → materialized / activated path allows re-materializing or re-activating a previously deactivated artifact.
+- `dismiss` is reversible only via re-creating a new candidate; once `dismissed` it is terminal.
 
 ## Relationships
 
@@ -890,6 +936,7 @@ Layer 5 records what safety checks were applied to accepted candidates.
 type CandidateSafetyMetadata = {
   validator_version: string;
   sanitizer_policy_version: string;
+  sanitizer_module: "scripts/lib/sanitize-observation.js";
 
   raw_prompt_included: false;
   raw_response_included: false;
@@ -914,6 +961,16 @@ type CandidateSafetyMetadata = {
 ```
 
 Layer 5 accepted records must not include raw unsafe material. Tests and evals should assert these flags and inspect persisted candidate records.
+
+### Shared sanitizer contract
+
+`secret_scan.rule_version` and `sanitizer_policy_version` reference the canonical sanitizer module at `scripts/lib/sanitize-observation.js`. This module is shared between Layer 4 (curator prompt assembly — sanitizes the bounded batch before LLM invocation) and Layer 5 (validator — sanitizes proposal `body` and every cited evidence field before queue append). Both layers must:
+
+1. Import from the same module — no parallel regex implementations in bash, jq, or inline JavaScript.
+2. Record the same `rule_version` string in their respective manifests / safety metadata.
+3. Fail closed if the module is unavailable.
+
+This eliminates the gap where Layer 4 and Layer 5 could enforce different secret-scan rules by construction.
 
 ## Dashboard exposure of rejections
 

@@ -106,6 +106,9 @@ type CuratorPromptPolicy = {
   no_file_writes: true;
   no_activation_claims: true;
 
+  sanitizer_module: "scripts/lib/sanitize-observation.js";
+  sanitizer_policy_version: string;
+
   output_format: "json";
 };
 ```
@@ -128,6 +131,8 @@ The prompt must instruct the LLM:
 - do not assign candidate IDs, lifecycle status, final confidence, or final evidence quality;
 - for the first 3.1 daemon-curator policy, output `instinct` proposals only;
 - if evidence is weak, output `needs_more_evidence` or no proposal.
+
+The Curator Prompt Builder must run the bounded batch through `scripts/lib/sanitize-observation.js` (the canonical sanitizer) before passing it to the LLM. The `sanitizer_policy_version` recorded in the prompt policy must match the `rule_version` Layer 5 stamps on accepted candidates. Layer 4 and Layer 5 must agree on the same sanitizer module to close the secret-scan gap by construction.
 
 ## Primary output — CandidateProposalPayload
 
@@ -202,7 +207,7 @@ type CandidateProposalDraft = {
   trigger?: string;
 
   body?: string;
-  body_source?: "llm_draft";
+  body_source?: "llm_curator";
 
   evidence_refs: CandidateProposalEvidenceRef[];
 
@@ -219,6 +224,8 @@ type CandidateProposalDraft = {
 ```
 
 Use `name`, not `title`, to avoid avoidable drift between Layer 4 proposals and later canonical candidate records.
+
+`body_source` is `"llm_curator"` at the source (Layer 4 *is* the LLM curator). It must not be `"llm_draft"`, `"draft"`, or any other label that would require Layer 5 to normalize. The enum value Layer 4 emits is the same enum value Layer 5 accepts, eliminating mid-pipeline rename drift.
 
 For the first 3.1 daemon-curator policy, `proposed_scope.kind` is `"project"`. Global candidate proposals come from explicit first-slice dashboard promotion/review flows through Layer 6 → Layer 5, not from the default production Layer 4 daemon-curator path.
 

@@ -141,9 +141,15 @@ type ActivationPolicy = {
 
   claude_md_auto_apply_allowed: false;
 
-  overwrite_existing_active_artifact:
-    | "forbidden"
-    | "supersede_with_backup";
+  // Per-target-kind overwrite policy. Each target kind that may be activated
+  // must have an explicit policy. Missing keys are treated as "forbidden".
+  overwrite_existing_active_artifact: {
+    instinct?: "forbidden" | "supersede_with_backup";
+    skill?: "forbidden" | "supersede_with_backup";
+    command?: "forbidden" | "supersede_with_backup";
+    agent?: "forbidden" | "supersede_with_backup";
+    manual_claude_md_patch?: "forbidden" | "supersede_with_backup";
+  };
 
   deactivation_mode:
     | "disable_manifest"
@@ -479,6 +485,11 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
 2. `command` and `agent` activation are **reserved** until skill activation is implemented, reviewed, and proven safe. `claude_md_addition` remains manual-only and is never auto-applied.
 3. Activated instincts are consumed by dashboard/history/evolve surfaces only in the first slice. They must not be auto-loaded into Claude context at SessionStart and must not become direct runtime instructions.
 4. Deactivation uses `move_to_disabled_archive` with a backup record. The first dashboard UX exposes deactivate status and backup metadata; full rollback/supersede UX is deferred.
+5. **Overwrite policy defaults**:
+   - `instinct`: `"supersede_with_backup"` — re-activating an instinct after manual edit must preserve the prior body as a backup record, not hard-fail. The instinct path includes a candidate-derived `<id>`, so collisions are intended re-activations.
+   - `skill`: `"forbidden"` — `skills/<name>/SKILL.md` may be user-edited; overwriting must hard-fail to protect manual changes. (Moot in the first slice, where skill activation is reserved; the policy is pinned for forward compatibility.)
+   - `manual_claude_md_patch`: `"forbidden"` — `CLAUDE.md` is never auto-applied, so this is also moot but pinned explicitly to prevent future relaxation by default.
+   - `command`, `agent`: `"forbidden"` (reserved for first slice).
 
 ## Deferred decisions
 
