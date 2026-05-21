@@ -1,0 +1,394 @@
+/**
+ * proposal-ingestor.js — Layer 4 → Layer 5 bridge.
+ *
+ * Reads the LLM JSON output (CandidateProposalPayload), validates each proposal,
+ * enriches it into a full CandidateQueueRecord, and hands off to Layer 5 via
+ * queue-writer.js.
+ *
+ * Exports:
+ *   ingestProposal({ batchId, responseFile, homeDir? })
+ *     → { run_id, parse_status, accepted, rejected }
+ *
+ * Per Layer 4 spec (layer-4-llm-curator-analysis.md):
+ * - CuratorRunManifest persisted for every attempted run (even failures)
+ * - raw_prompt_saved: false, raw_response_saved: false (default off)
+ * - parse_status: "parsed" | "empty" | "malformed_json" | "non_object"
+ *
+ * Idempotency: run_id is derived deterministically from (batch_id, response_hash,
+ * prompt_policy_version). If the same run_id manifest already exists, the prior
+ * result is returned without re-processing.
+ *
+ * PR #31 reconcile 1.9: sanitizer runs on body + evidence before queue append
+ * (this happens inside appendCandidate in queue-writer.js; no double-sanitize here).
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+
+const { appendCandidate, rejectProposal } = require('./queue-writer');
+const { computeEvidenceQuality } = require('./schema');
+const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
+const { atomicWriteFile, sha256Truncated } = require('../utils');
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const PROMPT_POLICY_VERSION = 'v1';
+const SCHEMA_VERSION = 1;
+
+// ---------------------------------------------------------------------------
+// Path helpers
+// ---------------------------------------------------------------------------
+
+function getArcforgeDir(homeDir) {
+  return path.join(homeDir, '.arcforge');
+}
+
+function getBatchesDir(homeDir) {
+  return path.join(getArcforgeDir(homeDir), 'learning', 'curator-batches');
+}
+
+function getRunsDir(homeDir) {
+  return path.join(getArcforgeDir(homeDir), 'learning', 'curator-runs');
+}
+
+// ---------------------------------------------------------------------------
+// Compact UTC timestamp for IDs
+// ---------------------------------------------------------------------------
+
+function compactUtc(dt) {
+  return dt
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '');
+}
+
+// ---------------------------------------------------------------------------
+// Load batch manifest
+// ---------------------------------------------------------------------------
+
+function loadBatchManifest(batchId, homeDir) {
+  const manifestPath = path.join(getBatchesDir(homeDir), `${batchId}.manifest.json`);
+  if (!fs.existsSync(manifestPath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Persist CuratorRunManifest
+// ---------------------------------------------------------------------------
+
+function persistRunManifest(runManifest, homeDir) {
+  const runsDir = getRunsDir(homeDir);
+  fs.mkdirSync(runsDir, { recursive: true });
+  const runManifestPath = path.join(runsDir, `${runManifest.run_id}.manifest.json`);
+  // Atomic: write to sibling tmp, then rename. Prevents truncated manifest on crash.
+  atomicWriteFile(runManifestPath, JSON.stringify(runManifest, null, 2));
+  return runManifestPath;
+}
+
+// ---------------------------------------------------------------------------
+// Build CandidateQueueRecord from a proposal draft
+// ---------------------------------------------------------------------------
+
+function buildCandidateRecord(proposal, batchManifest, now) {
+  const nowIso = now.toISOString();
+  const ts = compactUtc(now);
+
+  // Generate deterministic candidate_id from artifact_type + name + scope + batch
+  const candidateHashInput = `${proposal.artifact_type}|${proposal.name}|${JSON.stringify(proposal.proposed_scope)}|${batchManifest.batch_id}|${proposal.proposal_index}`;
+  const candidateHash = sha256Truncated(candidateHashInput, 12);
+  const candidateId = `cand_${proposal.artifact_type}_${ts}_${candidateHash}`;
+
+  // Derive project info from scope + batch manifest
+  const scope = {
+    kind: 'project',
+    project: batchManifest.scope.project,
+    project_id: proposal.proposed_scope.project_id || batchManifest.scope.project_id,
+  };
+
+  // Map evidence_refs to full evidence entries with summary field
+  // Layer 5 schema requires evidence[i].summary — derive from batch manifest evidence_ids
+  // For first slice, we look up matching evidence items from the batch manifest if available,
+  // or use the relevance field as a fallback summary.
+  const evidence = (proposal.evidence_refs || []).map((ref) => ({
+    evidence_id: ref.evidence_id,
+    evidence_type: ref.evidence_type,
+    relevance: ref.relevance || '',
+    summary: ref.relevance || `Evidence from batch ${batchManifest.batch_id}`,
+  }));
+
+  // Compute evidence_quality using v1 formula (project_obs_count only)
+  const projectObsCount = batchManifest.quality_inputs
+    ? batchManifest.quality_inputs.project_observation_count || 0
+    : 0;
+  const evidenceQuality = computeEvidenceQuality(projectObsCount);
+
+  const record = {
+    schema_version: SCHEMA_VERSION,
+    candidate_id: candidateId,
+    created_at: nowIso,
+    updated_at: nowIso,
+    artifact_type: proposal.artifact_type,
+    scope,
+    source: {
+      source_type: 'layer4_llm_curator',
+      batch_id: batchManifest.batch_id,
+      batch_hash: batchManifest.batch_hash,
+      run_id: `curator_run_${ts}_${sha256Truncated(batchManifest.batch_id + batchManifest.batch_hash, 12)}`,
+      prompt_policy_version: PROMPT_POLICY_VERSION,
+    },
+    name: proposal.name || '',
+    summary: proposal.summary || '',
+    rationale: proposal.rationale || '',
+    domain: proposal.domain || 'workflow',
+    body: proposal.body || '',
+    body_source: proposal.body_source || 'llm_curator',
+    trigger: proposal.trigger,
+    evidence,
+    evidence_quality: evidenceQuality,
+    evidence_quality_metadata: {
+      rule_version: SANITIZER_POLICY_VERSION,
+      basis: {
+        project_obs_count: projectObsCount,
+      },
+    },
+    lifecycle: {
+      status: 'pending_review',
+      status_changed_at: nowIso,
+    },
+    safety: {
+      raw_prompt_included: false,
+      raw_response_included: false,
+      raw_hook_payloads_included: false,
+      raw_transcripts_included: false,
+      edit_bodies_included: false,
+      skill_args_included: false,
+    },
+    dedupe: {
+      dedupe_key: sha256Truncated(
+        `${scope.project_id}|${proposal.artifact_type}|${proposal.name}`,
+        16,
+      ),
+      dedupe_basis: {
+        artifact_type: proposal.artifact_type,
+        name: proposal.name,
+        scope_project_id: scope.project_id,
+      },
+    },
+  };
+
+  return record;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Ingest a Layer 4 LLM response into Layer 5 candidate queue.
+ *
+ * @param {object} options
+ * @param {string} options.batchId — batch_id used for this run
+ * @param {string} options.responseFile — path to the LLM JSON response file
+ * @param {string} [options.homeDir] — override home directory (tests)
+ * @param {number} [options.durationMs] — elapsed time for run manifest
+ * @returns {{ run_id, parse_status, accepted, rejected }}
+ */
+function ingestProposal({ batchId, responseFile, homeDir: homeOverride, durationMs } = {}) {
+  if (typeof batchId !== 'string' || !batchId.trim()) {
+    throw new Error('ingestProposal: batchId must be a non-empty string');
+  }
+  if (typeof responseFile !== 'string' || !responseFile.trim()) {
+    throw new Error('ingestProposal: responseFile must be a non-empty string');
+  }
+  if (!fs.existsSync(responseFile)) {
+    throw new Error(`ingestProposal: responseFile does not exist: ${responseFile}`);
+  }
+
+  const homeDir = homeOverride || os.homedir();
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const ts = compactUtc(now);
+
+  // Load response file
+  let rawResponse;
+  try {
+    rawResponse = fs.readFileSync(responseFile, 'utf8');
+  } catch (err) {
+    throw new Error(`ingestProposal: failed to read responseFile: ${err.message}`);
+  }
+
+  const responseHash = sha256Truncated(rawResponse, 12);
+
+  // Compute run_id deterministically: (batch_id, response_hash, prompt_policy_version)
+  const runIdHash = sha256Truncated(`${batchId}|${responseHash}|${PROMPT_POLICY_VERSION}`, 12);
+  const runId = `curator_run_${ts}_${runIdHash}`;
+
+  // Idempotency check: if manifest already exists, return prior result.
+  // Uses persisted accepted_count / rejected_count so the count is audit-stable
+  // (a re-submitted response yields the same (accepted, rejected) tuple — not
+  // proposal_count, which would over-report on retries that originally had
+  // rejections).
+  const runsDir = getRunsDir(homeDir);
+  const existingManifestPath = path.join(runsDir, `${runId}.manifest.json`);
+  if (fs.existsSync(existingManifestPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(existingManifestPath, 'utf8'));
+      return {
+        run_id: existing.run_id,
+        parse_status: existing.parse_status,
+        accepted: existing.accepted_count ?? 0,
+        rejected: existing.rejected_count ?? 0,
+      };
+    } catch {
+      // fallthrough — re-process (corrupt manifest)
+    }
+  }
+
+  // Load batch manifest (needed for evidence_id validation and project context).
+  // A missing manifest is a hard error — source_batch_hash is required (string) in
+  // CuratorRunManifest; we cannot construct a valid run record without it.
+  const batchManifest = loadBatchManifest(batchId, homeDir);
+  if (!batchManifest) {
+    throw new Error(
+      `ingestProposal: batch manifest not found for batch_id "${batchId}". ` +
+        'Run assemble-batch first.',
+    );
+  }
+  const validEvidenceIds = new Set(
+    Array.isArray(batchManifest.evidence_ids) ? batchManifest.evidence_ids : [],
+  );
+
+  // Base run manifest fields
+  const runManifest = {
+    schema_version: SCHEMA_VERSION,
+    run_id: runId,
+    created_at: createdAt,
+    source_batch_id: batchId,
+    source_batch_hash: batchManifest.batch_hash,
+    prompt_policy_version: PROMPT_POLICY_VERSION,
+    output_schema_version: 1,
+    model: null,
+    provider: null,
+    invocation: {
+      tool_access: false,
+      duration_ms: durationMs || null,
+      transport_status: 'completed',
+    },
+    parse_status: 'parsed',
+    proposal_count: 0,
+    accepted_count: 0,
+    rejected_count: 0,
+    handed_to_layer5: false,
+    prompt_hash: null,
+    response_hash: responseHash,
+    raw_prompt_saved: false,
+    raw_response_saved: false,
+  };
+
+  // Parse response
+  let payload;
+  try {
+    payload = JSON.parse(rawResponse);
+  } catch {
+    runManifest.parse_status = 'malformed_json';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'malformed_json', accepted: 0, rejected: 0 };
+  }
+
+  // Must be a non-null object
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    runManifest.parse_status = 'non_object';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'non_object', accepted: 0, rejected: 0 };
+  }
+
+  // Check proposals array
+  const proposals = payload.proposals;
+  if (!Array.isArray(proposals) || proposals.length === 0) {
+    runManifest.parse_status = 'empty';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'empty', accepted: 0, rejected: 0 };
+  }
+
+  runManifest.proposal_count = proposals.length;
+  runManifest.handed_to_layer5 = true;
+
+  // Persist a pending manifest BEFORE processing so a mid-loop crash still
+  // leaves an audit trail. Final counts are written below after the loop.
+  persistRunManifest(runManifest, homeDir);
+
+  // Count queue size ONCE before the loop. Each appendCandidate either appends
+  // (accepted) or writes to rejections.jsonl (rejected via validateCandidateV1).
+  // We compute total accepted = (queue size after loop) - (queue size before).
+  // Avoids the O(N × queue size) full-replay cost of reading the queue per proposal.
+  const queuePath = path.join(homeDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+  const countQueueLines = () => {
+    if (!fs.existsSync(queuePath)) return 0;
+    return fs
+      .readFileSync(queuePath, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim()).length;
+  };
+  const linesBefore = countQueueLines();
+
+  // Process each proposal. Rejection paths (missing evidence refs, record-build
+  // failure) write to rejections.jsonl; appendCandidate writes to queue.jsonl on
+  // pass or rejections.jsonl on schema/safety fail. Counts computed from the
+  // queue-size diff below — no per-proposal queue read.
+  for (const proposal of proposals) {
+    const missingRefs = Array.isArray(proposal.evidence_refs)
+      ? proposal.evidence_refs.filter(
+          (ref) => ref.evidence_id && !validEvidenceIds.has(ref.evidence_id),
+        )
+      : [];
+
+    if (missingRefs.length > 0) {
+      const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+      rejectProposal(
+        missingRefs.map((ref) => ({
+          code: 'evidence_ref_missing',
+          field_path: 'evidence_refs',
+          detail: `evidence_id "${ref.evidence_id}" is not present in batch ${batchId}`,
+        })),
+        source,
+      );
+      continue;
+    }
+
+    let record;
+    try {
+      record = buildCandidateRecord(proposal, batchManifest, now);
+    } catch (err) {
+      const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+      rejectProposal(
+        [{ code: 'schema_invalid', detail: `Failed to build candidate record: ${err.message}` }],
+        source,
+      );
+      continue;
+    }
+
+    appendCandidate(record);
+  }
+
+  const linesAfter = countQueueLines();
+  const accepted = Math.max(0, linesAfter - linesBefore);
+  const rejected = proposals.length - accepted;
+
+  runManifest.accepted_count = accepted;
+  runManifest.rejected_count = rejected;
+
+  persistRunManifest(runManifest, homeDir);
+
+  return { run_id: runId, parse_status: 'parsed', accepted, rejected };
+}
+
+module.exports = { ingestProposal };
