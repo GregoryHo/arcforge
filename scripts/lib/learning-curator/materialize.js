@@ -322,10 +322,11 @@ function materialize({
     return { ok: false, failure };
   }
 
-  // L7-1: Reject non-approved candidates
+  // L7-1: candidate must be approved (first materialization) or deactivated (re-materialization).
+  // Matrix-allowed transitions: approved → materialized, deactivated → materialized.
   const status = candidate?.lifecycle ? candidate.lifecycle.status : undefined;
-  if (status !== 'approved') {
-    return fail('invalid_lifecycle_status', `Expected approved, got: ${status}`);
+  if (status !== 'approved' && status !== 'deactivated') {
+    return fail('invalid_lifecycle_status', `Expected approved or deactivated, got: ${status}`);
   }
 
   // L7-2: First-slice supports instinct only
@@ -419,7 +420,7 @@ function materialize({
       source_candidate: {
         candidate_id: candidate.candidate_id,
         candidate_record_hash: recordHash,
-        lifecycle_status_at_materialization: 'approved',
+        lifecycle_status_at_materialization: status,
       },
       artifact_type: artifactType,
       draft_artifacts: [
