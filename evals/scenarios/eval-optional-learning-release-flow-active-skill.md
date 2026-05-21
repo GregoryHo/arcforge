@@ -1,6 +1,6 @@
 # Eval: eval-optional-learning-release-flow-active-skill
 
-**Status**: Pending Slice E rewrite after the learning curator pivot. This scenario was designed against the pre-3.1 statistical/auto-load lifecycle. Slice E will replace or update the assertions to match the daemon-curator + dashboard-gated flow.
+**Status**: DROP — Pre-3.1 statistical pipeline assertion. Replaced by [activated-skill-behavior.md](activated-skill-behavior.md). To be removed in Slice I.
 
 ## Scope
 skill
