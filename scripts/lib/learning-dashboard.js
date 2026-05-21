@@ -1,322 +1,350 @@
 /**
- * learning-dashboard.js — User-facing dashboard for the optional learning loop.
+ * learning-dashboard.js — Layer 6 dashboard control plane (Slice F, 3.1 schema v1).
  *
- * Goal: surface candidate suggestions in user-friendly language so users do not
- * need to know analyze / inbox / inspect / accept / activate.
+ * Responsibilities:
+ *   - Build allowlisted DashboardCandidateCard / DashboardCandidateDetail wire models
+ *     from Layer 5 canonical candidates (readCurrentCandidates).
+ *   - Validate and dispatch reviewer actions via the Layer 5 Action × Status matrix.
+ *   - Write an append-only audit log to ~/.arcforge/learning/dashboard/actions.jsonl.
+ *   - Serve a minimal HTTP server (createRouter / startServer).
  *
- * Privacy invariants (do NOT relax without re-reviewing learning.js evidence shape):
- *   - dashboard model is allowlisted — no raw evidence array, no trigger text
- *   - detail model never echoes evidence reasons / session ids
- *   - global scope is read/dismiss only — never auto-draft or auto-apply
- *   - repo_convention_patch is never auto-applied — manual review required
+ * Privacy invariants:
+ *   - Wire model is allowlist-based. body, raw evidence, project_id, and all
+ *     raw payloads are NEVER served.
+ *   - Sanitizer (sanitize-observation.js) is applied to name/summary/rationale/body
+ *     before slicing into preview windows.
+ *
+ * Layer 6 does NOT write active skill / instinct / command files. Layer 7/8 own those.
  */
 
-const http = require('node:http');
-const crypto = require('node:crypto');
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
-const learning = require('./learning');
+const { readCurrentCandidates, appendCandidate } = require('./learning-curator/queue-writer');
+const {
+  appendTransitionEvent,
+  appendRelatedEvent,
+} = require('./learning-curator/dashboard-events');
+const {
+  isLegalAction,
+  applyTransition,
+  ACTIONS,
+  LIFECYCLE_ACTION,
+} = require('./learning-curator/lifecycle');
+const { redactObservationText } = require('./sanitize-observation');
 
-const ARTIFACT_TYPE_LABELS = {
-  skill: 'Skill suggestion',
-  instinct: 'Instinct / habit',
-  command: 'Command suggestion',
-  agent: 'Agent suggestion',
-  eval: 'Eval suggestion',
-  repo_convention_patch: 'CLAUDE.md / repo convention suggestion',
-};
+// ---------------------------------------------------------------------------
+// Wire model limits
+// ---------------------------------------------------------------------------
 
-const STATUS_LABELS = {
-  pending: 'New',
-  approved: 'Saved',
-  materialized: 'Drafted',
-  activated: 'Applied',
-  rejected: 'Dismissed',
-};
+const CARD_SUMMARY_MAX = 200;
+const CARD_NAME_MAX = 120;
+const DETAIL_RATIONALE_MAX = 500;
+const DETAIL_BODY_PREVIEW_MAX = 500;
 
-const DRAFT_ELIGIBLE_STATUSES = new Set(['pending', 'approved']);
+// ---------------------------------------------------------------------------
+// Sanitization helpers
+// ---------------------------------------------------------------------------
 
-function artifactTypeLabel(type) {
-  return ARTIFACT_TYPE_LABELS[type] || 'Suggestion';
+function sanitizeText(value, maxLen) {
+  if (!value) return '';
+  return redactObservationText(String(value)).slice(0, maxLen);
 }
 
-function normalizedArtifactType(type) {
-  return ARTIFACT_TYPE_LABELS[type] ? type : 'unknown';
-}
+// ---------------------------------------------------------------------------
+// Layer 6 DashboardCandidateCard wire model builder
+//
+// Allowlisted fields only. project_id is NEVER included in the scope object.
+// lifecycle.status is flattened to lifecycle_status.
+// Raw body, raw evidence array, dedupe, safety, source are excluded.
+// ---------------------------------------------------------------------------
 
-function normalizedStatus(status) {
-  return STATUS_LABELS[status] ? status : 'unknown';
-}
-
-function statusLabel(status) {
-  return STATUS_LABELS[status] || 'Unknown';
-}
-
-function safeDisplayText(value, { fallback = '', maxLength = 240 } = {}) {
-  const text = String(value || fallback)
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*"[^"]*"/gi, '$1="[REDACTED]"')
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*'[^']*'/gi, "$1='[REDACTED]'")
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*[^\s,}]+/gi, '$1=[REDACTED]')
-    .replace(/\/(?:[^\s/]+\/){1,}[^\s]*/g, '[path]')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength)}…`;
-}
-
-function nextUserAction(candidate) {
-  const isPatch = candidate.artifact_type === 'repo_convention_patch';
-  switch (candidate.status) {
-    case 'pending':
-      return 'Review and save as draft, or dismiss.';
-    case 'approved':
-      return 'Save the draft so you can review it before applying.';
-    case 'materialized':
-      if (isPatch) return 'Ask Claude Code to review and apply the saved patch draft manually.';
-      return 'Ask Claude Code to review and apply the saved draft manually.';
-    case 'activated':
-      return 'Already in use — no further action.';
-    case 'rejected':
-      return 'Dismissed — no action available.';
-    default:
-      return '';
+function buildCardScope(scope) {
+  if (!scope) return { kind: 'global' };
+  const result = { kind: scope.kind };
+  if (scope.kind === 'project' && scope.project) {
+    result.project = scope.project;
+    // project_id intentionally excluded (no project_id leak — criterion 1)
   }
+  return result;
 }
 
-function canDismiss(candidate) {
-  return (
-    candidate.status === 'pending' ||
-    candidate.status === 'approved' ||
-    candidate.status === 'materialized'
-  );
+function countEvidenceByType(evidence) {
+  if (!Array.isArray(evidence)) return { total: 0, by_type: {} };
+  const byType = {};
+  for (const ev of evidence) {
+    const key = typeof ev?.evidence_type === 'string' ? ev.evidence_type : 'unknown';
+    byType[key] = (byType[key] || 0) + 1;
+  }
+  return { total: evidence.length, by_type: byType };
 }
 
-function canDraft(candidate) {
-  return candidate.scope === 'project' && DRAFT_ELIGIBLE_STATUSES.has(candidate.status);
-}
-
-function canApply(_candidate) {
-  return false;
+function legalActionsFor(status) {
+  if (!status) return [];
+  return ACTIONS.filter((action) => isLegalAction(status, action));
 }
 
 /**
- * Allowlisted card model. Anything not explicitly listed here is excluded —
- * raw evidence reasons, draft paths, and trigger text never reach the wire.
+ * Build a DashboardCandidateCard from a CandidateQueueRecord per Layer 6 spec.
+ * Returns only allowlisted fields. project_id intentionally excluded.
+ *
+ * @param {object} record — CandidateQueueRecord (from readCurrentCandidates)
+ * @returns {object} DashboardCandidateCard
  */
-function sanitizeDashboardCandidate(candidate) {
+function sanitizeDashboardCard(record) {
+  const status = record.lifecycle ? record.lifecycle.status : undefined;
+  const llmAssessment = record.llm_assessment || {};
+
   return {
-    id: candidate.id,
-    scope: candidate.scope,
-    artifact_type: normalizedArtifactType(candidate.artifact_type),
-    artifact_type_label: artifactTypeLabel(candidate.artifact_type),
-    name: safeDisplayText(candidate.name, { fallback: '(unnamed)', maxLength: 96 }),
-    summary: safeDisplayText(candidate.summary),
-    confidence: candidate.confidence,
-    status: normalizedStatus(candidate.status),
-    status_label: statusLabel(candidate.status),
-    next_user_action: nextUserAction(candidate),
-    evidence_count: Array.isArray(candidate.evidence) ? candidate.evidence.length : 0,
-    created_at: candidate.created_at,
-    updated_at: candidate.updated_at,
-    can_dismiss: canDismiss(candidate),
-    can_draft: canDraft(candidate),
-    can_apply: canApply(candidate),
+    schema_version: 1,
+    candidate_id: record.candidate_id,
+    artifact_type: record.artifact_type,
+    scope: buildCardScope(record.scope),
+    name: sanitizeText(record.name, CARD_NAME_MAX),
+    summary: sanitizeText(record.summary, CARD_SUMMARY_MAX),
+    domain: record.domain,
+    lifecycle_status: status,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    evidence_quality: record.evidence_quality,
+    evidence_counts: countEvidenceByType(record.evidence),
+    risk_note_count: Array.isArray(llmAssessment.risk_notes) ? llmAssessment.risk_notes.length : 0,
+    uncertainty_note_count: Array.isArray(llmAssessment.uncertainty_notes)
+      ? llmAssessment.uncertainty_notes.length
+      : 0,
+    available_actions: legalActionsFor(status),
   };
 }
 
-function dashboardCounts(candidates) {
-  const byStatus = {};
-  const byType = {};
-  for (const c of candidates) {
-    const statusKey = normalizedStatus(c.status);
-    const typeKey = normalizedArtifactType(c.artifact_type);
-    byStatus[statusKey] = (byStatus[statusKey] || 0) + 1;
-    byType[typeKey] = (byType[typeKey] || 0) + 1;
+/**
+ * Build a DashboardCandidateDetail (extends card with rationale + body_preview).
+ *
+ * @param {string} candidateId
+ * @returns {object} DashboardCandidateDetail
+ * @throws {Error} with code 'NOT_FOUND' if candidateId not in current candidates
+ */
+function sanitizeDashboardDetail(candidateId) {
+  const candidates = readCurrentCandidates();
+  const record = candidates[candidateId];
+  if (!record) {
+    const err = new Error(`candidate not found: ${candidateId}`);
+    err.code = 'NOT_FOUND';
+    throw err;
   }
-  return { by_status: byStatus, by_artifact_type: byType };
-}
 
-function statusRank(status) {
-  return { pending: 0, approved: 1, materialized: 2, activated: 3, rejected: 4 }[status] ?? 99;
-}
+  const card = sanitizeDashboardCard(record);
 
-function createDashboardModel({ scope = 'project', projectRoot, homeDir } = {}) {
-  const all = learning
-    .loadCandidates({ scope, projectRoot, homeDir })
-    .filter((c) => c.scope === scope);
-  const sorted = all.slice().sort((a, b) => {
-    const r = statusRank(a.status) - statusRank(b.status);
-    if (r !== 0) return r;
-    const conf = (b.confidence || 0) - (a.confidence || 0);
-    if (conf !== 0) return conf;
-    return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-  });
-  const cards = sorted.map(sanitizeDashboardCandidate);
+  const fullBody = typeof record.body === 'string' ? redactObservationText(record.body) : '';
+  const bodyTruncated = fullBody.length > DETAIL_BODY_PREVIEW_MAX;
+  const bodyPreviewText = fullBody.slice(0, DETAIL_BODY_PREVIEW_MAX);
+
+  const rationaleText = sanitizeText(record.rationale, DETAIL_RATIONALE_MAX);
+
   return {
-    scope,
+    ...card,
+    rationale: rationaleText,
+    body_preview: {
+      text: bodyPreviewText,
+      truncated: bodyTruncated,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard model (list view)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the full dashboard model from current Layer 5 candidates.
+ *
+ * @returns {{ count: number, candidates: object[] }}
+ */
+function createDashboardModel() {
+  const candidates = readCurrentCandidates();
+  const cards = Object.values(candidates).map(sanitizeDashboardCard);
+  return {
     count: cards.length,
-    counts: dashboardCounts(all),
     candidates: cards,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Audit log — ~/.arcforge/learning/dashboard/actions.jsonl
+// ---------------------------------------------------------------------------
+
+function getAuditLogPath() {
+  return path.join(os.homedir(), '.arcforge', 'learning', 'dashboard', 'actions.jsonl');
+}
+
+function writeAuditEntry(entry) {
+  const logPath = getAuditLogPath();
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
+}
+
+// ---------------------------------------------------------------------------
+// Action handler
+//
+// Contract per Slice F spec:
+//   1. Validate input shape (candidate_id present, action in ACTIONS enum)
+//   2. Read current candidate state via readCurrentCandidates()
+//   3. Look up candidate — 404 if not found
+//   4. Check isLegalAction — 400 + policy_violation if illegal
+//   5. Status-changing: applyTransition, then appendTransitionEvent
+//   6. Candidate-producing (promote/evolve): create new record, appendCandidate,
+//      appendRelatedEvent on source
+//   7. Always write audit log
+// ---------------------------------------------------------------------------
+
+function generateActionId() {
+  return `act_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+}
+
 /**
- * Sanitized candidate detail. Reuses the queue lookup but strips raw evidence
- * and lifecycle-internal fields. Never returns evidence reasons or session ids.
+ * Handle a dashboard reviewer action request.
+ *
+ * @param {{ action: string, candidate_id: string }} opts
+ * @returns {{ accepted: boolean, action_id: string, reason?: string, ... }}
  */
-function sanitizeDashboardDetail(id, { scope, projectRoot, homeDir } = {}) {
-  const candidates = learning
-    .loadCandidates({ scope, projectRoot, homeDir })
-    .filter((c) => c.scope === scope);
-  const found = candidates.find((c) => c.id === id);
-  if (!found) {
-    const err = new Error(`candidate not found: ${id}`);
-    err.code = 'NOT_FOUND';
-    throw err;
-  }
-  return {
-    scope,
-    candidate: sanitizeDashboardCandidate(found),
-    next_user_action: nextUserAction(found),
-  };
-}
+function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
+  const actionId = generateActionId();
+  const requestedAt = new Date().toISOString();
 
-// ── Action handler ─────────────────────────────────────────────────────────
-
-const VALID_ACTIONS = new Set(['dismiss', 'draft', 'apply']);
-
-function handleDashboardAction({ action, id, scope = 'project', projectRoot, homeDir, now } = {}) {
-  if (!VALID_ACTIONS.has(action)) {
-    return { ok: false, status: 400, error: `unknown action: ${action}` };
-  }
-  if (!id || typeof id !== 'string') {
-    return { ok: false, status: 400, error: 'id required' };
-  }
-
-  try {
-    if (action === 'dismiss') {
-      const current = learning
-        .loadCandidates({ scope, projectRoot, homeDir })
-        .find((candidate) => candidate.id === id && candidate.scope === scope);
-      if (!current) {
-        return { ok: false, status: 404, error: `candidate not found: ${id}` };
-      }
-      if (!canDismiss(current)) {
-        return {
-          ok: false,
-          status: 400,
-          error: 'suggestion cannot be dismissed in its current state',
-        };
-      }
-      const updated = learning.transitionCandidate(id, 'rejected', {
-        scope,
-        projectRoot,
-        homeDir,
-        now,
-      });
-      return { ok: true, status: 200, candidate: sanitizeDashboardCandidate(updated) };
-    }
-
-    if (action === 'draft') {
-      if (scope !== 'project') {
-        return {
-          ok: false,
-          status: 403,
-          error:
-            'draft is project-scope only — global suggestions can only be reviewed or dismissed',
-        };
-      }
-      const current = learning
-        .loadCandidates({ scope, projectRoot, homeDir })
-        .find((candidate) => candidate.id === id && candidate.scope === scope);
-      if (!current) {
-        return { ok: false, status: 404, error: `candidate not found: ${id}` };
-      }
-      if (!canDraft(current)) {
-        return {
-          ok: false,
-          status: 400,
-          error: 'suggestion cannot be saved as draft in its current state',
-        };
-      }
-      const result = learning.acceptCandidate(id, { scope, projectRoot, homeDir, now });
-      return { ok: true, status: 200, candidate: sanitizeDashboardCandidate(result.candidate) };
-    }
-
-    if (action === 'apply') {
-      return {
-        ok: false,
-        status: 403,
-        error: 'dashboard apply is intentionally disabled — save a draft and review it manually',
-        requires_review: true,
-      };
-    }
-
-    return { ok: false, status: 400, error: `unhandled action: ${action}` };
-  } catch (_err) {
-    return {
-      ok: false,
-      status: 400,
-      error: 'learning dashboard action failed; review the candidate draft state locally',
+  function reject(reason, extra = {}) {
+    const result = {
+      accepted: false,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      reason,
+      ...extra,
     };
-  }
-}
-
-// ── Notification builder ───────────────────────────────────────────────────
-
-function buildLearningNotification({
-  result,
-  now = new Date().toISOString(),
-  dashboardCommand = 'arc learn dashboard',
-  projectId,
-} = {}) {
-  const project = result?.project ?? {};
-  const global = result?.global ?? {};
-  const projectCandidates = Array.isArray(project.candidates) ? project.candidates : [];
-  const globalCandidates = Array.isArray(global.candidates) ? global.candidates : [];
-  const total = projectCandidates.length + globalCandidates.length;
-  if (total === 0) return null;
-
-  const byArtifactType = {};
-  for (const c of [...projectCandidates, ...globalCandidates]) {
-    byArtifactType[c.artifact_type] = (byArtifactType[c.artifact_type] || 0) + 1;
+    writeAuditEntry(result);
+    return result;
   }
 
-  const note = {
-    ts: now,
-    type: 'learning_candidates',
-    total,
-    by_scope: { project: projectCandidates.length, global: globalCandidates.length },
-    by_artifact_type: byArtifactType,
-    dashboard_command: dashboardCommand,
-    message: `ArcForge learned ${total} candidate suggestion(s). Open review: ${dashboardCommand}`,
+  // Step 1: validate input shape
+  if (!action || !ACTIONS.includes(action)) {
+    return reject('action_not_available');
+  }
+  if (!candidateId || typeof candidateId !== 'string') {
+    return reject('candidate_not_found');
+  }
+
+  // Step 2: read current state
+  const candidates = readCurrentCandidates();
+
+  // Step 3: look up candidate
+  const candidate = candidates[candidateId];
+  if (!candidate) {
+    return reject('candidate_not_found');
+  }
+
+  const currentStatus = candidate.lifecycle ? candidate.lifecycle.status : undefined;
+
+  // Step 4: check Action × Status matrix
+  if (!isLegalAction(currentStatus, action)) {
+    return reject('policy_violation');
+  }
+
+  // Step 5/6: dispatch by action type
+  const actor = { layer: 6, actor_type: 'dashboard' };
+
+  if (action === LIFECYCLE_ACTION.PROMOTE) {
+    // Candidate-producing: create a global-scope copy of the source candidate.
+    // Source candidate's status does NOT change.
+    const newId = `cand_promoted_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const now = new Date().toISOString();
+    const newRecord = {
+      ...candidate,
+      candidate_id: newId,
+      scope: { kind: 'global' },
+      source: { source_type: 'dashboard_promote' },
+      lifecycle: { status: 'pending_review', status_changed_at: now },
+      relationships: {
+        ...(candidate.relationships || {}),
+        promoted_from_candidate_id: candidateId,
+      },
+      created_at: now,
+      updated_at: now,
+    };
+    // Remove project_id from new global scope
+    delete newRecord.scope.project_id;
+    delete newRecord.scope.project;
+
+    appendCandidate(newRecord, { actor });
+    appendRelatedEvent(candidateId, { promoted_to_candidate_id: newId }, actor);
+
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      new_candidate_id: newId,
+    };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  if (action === LIFECYCLE_ACTION.EVOLVE) {
+    // Candidate-producing: create a new skill candidate derived from source.
+    // Source candidate's status does NOT change.
+    const newId = `cand_evolved_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const now = new Date().toISOString();
+    const newRecord = {
+      ...candidate,
+      candidate_id: newId,
+      artifact_type: 'skill',
+      source: { source_type: 'dashboard_evolve' },
+      body_source: 'dashboard_evolve',
+      lifecycle: { status: 'pending_review', status_changed_at: now },
+      relationships: {
+        ...(candidate.relationships || {}),
+        evolved_from_candidate_id: candidateId,
+      },
+      created_at: now,
+      updated_at: now,
+    };
+
+    appendCandidate(newRecord, { actor });
+    appendRelatedEvent(candidateId, { evolved_to_candidate_id: newId }, actor);
+
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      new_candidate_id: newId,
+    };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  // Status-changing actions: dismiss, approve, materialize, activate
+  const nextStatus = applyTransition(currentStatus, action);
+  appendTransitionEvent(candidateId, action, nextStatus, actor);
+
+  const result = {
+    accepted: true,
+    action_id: actionId,
+    requested_at: requestedAt,
+    action,
+    candidate_id: candidateId,
+    next_status: nextStatus,
   };
-  if (projectId) note.project_id = projectId;
-  return note;
+  writeAuditEntry(result);
+  return result;
 }
 
-function getNotificationsPath({ projectRoot = process.cwd(), homeDir } = {}) {
-  const projectId = learning.getProjectId(projectRoot);
-  return path.join(
-    homeDir || os.homedir(),
-    '.arcforge',
-    'learning',
-    'notifications',
-    `${projectId}.jsonl`,
-  );
-}
-
-function writeLearningNotification(notification, { projectRoot = process.cwd(), homeDir } = {}) {
-  if (!notification) return null;
-  const filePath = getNotificationsPath({ projectRoot, homeDir });
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.appendFileSync(filePath, `${JSON.stringify(notification)}\n`, 'utf8');
-  return filePath;
-}
-
-// ── HTTP server ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Security headers
+// ---------------------------------------------------------------------------
 
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
@@ -324,6 +352,10 @@ const SECURITY_HEADERS = {
     "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
   'X-Content-Type-Options': 'nosniff',
 };
+
+// ---------------------------------------------------------------------------
+// HTTP utilities
+// ---------------------------------------------------------------------------
 
 function sendJson(res, data, status = 200) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
@@ -357,78 +389,104 @@ function readRequestBody(req) {
   });
 }
 
-function parseScope(url) {
-  const scope = url.searchParams.get('scope') || 'project';
-  if (scope !== 'project' && scope !== 'global') return null;
-  return scope;
-}
-
+/**
+ * Validate the per-server write token header.
+ *
+ * @param {object} req
+ * @param {string} writeToken
+ * @returns {boolean}
+ */
 function hasDashboardWriteHeader(req, writeToken) {
   if (!writeToken || typeof writeToken !== 'string') return false;
   if (req.headers['x-arcforge-dashboard'] !== '1') return false;
   return req.headers['x-arcforge-dashboard-token'] === writeToken;
 }
 
-function createRouter({ projectRoot, homeDir, htmlBody, writeToken }) {
+// ---------------------------------------------------------------------------
+// HTTP router
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a request handler for the dashboard HTTP server.
+ *
+ * Routes:
+ *   GET  /                         → HTML dashboard
+ *   GET  /api/candidates           → DashboardCandidateCard[] list
+ *   GET  /api/candidates/:id       → DashboardCandidateDetail
+ *   POST /api/candidates/:id/action → action dispatch (requires write token)
+ *
+ * @param {{ htmlBody: string, writeToken: string }} options
+ * @returns {function}
+ */
+function createRouter({ htmlBody, writeToken }) {
   return async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
     const pathname = url.pathname;
     const method = req.method || 'GET';
 
+    // GET / — HTML dashboard
     if (method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
       return sendHtml(res, htmlBody);
     }
 
-    if (method === 'GET' && pathname === '/api/learning') {
-      const scope = parseScope(url);
-      if (!scope) return sendError(res, 400, 'invalid scope');
+    // GET /api/candidates — list
+    if (method === 'GET' && pathname === '/api/candidates') {
       try {
-        return sendJson(res, createDashboardModel({ scope, projectRoot, homeDir }));
+        return sendJson(res, createDashboardModel());
       } catch {
-        return sendError(res, 500, 'learning dashboard failed to load suggestions');
+        return sendError(res, 500, 'dashboard failed to load candidates');
       }
     }
 
+    // GET /api/candidates/:id — detail
     const detailMatch = pathname.match(/^\/api\/candidates\/([^/]+)$/);
     if (method === 'GET' && detailMatch) {
-      const scope = parseScope(url);
-      if (!scope) return sendError(res, 400, 'invalid scope');
       try {
-        return sendJson(
-          res,
-          sanitizeDashboardDetail(detailMatch[1], { scope, projectRoot, homeDir }),
-        );
+        const detail = sanitizeDashboardDetail(detailMatch[1]);
+        return sendJson(res, detail);
       } catch (err) {
         if (err.code === 'NOT_FOUND') return sendError(res, 404, 'candidate not found');
-        return sendError(res, 500, 'learning dashboard failed to load candidate');
+        return sendError(res, 500, 'dashboard failed to load candidate');
       }
     }
 
-    const actionMatch = pathname.match(/^\/api\/candidates\/([^/]+)\/(dismiss|draft|apply)$/);
+    // POST /api/candidates/:id/action — action dispatch
+    const actionMatch = pathname.match(/^\/api\/candidates\/([^/]+)\/action$/);
     if (method === 'POST' && actionMatch) {
       if (!hasDashboardWriteHeader(req, writeToken)) {
         return sendError(res, 403, 'dashboard write header required');
       }
-      const scope = parseScope(url);
-      if (!scope) return sendError(res, 400, 'invalid scope');
+
+      let body;
       try {
-        await readRequestBody(req);
+        body = await readRequestBody(req);
       } catch (err) {
         return sendError(res, 400, err.message);
       }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        return sendError(res, 400, 'invalid JSON body');
+      }
+
       const result = handleDashboardAction({
-        action: actionMatch[2],
-        id: actionMatch[1],
-        scope,
-        projectRoot,
-        homeDir,
+        action: parsed.action,
+        candidate_id: actionMatch[1],
       });
-      return sendJson(res, result, result.ok ? 200 : result.status || 400);
+
+      const status = result.accepted ? 200 : result.reason === 'candidate_not_found' ? 404 : 400;
+      return sendJson(res, result, status);
     }
 
-    sendError(res, 404, 'Not found');
+    return sendError(res, 404, 'Not found');
   };
 }
+
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
 
 function loadHtml(writeToken = '') {
   const htmlPath = path.join(__dirname, 'learning-dashboard.html');
@@ -440,10 +498,10 @@ function loadHtml(writeToken = '') {
 }
 
 function startServer(options = {}) {
-  const { projectRoot = process.cwd(), homeDir, port = 3334, host = '127.0.0.1' } = options;
+  const { port = 3334, host = '127.0.0.1' } = options;
   const writeToken = crypto.randomBytes(24).toString('hex');
   const htmlBody = loadHtml(writeToken);
-  const router = createRouter({ projectRoot, homeDir, htmlBody, writeToken });
+  const router = createRouter({ htmlBody, writeToken });
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -469,18 +527,10 @@ function startServer(options = {}) {
 }
 
 module.exports = {
-  ARTIFACT_TYPE_LABELS,
-  STATUS_LABELS,
-  artifactTypeLabel,
-  statusLabel,
-  nextUserAction,
-  sanitizeDashboardCandidate,
+  sanitizeDashboardCard,
   sanitizeDashboardDetail,
   createDashboardModel,
   handleDashboardAction,
-  buildLearningNotification,
-  writeLearningNotification,
-  getNotificationsPath,
   hasDashboardWriteHeader,
   createRouter,
   startServer,
