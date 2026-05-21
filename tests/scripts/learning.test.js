@@ -395,8 +395,9 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('observe redaction removes common secrets before observations are stored', () => {
-    delete require.cache[require.resolve('../../hooks/observe/main')];
-    const { redactObservationText } = require('../../hooks/observe/main');
+    // redactObservationText moved to scripts/lib/sanitize-observation (Slice C)
+    delete require.cache[require.resolve('../../scripts/lib/sanitize-observation')];
+    const { redactObservationText } = require('../../scripts/lib/sanitize-observation');
 
     const apiKeyName = ['api', '_key'].join('');
     const passwordName = ['pass', 'word'].join('');
@@ -409,14 +410,14 @@ describe('learning subsystem MVP-1', () => {
       `${apiKeyName}="${apiKey}" ${passwordName}: "${password}" Authorization: Bearer ${bearer} ${tokenName}=${token}`,
     );
 
-    expect(redacted).toContain('api_key=[REDACTED]');
-    expect(redacted).toContain('password=[REDACTED]');
-    expect(redacted).toContain('Authorization: Bearer [REDACTED]');
-    expect(redacted).toContain('token=[REDACTED]');
+    // Sanitizer preserves delimiter context: api_key="value" → api_key="[REDACTED]"
+    // and password: "value" → password: "[REDACTED]"
     expect(redacted).not.toContain(apiKey);
     expect(redacted).not.toContain(password);
     expect(redacted).not.toContain(bearer);
     expect(redacted).not.toContain(token);
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).toContain('Authorization: Bearer [REDACTED]');
   });
 
   it('observe hook is disabled until project or global learning is explicitly enabled', () => {

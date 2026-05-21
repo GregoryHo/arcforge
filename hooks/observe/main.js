@@ -25,6 +25,12 @@ const {
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
 const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
+const {
+  sanitizeObservationPayload,
+  EVIDENCE_STATUS,
+} = require('../../scripts/lib/sanitize-observation');
+// summarizeToolInput is available for read-time consumers via:
+// require('../../scripts/lib/learning-observation-view').summarizeToolInput
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -86,26 +92,6 @@ function shouldObserve({
 // ─────────────────────────────────────────────
 
 /**
- * Truncate string to max length with indicator.
- */
-function truncate(str, maxLen) {
-  if (!str || str.length <= maxLen) return str || '';
-  return `${str.substring(0, maxLen)}...[truncated]`;
-}
-
-function redactObservationText(value) {
-  return String(value || '')
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*"[^"]*"/gi, '$1="[REDACTED]"')
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*'[^']*'/gi, "$1='[REDACTED]'")
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*[^\s,}]+/gi, '$1=[REDACTED]')
-    .replace(/\bAuthorization\s*:\s*Bearer\s+[^\s,}]+/gi, 'Authorization: Bearer [REDACTED]');
-}
-
-function sanitizeObservationPayload(value, maxLen) {
-  return truncate(redactObservationText(value), maxLen);
-}
-
-/**
  * Extract the skill name from a Skill tool invocation. Returns null when the
  * tool is not Skill, the input is missing, or the skill field is absent.
  * Only the skill name is returned — never the args payload — so this remains
@@ -149,125 +135,165 @@ function responseByteSize(toolResponse) {
   }
 }
 
-function buildObservedToolInput(toolName, toolInput) {
-  if (!toolInput || typeof toolInput !== 'object') return toolInput;
-  if (toolName !== 'Skill') return toolInput;
-  const skillName = extractSkillName(toolName, toolInput);
-  return skillName ? { skill: skillName } : {};
-}
-
 // ---------------------------------------------------------------------------
-// Semantic summaries
+// Per-tool collection contract (Layer 2 — SafeEvidencePatch)
 //
-// Privacy-safe, bounded shape derived from the tool input. We never persist
-// raw command lines, file contents, search queries, or skill args. We classify
-// the call into a small vocabulary so the analyzer can reason about workflows
-// without the redacted text. The contract: the persisted `semantic` object
-// only contains short enums and `payload_saved=false`.
+// Returns a SafeEvidencePatch object. The patch is spread directly into the
+// observation record — no nested `evidence` key.
+//
+// evidence_status values:
+//   "present"                 — safe evidence fields were added
+//   "omitted_no_input"        — no tool_input present
+//   "omitted_unsupported_tool"— tool class not in the allowlist
+//   "omitted_safety"          — payload existed but post-sanitize result is empty
+//
+// Fail-closed: raw fallback is forbidden. When a field cannot be proven safe,
+// it is omitted. An empty post-sanitize result becomes omitted_safety.
 // ---------------------------------------------------------------------------
 
-const PATH_CLASSES = [
-  { key: 'test', regex: /(^|\/)tests?(\/|$)|\.test\.|_test\.|test_/ },
-  { key: 'docs', regex: /(^|\/)docs?(\/|$)|\.md$/i },
-  { key: 'config', regex: /\.(json|ya?ml|toml|ini)$/i },
-  { key: 'script', regex: /^scripts\/|\.sh$/ },
-  { key: 'source', regex: /^(src|lib|scripts)\//i },
-];
-
-function classifyPath(rawPath) {
-  if (typeof rawPath !== 'string' || rawPath.length === 0) return 'unknown';
-  for (const { key, regex } of PATH_CLASSES) if (regex.test(rawPath)) return key;
-  if (/\.(js|ts|py|go|rs|java|rb|c|cpp|h|hpp)$/i.test(rawPath)) return 'source';
-  return 'other';
-}
-
-const ALLOWED_FILE_KINDS = new Set([
-  'js',
-  'ts',
-  'jsx',
-  'tsx',
-  'py',
-  'md',
-  'json',
-  'yaml',
-  'yml',
-  'toml',
-  'sh',
-  'txt',
+/** Tool classes in the Layer 2 allowlist. */
+const SUPPORTED_TOOLS = new Set([
+  'Bash',
+  'Read',
+  'Edit',
+  'Write',
+  'Grep',
+  'Glob',
+  'NotebookEdit',
+  'Skill',
+  'WebFetch',
+  'WebSearch',
 ]);
 
-function fileKindFromPath(rawPath) {
-  if (typeof rawPath !== 'string') return 'unknown';
-  const match = rawPath.match(/\.([a-z0-9]+)$/i);
-  if (!match) return 'none';
-  const ext = match[1].toLowerCase();
-  return ALLOWED_FILE_KINDS.has(ext) ? ext : 'other';
+/**
+ * Build a SafeEvidencePatch from a tool name and (optional) raw tool_input.
+ * The returned object is spread into the observation record alongside the
+ * Layer 1 event skeleton fields.
+ *
+ * @param {string} toolName
+ * @param {object|null|undefined} toolInput
+ * @returns {object} SafeEvidencePatch
+ */
+// Helper: classify the omit reason — empty raw input is omitted_no_input,
+// non-empty raw that the sanitizer strips entirely is omitted_safety. Per
+// Layer 2 spec these are semantically distinct and must not be conflated.
+function classifyOmission(raw, sanitized) {
+  if (!raw || !raw.trim()) return EVIDENCE_STATUS.OMITTED_NO_INPUT;
+  if (!sanitized.trim()) return EVIDENCE_STATUS.OMITTED_SAFETY;
+  return null;
 }
 
-function classifyBashCommand(rawCommand) {
-  if (typeof rawCommand !== 'string' || rawCommand.trim() === '') return 'unknown';
-  const head = rawCommand.trim().split(/\s+/)[0] || '';
-  const lower = head.toLowerCase();
-  if (/^(npm|yarn|pnpm|bun)$/.test(lower)) {
-    if (/\btest\b/.test(rawCommand)) return 'test';
-    if (/\b(lint|format|biome|eslint)\b/.test(rawCommand)) return 'lint';
-    if (/\b(build|compile|tsc)\b/.test(rawCommand)) return 'build';
-    return 'package';
-  }
-  if (/^(jest|pytest|mocha|vitest|cargo|go)$/.test(lower) && /test/.test(rawCommand)) return 'test';
-  if (/^(jest|pytest|mocha|vitest)$/.test(lower)) return 'test';
-  if (/^(biome|eslint|prettier|black|flake8|ruff)$/.test(lower)) return 'lint';
-  if (/^(git)$/.test(lower)) return 'git';
-  if (/^(grep|rg|find|ls|cat|head|tail|wc)$/.test(lower)) return 'inspect';
-  if (/^(node|python3?|deno|bun)$/.test(lower)) return 'run';
-  if (/^(make|cargo|go|gcc|clang)$/.test(lower)) return 'build';
-  if (/^(curl|wget|http)$/.test(lower)) return 'network';
-  return 'other';
-}
-
-function summarizeToolInput(toolName, toolInput) {
+function buildObservedEvidence(toolName, toolInput) {
   if (!toolInput || typeof toolInput !== 'object') {
-    return { tool: toolName, payload_saved: false };
+    return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
   }
-  const base = { tool: toolName, payload_saved: false };
+
+  if (!SUPPORTED_TOOLS.has(toolName)) {
+    return { evidence_status: EVIDENCE_STATUS.OMITTED_UNSUPPORTED_TOOL };
+  }
+
   switch (toolName) {
-    case 'Bash':
+    case 'Bash': {
+      const raw = typeof toolInput.command === 'string' ? toolInput.command : '';
+      const sanitized = sanitizeObservationPayload(raw, MAX_INPUT_LENGTH);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
       return {
-        ...base,
-        operation: 'shell',
-        command_kind: classifyBashCommand(toolInput.command),
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        input: sanitized,
+        operation_kind: 'shell',
       };
-    case 'Read':
-      return {
-        ...base,
-        operation: 'read',
-        path_class: classifyPath(toolInput.file_path),
-        file_kind: fileKindFromPath(toolInput.file_path),
-      };
-    case 'Edit':
-    case 'Write':
-      return {
-        ...base,
-        operation: toolName.toLowerCase(),
-        path_class: classifyPath(toolInput.file_path),
-        file_kind: fileKindFromPath(toolInput.file_path),
-      };
-    case 'Grep':
-      return {
-        ...base,
-        operation: 'search',
-        path_class: classifyPath(toolInput.path || toolInput.glob || ''),
-      };
-    case 'Glob':
-      return { ...base, operation: 'glob' };
+    }
+    case 'Read': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'read' };
+    }
+    case 'Edit': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'edit' };
+    }
+    case 'Write': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'write' };
+    }
+    case 'Grep': {
+      const patternRaw = typeof toolInput.pattern === 'string' ? toolInput.pattern : '';
+      const pathRaw = typeof toolInput.path === 'string' ? toolInput.path : '';
+      const pattern = sanitizeObservationPayload(patternRaw, 512);
+      const pathVal = sanitizeObservationPayload(pathRaw, 1024);
+      const noRaw = !patternRaw.trim() && !pathRaw.trim();
+      const noSanitized = !pattern.trim() && !pathVal.trim();
+      if (noRaw) return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
+      if (noSanitized) return { evidence_status: EVIDENCE_STATUS.OMITTED_SAFETY };
+      const patch = { evidence_status: EVIDENCE_STATUS.PRESENT, operation_kind: 'search' };
+      if (pattern.trim()) patch.pattern = pattern;
+      if (pathVal.trim()) patch.path = pathVal;
+      return patch;
+    }
+    case 'Glob': {
+      const raw = typeof toolInput.pattern === 'string' ? toolInput.pattern : '';
+      const sanitized = sanitizeObservationPayload(raw, 512);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, glob: sanitized, operation_kind: 'glob' };
+    }
+    case 'NotebookEdit': {
+      const raw = typeof toolInput.notebook_path === 'string' ? toolInput.notebook_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'edit' };
+    }
     case 'Skill': {
       const skillName = extractSkillName(toolName, toolInput);
-      return { ...base, operation: 'skill', ...(skillName ? { skill_name: skillName } : {}) };
+      if (!skillName) return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
+      // Skill args are never persisted.
+      return {
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        skill: skillName,
+        operation_kind: 'skill',
+      };
+    }
+    case 'WebFetch':
+    case 'WebSearch': {
+      const urlRaw =
+        typeof toolInput.url === 'string'
+          ? toolInput.url
+          : typeof toolInput.query === 'string'
+            ? toolInput.query
+            : '';
+      const sanitized = sanitizeObservationPayload(urlRaw, 1024);
+      const omit = classifyOmission(urlRaw, sanitized);
+      if (omit) return { evidence_status: omit };
+      let domain = '';
+      try {
+        domain = new URL(sanitized).hostname;
+      } catch {
+        domain = sanitized.split('/')[0] || '';
+      }
+      return {
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        url: sanitized,
+        ...(domain ? { domain } : {}),
+        operation_kind: 'network',
+      };
     }
     default:
-      return { ...base, operation: 'other' };
+      return { evidence_status: EVIDENCE_STATUS.OMITTED_UNSUPPORTED_TOOL };
   }
 }
+
+// summarizeToolInput is now a read-time helper imported from
+// scripts/lib/learning-observation-view (Decision 4 — not persisted).
 
 /**
  * Archive observations file if it exceeds MAX_FILE_SIZE.
@@ -385,20 +411,24 @@ function main() {
       project_id: getProjectId(process.env.CLAUDE_PROJECT_DIR || process.cwd()),
     };
 
-    // Coarse skill-usage signal: when the call is a Skill invocation, record
-    // only the skill name. This lets us answer "are non-learning skills used?"
-    // without storing the args payload.
+    // Coarse skill-usage shortcut: record skill name at top level for both
+    // pre and post phases when the tool is Skill. This preserves the backward-
+    // compatible signal "which skills were used this session?" without storing args.
     const skillName = extractSkillName(toolName, input.tool_input);
     if (skillName) observation.skill = skillName;
 
-    // Add semantic input summary based on phase. PreToolUse deliberately does
-    // not persist raw tool input (commands, file paths, file contents, queries,
-    // or skill args). The bounded semantic object is the durable payload.
-    if (phase === 'pre' && input.tool_input) {
+    // Layer 2: build SafeEvidencePatch and spread into observation record.
+    // Decision 4: no semantic field is persisted; summarizeToolInput is read-time only.
+    // Decision 5: all evidence fields pass through the shared sanitizer.
+    if (phase === 'pre') {
       try {
-        observation.semantic = summarizeToolInput(toolName, input.tool_input);
+        const patch = buildObservedEvidence(toolName, input.tool_input);
+        Object.assign(observation, patch);
       } catch {
-        // Summary is best-effort; never block the observation.
+        // Best-effort: if buildObservedEvidence throws (e.g. unexpected input
+        // shape from a future tool), label as no-input rather than safety so
+        // we don't pollute downstream signal with a fake safety event.
+        observation.evidence_status = EVIDENCE_STATUS.OMITTED_NO_INPUT;
       }
     }
 
@@ -441,17 +471,10 @@ if (require.main === module) {
 }
 
 module.exports = {
-  truncate,
-  redactObservationText,
-  sanitizeObservationPayload,
   extractSkillName,
   classifyOutcome,
   responseByteSize,
-  buildObservedToolInput,
-  summarizeToolInput,
-  classifyPath,
-  classifyBashCommand,
-  fileKindFromPath,
+  buildObservedEvidence,
   getArchiveDir,
   getPidFile,
   shouldObserve,
