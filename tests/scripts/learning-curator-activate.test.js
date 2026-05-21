@@ -183,6 +183,26 @@ describe('L8-1: reject invalid lifecycle status', () => {
     expect(result.ok).toBe(false);
     expect(result.failure.reason).toBe('invalid_lifecycle_status');
   });
+
+  it('activate accepts deactivated status (reactivation path)', () => {
+    const { candidate, materializationRecord, arcforgeRoot } = runMaterialize();
+    // Simulate the deactivated state after a prior activate → deactivate cycle.
+    const deactivatedCandidate = {
+      ...candidate,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-21T01:00:00Z' },
+    };
+
+    const result = activate({
+      candidate: deactivatedCandidate,
+      materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: deactivatedCandidate.candidate_id }),
+      activationPolicy: defaultActivationPolicy(arcforgeRoot),
+      arcforgeRoot,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.record.action).toBe('activate');
+    expect(result.activeArtifacts[0].status).toBe('active');
+  });
 });
 
 // ---------------------------------------------------------------------------

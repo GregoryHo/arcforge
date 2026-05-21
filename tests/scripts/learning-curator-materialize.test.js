@@ -144,6 +144,14 @@ describe('L7-1: reject non-approved candidates', () => {
     const result = callMaterialize({});
     expect(result.ok).toBe(true);
   });
+
+  it('does NOT reject deactivated candidate (re-materialization path)', () => {
+    const result = callMaterialize({
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-21T01:00:00Z' },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.record.source_candidate.lifecycle_status_at_materialization).toBe('deactivated');
+  });
 });
 
 // ---------------------------------------------------------------------------

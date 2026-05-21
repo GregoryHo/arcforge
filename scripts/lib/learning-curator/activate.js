@@ -224,10 +224,11 @@ function activate({
     return { ok: false, failure };
   }
 
-  // L8-1: candidate must be materialized
+  // L8-1: candidate must be materialized (first activation) or deactivated (reactivation).
+  // Matrix-allowed transitions: materialized → activated, deactivated → activated.
   const status = candidate?.lifecycle ? candidate.lifecycle.status : undefined;
-  if (status !== 'materialized') {
-    return fail('invalid_lifecycle_status', `Expected materialized, got: ${status}`);
+  if (status !== 'materialized' && status !== 'deactivated') {
+    return fail('invalid_lifecycle_status', `Expected materialized or deactivated, got: ${status}`);
   }
 
   // L8-2: materializationRecord candidate_id must match
