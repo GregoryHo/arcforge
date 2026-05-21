@@ -35,6 +35,22 @@ const {
   LIFECYCLE_ACTION,
 } = require('./learning-curator/lifecycle');
 const { redactObservationText } = require('./sanitize-observation');
+const { materialize, defaultRenderPolicy } = require('./learning-curator/materialize');
+const {
+  activate: activateLayer8,
+  deactivate: deactivateLayer8,
+  defaultActivationPolicy,
+  findLatestActivation,
+  findLatestMaterialization,
+} = require('./learning-curator/activate');
+
+// ---------------------------------------------------------------------------
+// Arcforge root — used by materialize/activate handlers
+// ---------------------------------------------------------------------------
+
+function getArcforgeRoot() {
+  return path.join(os.homedir(), '.arcforge');
+}
 
 // ---------------------------------------------------------------------------
 // Wire model limits
@@ -326,7 +342,117 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     return result;
   }
 
-  // Status-changing actions: dismiss, approve, materialize, activate
+  // DH-1: materialize — delegates to Layer 7 materialize.js
+  if (action === LIFECYCLE_ACTION.MATERIALIZE) {
+    const arcforgeRoot = getArcforgeRoot();
+    const matResult = materialize({
+      candidate,
+      sourceActionId: actionId,
+      requestedArtifactType: candidate.artifact_type,
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    if (!matResult.ok) {
+      return reject(matResult.failure.reason, { module_failure: matResult.failure });
+    }
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      next_status: 'materialized',
+      materialization_id: matResult.record.materialization_id,
+    };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  // DH-2: activate — delegates to Layer 8 activate.js
+  if (action === LIFECYCLE_ACTION.ACTIVATE) {
+    const arcforgeRoot = getArcforgeRoot();
+    // Find the latest materialization record on disk for this candidate
+    const materializationRecord = findLatestMaterialization(arcforgeRoot, candidateId);
+    if (!materializationRecord) {
+      return reject('materialization_missing', {
+        detail: 'No materialization record found for this candidate',
+      });
+    }
+    // DH-4: synthesize reviewer_ack from dashboard click context
+    const reviewerAck = { confirmed_behavior_change: true, saw_target_summary: true };
+    const activationRequest = {
+      schema_version: 1,
+      request_id: actionId,
+      requested_at: requestedAt,
+      source_action_id: actionId,
+      action: 'activate',
+      candidate_id: candidateId,
+      expected_candidate_status: 'materialized',
+      target: { target_kind: candidate.artifact_type },
+      reviewer_ack: reviewerAck,
+    };
+    const actResult = activateLayer8({
+      candidate,
+      materializationRecord,
+      activationRequest,
+      activationPolicy: defaultActivationPolicy(arcforgeRoot),
+      arcforgeRoot,
+    });
+    if (!actResult.ok) {
+      return reject(actResult.failure.reason, { module_failure: actResult.failure });
+    }
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      next_status: 'activated',
+      activation_id: actResult.record.activation_id,
+    };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  // DH-6: deactivate — delegates to Layer 8 deactivate.js
+  if (action === LIFECYCLE_ACTION.DEACTIVATE) {
+    const arcforgeRoot = getArcforgeRoot();
+    // Find the latest activation record on disk for this candidate
+    const activationRecord = findLatestActivation(arcforgeRoot, candidateId);
+    const deactivationRequest = {
+      schema_version: 1,
+      request_id: actionId,
+      requested_at: requestedAt,
+      source_action_id: actionId,
+      action: 'deactivate',
+      candidate_id: candidateId,
+      expected_candidate_status: 'activated',
+      reviewer_ack: { confirmed_behavior_change: true, saw_target_summary: true },
+    };
+    const deactResult = deactivateLayer8({
+      candidate,
+      activationRecord,
+      activationRequest: deactivationRequest,
+      activationPolicy: defaultActivationPolicy(arcforgeRoot),
+      arcforgeRoot,
+    });
+    if (!deactResult.ok) {
+      return reject(deactResult.failure.reason, { module_failure: deactResult.failure });
+    }
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      next_status: 'deactivated',
+      activation_id: deactResult.record.activation_id,
+    };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  // Status-changing actions: dismiss, approve (materialize, activate, deactivate handled above)
   const nextStatus = applyTransition(currentStatus, action);
   appendTransitionEvent(candidateId, action, nextStatus, actor);
 

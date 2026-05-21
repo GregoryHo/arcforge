@@ -445,7 +445,12 @@ describe('action handlers — Action × Status matrix (criterion 2)', () => {
     const record = makeCandidateRecord();
     appendCandidate(record);
     appendTransitionEvent(record.candidate_id, 'approve', 'approved');
-    appendTransitionEvent(record.candidate_id, 'materialize', 'materialized');
+    // Use the dashboard materialize action to get both transition event AND draft file on disk
+    const matResult = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+    expect(matResult.accepted).toBe(true);
 
     const result = handleDashboardAction({ action: 'activate', candidate_id: record.candidate_id });
 
@@ -809,5 +814,229 @@ describe('HTTP routes — createRouter', () => {
     const res = await routeRequest(router, { url: '/unknown/path' });
 
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// ===========================================================================
+// Slice G — Dashboard re-wire (DH-1..DH-5)
+// ===========================================================================
+
+describe('DH-1: materialize action calls materialize.js module', () => {
+  it('successful materialize writes a draft file on disk (proof of module call)', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+
+    const result = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+
+    expect(result.accepted).toBe(true);
+
+    // Proof: a draft file must exist under .arcforge/learning/drafts/
+    const draftsBase = path.join(tmpDir, '.arcforge', 'learning', 'drafts');
+    expect(fs.existsSync(draftsBase)).toBe(true);
+    const candidateDirs = fs.readdirSync(draftsBase).filter((f) => !f.endsWith('.jsonl'));
+    expect(candidateDirs.length).toBeGreaterThan(0);
+  });
+
+  it('materialize failure propagates as accepted: false with reason', () => {
+    // Attempt materialize from pending_review (not approved) — should fail
+    const record = makeCandidateRecord({
+      lifecycle: { status: 'pending_review', status_changed_at: '2026-05-21T00:00:00Z' },
+    });
+    appendCandidate(record);
+
+    // Force an invalid path: candidate name with traversal — materialize.js will reject
+    const badRecord = makeCandidateRecord({
+      candidate_id: `cand_badname_${crypto.randomBytes(4).toString('hex')}`,
+      name: '../../../etc/passwd',
+    });
+    appendCandidate(badRecord);
+    appendTransitionEvent(badRecord.candidate_id, 'approve', 'approved');
+
+    const result = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: badRecord.candidate_id,
+    });
+
+    // materialize.js should reject with path_policy_rejected
+    expect(result.accepted).toBe(false);
+  });
+});
+
+describe('DH-2: activate action calls activate.js module', () => {
+  it('successful activate writes active file on disk (proof of module call)', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+    appendTransitionEvent(record.candidate_id, 'materialize', 'materialized');
+
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+    });
+
+    expect(result.accepted).toBe(true);
+
+    // Proof: an active instinct file must exist
+    const instinctsBase = path.join(tmpDir, '.arcforge', 'instincts');
+    expect(fs.existsSync(instinctsBase)).toBe(true);
+  });
+
+  it('activate fails gracefully when no materialization record exists', () => {
+    // Candidate is in materialized status but no materialization.json on disk
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    appendTransitionEvent(record.candidate_id, 'materialize', 'materialized');
+    // No actual materialize.js call — so no draft file on disk
+
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+    });
+
+    // activate.js should fail because there is no materialization record on disk
+    expect(result.accepted).toBe(false);
+  });
+});
+
+describe('DH-3: no double transition events on success', () => {
+  it('materialize action emits exactly 1 transition event total', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+
+    const {
+      readCurrentCandidates: rcc,
+    } = require('../../scripts/lib/learning-curator/queue-writer');
+    const candidates = rcc();
+    expect(candidates[record.candidate_id].lifecycle.status).toBe('materialized');
+
+    // Count transition events for this candidate
+    const queuePath = path.join(tmpDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+    const lines = fs
+      .readFileSync(queuePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+    const transitionEvents = lines.filter(
+      (e) =>
+        e.event_type === 'candidate.transitioned' &&
+        e.candidate_id === record.candidate_id &&
+        e.action === 'materialize',
+    );
+    // Exactly 1 transition event for this materialize action (not 2)
+    expect(transitionEvents.length).toBe(1);
+  });
+});
+
+describe('DH-4: dashboard synthesizes reviewer_ack (does not pass from HTTP body)', () => {
+  it('handleDashboardAction does not require reviewer_ack in the action input', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+
+    // Call handleDashboardAction without reviewer_ack in the opts
+    const result = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+      // No reviewer_ack passed — dashboard synthesizes it
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+});
+
+describe('DH-5: audit log still written on materialize/activate', () => {
+  function getAuditLogPath() {
+    return path.join(tmpDir, '.arcforge', 'learning', 'dashboard', 'actions.jsonl');
+  }
+
+  it('materialize action writes to actions.jsonl', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+
+    expect(fs.existsSync(getAuditLogPath())).toBe(true);
+    const lines = fs.readFileSync(getAuditLogPath(), 'utf8').trim().split('\n').filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    const entry = JSON.parse(lines[0]);
+    expect(entry.action).toBe('materialize');
+    expect(entry.candidate_id).toBe(record.candidate_id);
+  });
+});
+
+describe('DH-6: deactivate action calls deactivate.js module', () => {
+  it('deactivate → active file gone, .disabled/ archive exists, exactly 1 deactivate transition event', () => {
+    // Set up: pending_review → approve → materialize → activate
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const matResult = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+    expect(matResult.accepted).toBe(true);
+
+    const actResult = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+    });
+    expect(actResult.accepted).toBe(true);
+
+    // Verify active file exists before deactivate
+    const instinctsBase = path.join(tmpDir, '.arcforge', 'instincts');
+    const scopeDir = record.scope.project_id || 'unknown';
+    const activePath = path.join(instinctsBase, scopeDir, `${record.candidate_id}.md`);
+    expect(fs.existsSync(activePath)).toBe(true);
+
+    // Deactivate
+    const deactResult = handleDashboardAction({
+      action: 'deactivate',
+      candidate_id: record.candidate_id,
+    });
+    expect(deactResult.accepted).toBe(true);
+
+    // Active file should be gone
+    expect(fs.existsSync(activePath)).toBe(false);
+
+    // .disabled/ archive should contain the archived file
+    const disabledDir = path.join(instinctsBase, scopeDir, '.disabled');
+    expect(fs.existsSync(disabledDir)).toBe(true);
+    const disabledFiles = fs.readdirSync(disabledDir);
+    expect(disabledFiles.length).toBeGreaterThan(0);
+    const archivedFile = disabledFiles.find((f) => f.startsWith(record.candidate_id));
+    expect(archivedFile).toBeTruthy();
+
+    // Exactly 1 deactivate transition event in queue.jsonl
+    const queuePath = path.join(tmpDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+    const lines = fs
+      .readFileSync(queuePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+    const deactivateEvents = lines.filter(
+      (e) =>
+        e.event_type === 'candidate.transitioned' &&
+        e.candidate_id === record.candidate_id &&
+        e.action === 'deactivate',
+    );
+    expect(deactivateEvents.length).toBe(1);
+
+    // Candidate lifecycle status must read as deactivated
+    const {
+      readCurrentCandidates: rcc,
+    } = require('../../scripts/lib/learning-curator/queue-writer');
+    expect(rcc()[record.candidate_id].lifecycle.status).toBe('deactivated');
   });
 });

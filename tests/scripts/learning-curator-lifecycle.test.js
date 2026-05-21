@@ -25,6 +25,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: true,
       evolve: true,
+      deactivate: false,
     },
     needs_more_evidence: {
       dismiss: true,
@@ -33,6 +34,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: false,
       evolve: false,
+      deactivate: false,
     },
     approved: {
       dismiss: false,
@@ -41,6 +43,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: true,
       evolve: true,
+      deactivate: false,
     },
     materialized: {
       dismiss: false,
@@ -49,6 +52,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: true,
       promote: false,
       evolve: false,
+      deactivate: false,
     },
     activated: {
       dismiss: false,
@@ -57,6 +61,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: false,
       evolve: false,
+      deactivate: true,
     },
     deactivated: {
       dismiss: false,
@@ -65,6 +70,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: true,
       promote: false,
       evolve: false,
+      deactivate: false,
     },
     dismissed: {
       dismiss: false,
@@ -73,6 +79,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: false,
       evolve: false,
+      deactivate: false,
     },
     superseded: {
       dismiss: false,
@@ -81,6 +88,7 @@ describe('Action × Status matrix — canonical spec', () => {
       activate: false,
       promote: false,
       evolve: false,
+      deactivate: false,
     },
   };
 
@@ -88,9 +96,9 @@ describe('Action × Status matrix — canonical spec', () => {
     expect([...LIFECYCLE_STATUSES].sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 
-  it('ACTIONS covers all 6 spec actions', () => {
+  it('ACTIONS covers all 7 spec actions (6 original + deactivate)', () => {
     expect([...ACTIONS].sort()).toEqual(
-      ['dismiss', 'approve', 'materialize', 'activate', 'promote', 'evolve'].sort(),
+      ['dismiss', 'approve', 'materialize', 'activate', 'promote', 'evolve', 'deactivate'].sort(),
     );
   });
 
@@ -359,5 +367,65 @@ describe('applyTransition — throws for illegal transitions', () => {
     }
     expect(msg).toMatch(/activated/);
     expect(msg).toMatch(/dismiss/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LC-1..LC-6 — deactivate matrix extension (Slice G)
+// ---------------------------------------------------------------------------
+
+describe('LC-1: LIFECYCLE_ACTION.DEACTIVATE constant', () => {
+  it('LIFECYCLE_ACTION.DEACTIVATE equals "deactivate"', () => {
+    expect(LIFECYCLE_ACTION.DEACTIVATE).toBe('deactivate');
+  });
+});
+
+describe('LC-2 / LC-3 / LC-4: deactivate legal only from activated', () => {
+  it('LC-2: isLegalAction("activated", "deactivate") === true', () => {
+    expect(isLegalAction('activated', 'deactivate')).toBe(true);
+  });
+
+  it('LC-3: isLegalAction("deactivated", "deactivate") === false', () => {
+    expect(isLegalAction('deactivated', 'deactivate')).toBe(false);
+  });
+
+  it('LC-4: applyTransition("activated", "deactivate") === "deactivated"', () => {
+    expect(applyTransition('activated', 'deactivate')).toBe('deactivated');
+  });
+});
+
+describe('LC-5: all other rows reject deactivate', () => {
+  const NON_ACTIVATED_STATUSES = [
+    'pending_review',
+    'needs_more_evidence',
+    'approved',
+    'materialized',
+    'deactivated',
+    'dismissed',
+    'superseded',
+  ];
+
+  for (const status of NON_ACTIVATED_STATUSES) {
+    it(`deactivate from "${status}" is illegal`, () => {
+      expect(isLegalAction(status, 'deactivate')).toBe(false);
+    });
+  }
+});
+
+describe('LC-6: existing transitions still pass after deactivate extension', () => {
+  it('approved + materialize → materialized still valid', () => {
+    expect(applyTransition('approved', 'materialize')).toBe('materialized');
+  });
+
+  it('materialized + activate → activated still valid', () => {
+    expect(applyTransition('materialized', 'activate')).toBe('activated');
+  });
+
+  it('pending_review + approve → approved still valid', () => {
+    expect(applyTransition('pending_review', 'approve')).toBe('approved');
+  });
+
+  it('activated → dismiss is still illegal', () => {
+    expect(isLegalAction('activated', 'dismiss')).toBe(false);
   });
 });
