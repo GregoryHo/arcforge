@@ -103,7 +103,6 @@ C3_LOCKED_LOG=$(
   HOME="$TEST_HOME_C3"
   SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
   OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
-  OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -125,7 +124,6 @@ C3_CLEAN_RESULT=$(
   HOME="$TEST_HOME_C3B"
   SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
   OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
-  OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -146,7 +144,6 @@ C3_CLEAN_LOG=$(
   HOME="$TEST_HOME_C3C"
   SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
   OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
-  OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -197,7 +194,6 @@ C4_LOG=$(
   OBSERVER_DAEMON_WATCHDOG_SECS=3
   SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
   OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
-  OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -221,6 +217,195 @@ else
   echo "  FAIL: C4: watchdog did not kill process in time (${ELAPSED}s elapsed, expected < 10s)"
   FAIL=$((FAIL + 1))
   ERRORS+=('C4: process killed before stub sleep (elapsed check)')
+fi
+
+# ─────────────────────────────────────────────
+# E2-G1: daemon no longer writes to per-project instincts subdir
+# Strategy: the production analysis code must not contain mkdir + write
+# operations targeting ${project_instincts}/<id>.md.
+# We check that 'project_instincts' is NOT used with mkdir or as a write target
+# in the production code section (below the ANALYZING lock acquisition).
+# Comments/retired-label references are acceptable.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== E2-G1: No direct instinct file writes in production code ==="
+
+# Grep for lines that use project_instincts in file-write contexts.
+# The old pattern wrote to "${project_instincts}/<id>.md" via 'Write' tool
+# or direct shell redirects. After rewire, project_instincts is not used for
+# writing; only the instincts dir root is used for lock/log files.
+INSTINCT_WRITE_LINES=$(grep -n 'project_instincts' "$DAEMON_SCRIPT" | \
+  grep -v '^[[:space:]]*#' | \
+  grep -E '(mkdir|before_count|after_count|\.md|find.*\.md|existing_instincts)' || true)
+
+assert_eq \
+  'E2-G1: daemon production code does not write to per-project instincts subdir' \
+  '' \
+  "$INSTINCT_WRITE_LINES"
+
+# ─────────────────────────────────────────────
+# E2-G2: daemon calls Node CLI assemble-batch and ingest-proposal
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== E2-G2: Daemon calls Node CLI ==="
+
+# Match patterns: either 'cli.js assemble-batch' or 'CURATOR_CLI' + 'assemble-batch' on same line
+ASSEMBLE_BATCH_LINE=$(grep 'assemble-batch' "$DAEMON_SCRIPT" | grep -v '^[[:space:]]*#' | wc -l | tr -d ' ')
+INGEST_PROPOSAL_LINE=$(grep 'ingest-proposal' "$DAEMON_SCRIPT" | grep -v '^[[:space:]]*#' | wc -l | tr -d ' ')
+
+if [ "$ASSEMBLE_BATCH_LINE" -ge 1 ]; then
+  echo "  PASS: E2-G2: daemon calls cli.js assemble-batch"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: E2-G2: daemon does not call cli.js assemble-batch"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('E2-G2: daemon calls cli.js assemble-batch')
+fi
+
+if [ "$INGEST_PROPOSAL_LINE" -ge 1 ]; then
+  echo "  PASS: E2-G2: daemon calls cli.js ingest-proposal"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: E2-G2: daemon does not call cli.js ingest-proposal"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('E2-G2: daemon calls cli.js ingest-proposal')
+fi
+
+# ─────────────────────────────────────────────
+# E2-G3: End-to-end integration test
+# Strategy:
+#   (a) seed observations in a temp dir
+#   (b) stub 'claude' CLI that writes a known CandidateProposalPayload JSON to stdout
+#   (c) source daemon + invoke analyze_project with ARCFORGE_ROOT pointing to repo
+#   (d) assert queue.jsonl has one new candidate, instincts dir for the project is empty
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== E2-G3: End-to-end integration test ==="
+
+ARCFORGE_REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+TMPDIR_G3=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3"' EXIT
+TEST_HOME_G3="${TMPDIR_G3}/home"
+STUB_BIN_G3="${TMPDIR_G3}/bin"
+mkdir -p "$TEST_HOME_G3" "$STUB_BIN_G3"
+
+# Seed 15 observations so the MIN_OBSERVATIONS gate passes
+G3_PROJECT="e2-test-proj"
+G3_OBS_DIR="${TEST_HOME_G3}/.arcforge/observations/${G3_PROJECT}"
+mkdir -p "$G3_OBS_DIR"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-21T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"session-abc","project":"%s","project_id":"proj_abc123456789ab","evidence_status":"present","input_summary":"reading file %d"}\n' \
+    "$i" "$G3_PROJECT" "$i" >> "${G3_OBS_DIR}/observations.jsonl"
+done
+
+# Stub 'node' that intercepts cli.js calls:
+#   - assemble-batch: writes a minimal manifest + prompt, prints JSON
+#   - ingest-proposal: calls real Node to ingest (so queue.jsonl gets written)
+# This stub delegates back to real node when the script is NOT cli.js,
+# and handles cli.js calls with hardcoded responses.
+#
+# Actually: simplest approach — stub only 'claude' to emit known JSON.
+# Let node calls go to real node (ARCFORGE_ROOT is set to repo root).
+
+# Known CandidateProposalPayload that the stub 'claude' will emit.
+# Using a simplified payload that matches the required schema shape.
+STUB_PAYLOAD='{"schema_version":1,"source":{"layer":4,"curator":"llm","run_id":"curator_run_20260521T030000Z_aabbccddee11","created_at":"2026-05-21T03:00:00.000Z","batch_id":"STUB_BATCH","batch_hash":"STUB_HASH","prompt_policy_version":"v1","output_schema_version":1},"proposals":[{"proposal_index":0,"artifact_type":"instinct","proposed_scope":{"kind":"project","project_id":"proj_abc123456789ab"},"name":"e2-test-instinct","summary":"Test instinct from E2 stub","rationale":"Observed in E2 test fixture","domain":"workflow","body":"When in E2 test, always write tests first.","body_source":"llm_curator","evidence_refs":[],"llm_confidence":"medium","risk_notes":[],"uncertainty_notes":[],"recommended_review_action":"review"}]}'
+
+# Stub claude that outputs the stub payload (ignores --max-turns, --print, etc.)
+cat > "${STUB_BIN_G3}/claude" << STUB_EOF
+#!/usr/bin/env bash
+# Consume stdin (prompt file piped in), emit the known payload
+cat > /dev/null
+printf '%s\n' '$STUB_PAYLOAD'
+STUB_EOF
+chmod +x "${STUB_BIN_G3}/claude"
+
+# Run analyze_project via sourced daemon.
+# Key overrides:
+#   HOME          = TEST_HOME_G3 (isolates all .arcforge paths)
+#   ARCFORGE_ROOT = ARCFORGE_REPO_ROOT (so cli.js path resolves correctly)
+#   PATH          = stub bin first (so our stub claude is found)
+#   SCRIPT_DIR    = real scripts dir (for observer-prompt.md)
+#   OBSERVER_DAEMON_WATCHDOG_SECS = 10 (fast watchdog for test)
+
+G3_RESULT=$(
+  HOME="$TEST_HOME_G3"
+  ARCFORGE_ROOT="$ARCFORGE_REPO_ROOT"
+  PATH="${STUB_BIN_G3}:${PATH}"
+  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
+  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project "$G3_PROJECT" 2>/dev/null
+  echo "EXIT_CODE:$?"
+) 2>/dev/null
+
+# Check for queue.jsonl having a candidate
+G3_QUEUE="${TEST_HOME_G3}/.arcforge/learning/candidates/queue.jsonl"
+G3_QUEUE_COUNT=0
+if [ -f "$G3_QUEUE" ]; then
+  G3_QUEUE_COUNT=$(grep -c '"event_type":"candidate.created"' "$G3_QUEUE" 2>/dev/null || echo 0)
+fi
+
+if [ "$G3_QUEUE_COUNT" -ge 1 ]; then
+  echo "  PASS: E2-G3: queue.jsonl has at least one candidate after analysis"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: E2-G3: queue.jsonl has no candidates (count: ${G3_QUEUE_COUNT})"
+  echo "        G3_RESULT: $G3_RESULT"
+  echo "        queue path: $G3_QUEUE"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('E2-G3: queue.jsonl has at least one candidate after analysis')
+fi
+
+# Check that per-project instincts subdir is NOT created with .md files
+G3_INSTINCTS_DIR="${TEST_HOME_G3}/.arcforge/instincts/${G3_PROJECT}"
+G3_INSTINCT_FILES=0
+if [ -d "$G3_INSTINCTS_DIR" ]; then
+  G3_INSTINCT_FILES=$(find "$G3_INSTINCTS_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+fi
+
+assert_eq \
+  'E2-G3: no .md instinct files written to per-project instincts dir' \
+  '0' \
+  "$G3_INSTINCT_FILES"
+
+# Check that manifests were created
+G3_BATCHES_DIR="${TEST_HOME_G3}/.arcforge/learning/curator-batches"
+G3_BATCH_COUNT=0
+if [ -d "$G3_BATCHES_DIR" ]; then
+  G3_BATCH_COUNT=$(find "$G3_BATCHES_DIR" -name '*.manifest.json' 2>/dev/null | wc -l | tr -d ' ')
+fi
+
+if [ "$G3_BATCH_COUNT" -ge 1 ]; then
+  echo "  PASS: E2-G3: curator batch manifest(s) created"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: E2-G3: no curator batch manifests found"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('E2-G3: curator batch manifests created')
+fi
+
+# Check that run manifest was created (Layer 4 CuratorRunManifest persistence)
+G3_RUNS_DIR="${TEST_HOME_G3}/.arcforge/learning/curator-runs"
+G3_RUN_COUNT=0
+if [ -d "$G3_RUNS_DIR" ]; then
+  G3_RUN_COUNT=$(find "$G3_RUNS_DIR" -name '*.manifest.json' 2>/dev/null | wc -l | tr -d ' ')
+fi
+
+if [ "$G3_RUN_COUNT" -ge 1 ]; then
+  echo "  PASS: E2-G3: curator run manifest(s) created"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: E2-G3: no curator run manifests found"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('E2-G3: curator run manifests created')
 fi
 
 # ─────────────────────────────────────────────
