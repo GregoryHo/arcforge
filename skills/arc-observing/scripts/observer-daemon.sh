@@ -21,9 +21,14 @@ MIN_OBSERVATIONS=10    # Minimum obs before analysis
 IDLE_TIMEOUT=1800      # 30 minutes no new obs → auto-stop
 MAX_AGE=7200           # 2 hours maximum lifetime
 ANALYSIS_COOLDOWN=60   # Minimum 60 seconds between analyses
+# Watchdog timeout for claude CLI invocation (override via env var for tests)
+OBSERVER_DAEMON_WATCHDOG_SECS="${OBSERVER_DAEMON_WATCHDOG_SECS:-120}"
 
 # Path to observer prompt (relative to this script)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# SCRIPT_DIR can be pre-set via env var when sourced for testing
+if [ -z "${SCRIPT_DIR:-}" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
 OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
 
@@ -166,31 +171,57 @@ Each file: {id}.md with YAML frontmatter + markdown body.
 "
 
   # Call Haiku for analysis — clean session with zero MCP overhead
+  # Wrapped in a watchdog: kill claude if it exceeds OBSERVER_DAEMON_WATCHDOG_SECS.
   local claude_output
   local analysis_success=false
   local retry_count=0
   local max_retries=1
 
+  # Deterministic per-function tmp file so the daemon-level EXIT trap can
+  # clean it even if SIGTERM hits mid-analysis. Guarded by the ANALYZING
+  # lock so only one analyze_project runs at a time.
+  local tmp_out="${INSTINCTS_DIR}/.analyzing.output.tmp"
+  trap 'rm -f "$tmp_out"' RETURN
+
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     if command -v claude &>/dev/null; then
-      # Capture stdout and stderr separately
       local exit_code=0
-      claude_output=$(echo "$prompt" | claude --model haiku \
-        --max-turns 3 \
+      local claude_pid=""
+      local watchdog_pid=""
+
+      (echo "$prompt" | claude --model haiku \
+        --max-turns 15 \
         --print \
         --system-prompt "$(cat "$OBSERVER_SYSTEM_PROMPT")" \
         --tools "Write,Read,Bash,Grep,Glob" \
         --disable-slash-commands \
         --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-        2>&1) || exit_code=$?
+        > "$tmp_out" 2>&1) &
+      claude_pid=$!
+
+      # Watchdog: kill claude_pid after OBSERVER_DAEMON_WATCHDOG_SECS seconds
+      (sleep "$OBSERVER_DAEMON_WATCHDOG_SECS" && \
+        if kill -0 "$claude_pid" 2>/dev/null; then \
+          log_msg "WATCHDOG: claude exceeded ${OBSERVER_DAEMON_WATCHDOG_SECS}s — killing (PID ${claude_pid})"; \
+          kill "$claude_pid" 2>/dev/null || true; \
+        fi) &
+      watchdog_pid=$!
+
+      wait "$claude_pid" 2>/dev/null && exit_code=0 || exit_code=$?
+      # Cancel watchdog if claude finished normally
+      kill "$watchdog_pid" 2>/dev/null || true
+      wait "$watchdog_pid" 2>/dev/null || true
+
+      claude_output=$(cat "$tmp_out" 2>/dev/null || true)
 
       if [ "$exit_code" -eq 0 ]; then
         analysis_success=true
         log_msg "Claude analysis completed successfully"
       else
         log_msg "ERROR: claude analysis failed (exit code: ${exit_code})"
-        if [ "$retry_count" -lt "$max_retries" ]; then
-          retry_count=$((retry_count + 1))
+        # Always advance retry_count so the while condition eventually becomes false
+        retry_count=$((retry_count + 1))
+        if [ "$retry_count" -le "$max_retries" ]; then
           log_msg "Retrying analysis (attempt ${retry_count}/${max_retries})..."
           sleep 2
         fi
@@ -251,7 +282,25 @@ archive_observations() {
 }
 
 analyze_all_projects() {
+  local analyzing_lock="${INSTINCTS_DIR}/.analyzing.lock"
+  # Staleness: a SIGKILL/OOM can leave .analyzing.lock behind because EXIT
+  # trap doesn't fire. Treat locks older than 30 minutes as stale and reclaim.
+  local stale_lock_minutes=30
+
+  if [ -f "$analyzing_lock" ]; then
+    if find "$analyzing_lock" -mmin +"$stale_lock_minutes" -print 2>/dev/null | grep -q .; then
+      log_msg "ANALYZING: stale .analyzing.lock (>${stale_lock_minutes}m old) — reclaiming"
+      rm -f "$analyzing_lock"
+    else
+      log_msg "ANALYZING: analysis already in progress (.analyzing.lock exists) — skipping this round"
+      return
+    fi
+  fi
+
+  touch "$analyzing_lock" 2>/dev/null || true
+
   if [ ! -d "$OBS_DIR" ]; then
+    rm -f "$analyzing_lock"
     return
   fi
 
@@ -261,6 +310,8 @@ analyze_all_projects() {
     project=$(basename "$project_dir")
     analyze_project "$project"
   done
+
+  rm -f "$analyzing_lock"
 }
 
 # ─────────────────────────────────────────────
@@ -279,9 +330,9 @@ daemon_loop() {
   # Track observation state to detect actual new data
   local obs_state_file="${OBS_DIR}/.obs_state"
 
-  # Cleanup lock on exit
-  trap 'log_msg "Daemon stopping (EXIT)"; remove_lock' EXIT
-  trap 'log_msg "Daemon stopping (signal)"; remove_lock; exit 0' TERM INT
+  # Cleanup lock + transient analyzer files on exit; also remove ANALYZING lock to prevent stale lock after crash
+  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp"; remove_lock' EXIT
+  trap 'log_msg "Daemon stopping (signal)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp"; remove_lock; exit 0' TERM INT
 
   # SIGUSR1 handler with cooldown
   handle_sigusr1() {
@@ -421,12 +472,15 @@ cmd_status() {
 # Main
 # ─────────────────────────────────────────────
 
-case "${1:-status}" in
-  start)  cmd_start ;;
-  stop)   cmd_stop ;;
-  status) cmd_status ;;
-  *)
-    echo "Usage: $0 {start|stop|status}"
-    exit 1
-    ;;
-esac
+# Guard: skip command dispatch when sourced (allows tests to import functions)
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+  case "${1:-status}" in
+    start)  cmd_start ;;
+    stop)   cmd_stop ;;
+    status) cmd_status ;;
+    *)
+      echo "Usage: $0 {start|stop|status}"
+      exit 1
+      ;;
+  esac
+fi

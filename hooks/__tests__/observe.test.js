@@ -618,3 +618,258 @@ describe('observe: statistical auto-trigger is retired', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────
+// Slice B — C1 + C2: shouldObserve path filtering
+// ─────────────────────────────────────────────
+
+describe('observe: shouldObserve — eval-trial path rejection (C1)', () => {
+  const originalEnv = { ...process.env };
+  let testHome;
+
+  beforeEach(() => {
+    testHome = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-c1-'));
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+
+    // Enable learning globally so path filtering is the only gate
+    const learning = require('../../scripts/lib/learning');
+    learning.setLearningEnabled({ scope: 'global', enabled: true, homeDir: testHome });
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testHome, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('rejects a projectRoot containing /.eval-trials/', () => {
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'projects', '.eval-trials', 'run-1'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(result, false, 'should return false for .eval-trials/ path');
+  });
+
+  it('rejects a projectRoot matching trial-dir suffix -tN+-[A-Za-z0-9]{6}', () => {
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'myapp-t123-abc456'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(result, false, 'should return false for trial-dir suffix path');
+  });
+
+  it('rejects various valid trial-dir suffix patterns', () => {
+    const { shouldObserve } = require('../observe/main');
+    const trialPaths = [
+      path.join(testHome, 'proj-t1-aB2cD3'),
+      path.join(testHome, 'myrepo-t99-ZZZZZZ'),
+      path.join(testHome, 'arcforge-t0-a1B2c3'),
+    ];
+    for (const projectRoot of trialPaths) {
+      const result = shouldObserve({ projectRoot, homeDir: testHome });
+      assert.strictEqual(result, false, `should reject trial path: ${projectRoot}`);
+    }
+  });
+
+  it('allows a normal project path when learning is globally enabled', () => {
+    const { shouldObserve } = require('../observe/main');
+    const normalRoot = path.join(testHome, 'my-normal-project');
+    const result = shouldObserve({ projectRoot: normalRoot, homeDir: testHome });
+    assert.strictEqual(
+      result,
+      true,
+      'should return true for normal path with global learning enabled',
+    );
+  });
+
+  it('does not reject a path that has "eval-trials" without the /.eval-trials/ pattern', () => {
+    const { shouldObserve } = require('../observe/main');
+    // A path named "eval-trials-project" at the basename level (no slash+dot)
+    const normalRoot = path.join(testHome, 'eval-trials-project');
+    const result = shouldObserve({ projectRoot: normalRoot, homeDir: testHome });
+    assert.strictEqual(
+      result,
+      true,
+      'eval-trials-project without /.eval-trials/ should be allowed',
+    );
+  });
+});
+
+describe('observe: shouldObserve — ARCFORGE_OBSERVE_SKIP_PATHS env var (C2)', () => {
+  const originalEnv = { ...process.env };
+  let testHome;
+
+  beforeEach(() => {
+    testHome = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-c2-'));
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+
+    // Enable learning globally so skip-path env var is the only gate
+    const learning = require('../../scripts/lib/learning');
+    learning.setLearningEnabled({ scope: 'global', enabled: true, homeDir: testHome });
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testHome, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('rejects a projectRoot that contains a substring from ARCFORGE_OBSERVE_SKIP_PATHS', () => {
+    const skipDir = path.join(testHome, 'skip-me');
+    process.env.ARCFORGE_OBSERVE_SKIP_PATHS = `${skipDir},/other/skip`;
+    delete require.cache[require.resolve('../observe/main')];
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(skipDir, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      false,
+      'should return false when projectRoot matches ARCFORGE_OBSERVE_SKIP_PATHS substring',
+    );
+  });
+
+  it('rejects the second entry in a comma-separated list', () => {
+    const skipDir = path.join(testHome, 'other-skip');
+    process.env.ARCFORGE_OBSERVE_SKIP_PATHS = `${path.join(testHome, 'first')},${skipDir}`;
+    delete require.cache[require.resolve('../observe/main')];
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(skipDir, 'project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(result, false, 'should reject the second skip-path entry');
+  });
+
+  it('allows a path not in ARCFORGE_OBSERVE_SKIP_PATHS when learning is enabled', () => {
+    process.env.ARCFORGE_OBSERVE_SKIP_PATHS = path.join(testHome, 'skip-me');
+    delete require.cache[require.resolve('../observe/main')];
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'safe-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(result, true, 'should allow a path not in the skip list');
+  });
+
+  it('honors an empty ARCFORGE_OBSERVE_SKIP_PATHS (no-op)', () => {
+    process.env.ARCFORGE_OBSERVE_SKIP_PATHS = '';
+    delete require.cache[require.resolve('../observe/main')];
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'project'),
+      homeDir: testHome,
+    });
+    // With empty skip list and global learning enabled, should return true
+    assert.strictEqual(result, true, 'empty skip list should not block observation');
+  });
+});
+
+// ─────────────────────────────────────────────
+// Slice B — C6: Daemon lazy-start
+// ─────────────────────────────────────────────
+
+describe('observe: daemon lazy-start (C6)', () => {
+  const originalEnv = { ...process.env };
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-lazystart-'));
+    process.env.HOME = testDir;
+    process.env.CLAUDE_PROJECT_DIR = path.join(testDir, 'project');
+    // CI safety: never actually spawn a real daemon during tests.
+    process.env.ARCFORGE_OBSERVE_NO_SPAWN = '1';
+    fs.mkdirSync(process.env.CLAUDE_PROJECT_DIR, { recursive: true });
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('exports LAZY_START_THRESHOLD constant defaulting to 50', () => {
+    const mod = require('../observe/main');
+    assert.strictEqual(mod.LAZY_START_THRESHOLD, 50, 'default LAZY_START_THRESHOLD must be 50');
+  });
+
+  it('exports spawnDaemonIfNeeded function', () => {
+    const mod = require('../observe/main');
+    assert.strictEqual(
+      typeof mod.spawnDaemonIfNeeded,
+      'function',
+      'spawnDaemonIfNeeded must be exported',
+    );
+  });
+
+  it('honors ARCFORGE_LAZY_START_THRESHOLD env override', () => {
+    process.env.ARCFORGE_LAZY_START_THRESHOLD = '5';
+    delete require.cache[require.resolve('../observe/main')];
+    const mod = require('../observe/main');
+    assert.strictEqual(mod.LAZY_START_THRESHOLD, 5, 'env override must apply');
+  });
+
+  it('returns "below-threshold" when observation count is below threshold', () => {
+    const { spawnDaemonIfNeeded } = require('../observe/main');
+    const { getObservationsPath } = require('../../scripts/lib/session-utils');
+    const obsPath = getObservationsPath('test-project');
+    fs.mkdirSync(path.dirname(obsPath), { recursive: true });
+    const lines = Array.from({ length: 10 }, (_, i) => JSON.stringify({ i })).join('\n') + '\n';
+    fs.writeFileSync(obsPath, lines, 'utf-8');
+
+    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'below-threshold');
+  });
+
+  it('returns "pid-exists" when PID file is present (daemon already running)', () => {
+    const { spawnDaemonIfNeeded } = require('../observe/main');
+    const { getObservationsPath, getObserverPidFile } = require('../../scripts/lib/session-utils');
+    const obsPath = getObservationsPath('test-project');
+    fs.mkdirSync(path.dirname(obsPath), { recursive: true });
+    const lines = Array.from({ length: 60 }, (_, i) => JSON.stringify({ i })).join('\n') + '\n';
+    fs.writeFileSync(obsPath, lines, 'utf-8');
+
+    const pidFile = getObserverPidFile();
+    fs.mkdirSync(path.dirname(pidFile), { recursive: true });
+    fs.writeFileSync(pidFile, String(process.pid), 'utf-8');
+
+    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'pid-exists');
+    assert.ok(fs.existsSync(pidFile), 'PID file should still exist');
+  });
+
+  it('returns "no-file" when observations file does not exist', () => {
+    const { spawnDaemonIfNeeded } = require('../observe/main');
+    const { getObservationsPath } = require('../../scripts/lib/session-utils');
+    const obsPath = getObservationsPath('test-project');
+    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'no-file');
+  });
+
+  it('returns "no-spawn-env" when threshold met but ARCFORGE_OBSERVE_NO_SPAWN=1', () => {
+    const { spawnDaemonIfNeeded, LAZY_START_THRESHOLD } = require('../observe/main');
+    const { getObservationsPath } = require('../../scripts/lib/session-utils');
+    const obsPath = getObservationsPath('test-project');
+    fs.mkdirSync(path.dirname(obsPath), { recursive: true });
+    const lines =
+      Array.from({ length: LAZY_START_THRESHOLD }, (_, i) => JSON.stringify({ i })).join('\n') +
+      '\n';
+    fs.writeFileSync(obsPath, lines, 'utf-8');
+
+    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'no-spawn-env');
+  });
+});

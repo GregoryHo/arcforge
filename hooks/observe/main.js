@@ -10,6 +10,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 
 const {
   getProjectName,
@@ -34,6 +35,8 @@ const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SIGNAL_COOLDOWN_MS = 30000; // 30 seconds between SIGUSR1 signals
 const SIGNAL_TIMESTAMP_FILE = getObserverSignalFile();
+const LAZY_START_THRESHOLD = Number(process.env.ARCFORGE_LAZY_START_THRESHOLD) || 50;
+const SKIP_SPAWN = process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1';
 
 /**
  * Get observations archive directory for a project.
@@ -44,11 +47,31 @@ function getArchiveDir(project) {
 
 const getPidFile = getObserverPidFile;
 
+// Eval harness isolation — observations from eval trial dirs are not real user activity.
+const EVAL_TRIAL_SEGMENT_RE = /\/\.eval-trials\//;
+const EVAL_TRIAL_SUFFIX_RE = /-t\d+-[A-Za-z0-9]{6}$/;
+
+// User-configured skip list — parsed once at module load (hook is a fresh process per event).
+const USER_SKIP_ENTRIES = (process.env.ARCFORGE_OBSERVE_SKIP_PATHS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isSkippedPath(projectRoot) {
+  if (EVAL_TRIAL_SEGMENT_RE.test(projectRoot)) return true;
+  if (EVAL_TRIAL_SUFFIX_RE.test(projectRoot)) return true;
+  for (const entry of USER_SKIP_ENTRIES) {
+    if (projectRoot.includes(entry)) return true;
+  }
+  return false;
+}
+
 function shouldObserve({
   projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   homeDir,
 } = {}) {
   try {
+    if (isSkippedPath(projectRoot)) return false;
     return (
       isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
       isLearningEnabled({ scope: 'global', projectRoot, homeDir })
@@ -292,6 +315,38 @@ function signalDaemon() {
   }
 }
 
+/**
+ * Spawn the observer daemon if observations >= LAZY_START_THRESHOLD and daemon not running.
+ * Non-blocking, silent catch — never throws. Returns a status string for testability:
+ *   'pid-exists' | 'no-file' | 'below-threshold' | 'no-spawn-env' | 'spawned' | 'error'
+ */
+function spawnDaemonIfNeeded(obsPath) {
+  try {
+    const pidFile = getPidFile();
+    if (fs.existsSync(pidFile)) return 'pid-exists';
+    if (!fs.existsSync(obsPath)) return 'no-file';
+
+    const content = fs.readFileSync(obsPath, 'utf-8');
+    const lineCount = content.split('\n').filter((l) => l.trim()).length;
+    if (lineCount < LAZY_START_THRESHOLD) return 'below-threshold';
+
+    if (SKIP_SPAWN) return 'no-spawn-env';
+
+    const daemonScript = path.resolve(
+      __dirname,
+      '../../skills/arc-observing/scripts/observer-daemon.sh',
+    );
+    const child = spawn('bash', [daemonScript, 'start'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    return 'spawned';
+  } catch {
+    return 'error';
+  }
+}
+
 // ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
@@ -369,6 +424,9 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
+    // Lazy-start daemon when enough observations have accumulated.
+    spawnDaemonIfNeeded(obsPath);
+
     // Wake the LLM-curation daemon; statistical auto-trigger retired (Slice A).
     signalDaemon();
   } catch {
@@ -397,6 +455,8 @@ module.exports = {
   getArchiveDir,
   getPidFile,
   shouldObserve,
+  spawnDaemonIfNeeded,
   MAX_INPUT_LENGTH,
   MAX_OUTPUT_LENGTH,
+  LAZY_START_THRESHOLD,
 };

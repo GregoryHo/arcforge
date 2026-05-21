@@ -29,11 +29,12 @@
   ],
   "scripts": {
     "dev": "claude --plugin-dir .",
-    "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills",
+    "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills && npm run test:observer-daemon",
     "test:scripts": "jest",
     "test:hooks": "cd hooks && npm test",
     "test:node": "node tests/node/run-tests.js",
     "test:skills": "python3 -m pytest tests/skills/ -v",
+    "test:observer-daemon": "bash skills/arc-observing/tests/run-tests.sh",
     "test:diary": "node skills/arc-journaling/scripts/diary.js",
     "test:reflect": "node skills/arc-reflecting/scripts/reflect.js",
     "lint": "biome check .",
