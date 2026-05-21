@@ -16,15 +16,15 @@
 // the SOURCE candidate's status.  applyTransition throws for those two actions so
 // callers are forced to handle them separately (creating a new candidate record).
 //
-//  status \ action     | dismiss | approve | materialize | activate | promote | evolve
-//  pending_review      |   ✓     |   ✓     |     ✗       |    ✗     |   ✓     |   ✓
-//  needs_more_evidence |   ✓     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗
-//  approved            |   ✗     |   ✗     |     ✓       |    ✗     |   ✓     |   ✓
-//  materialized        |   ✗     |   ✗     |     ✗       |    ✓     |   ✗     |   ✗
-//  activated           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗
-//  deactivated         |   ✗     |   ✗     |     ✓       |    ✓     |   ✗     |   ✗
-//  dismissed           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗
-//  superseded          |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗
+//  status \ action     | dismiss | approve | materialize | activate | promote | evolve | deactivate
+//  pending_review      |   ✓     |   ✓     |     ✗       |    ✗     |   ✓     |   ✓   |    ✗
+//  needs_more_evidence |   ✓     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
+//  approved            |   ✗     |   ✗     |     ✓       |    ✗     |   ✓     |   ✓   |    ✗
+//  materialized        |   ✗     |   ✗     |     ✗       |    ✓     |   ✗     |   ✗   |    ✗
+//  activated           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✓
+//  deactivated         |   ✗     |   ✗     |     ✓       |    ✓     |   ✗     |   ✗   |    ✗
+//  dismissed           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
+//  superseded          |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
 // ---------------------------------------------------------------------------
 
 // Canonical lifecycle status set (Layer 5 spec — CandidateLifecycleStatus).
@@ -43,6 +43,7 @@ const LIFECYCLE_STATUS = Object.freeze({
 const LIFECYCLE_STATUSES = Object.freeze(Object.values(LIFECYCLE_STATUS));
 
 // Canonical action set (Layer 5 spec — Action × Status matrix columns).
+// DEACTIVATE added in Slice G (Layer 8 extension).
 const LIFECYCLE_ACTION = Object.freeze({
   DISMISS: 'dismiss',
   APPROVE: 'approve',
@@ -50,22 +51,25 @@ const LIFECYCLE_ACTION = Object.freeze({
   ACTIVATE: 'activate',
   PROMOTE: 'promote',
   EVOLVE: 'evolve',
+  DEACTIVATE: 'deactivate',
 });
 
 const ACTIONS = Object.freeze(Object.values(LIFECYCLE_ACTION));
 
 // true  = action is legal from this status
 // false = action must be rejected with policy_violation
-// Index order matches ACTIONS above
+// Index order matches ACTIONS above:
+//   dismiss, approve, materialize, activate, promote, evolve, deactivate
+// deactivate column added in Slice G (Layer 8 extension).
 const MATRIX = {
-  pending_review: [true, true, false, false, true, true],
-  needs_more_evidence: [true, false, false, false, false, false],
-  approved: [false, false, true, false, true, true],
-  materialized: [false, false, false, true, false, false],
-  activated: [false, false, false, false, false, false],
-  deactivated: [false, false, true, true, false, false],
-  dismissed: [false, false, false, false, false, false],
-  superseded: [false, false, false, false, false, false],
+  pending_review: [true, true, false, false, true, true, false],
+  needs_more_evidence: [true, false, false, false, false, false, false],
+  approved: [false, false, true, false, true, true, false],
+  materialized: [false, false, false, true, false, false, false],
+  activated: [false, false, false, false, false, false, true],
+  deactivated: [false, false, true, true, false, false, false],
+  dismissed: [false, false, false, false, false, false, false],
+  superseded: [false, false, false, false, false, false, false],
 };
 
 // Status produced after a legal status-changing action
@@ -75,6 +79,7 @@ const NEXT_STATUS = {
   approve: 'approved',
   materialize: 'materialized',
   activate: 'activated',
+  deactivate: 'deactivated',
 };
 
 /**
