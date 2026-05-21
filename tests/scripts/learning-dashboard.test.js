@@ -1032,5 +1032,11 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
         e.action === 'deactivate',
     );
     expect(deactivateEvents.length).toBe(1);
+
+    // Candidate lifecycle status must read as deactivated
+    const {
+      readCurrentCandidates: rcc,
+    } = require('../../scripts/lib/learning-curator/queue-writer');
+    expect(rcc()[record.candidate_id].lifecycle.status).toBe('deactivated');
   });
 });
