@@ -974,3 +974,63 @@ describe('DH-5: audit log still written on materialize/activate', () => {
     expect(entry.candidate_id).toBe(record.candidate_id);
   });
 });
+
+describe('DH-6: deactivate action calls deactivate.js module', () => {
+  it('deactivate → active file gone, .disabled/ archive exists, exactly 1 deactivate transition event', () => {
+    // Set up: pending_review → approve → materialize → activate
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const matResult = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+    expect(matResult.accepted).toBe(true);
+
+    const actResult = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+    });
+    expect(actResult.accepted).toBe(true);
+
+    // Verify active file exists before deactivate
+    const instinctsBase = path.join(tmpDir, '.arcforge', 'instincts');
+    const scopeDir = record.scope.project_id || 'unknown';
+    const activePath = path.join(instinctsBase, scopeDir, `${record.candidate_id}.md`);
+    expect(fs.existsSync(activePath)).toBe(true);
+
+    // Deactivate
+    const deactResult = handleDashboardAction({
+      action: 'deactivate',
+      candidate_id: record.candidate_id,
+    });
+    expect(deactResult.accepted).toBe(true);
+
+    // Active file should be gone
+    expect(fs.existsSync(activePath)).toBe(false);
+
+    // .disabled/ archive should contain the archived file
+    const disabledDir = path.join(instinctsBase, scopeDir, '.disabled');
+    expect(fs.existsSync(disabledDir)).toBe(true);
+    const disabledFiles = fs.readdirSync(disabledDir);
+    expect(disabledFiles.length).toBeGreaterThan(0);
+    const archivedFile = disabledFiles.find((f) => f.startsWith(record.candidate_id));
+    expect(archivedFile).toBeTruthy();
+
+    // Exactly 1 deactivate transition event in queue.jsonl
+    const queuePath = path.join(tmpDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+    const lines = fs
+      .readFileSync(queuePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+    const deactivateEvents = lines.filter(
+      (e) =>
+        e.event_type === 'candidate.transitioned' &&
+        e.candidate_id === record.candidate_id &&
+        e.action === 'deactivate',
+    );
+    expect(deactivateEvents.length).toBe(1);
+  });
+});

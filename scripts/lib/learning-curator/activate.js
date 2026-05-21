@@ -543,6 +543,47 @@ function deactivate({
 }
 
 // ---------------------------------------------------------------------------
+// findLatestActivation — scan activations dir for the latest activate record
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan learning/activations and return the most recent ActivationRecord with
+ * action === 'activate' for the given candidateId.
+ *
+ * @param {string} arcforgeRoot
+ * @param {string} candidateId
+ * @returns {object|null} ActivationRecord or null if none found
+ */
+function findLatestActivation(arcforgeRoot, candidateId) {
+  const activationsDir = getActivationsDir(arcforgeRoot);
+  if (!fs.existsSync(activationsDir)) return null;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(activationsDir);
+  } catch {
+    return null;
+  }
+
+  let latest = null;
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const recordPath = path.join(activationsDir, entry);
+    try {
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+      if (record.action !== 'activate') continue;
+      if (record.candidate_id !== candidateId) continue;
+      if (!latest || record.created_at > latest.created_at) {
+        latest = record;
+      }
+    } catch {
+      // Corrupted record — skip
+    }
+  }
+  return latest;
+}
+
+// ---------------------------------------------------------------------------
 // findLatestMaterialization — scan candidate drafts dir for the latest record
 // ---------------------------------------------------------------------------
 
@@ -586,5 +627,6 @@ module.exports = {
   deactivate,
   defaultActivationPolicy,
   buildActiveInstinctPath,
+  findLatestActivation,
   findLatestMaterialization,
 };
