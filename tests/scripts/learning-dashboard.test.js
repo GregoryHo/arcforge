@@ -676,7 +676,15 @@ describe('HTML — statistical-pipeline dead code removed (criterion 4)', () => 
     const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
-    for (const action of ['dismiss', 'approve', 'materialize', 'activate', 'deactivate', 'promote', 'evolve']) {
+    for (const action of [
+      'dismiss',
+      'approve',
+      'materialize',
+      'activate',
+      'deactivate',
+      'promote',
+      'evolve',
+    ]) {
       expect(html).toMatch(new RegExp(`${action}:\\s*'[A-Z][a-z]+'`));
       expect(html).toMatch(new RegExp(`${action}:\\s*\\[[^\\]]+\\]`));
     }
