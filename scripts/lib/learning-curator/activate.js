@@ -193,9 +193,10 @@ function makeActivationFailure(opts) {
 /**
  * Activate a materialized candidate — writes active instinct file.
  *
- * @param {{ candidate, materializationRecord, activationRequest, activationPolicy, arcforgeRoot }}
- * @returns {{ ok: true, record: ActivationRecord, activeArtifacts: ActiveArtifactRecord[] } |
- *           { ok: false, failure: ActivationFailureRecord }}
+ * @param {object} opts
+ * @returns {object} `{ ok: true, record, activeArtifacts }` on success;
+ *                   `{ ok: false, failure }` on validation/write failure.
+ *                   See layer-8-activation-runtime-influence-surface.md for full record shapes.
  */
 function activate({
   candidate,
@@ -413,9 +414,10 @@ function activate({
 /**
  * Deactivate an activated candidate — moves active file to .disabled/ archive.
  *
- * @param {{ candidate, activationRecord, activationRequest, activationPolicy, arcforgeRoot }}
- * @returns {{ ok: true, record: ActivationRecord, activeArtifacts: ActiveArtifactRecord[] } |
- *           { ok: false, failure: ActivationFailureRecord }}
+ * @param {object} opts
+ * @returns {object} `{ ok: true, record, activeArtifacts }` on success;
+ *                   `{ ok: false, failure }` on validation/write failure.
+ *                   See layer-8-activation-runtime-influence-surface.md for full record shapes.
  */
 function deactivate({
   candidate,

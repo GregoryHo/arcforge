@@ -294,9 +294,10 @@ function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, p
 /**
  * Materialize an approved candidate into an inactive draft artifact.
  *
- * @param {{ candidate, sourceActionId, requestedArtifactType, reviewerNote, renderPolicy, arcforgeRoot }} opts
- * @returns {{ ok: true, record: MaterializationRecord, draftPaths: string[] } |
- *           { ok: false, failure: MaterializationFailureRecord }}
+ * @param {object} opts
+ * @returns {object} `{ ok: true, record, draftPaths }` on success;
+ *                   `{ ok: false, failure }` on validation/write failure.
+ *                   See layer-7-materialization.md for full record shapes.
  */
 function materialize({
   candidate,

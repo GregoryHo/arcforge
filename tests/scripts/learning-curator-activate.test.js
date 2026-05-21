@@ -66,7 +66,6 @@ function makeCandidateRecord(overrides = {}) {
 let tmpDir;
 let homedirSpy;
 let materializeModule;
-let _activateModule;
 let activate;
 let deactivate;
 let defaultActivationPolicy;
