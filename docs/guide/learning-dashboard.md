@@ -36,42 +36,47 @@ Each candidate moves through a defined set of statuses. The dashboard enforces t
 |---|---|---|
 | **Dismiss** | `pending_review`, `needs_more_evidence` | Closes the candidate without writing artifacts |
 | **Approve** | `pending_review` | Marks the analysis as correct; enables materialization |
-| **Materialize** | `approved`, `deactivated` | Writes `.draft` artifact files (inactive) |
-| **Activate** | `materialized`, `deactivated` | Promotes draft artifacts to active files |
+| **Materialize** | `approved`, `deactivated` | Writes inactive draft to `~/.arcforge/learning/drafts/<cid>/<mid>/instincts/<name>.md` |
+| **Activate** | `materialized`, `deactivated` | Copies the draft to the active path `~/.arcforge/instincts/<scope>/<cid>.md` |
 | **Promote** | `pending_review`, `approved` | Creates a new global-scope candidate from this project candidate |
 | **Evolve** | `pending_review`, `approved` | Creates a revised successor candidate |
 | **Deactivate** | `activated` | Turns off a previously activated candidate |
 
 **Promote and Evolve** create a new candidate record — they do not change the source candidate's status. Promotion to global scope always requires this explicit action; silent auto-promotion is not supported.
 
-## CLI Alternative
+## Legacy CLI (pre-pivot data — not equivalent to dashboard)
 
-The dashboard UI dispatches the same actions available via CLI subcommands:
+The `arcforge learn ...` subcommands below remain in the CLI for backward compatibility with older instinct-clustering tests, but they read and write the **pre-pivot** legacy data model in `scripts/lib/learning.js`. They do not interact with the post-pivot `queue.jsonl` candidate queue or the Layer 7 / Layer 8 modules that back the dashboard. **Use the dashboard for v3.1 workflows.**
 
-| Dashboard action | CLI equivalent |
-|---|---|
-| View candidates | `arcforge learn review --project` |
-| Check inbox | `arcforge learn inbox --project` |
-| Approve | `arcforge learn approve <id> --project` |
-| Reject/Dismiss | `arcforge learn reject <id> --project` |
-| Materialize | `arcforge learn materialize <id> --project` |
-| Inspect | `arcforge learn inspect <id> --project` |
-| List drafts | `arcforge learn drafts --project` |
-| Activate | `arcforge learn activate <id> --project` |
-
-Use `--json` on any CLI command for machine-readable output.
+- `arcforge learn analyze --project` — retired (exits with deprecation notice)
+- `arcforge learn review|inbox|inspect|drafts --project` — legacy read commands; show pre-pivot data only
+- `arcforge learn approve|reject <id> --project` — legacy transitions; do not affect dashboard candidates
+- `arcforge learn materialize <id> --project` — writes project-relative `.draft` siblings (legacy paths)
+- `arcforge learn activate <id> --project` — legacy activation; does not call the post-pivot Layer 8 gate
 
 ## Storage
 
 ```
-~/.arcforge/learning/
-├── candidates/
-│   └── queue.jsonl         # Append-only candidate queue (Layer 5)
-└── dashboard/
-    └── actions.jsonl       # Append-only audit log of every dashboard action
+~/.arcforge/
+├── learning/
+│   ├── candidates/
+│   │   └── queue.jsonl           # Append-only Layer 5 candidate queue
+│   ├── drafts/
+│   │   └── <cid>/<mid>/instincts/<name>.md   # Layer 7 inactive draft artifacts
+│   ├── activations/
+│   │   └── <activation-id>.json  # Layer 8 activation records
+│   └── dashboard/
+│       └── actions.jsonl         # Append-only audit log of dashboard actions
+└── instincts/
+    ├── <project>/
+    │   ├── <cid>.md              # Active project-scoped instinct (Layer 8 output)
+    │   └── .disabled/<cid>-<ts>.md  # Archive of deactivated instincts
+    └── global/
+        ├── <cid>.md              # Active global-scoped instinct
+        └── .disabled/<cid>-<ts>.md
 ```
 
-The dashboard never writes active skill or instinct files directly. Materialization (Layer 7) and activation (Layer 8) are separate steps that write draft files and then promote them.
+The dashboard never writes active instinct files directly. Materialization (Layer 7) writes drafts under `~/.arcforge/learning/drafts/` only; activation (Layer 8) is the sole layer that writes under `~/.arcforge/instincts/`, and only on explicit `[Activate]` action with a reviewer acknowledgement.
 
 ## Privacy Invariants
 
@@ -96,13 +101,14 @@ arcforge learn status
 `arcforge learn analyze` was retired in v3.1. The statistical analyzer has been replaced by the observer daemon's LLM curator (Layers 3+4). Candidates are queued automatically once learning is enabled — no manual trigger is needed.
 
 ### Activating without inspecting drafts
-Activation is irreversible in one step. Inspect the materialized `.draft` files before activating:
+Activation copies the draft to the active path. Before clicking `[Activate]`, inspect the materialized draft on disk:
 ```bash
-arcforge learn inspect <candidate-id> --project
-arcforge learn drafts --project
+ls ~/.arcforge/learning/drafts/<candidate-id>/
+cat ~/.arcforge/learning/drafts/<candidate-id>/<materialization-id>/instincts/<name>.md
 ```
+Deactivation moves the active file to a `.disabled/` backup archive, so you can reactivate later if needed.
 
 ### Confusing Approve with Activate
 **Approve** only authorizes materialization — no file is written yet.
-**Materialize** writes inactive `.draft` files.
-**Activate** is the only action that changes active session behavior by promoting drafts to live artifacts.
+**Materialize** writes the inactive draft under `~/.arcforge/learning/drafts/<cid>/<mid>/`.
+**Activate** is the only action that produces an active artifact under `~/.arcforge/instincts/<scope>/`. Even after activation, instincts are **not** auto-loaded into Claude context at SessionStart — they surface through dashboard, `/recall`, and explicit Read tool calls only.

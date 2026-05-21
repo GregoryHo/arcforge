@@ -44,9 +44,8 @@ The observer daemon is a four-layer orchestrator:
 2. **Batch assembly** (Layer 3): Daemon calls `node $CURATOR_CLI assemble-batch --project` to gather recent observation windows into a structured batch
 3. **LLM curation** (Layer 4): Daemon invokes `claude --model haiku --max-turns 15 --print --output-format json --json-schema` with the batch. The LLM curator produces structured candidate proposals rather than direct instinct file writes
 4. **Ingestion** (Layer 5): Daemon calls `node $CURATOR_CLI ingest-proposal --batch-id --response-file` to parse the LLM response and append candidates to the review queue at `~/.arcforge/learning/candidates/queue.jsonl`
-5. **Loading**: Session start loads instincts with confidence >= 0.7 into Claude context
 
-The daemon never writes instinct `.md` files directly. All candidate proposals flow through the LLM curator and land in the review queue for human review via `arcforge learn dashboard`.
+The daemon never writes instinct `.md` files directly, and SessionStart never auto-loads instinct bodies into Claude context. All candidate proposals flow through the LLM curator into the review queue; human review via `arcforge learn dashboard` is the only path that produces active instinct files (Layer 8 activation), and activated instincts are surfaced through dashboard / history / evolve flows rather than runtime auto-injection.
 
 ## Instinct Format
 
@@ -99,13 +98,15 @@ Always use Grep to find the exact location before using Edit.
 
 ## Confidence Lifecycle
 
+Confidence is metadata stored on the candidate / activated instinct record. It does **not** drive runtime auto-loading (Slice A removed SessionStart auto-load). It informs which records to surface in dashboard / `/recall` / history views.
+
 ```
 Auto-detected by daemon: confidence 0.5
 Confirmed → +0.05 (cap 0.9)
 Contradicted → -0.10 (floor 0.1), -0.05 for manual/reflection sources
 No activity → -0.02/week, -0.01/week for manual/reflection sources
 
->= 0.7 → Auto-loaded into Claude context
+>= 0.7 → Surfaced prominently in dashboard / /recall
 0.3-0.7 → Listed as summary
 < 0.3 → Silent
 < 0.15 → Archived (moved to archived/ subdir)
