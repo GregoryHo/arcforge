@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — v3.1.0
+
+**Learning Curator 3.1 pivot: LLM-curation replaces statistical pipeline.** The observer daemon's statistical analyzer is retired. In its place, the daemon now orchestrates a four-layer pipeline: Layer 3 assembles batches of sanitized observations, Layer 4 calls the Haiku LLM curator with `--json-schema` structured output to generate candidate proposals, Layer 5 ingests proposals into the persistent candidate queue, and Layer 6 (the new dashboard) provides the browser-based control plane for human review. The dashboard replaces the pre-pivot `arcforge learn analyze` command as the entry point for the learning workflow. All three authorization gates — approve, materialize, activate — remain intact; no candidate changes active session behavior without explicit human action.
+
+### Added
+
+- **Learning dashboard control plane** (`scripts/lib/learning-dashboard.js`, port 3334). Browser-based reviewer UI with an allowlist-based wire model (raw evidence, full payloads, and project identifiers are never served). Per-session write token guards all `POST` action requests. Standard security headers on all responses. The dashboard dispatches all seven lifecycle actions (dismiss, approve, materialize, activate, promote, evolve, deactivate) via the Layer 5 Action × Status legality matrix.
+- **Layer 5 lifecycle state machine** (`scripts/lib/learning-curator/lifecycle.js`). Canonical Action × Status matrix as a pure stateless module. Exports `LIFECYCLE_STATUS`, `LIFECYCLE_ACTION`, `ACTIONS`, `isLegalAction`, `applyTransition`. The promote and evolve actions create new candidate records rather than transitioning the source — callers handle them separately.
+- **Layer 7 materialization** (`scripts/lib/learning-curator/materialize.js`). Writes `.draft` artifact files for approved candidates. Inactive drafts are readable but not routed on by the skill system.
+- **Layer 8 activation/deactivation** (`scripts/lib/learning-curator/activate.js`). Promotes materialized drafts to active artifact files. Deactivation path added (Slice G). Activation fails closed if drafts are missing or active files already exist.
+- **`docs/guide/learning-dashboard.md`** — new user-facing operational guide covering dashboard startup, candidate statuses, available actions, CLI equivalents, storage layout, privacy invariants, security model, and common mistakes.
+- **`arcforge learn dashboard [--port N]`** subcommand (`scripts/cli.js`). Starts the local dashboard server; default port 3334.
+
+### Changed
+
+- **`arc-learning` SKILL.md updated** for dashboard-first flow. Quick Reference adds the dashboard command as the primary review entry point. Retired `arcforge learn analyze --project` documented explicitly as deprecated (statistical analyzer retired in v3.1). Candidate lifecycle status table added. Global promotion reframed: silent auto-promotion remains unsupported; the dashboard Promote action is the supported path and requires explicit user authorization.
+- **`arc-observing` SKILL.md updated** to reflect post-pivot daemon contract. "How Observations Work" section now describes the four-layer orchestration (capture → batch assembly → LLM curation → ingestion). Direct `.md` instinct file writes by the daemon are retired — all proposals flow through the LLM curator into the candidate queue. Daemon safety section added covering the `.analyzing.lock` re-entrancy guard (30-min stale TTL), 120s watchdog, and `ARCFORGE_OBSERVE_SKIP_PATHS` / `.eval-trials/` skip filter.
+- **Observer daemon** (`skills/arc-observing/scripts/observer-daemon.sh`) retires direct instinct writes. Layer 3 now calls `node $CURATOR_CLI assemble-batch --project`; Layer 4 calls `claude --model haiku --max-turns 15 --print --output-format json --json-schema`; Layer 5 calls `node $CURATOR_CLI ingest-proposal` to route the structured response into the candidate queue.
+
+### Deprecated
+
+- **`arcforge learn analyze`** exits with code 1 and the message: "arc learn analyze is deprecated. The statistical analyzer has been retired; candidate review now lives in the dashboard. Run: arc learn dashboard". The command remains registered in the CLI so users see a helpful migration message rather than "unknown command."
+
 ## [3.0.1] - 2026-05-06
 
 **Vault interface refinement + skill-authoring authority consolidation.** Patch follow-up to v3.0.0 that closes two architectural cleanups the rc.2 → 3.0.0 promotion didn't have time to land. (1) `arc-maintaining-obsidian` finishes the journey from "single-vault wiki maintainer" to true **vault interface** — the skill now resolves to a chosen vault's *paired contract* (`AGENTS.md` runtime + `SCHEMA.md` domain schema), `references/` files describe mechanism only, the vault contract wins where they overlap (Schema Authority rule, locked verbatim across all four presets — `minimal`, `llm-wiki`, `news`, `project-tracker`), and `init-vault` presets are reframed as *one-shot authoring guidance, not stamping templates*. The skill is now genuinely domain-agnostic: same three modes (ingest / query / audit) serve a Karpathy LLM-Wiki, a project tracker, a news pipeline, or a journal vault, dispatched by the vault's own contract. (2) Skill-authoring rules consolidated — `arc-writing-skills` becomes the single canonical authority and `.claude/rules/skills.md` shrinks to a 21-line contributor pointer. Frontmatter rule relaxed: previously `name` + `description` were the only allowed fields, now four optional fields (`argument-hint`, `allowed-tools`, `disable-model-invocation`, `user-invocable`) are documented with use cases, so skills can earn UX (`argument-hint` for CLI surfaces) and security (`allowed-tools` for read-only skills) at the skill layer instead of relying on the harness default.

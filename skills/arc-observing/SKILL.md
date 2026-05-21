@@ -7,7 +7,7 @@ description: Use when user asks about behavioral patterns, requests instinct sta
 
 ## Overview
 
-Manage automatically detected behavioral patterns (instincts) from tool usage observations. The observer daemon runs in the background, analyzing tool call patterns and creating instincts — atomic behavioral rules with confidence scores.
+Manage automatically detected behavioral patterns (instincts) from tool usage observations. The observer daemon runs in the background as an orchestrator: it captures tool-call observations, assembles batches, calls the LLM curator to generate candidate proposals, and ingests those proposals into the learning queue. Confirmed instincts are loaded as behavioral guidance at session start.
 
 **Three layers in arcforge — this skill handles Behavioral:**
 - **Behavioral (instincts)** — auto-detected from tool usage patterns (this skill). Focuses on tool-usage workflow patterns only. User preferences and project context are handled by Claude Code's native auto-memory.
@@ -38,11 +38,15 @@ fi
 
 ## How Observations Work
 
+The observer daemon is a four-layer orchestrator:
+
 1. **Capture**: `hooks/observe/main.js` records every tool call to `~/.arcforge/observations/{project}/observations.jsonl`
-2. **Analysis**: Background daemon reads observations (10+ required), calls Haiku to detect patterns
-3. **Creation**: Instincts saved as `.md` files with YAML frontmatter in `~/.arcforge/instincts/{project}/`
-4. **Loading**: Session start loads instincts with confidence >= 0.7 into Claude context
-5. **Lifecycle**: Confirm (+0.05) / Contradict (-0.10, -0.05 for manual/reflection) / Decay (-0.02/week, -0.01 for manual/reflection) / Archive (< 0.15)
+2. **Batch assembly** (Layer 3): Daemon calls `node $CURATOR_CLI assemble-batch --project` to gather recent observation windows into a structured batch
+3. **LLM curation** (Layer 4): Daemon invokes `claude --model haiku --max-turns 15 --print --output-format json --json-schema` with the batch. The LLM curator produces structured candidate proposals rather than direct instinct file writes
+4. **Ingestion** (Layer 5): Daemon calls `node $CURATOR_CLI ingest-proposal --batch-id --response-file` to parse the LLM response and append candidates to the review queue at `~/.arcforge/learning/candidates/queue.jsonl`
+5. **Loading**: Session start loads instincts with confidence >= 0.7 into Claude context
+
+The daemon never writes instinct `.md` files directly. All candidate proposals flow through the LLM curator and land in the review queue for human review via `arcforge learn dashboard`.
 
 ## Instinct Format
 
@@ -72,7 +76,7 @@ Always use Grep to find the exact location before using Edit.
 ## Storage
 
 ```
-~/.claude/
+~/.arcforge/
 ├── observations/{project}/
 │   ├── observations.jsonl          # Current (append-only)
 │   └── archive/                    # Processed observations
@@ -81,10 +85,16 @@ Always use Grep to find the exact location before using Edit.
 │   ├── {project}/
 │   │   ├── grep-before-edit.md     # Atomic instincts
 │   │   └── archived/               # Decayed instincts
-│   ├── global/                     # Cross-project (auto-promoted)
+│   ├── global/                     # Cross-project (promoted via dashboard)
 │   ├── global-index.jsonl          # Bubble-up tracking
 │   ├── config.json                 # Observer configuration
 │   └── .observer.pid               # Daemon PID file
+│
+└── learning/
+    ├── candidates/
+    │   └── queue.jsonl             # LLM curator output (pending review)
+    └── dashboard/
+        └── actions.jsonl           # Dashboard action audit log
 ```
 
 ## Confidence Lifecycle
@@ -100,6 +110,12 @@ No activity → -0.02/week, -0.01/week for manual/reflection sources
 < 0.3 → Silent
 < 0.15 → Archived (moved to archived/ subdir)
 ```
+
+## Daemon Safety
+
+- **Re-entrancy guard**: The daemon checks for a `.analyzing.lock` file with a 30-minute stale TTL before running the LLM curator. Concurrent daemon runs are blocked automatically.
+- **Watchdog**: A `OBSERVER_DAEMON_WATCHDOG_SECS` (default 120s) timeout prevents hung LLM curator calls from blocking subsequent runs.
+- **Skip filter**: `ARCFORGE_OBSERVE_SKIP_PATHS` and `.eval-trials/` paths are excluded from observation capture to prevent eval noise from polluting the learning queue.
 
 ## When to Use
 
@@ -142,7 +158,7 @@ When user agrees or disagrees with a pattern:
 
 ### Bubble-up to Global
 
-Patterns appearing in 2+ projects are auto-promoted to `~/.arcforge/instincts/global/`. At session start, user is notified of newly promoted global patterns.
+Patterns appearing in 2+ projects can be promoted to `~/.arcforge/instincts/global/` via the dashboard Promote action. The Promote action requires explicit user authorization — silent auto-promotion is not supported.
 
 ## Common Mistakes
 

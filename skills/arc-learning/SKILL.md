@@ -9,47 +9,69 @@ description: Use when optional learning is enabled and observations should becom
 
 `arc-learning` turns repeated project observations into reviewable learning candidates. Learning is **disabled by default**, **automatic once enabled**, and conservative at every behavior-change boundary.
 
-**Position:** `observations → automatic analyzer → candidate queue → human review → inactive drafts → explicit activation → active artifacts`
+**Position:** `observations → candidate queue → dashboard review → inactive drafts → explicit activation → active artifacts`
 
-The default scope is project-local. Global materialization/activation is unsupported in this MVP; cross-project or global patterns should be proposed as promotion candidates, not silently promoted.
+The primary interface for reviewing and acting on candidates is the **dashboard** (`arcforge learn dashboard`). Candidates are queued automatically by the observer daemon's LLM curator; the dashboard is where the human reviewer approves, dismisses, materializes, activates, promotes, or deactivates them.
+
+The default scope is project-local. Promotion to global scope is an explicit dashboard action; silent auto-promotion to global remains unsupported — the dashboard's Promote action is the only path, and it requires explicit user authorization.
 
 ## Quick Reference
 
 | Task | Command |
 |---|---|
-| Check config | `arcforge learn status --json` |
+| Check config | `arcforge learn status [--json]` |
 | Enable project learning | `arcforge learn enable --project` |
 | Disable project learning | `arcforge learn disable --project` |
-| Manually run analyzer | `arcforge learn analyze --project` |
-| Review queued candidates | `arcforge learn review --project` |
+| Open review dashboard | `arcforge learn dashboard [--port N]` |
+| Review queued candidates (CLI) | `arcforge learn review --project` |
+| Check pending inbox | `arcforge learn inbox --project` |
 | Approve a candidate | `arcforge learn approve <candidate-id> --project` |
 | Reject a candidate | `arcforge learn reject <candidate-id> --project` |
 | Write inactive draft artifacts | `arcforge learn materialize <candidate-id> --project` |
 | Inspect candidate and artifact state | `arcforge learn inspect <candidate-id> --project` |
 | List materialized drafts | `arcforge learn drafts --project` |
-| Promote reviewed drafts | `arcforge learn activate <candidate-id> --project` |
+| Promote reviewed drafts to active | `arcforge learn activate <candidate-id> --project` |
 
 Use `--json` on any command when another tool or test needs machine-readable output.
 
+### Retired / Deprecated
+
+- `arcforge learn analyze --project` — the statistical analyzer has been retired in v3.1. The statistical pipeline is replaced by the LLM curator (observer daemon Layer 3+4). Run `arcforge learn dashboard` instead.
+
 ## Workflow
 
-1. **Confirm enablement.** Run `arcforge learn status --json`. Learning is disabled by default for both project and global scopes.
-2. **Enable only when requested.** Run `arcforge learn enable --project` for project-local learning. After enablement, the observe hook may automatically append sanitized observations and trigger the lightweight analyzer.
-3. **Automatic candidate queueing.** Once enabled, repeated release-flow observations can be queued as a **pending candidate**. The automatic trigger only appends candidate records; it does not approve, materialize, activate, tag, push, publish, or change runtime behavior.
-4. **Review.** Run `arcforge learn review --project` and inspect the summary, trigger, confidence, and redacted evidence.
-5. **Approve or reject.** Run `arcforge learn approve <candidate-id> --project` or `arcforge learn reject <candidate-id> --project`. Approval is required before any artifact is written.
-6. **Materialize as inactive drafts.** Run `arcforge learn materialize <candidate-id> --project`. This writes `.draft` files only, for example `skills/arc-releasing/SKILL.md.draft` and `tests/skills/test_skill_arc_releasing.py.draft`.
+1. **Confirm enablement.** Run `arcforge learn status [--json]`. Learning is disabled by default for both project and global scopes.
+2. **Enable only when requested.** Run `arcforge learn enable --project` for project-local learning. After enablement, the observer daemon assembles evidence batches, calls the LLM curator, and automatically queues **pending candidates** in the candidate queue.
+3. **Automatic candidate queueing.** Once enabled, the daemon's LLM curator converts batched observations into pending candidates. The automatic trigger only appends candidate records; it does not approve, materialize, activate, tag, push, publish, or change runtime behavior.
+4. **Review via dashboard.** Run `arcforge learn dashboard` to open the browser control plane at `localhost:3334`. Alternatively, run `arcforge learn review --project` for a CLI summary of pending candidates.
+5. **Approve or dismiss.** Use the dashboard Approve or Dismiss action, or run `arcforge learn approve <candidate-id> --project` / `arcforge learn reject <candidate-id> --project`. Approval is required before any artifact is written.
+6. **Materialize as inactive drafts.** Use the dashboard Materialize action, or run `arcforge learn materialize <candidate-id> --project`. This writes `.draft` files only — for example `skills/arc-releasing/SKILL.md.draft` — which are readable but not active.
 7. **Inspect before activation.** Run `arcforge learn inspect <candidate-id> --project` or `arcforge learn drafts --project`. Inspection is read-only and review-safe.
-8. **Explicit activation.** Run `arcforge learn activate <candidate-id> --project` only after reviewing the draft artifacts. Activation promotes drafts to active artifacts and fails closed if drafts are missing or active files already exist.
+8. **Explicit activation.** Use the dashboard Activate action, or run `arcforge learn activate <candidate-id> --project` only after reviewing the draft artifacts. Activation promotes drafts to active artifacts and fails closed if drafts are missing or active files already exist.
+
+## Candidate Lifecycle Statuses
+
+The full set of statuses a candidate moves through:
+
+| Status | Meaning |
+|---|---|
+| `pending_review` | Queued by LLM curator, awaiting human review |
+| `needs_more_evidence` | Flagged for more evidence before approval |
+| `approved` | Human-approved, ready to materialize |
+| `materialized` | `.draft` artifacts written, ready to activate |
+| `activated` | Draft artifacts promoted to active |
+| `deactivated` | Previously activated, now deactivated |
+| `dismissed` | Rejected; no artifacts written |
+| `superseded` | Replaced by an evolved candidate |
 
 ## Key Principles
 
 - **No active behavior change without explicit activation.** Pending candidates and inactive drafts do not affect runtime behavior.
-- **Project scope first.** Project learning writes project-local config, queues, and drafts. Global materialization and activation are unsupported in this MVP.
-- **Human authorization at gates.** Automatic analysis may propose; users approve/reject, materialize, and activate.
+- **Project scope first.** Project learning writes project-local config, queues, and drafts. Promotion to global scope is an explicit dashboard action; silent auto-promotion to global remains unsupported.
+- **Human authorization at gates.** The LLM curator proposes; users approve/reject, materialize, and activate via dashboard or CLI.
 - **Redacted durable evidence.** Observations are sanitized before persistence; candidate evidence stores review-safe summaries, not raw tool payloads.
 - **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and refuses to overwrite existing active artifacts.
-- **Duplicate suppression.** Analyzer reruns should not append semantic duplicate candidates for the same learned behavior.
+- **Duplicate suppression.** The curator should not append semantic duplicate candidates for the same learned behavior.
 
 ## When to Use
 
@@ -62,8 +84,7 @@ Use `--json` on any command when another tool or test needs machine-readable out
 
 - Learning has not been explicitly enabled.
 - The user wants to save a single known preference or fact; use the appropriate memory/skill workflow instead.
-- The pattern is not supported by the current analyzer; keep it as a manual plan or skill change.
-- The candidate would require global activation; global activation is unsupported in this MVP.
+- The pattern is not supported by the current learning system; keep it as a manual plan or skill change.
 - The action would perform a destructive release step such as tag, push, package publish, or GitHub release creation without explicit user approval.
 
 ## Legacy Compatibility
