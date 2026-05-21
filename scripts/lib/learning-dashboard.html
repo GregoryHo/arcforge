@@ -61,12 +61,13 @@
       const refreshEl = document.getElementById('refresh');
       const countsEl = document.getElementById('counts');
 
-      const ACTION_LABELS = { dismiss: 'Dismiss', approve: 'Approve', materialize: 'Materialize', activate: 'Activate', promote: 'Promote', evolve: 'Evolve' };
+      const ACTION_LABELS = { dismiss: 'Dismiss', approve: 'Approve', materialize: 'Materialize', activate: 'Activate', deactivate: 'Deactivate', promote: 'Promote', evolve: 'Evolve' };
       const ACTION_AVAILABLE_FROM = {
         dismiss: ['pending_review', 'needs_more_evidence'],
         approve: ['pending_review'],
         materialize: ['approved', 'deactivated'],
         activate: ['materialized', 'deactivated'],
+        deactivate: ['activated'],
         promote: ['pending_review', 'approved'],
         evolve: ['pending_review', 'approved'],
       };

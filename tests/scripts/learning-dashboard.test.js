@@ -671,6 +671,16 @@ describe('HTML — statistical-pipeline dead code removed (criterion 4)', () => 
     // Should have action buttons defined
     expect(html).toMatch(/dismiss|approve|promote/i);
   });
+
+  it('HTML exposes every lifecycle action in ACTION_LABELS and ACTION_AVAILABLE_FROM', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    for (const action of ['dismiss', 'approve', 'materialize', 'activate', 'deactivate', 'promote', 'evolve']) {
+      expect(html).toMatch(new RegExp(`${action}:\\s*'[A-Z][a-z]+'`));
+      expect(html).toMatch(new RegExp(`${action}:\\s*\\[[^\\]]+\\]`));
+    }
+  });
 });
 
 // ===========================================================================
