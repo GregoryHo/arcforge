@@ -189,12 +189,14 @@ try {
 
   const { sourceCandidateId, homeDir } = JSON.parse(fs.readFileSync(ctxPath, 'utf8'));
 
-  // Invoke the dashboard evolve action
-  const { applyDashboardAction } = require(path.join(projectRoot, 'scripts/lib/learning-dashboard.js'));
-  const result = applyDashboardAction({
-    candidateId: sourceCandidateId,
+  // Invoke the dashboard evolve action.
+  // The real export is `handleDashboardAction` with `candidate_id` snake_case
+  // and no homeDir param — the function uses os.homedir() at call time which
+  // we've redirected via `process.env.HOME = trialDir` above.
+  const { handleDashboardAction } = require(path.join(projectRoot, 'scripts/lib/learning-dashboard.js'));
+  const result = handleDashboardAction({
+    candidate_id: sourceCandidateId,
     action: 'evolve',
-    homeDir,
   });
 
   if (!result || !result.accepted) {

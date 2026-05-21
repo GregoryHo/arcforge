@@ -126,10 +126,14 @@ try {
   emit('A2', a2, a2 ? '' : `shouldObserve returned ${a2Result} for trial-suffix path — should be false`);
   if (!a2) allPass = false;
 
-  // A3: normal project path — should return true (learning is enabled for trialDir)
-  const a3Result = shouldObserve({ projectRoot: trialDir, homeDir: trialDir });
+  // A3: normal project path — should return true (learning is enabled in HOME config).
+  // Must NOT use trialDir itself: the eval harness places trials under
+  // `.eval-trials/<scenario>-tN-XXXXXX/` — that path matches BOTH skip patterns
+  // (eval-trials segment + trial suffix). Use a synthetic non-skipped path instead.
+  const synthNormalPath = `/tmp/eval-trial-obs-exclusion-positive-control-${process.pid}`;
+  const a3Result = shouldObserve({ projectRoot: synthNormalPath, homeDir: trialDir });
   const a3 = a3Result === true;
-  emit('A3', a3, a3 ? '' : `shouldObserve returned ${a3Result} for normal path — should be true when learning enabled`);
+  emit('A3', a3, a3 ? '' : `shouldObserve returned ${a3Result} for synthetic non-eval-trial path ${synthNormalPath} — should be true when learning enabled in HOME`);
   if (!a3) allPass = false;
 
 } catch (err) {
