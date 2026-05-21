@@ -310,16 +310,18 @@ done
 # Actually: simplest approach — stub only 'claude' to emit known JSON.
 # Let node calls go to real node (ARCFORGE_ROOT is set to repo root).
 
-# Known CandidateProposalPayload that the stub 'claude' will emit.
-# Using a simplified payload that matches the required schema shape.
+# Slice E.2b: daemon calls claude with `--output-format json --json-schema ...`,
+# so the response file is a CLI envelope whose .structured_output holds the payload.
+# The stub mimics that envelope shape — proposal-ingestor.js extracts structured_output.
 STUB_PAYLOAD='{"schema_version":1,"source":{"layer":4,"curator":"llm","run_id":"curator_run_20260521T030000Z_aabbccddee11","created_at":"2026-05-21T03:00:00.000Z","batch_id":"STUB_BATCH","batch_hash":"STUB_HASH","prompt_policy_version":"v1","output_schema_version":1},"proposals":[{"proposal_index":0,"artifact_type":"instinct","proposed_scope":{"kind":"project","project_id":"proj_abc123456789ab"},"name":"e2-test-instinct","summary":"Test instinct from E2 stub","rationale":"Observed in E2 test fixture","domain":"workflow","body":"When in E2 test, always write tests first.","body_source":"llm_curator","evidence_refs":[],"llm_confidence":"medium","risk_notes":[],"uncertainty_notes":[],"recommended_review_action":"review"}]}'
+STUB_ENVELOPE='{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"duration_ms":100,"result":"stub success","structured_output":'$STUB_PAYLOAD'}'
 
-# Stub claude that outputs the stub payload (ignores --max-turns, --print, etc.)
+# Stub claude that emits the CLI envelope (matches --output-format json + --json-schema)
 cat > "${STUB_BIN_G3}/claude" << STUB_EOF
 #!/usr/bin/env bash
-# Consume stdin (prompt file piped in), emit the known payload
+# Consume stdin (prompt file piped in), emit the known envelope
 cat > /dev/null
-printf '%s\n' '$STUB_PAYLOAD'
+printf '%s\n' '$STUB_ENVELOPE'
 STUB_EOF
 chmod +x "${STUB_BIN_G3}/claude"
 

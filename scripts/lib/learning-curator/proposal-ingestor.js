@@ -294,19 +294,44 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
     raw_response_saved: false,
   };
 
-  // Parse response
-  let payload;
+  // Parse response. Daemon uses `claude --output-format json --json-schema ...`
+  // so rawResponse is a CLI envelope; the actual CandidateProposalPayload lives
+  // under .structured_output. (Pre-Slice-E.2b ingestors expected the raw payload
+  // at the top level — that path is removed since the daemon never emits it now.)
+  let envelope;
   try {
-    payload = JSON.parse(rawResponse);
+    envelope = JSON.parse(rawResponse);
   } catch {
     runManifest.parse_status = 'malformed_json';
+    runManifest.detail = 'envelope JSON parse failed';
     persistRunManifest(runManifest, homeDir);
     return { run_id: runId, parse_status: 'malformed_json', accepted: 0, rejected: 0 };
   }
 
-  // Must be a non-null object
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope)) {
     runManifest.parse_status = 'non_object';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'non_object', accepted: 0, rejected: 0 };
+  }
+
+  // CLI envelope error signal — model timeout, API error, schema-validation reject.
+  if (envelope.is_error === true || envelope.subtype === 'error') {
+    runManifest.parse_status = 'transport_error';
+    runManifest.detail = envelope.api_error_status || envelope.subtype || 'cli reported error';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'transport_error', accepted: 0, rejected: 0 };
+  }
+
+  const payload = envelope.structured_output;
+  if (payload === undefined || payload === null) {
+    runManifest.parse_status = 'malformed_json';
+    runManifest.detail = 'envelope missing structured_output field';
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'malformed_json', accepted: 0, rejected: 0 };
+  }
+  if (typeof payload !== 'object' || Array.isArray(payload)) {
+    runManifest.parse_status = 'non_object';
+    runManifest.detail = 'structured_output is not an object';
     persistRunManifest(runManifest, homeDir);
     return { run_id: runId, parse_status: 'non_object', accepted: 0, rejected: 0 };
   }
