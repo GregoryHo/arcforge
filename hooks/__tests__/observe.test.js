@@ -4,53 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-describe('observe: truncate', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    process.env.CLAUDE_SESSION_ID = 'test-observe-session';
-    delete require.cache[require.resolve('../observe/main')];
-    delete require.cache[require.resolve('../../scripts/lib/utils')];
-    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
-  });
-
-  afterEach(() => {
-    for (const key of Object.keys(process.env)) delete process.env[key];
-    Object.assign(process.env, originalEnv);
-  });
-
-  it('should return original string when under maxLen', () => {
-    const { truncate } = require('../observe/main');
-    assert.strictEqual(truncate('hello', 10), 'hello');
-  });
-
-  it('should return original string when exactly maxLen', () => {
-    const { truncate } = require('../observe/main');
-    assert.strictEqual(truncate('12345', 5), '12345');
-  });
-
-  it('should truncate and add indicator when over maxLen', () => {
-    const { truncate } = require('../observe/main');
-    const result = truncate('hello world', 5);
-    assert.strictEqual(result, 'hello...[truncated]');
-  });
-
-  it('should return empty string for null input', () => {
-    const { truncate } = require('../observe/main');
-    assert.strictEqual(truncate(null, 10), '');
-  });
-
-  it('should return empty string for undefined input', () => {
-    const { truncate } = require('../observe/main');
-    assert.strictEqual(truncate(undefined, 10), '');
-  });
-
-  it('should return empty string for empty string input', () => {
-    const { truncate } = require('../observe/main');
-    assert.strictEqual(truncate('', 10), '');
-  });
-});
-
 describe('observe: getArchiveDir', () => {
   const originalEnv = { ...process.env };
   let testDir;
@@ -150,26 +103,6 @@ describe('observe: extractSkillName', () => {
   });
 });
 
-describe('observe: buildObservedToolInput', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../observe/main')];
-  });
-
-  it('drops Skill args while retaining the skill name', () => {
-    const { buildObservedToolInput } = require('../observe/main');
-    assert.deepStrictEqual(
-      buildObservedToolInput('Skill', { skill: 'arc-debugging', args: 'private task details' }),
-      { skill: 'arc-debugging' },
-    );
-  });
-
-  it('keeps non-Skill tool input unchanged for existing learning signal extraction', () => {
-    const { buildObservedToolInput } = require('../observe/main');
-    const input = { command: 'npm test' };
-    assert.strictEqual(buildObservedToolInput('Bash', input), input);
-  });
-});
-
 describe('observe: classifyOutcome', () => {
   beforeEach(() => {
     delete require.cache[require.resolve('../observe/main')];
@@ -224,10 +157,12 @@ describe('observe: responseByteSize', () => {
 describe('observe: privacy boundaries', () => {
   beforeEach(() => {
     delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/sanitize-observation')];
   });
 
   it('redacts secret-like fields from sanitized payloads', () => {
-    const { sanitizeObservationPayload } = require('../observe/main');
+    // sanitizeObservationPayload now lives in scripts/lib/sanitize-observation
+    const { sanitizeObservationPayload } = require('../../scripts/lib/sanitize-observation');
     const out = sanitizeObservationPayload(
       'curl -H "Authorization: Bearer sk-12345" --data api_key="abc123"',
       5000,
@@ -239,7 +174,8 @@ describe('observe: privacy boundaries', () => {
   });
 
   it('caps sanitized payload length at the configured maximum', () => {
-    const { sanitizeObservationPayload, MAX_OUTPUT_LENGTH } = require('../observe/main');
+    const { sanitizeObservationPayload } = require('../../scripts/lib/sanitize-observation');
+    const { MAX_OUTPUT_LENGTH } = require('../observe/main');
     const huge = 'A'.repeat(MAX_OUTPUT_LENGTH * 4);
     const out = sanitizeObservationPayload(huge, MAX_OUTPUT_LENGTH);
     assert.ok(
@@ -302,7 +238,10 @@ describe('observe: event shape on PreToolUse', () => {
     assert.strictEqual(entry.event, 'tool_start');
     assert.strictEqual(entry.skill, 'arc-debugging');
     assert.ok(!('input' in entry), 'pre-event must not persist raw tool input');
-    assert.strictEqual(entry.semantic.skill_name, 'arc-debugging');
+    // Slice C: no semantic field; SafeEvidencePatch fields instead
+    assert.ok(!('semantic' in entry), 'semantic field must not be persisted (Decision 4)');
+    assert.strictEqual(entry.evidence_status, 'present');
+    assert.strictEqual(entry.operation_kind, 'skill');
     assert.ok(!JSON.stringify(entry).includes('private task details'));
     assert.ok(!JSON.stringify(entry).includes('sk-12345'));
   });
@@ -426,66 +365,16 @@ describe('observe: event shape on PostToolUse', () => {
   });
 });
 
-describe('observe: semantic summaries', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../observe/main')];
-  });
+// Note: summarizeToolInput tests moved to tests/scripts/learning-observation-view.test.js
+// (Slice C — Decision 4: semantic view is read-time only, lives in scripts/lib/)
 
-  it('classifies known bash command kinds without storing the command line', () => {
-    const { summarizeToolInput } = require('../observe/main');
-    assert.deepStrictEqual(summarizeToolInput('Bash', { command: 'npm test' }), {
-      tool: 'Bash',
-      payload_saved: false,
-      operation: 'shell',
-      command_kind: 'test',
-    });
-    assert.strictEqual(summarizeToolInput('Bash', { command: 'git status' }).command_kind, 'git');
-    assert.strictEqual(
-      summarizeToolInput('Bash', { command: 'npm run lint' }).command_kind,
-      'lint',
-    );
-  });
-
-  it('classifies file-targeted tools by path class without storing file path', () => {
-    const { summarizeToolInput } = require('../observe/main');
-    const summary = summarizeToolInput('Edit', { file_path: 'tests/scripts/foo.test.js' });
-    assert.strictEqual(summary.path_class, 'test');
-    assert.strictEqual(summary.file_kind, 'js');
-    assert.strictEqual(summary.payload_saved, false);
-    assert.ok(!('file_path' in summary), 'file path must not be persisted in summary');
-  });
-
-  it('maps unknown file suffixes to a bounded enum', () => {
-    const { summarizeToolInput } = require('../observe/main');
-    const summary = summarizeToolInput('Read', {
-      file_path: 'notes/customer-acme.secretprojectcodename',
-    });
-    assert.strictEqual(summary.file_kind, 'other');
-    assert.ok(!JSON.stringify(summary).includes('secretprojectcodename'));
-  });
-
-  it('records skill name in summary when tool is Skill', () => {
-    const { summarizeToolInput } = require('../observe/main');
-    const summary = summarizeToolInput('Skill', { skill: 'arc-debugging', args: 'private' });
-    assert.strictEqual(summary.skill_name, 'arc-debugging');
-    assert.ok(!('args' in summary), 'skill args must not be persisted in summary');
-  });
-
-  it('falls back to the unknown classifications when unfamiliar tool is supplied', () => {
-    const { summarizeToolInput } = require('../observe/main');
-    const summary = summarizeToolInput('SomeNewTool', { x: 1 });
-    assert.strictEqual(summary.operation, 'other');
-    assert.strictEqual(summary.payload_saved, false);
-  });
-});
-
-describe('observe: pre-event persists semantic summary', () => {
+describe('observe: pre-event persists SafeEvidencePatch (Slice C)', () => {
   const originalEnv = { ...process.env };
   let testDir;
   let projectRoot;
 
   beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-semantic-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-evidence-'));
     projectRoot = path.join(testDir, 'project');
     fs.mkdirSync(projectRoot, { recursive: true });
     process.env.HOME = path.join(testDir, 'home');
@@ -502,7 +391,7 @@ describe('observe: pre-event persists semantic summary', () => {
     Object.assign(process.env, originalEnv);
   });
 
-  it('writes a bounded semantic field on tool_start observations', () => {
+  it('writes SafeEvidencePatch on Bash tool_start (no semantic, no raw input)', () => {
     const learning = require('../../scripts/lib/learning');
     const sessionUtils = require('../../scripts/lib/session-utils');
     const { spawnSync } = require('node:child_process');
@@ -510,7 +399,7 @@ describe('observe: pre-event persists semantic summary', () => {
     learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
 
     const hookInput = {
-      session_id: 'sem-session',
+      session_id: 'evidence-bash-session',
       hook_event_name: 'PreToolUse',
       cwd: projectRoot,
       tool_name: 'Bash',
@@ -527,13 +416,79 @@ describe('observe: pre-event persists semantic summary', () => {
     const obsPath = sessionUtils.getObservationsPath(path.basename(projectRoot));
     const lines = fs.readFileSync(obsPath, 'utf8').trim().split('\n');
     const entry = JSON.parse(lines[lines.length - 1]);
-    assert.ok(entry.semantic, 'semantic summary must be present on pre events');
-    assert.strictEqual(entry.semantic.tool, 'Bash');
-    assert.strictEqual(entry.semantic.command_kind, 'test');
-    assert.strictEqual(entry.semantic.payload_saved, false);
-    assert.ok(!('input' in entry), 'pre-event must not persist raw tool input');
-    assert.ok(!JSON.stringify(entry).includes('npm test'));
-    assert.ok(!JSON.stringify(entry).includes('run tests'));
+    // Decision 4: no semantic field
+    assert.ok(!('semantic' in entry), 'semantic field must not be persisted (Decision 4)');
+    // SafeEvidencePatch fields
+    assert.strictEqual(entry.evidence_status, 'present');
+    assert.strictEqual(entry.operation_kind, 'shell');
+    // sanitized input is present (Bash tool)
+    assert.ok('input' in entry, 'Bash tool_start must have sanitized input');
+    assert.ok(!JSON.stringify(entry).includes('run tests'), 'description must not be persisted');
+  });
+
+  it('writes SafeEvidencePatch on Read tool_start (path field, no contents)', () => {
+    const learning = require('../../scripts/lib/learning');
+    const sessionUtils = require('../../scripts/lib/session-utils');
+    const { spawnSync } = require('node:child_process');
+
+    learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+
+    const hookInput = {
+      session_id: 'evidence-read-session',
+      hook_event_name: 'PreToolUse',
+      cwd: projectRoot,
+      tool_name: 'Read',
+      tool_input: { file_path: 'README.md', contents: 'secret content' },
+    };
+    const scriptPath = path.join(__dirname, '..', 'observe', 'main.js');
+    const result = spawnSync('node', [scriptPath, 'pre'], {
+      input: JSON.stringify(hookInput),
+      env: { ...process.env, HOME: process.env.HOME, CLAUDE_PROJECT_DIR: projectRoot },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+
+    const obsPath = sessionUtils.getObservationsPath(path.basename(projectRoot));
+    const lines = fs.readFileSync(obsPath, 'utf8').trim().split('\n');
+    const entry = JSON.parse(lines[lines.length - 1]);
+    assert.ok(!('semantic' in entry), 'semantic field must not be persisted');
+    assert.strictEqual(entry.evidence_status, 'present');
+    assert.strictEqual(entry.operation_kind, 'read');
+    assert.ok('path' in entry, 'Read must persist sanitized path');
+    assert.ok(!('input' in entry), 'Read must not have input field');
+    assert.ok(
+      !JSON.stringify(entry).includes('secret content'),
+      'file contents must not be persisted',
+    );
+  });
+
+  it('omits_unsupported_tool for unknown tool classes', () => {
+    const learning = require('../../scripts/lib/learning');
+    const sessionUtils = require('../../scripts/lib/session-utils');
+    const { spawnSync } = require('node:child_process');
+
+    learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+
+    const hookInput = {
+      session_id: 'evidence-unknown-session',
+      hook_event_name: 'PreToolUse',
+      cwd: projectRoot,
+      tool_name: 'SomeUnknownTool',
+      tool_input: { x: 1 },
+    };
+    const scriptPath = path.join(__dirname, '..', 'observe', 'main.js');
+    const result = spawnSync('node', [scriptPath, 'pre'], {
+      input: JSON.stringify(hookInput),
+      env: { ...process.env, HOME: process.env.HOME, CLAUDE_PROJECT_DIR: projectRoot },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+
+    const obsPath = sessionUtils.getObservationsPath(path.basename(projectRoot));
+    const lines = fs.readFileSync(obsPath, 'utf8').trim().split('\n');
+    const entry = JSON.parse(lines[lines.length - 1]);
+    assert.strictEqual(entry.evidence_status, 'omitted_unsupported_tool');
+    assert.ok(!('semantic' in entry), 'semantic field must not be persisted');
   });
 });
 
@@ -831,7 +786,7 @@ describe('observe: daemon lazy-start (C6)', () => {
     const { getObservationsPath } = require('../../scripts/lib/session-utils');
     const obsPath = getObservationsPath('test-project');
     fs.mkdirSync(path.dirname(obsPath), { recursive: true });
-    const lines = Array.from({ length: 10 }, (_, i) => JSON.stringify({ i })).join('\n') + '\n';
+    const lines = `${Array.from({ length: 10 }, (_, i) => JSON.stringify({ i })).join('\n')}\n`;
     fs.writeFileSync(obsPath, lines, 'utf-8');
 
     assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'below-threshold');
@@ -842,7 +797,7 @@ describe('observe: daemon lazy-start (C6)', () => {
     const { getObservationsPath, getObserverPidFile } = require('../../scripts/lib/session-utils');
     const obsPath = getObservationsPath('test-project');
     fs.mkdirSync(path.dirname(obsPath), { recursive: true });
-    const lines = Array.from({ length: 60 }, (_, i) => JSON.stringify({ i })).join('\n') + '\n';
+    const lines = `${Array.from({ length: 60 }, (_, i) => JSON.stringify({ i })).join('\n')}\n`;
     fs.writeFileSync(obsPath, lines, 'utf-8');
 
     const pidFile = getObserverPidFile();
@@ -871,5 +826,144 @@ describe('observe: daemon lazy-start (C6)', () => {
     fs.writeFileSync(obsPath, lines, 'utf-8');
 
     assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'no-spawn-env');
+  });
+});
+
+// ─────────────────────────────────────────────
+// Slice C — Sanitizer import + buildObservedEvidence
+// ─────────────────────────────────────────────
+
+describe('observe: sanitizer is imported from shared module (Slice C — C5)', () => {
+  beforeEach(() => {
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  it('buildObservedEvidence redacts Authorization Bearer values in Bash commands', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', {
+      command: "curl -H 'Authorization: Bearer sk-abc123' https://api.example.com",
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.ok(patch.input.includes('Authorization: Bearer'), 'keyword preserved');
+    assert.ok(!patch.input.includes('sk-abc123'), 'secret must be redacted');
+  });
+
+  it('buildObservedEvidence redacts OPENAI_API_KEY env-var assignments', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', {
+      command: 'OPENAI_API_KEY=sk-real-secret python run.py',
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.ok(!patch.input.includes('sk-real-secret'), 'secret must be redacted');
+  });
+});
+
+describe('observe: buildObservedEvidence — per-tool SafeEvidencePatch (Slice C — C6)', () => {
+  beforeEach(() => {
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  it('Bash tool returns present evidence with sanitized input and shell operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', { command: 'npm test' });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'shell');
+    assert.ok('input' in patch, 'Bash must have input field');
+    assert.ok(!('path' in patch), 'Bash must not have path field');
+  });
+
+  it('Bash tool sanitizes secrets in the command', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', {
+      command: 'curl -H "Authorization: Bearer sk-12345" https://api.example.com',
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.ok(!patch.input.includes('sk-12345'), 'Bearer token must be redacted');
+    assert.ok(patch.input.includes('https://api.example.com'), 'URL must be preserved');
+  });
+
+  it('Read tool returns present evidence with path and read operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Read', { file_path: 'README.md' });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'read');
+    assert.ok('path' in patch, 'Read must have path field');
+    assert.ok(!('input' in patch), 'Read must not have input field');
+  });
+
+  it('Edit tool returns present evidence with path and edit operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Edit', {
+      file_path: 'src/foo.js',
+      old_string: 'old',
+      new_string: 'new',
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'edit');
+    assert.ok('path' in patch);
+    assert.ok(!JSON.stringify(patch).includes('old'), 'old_string must not be persisted');
+    assert.ok(!JSON.stringify(patch).includes('new'), 'new_string must not be persisted');
+  });
+
+  it('Write tool returns present evidence with path and write operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Write', {
+      file_path: 'output.txt',
+      content: 'secret file content',
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'write');
+    assert.ok('path' in patch);
+    assert.ok(
+      !JSON.stringify(patch).includes('secret file content'),
+      'content must not be persisted',
+    );
+  });
+
+  it('Grep tool returns present evidence with path and search operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Grep', { pattern: 'TODO', path: 'src/' });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'search');
+    assert.ok('pattern' in patch || 'path' in patch, 'Grep must have pattern or path');
+  });
+
+  it('Glob tool returns present evidence with glob and glob operation_kind', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Glob', { pattern: '**/*.test.js' });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'glob');
+  });
+
+  it('Skill tool returns present evidence with skill name only (no args)', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Skill', {
+      skill: 'arc-debugging',
+      args: { sensitive: 'private' },
+    });
+    assert.strictEqual(patch.evidence_status, 'present');
+    assert.strictEqual(patch.operation_kind, 'skill');
+    assert.strictEqual(patch.skill, 'arc-debugging');
+    assert.ok(!JSON.stringify(patch).includes('private'), 'skill args must not be persisted');
+  });
+
+  it('unknown tool class returns omitted_unsupported_tool', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('SomeUnknownTool', { x: 1 });
+    assert.strictEqual(patch.evidence_status, 'omitted_unsupported_tool');
+    assert.ok(!('input' in patch), 'unsupported tool must not have input');
+  });
+
+  it('returns omitted_no_input when tool_input is missing', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', null);
+    assert.strictEqual(patch.evidence_status, 'omitted_no_input');
+  });
+
+  it('no raw tool_input persisted — evidence_status present on Bash', () => {
+    const { buildObservedEvidence } = require('../observe/main');
+    const patch = buildObservedEvidence('Bash', { command: 'ls', env: { SECRET: 'abc' } });
+    // env dump must not be in the output
+    assert.ok(!JSON.stringify(patch).includes('abc'), 'env dump must not be persisted');
   });
 });
