@@ -202,12 +202,28 @@ analyze_project() {
   fi
 
   # ── Layer 4: Call claude with watchdog ────────────────────────────────────
+  # Uses Anthropic structured output (--json-schema) to force the model to emit
+  # a payload conforming to CandidateProposalPayload v1. Without this, claude
+  # CLI's default Code-mode system prompt biases the model to wrap JSON in
+  # markdown code fences (verified E.3). With --json-schema + --output-format
+  # json, the model cannot wrap — the CLI returns an envelope containing the
+  # structured payload under the `structured_output` field.
+  #
   # Response file: transient, cleaned in EXIT trap and after ingestion.
   # Note: Layer 4 spec says tool_access=false — no --tools flag.
   local response_file="${INSTINCTS_DIR}/.curator-response.${batch_id}.json"
   local analysis_success=false
   local retry_count=0
   local max_retries=1
+  local schema_path="${ARCFORGE_ROOT}/scripts/lib/learning-curator/candidate-proposal-schema.json"
+  if [ ! -f "$schema_path" ]; then
+    log_msg "ERROR: candidate-proposal-schema.json not found at ${schema_path}"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
+  # Read schema once per analyze_project call so the inner loop reuses it.
+  local schema_json
+  schema_json=$(cat "$schema_path")
 
   # Ensure INSTINCTS_DIR exists for the response file
   mkdir -p "$INSTINCTS_DIR"
@@ -222,11 +238,15 @@ analyze_project() {
       local claude_pid=""
       local watchdog_pid=""
 
-      # Pipe prompt file to claude; capture JSON output to response_file.
-      # No --tools flag: Layer 4 LLM curator must not have tool access.
+      # Pipe prompt file to claude; capture JSON envelope to response_file.
+      # --output-format json + --json-schema forces structured output (no
+      # markdown wrap possible). The payload lives at .structured_output in
+      # the envelope; ingest-proposal extracts it.
       (claude --model haiku \
         --max-turns 15 \
         --print \
+        --output-format json \
+        --json-schema "$schema_json" \
         --disable-slash-commands \
         --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
         < "$prompt_path" \

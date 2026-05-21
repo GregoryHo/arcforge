@@ -161,11 +161,37 @@ function makeValidProposalPayload(batchId, batchHash) {
   };
 }
 
-function makeResponseFile(payload) {
+// Wrap a CandidateProposalPayload in the claude --output-format json envelope
+// the daemon writes to the response file. Slice E.2b switched to structured
+// output; the model can no longer wrap in markdown because the CLI enforces
+// the schema via --json-schema and exposes the result under structured_output.
+function makeCliEnvelope(payload, overrides = {}) {
+  return {
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    api_error_status: null,
+    duration_ms: 32000,
+    result: 'analysis complete',
+    structured_output: payload,
+    ...overrides,
+  };
+}
+
+function makeResponseFile(payload, envelopeOverrides) {
   const responseDir = path.join(tmpDir, '.arcforge', 'learning', 'responses');
   fs.mkdirSync(responseDir, { recursive: true });
   const responsePath = path.join(responseDir, `response-${Date.now()}.json`);
-  fs.writeFileSync(responsePath, JSON.stringify(payload, null, 2), 'utf8');
+  const envelope = makeCliEnvelope(payload, envelopeOverrides);
+  fs.writeFileSync(responsePath, JSON.stringify(envelope, null, 2), 'utf8');
+  return responsePath;
+}
+
+function writeRawResponseFile(rawContents) {
+  const responseDir = path.join(tmpDir, '.arcforge', 'learning', 'responses');
+  fs.mkdirSync(responseDir, { recursive: true });
+  const responsePath = path.join(responseDir, `response-${Date.now()}.json`);
+  fs.writeFileSync(responsePath, rawContents, 'utf8');
   return responsePath;
 }
 
@@ -249,10 +275,7 @@ describe('ingestProposal — malformed JSON', () => {
   test('garbage response text produces parse_status malformed_json, no queue change', () => {
     const { ingestProposal } = getIngestor();
     const { batchId } = makeBatchManifest();
-    const responseDir = path.join(tmpDir, '.arcforge', 'learning', 'responses');
-    fs.mkdirSync(responseDir, { recursive: true });
-    const responsePath = path.join(responseDir, 'garbage.json');
-    fs.writeFileSync(responsePath, 'this is not json {{{', 'utf8');
+    const responsePath = writeRawResponseFile('this is not json {{{');
 
     const result = ingestProposal({ batchId, responseFile: responsePath });
 
@@ -270,6 +293,80 @@ describe('ingestProposal — malformed JSON', () => {
     const runManifest = JSON.parse(fs.readFileSync(runManifestPath, 'utf8'));
     expect(runManifest.parse_status).toBe('malformed_json');
     expect(runManifest.handed_to_layer5).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice E.2b — CLI envelope (--output-format json --json-schema)
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — CLI envelope (--output-format json)', () => {
+  test('envelope with is_error:true produces transport_error', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    const responsePath = writeRawResponseFile(
+      JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        api_error_status: { code: 'rate_limit_exceeded' },
+      }),
+    );
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.parse_status).toBe('transport_error');
+    expect(result.accepted).toBe(0);
+
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const runManifestPath = path.join(runsDir, `${result.run_id}.manifest.json`);
+    const runManifest = JSON.parse(fs.readFileSync(runManifestPath, 'utf8'));
+    expect(runManifest.parse_status).toBe('transport_error');
+  });
+
+  test('envelope missing structured_output produces malformed_json with detail', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    const responsePath = writeRawResponseFile(
+      JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        result: 'analysis complete but no structured output emitted',
+        // no structured_output field at all
+      }),
+    );
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.parse_status).toBe('malformed_json');
+
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const runManifestPath = path.join(runsDir, `${result.run_id}.manifest.json`);
+    const runManifest = JSON.parse(fs.readFileSync(runManifestPath, 'utf8'));
+    expect(runManifest.detail).toMatch(/structured_output/i);
+  });
+
+  test('envelope with structured_output:null produces malformed_json', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    const responsePath = writeRawResponseFile(
+      JSON.stringify({ type: 'result', is_error: false, structured_output: null }),
+    );
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+    expect(result.parse_status).toBe('malformed_json');
+  });
+
+  test('envelope with subtype:error produces transport_error', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    const responsePath = writeRawResponseFile(
+      JSON.stringify({ type: 'result', subtype: 'error', is_error: false }),
+    );
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+    expect(result.parse_status).toBe('transport_error');
   });
 });
 
