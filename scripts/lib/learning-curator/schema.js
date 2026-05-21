@@ -29,16 +29,9 @@ const DOMAINS = [
   'other',
 ];
 
-const LIFECYCLE_STATUSES = [
-  'pending_review',
-  'needs_more_evidence',
-  'dismissed',
-  'approved',
-  'materialized',
-  'activated',
-  'deactivated',
-  'superseded',
-];
+// Imported from lifecycle.js — single source of truth for the canonical Layer 5
+// CandidateLifecycleStatus enum. Do not redefine this list in schema.js.
+const { LIFECYCLE_STATUSES } = require('./lifecycle');
 
 const EVIDENCE_TYPES = ['observation', 'session_summary', 'diary', 'reflect', 'recall'];
 
