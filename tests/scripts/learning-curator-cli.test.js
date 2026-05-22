@@ -144,3 +144,93 @@ describe('CLI help', () => {
     expect(output.toLowerCase()).toMatch(/usage|subcommand|assemble-batch|ingest-proposal/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR-F: record-run-failure subcommand
+// ---------------------------------------------------------------------------
+
+describe('CLI record-run-failure', () => {
+  test('writes manifest file and prints JSON result', () => {
+    const output = runCLI([
+      'record-run-failure',
+      '--batch-id',
+      'batch_test_rf_001',
+      '--parse-status',
+      'transport_error',
+      '--detail',
+      'claude exit 1',
+    ]);
+    const parsed = JSON.parse(output);
+    expect(parsed.run_id).toMatch(/^curator_run_/);
+    expect(parsed.parse_status).toBe('transport_error');
+    expect(parsed.accepted).toBe(0);
+    expect(parsed.rejected).toBe(0);
+
+    // Manifest file must exist
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifestPath = path.join(runsDir, `${parsed.run_id}.manifest.json`);
+    expect(fs.existsSync(manifestPath)).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    expect(manifest.parse_status).toBe('transport_error');
+  });
+
+  test('timeout parse-status persists correctly', () => {
+    const output = runCLI([
+      'record-run-failure',
+      '--batch-id',
+      'batch_test_rf_002',
+      '--parse-status',
+      'timeout',
+      '--detail',
+      'watchdog killed claude',
+    ]);
+    const parsed = JSON.parse(output);
+    expect(parsed.parse_status).toBe('timeout');
+  });
+
+  test('cli_not_found parse-status persists correctly', () => {
+    const output = runCLI([
+      'record-run-failure',
+      '--batch-id',
+      'batch_test_rf_003',
+      '--parse-status',
+      'cli_not_found',
+    ]);
+    const parsed = JSON.parse(output);
+    expect(parsed.parse_status).toBe('cli_not_found');
+  });
+
+  test('invalid parse-status exits non-zero', () => {
+    const { spawnSync } = require('node:child_process');
+    const result = spawnSync(
+      'node',
+      [
+        CLI_PATH,
+        'record-run-failure',
+        '--batch-id',
+        'batch_test_rf_bad',
+        '--parse-status',
+        'invalid_status',
+      ],
+      {
+        env: { ...process.env, HOME: tmpDir },
+        encoding: 'utf8',
+      },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/parse-status|invalid|allowed/i);
+  });
+
+  test('missing batch-id exits non-zero', () => {
+    const { spawnSync } = require('node:child_process');
+    const result = spawnSync(
+      'node',
+      [CLI_PATH, 'record-run-failure', '--parse-status', 'timeout'],
+      {
+        env: { ...process.env, HOME: tmpDir },
+        encoding: 'utf8',
+      },
+    );
+    expect(result.status).not.toBe(0);
+  });
+});

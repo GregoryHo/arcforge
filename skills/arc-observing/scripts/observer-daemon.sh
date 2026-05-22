@@ -232,11 +232,16 @@ analyze_project() {
   local tmp_out="${INSTINCTS_DIR}/.analyzing.output.tmp"
   trap 'rm -f "$tmp_out" "$response_file"' RETURN
 
+  # Marker file: set by watchdog subshell before killing claude.
+  # Lets the outer loop distinguish timeout from plain transport_error.
+  local watchdog_fired_marker="${INSTINCTS_DIR}/.watchdog-fired.${batch_id}"
+
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     if command -v claude &>/dev/null; then
       local exit_code=0
       local claude_pid=""
       local watchdog_pid=""
+      rm -f "$watchdog_fired_marker"
 
       # Pipe prompt file to claude; capture JSON envelope to response_file.
       # --output-format json + --json-schema forces structured output (no
@@ -253,10 +258,13 @@ analyze_project() {
         > "$response_file" 2>"$tmp_out") &
       claude_pid=$!
 
-      # Watchdog: kill claude if it exceeds OBSERVER_DAEMON_WATCHDOG_SECS
+      # Watchdog: kill claude if it exceeds OBSERVER_DAEMON_WATCHDOG_SECS.
+      # Touch watchdog_fired_marker before killing so the outer loop can
+      # distinguish timeout from a plain claude crash (transport_error).
       (sleep "$OBSERVER_DAEMON_WATCHDOG_SECS" && \
         if kill -0 "$claude_pid" 2>/dev/null; then \
           log_msg "WATCHDOG: claude exceeded ${OBSERVER_DAEMON_WATCHDOG_SECS}s — killing (PID ${claude_pid})"; \
+          touch "$watchdog_fired_marker" 2>/dev/null || true; \
           kill "$claude_pid" 2>/dev/null || true; \
         fi) &
       watchdog_pid=$!
@@ -271,6 +279,16 @@ analyze_project() {
         log_msg "Claude analysis completed successfully"
       else
         log_msg "ERROR: claude analysis failed (exit code: ${exit_code})"
+        # If watchdog fired, this attempt counts as a timeout.
+        # Write a failure manifest for this attempt (Layer 4 spec §10).
+        if [ -f "$watchdog_fired_marker" ]; then
+          rm -f "$watchdog_fired_marker"
+          node "$CURATOR_CLI" record-run-failure \
+            --batch-id "$batch_id" \
+            --parse-status "timeout" \
+            --detail "claude CLI exceeded watchdog timeout (${OBSERVER_DAEMON_WATCHDOG_SECS}s)" \
+            > /dev/null 2>&1 || true
+        fi
         retry_count=$((retry_count + 1))
         if [ "$retry_count" -le "$max_retries" ]; then
           log_msg "Retrying analysis (attempt ${retry_count}/${max_retries})..."
@@ -279,6 +297,12 @@ analyze_project() {
       fi
     else
       log_msg "WARNING: claude CLI not found, skipping analysis"
+      # PR-F: write failure manifest for cli_not_found
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "cli_not_found" \
+        --detail "claude CLI not found in PATH" \
+        > /dev/null 2>&1 || true
       return
     fi
   done
@@ -287,6 +311,12 @@ analyze_project() {
     log_msg "ERROR: Analysis failed after ${max_retries} retries for ${project}"
     echo $((fail_count + 1)) > "$fail_count_file"
     rm -f "$response_file"
+    # PR-F: write failure manifest for transport_error (all retries exhausted)
+    node "$CURATOR_CLI" record-run-failure \
+      --batch-id "$batch_id" \
+      --parse-status "transport_error" \
+      --detail "claude CLI exited non-zero after ${max_retries} retries" \
+      > /dev/null 2>&1 || true
     return
   fi
 

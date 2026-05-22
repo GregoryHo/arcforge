@@ -219,6 +219,89 @@ else
   ERRORS+=('C4: process killed before stub sleep (elapsed check)')
 fi
 
+# PR-F C4 extension: assert that a failure manifest with parse_status=timeout was written
+C4_RUNS_DIR="${TEST_HOME_C4}/.arcforge/learning/curator-runs"
+C4_TIMEOUT_STATUS=""
+if [ -d "$C4_RUNS_DIR" ]; then
+  C4_TIMEOUT_STATUS=$(find "$C4_RUNS_DIR" -name '*.manifest.json' 2>/dev/null \
+    -exec grep -l '"timeout"' {} \; | head -1 || true)
+fi
+
+if [ -n "$C4_TIMEOUT_STATUS" ]; then
+  echo "  PASS: C4 PR-F: failure manifest with parse_status=timeout was written"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: C4 PR-F: no failure manifest with parse_status=timeout found in ${C4_RUNS_DIR}"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('C4 PR-F: failure manifest with parse_status=timeout was written')
+fi
+
+# ─────────────────────────────────────────────
+# PR-F-T1: transport_error — stub claude exits 1 → failure manifest written
+# Strategy: stub claude exits 1 immediately. Daemon should call record-run-failure
+# and write a manifest with parse_status=transport_error.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== PR-F-T1: transport_error failure manifest ==="
+
+ARCFORGE_REPO_ROOT_PRF="$(cd "$(dirname "$0")/../../.." && pwd)"
+TMPDIR_PRF=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_PRF"' EXIT
+TEST_HOME_PRF="${TMPDIR_PRF}/home"
+STUB_BIN_PRF="${TMPDIR_PRF}/bin"
+mkdir -p "$TEST_HOME_PRF" "$STUB_BIN_PRF"
+
+# Stub 'claude' that exits 1 immediately (transport_error)
+cat > "${STUB_BIN_PRF}/claude" << 'STUB_EOF'
+#!/usr/bin/env bash
+exit 1
+STUB_EOF
+chmod +x "${STUB_BIN_PRF}/claude"
+
+# Create a project with enough observations
+PRF_PROJECT="prf-test-proj"
+PRF_OBS_DIR="${TEST_HOME_PRF}/.arcforge/observations/${PRF_PROJECT}"
+mkdir -p "$PRF_OBS_DIR"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"%s","project_id":"proj_abc123456789ab","evidence_status":"present","input_summary":"file %d"}\n' \
+    "$i" "$PRF_PROJECT" "$i" >> "${PRF_OBS_DIR}/observations.jsonl"
+done
+
+PRF_RESULT=$(
+  HOME="$TEST_HOME_PRF"
+  ARCFORGE_ROOT="$ARCFORGE_REPO_ROOT_PRF"
+  PATH="${STUB_BIN_PRF}:${PATH}"
+  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
+  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project "$PRF_PROJECT" 2>/dev/null || true
+  echo "done"
+) 2>/dev/null
+
+# Assert: failure manifest with parse_status=transport_error was written
+PRF_RUNS_DIR="${TEST_HOME_PRF}/.arcforge/learning/curator-runs"
+PRF_TRANSPORT_MANIFEST=""
+if [ -d "$PRF_RUNS_DIR" ]; then
+  PRF_TRANSPORT_MANIFEST=$(find "$PRF_RUNS_DIR" -name '*.manifest.json' 2>/dev/null \
+    -exec grep -l '"transport_error"' {} \; | head -1 || true)
+fi
+
+if [ -n "$PRF_TRANSPORT_MANIFEST" ]; then
+  echo "  PASS: PR-F-T1: failure manifest with parse_status=transport_error was written"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: PR-F-T1: no failure manifest with parse_status=transport_error found"
+  echo "        Runs dir: ${PRF_RUNS_DIR}"
+  echo "        PRF_RESULT: ${PRF_RESULT}"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('PR-F-T1: failure manifest with parse_status=transport_error was written')
+fi
+
 # ─────────────────────────────────────────────
 # E2-G1: daemon no longer writes to per-project instincts subdir
 # Strategy: the production analysis code must not contain mkdir + write
