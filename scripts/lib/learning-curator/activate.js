@@ -187,6 +187,30 @@ function makeActivationFailure(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify reviewer_ack is present and confirmed_behavior_change is true.
+ * Returns null on success; returns [reason, detail] on failure.
+ */
+function verifyReviewerAck(activationRequest) {
+  const ack = activationRequest?.reviewer_ack;
+  if (!ack || ack.confirmed_behavior_change !== true) {
+    return ['missing_reviewer_ack', 'confirmed_behavior_change must be true'];
+  }
+  return null;
+}
+
+/**
+ * Build a redacted active_path_summary that strips project_id.
+ * Returns `instincts/<sha256(activePath)[:12]>.md` — safe to log/audit.
+ */
+function summarizeActivePath(activePath) {
+  return `instincts/${sha256Truncated(activePath, 12)}.md`;
+}
+
+// ---------------------------------------------------------------------------
 // activate()
 // ---------------------------------------------------------------------------
 
@@ -237,9 +261,9 @@ function activate({
   }
 
   // L8-4: reviewer_ack required
-  const ack = activationRequest?.reviewer_ack;
-  if (!ack || ack.confirmed_behavior_change !== true) {
-    return fail('missing_reviewer_ack', 'confirmed_behavior_change must be true');
+  const ackError = verifyReviewerAck(activationRequest);
+  if (ackError) {
+    return fail(ackError[0], ackError[1]);
   }
 
   // L8-5: first-slice supports instinct only; reject claude_md_addition
@@ -342,7 +366,7 @@ function activate({
       target_kind: 'instinct',
       active_path: activePath,
       active_path_hash: sha256Truncated(activePath, 32),
-      active_path_summary: path.relative(effectiveRoot, activePath),
+      active_path_summary: summarizeActivePath(activePath),
       source_draft_artifact_id: draftArtifact.draft_artifact_id,
       source_draft_content_hash: draftArtifact.content_hash,
       active_content_hash: activeContentHash,
@@ -450,6 +474,12 @@ function deactivate({
     return fail('invalid_lifecycle_status', `Expected activated for deactivate, got: ${status}`);
   }
 
+  // reviewer_ack required for deactivation
+  const ackError = verifyReviewerAck(activationRequest);
+  if (ackError) {
+    return fail(ackError[0], ackError[1]);
+  }
+
   // Compute active path
   const activePath = buildActiveInstinctPath(effectiveRoot, candidate);
 
@@ -490,7 +520,7 @@ function deactivate({
       target_kind: 'instinct',
       active_path: archivePath,
       active_path_hash: sha256Truncated(archivePath, 32),
-      active_path_summary: path.relative(effectiveRoot, archivePath),
+      active_path_summary: summarizeActivePath(archivePath),
       active_content_hash: disabledContent ? sha256Truncated(disabledContent, 64) : undefined,
       status: 'deactivated',
     };

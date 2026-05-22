@@ -887,3 +887,148 @@ describe('RT-1: round-trip integration test', () => {
     expect(fs.existsSync(deactResult.activeArtifacts[0].active_path)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Criterion #4 — active_path_summary redaction (PR-B Layer 8)
+// ---------------------------------------------------------------------------
+
+describe('active_path_summary — redacted form', () => {
+  it('activate: active_path_summary matches instincts/<12hexchars>.md and does not contain project_id', () => {
+    const { candidate, materializationRecord, arcforgeRoot } = runMaterialize();
+    const policy = defaultActivationPolicy(arcforgeRoot);
+
+    const actResult = activate({
+      candidate,
+      materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: candidate.candidate_id }),
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(actResult.ok).toBe(true);
+    const summary = actResult.activeArtifacts[0].active_path_summary;
+    expect(summary).toMatch(/^instincts\/[a-f0-9]{12}\.md$/);
+    expect(summary).not.toContain('proj-abc123');
+  });
+
+  it('deactivate: active_path_summary matches instincts/<12hexchars>.md and does not contain project_id', () => {
+    const { candidate, materializationRecord, arcforgeRoot } = runMaterialize();
+    const policy = defaultActivationPolicy(arcforgeRoot);
+
+    const actResult = activate({
+      candidate,
+      materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: candidate.candidate_id }),
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(actResult.ok).toBe(true);
+
+    const deactResult = deactivate({
+      candidate: { ...candidate, lifecycle: { status: 'activated', status_changed_at: 'x' } },
+      activationRecord: actResult.record,
+      activationRequest: {
+        ...makeActivationRequest({ candidate_id: candidate.candidate_id }),
+        action: 'deactivate',
+        expected_candidate_status: 'activated',
+      },
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(deactResult.ok).toBe(true);
+    const summary = deactResult.activeArtifacts[0].active_path_summary;
+    expect(summary).toMatch(/^instincts\/[a-f0-9]{12}\.md$/);
+    expect(summary).not.toContain('proj-abc123');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion #3 — deactivate() requires reviewer_ack (PR-B Layer 8 Blocker #3)
+// ---------------------------------------------------------------------------
+
+describe('deactivate — reviewer_ack enforcement', () => {
+  function runActivate() {
+    const { candidate, materializationRecord, arcforgeRoot } = runMaterialize();
+    const policy = defaultActivationPolicy(arcforgeRoot);
+    const actResult = activate({
+      candidate,
+      materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: candidate.candidate_id }),
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(actResult.ok).toBe(true);
+    return {
+      activatedCandidate: {
+        ...candidate,
+        lifecycle: { status: 'activated', status_changed_at: 'x' },
+      },
+      activationRecord: actResult.record,
+      arcforgeRoot,
+      policy,
+    };
+  }
+
+  it('rejects deactivation when reviewer_ack is missing', () => {
+    const { activatedCandidate, activationRecord, arcforgeRoot, policy } = runActivate();
+    const req = {
+      ...makeActivationRequest({ candidate_id: activatedCandidate.candidate_id }),
+      action: 'deactivate',
+      expected_candidate_status: 'activated',
+    };
+    delete req.reviewer_ack;
+
+    const result = deactivate({
+      candidate: activatedCandidate,
+      activationRecord,
+      activationRequest: req,
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failure.reason).toBe('missing_reviewer_ack');
+  });
+
+  it('rejects deactivation when confirmed_behavior_change is false', () => {
+    const { activatedCandidate, activationRecord, arcforgeRoot, policy } = runActivate();
+    const req = {
+      ...makeActivationRequest({ candidate_id: activatedCandidate.candidate_id }),
+      action: 'deactivate',
+      expected_candidate_status: 'activated',
+      reviewer_ack: { confirmed_behavior_change: false, saw_target_summary: true },
+    };
+
+    const result = deactivate({
+      candidate: activatedCandidate,
+      activationRecord,
+      activationRequest: req,
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failure.reason).toBe('missing_reviewer_ack');
+  });
+
+  it('succeeds deactivation when reviewer_ack.confirmed_behavior_change is true', () => {
+    const { activatedCandidate, activationRecord, arcforgeRoot, policy } = runActivate();
+    const req = {
+      ...makeActivationRequest({ candidate_id: activatedCandidate.candidate_id }),
+      action: 'deactivate',
+      expected_candidate_status: 'activated',
+      reviewer_ack: { confirmed_behavior_change: true, saw_target_summary: true },
+    };
+
+    const result = deactivate({
+      candidate: activatedCandidate,
+      activationRecord,
+      activationRequest: req,
+      activationPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(result.ok).toBe(true);
+  });
+});

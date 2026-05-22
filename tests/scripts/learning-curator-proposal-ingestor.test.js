@@ -464,3 +464,96 @@ describe('ingestProposal — missing batch manifest', () => {
     ).toThrow(/batch manifest not found/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Criterion #2 — evidence_ref_omitted_upstream (PR-B Layer 5 Blocker #2)
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — evidence_ref_omitted_upstream', () => {
+  test('rejects proposal when evidence_id is in batch but has evidence_status != present', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest({
+      evidence_ids: ['ev_001', 'ev_002', 'ev_omitted'],
+      evidence_status_by_id: {
+        ev_001: 'present',
+        ev_002: 'present',
+        ev_omitted: 'omitted_sanitizer_policy',
+      },
+    });
+
+    const payload = {
+      schema_version: 1,
+      source: {
+        layer: 4,
+        curator: 'llm',
+        run_id: 'curator_run_20260521T010000Z_testomit01',
+        created_at: '2026-05-21T01:00:00.000Z',
+        batch_id: batchId,
+        batch_hash: manifest.batch_hash,
+        prompt_policy_version: 'v1',
+        output_schema_version: 1,
+      },
+      proposals: [
+        {
+          proposal_index: 0,
+          artifact_type: 'instinct',
+          proposed_scope: { kind: 'project', project_id: 'proj_abc123456789ab' },
+          name: 'grep-before-edit',
+          summary: 'Always use grep before editing.',
+          rationale: 'Observed pattern.',
+          domain: 'workflow',
+          body: 'Use grep first.',
+          body_source: 'llm_curator',
+          evidence_refs: [
+            {
+              evidence_id: 'ev_001',
+              evidence_type: 'observation',
+              relevance: 'direct',
+            },
+            {
+              evidence_id: 'ev_omitted',
+              evidence_type: 'observation',
+              relevance: 'indirect',
+            },
+          ],
+          llm_confidence: 'medium',
+          risk_notes: [],
+          uncertainty_notes: [],
+          recommended_review_action: 'review',
+        },
+      ],
+    };
+
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBeGreaterThanOrEqual(1);
+
+    const rejections = readRejections();
+    expect(rejections.length).toBeGreaterThanOrEqual(1);
+    const rejection = rejections[0];
+    expect(rejection.reasons.some((r) => r.code === 'evidence_ref_omitted_upstream')).toBe(true);
+    const omitReason = rejection.reasons.find((r) => r.code === 'evidence_ref_omitted_upstream');
+    expect(omitReason.detail).toMatch(/ev_omitted/);
+    expect(omitReason.detail).toMatch(/omitted_sanitizer_policy/);
+  });
+
+  test('accepts proposal when all evidence_ids have evidence_status "present"', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest({
+      evidence_ids: ['ev_001', 'ev_002'],
+      evidence_status_by_id: {
+        ev_001: 'present',
+        ev_002: 'present',
+      },
+    });
+
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(1);
+    expect(result.rejected).toBe(0);
+  });
+});

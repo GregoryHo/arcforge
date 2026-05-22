@@ -12,6 +12,12 @@
  */
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const VALIDATOR_VERSION = 'v1';
+
+// ---------------------------------------------------------------------------
 // Allowed enum values
 // ---------------------------------------------------------------------------
 
@@ -412,6 +418,20 @@ function validateCandidateV1(record) {
     if (!isObject(s)) {
       add('schema_invalid', 'safety', 'safety must be an object');
     } else {
+      // Required provenance fields
+      if (!isNonEmptyString(s.validator_version)) {
+        add('missing_required_field', 'safety.validator_version', 'validator_version is required');
+      }
+      if (!isNonEmptyString(s.sanitizer_policy_version)) {
+        add(
+          'missing_required_field',
+          'safety.sanitizer_policy_version',
+          'sanitizer_policy_version is required',
+        );
+      }
+      if (!isNonEmptyString(s.sanitizer_module)) {
+        add('missing_required_field', 'safety.sanitizer_module', 'sanitizer_module is required');
+      }
       // Check all raw_*_included must be false
       const rawFlags = [
         'raw_prompt_included',
@@ -426,31 +446,39 @@ function validateCandidateV1(record) {
           add('unsafe_content', `safety.${flag}`, `${flag} must be false`);
         }
       }
-      // secret_scan
-      if (isObject(s.secret_scan)) {
-        if (s.secret_scan.status === 'rejected') {
-          add('secret_reconstruction', 'safety.secret_scan', 'secret_scan.status is "rejected"');
-        }
+      // secret_scan — required, status must not be "rejected"
+      if (!isObject(s.secret_scan)) {
+        add('missing_required_field', 'safety.secret_scan', 'secret_scan is required');
+      } else if (s.secret_scan.status === 'rejected') {
+        add('secret_reconstruction', 'safety.secret_scan', 'secret_scan.status is "rejected"');
       }
-      // activation_claim_scan
-      if (isObject(s.activation_claim_scan)) {
-        if (s.activation_claim_scan.status === 'rejected') {
-          add(
-            'activation_claim',
-            'safety.activation_claim_scan',
-            'activation_claim_scan.status is "rejected"',
-          );
-        }
+      // activation_claim_scan — required, status must not be "rejected"
+      if (!isObject(s.activation_claim_scan)) {
+        add(
+          'missing_required_field',
+          'safety.activation_claim_scan',
+          'activation_claim_scan is required',
+        );
+      } else if (s.activation_claim_scan.status === 'rejected') {
+        add(
+          'activation_claim',
+          'safety.activation_claim_scan',
+          'activation_claim_scan.status is "rejected"',
+        );
       }
-      // file_write_claim_scan
-      if (isObject(s.file_write_claim_scan)) {
-        if (s.file_write_claim_scan.status === 'rejected') {
-          add(
-            'file_write_claim',
-            'safety.file_write_claim_scan',
-            'file_write_claim_scan.status is "rejected"',
-          );
-        }
+      // file_write_claim_scan — required, status must not be "rejected"
+      if (!isObject(s.file_write_claim_scan)) {
+        add(
+          'missing_required_field',
+          'safety.file_write_claim_scan',
+          'file_write_claim_scan is required',
+        );
+      } else if (s.file_write_claim_scan.status === 'rejected') {
+        add(
+          'file_write_claim',
+          'safety.file_write_claim_scan',
+          'file_write_claim_scan.status is "rejected"',
+        );
       }
     }
   }
@@ -505,4 +533,9 @@ const REJECTION_CODES = Object.freeze([
   'policy_violation',
 ]);
 
-module.exports = { validateCandidateV1, computeEvidenceQuality, REJECTION_CODES };
+module.exports = {
+  validateCandidateV1,
+  computeEvidenceQuality,
+  REJECTION_CODES,
+  VALIDATOR_VERSION,
+};

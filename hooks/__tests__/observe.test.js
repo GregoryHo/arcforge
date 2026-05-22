@@ -967,3 +967,135 @@ describe('observe: buildObservedEvidence — per-tool SafeEvidencePatch (Slice C
     assert.ok(!JSON.stringify(patch).includes('abc'), 'env dump must not be persisted');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Criterion #5 — ARCFORGE_OBSERVE_EXPLICIT_SKIP + ARCFORGE_OBSERVE_SELF_ANALYSIS
+// ---------------------------------------------------------------------------
+
+describe('observe: shouldObserve — ARCFORGE_OBSERVE_EXPLICIT_SKIP env guard (C3)', () => {
+  const originalEnv = { ...process.env };
+  let testHome;
+
+  beforeEach(() => {
+    testHome = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-c3-'));
+    // Enable learning globally so env var is the only gate
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    const learning = require('../../scripts/lib/learning');
+    learning.setLearningEnabled({ scope: 'global', enabled: true, homeDir: testHome });
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testHome, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  it('returns false when ARCFORGE_OBSERVE_EXPLICIT_SKIP=1', () => {
+    process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP = '1';
+    // No cache deletion — reads process.env at call time
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      false,
+      'ARCFORGE_OBSERVE_EXPLICIT_SKIP=1 should disable observation',
+    );
+  });
+
+  it('does not skip when ARCFORGE_OBSERVE_EXPLICIT_SKIP is "0"', () => {
+    process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP = '0';
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      true,
+      'ARCFORGE_OBSERVE_EXPLICIT_SKIP=0 should not disable observation',
+    );
+  });
+
+  it('does not skip when ARCFORGE_OBSERVE_EXPLICIT_SKIP is unset', () => {
+    delete process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP;
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      true,
+      'unset ARCFORGE_OBSERVE_EXPLICIT_SKIP should not disable observation',
+    );
+  });
+});
+
+describe('observe: shouldObserve — ARCFORGE_OBSERVE_SELF_ANALYSIS env guard (C4)', () => {
+  const originalEnv = { ...process.env };
+  let testHome;
+
+  beforeEach(() => {
+    testHome = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-c4-'));
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    const learning = require('../../scripts/lib/learning');
+    learning.setLearningEnabled({ scope: 'global', enabled: true, homeDir: testHome });
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testHome, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+    delete require.cache[require.resolve('../observe/main')];
+  });
+
+  it('returns false when ARCFORGE_OBSERVE_SELF_ANALYSIS=1', () => {
+    process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS = '1';
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      false,
+      'ARCFORGE_OBSERVE_SELF_ANALYSIS=1 should disable observation',
+    );
+  });
+
+  it('does not skip when ARCFORGE_OBSERVE_SELF_ANALYSIS is "0"', () => {
+    process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS = '0';
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      true,
+      'ARCFORGE_OBSERVE_SELF_ANALYSIS=0 should not disable observation',
+    );
+  });
+
+  it('does not skip when ARCFORGE_OBSERVE_SELF_ANALYSIS is unset', () => {
+    delete process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS;
+    const { shouldObserve } = require('../observe/main');
+    const result = shouldObserve({
+      projectRoot: path.join(testHome, 'my-project'),
+      homeDir: testHome,
+    });
+    assert.strictEqual(
+      result,
+      true,
+      'unset ARCFORGE_OBSERVE_SELF_ANALYSIS should not disable observation',
+    );
+  });
+});

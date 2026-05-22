@@ -50,12 +50,18 @@ function makeCandidateRecord(overrides = {}) {
       status_changed_at: '2026-05-01T00:00:00Z',
     },
     safety: {
+      validator_version: 'v1',
+      sanitizer_policy_version: 'v1',
+      sanitizer_module: 'scripts/lib/sanitize-observation.js',
       raw_prompt_included: false,
       raw_response_included: false,
       raw_hook_payloads_included: false,
       raw_transcripts_included: false,
       edit_bodies_included: false,
       skill_args_included: false,
+      secret_scan: { status: 'passed', rule_version: 'v1' },
+      activation_claim_scan: { status: 'passed' },
+      file_write_claim_scan: { status: 'passed' },
     },
     dedupe: {
       dedupe_key: 'use-edit-bash-workflow-v1',

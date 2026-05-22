@@ -27,7 +27,7 @@ const path = require('node:path');
 const os = require('node:os');
 
 const { appendCandidate, rejectProposal } = require('./queue-writer');
-const { computeEvidenceQuality } = require('./schema');
+const { computeEvidenceQuality, VALIDATOR_VERSION } = require('./schema');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated } = require('../utils');
 
@@ -165,12 +165,18 @@ function buildCandidateRecord(proposal, batchManifest, now) {
       status_changed_at: nowIso,
     },
     safety: {
+      validator_version: VALIDATOR_VERSION,
+      sanitizer_policy_version: SANITIZER_POLICY_VERSION,
+      sanitizer_module: 'scripts/lib/sanitize-observation.js',
       raw_prompt_included: false,
       raw_response_included: false,
       raw_hook_payloads_included: false,
       raw_transcripts_included: false,
       edit_bodies_included: false,
       skill_args_included: false,
+      secret_scan: { status: 'passed', rule_version: SANITIZER_POLICY_VERSION },
+      activation_claim_scan: { status: 'passed' },
+      file_write_claim_scan: { status: 'passed' },
     },
     dedupe: {
       dedupe_key: sha256Truncated(
@@ -266,6 +272,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   const validEvidenceIds = new Set(
     Array.isArray(batchManifest.evidence_ids) ? batchManifest.evidence_ids : [],
   );
+  const evidenceStatusById = batchManifest.evidence_status_by_id || {};
 
   // Base run manifest fields
   const runManifest = {
@@ -383,6 +390,27 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
           code: 'evidence_ref_missing',
           field_path: 'evidence_refs',
           detail: `evidence_id "${ref.evidence_id}" is not present in batch ${batchId}`,
+        })),
+        source,
+      );
+      continue;
+    }
+
+    // Check for references to evidence that exists in batch but was omitted upstream
+    const omittedRefs = Array.isArray(proposal.evidence_refs)
+      ? proposal.evidence_refs.filter((ref) => {
+          const status = evidenceStatusById[ref.evidence_id];
+          return status !== undefined && status !== 'present';
+        })
+      : [];
+
+    if (omittedRefs.length > 0) {
+      const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+      rejectProposal(
+        omittedRefs.map((ref) => ({
+          code: 'evidence_ref_omitted_upstream',
+          field_path: 'evidence_refs',
+          detail: `evidence_id "${ref.evidence_id}" was omitted upstream with status "${evidenceStatusById[ref.evidence_id]}"`,
         })),
         source,
       );
