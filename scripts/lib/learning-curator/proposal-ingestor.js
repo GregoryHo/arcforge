@@ -32,6 +32,7 @@ const {
   VALIDATOR_VERSION,
   EVIDENCE_QUALITY_RULE_VERSION,
 } = require('./schema');
+const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated } = require('../utils');
 
@@ -398,10 +399,9 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   try {
     const existingCandidates = readCurrentCandidates();
     for (const [cid, c] of Object.entries(existingCandidates)) {
-      const status = c.lifecycle && c.lifecycle.status;
+      const status = c.lifecycle?.status;
       if (!NON_TERMINAL_STATUSES.includes(status)) continue;
-      const bodyHash =
-        c.dedupe && c.dedupe.dedupe_basis && c.dedupe.dedupe_basis.normalized_body_hash;
+      const bodyHash = c.dedupe?.dedupe_basis?.normalized_body_hash;
       if (bodyHash) {
         existingByBodyHash[bodyHash] = cid;
       }
@@ -467,16 +467,20 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
       continue;
     }
 
-    // Check for semantic duplicate via normalized_body_hash.
-    // Per spec: if a matching non-terminal candidate exists, mark new candidate superseded.
-    const bodyHash =
-      record.dedupe &&
-      record.dedupe.dedupe_basis &&
-      record.dedupe.dedupe_basis.normalized_body_hash;
+    // Semantic dedupe via normalized_body_hash. Per Layer 5 spec line 583, when a
+    // duplicate is detected the NEW candidate is created with `superseded` status —
+    // this is an insertion-time status assignment, not an action transition through
+    // lifecycle.applyTransition. INSERTION_STATUSES gates this contract; any other
+    // status reached at insertion time is a bug.
+    const bodyHash = record.dedupe?.dedupe_basis?.normalized_body_hash;
     const existingCandidateId = bodyHash ? existingByBodyHash[bodyHash] : undefined;
     if (existingCandidateId) {
+      const supersededStatus = LIFECYCLE_STATUS.SUPERSEDED;
+      if (!isLegalInsertionStatus(supersededStatus)) {
+        throw new Error(`proposal-ingestor: "${supersededStatus}" is not a legal insertion status`);
+      }
       record.lifecycle = {
-        status: 'superseded',
+        status: supersededStatus,
         status_changed_at: now.toISOString(),
       };
       record.dedupe = {
@@ -484,7 +488,6 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
         duplicate_of: existingCandidateId,
       };
     } else if (bodyHash) {
-      // Register in local index so a second proposal in the same batch also dedupes
       existingByBodyHash[bodyHash] = record.candidate_id;
     }
 

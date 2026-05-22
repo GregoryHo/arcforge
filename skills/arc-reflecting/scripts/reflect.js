@@ -13,7 +13,7 @@ const {
 } = require('../../../scripts/lib/session-utils');
 const { saveInstinct } = require('../../../scripts/lib/instinct-writer');
 const { REFLECT_MAX_CONFIDENCE } = require('../../../scripts/lib/confidence');
-const { saveReflectionRecord } = require('../../../scripts/lib/reflect-record-writer');
+const { saveReflectionRecord } = require('../../../scripts/lib/operation-record-writer');
 
 function parseArgs(argv) {
   const args = argv.slice(2);

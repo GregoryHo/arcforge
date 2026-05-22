@@ -133,37 +133,75 @@ function walkFilesByMtime(dir, namePattern) {
 }
 
 // ---------------------------------------------------------------------------
-// Read recent diaries (at most MAX_DIARIES) → DiaryEvidenceItem[]
+// Read recent typed-evidence files (diary / reflect / recall)
 // ---------------------------------------------------------------------------
 
-function readRecentDiaries(homeDir, project) {
-  const diaryDir = path.join(getDiariesDir(homeDir), project);
-  if (!fs.existsSync(diaryDir)) return { items: [], scanned: 0, selected: 0 };
+// Per-kind config: dir resolver, filename regex, max-count, ID field name on the item,
+// and a builder for the kind-specific extra fields. Shared shape across all three is
+// applied in readRecentEvidence below.
+//
+// Note: evidence_id is derived from filePath (sha256[:12]). It's stable across runs
+// for the same file, but not content-addressed — content rename = same id. Content
+// identity is captured separately by source_ref.content_hash.
+const EVIDENCE_KIND_CONFIG = {
+  diary: {
+    getDir: getDiariesDir,
+    pattern: /^diary-.*\.md$/,
+    maxN: () => MAX_DIARIES,
+    idField: 'diary_id',
+    store: 'diary',
+    buildExtra: (sanitized) => ({ summary: sanitized }),
+  },
+  reflect: {
+    getDir: getReflectionsDir,
+    pattern: /^reflect-.*\.md$/,
+    maxN: () => MAX_REFLECTS,
+    idField: 'reflect_id',
+    store: 'reflect',
+    buildExtra: (sanitized) => ({
+      pattern_summary: sanitized,
+      supporting_sessions: [],
+      support_count: 0,
+    }),
+  },
+  recall: {
+    getDir: getRecallsDir,
+    pattern: /^recall-.*\.md$/,
+    maxN: () => MAX_RECALLS,
+    idField: 'recall_id',
+    store: 'recall',
+    buildExtra: (sanitized) => ({ user_authored: true, summary: sanitized }),
+  },
+};
 
-  const allFiles = walkFilesByMtime(diaryDir, /^diary-.*\.md$/);
+function readRecentEvidence(kind, homeDir, project) {
+  const cfg = EVIDENCE_KIND_CONFIG[kind];
+  if (!cfg) throw new Error(`readRecentEvidence: unknown kind "${kind}"`);
+
+  const dir = path.join(cfg.getDir(homeDir), project);
+  if (!fs.existsSync(dir)) return { items: [], scanned: 0, selected: 0 };
+
+  const allFiles = walkFilesByMtime(dir, cfg.pattern);
   const scanned = allFiles.length;
-  const selected = allFiles.slice(0, MAX_DIARIES);
+  const selected = allFiles.slice(0, cfg.maxN());
 
   const items = [];
   for (const { path: filePath } of selected) {
     try {
       const raw = fs.readFileSync(filePath, 'utf8');
       const sanitized = sanitizeObservationPayload(raw, 2000);
-
-      // Derive diary_id from filename (e.g. diary-abc123.md → diary-abc123)
-      const diaryId = path.basename(filePath, '.md');
-      const evidenceId = `evd-diary-${sha256Truncated(filePath, 12)}`;
+      const itemId = path.basename(filePath, '.md');
 
       items.push({
-        evidence_id: evidenceId,
-        evidence_type: 'diary',
-        diary_id: diaryId,
+        evidence_id: `evd-${kind}-${sha256Truncated(filePath, 12)}`,
+        evidence_type: kind,
+        [cfg.idField]: itemId,
         project,
         project_id: '',
         created_at: '',
-        summary: sanitized,
+        ...cfg.buildExtra(sanitized),
         source_ref: {
-          store: 'diary',
+          store: cfg.store,
           path_hash: sha256Truncated(filePath, 16),
           content_hash: sha256Truncated(raw, 16),
         },
@@ -176,95 +214,9 @@ function readRecentDiaries(homeDir, project) {
   return { items, scanned, selected: items.length };
 }
 
-// ---------------------------------------------------------------------------
-// Read recent reflections (at most MAX_REFLECTS) → ReflectEvidenceItem[]
-// ---------------------------------------------------------------------------
-
-function readRecentReflects(homeDir, project) {
-  const reflDir = path.join(getReflectionsDir(homeDir), project);
-  if (!fs.existsSync(reflDir)) return { items: [], scanned: 0, selected: 0 };
-
-  const allFiles = walkFilesByMtime(reflDir, /^reflect-.*\.md$/);
-  const scanned = allFiles.length;
-  const selected = allFiles.slice(0, MAX_REFLECTS);
-
-  const items = [];
-  for (const { path: filePath } of selected) {
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const sanitized = sanitizeObservationPayload(raw, 2000);
-
-      // Parse reflect_id from frontmatter or filename
-      const reflectId = path.basename(filePath, '.md');
-      const evidenceId = `evd-reflect-${sha256Truncated(filePath, 12)}`;
-
-      items.push({
-        evidence_id: evidenceId,
-        evidence_type: 'reflect',
-        reflect_id: reflectId,
-        project,
-        project_id: '',
-        created_at: '',
-        pattern_summary: sanitized,
-        supporting_sessions: [],
-        support_count: 0,
-        source_ref: {
-          store: 'reflect',
-          path_hash: sha256Truncated(filePath, 16),
-          content_hash: sha256Truncated(raw, 16),
-        },
-      });
-    } catch {
-      // skip unreadable files
-    }
-  }
-
-  return { items, scanned, selected: items.length };
-}
-
-// ---------------------------------------------------------------------------
-// Read recent recalls (at most MAX_RECALLS) → RecallEvidenceItem[]
-// ---------------------------------------------------------------------------
-
-function readRecentRecalls(homeDir, project) {
-  const recallDir = path.join(getRecallsDir(homeDir), project);
-  if (!fs.existsSync(recallDir)) return { items: [], scanned: 0, selected: 0 };
-
-  const allFiles = walkFilesByMtime(recallDir, /^recall-.*\.md$/);
-  const scanned = allFiles.length;
-  const selected = allFiles.slice(0, MAX_RECALLS);
-
-  const items = [];
-  for (const { path: filePath } of selected) {
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const sanitized = sanitizeObservationPayload(raw, 2000);
-
-      const recallId = path.basename(filePath, '.md');
-      const evidenceId = `evd-recall-${sha256Truncated(filePath, 12)}`;
-
-      items.push({
-        evidence_id: evidenceId,
-        evidence_type: 'recall',
-        recall_id: recallId,
-        project,
-        project_id: '',
-        created_at: '',
-        user_authored: true,
-        summary: sanitized,
-        source_ref: {
-          store: 'recall',
-          path_hash: sha256Truncated(filePath, 16),
-          content_hash: sha256Truncated(raw, 16),
-        },
-      });
-    } catch {
-      // skip unreadable files
-    }
-  }
-
-  return { items, scanned, selected: items.length };
-}
+const readRecentDiaries = (homeDir, project) => readRecentEvidence('diary', homeDir, project);
+const readRecentReflects = (homeDir, project) => readRecentEvidence('reflect', homeDir, project);
+const readRecentRecalls = (homeDir, project) => readRecentEvidence('recall', homeDir, project);
 
 // ---------------------------------------------------------------------------
 // Build evidence items from observation records

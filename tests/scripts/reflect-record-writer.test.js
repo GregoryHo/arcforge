@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 function getWriter() {
-  return require('../../scripts/lib/reflect-record-writer');
+  return require('../../scripts/lib/operation-record-writer');
 }
 
 // ---------------------------------------------------------------------------

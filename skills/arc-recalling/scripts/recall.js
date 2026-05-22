@@ -6,7 +6,7 @@
  */
 
 const { saveInstinct, checkInstinctDuplicate } = require('../../../scripts/lib/instinct-writer');
-const { saveRecallRecord } = require('../../../scripts/lib/recall-record-writer');
+const { saveRecallRecord } = require('../../../scripts/lib/operation-record-writer');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
