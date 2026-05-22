@@ -32,6 +32,8 @@ const { atomicWriteFile, sha256Truncated } = require('../utils');
 // Per Section 4 Slice E + Layer 3 open question #2: first-slice bounds
 const MAX_OBSERVATIONS = 200;
 const MAX_DIARIES = 5;
+const MAX_REFLECTS = 10;
+const MAX_RECALLS = 10;
 const MAX_CHARS_PER_ITEM = 1000;
 const MAX_CHARS_TOTAL = 100000;
 const SELECTION_POLICY_VERSION = 'v1';
@@ -50,6 +52,14 @@ function getObsDir(homeDir) {
 
 function getDiariesDir(homeDir) {
   return path.join(getArcforgeDir(homeDir), 'diaries');
+}
+
+function getReflectionsDir(homeDir) {
+  return path.join(getArcforgeDir(homeDir), 'reflections');
+}
+
+function getRecallsDir(homeDir) {
+  return path.join(getArcforgeDir(homeDir), 'recalls');
 }
 
 function getBatchesDir(homeDir) {
@@ -89,59 +99,124 @@ function readObservations(homeDir, project) {
 }
 
 // ---------------------------------------------------------------------------
-// Read recent diaries (at most MAX_DIARIES)
+// Walk a directory recursively, collecting files matching a name pattern.
+// Returns { path, mtime } sorted by mtime descending.
 // ---------------------------------------------------------------------------
 
-function readRecentDiaries(homeDir, project) {
-  const diaryDir = path.join(getDiariesDir(homeDir), project);
-  if (!fs.existsSync(diaryDir)) return [];
-
-  // Collect all diary-*.md files recursively under diaryDir
-  const diaryFiles = [];
-  function walk(dir) {
+function walkFilesByMtime(dir, namePattern) {
+  const files = [];
+  function walk(d) {
     let entries;
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = fs.readdirSync(d, { withFileTypes: true });
     } catch {
       return;
     }
     for (const entry of entries) {
-      const full = path.join(dir, entry.name);
+      const full = path.join(d, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else if (entry.isFile() && /^diary-.*\.md$/.test(entry.name)) {
-        diaryFiles.push(full);
+      } else if (entry.isFile() && namePattern.test(entry.name)) {
+        let mtime = 0;
+        try {
+          mtime = fs.statSync(full).mtimeMs;
+        } catch {
+          // unreadable; sort to the end
+        }
+        files.push({ path: full, mtime });
       }
     }
   }
-  walk(diaryDir);
+  walk(dir);
+  files.sort((a, b) => b.mtime - a.mtime);
+  return files;
+}
 
-  // Precompute mtime once per file — sort comparator would otherwise call
-  // statSync O(N log N) times. Files we can't stat fall through to mtime=0.
-  const withMtime = diaryFiles.map((p) => {
-    let mtime = 0;
-    try {
-      mtime = fs.statSync(p).mtimeMs;
-    } catch {
-      // unreadable; sort to the end
-    }
-    return { path: p, mtime };
-  });
-  withMtime.sort((a, b) => b.mtime - a.mtime);
-  const selected = withMtime.slice(0, MAX_DIARIES).map((x) => x.path);
+// ---------------------------------------------------------------------------
+// Read recent typed-evidence files (diary / reflect / recall)
+// ---------------------------------------------------------------------------
 
-  // Read content (sanitized)
-  const entries = [];
-  for (const filePath of selected) {
+// Per-kind config: dir resolver, filename regex, max-count, ID field name on the item,
+// and a builder for the kind-specific extra fields. Shared shape across all three is
+// applied in readRecentEvidence below.
+//
+// Note: evidence_id is derived from filePath (sha256[:12]). It's stable across runs
+// for the same file, but not content-addressed — content rename = same id. Content
+// identity is captured separately by source_ref.content_hash.
+const EVIDENCE_KIND_CONFIG = {
+  diary: {
+    getDir: getDiariesDir,
+    pattern: /^diary-.*\.md$/,
+    maxN: () => MAX_DIARIES,
+    idField: 'diary_id',
+    store: 'diary',
+    buildExtra: (sanitized) => ({ summary: sanitized }),
+  },
+  reflect: {
+    getDir: getReflectionsDir,
+    pattern: /^reflect-.*\.md$/,
+    maxN: () => MAX_REFLECTS,
+    idField: 'reflect_id',
+    store: 'reflect',
+    buildExtra: (sanitized) => ({
+      pattern_summary: sanitized,
+      supporting_sessions: [],
+      support_count: 0,
+    }),
+  },
+  recall: {
+    getDir: getRecallsDir,
+    pattern: /^recall-.*\.md$/,
+    maxN: () => MAX_RECALLS,
+    idField: 'recall_id',
+    store: 'recall',
+    buildExtra: (sanitized) => ({ user_authored: true, summary: sanitized }),
+  },
+};
+
+function readRecentEvidence(kind, homeDir, project) {
+  const cfg = EVIDENCE_KIND_CONFIG[kind];
+  if (!cfg) throw new Error(`readRecentEvidence: unknown kind "${kind}"`);
+
+  const dir = path.join(cfg.getDir(homeDir), project);
+  if (!fs.existsSync(dir)) return { items: [], scanned: 0, selected: 0 };
+
+  const allFiles = walkFilesByMtime(dir, cfg.pattern);
+  const scanned = allFiles.length;
+  const selected = allFiles.slice(0, cfg.maxN());
+
+  const items = [];
+  for (const { path: filePath } of selected) {
     try {
       const raw = fs.readFileSync(filePath, 'utf8');
-      entries.push(sanitizeObservationPayload(raw, 2000));
+      const sanitized = sanitizeObservationPayload(raw, 2000);
+      const itemId = path.basename(filePath, '.md');
+
+      items.push({
+        evidence_id: `evd-${kind}-${sha256Truncated(filePath, 12)}`,
+        evidence_type: kind,
+        [cfg.idField]: itemId,
+        project,
+        project_id: '',
+        created_at: '',
+        ...cfg.buildExtra(sanitized),
+        source_ref: {
+          store: cfg.store,
+          path_hash: sha256Truncated(filePath, 16),
+          content_hash: sha256Truncated(raw, 16),
+        },
+      });
     } catch {
       // skip unreadable files
     }
   }
-  return entries;
+
+  return { items, scanned, selected: items.length };
 }
+
+const readRecentDiaries = (homeDir, project) => readRecentEvidence('diary', homeDir, project);
+const readRecentReflects = (homeDir, project) => readRecentEvidence('reflect', homeDir, project);
+const readRecentRecalls = (homeDir, project) => readRecentEvidence('recall', homeDir, project);
 
 // ---------------------------------------------------------------------------
 // Build evidence items from observation records
@@ -269,7 +344,7 @@ function buildAggregateContext(evidenceItems) {
 // Prompt template rendering
 // ---------------------------------------------------------------------------
 
-function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryEntries }) {
+function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryItems }) {
   const promptTemplatePath = path.join(
     __dirname,
     '../../../skills/arc-observing/scripts/observer-prompt.md',
@@ -303,10 +378,15 @@ function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryEnt
     })
     .join('\n\n---\n\n');
 
-  // Build diary section
+  // Build diary section from DiaryEvidenceItem[]
   let diarySection;
-  if (diaryEntries.length > 0) {
-    diarySection = diaryEntries.map((d, i) => `### Diary ${i + 1}\n\n${d}`).join('\n\n');
+  if (diaryItems.length > 0) {
+    diarySection = diaryItems
+      .map((item, i) => {
+        const body = item.summary || '';
+        return `### Diary ${i + 1} (${item.evidence_id})\n\n${body}`;
+      })
+      .join('\n\n');
   } else {
     diarySection = 'None';
   }
@@ -371,14 +451,31 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
   const allObs = readObservations(homeDir, project);
   const projectId = deriveProjectId(allObs, project);
   const {
-    items: evidenceItems,
+    items: obsItems,
     scanned,
     selected,
     omissions,
   } = buildEvidenceItems(allObs, project, projectId);
 
-  // Read diary context
-  const diaryEntries = readRecentDiaries(homeDir, project);
+  // Read diary, reflect, recall evidence
+  const {
+    items: diaryItems,
+    scanned: diaryScanned,
+    selected: diarySelected,
+  } = readRecentDiaries(homeDir, project);
+  const {
+    items: reflectItems,
+    scanned: reflectScanned,
+    selected: reflectSelected,
+  } = readRecentReflects(homeDir, project);
+  const {
+    items: recallItems,
+    scanned: recallScanned,
+    selected: recallSelected,
+  } = readRecentRecalls(homeDir, project);
+
+  // Merge all evidence items: observations first, then diary/reflect/recall
+  const evidenceItems = [...obsItems, ...diaryItems, ...reflectItems, ...recallItems];
 
   // Compute batch_id components
   const idTimestamp = compactUtc(now);
@@ -388,28 +485,28 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
   const batchId = `batch_${idTimestamp}_${batchIdHash}`;
 
   // Aggregate context
-  const aggregateContext = buildAggregateContext(evidenceItems);
+  const aggregateContext = buildAggregateContext(obsItems);
 
   // Quality inputs (v1 formula: project_obs_count only)
   const qualityInputs = {
     project_observation_count: allObs.length,
     selected_evidence_count: evidenceItems.length,
     selected_by_type: {
-      observation: evidenceItems.filter((e) => e.evidence_type === 'observation').length,
-      diary: 0,
-      reflect: 0,
-      recall: 0,
+      observation: obsItems.length,
+      diary: diaryItems.length,
+      reflect: reflectItems.length,
+      recall: recallItems.length,
       session_summary: 0,
     },
     session_span: {
       session_count: aggregateContext.session_count,
-      first_ts: evidenceItems.length > 0 ? evidenceItems[0].ts : undefined,
-      last_ts: evidenceItems.length > 0 ? evidenceItems[evidenceItems.length - 1].ts : undefined,
+      first_ts: obsItems.length > 0 ? obsItems[0].ts : undefined,
+      last_ts: obsItems.length > 0 ? obsItems[obsItems.length - 1].ts : undefined,
     },
     signal_mix: {
       has_user_correction: false,
-      has_manual_recall: false,
-      has_reflect_pattern: false,
+      has_manual_recall: recallItems.length > 0,
+      has_reflect_pattern: reflectItems.length > 0,
       has_error_repair_sequence: false,
       has_repeated_observation_sequence: false,
     },
@@ -448,7 +545,7 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
     batchId,
     batchHash,
     evidenceItems,
-    diaryEntries,
+    diaryItems,
   });
 
   // Persist manifest and prompt
@@ -462,8 +559,8 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
     policy_version: SELECTION_POLICY_VERSION,
     max_observations: MAX_OBSERVATIONS,
     max_diaries: MAX_DIARIES,
-    max_reflections: 0,
-    max_recalls: 0,
+    max_reflections: MAX_REFLECTS,
+    max_recalls: MAX_RECALLS,
     max_transcript_summaries: 0,
     ordering: 'chronological',
     selection_rules: ['recent'],
@@ -483,6 +580,18 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
         records_scanned: scanned,
         records_selected: selected,
         records_omitted: scanned - selected,
+      },
+      diaries: {
+        records_scanned: diaryScanned,
+        records_selected: diarySelected,
+      },
+      reflects: {
+        records_scanned: reflectScanned,
+        records_selected: reflectSelected,
+      },
+      recalls: {
+        records_scanned: recallScanned,
+        records_selected: recallSelected,
       },
       transcript_summaries: {
         available: false,

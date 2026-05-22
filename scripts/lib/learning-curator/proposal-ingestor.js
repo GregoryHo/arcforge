@@ -26,8 +26,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { appendCandidate, rejectProposal } = require('./queue-writer');
-const { computeEvidenceQuality, VALIDATOR_VERSION } = require('./schema');
+const { appendCandidate, rejectProposal, readCurrentCandidates } = require('./queue-writer');
+const {
+  computeEvidenceQuality,
+  VALIDATOR_VERSION,
+  EVIDENCE_QUALITY_RULE_VERSION,
+} = require('./schema');
+const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated } = require('../utils');
 
@@ -155,7 +160,7 @@ function buildCandidateRecord(proposal, batchManifest, now) {
     evidence,
     evidence_quality: evidenceQuality,
     evidence_quality_metadata: {
-      rule_version: SANITIZER_POLICY_VERSION,
+      rule_version: EVIDENCE_QUALITY_RULE_VERSION,
       basis: {
         project_obs_count: projectObsCount,
       },
@@ -178,17 +183,32 @@ function buildCandidateRecord(proposal, batchManifest, now) {
       activation_claim_scan: { status: 'passed' },
       file_write_claim_scan: { status: 'passed' },
     },
-    dedupe: {
-      dedupe_key: sha256Truncated(
-        `${scope.project_id}|${proposal.artifact_type}|${proposal.name}`,
-        16,
-      ),
-      dedupe_basis: {
-        artifact_type: proposal.artifact_type,
-        name: proposal.name,
-        scope_project_id: scope.project_id,
-      },
-    },
+  };
+
+  // Compute canonical dedupe_basis per Layer 5 spec (layer-5-candidate-queue-lifecycle.md)
+  const normalizedName = (proposal.name || '').toLowerCase().replace(/\s+/g, '-');
+  const normalizedTrigger =
+    typeof proposal.trigger === 'string' ? proposal.trigger.toLowerCase().trim() : undefined;
+  const normalizedBodyHash = sha256Truncated(proposal.body || '', 12);
+
+  const dedupeBasis = {
+    scope_kind: scope.kind,
+    artifact_type: proposal.artifact_type,
+    normalized_name: normalizedName,
+    normalized_body_hash: normalizedBodyHash,
+  };
+  if (scope.kind === 'project' && scope.project_id) {
+    dedupeBasis.project_id = scope.project_id;
+  }
+  if (normalizedTrigger !== undefined) {
+    dedupeBasis.normalized_trigger = normalizedTrigger;
+  }
+
+  const dedupeKey = sha256Truncated(JSON.stringify(dedupeBasis), 12);
+
+  record.dedupe = {
+    dedupe_key: dedupeKey,
+    dedupe_basis: dedupeBasis,
   };
 
   return record;
@@ -372,6 +392,24 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   };
   const linesBefore = countQueueLines();
 
+  // Build a body-hash → candidate_id index from existing non-terminal candidates
+  // for superseded dedupe detection. Read once before the loop.
+  const existingByBodyHash = {};
+  const NON_TERMINAL_STATUSES = ['pending_review', 'needs_more_evidence'];
+  try {
+    const existingCandidates = readCurrentCandidates();
+    for (const [cid, c] of Object.entries(existingCandidates)) {
+      const status = c.lifecycle?.status;
+      if (!NON_TERMINAL_STATUSES.includes(status)) continue;
+      const bodyHash = c.dedupe?.dedupe_basis?.normalized_body_hash;
+      if (bodyHash) {
+        existingByBodyHash[bodyHash] = cid;
+      }
+    }
+  } catch {
+    // If queue is unreadable, skip dedup check — do not block ingestion
+  }
+
   // Process each proposal. Rejection paths (missing evidence refs, record-build
   // failure) write to rejections.jsonl; appendCandidate writes to queue.jsonl on
   // pass or rejections.jsonl on schema/safety fail. Counts computed from the
@@ -427,6 +465,30 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
         source,
       );
       continue;
+    }
+
+    // Semantic dedupe via normalized_body_hash. Per Layer 5 spec line 583, when a
+    // duplicate is detected the NEW candidate is created with `superseded` status —
+    // this is an insertion-time status assignment, not an action transition through
+    // lifecycle.applyTransition. INSERTION_STATUSES gates this contract; any other
+    // status reached at insertion time is a bug.
+    const bodyHash = record.dedupe?.dedupe_basis?.normalized_body_hash;
+    const existingCandidateId = bodyHash ? existingByBodyHash[bodyHash] : undefined;
+    if (existingCandidateId) {
+      const supersededStatus = LIFECYCLE_STATUS.SUPERSEDED;
+      if (!isLegalInsertionStatus(supersededStatus)) {
+        throw new Error(`proposal-ingestor: "${supersededStatus}" is not a legal insertion status`);
+      }
+      record.lifecycle = {
+        status: supersededStatus,
+        status_changed_at: now.toISOString(),
+      };
+      record.dedupe = {
+        ...record.dedupe,
+        duplicate_of: existingCandidateId,
+      };
+    } else if (bodyHash) {
+      existingByBodyHash[bodyHash] = record.candidate_id;
     }
 
     appendCandidate(record);

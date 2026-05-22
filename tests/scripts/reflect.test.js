@@ -1,9 +1,9 @@
 // tests/scripts/reflect.test.js
 
 const { execFileSync } = require('node:child_process');
-const _fs = require('node:fs');
+const fs = require('node:fs');
 const path = require('node:path');
-const _os = require('node:os');
+const os = require('node:os');
 
 describe('reflect.js CLI', () => {
   const scriptPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
@@ -56,5 +56,82 @@ describe('reflect.js CLI', () => {
         expect(err.status).toBe(1);
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 1: save-record command emits a reflection operation record
+// ---------------------------------------------------------------------------
+
+describe('reflect.js save-record command (criterion 1)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-reflect-op-test-'));
+  });
+
+  afterEach(() => {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  const scriptPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
+
+  it('saves a reflection operation record to ~/.arcforge/reflections/<project>/', () => {
+    const reflectId = 'reflect-20260522T010000Z-abcd1234';
+    execFileSync(
+      'node',
+      [
+        scriptPath,
+        'save-record',
+        '--project',
+        'test-project',
+        '--reflect-id',
+        reflectId,
+        '--session',
+        'session-abc',
+        '--diaries',
+        'diary-1.md,diary-2.md',
+        '--summary',
+        'Grep pattern found',
+        '--home-dir',
+        tmpDir,
+      ],
+      { encoding: 'utf-8' },
+    );
+
+    const expectedPath = path.join(
+      tmpDir,
+      '.arcforge',
+      'reflections',
+      'test-project',
+      `${reflectId}.md`,
+    );
+    expect(fs.existsSync(expectedPath)).toBe(true);
+
+    const content = fs.readFileSync(expectedPath, 'utf-8');
+    expect(content).toContain(`reflect_id: ${reflectId}`);
+    expect(content).toContain('Grep pattern found');
+  });
+
+  it('exits with error when missing required --project', () => {
+    expect(() => {
+      execFileSync('node', [scriptPath, 'save-record', '--reflect-id', 'reflect-x'], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+    }).toThrow();
+  });
+
+  it('exits with error when missing required --reflect-id', () => {
+    expect(() => {
+      execFileSync('node', [scriptPath, 'save-record', '--project', 'test-project'], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+    }).toThrow();
   });
 });

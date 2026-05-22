@@ -31,11 +31,19 @@ Do NOT propose `skill`, `command`, `agent`, or `claude_md_addition`. Those artif
 
 The following evidence items are the ONLY evidence you may cite. Each item has an `evidence_id` — use only those IDs in your `evidence_refs`.
 
+Evidence comes in four types:
+- **observation** — individual tool call events captured from Claude Code sessions
+- **diary** — bounded session diary summaries
+- **reflect** — cross-session reflection patterns from past `/reflect` operations
+- **recall** — manually captured insights from past `/recall` operations
+
+Every item in the batch below has an `evidence_id`. You MUST use those IDs when citing evidence in `evidence_refs`.
+
 {{EVIDENCE_ITEMS}}
 
 ## Recent Diary Reflections
 
-The following are recent session diary summaries for this project. Use these as supporting context, but they do not have `evidence_id`s and cannot be cited in `evidence_refs`.
+The following are recent session diary summaries for this project. These items also appear in the Evidence Batch above with `evidence_type: "diary"` and have `evidence_id`s — you CAN cite them in `evidence_refs` using their `evidence_id`.
 
 {{DIARY_CONTEXT}}
 
@@ -72,7 +80,7 @@ Respond with a single JSON object matching the `CandidateProposalPayload` schema
       "body_source": "llm_curator",
       "evidence_refs": [
         {
-          "evidence_id": "<must be one of the evidence_ids in the batch above>",
+          "evidence_id": "<must be one of the evidence_ids in the batch above — all 4 evidence types are citable>",
           "evidence_type": "<observation|diary|reflect|recall>",
           "relevance": "<brief reason why this evidence supports the proposal>"
         }

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Recall CLI — save, check-duplicate
+ * Recall CLI — save, check-duplicate, save-record
  *
  * Manual instinct creation from user session context.
  */
 
 const { saveInstinct, checkInstinctDuplicate } = require('../../../scripts/lib/instinct-writer');
+const { saveRecallRecord } = require('../../../scripts/lib/operation-record-writer');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -51,6 +52,36 @@ function cmdSave(flags) {
   }
 }
 
+function cmdSaveRecord(flags) {
+  const { project, session, summary } = flags;
+  const recallId = flags['recall-id'];
+  const query = flags['query'] || flags['recall-query'];
+  const homeDir = flags['home-dir'];
+  const returnedIds = flags['instinct-ids'];
+
+  if (!project || !recallId) {
+    console.error('Error: Missing required arguments');
+    console.log('Usage: recall.js save-record --project X --recall-id Y [--session Z] [--query "..."] [--summary "..."] [--instinct-ids "a,b,c"] [--home-dir DIR]');
+    process.exit(1);
+  }
+
+  const returnedInstinctIds = returnedIds ? returnedIds.split(',').filter(Boolean) : [];
+
+  saveRecallRecord({
+    recall_id: recallId,
+    project,
+    project_id: flags['project-id'] || '',
+    session: session || '',
+    created_at: new Date().toISOString(),
+    recall_query: query || '',
+    returned_instinct_ids: returnedInstinctIds,
+    summary: summary || '',
+    homeDir,
+  });
+
+  console.log(`✓ Saved recall record: ${recallId}`);
+}
+
 function cmdCheckDuplicate(flags) {
   const { id, project } = flags;
 
@@ -71,6 +102,9 @@ function main() {
       break;
     case 'check-duplicate':
       cmdCheckDuplicate(flags);
+      break;
+    case 'save-record':
+      cmdSaveRecord(flags);
       break;
     default:
       console.log('Recall CLI — Manual instinct creation\n');
@@ -94,7 +128,8 @@ function main() {
 module.exports = {
   parseArgs,
   cmdSave,
-  cmdCheckDuplicate
+  cmdCheckDuplicate,
+  cmdSaveRecord,
 };
 
 if (require.main === module) {

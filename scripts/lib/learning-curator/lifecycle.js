@@ -42,6 +42,21 @@ const LIFECYCLE_STATUS = Object.freeze({
 
 const LIFECYCLE_STATUSES = Object.freeze(Object.values(LIFECYCLE_STATUS));
 
+// Statuses a NEW candidate may be created with (insertion-time, not from an action transition).
+// `pending_review` is the default for fresh proposals; `superseded` is reserved for the
+// "we ingested a duplicate of an existing candidate" path in proposal-ingestor — see spec
+// layer-5 line 583 ("If a candidate is replaced, use relationship metadata and, when
+// appropriate, the `superseded` lifecycle status."). All other statuses are reachable only
+// via applyTransition() from a prior status.
+const INSERTION_STATUSES = Object.freeze([
+  LIFECYCLE_STATUS.PENDING_REVIEW,
+  LIFECYCLE_STATUS.SUPERSEDED,
+]);
+
+function isLegalInsertionStatus(status) {
+  return INSERTION_STATUSES.includes(status);
+}
+
 // Canonical action set (Layer 5 spec — Action × Status matrix columns).
 // DEACTIVATE added in Slice G (Layer 8 extension).
 const LIFECYCLE_ACTION = Object.freeze({
@@ -135,8 +150,10 @@ function applyTransition(currentStatus, action) {
 module.exports = {
   isLegalAction,
   applyTransition,
+  isLegalInsertionStatus,
   LIFECYCLE_STATUS,
   LIFECYCLE_STATUSES,
+  INSERTION_STATUSES,
   LIFECYCLE_ACTION,
   ACTIONS,
   MATRIX,
