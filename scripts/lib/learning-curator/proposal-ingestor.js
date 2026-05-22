@@ -12,7 +12,9 @@
  * Per Layer 4 spec (layer-4-llm-curator-analysis.md):
  * - CuratorRunManifest persisted for every attempted run (even failures)
  * - raw_prompt_saved: false, raw_response_saved: false (default off)
- * - parse_status: "parsed" | "empty" | "malformed_json" | "non_object"
+ * - parse_status (open enum of run outcomes):
+ *     "parsed" | "empty" | "malformed_json" | "non_object" |
+ *     "transport_error" | "source_hash_mismatch" | "source_manifest_missing"
  *
  * Idempotency: run_id is derived deterministically from (batch_id, response_hash,
  * prompt_policy_version). If the same run_id manifest already exists, the prior
@@ -373,6 +375,8 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   }
 
   // Verify batch_hash in payload matches loaded manifest — detects stale or misrouted responses.
+  // Ordered after the empty-proposals guard because an empty payload is inert (no record reaches
+  // the queue) regardless of hash; the hash check is only material when there's something to admit.
   const payloadBatchHash = payload.source?.batch_hash;
   if (payloadBatchHash !== undefined && payloadBatchHash !== batchManifest.batch_hash) {
     const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
