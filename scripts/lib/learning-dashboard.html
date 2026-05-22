@@ -43,6 +43,24 @@
       .actions button.danger { color: var(--danger); }
       .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 48px 0; }
       .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--border); color: var(--fg); font-size: 11px; }
+      .chip { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+      .chip-low_signal { background: #ffe0e0; color: #b32424; }
+      .chip-medium_signal { background: #fff3cd; color: #856404; }
+      .chip-high_signal { background: #d4edda; color: #155724; }
+      @media (prefers-color-scheme: dark) {
+        .chip-low_signal { background: #4a1a1a; color: #ff8888; }
+        .chip-medium_signal { background: #4a3a00; color: #ffd966; }
+        .chip-high_signal { background: #1a3a1a; color: #66bb66; }
+      }
+      .evidence-counts { font-size: 11px; color: var(--muted); }
+      .note-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+      .note-badge { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: var(--border); }
+      .detail-panel { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+      .detail-section { font-size: 13px; }
+      .detail-section summary { cursor: pointer; font-weight: 600; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      .evidence-summary-item { padding: 6px 0; border-bottom: 1px solid var(--border); }
+      .evidence-summary-item:last-child { border-bottom: none; }
+      .llm-block, .lifecycle-block { background: var(--border); border-radius: 6px; padding: 8px; font-size: 12px; }
     </style>
   </head>
   <body>
@@ -98,10 +116,41 @@
         summaryEl.className = 'summary';
         summaryEl.textContent = c.summary || '';
 
+        // evidence_quality_chip pill
+        const chipEl = document.createElement('div');
+        if (c.evidence_quality_chip) {
+          const pill = document.createElement('span');
+          pill.className = 'chip chip-' + c.evidence_quality_chip;
+          pill.textContent = c.evidence_quality_chip.replace('_signal', '') + ' signal';
+          chipEl.appendChild(pill);
+        }
+
+        // evidence_counts breakdown
         const evidenceEl = document.createElement('div');
-        evidenceEl.style.fontSize = '12px';
-        evidenceEl.style.color = 'var(--muted)';
-        evidenceEl.textContent = 'Evidence: ' + (c.evidence_count || 0) + ' (' + (c.evidence_quality || 'unknown') + ')';
+        evidenceEl.className = 'evidence-counts';
+        const counts = c.evidence_counts || {};
+        const total = counts.total || 0;
+        const byType = counts.by_type || {};
+        const byTypeStr = Object.entries(byType).map(([t, n]) => t + ':' + n).join(', ');
+        evidenceEl.textContent = 'Evidence: ' + total + (byTypeStr ? ' (' + byTypeStr + ')' : '') + ' — quality: ' + (c.evidence_quality || 'unknown');
+
+        // risk/uncertainty note badges
+        const noteBadgesEl = document.createElement('div');
+        noteBadgesEl.className = 'note-badges';
+        if ((c.risk_note_count || 0) > 0) {
+          const rb = document.createElement('span');
+          rb.className = 'note-badge';
+          rb.title = 'risk_note_count';
+          rb.textContent = c.risk_note_count + ' risk';
+          noteBadgesEl.appendChild(rb);
+        }
+        if ((c.uncertainty_note_count || 0) > 0) {
+          const ub = document.createElement('span');
+          ub.className = 'note-badge';
+          ub.title = 'uncertainty_note_count';
+          ub.textContent = c.uncertainty_note_count + ' uncertain';
+          noteBadgesEl.appendChild(ub);
+        }
 
         const actionsEl = document.createElement('div');
         actionsEl.className = 'actions';
@@ -119,9 +168,98 @@
         card.appendChild(meta);
         card.appendChild(nameEl);
         card.appendChild(summaryEl);
+        card.appendChild(chipEl);
         card.appendChild(evidenceEl);
+        card.appendChild(noteBadgesEl);
+        // relationships link
+        if (c.relationships) {
+          const relEl = document.createElement('div');
+          relEl.style.fontSize = '11px';
+          relEl.style.color = 'var(--muted)';
+          const relKeys = Object.keys(c.relationships).join(', ');
+          relEl.textContent = 'Related: ' + relKeys;
+          card.appendChild(relEl);
+        }
         card.appendChild(actionsEl);
+        // Detail view (collapsible)
+        card.appendChild(createDetailTrigger(c));
         return card;
+      }
+
+      function createDetailTrigger(c) {
+        const container = document.createElement('div');
+        container.style.marginTop = '4px';
+        const btn = document.createElement('button');
+        btn.textContent = 'Details';
+        btn.style.fontSize = '11px';
+        btn.addEventListener('click', async () => {
+          const existing = container.querySelector('.detail-panel');
+          if (existing) { existing.remove(); return; }
+          try {
+            const res = await fetch('/api/candidates/' + encodeURIComponent(c.candidate_id));
+            const detail = await res.json();
+            container.appendChild(renderDetailPanel(detail));
+          } catch (e) {
+            const errEl = document.createElement('div');
+            errEl.textContent = 'Detail load failed';
+            container.appendChild(errEl);
+          }
+        });
+        container.appendChild(btn);
+        return container;
+      }
+
+      function renderDetailPanel(d) {
+        const panel = document.createElement('div');
+        panel.className = 'detail-panel';
+
+        // evidence_summaries
+        if (d.evidence_summaries && d.evidence_summaries.length > 0) {
+          const details = document.createElement('details');
+          details.className = 'detail-section';
+          const summary = document.createElement('summary');
+          summary.textContent = 'Evidence summaries (' + d.evidence_summaries.length + ')';
+          details.appendChild(summary);
+          for (const ev of d.evidence_summaries) {
+            const item = document.createElement('div');
+            item.className = 'evidence-summary-item';
+            item.innerHTML = '<strong>' + (ev.evidence_type || '') + '</strong>: ' + (ev.summary || '') +
+              (ev.relevance ? '<br><em>' + ev.relevance + '</em>' : '');
+            details.appendChild(item);
+          }
+          panel.appendChild(details);
+        }
+
+        // llm_assessment block
+        if (d.llm_assessment) {
+          const llmEl = document.createElement('div');
+          llmEl.className = 'llm-block detail-section';
+          const conf = d.llm_assessment.llm_confidence || 'unknown';
+          const risks = (d.llm_assessment.risk_notes || []).join('; ');
+          const unc = (d.llm_assessment.uncertainty_notes || []).join('; ');
+          llmEl.innerHTML = '<strong>LLM assessment</strong>: confidence=' + conf +
+            (risks ? '<br>Risks: ' + risks : '') +
+            (unc ? '<br>Uncertain: ' + unc : '');
+          panel.appendChild(llmEl);
+        }
+
+        // materialization block
+        if (d.materialization) {
+          const matEl = document.createElement('div');
+          matEl.className = 'lifecycle-block detail-section';
+          matEl.innerHTML = '<strong>Materialization</strong>: ' + JSON.stringify(d.materialization);
+          panel.appendChild(matEl);
+        }
+
+        // activation block
+        if (d.activation) {
+          const actEl = document.createElement('div');
+          actEl.className = 'lifecycle-block detail-section';
+          actEl.innerHTML = '<strong>Activation</strong>: ' + JSON.stringify(d.activation);
+          panel.appendChild(actEl);
+        }
+
+        return panel;
       }
 
       function render(model) {

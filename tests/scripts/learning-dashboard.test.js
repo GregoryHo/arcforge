@@ -452,7 +452,14 @@ describe('action handlers — Action × Status matrix (criterion 2)', () => {
     });
     expect(matResult.accepted).toBe(true);
 
-    const result = handleDashboardAction({ action: 'activate', candidate_id: record.candidate_id });
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
+    });
 
     expect(result.accepted).toBe(true);
   });
@@ -689,6 +696,59 @@ describe('HTML — statistical-pipeline dead code removed (criterion 4)', () => 
       expect(html).toMatch(new RegExp(`${action}:\\s*\\[[^\\]]+\\]`));
     }
   });
+
+  it('HTML contains evidence_quality_chip CSS classes', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('chip-low_signal');
+    expect(html).toContain('chip-medium_signal');
+    expect(html).toContain('chip-high_signal');
+  });
+
+  it('HTML renders evidence_quality_chip pill on card', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('evidence_quality_chip');
+  });
+
+  it('HTML renders evidence_counts breakdown on card', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('evidence_counts');
+  });
+
+  it('HTML renders risk and uncertainty count badges on card', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('risk_note_count');
+    expect(html).toContain('uncertainty_note_count');
+  });
+
+  it('HTML renders evidence_summaries section in detail view', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('evidence_summaries');
+  });
+
+  it('HTML renders llm_assessment block in detail view', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('llm_assessment');
+  });
+
+  it('HTML renders materialization and activation status blocks in detail view', () => {
+    const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toContain('materialization');
+    expect(html).toContain('activation');
+  });
 });
 
 // ===========================================================================
@@ -895,6 +955,10 @@ describe('DH-2: activate action calls activate.js module', () => {
     const result = handleDashboardAction({
       action: 'activate',
       candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
     });
 
     expect(result.accepted).toBe(true);
@@ -1008,6 +1072,10 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
     const actResult = handleDashboardAction({
       action: 'activate',
       candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
     });
     expect(actResult.accepted).toBe(true);
 
@@ -1021,6 +1089,7 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
     const deactResult = handleDashboardAction({
       action: 'deactivate',
       candidate_id: record.candidate_id,
+      safety_ack: { reviewer_saw_behavior_change_warning: true },
     });
     expect(deactResult.accepted).toBe(true);
 
@@ -1056,5 +1125,449 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
       readCurrentCandidates: rcc,
     } = require('../../scripts/lib/learning-curator/queue-writer');
     expect(rcc()[record.candidate_id].lifecycle.status).toBe('deactivated');
+  });
+});
+
+// ===========================================================================
+// PR-D Criterion 1 — evidence_quality_chip + relationships on card
+// ===========================================================================
+
+describe('PR-D Criterion 1 — evidence_quality_chip and relationships on card', () => {
+  it('evidence_quality_chip is derived correctly from evidence_quality', () => {
+    for (const [quality, chip] of [
+      ['low', 'low_signal'],
+      ['medium', 'medium_signal'],
+      ['high', 'high_signal'],
+    ]) {
+      const record = makeCandidateRecord({ evidence_quality: quality });
+      const card = sanitizeDashboardCard(record);
+      expect(card.evidence_quality_chip).toBe(chip);
+    }
+  });
+
+  it('evidence_quality_chip is omitted when evidence_quality is absent', () => {
+    const record = makeCandidateRecord({ evidence_quality: undefined });
+    const card = sanitizeDashboardCard(record);
+    expect(card).not.toHaveProperty('evidence_quality_chip');
+  });
+
+  it('relationships is copied from candidate if present', () => {
+    const record = makeCandidateRecord({
+      relationships: { promoted_from_candidate_id: 'cand-parent-001' },
+    });
+    const card = sanitizeDashboardCard(record);
+    expect(card.relationships).toEqual({ promoted_from_candidate_id: 'cand-parent-001' });
+  });
+
+  it('relationships is absent from card if candidate has none', () => {
+    const record = makeCandidateRecord();
+    const card = sanitizeDashboardCard(record);
+    expect(card).not.toHaveProperty('relationships');
+  });
+});
+
+// ===========================================================================
+// PR-D Criterion 2 — expected_current_status optimistic concurrency
+// ===========================================================================
+
+describe('PR-D Criterion 2 — expected_current_status stale guard', () => {
+  it('stale expected_current_status → rejected with stale_status', () => {
+    const record = makeCandidateRecord({
+      lifecycle: { status: 'pending_review', status_changed_at: '2026-05-01T00:00:00Z' },
+    });
+    appendCandidate(record);
+
+    // Client thinks status is 'approved' but it's really 'pending_review'
+    const result = handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      expected_current_status: 'approved',
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('stale_status');
+    expect(result.expected).toBe('approved');
+    expect(result.current).toBe('pending_review');
+  });
+
+  it('matching expected_current_status → proceeds normally', () => {
+    const record = makeCandidateRecord({
+      lifecycle: { status: 'pending_review', status_changed_at: '2026-05-01T00:00:00Z' },
+    });
+    appendCandidate(record);
+
+    const result = handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      expected_current_status: 'pending_review',
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+
+  it('absent expected_current_status → degrades gracefully (backward compat)', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    const result = handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      // no expected_current_status
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+
+  it('null expected_current_status → degrades gracefully', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    const result = handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      expected_current_status: null,
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+
+  it('stale_status check emits 409 from HTTP router', async () => {
+    const { EventEmitter } = require('node:events');
+
+    async function routeRequest(
+      router,
+      { method = 'GET', url = '/', headers = {}, body = '' } = {},
+    ) {
+      const req = new EventEmitter();
+      req.method = method;
+      req.url = url;
+      req.headers = { host: '127.0.0.1', ...headers };
+      req.destroy = () => req.emit('error', new Error('destroyed'));
+      const res = {
+        statusCode: undefined,
+        headers: undefined,
+        body: '',
+        writeHead(statusCode, responseHeaders) {
+          this.statusCode = statusCode;
+          this.headers = responseHeaders;
+        },
+        end(chunk = '') {
+          this.body += chunk;
+        },
+      };
+      const promise = router(req, res);
+      process.nextTick(() => {
+        if (body) req.emit('data', Buffer.isBuffer(body) ? body : Buffer.from(body));
+        req.emit('end');
+      });
+      await promise;
+      return res;
+    }
+
+    const record = makeCandidateRecord({
+      lifecycle: { status: 'pending_review', status_changed_at: '2026-05-01T00:00:00Z' },
+    });
+    appendCandidate(record);
+
+    const router = createRouter({ htmlBody: '<html></html>', writeToken: 'tok' });
+    const res = await routeRequest(router, {
+      method: 'POST',
+      url: `/api/candidates/${record.candidate_id}/action`,
+      headers: { 'x-arcforge-dashboard': '1', 'x-arcforge-dashboard-token': 'tok' },
+      body: JSON.stringify({ action: 'dismiss', expected_current_status: 'approved' }),
+    });
+
+    expect(res.statusCode).toBe(409);
+    const data = JSON.parse(res.body);
+    expect(data.reason).toBe('stale_status');
+  });
+});
+
+// ===========================================================================
+// PR-D Criterion 3 — safety_ack required for activate / deactivate
+// ===========================================================================
+
+describe('PR-D Criterion 3 — safety_ack gate on activate / deactivate', () => {
+  it('activate without safety_ack is rejected with missing_safety_ack', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      // no safety_ack
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('missing_safety_ack');
+  });
+
+  it('activate with partial safety_ack (behavior_change only) is rejected', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      safety_ack: { reviewer_saw_behavior_change_warning: true },
+      // missing reviewer_saw_target_path_summary
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('missing_safety_ack');
+  });
+
+  it('activate with full safety_ack succeeds', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    handleDashboardAction({ action: 'materialize', candidate_id: record.candidate_id });
+
+    const result = handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+
+  it('deactivate without safety_ack is rejected with missing_safety_ack', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const matResult = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+    expect(matResult.accepted).toBe(true);
+    handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
+    });
+
+    const result = handleDashboardAction({
+      action: 'deactivate',
+      candidate_id: record.candidate_id,
+      // no safety_ack
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('missing_safety_ack');
+  });
+
+  it('deactivate with reviewer_saw_behavior_change_warning: true succeeds', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const matResult = handleDashboardAction({
+      action: 'materialize',
+      candidate_id: record.candidate_id,
+    });
+    expect(matResult.accepted).toBe(true);
+    handleDashboardAction({
+      action: 'activate',
+      candidate_id: record.candidate_id,
+      safety_ack: {
+        reviewer_saw_behavior_change_warning: true,
+        reviewer_saw_target_path_summary: true,
+      },
+    });
+
+    const result = handleDashboardAction({
+      action: 'deactivate',
+      candidate_id: record.candidate_id,
+      safety_ack: { reviewer_saw_behavior_change_warning: true },
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+
+  it('non-activate/deactivate actions do not require safety_ack', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    const result = handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      // no safety_ack
+    });
+
+    expect(result.accepted).toBe(true);
+  });
+});
+
+// ===========================================================================
+// PR-D Criterion 4 — actor default + reason to audit log
+// ===========================================================================
+
+describe('PR-D Criterion 4 — actor default and reason in audit log', () => {
+  function getAuditLogPath() {
+    return path.join(tmpDir, '.arcforge', 'learning', 'dashboard', 'actions.jsonl');
+  }
+
+  it('absent actor defaults to { layer: 6, actor_type: "dashboard", reviewer: "local_user" }', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    handleDashboardAction({ action: 'dismiss', candidate_id: record.candidate_id });
+
+    const line = fs.readFileSync(getAuditLogPath(), 'utf8').trim();
+    const entry = JSON.parse(line);
+    expect(entry.actor).toEqual({ layer: 6, actor_type: 'dashboard', reviewer: 'local_user' });
+  });
+
+  it('reason is written to audit log when provided', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    handleDashboardAction({
+      action: 'dismiss',
+      candidate_id: record.candidate_id,
+      reason: 'not relevant to this project',
+    });
+
+    const line = fs.readFileSync(getAuditLogPath(), 'utf8').trim();
+    const entry = JSON.parse(line);
+    expect(entry.reason).toBe('not relevant to this project');
+  });
+
+  it('absent reason does not add reason field to audit log', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+
+    handleDashboardAction({ action: 'dismiss', candidate_id: record.candidate_id });
+
+    const line = fs.readFileSync(getAuditLogPath(), 'utf8').trim();
+    const entry = JSON.parse(line);
+    expect(entry).not.toHaveProperty('reason');
+  });
+});
+
+// ===========================================================================
+// PR-D Criterion 5 — detail view new blocks
+// ===========================================================================
+
+describe('PR-D Criterion 5 — detail view evidence_summaries / llm_assessment / materialization / activation', () => {
+  it('evidence_summaries maps evidence[] to { evidence_id, evidence_type, relevance, summary }', () => {
+    const record = makeCandidateRecord({
+      evidence: [
+        {
+          evidence_id: 'ev-1',
+          evidence_type: 'observation',
+          relevance: 'direct use',
+          summary: 'Seen in session A',
+        },
+        {
+          evidence_id: 'ev-2',
+          evidence_type: 'diary',
+          relevance: 'indirect',
+          summary: 'Mentioned in diary',
+        },
+      ],
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+
+    expect(detail).toHaveProperty('evidence_summaries');
+    expect(detail.evidence_summaries).toHaveLength(2);
+    expect(detail.evidence_summaries[0]).toMatchObject({
+      evidence_id: 'ev-1',
+      evidence_type: 'observation',
+    });
+    expect(detail.evidence_summaries[0]).toHaveProperty('relevance');
+    expect(detail.evidence_summaries[0]).toHaveProperty('summary');
+  });
+
+  it('evidence_summaries is empty array when candidate has no evidence', () => {
+    const record = makeCandidateRecord({ evidence: [] });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(detail.evidence_summaries).toEqual([]);
+  });
+
+  it('llm_assessment is included in detail view if present on candidate', () => {
+    const record = makeCandidateRecord({
+      llm_assessment: {
+        llm_confidence: 'high',
+        risk_notes: ['risk A'],
+        uncertainty_notes: [],
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(detail.llm_assessment).toBeDefined();
+    expect(detail.llm_assessment.llm_confidence).toBe('high');
+  });
+
+  it('llm_assessment is absent from detail if not on candidate', () => {
+    const record = makeCandidateRecord({ llm_assessment: undefined });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(detail).not.toHaveProperty('llm_assessment');
+  });
+
+  it('materialization is included in detail if lifecycle.materialization is present', () => {
+    const record = makeCandidateRecord({
+      lifecycle: {
+        status: 'materialized',
+        status_changed_at: '2026-05-01T00:00:00Z',
+        materialization: { materialization_id: 'mat-001', materialized_at: '2026-05-01T00:00:00Z' },
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(detail.materialization).toBeDefined();
+    expect(detail.materialization.materialization_id).toBe('mat-001');
+  });
+
+  it('activation is included in detail if lifecycle.activation is present', () => {
+    const record = makeCandidateRecord({
+      lifecycle: {
+        status: 'activated',
+        status_changed_at: '2026-05-01T00:00:00Z',
+        activation: { activation_id: 'act-001', activated_at: '2026-05-01T00:00:00Z' },
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(detail.activation).toBeDefined();
+    expect(detail.activation.activation_id).toBe('act-001');
+  });
+
+  it('evidence_summaries — secret in evidence.summary does not leak', () => {
+    const secretKey = 'sk-secret-evidence-key-99999';
+    const record = makeCandidateRecord({
+      evidence: [
+        {
+          evidence_id: 'ev-sec',
+          evidence_type: 'observation',
+          relevance: 'test relevance',
+          summary: `API_KEY=${secretKey} was used in the session`,
+        },
+      ],
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    const serialized = JSON.stringify(detail);
+    expect(serialized).not.toContain(secretKey);
   });
 });

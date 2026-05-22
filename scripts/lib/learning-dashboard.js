@@ -104,6 +104,15 @@ function legalActionsFor(status) {
 }
 
 /**
+ * Derive the evidence_quality_chip value from evidence_quality.
+ * Returns undefined if evidence_quality is not one of the known values.
+ */
+function evidenceQualityChip(quality) {
+  const map = { low: 'low_signal', medium: 'medium_signal', high: 'high_signal' };
+  return map[quality];
+}
+
+/**
  * Build a DashboardCandidateCard from a CandidateQueueRecord per Layer 6 spec.
  * Returns only allowlisted fields. project_id intentionally excluded.
  *
@@ -114,7 +123,7 @@ function sanitizeDashboardCard(record) {
   const status = record.lifecycle ? record.lifecycle.status : undefined;
   const llmAssessment = record.llm_assessment || {};
 
-  return {
+  const card = {
     schema_version: 1,
     candidate_id: record.candidate_id,
     artifact_type: record.artifact_type,
@@ -133,6 +142,17 @@ function sanitizeDashboardCard(record) {
       : 0,
     available_actions: legalActionsFor(status),
   };
+
+  // Criterion 1: evidence_quality_chip (derived, omitted if quality unknown)
+  const chip = evidenceQualityChip(record.evidence_quality);
+  if (chip !== undefined) card.evidence_quality_chip = chip;
+
+  // Criterion 1: relationships (copied if present, omitted otherwise)
+  if (record.relationships !== undefined && record.relationships !== null) {
+    card.relationships = record.relationships;
+  }
+
+  return card;
 }
 
 /**
@@ -159,14 +179,40 @@ function sanitizeDashboardDetail(candidateId) {
 
   const rationaleText = sanitizeText(record.rationale, DETAIL_RATIONALE_MAX);
 
-  return {
+  // Criterion 5: evidence_summaries — map evidence[] to sanitized summary objects
+  const evidenceSummaries = Array.isArray(record.evidence)
+    ? record.evidence.map((ev) => ({
+        evidence_id: ev.evidence_id,
+        evidence_type: ev.evidence_type,
+        relevance: sanitizeText(ev.relevance, 200),
+        summary: sanitizeText(ev.summary, 300),
+      }))
+    : [];
+
+  const detail = {
     ...card,
     rationale: rationaleText,
     body_preview: {
       text: bodyPreviewText,
       truncated: bodyTruncated,
     },
+    evidence_summaries: evidenceSummaries,
   };
+
+  // Criterion 5: llm_assessment — copy if present
+  if (record.llm_assessment !== undefined) {
+    detail.llm_assessment = record.llm_assessment;
+  }
+
+  // Criterion 5: materialization + activation — copy from lifecycle if present
+  if (record.lifecycle && record.lifecycle.materialization !== undefined) {
+    detail.materialization = record.lifecycle.materialization;
+  }
+  if (record.lifecycle && record.lifecycle.activation !== undefined) {
+    detail.activation = record.lifecycle.activation;
+  }
+
+  return detail;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,23 +268,51 @@ function generateActionId() {
 /**
  * Handle a dashboard reviewer action request.
  *
- * @param {{ action: string, candidate_id: string }} opts
+ * @param {{ action: string, candidate_id: string, expected_current_status?: string,
+ *           safety_ack?: object, actor?: object, reason?: string }} opts
  * @returns {{ accepted: boolean, action_id: string, reason?: string, ... }}
  */
-function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
+function handleDashboardAction({
+  action,
+  candidate_id: candidateId,
+  expected_current_status: expectedStatus,
+  safety_ack: safetyAck,
+  actor: incomingActor,
+  reason,
+} = {}) {
   const actionId = generateActionId();
   const requestedAt = new Date().toISOString();
 
-  function reject(reason, extra = {}) {
+  // Criterion 4: default actor
+  const actor = incomingActor || { layer: 6, actor_type: 'dashboard', reviewer: 'local_user' };
+
+  function reject(rejectionReason, extra = {}) {
     const result = {
       accepted: false,
       action_id: actionId,
       requested_at: requestedAt,
       action,
       candidate_id: candidateId,
-      reason,
+      actor,
+      reason: rejectionReason,
       ...extra,
     };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  function accept(extra = {}) {
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      actor,
+      ...extra,
+    };
+    // Criterion 4: include user-supplied reason in audit log
+    if (reason !== undefined) result.reason = reason;
     writeAuditEntry(result);
     return result;
   }
@@ -262,13 +336,33 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
 
   const currentStatus = candidate.lifecycle ? candidate.lifecycle.status : undefined;
 
-  // Step 4: check Action × Status matrix
+  // Criterion 2: optimistic concurrency guard — check expected_current_status
+  if (expectedStatus !== undefined && expectedStatus !== null) {
+    if (expectedStatus !== currentStatus) {
+      return reject('stale_status', { expected: expectedStatus, current: currentStatus });
+    }
+  }
+
+  // Step 4: check Action × Status matrix (before safety_ack so illegal actions fail fast)
   if (!isLegalAction(currentStatus, action)) {
     return reject('policy_violation');
   }
 
+  // Criterion 3: safety_ack gate for activate and deactivate (only after policy check passes)
+  if (action === LIFECYCLE_ACTION.ACTIVATE) {
+    const ack = safetyAck || {};
+    if (!ack.reviewer_saw_behavior_change_warning || !ack.reviewer_saw_target_path_summary) {
+      return reject('missing_safety_ack');
+    }
+  }
+  if (action === LIFECYCLE_ACTION.DEACTIVATE) {
+    const ack = safetyAck || {};
+    if (!ack.reviewer_saw_behavior_change_warning) {
+      return reject('missing_safety_ack');
+    }
+  }
+
   // Step 5/6: dispatch by action type
-  const actor = { layer: 6, actor_type: 'dashboard' };
 
   if (action === LIFECYCLE_ACTION.PROMOTE) {
     // Candidate-producing: create a global-scope copy of the source candidate.
@@ -295,16 +389,7 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     appendCandidate(newRecord, { actor });
     appendRelatedEvent(candidateId, { promoted_to_candidate_id: newId }, actor);
 
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
-      new_candidate_id: newId,
-    };
-    writeAuditEntry(result);
-    return result;
+    return accept({ new_candidate_id: newId });
   }
 
   if (action === LIFECYCLE_ACTION.EVOLVE) {
@@ -330,16 +415,7 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     appendCandidate(newRecord, { actor });
     appendRelatedEvent(candidateId, { evolved_to_candidate_id: newId }, actor);
 
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
-      new_candidate_id: newId,
-    };
-    writeAuditEntry(result);
-    return result;
+    return accept({ new_candidate_id: newId });
   }
 
   // DH-1: materialize — delegates to Layer 7 materialize.js
@@ -355,17 +431,10 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!matResult.ok) {
       return reject(matResult.failure.reason, { module_failure: matResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'materialized',
       materialization_id: matResult.record.materialization_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // DH-2: activate — delegates to Layer 8 activate.js
@@ -401,17 +470,10 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!actResult.ok) {
       return reject(actResult.failure.reason, { module_failure: actResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'activated',
       activation_id: actResult.record.activation_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // DH-6: deactivate — delegates to Layer 8 deactivate.js
@@ -439,33 +501,17 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!deactResult.ok) {
       return reject(deactResult.failure.reason, { module_failure: deactResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'deactivated',
       activation_id: deactResult.record.activation_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // Status-changing actions: dismiss, approve (materialize, activate, deactivate handled above)
   const nextStatus = applyTransition(currentStatus, action);
   appendTransitionEvent(candidateId, action, nextStatus, actor);
 
-  const result = {
-    accepted: true,
-    action_id: actionId,
-    requested_at: requestedAt,
-    action,
-    candidate_id: candidateId,
-    next_status: nextStatus,
-  };
-  writeAuditEntry(result);
-  return result;
+  return accept({ next_status: nextStatus });
 }
 
 // ---------------------------------------------------------------------------
@@ -600,9 +646,18 @@ function createRouter({ htmlBody, writeToken }) {
       const result = handleDashboardAction({
         action: parsed.action,
         candidate_id: actionMatch[1],
+        expected_current_status: parsed.expected_current_status,
+        safety_ack: parsed.safety_ack,
+        actor: parsed.actor,
+        reason: parsed.reason,
       });
 
-      const status = result.accepted ? 200 : result.reason === 'candidate_not_found' ? 404 : 400;
+      let status = 200;
+      if (!result.accepted) {
+        if (result.reason === 'candidate_not_found') status = 404;
+        else if (result.reason === 'stale_status') status = 409;
+        else status = 400;
+      }
       return sendJson(res, result, status);
     }
 
