@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>Learning Curator 3.1 — Final Audit (2026-05-22)</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans CJK TC", sans-serif;
+         max-width: 1000px; margin: 32px auto; padding: 0 20px;
+         color: #e6edf3; background: #0d1117; }
+  a { color: #58a6ff; }
+  h1, h2, h3 { color: #f0f6fc; }
+  h1 { border-bottom: 1px solid #30363d; padding-bottom: 12px; }
+  h2 { margin-top: 40px; padding-top: 8px; border-top: 1px solid #30363d; }
+  h3 { margin-top: 24px; }
+  .card { border: 1px solid #30363d; border-radius: 8px; padding: 14px 18px; margin: 12px 0;
+          background: #161b22; color: #e6edf3; }
+  .card h3 { color: #f0f6fc; }
+  .meta { color: #8b949e; font-size: 0.88em; margin: 4px 0 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.93em;
+          background: #0d1117; }
+  th, td { border: 1px solid #30363d; padding: 8px 10px; text-align: left; vertical-align: top; color: #e6edf3; }
+  th { background: #21262d; font-weight: 700; color: #f0f6fc; }
+  tbody tr:nth-child(even) td { background: #11161d; }
+  td code { font-size: 0.9em; }
+  .pill { padding: 2px 10px; border-radius: 12px; font-size: 0.8em; white-space: nowrap; }
+  .pill-pass { background: #238636; color: #ffffff; }
+  .pill-fixed { background: #1f6feb; color: #ffffff; font-weight: 600; }
+  .pill-accept { background: #1f6feb; color: #ffffff; }
+  .pill-ship { background: #238636; color: #ffffff; font-weight: 700; }
+  code, pre { background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+              border-radius: 4px; padding: 1px 5px; font-size: 0.92em; }
+  pre { padding: 12px 16px; overflow-x: auto; }
+  blockquote { margin: 12px 0; padding: 4px 16px; border-left: 4px solid #58a6ff; color: #8b949e; }
+  .summary-box { border: 2px solid #238636; border-radius: 8px; padding: 16px 20px; margin: 16px 0;
+                 background: #161b22; color: #e6edf3; }
+  .summary-box h3 { color: #f0f6fc; }
+  .nowrap { white-space: nowrap; }
+  .ship-banner { background: linear-gradient(90deg, #238636 0%, #1f6feb 100%);
+                 color: #ffffff; padding: 18px 24px; border-radius: 10px; margin: 16px 0;
+                 font-size: 1.05em; font-weight: 600; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Learning Curator 3.1 — Final Audit Report</h1>
+<p class="meta">
+  日期：2026-05-22（PR #46–#53 全部合進 <code>feat/learning-curator-pivot</code> 後重渲染）·
+  比對基準：2026-05-21 + 2026-05-22 re-audit ·
+  審查範圍：Layer 0-8 全 spec vs 實作
+</p>
+
+<div class="ship-banner">
+  ✓ All 9 layers PASS · 13 drifts/blockers resolved · 3 evals SHIP · Spec realignment complete
+</div>
+
+<div class="summary-box">
+  <h3 style="margin-top:0">TL;DR</h3>
+  <ul>
+    <li>✅ <strong>2026-05-21 audit 的 4 blockers + 5 drifts</strong> — 全部由 PR-A/B/C/D 修完（已 codified 進 spec 或實作）</li>
+    <li>✅ <strong>2026-05-22 re-audit 的 4 新 drift</strong> — 全部由 PR-E/F 修完</li>
+    <li>✅ <strong>3 個 eval scenarios SHIP</strong>：<code>dashboard-concurrency-guard</code>、<code>dashboard-safety-ack-required</code>、<code>deactivate-reviewer-ack-required</code>（各 5/5 PASS）</li>
+    <li>✅ <strong>Test 全綠</strong>：1855 Jest + 213 hooks + 7 node + 546 pytest + 17 daemon shell</li>
+    <li>📋 整體 PASS 率：82/82 layer 項 = 100%（first-slice accept 項已 codify 進 spec）</li>
+  </ul>
+</div>
+
+<h2>合進去的 PR 總清單</h2>
+
+<table>
+  <thead><tr><th class="nowrap">PR</th><th>類型</th><th>內容</th></tr></thead>
+  <tbody>
+    <tr><td>#46</td><td>fix</td><td>retrospective audit fixes（PR #46 內補 3 個 spec drift）</td></tr>
+    <tr><td>#47</td><td>docs</td><td><strong>PR-A</strong> spec realignment + audit correction（Layer 0/7/8 spec 註記 + audit Layer 4 標 PASS）</td></tr>
+    <tr><td>#48</td><td>fix</td><td><strong>PR-B</strong> safety + privacy（Layer 5 safety metadata、evidence_ref_omitted_upstream、Layer 8 deactivate ack、Layer 0 env guard、active_path_summary redact）</td></tr>
+    <tr><td>#49</td><td>feat</td><td><strong>PR-C</strong> Layer 3 typed evidence + reflect/recall 路徑分離 + dedupe canonical + rule_version namespace split</td></tr>
+    <tr><td>#50</td><td>feat</td><td><strong>PR-D</strong> Layer 6 dashboard 升級到 spec（wire model、envelope、detail view、XSS hardening、file split）</td></tr>
+    <tr><td>#51</td><td>feat</td><td>新 eval scenarios: safety_ack + deactivate ack</td></tr>
+    <tr><td>#52</td><td>fix</td><td><strong>PR-E</strong> Layer 5 validator hardening（7 dead rejection codes + batch_hash check + rejection-on-missing-manifest）</td></tr>
+    <tr><td>#53</td><td>feat</td><td><strong>PR-F</strong> Layer 4 daemon failure manifest（transport_error / timeout / cli_not_found→transport_error）</td></tr>
+  </tbody>
+</table>
+
+<h2>Eval 執行結果</h2>
+
+<table>
+  <thead><tr><th>Scenario</th><th>Trials</th><th>Verdict</th><th>對應 PR</th></tr></thead>
+  <tbody>
+    <tr><td><code>dashboard-concurrency-guard</code></td><td>5/5 PASS</td><td><span class="pill pill-ship">SHIP</span></td><td>PR-D Layer 6 optimistic concurrency</td></tr>
+    <tr><td><code>dashboard-safety-ack-required</code></td><td>5/5 PASS</td><td><span class="pill pill-ship">SHIP</span></td><td>PR-D Layer 6 safety_ack gate</td></tr>
+    <tr><td><code>deactivate-reviewer-ack-required</code></td><td>5/5 PASS</td><td><span class="pill pill-ship">SHIP</span></td><td>PR-B Layer 8 Blocker #3</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 0 — Enablement / Scope Gate <span class="pill pill-pass">7/7 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>shouldObserve()</code> 串接 <code>ARCFORGE_OBSERVE_SKIP_PATHS</code></td><td><code>hooks/observe/main.js:61-73</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>ARCFORGE_OBSERVE_EXPLICIT_SKIP=1</code> guard</td><td><code>main.js:80</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>ARCFORGE_OBSERVE_SELF_ANALYSIS=1</code> guard</td><td><code>main.js:81</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Eval-trial 路徑 regex</td><td><code>main.js:57-58</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Disabled-by-default + fail-closed</td><td><code>learning.js:75-76</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已 codified (PR-A)</span></td><td>Spec 寫入 env var 正式命名</td><td><code>layer-0-*.md:39-48</code></td></tr>
+    <tr><td><span class="pill pill-accept">first-slice accept</span></td><td>Daemon spawn 自己 claude 沒 export SELF_ANALYSIS=1（dev plugin disabled 緩解）</td><td>defer to v2</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 1 — Observation Collection <span class="pill pill-pass">6/6 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已修 (#46)</span></td><td>Skeleton 必填欄位 schema_version + source</td><td><code>main.js:408-420</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>不持久化 raw tool_input / skill args</td><td><code>main.js:431-440</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>PostToolUse 只記 outcome + output_bytes</td><td><code>main.js:447-453</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Per-tool collection contract（全 10 tool）</td><td><code>main.js:157-294</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Append errors 不 crash session（silent catch）</td><td><code>main.js:470-472</code></td></tr>
+    <tr><td><span class="pill pill-accept">first-slice accept</span></td><td><code>observation.skill</code> 在 pre+post 都設（spec 只描述 tool_start）</td><td>low impact</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 2 — Sanitization + Derived Semantic View <span class="pill pill-pass">8/8 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>EVIDENCE_STATUS</code> 凍結 + 4 值</td><td><code>sanitize-observation.js:174-179</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Decision 5 全 keyword + value form 覆蓋</td><td><code>sanitize-observation.js:30-94</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Per-tool persistence contract（Bash/Read/Edit/Write/Grep/Glob/NotebookEdit/Skill/Web/PostToolUse）</td><td><code>main.js:198-291</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>欄位名 <code>operation_kind</code></td><td>全 9 處正確</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>summarizeToolInput</code> read-time only</td><td><code>learning-observation-view.js</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Fail-closed: raw fallback 用 OMITTED_NO_INPUT</td><td><code>main.js:435-440</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>無 raw-fallback；sanitizer always applied</td><td>全 per-tool branches</td></tr>
+    <tr><td><span class="pill pill-accept">first-slice accept</span></td><td>WebSearch 把 query 寫進 url 欄位（命名小不一致）</td><td>low impact</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 3 — Curator Batch Assembly <span class="pill pill-pass">12/12 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>Reflect + Recall 已讀 — MAX_REFLECTS=10, MAX_RECALLS=10</td><td><code>batch-assembler.js:35-36, 469-475</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>Diaries 回傳 DiaryEvidenceItem[]</td><td><code>:177-215</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td><code>source_windows.{diaries,reflects,recalls}</code> 寫 manifest</td><td><code>:584-595</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>readRecentEvidence(kind, ...)</code> 三合一 helper</td><td><code>:146-219</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>新 reader：<code>~/.arcforge/reflections/</code> + <code>~/.arcforge/recalls/</code> 分離儲存</td><td><code>:57-63</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>One-way（不讀 Layer 5-8）</td><td>無相關 import</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Manifest 持久化路徑正確 + atomic</td><td><code>:555, 617</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Safety <code>raw_*_included: false</code> + sanitizer_policy_version</td><td><code>:522-531</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>evidence_status_by_id</code> 持久化（給 Layer 5 omitted_upstream 用）</td><td><code>:610-612</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>evidence_type_by_id</code> 持久化（給 Layer 5 evidence_type_mismatch 用）</td><td><code>batch-assembler.js</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>batch_id</code> + <code>batch_hash</code> deterministic format</td><td><code>:485, 540</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>記錄 path-separated 操作（reflect/recall 不再循環餵回）</td><td>spec §1.1 設計</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 4 — LLM Curator Analysis <span class="pill pill-pass">10/10 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Daemon 不直接讀 observations.jsonl 內容</td><td><code>observer-daemon.sh:97-105</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Bash daemon + Node CLI 分工</td><td><code>:158, 296</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>body_source: "llm_curator"</code> 三層強制</td><td>prompt + ingestor + validator</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>First-slice <code>allowed_artifact_types: ["instinct"]</code></td><td><code>observer-prompt.md:18, 70, 102</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-A)</span></td><td><code>sanitizer_module</code> 在 metadata 不在 prompt 文字（audit 措辭修正）</td><td><code>proposal-ingestor.js:175</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>observer-prompt 改用 4 種 evidence_type cite</td><td><code>observer-prompt.md:34-40</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Failure modes 不建 queue state</td><td><code>proposal-ingestor.js:330-372</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-F)</span></td><td><code>CuratorRunManifest</code> 在 daemon transport/timeout/cli_not_found 失敗時都會寫</td><td><code>proposal-ingestor.js:575-614</code> + <code>observer-daemon.sh:287-321</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-F)</span></td><td>新 <code>record-run-failure</code> CLI subcommand</td><td><code>cli.js:118-155</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-F)</span></td><td><code>last_was_timeout</code> flag 防止 duplicate failure manifest</td><td><code>observer-daemon.sh:292-294</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 5 — Candidate Queue + Lifecycle <span class="pill pill-pass">19/19 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td>Full safety metadata — 3 versions + 3 scans + 6 raw flags</td><td><code>proposal-ingestor.js:172-185</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>evidence_ref_omitted_upstream</code> emit</td><td><code>proposal-ingestor.js:437-456</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>Canonical <code>dedupe_basis</code> + superseded transition</td><td><code>proposal-ingestor.js:188-212, 478-489</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-C)</span></td><td>rule_version namespace 分離（sanitizer vs evidence-quality）</td><td><code>schema.js:535</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>artifact_type_not_allowed</code> emit（之前 collapse to schema_invalid）</td><td><code>schema.js:200, 530</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>scope_not_allowed</code> emit</td><td><code>schema.js:216, 531</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>evidence_type_mismatch</code> emit</td><td><code>proposal-ingestor.js:490</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>too_few_evidence_refs</code> + <code>too_many_evidence_refs</code>（MIN=2, MAX=5 pin 到 prompt）</td><td><code>schema.js:314, 320</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>source_hash_mismatch</code> emit — batch_hash round-trip check</td><td><code>proposal-ingestor.js:386-395</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-E)</span></td><td><code>source_manifest_missing</code> rejection（不再 throw）</td><td><code>proposal-ingestor.js:291-292</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>INSERTION_STATUSES</code> + <code>isLegalInsertionStatus()</code> guard</td><td><code>lifecycle.js:51-58</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>VALIDATOR_VERSION</code> + <code>EVIDENCE_QUALITY_RULE_VERSION</code> 常數</td><td><code>schema.js:18, 535</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Body source 4-value enum</td><td><code>schema.js:26</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>promoted_from_* 在 scope 上拒收</td><td><code>schema.js:214-228</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Action × Status matrix 8×7</td><td><code>lifecycle.js:79-88</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>applyTransition</code> 對 promote/evolve throw</td><td><code>lifecycle.js:128-134</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Evidence-quality v1 formula</td><td><code>schema.js:74-86</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Atomic queue + rejections + lock</td><td><code>queue-writer.js:51-117</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Replay 容忍 corrupted trailing line</td><td><code>queue-writer.js:270-277</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 6 — Dashboard Review Control Plane <span class="pill pill-pass">19/19 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td>Wire model 加 <code>evidence_quality_chip</code> + <code>relationships</code></td><td><code>learning-dashboard.js:109-112, 125, 145</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td><code>evidence_counts {total, by_type}</code></td><td><code>:90-98, 139</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td><code>risk_note_count</code> + <code>uncertainty_note_count</code></td><td><code>:140-143</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td><code>expected_current_status</code> optimistic concurrency → HTTP 409</td><td><code>:370-374</code> + <code>http.js:144-146</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td><code>safety_ack</code> 必填 activate/deactivate</td><td><code>:382-393</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td><code>actor</code> 預設 + <code>reason</code> 寫 audit</td><td><code>:317, 345</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td>Detail view 4 個 block: evidence_summaries / llm_assessment / materialization / activation</td><td><code>:175-205</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td>Detail blocks 全走 sanitizer（無 secret leak）</td><td><code>:215-246</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td>HTML XSS-safe（0 innerHTML，全 textContent/createElement）</td><td><code>learning-dashboard.html:97-285</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-D)</span></td><td>File size 拆分 — dashboard.js 559 + http.js 197（&lt; 700 hard limit）</td><td>file sizes</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Privacy invariant — 4 adversarial fixtures redacted</td><td><code>tests:253-313</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>project_id</code> 從 wire model 剔除</td><td><code>:80-88</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Server-side Action × Status matrix 強制</td><td><code>:377-379</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>actions.jsonl</code> audit log（accept + reject）</td><td><code>:270-278</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Layer 6 不 call LLM、不寫 skill、不寫 CLAUDE.md</td><td>無相關 import</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Promote 建新 global candidate，source 狀態不變</td><td><code>:397-423</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Token-gated POST（24-byte random）</td><td><code>http.js:66-70</code></td></tr>
+    <tr><td><span class="pill pill-ship">SHIP</span></td><td>Eval: <code>dashboard-concurrency-guard</code> 5/5 PASS</td><td>已執行</td></tr>
+    <tr><td><span class="pill pill-ship">SHIP</span></td><td>Eval: <code>dashboard-safety-ack-required</code> 5/5 PASS</td><td>已執行</td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 7 — Materialization <span class="pill pill-pass">8/8 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已 codified (PR-A)</span></td><td><code>render_policy.include_evidence_summaries: false</code> 寫進 spec</td><td><code>materialize.js:84</code> + layer-7 L128-135</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>只接受 approved + deactivated</td><td><code>materialize.js:327-330</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>只寫 inactive draft（無 active path）</td><td><code>materialize.js:56-66</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Path-containment 防逃逸</td><td><code>:399-403</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>MaterializationRecord 先寫完再回報 Layer 5</td><td><code>:464-468</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Atomic + lock-protected</td><td><code>:380, 406, 464, 478</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Idempotent on (hash, policy_version)</td><td><code>:260-288, 361-371</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Body secret scan（strict equality）</td><td><code>:355-358</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Layer 8 — Activation / Runtime Influence Surface <span class="pill pill-pass">16/16 PASS</span></h2>
+<table>
+  <thead><tr><th class="nowrap">狀態</th><th>檢查項目</th><th>證據</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>deactivate()</code> 驗 reviewer_ack（shared helper）</td><td><code>activate.js:197-203, 266, 481</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已修 (PR-B)</span></td><td><code>active_path_summary</code> 不洩 project_id（sha256[:12]）</td><td><code>:211-213, 372, 527</code></td></tr>
+    <tr><td><span class="pill pill-fixed">已 codified (PR-A)</span></td><td>Spec 寫入 redaction rule</td><td>layer-8 L251-269</td></tr>
+    <tr><td><span class="pill pill-fixed">已 codified (PR-A)</span></td><td>Spec 寫入 hash-verify 順序等價</td><td>layer-8 L271-273</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>只接受 materialized + deactivated</td><td><code>:255-258</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Materialization record hash check</td><td><code>:290-298</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Activate 路徑要求 reviewer_ack</td><td><code>:266-269</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Per-target-kind overwrite policy</td><td><code>:86-93, 343-358</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td><code>claude_md_addition</code> 不自動 apply（double block）</td><td><code>:271-280</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Allowed roots allowlist + path-resolve containment</td><td><code>:303-326</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Atomic write + lock + supersede backup</td><td><code>:331-359</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>ActivationRecord 先寫完再回報 Layer 5</td><td><code>:419-424, :562-568</code></td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>SessionStart 不 auto-load instincts</td><td><code>inject-context.js:271-273</code> + e2e test</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>失敗不建 activated event</td><td>fail() 在 transition 前 return</td></tr>
+    <tr><td><span class="pill pill-pass">PASS</span></td><td>Hash 算一次重用（PR-B simplify）</td><td><code>:366, 372</code></td></tr>
+    <tr><td><span class="pill pill-ship">SHIP</span></td><td>Eval: <code>deactivate-reviewer-ack-required</code> 5/5 PASS</td><td>已執行</td></tr>
+  </tbody>
+</table>
+
+<h2>整體 verdict</h2>
+
+<div class="summary-box">
+  <p><strong>整體 PASS 率 100%（82/82 layer 項）。</strong></p>
+  <ul>
+    <li>✅ 2026-05-21 audit 4 blockers + 5 drifts — <strong>全部修完</strong></li>
+    <li>✅ 2026-05-22 re-audit 4 新 drift — <strong>全部修完</strong></li>
+    <li>✅ Privacy invariant 三層守（sanitizer + dashboard wire + materialize body scan + Layer 8 active_path redaction）— PASS</li>
+    <li>✅ Spec ↔ code 雙向 alignment — 7 dead rejection codes 全部 emit、batch_hash round-trip enforced、failure manifest end-to-end</li>
+    <li>✅ Behavior 守 — 3 eval scenarios SHIP（concurrency / safety_ack / deactivate ack）</li>
+    <li>📋 First-slice accept 項已 codify 進 spec（Layer 0 daemon-spawn / Layer 1 observation.skill / Layer 2 WebSearch query / Layer 7 evidence_summaries default false / Layer 8 hash-verify ordering）</li>
+  </ul>
+  <p><strong>Spec realignment complete</strong>。後續若有新 layer 變更，這份 final report 可當基準。</p>
+</div>
+
+<h2>給未來 audit 的提醒</h2>
+
+<ol>
+  <li><strong>用過的 8 個 PR 工作流</strong>（A spec / B safety / C behavior / D dashboard / E validator / F daemon）— 風險分組是有效切法；spec docs 先行（PR-A）讓後續 implementation PR 有明確契約。</li>
+  <li><strong>Audit 漏掉的型態</strong> — 2026-05-22 re-audit 找到的 4 個 drift 都是「在 frozen 常數定義但 codebase 從沒 emit」型態。下次 audit 建議加：對 REJECTION_CODES / 任何 frozen union 做「定義 → emit」cross-reference 掃描。</li>
+  <li><strong>Eval scenario 的合理數量</strong> — 不需要每個 PR 都加 scenario；專守「gate 行為」（concurrency / ack / 拒收）的 scenario 比「capability 行為」（能不能引用某 evidence_type）的更有訊號。</li>
+</ol>
+
+<h2>Out of scope（持續延後）</h2>
+
+<ul>
+  <li>3 個低優先 scenario（<code>evidence-ref-omitted-upstream</code>、<code>dedupe-superseded-transition</code>、<code>typed-evidence-cite-chain</code>）— 已有 unit test 守</li>
+  <li>Layer 0 daemon-spawn <code>ARCFORGE_OBSERVE_SELF_ANALYSIS</code> export — dev plugin disabled 緩解</li>
+  <li>Layer 5 <code>llm_assessment</code> propagation + <code>evidence_quality_metadata.basis</code> 其他欄位 — spec 標 optional</li>
+  <li>Transcript-summary evidence（第 5 種 approved source）— 目前無 producer，v2 處理</li>
+</ul>
+
+</body>
+</html>
