@@ -412,16 +412,65 @@ done
 
 # Slice E.2b: daemon calls claude with `--output-format json --json-schema ...`,
 # so the response file is a CLI envelope whose .structured_output holds the payload.
-# The stub mimics that envelope shape — proposal-ingestor.js extracts structured_output.
-STUB_PAYLOAD='{"schema_version":1,"source":{"layer":4,"curator":"llm","run_id":"curator_run_20260521T030000Z_aabbccddee11","created_at":"2026-05-21T03:00:00.000Z","batch_id":"STUB_BATCH","batch_hash":"STUB_HASH","prompt_policy_version":"v1","output_schema_version":1},"proposals":[{"proposal_index":0,"artifact_type":"instinct","proposed_scope":{"kind":"project","project_id":"proj_abc123456789ab"},"name":"e2-test-instinct","summary":"Test instinct from E2 stub","rationale":"Observed in E2 test fixture","domain":"workflow","body":"When in E2 test, always write tests first.","body_source":"llm_curator","evidence_refs":[],"llm_confidence":"medium","risk_notes":[],"uncertainty_notes":[],"recommended_review_action":"review"}]}'
-STUB_ENVELOPE='{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"duration_ms":100,"result":"stub success","structured_output":'$STUB_PAYLOAD'}'
-
-# Stub claude that emits the CLI envelope (matches --output-format json + --json-schema)
+# The stub reads the latest batch manifest to get the real batch_hash and evidence_ids,
+# then emits a valid CandidateProposalPayload with ≥2 evidence_refs (MIN_EVIDENCE_REFS=2).
 cat > "${STUB_BIN_G3}/claude" << STUB_EOF
 #!/usr/bin/env bash
-# Consume stdin (prompt file piped in), emit the known envelope
+# Consume stdin (prompt file piped in)
 cat > /dev/null
-printf '%s\n' '$STUB_ENVELOPE'
+# Find the most recent batch manifest in TEST_HOME_G3
+BATCHES_DIR="${TEST_HOME_G3}/.arcforge/learning/curator-batches"
+MANIFEST_FILE=\$(ls -t "\${BATCHES_DIR}"/*.manifest.json 2>/dev/null | head -1)
+if [ -z "\$MANIFEST_FILE" ]; then
+  # Fallback: emit empty proposals (ingestor will write empty parse_status)
+  printf '{"type":"result","subtype":"success","is_error":false,"duration_ms":100,"result":"stub","structured_output":{"schema_version":1,"source":{"layer":4,"curator":"llm","run_id":"stub_run","created_at":"2026-05-21T03:00:00.000Z","prompt_policy_version":"v1","output_schema_version":1},"proposals":[]}}\n'
+  exit 0
+fi
+# Extract batch_id, batch_hash, and first 2 evidence_ids from manifest via node
+node -e "
+  const m = JSON.parse(require('fs').readFileSync('\${MANIFEST_FILE}','utf8'));
+  const ids = (m.evidence_ids || []).slice(0,2);
+  const typeById = m.evidence_type_by_id || {};
+  const refs = ids.map((id,i) => ({
+    evidence_id: id,
+    evidence_type: typeById[id] || 'observation',
+    relevance: 'E2 test evidence ref ' + i
+  }));
+  const payload = {
+    schema_version: 1,
+    source: {
+      layer: 4, curator: 'llm',
+      run_id: 'curator_run_e2_stub_00000000',
+      created_at: '2026-05-21T03:00:00.000Z',
+      batch_id: m.batch_id,
+      batch_hash: m.batch_hash,
+      prompt_policy_version: 'v1',
+      output_schema_version: 1
+    },
+    proposals: refs.length >= 2 ? [{
+      proposal_index: 0,
+      artifact_type: 'instinct',
+      proposed_scope: { kind: 'project', project_id: m.scope && m.scope.project_id || 'proj_abc123456789ab' },
+      name: 'e2-test-instinct',
+      summary: 'Test instinct from E2 stub',
+      rationale: 'Observed in E2 test fixture',
+      domain: 'workflow',
+      body: 'When in E2 test, always write tests first.',
+      body_source: 'llm_curator',
+      evidence_refs: refs,
+      llm_confidence: 'medium',
+      risk_notes: [],
+      uncertainty_notes: [],
+      recommended_review_action: 'review'
+    }] : []
+  };
+  const envelope = {
+    type: 'result', subtype: 'success', is_error: false,
+    api_error_status: null, duration_ms: 100,
+    result: 'stub success', structured_output: payload
+  };
+  process.stdout.write(JSON.stringify(envelope) + '\n');
+"
 STUB_EOF
 chmod +x "${STUB_BIN_G3}/claude"
 

@@ -280,19 +280,20 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   }
 
   // Load batch manifest (needed for evidence_id validation and project context).
-  // A missing manifest is a hard error — source_batch_hash is required (string) in
-  // CuratorRunManifest; we cannot construct a valid run record without it.
+  // Per Layer 5 spec L244, a missing manifest is a rejection (not a hard throw):
+  // the run_id is derivable from the response hash, so we can still write an audit record.
   const batchManifest = loadBatchManifest(batchId, homeDir);
   if (!batchManifest) {
-    throw new Error(
-      `ingestProposal: batch manifest not found for batch_id "${batchId}". ` +
-        'Run assemble-batch first.',
-    );
+    const detail = `batch manifest not found for batch_id "${batchId}" — run assemble-batch first`;
+    const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+    rejectProposal([{ code: 'source_manifest_missing', detail }], source);
+    return { run_id: null, parse_status: 'source_manifest_missing', accepted: 0, rejected: 1 };
   }
   const validEvidenceIds = new Set(
     Array.isArray(batchManifest.evidence_ids) ? batchManifest.evidence_ids : [],
   );
   const evidenceStatusById = batchManifest.evidence_status_by_id || {};
+  const evidenceTypeById = batchManifest.evidence_type_by_id || {};
 
   // Base run manifest fields
   const runManifest = {
@@ -369,6 +370,25 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
     runManifest.parse_status = 'empty';
     persistRunManifest(runManifest, homeDir);
     return { run_id: runId, parse_status: 'empty', accepted: 0, rejected: 0 };
+  }
+
+  // Verify batch_hash in payload matches loaded manifest — detects stale or misrouted responses.
+  const payloadBatchHash = payload.source?.batch_hash;
+  if (payloadBatchHash !== undefined && payloadBatchHash !== batchManifest.batch_hash) {
+    const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+    rejectProposal(
+      [
+        {
+          code: 'source_hash_mismatch',
+          detail: `expected batch_hash "${batchManifest.batch_hash}", got "${payloadBatchHash}"`,
+        },
+      ],
+      source,
+    );
+    runManifest.parse_status = 'source_hash_mismatch';
+    runManifest.rejected_count = 1;
+    persistRunManifest(runManifest, homeDir);
+    return { run_id: runId, parse_status: 'source_hash_mismatch', accepted: 0, rejected: 1 };
   }
 
   runManifest.proposal_count = proposals.length;
@@ -452,6 +472,27 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
         })),
         source,
       );
+      continue;
+    }
+
+    // Check for evidence_type mismatches: proposal's claimed type must match batch's actual type
+    const typeMismatchReasons = [];
+    if (Array.isArray(proposal.evidence_refs)) {
+      for (let i = 0; i < proposal.evidence_refs.length; i++) {
+        const ref = proposal.evidence_refs[i];
+        const actualType = evidenceTypeById[ref.evidence_id];
+        if (actualType !== undefined && ref.evidence_type !== actualType) {
+          typeMismatchReasons.push({
+            code: 'evidence_type_mismatch',
+            field_path: `evidence_refs[${i}]`,
+            detail: `evidence_id "${ref.evidence_id}" has type "${actualType}" in batch but proposal claims "${ref.evidence_type}"`,
+          });
+        }
+      }
+    }
+    if (typeMismatchReasons.length > 0) {
+      const source = { source_type: 'layer4_llm_curator', batch_id: batchId };
+      rejectProposal(typeMismatchReasons, source);
       continue;
     }
 

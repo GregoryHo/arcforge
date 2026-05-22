@@ -63,6 +63,13 @@ const FIELD_LIMITS = {
 };
 
 // ---------------------------------------------------------------------------
+// Evidence count bounds (pin to prompt's 2-5)
+// ---------------------------------------------------------------------------
+
+const MIN_EVIDENCE_REFS = 2;
+const MAX_EVIDENCE_REFS = 5;
+
+// ---------------------------------------------------------------------------
 // Evidence quality formula (v1) — project_obs_count only
 // ---------------------------------------------------------------------------
 
@@ -190,7 +197,7 @@ function validateCandidateV1(record) {
     // missing
   } else if (!ARTIFACT_TYPES.includes(record.artifact_type)) {
     add(
-      'schema_invalid',
+      'artifact_type_not_allowed',
       'artifact_type',
       `artifact_type "${record.artifact_type}" is not allowed`,
     );
@@ -206,7 +213,7 @@ function validateCandidateV1(record) {
     } else {
       if (!['project', 'global'].includes(scope.kind)) {
         add(
-          'schema_invalid',
+          'scope_not_allowed',
           'scope.kind',
           `scope.kind "${scope.kind}" must be "project" or "global"`,
         );
@@ -302,6 +309,19 @@ function validateCandidateV1(record) {
   } else if (!isArray(record.evidence)) {
     add('schema_invalid', 'evidence', 'evidence must be an array');
   } else {
+    if (record.evidence.length < MIN_EVIDENCE_REFS) {
+      add(
+        'too_few_evidence_refs',
+        'evidence',
+        `evidence must have at least ${MIN_EVIDENCE_REFS} entries (got ${record.evidence.length})`,
+      );
+    } else if (record.evidence.length > MAX_EVIDENCE_REFS) {
+      add(
+        'too_many_evidence_refs',
+        'evidence',
+        `evidence must have at most ${MAX_EVIDENCE_REFS} entries (got ${record.evidence.length})`,
+      );
+    }
     for (let i = 0; i < record.evidence.length; i++) {
       const ev = record.evidence[i];
       if (!isObject(ev)) {
@@ -540,4 +560,6 @@ module.exports = {
   REJECTION_CODES,
   VALIDATOR_VERSION,
   EVIDENCE_QUALITY_RULE_VERSION,
+  MIN_EVIDENCE_REFS,
+  MAX_EVIDENCE_REFS,
 };

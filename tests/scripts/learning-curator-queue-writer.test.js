@@ -69,6 +69,12 @@ function makeValidRecord(overrides = {}) {
         relevance: 'User repeatedly used grep before editing files',
         summary: 'Observed grep-first pattern 5 times across 3 sessions',
       },
+      {
+        evidence_id: 'ev_def456',
+        evidence_type: 'observation',
+        relevance: 'Second observation supporting the pattern',
+        summary: 'Confirmed grep-first pattern in another session',
+      },
     ],
     evidence_quality: 'medium',
     evidence_quality_metadata: {
@@ -337,6 +343,11 @@ appendCandidate({
     evidence_type: 'observation',
     relevance: 'r',
     summary: 's',
+  }, {
+    evidence_id: 'e2',
+    evidence_type: 'observation',
+    relevance: 'r2',
+    summary: 's2',
   }],
   evidence_quality: 'low',
   evidence_quality_metadata: {

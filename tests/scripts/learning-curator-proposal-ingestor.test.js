@@ -454,14 +454,22 @@ describe('ingestProposal — non_object', () => {
 // ---------------------------------------------------------------------------
 
 describe('ingestProposal — missing batch manifest', () => {
-  test('throws when batch manifest does not exist for given batch_id', () => {
+  test('missing batch manifest produces rejection (not throw) with parse_status source_manifest_missing', () => {
     const { ingestProposal } = getIngestor();
     // Do NOT call makeBatchManifest — no manifest on disk
     const responsePath = makeResponseFile({ proposals: [] });
 
-    expect(() =>
-      ingestProposal({ batchId: 'batch_nonexistent_000000000000', responseFile: responsePath }),
-    ).toThrow(/batch manifest not found/i);
+    // Must not throw — per Layer 5 spec L244: missing manifest is a rejection
+    let result;
+    expect(() => {
+      result = ingestProposal({
+        batchId: 'batch_nonexistent_000000000000',
+        responseFile: responsePath,
+      });
+    }).not.toThrow();
+
+    expect(result.parse_status).toBe('source_manifest_missing');
+    expect(result.accepted).toBe(0);
   });
 });
 
@@ -738,5 +746,202 @@ describe('recordRunFailure — writes failure manifest', () => {
     });
     // Both runs produce same run_id (same batchId+parseStatus+timestamp-second)
     expect(r1.run_id).toBe(r2.run_id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 6: source_manifest_missing as REJECTION, not THROW (PR-E Drift #4)
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — source_manifest_missing rejection (not throw)', () => {
+  test('missing batch manifest produces rejection record, does not throw', () => {
+    const { ingestProposal } = getIngestor();
+    // Do NOT call makeBatchManifest — no manifest on disk
+    const responsePath = makeResponseFile({ proposals: [] });
+
+    // Must not throw
+    let result;
+    expect(() => {
+      result = ingestProposal({
+        batchId: 'batch_nonexistent_000000000000',
+        responseFile: responsePath,
+      });
+    }).not.toThrow();
+
+    // Should return a failure shape (not parsed)
+    expect(result).toBeDefined();
+    expect(result.parse_status).toBe('source_manifest_missing');
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBe(1);
+  });
+
+  test('rejection record with code source_manifest_missing is written to rejections.jsonl', () => {
+    const { ingestProposal } = getIngestor();
+    const responsePath = makeResponseFile({ proposals: [] });
+
+    ingestProposal({ batchId: 'batch_nonexistent_000000000000', responseFile: responsePath });
+
+    const rejections = readRejections();
+    expect(rejections.length).toBe(1);
+    const reasons = rejections[0].reasons || [];
+    expect(reasons.some((r) => r.code === 'source_manifest_missing')).toBe(true);
+  });
+
+  test('queue.jsonl gets nothing when manifest is missing', () => {
+    const { ingestProposal } = getIngestor();
+    const responsePath = makeResponseFile({ proposals: [] });
+
+    ingestProposal({ batchId: 'batch_nonexistent_000000000000', responseFile: responsePath });
+
+    const candidates = readCurrentCandidates();
+    expect(Object.keys(candidates).length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 5: source_hash_mismatch (PR-E Drift #3)
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — source_hash_mismatch', () => {
+  test('mismatched batch_hash in payload produces rejection with source_hash_mismatch', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    // Payload has the WRONG batch_hash
+    const payload = makeValidProposalPayload(batchId, 'wronghash000000000000');
+    const responsePath = makeResponseFile(payload);
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBeGreaterThanOrEqual(1);
+
+    const rejections = readRejections();
+    expect(rejections.length).toBeGreaterThanOrEqual(1);
+    const reasons = rejections[0].reasons || [];
+    expect(reasons.some((r) => r.code === 'source_hash_mismatch')).toBe(true);
+    const mismatchReason = reasons.find((r) => r.code === 'source_hash_mismatch');
+    expect(mismatchReason.detail).toMatch(/a1b2c3d4e5f6/); // expected hash from manifest
+  });
+
+  test('correct batch_hash passes without hash mismatch rejection', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(1);
+    expect(result.rejected).toBe(0);
+
+    const rejections = readRejections();
+    expect(rejections.length).toBe(0);
+  });
+
+  test('hash mismatch stops all proposal processing (queue gets nothing)', () => {
+    const { ingestProposal } = getIngestor();
+    const { batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, 'stale_hash_00000000000');
+    const responsePath = makeResponseFile(payload);
+
+    ingestProposal({ batchId, responseFile: responsePath });
+
+    const candidates = readCurrentCandidates();
+    expect(Object.keys(candidates).length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 4: evidence_type_mismatch (PR-E Drift #2c)
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — evidence_type_mismatch', () => {
+  test('proposal citing diary evidence_id with wrong evidence_type is rejected', () => {
+    const { ingestProposal } = getIngestor();
+    // Batch has a diary item as ev_diary_001
+    const { manifest, batchId } = makeBatchManifest({
+      evidence_ids: ['ev_diary_001', 'ev_obs_001'],
+      evidence_status_by_id: {
+        ev_diary_001: 'present',
+        ev_obs_001: 'present',
+      },
+      evidence_type_by_id: {
+        ev_diary_001: 'diary',
+        ev_obs_001: 'observation',
+      },
+    });
+
+    const payload = {
+      schema_version: 1,
+      source: {
+        layer: 4,
+        curator: 'llm',
+        run_id: 'curator_run_type_mismatch_test',
+        created_at: '2026-05-21T01:00:00.000Z',
+        batch_id: batchId,
+        batch_hash: manifest.batch_hash,
+        prompt_policy_version: 'v1',
+        output_schema_version: 1,
+      },
+      proposals: [
+        {
+          proposal_index: 0,
+          artifact_type: 'instinct',
+          proposed_scope: { kind: 'project', project_id: 'proj_abc123456789ab' },
+          name: 'test-instinct',
+          summary: 'A test instinct.',
+          rationale: 'Observed pattern.',
+          domain: 'workflow',
+          body: 'Always test your code.',
+          body_source: 'llm_curator',
+          // Claims diary evidence as 'observation' — type mismatch!
+          evidence_refs: [
+            {
+              evidence_id: 'ev_diary_001',
+              evidence_type: 'observation', // WRONG — batch has this as 'diary'
+              relevance: 'direct',
+            },
+            {
+              evidence_id: 'ev_obs_001',
+              evidence_type: 'observation', // correct
+              relevance: 'supporting',
+            },
+          ],
+          llm_confidence: 'medium',
+          risk_notes: [],
+          uncertainty_notes: [],
+          recommended_review_action: 'review',
+        },
+      ],
+    };
+
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBeGreaterThanOrEqual(1);
+
+    const rejections = readRejections();
+    expect(rejections.length).toBeGreaterThanOrEqual(1);
+    const reasons = rejections[0].reasons || [];
+    expect(reasons.some((r) => r.code === 'evidence_type_mismatch')).toBe(true);
+    const mismatchReason = reasons.find((r) => r.code === 'evidence_type_mismatch');
+    expect(mismatchReason.field_path).toMatch(/evidence_refs\[0\]/);
+  });
+
+  test('correct evidence_type for all refs passes without type mismatch', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest({
+      evidence_ids: ['ev_001', 'ev_002'],
+      evidence_status_by_id: { ev_001: 'present', ev_002: 'present' },
+      evidence_type_by_id: { ev_001: 'observation', ev_002: 'observation' },
+    });
+
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath });
+
+    expect(result.accepted).toBe(1);
+    expect(result.rejected).toBe(0);
   });
 });

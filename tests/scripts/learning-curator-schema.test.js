@@ -4,6 +4,8 @@ const {
   validateCandidateV1,
   REJECTION_CODES,
   VALIDATOR_VERSION,
+  MIN_EVIDENCE_REFS,
+  MAX_EVIDENCE_REFS,
 } = require('../../scripts/lib/learning-curator/schema');
 
 // ---------------------------------------------------------------------------
@@ -35,7 +37,7 @@ function makeRecord(overrides = {}) {
     domain: 'workflow',
     body: 'When editing files, first grep for existing patterns to avoid duplication',
     body_source: 'llm_curator',
-    evidence: [makeEvidence()],
+    evidence: [makeEvidence(), makeEvidence({ evidence_id: 'ev_def456' })],
     evidence_quality: 'medium',
     evidence_quality_metadata: {
       rule_version: 'v1',
@@ -270,7 +272,7 @@ describe('validateCandidateV1 — enum violations', () => {
     const r = makeRecord({ artifact_type: 'bot' });
     const res = validateCandidateV1(r);
     expect(res.ok).toBe(false);
-    expect(res.reasons.some((r) => r.code === 'schema_invalid')).toBe(true);
+    expect(res.reasons.some((r) => r.code === 'artifact_type_not_allowed')).toBe(true);
   });
 
   it('rejects unknown body_source', () => {
@@ -297,6 +299,107 @@ describe('validateCandidateV1 — enum violations', () => {
     const r = makeRecord({ scope: { kind: 'team' } });
     const res = validateCandidateV1(r);
     expect(res.ok).toBe(false);
+    expect(res.reasons.some((r) => r.code === 'scope_not_allowed')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion #1 — artifact_type_not_allowed (PR-E Drift #2a)
+// ---------------------------------------------------------------------------
+
+describe('validateCandidateV1 — artifact_type_not_allowed', () => {
+  it('accepts valid artifact_type "instinct"', () => {
+    const r = makeRecord({ artifact_type: 'instinct' });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('accepts valid artifact_type "skill"', () => {
+    const r = makeRecord({ artifact_type: 'skill' });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('rejects bad artifact_type with code artifact_type_not_allowed, NOT schema_invalid', () => {
+    const r = makeRecord({ artifact_type: 'fake_type' });
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    const codes = res.reasons.map((r) => r.code);
+    expect(codes).toContain('artifact_type_not_allowed');
+    expect(codes).not.toContain('schema_invalid');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion #2 — scope_not_allowed (PR-E Drift #2b)
+// ---------------------------------------------------------------------------
+
+describe('validateCandidateV1 — scope_not_allowed', () => {
+  it('accepts scope.kind "project"', () => {
+    const r = makeRecord({ scope: { kind: 'project', project: 'myproj', project_id: 'p_123' } });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('accepts scope.kind "global"', () => {
+    const r = makeRecord({ scope: { kind: 'global' } });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('rejects bad scope.kind with code scope_not_allowed, NOT schema_invalid', () => {
+    const r = makeRecord({ scope: { kind: 'invalid' } });
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    const codes = res.reasons.map((r) => r.code);
+    expect(codes).toContain('scope_not_allowed');
+    expect(codes).not.toContain('schema_invalid');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion #3 — too_few_evidence_refs + too_many_evidence_refs (PR-E Drift #2d/e)
+// ---------------------------------------------------------------------------
+
+describe('MIN_EVIDENCE_REFS / MAX_EVIDENCE_REFS constants', () => {
+  it('MIN_EVIDENCE_REFS is exported and equals 2', () => {
+    expect(MIN_EVIDENCE_REFS).toBe(2);
+  });
+
+  it('MAX_EVIDENCE_REFS is exported and equals 5', () => {
+    expect(MAX_EVIDENCE_REFS).toBe(5);
+  });
+});
+
+describe('validateCandidateV1 — evidence count enforcement', () => {
+  function makeEvidenceArray(n) {
+    return Array.from({ length: n }, (_, i) => makeEvidence({ evidence_id: `ev_test_${i}` }));
+  }
+
+  it('accepts exactly 2 evidence refs (MIN)', () => {
+    const r = makeRecord({ evidence: makeEvidenceArray(2) });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('accepts exactly 5 evidence refs (MAX)', () => {
+    const r = makeRecord({ evidence: makeEvidenceArray(5) });
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('rejects 1 evidence ref with code too_few_evidence_refs', () => {
+    const r = makeRecord({ evidence: makeEvidenceArray(1) });
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    const codes = res.reasons.map((r) => r.code);
+    expect(codes).toContain('too_few_evidence_refs');
+    const reason = res.reasons.find((r) => r.code === 'too_few_evidence_refs');
+    expect(reason.field_path).toBe('evidence');
+  });
+
+  it('rejects 6 evidence refs with code too_many_evidence_refs', () => {
+    const r = makeRecord({ evidence: makeEvidenceArray(6) });
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    const codes = res.reasons.map((r) => r.code);
+    expect(codes).toContain('too_many_evidence_refs');
+    const reason = res.reasons.find((r) => r.code === 'too_many_evidence_refs');
+    expect(reason.field_path).toBe('evidence');
   });
 });
 
@@ -489,10 +592,10 @@ describe('validateCandidateV1 — rejection reason codes', () => {
     expect(res.reasons.some((r) => r.code === 'field_too_long')).toBe(true);
   });
 
-  it('emits schema_invalid for unknown artifact_type', () => {
+  it('emits artifact_type_not_allowed for unknown artifact_type', () => {
     const r = makeRecord({ artifact_type: 'unknown' });
     const res = validateCandidateV1(r);
-    expect(res.reasons.some((r) => r.code === 'schema_invalid')).toBe(true);
+    expect(res.reasons.some((r) => r.code === 'artifact_type_not_allowed')).toBe(true);
   });
 });
 

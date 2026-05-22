@@ -16,6 +16,26 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 // ---------------------------------------------------------------------------
+// Helper — write a candidate event directly to queue.jsonl, bypassing
+// schema validation (for testing edge-case states like empty evidence).
+// ---------------------------------------------------------------------------
+
+function writeDirectlyToQueue(record) {
+  const queuePath = path.join(os.homedir(), '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+  fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+  const event = {
+    schema_version: 1,
+    event_id: `evt_direct_${crypto.randomBytes(4).toString('hex')}`,
+    ts: new Date().toISOString(),
+    candidate_id: record.candidate_id,
+    event_type: 'candidate.created',
+    actor: { layer: 5, actor_type: 'validator' },
+    record,
+  };
+  fs.appendFileSync(queuePath, `${JSON.stringify(event)}\n`, 'utf8');
+}
+
+// ---------------------------------------------------------------------------
 // Helpers — build a valid Candidate v1 record
 // ---------------------------------------------------------------------------
 
@@ -38,6 +58,12 @@ function makeCandidateRecord(overrides = {}) {
         evidence_type: 'observation',
         relevance: 'Direct observation of Edit → Bash pattern.',
         summary: 'Edit then Bash seen in session A.',
+      },
+      {
+        evidence_id: 'ev-002',
+        evidence_type: 'observation',
+        relevance: 'Second observation confirming the pattern.',
+        summary: 'Edit then Bash seen in session B.',
       },
     ],
     evidence_quality: 'low',
@@ -1498,8 +1524,9 @@ describe('PR-D Criterion 5 — detail view evidence_summaries / llm_assessment /
   });
 
   it('evidence_summaries is empty array when candidate has no evidence', () => {
+    // Write directly to queue bypassing schema validation (0 evidence is below MIN_EVIDENCE_REFS)
     const record = makeCandidateRecord({ evidence: [] });
-    appendCandidate(record);
+    writeDirectlyToQueue(record);
 
     const detail = sanitizeDashboardDetail(record.candidate_id);
     expect(detail.evidence_summaries).toEqual([]);
@@ -1567,6 +1594,12 @@ describe('PR-D Criterion 5 — detail view evidence_summaries / llm_assessment /
           evidence_type: 'observation',
           relevance: 'test relevance',
           summary: `API_KEY=${secretKey} was used in the session`,
+        },
+        {
+          evidence_id: 'ev-sec2',
+          evidence_type: 'observation',
+          relevance: 'second evidence',
+          summary: 'Clean evidence entry',
         },
       ],
     });
