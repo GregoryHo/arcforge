@@ -20,7 +20,11 @@
  */
 
 const { assembleBatch } = require('./batch-assembler');
-const { ingestProposal } = require('./proposal-ingestor');
+const { ingestProposal, recordRunFailure } = require('./proposal-ingestor');
+
+// Spec layer-4 §parse_status enum for daemon-side failures.
+// CLI-binary-missing maps to transport_error with detail carrying the reason.
+const ALLOWED_FAILURE_STATUSES = ['transport_error', 'timeout'];
 
 // ---------------------------------------------------------------------------
 // Arg parser — minimal, no external deps
@@ -113,6 +117,45 @@ function cmdIngestProposal(argv) {
   );
 }
 
+function cmdRecordRunFailure(argv) {
+  const args = parseArgs(argv);
+  const batchId = args['batch-id'];
+  const parseStatus = args['parse-status'];
+  const detail = args.detail || null;
+
+  if (!batchId || typeof batchId !== 'string') {
+    console.error('Error: --batch-id <batch_id> is required for record-run-failure');
+    process.exit(1);
+  }
+  if (!parseStatus || typeof parseStatus !== 'string') {
+    console.error('Error: --parse-status <status> is required for record-run-failure');
+    process.exit(1);
+  }
+  if (!ALLOWED_FAILURE_STATUSES.includes(parseStatus)) {
+    console.error(
+      `Error: --parse-status "${parseStatus}" is not allowed. Allowed values: ${ALLOWED_FAILURE_STATUSES.join(', ')}`,
+    );
+    process.exit(1);
+  }
+
+  let result;
+  try {
+    result = recordRunFailure({ batchId, parseStatus, detail: detail || undefined });
+  } catch (err) {
+    console.error(`Error: record-run-failure failed: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log(
+    JSON.stringify({
+      run_id: result.run_id,
+      parse_status: result.parse_status,
+      accepted: result.accepted,
+      rejected: result.rejected,
+    }),
+  );
+}
+
 function cmdHelp() {
   console.log(
     [
@@ -125,6 +168,10 @@ function cmdHelp() {
       '',
       '  ingest-proposal --batch-id <batch_id> --response-file <path>',
       '    Layer 4→5: parse LLM response and ingest proposals into candidate queue.',
+      '    Prints JSON: { run_id, parse_status, accepted, rejected }',
+      '',
+      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',
+      '    Layer 4: write a CuratorRunManifest for a daemon transport failure.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
       '  help',
@@ -146,6 +193,9 @@ switch (subcommand) {
     break;
   case 'ingest-proposal':
     cmdIngestProposal(remainingArgs);
+    break;
+  case 'record-run-failure':
+    cmdRecordRunFailure(remainingArgs);
     break;
   case 'help':
   case '--help':

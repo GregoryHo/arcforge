@@ -506,4 +506,64 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   return { run_id: runId, parse_status: 'parsed', accepted, rejected };
 }
 
-module.exports = { ingestProposal };
+// ---------------------------------------------------------------------------
+// recordRunFailure — Layer 4 spec §10: manifest for every attempted run,
+// including daemon transport failures (no response file available).
+// ---------------------------------------------------------------------------
+
+/**
+ * Write a minimal CuratorRunManifest for a daemon-side failure where no
+ * response file exists (claude CLI exited non-zero, watchdog killed it, or
+ * the CLI binary was missing entirely).
+ *
+ * Per Layer 4 spec, parse_status for these paths is exactly one of
+ * `'transport_error'` or `'timeout'`. "CLI not found" maps to transport_error
+ * with the reason carried in `detail`.
+ *
+ * @param {object} options
+ * @param {string} options.batchId
+ * @param {string} options.parseStatus — 'transport_error' | 'timeout'
+ * @param {string} [options.detail]    — free-text reason
+ * @param {string} [options.homeDir]   — override home directory (tests)
+ * @returns {{ run_id, parse_status, accepted, rejected }}
+ */
+function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride } = {}) {
+  if (typeof batchId !== 'string' || !batchId.trim()) {
+    throw new Error('recordRunFailure: batchId must be a non-empty string');
+  }
+  if (typeof parseStatus !== 'string' || !parseStatus.trim()) {
+    throw new Error('recordRunFailure: parseStatus must be a non-empty string');
+  }
+
+  const homeDir = homeOverride || os.homedir();
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const ts = compactUtc(now);
+
+  // Deterministic run_id: sha256 of (batchId + parseStatus), same shape as ingestProposal
+  const runIdHash = sha256Truncated(batchId + parseStatus, 12);
+  const runId = `curator_run_${ts}_${runIdHash}`;
+
+  const runManifest = {
+    schema_version: SCHEMA_VERSION,
+    run_id: runId,
+    created_at: createdAt,
+    source_batch_id: batchId,
+    parse_status: parseStatus,
+    detail: detail || null,
+    accepted_count: 0,
+    rejected_count: 0,
+    proposal_count: 0,
+    handed_to_layer5: false,
+    prompt_hash: null,
+    response_hash: null,
+    raw_prompt_saved: false,
+    raw_response_saved: false,
+  };
+
+  persistRunManifest(runManifest, homeDir);
+
+  return { run_id: runId, parse_status: parseStatus, accepted: 0, rejected: 0 };
+}
+
+module.exports = { ingestProposal, recordRunFailure };

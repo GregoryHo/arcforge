@@ -658,3 +658,85 @@ describe('ingestProposal — rule_version namespace split (criterion 5)', () => 
     expect(eqmRuleVersion).toBe('v1-project_obs_count');
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR-F: recordRunFailure — failure manifest for daemon transport errors
+// ---------------------------------------------------------------------------
+
+describe('recordRunFailure — writes failure manifest', () => {
+  test('transport_error: writes manifest file to curator-runs dir', () => {
+    const { recordRunFailure } = getIngestor();
+    const result = recordRunFailure({
+      batchId: 'batch_x',
+      parseStatus: 'transport_error',
+      detail: 'claude exit 1',
+      homeDir: tmpDir,
+    });
+
+    expect(result.run_id).toMatch(/^curator_run_/);
+    expect(result.parse_status).toBe('transport_error');
+    expect(result.accepted).toBe(0);
+    expect(result.rejected).toBe(0);
+
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifestPath = path.join(runsDir, `${result.run_id}.manifest.json`);
+    expect(fs.existsSync(manifestPath)).toBe(true);
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    expect(manifest.schema_version).toBe(1);
+    expect(manifest.parse_status).toBe('transport_error');
+    expect(manifest.accepted_count).toBe(0);
+    expect(manifest.rejected_count).toBe(0);
+    expect(manifest.handed_to_layer5).toBe(false);
+    expect(manifest.source_batch_id).toBe('batch_x');
+    expect(manifest.detail).toBe('claude exit 1');
+    expect(manifest.prompt_hash).toBeNull();
+    expect(manifest.response_hash).toBeNull();
+    expect(manifest.raw_prompt_saved).toBe(false);
+    expect(manifest.raw_response_saved).toBe(false);
+  });
+
+  test('persisted manifest has correct fields for both spec parse_status values', () => {
+    const { recordRunFailure } = getIngestor();
+    const statuses = ['transport_error', 'timeout'];
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+
+    for (const parseStatus of statuses) {
+      const result = recordRunFailure({
+        batchId: `batch_${parseStatus}`,
+        parseStatus,
+        detail: `test detail for ${parseStatus}`,
+        homeDir: tmpDir,
+      });
+
+      expect(result.parse_status).toBe(parseStatus);
+      const manifestPath = path.join(runsDir, `${result.run_id}.manifest.json`);
+      expect(fs.existsSync(manifestPath)).toBe(true);
+
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      expect(manifest.parse_status).toBe(parseStatus);
+      expect(manifest.accepted_count).toBe(0);
+      expect(manifest.rejected_count).toBe(0);
+      expect(manifest.handed_to_layer5).toBe(false);
+    }
+  });
+
+  test('run_id is deterministic-ish: same batchId+parseStatus within same second gives same run_id', () => {
+    const { recordRunFailure } = getIngestor();
+    // Same call twice should produce manifests with the same run_id (idempotent-ish)
+    const r1 = recordRunFailure({
+      batchId: 'batch_idem',
+      parseStatus: 'timeout',
+      detail: 'first call',
+      homeDir: tmpDir,
+    });
+    const r2 = recordRunFailure({
+      batchId: 'batch_idem',
+      parseStatus: 'timeout',
+      detail: 'second call',
+      homeDir: tmpDir,
+    });
+    // Both runs produce same run_id (same batchId+parseStatus+timestamp-second)
+    expect(r1.run_id).toBe(r2.run_id);
+  });
+});
