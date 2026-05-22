@@ -213,6 +213,17 @@
         const panel = document.createElement('div');
         panel.className = 'detail-panel';
 
+        // Helper: append a labeled section with content; uses textContent (XSS-safe)
+        function appendLabeledSection(parent, className, label, contentBuilder) {
+          const el = document.createElement('div');
+          el.className = className;
+          const strong = document.createElement('strong');
+          strong.textContent = label;
+          el.appendChild(strong);
+          contentBuilder(el);
+          parent.appendChild(el);
+        }
+
         // evidence_summaries
         if (d.evidence_summaries && d.evidence_summaries.length > 0) {
           const details = document.createElement('details');
@@ -223,8 +234,16 @@
           for (const ev of d.evidence_summaries) {
             const item = document.createElement('div');
             item.className = 'evidence-summary-item';
-            item.innerHTML = '<strong>' + (ev.evidence_type || '') + '</strong>: ' + (ev.summary || '') +
-              (ev.relevance ? '<br><em>' + ev.relevance + '</em>' : '');
+            const strong = document.createElement('strong');
+            strong.textContent = ev.evidence_type || '';
+            item.appendChild(strong);
+            item.appendChild(document.createTextNode(': ' + (ev.summary || '')));
+            if (ev.relevance) {
+              item.appendChild(document.createElement('br'));
+              const em = document.createElement('em');
+              em.textContent = ev.relevance;
+              item.appendChild(em);
+            }
             details.appendChild(item);
           }
           panel.appendChild(details);
@@ -232,31 +251,34 @@
 
         // llm_assessment block
         if (d.llm_assessment) {
-          const llmEl = document.createElement('div');
-          llmEl.className = 'llm-block detail-section';
-          const conf = d.llm_assessment.llm_confidence || 'unknown';
-          const risks = (d.llm_assessment.risk_notes || []).join('; ');
-          const unc = (d.llm_assessment.uncertainty_notes || []).join('; ');
-          llmEl.innerHTML = '<strong>LLM assessment</strong>: confidence=' + conf +
-            (risks ? '<br>Risks: ' + risks : '') +
-            (unc ? '<br>Uncertain: ' + unc : '');
-          panel.appendChild(llmEl);
+          appendLabeledSection(panel, 'llm-block detail-section', 'LLM assessment', (el) => {
+            const conf = d.llm_assessment.llm_confidence || 'unknown';
+            const risks = (d.llm_assessment.risk_notes || []).join('; ');
+            const unc = (d.llm_assessment.uncertainty_notes || []).join('; ');
+            el.appendChild(document.createTextNode(': confidence=' + conf));
+            if (risks) {
+              el.appendChild(document.createElement('br'));
+              el.appendChild(document.createTextNode('Risks: ' + risks));
+            }
+            if (unc) {
+              el.appendChild(document.createElement('br'));
+              el.appendChild(document.createTextNode('Uncertain: ' + unc));
+            }
+          });
         }
 
-        // materialization block
+        // materialization block — JSON stringified, textContent (no HTML interpretation)
         if (d.materialization) {
-          const matEl = document.createElement('div');
-          matEl.className = 'lifecycle-block detail-section';
-          matEl.innerHTML = '<strong>Materialization</strong>: ' + JSON.stringify(d.materialization);
-          panel.appendChild(matEl);
+          appendLabeledSection(panel, 'lifecycle-block detail-section', 'Materialization', (el) => {
+            el.appendChild(document.createTextNode(': ' + JSON.stringify(d.materialization)));
+          });
         }
 
-        // activation block
+        // activation block — same, XSS-safe
         if (d.activation) {
-          const actEl = document.createElement('div');
-          actEl.className = 'lifecycle-block detail-section';
-          actEl.innerHTML = '<strong>Activation</strong>: ' + JSON.stringify(d.activation);
-          panel.appendChild(actEl);
+          appendLabeledSection(panel, 'lifecycle-block detail-section', 'Activation', (el) => {
+            el.appendChild(document.createTextNode(': ' + JSON.stringify(d.activation)));
+          });
         }
 
         return panel;

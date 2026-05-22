@@ -1570,4 +1570,55 @@ describe('PR-D Criterion 5 — detail view evidence_summaries / llm_assessment /
     const serialized = JSON.stringify(detail);
     expect(serialized).not.toContain(secretKey);
   });
+
+  it('llm_assessment — secret in risk_notes does not leak', () => {
+    const secretKey = 'sk-llm-risk-leak-12345';
+    const record = makeCandidateRecord({
+      llm_assessment: {
+        llm_confidence: 'medium',
+        risk_notes: [`Observed API_KEY=${secretKey} in the agent's output`],
+        uncertainty_notes: [],
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(JSON.stringify(detail)).not.toContain(secretKey);
+  });
+
+  it('materialization — API_KEY in a string field is redacted', () => {
+    const secretKey = 'sk-materialize-leak-77777';
+    const record = makeCandidateRecord({
+      lifecycle: {
+        status: 'materialized',
+        status_changed_at: new Date().toISOString(),
+        materialization: {
+          materialization_id: 'mat-test',
+          reviewer_note: `Looked at draft; API_KEY=${secretKey} was visible in the body.`,
+        },
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(JSON.stringify(detail)).not.toContain(secretKey);
+  });
+
+  it('activation — API_KEY in target_summary is redacted', () => {
+    const secretKey = 'sk-activate-leak-88888';
+    const record = makeCandidateRecord({
+      lifecycle: {
+        status: 'activated',
+        status_changed_at: new Date().toISOString(),
+        activation: {
+          activation_id: 'act-test',
+          target_summary: `Token: API_KEY=${secretKey} embedded`,
+        },
+      },
+    });
+    appendCandidate(record);
+
+    const detail = sanitizeDashboardDetail(record.candidate_id);
+    expect(JSON.stringify(detail)).not.toContain(secretKey);
+  });
 });
