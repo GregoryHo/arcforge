@@ -248,6 +248,30 @@ type ActiveArtifactRecord = {
 
 For `manual_claude_md_patch`, `active_path` may be absent and `status` should be `manual_patch_pending` unless the system later has an explicit, separately approved manual-apply recording workflow.
 
+### `active_path_summary` redaction rule
+
+`active_path_summary` is a human-readable diagnostic string included in activation records and surfaced through Layer 6 review and Layer 5 events. Because activation records persist beyond a single session and may be exported, the summary MUST NOT carry the raw `project_id` segment.
+
+Acceptable forms:
+
+```text
+"<artifact_type>/<artifact_id>.md"               ✓ no project_id
+"<project_id_short_hash>/<artifact_id>.md"       ✓ hashed project id
+"<active_path_hash[:12]>"                         ✓ truncated path hash
+```
+
+Forbidden form:
+
+```text
+"<raw_project_id>/<artifact_id>.md"               ✗ project_id leaked verbatim
+```
+
+Implementations that derive the summary from a relative path against the active root must strip or hash the project_id segment before persisting. The full path remains available indirectly via `active_path_hash` for integrity checks.
+
+### Hash verification ordering note
+
+The spec phrasing "verify before reading" the draft body refers to the integrity-vs-action ordering, not the order of byte reads in memory. Implementations that read the full draft body into a buffer, compute its hash, compare against `source_draft_content_hash`, and only then act on the buffer are equivalent to the spec — the action (writing to active path, transitioning Layer 5 state) does not occur unless the hash matches. Implementations that act on the buffer before completing the hash check are non-compliant.
+
 ## Activation registry
 
 Layer 8 persists activation records:

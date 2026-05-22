@@ -125,6 +125,15 @@ type MaterializationRenderPolicy = {
 };
 ```
 
+**First-slice default**: `include_evidence_summaries: false` until Layer 6 detail
+view exposes `evidence_summaries` block in the dashboard review surface. Once
+Layer 6 surfaces evidence summaries to the reviewer, Layer 7 may flip this
+default to `true` so the activated artifact carries the same provenance the
+reviewer saw. Pre-Layer-6-completion enabling this flag would write evidence
+summaries into draft bodies that the reviewer cannot see during approval,
+breaking the "review surface mirrors stored body" invariant. Flip in lockstep,
+not before.
+
 Recommended default draft root:
 
 ```text
