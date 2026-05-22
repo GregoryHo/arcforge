@@ -204,10 +204,12 @@ function verifyReviewerAck(activationRequest) {
 
 /**
  * Build a redacted active_path_summary that strips project_id.
+ * Takes the already-computed `active_path_hash` (32-char sha256 digest prefix)
+ * and slices it to 12 to avoid hashing the same path twice.
  * Returns `instincts/<sha256(activePath)[:12]>.md` — safe to log/audit.
  */
-function summarizeActivePath(activePath) {
-  return `instincts/${sha256Truncated(activePath, 12)}.md`;
+function summarizeActivePath(activePathHash) {
+  return `instincts/${activePathHash.slice(0, 12)}.md`;
 }
 
 // ---------------------------------------------------------------------------
@@ -361,12 +363,13 @@ function activate({
     const activeContentHash = sha256Truncated(draftContent, 64);
 
     // Build active artifact record
+    const activePathHash = sha256Truncated(activePath, 32);
     const activeArtifactRecord = {
       active_artifact_id: activeArtifactId,
       target_kind: 'instinct',
       active_path: activePath,
-      active_path_hash: sha256Truncated(activePath, 32),
-      active_path_summary: summarizeActivePath(activePath),
+      active_path_hash: activePathHash,
+      active_path_summary: summarizeActivePath(activePathHash),
       source_draft_artifact_id: draftArtifact.draft_artifact_id,
       source_draft_content_hash: draftArtifact.content_hash,
       active_content_hash: activeContentHash,
@@ -515,12 +518,13 @@ function deactivate({
       atomicWriteFile(archivePath, '<!-- deactivated artifact — original file was missing -->');
     }
 
+    const archivePathHash = sha256Truncated(archivePath, 32);
     const archivedArtifactRecord = {
       active_artifact_id: archivedArtifactId,
       target_kind: 'instinct',
       active_path: archivePath,
-      active_path_hash: sha256Truncated(archivePath, 32),
-      active_path_summary: summarizeActivePath(archivePath),
+      active_path_hash: archivePathHash,
+      active_path_summary: summarizeActivePath(archivePathHash),
       active_content_hash: disabledContent ? sha256Truncated(disabledContent, 64) : undefined,
       status: 'deactivated',
     };
