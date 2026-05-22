@@ -512,12 +512,17 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
 // ---------------------------------------------------------------------------
 
 /**
- * Write a minimal CuratorRunManifest for a daemon-side failure
- * (transport_error, timeout, cli_not_found) where no response file exists.
+ * Write a minimal CuratorRunManifest for a daemon-side failure where no
+ * response file exists (claude CLI exited non-zero, watchdog killed it, or
+ * the CLI binary was missing entirely).
+ *
+ * Per Layer 4 spec, parse_status for these paths is exactly one of
+ * `'transport_error'` or `'timeout'`. "CLI not found" maps to transport_error
+ * with the reason carried in `detail`.
  *
  * @param {object} options
  * @param {string} options.batchId
- * @param {string} options.parseStatus — 'transport_error' | 'timeout' | 'cli_not_found'
+ * @param {string} options.parseStatus — 'transport_error' | 'timeout'
  * @param {string} [options.detail]    — free-text reason
  * @param {string} [options.homeDir]   — override home directory (tests)
  * @returns {{ run_id, parse_status, accepted, rejected }}
@@ -548,6 +553,7 @@ function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride 
     detail: detail || null,
     accepted_count: 0,
     rejected_count: 0,
+    proposal_count: 0,
     handed_to_layer5: false,
     prompt_hash: null,
     response_hash: null,

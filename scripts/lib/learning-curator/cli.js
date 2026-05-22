@@ -22,7 +22,9 @@
 const { assembleBatch } = require('./batch-assembler');
 const { ingestProposal, recordRunFailure } = require('./proposal-ingestor');
 
-const ALLOWED_FAILURE_STATUSES = ['transport_error', 'timeout', 'cli_not_found'];
+// Spec layer-4 §parse_status enum for daemon-side failures.
+// CLI-binary-missing maps to transport_error with detail carrying the reason.
+const ALLOWED_FAILURE_STATUSES = ['transport_error', 'timeout'];
 
 // ---------------------------------------------------------------------------
 // Arg parser — minimal, no external deps
@@ -168,7 +170,7 @@ function cmdHelp() {
       '    Layer 4→5: parse LLM response and ingest proposals into candidate queue.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
-      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout|cli_not_found> [--detail <msg>]',
+      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',
       '    Layer 4: write a CuratorRunManifest for a daemon transport failure.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',

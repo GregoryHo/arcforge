@@ -188,16 +188,22 @@ describe('CLI record-run-failure', () => {
     expect(parsed.parse_status).toBe('timeout');
   });
 
-  test('cli_not_found parse-status persists correctly', () => {
-    const output = runCLI([
-      'record-run-failure',
-      '--batch-id',
-      'batch_test_rf_003',
-      '--parse-status',
-      'cli_not_found',
-    ]);
-    const parsed = JSON.parse(output);
-    expect(parsed.parse_status).toBe('cli_not_found');
+  test('invalid parse-status (e.g. cli_not_found) is rejected — only spec enum values allowed', () => {
+    const { spawnSync } = require('node:child_process');
+    const result = spawnSync(
+      'node',
+      [
+        CLI_PATH,
+        'record-run-failure',
+        '--batch-id',
+        'batch_test_rf_003',
+        '--parse-status',
+        'cli_not_found',
+      ],
+      { env: { ...process.env, HOME: tmpDir }, encoding: 'utf8' },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/not allowed/i);
   });
 
   test('invalid parse-status exits non-zero', () => {

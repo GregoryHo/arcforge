@@ -696,9 +696,9 @@ describe('recordRunFailure — writes failure manifest', () => {
     expect(manifest.raw_response_saved).toBe(false);
   });
 
-  test('persisted manifest has correct fields for all 3 parse_status values', () => {
+  test('persisted manifest has correct fields for both spec parse_status values', () => {
     const { recordRunFailure } = getIngestor();
-    const statuses = ['transport_error', 'timeout', 'cli_not_found'];
+    const statuses = ['transport_error', 'timeout'];
     const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
 
     for (const parseStatus of statuses) {

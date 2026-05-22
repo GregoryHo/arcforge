@@ -301,10 +301,12 @@ analyze_project() {
       fi
     else
       log_msg "WARNING: claude CLI not found, skipping analysis"
-      # PR-F: write failure manifest for cli_not_found
+      # PR-F: write failure manifest. CLI-binary-missing is recorded as
+      # transport_error per layer-4 spec parse_status enum; detail carries
+      # the "not found in PATH" specific reason.
       node "$CURATOR_CLI" record-run-failure \
         --batch-id "$batch_id" \
-        --parse-status "cli_not_found" \
+        --parse-status "transport_error" \
         --detail "claude CLI not found in PATH" \
         > /dev/null 2>&1 || true
       return
@@ -425,8 +427,8 @@ daemon_loop() {
 
   # Cleanup lock + transient analyzer files on exit; also remove ANALYZING lock to prevent stale lock after crash.
   # Also clean up any transient curator response files left by an interrupted analysis.
-  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json; remove_lock' EXIT
-  trap 'log_msg "Daemon stopping (signal)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json; remove_lock; exit 0' TERM INT
+  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock' EXIT
+  trap 'log_msg "Daemon stopping (signal)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock; exit 0' TERM INT
 
   # SIGUSR1 handler with cooldown
   handle_sigusr1() {
