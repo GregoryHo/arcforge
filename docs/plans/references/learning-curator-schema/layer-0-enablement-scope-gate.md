@@ -41,6 +41,12 @@ type ScopeGateInput = {
     observer_self_analysis?: boolean;
   };
 
+  // Canonical env var names that map into the above structured fields.
+  // `ARCFORGE_OBSERVE_EXPLICIT_SKIP=1` sets environment.explicit_skip = true.
+  // `ARCFORGE_OBSERVE_SELF_ANALYSIS=1` sets environment.observer_self_analysis = true.
+  // These two are the only environment-driven scope toggles; reject any other
+  // env-driven kill switches as out-of-contract.
+
   path_context?: {
     is_eval_trial?: boolean;
     is_legacy_quarantine?: boolean;
