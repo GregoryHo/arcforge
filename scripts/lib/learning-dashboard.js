@@ -18,7 +18,6 @@
  */
 
 const fs = require('node:fs');
-const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -104,6 +103,15 @@ function legalActionsFor(status) {
 }
 
 /**
+ * Derive the evidence_quality_chip value from evidence_quality.
+ * Returns undefined if evidence_quality is not one of the known values.
+ */
+function evidenceQualityChip(quality) {
+  const map = { low: 'low_signal', medium: 'medium_signal', high: 'high_signal' };
+  return map[quality];
+}
+
+/**
  * Build a DashboardCandidateCard from a CandidateQueueRecord per Layer 6 spec.
  * Returns only allowlisted fields. project_id intentionally excluded.
  *
@@ -113,6 +121,8 @@ function legalActionsFor(status) {
 function sanitizeDashboardCard(record) {
   const status = record.lifecycle ? record.lifecycle.status : undefined;
   const llmAssessment = record.llm_assessment || {};
+  const chip = evidenceQualityChip(record.evidence_quality);
+  const hasRelationships = record.relationships !== undefined && record.relationships !== null;
 
   return {
     schema_version: 1,
@@ -132,6 +142,8 @@ function sanitizeDashboardCard(record) {
       ? llmAssessment.uncertainty_notes.length
       : 0,
     available_actions: legalActionsFor(status),
+    ...(chip !== undefined && { evidence_quality_chip: chip }),
+    ...(hasRelationships && { relationships: record.relationships }),
   };
 }
 
@@ -159,14 +171,78 @@ function sanitizeDashboardDetail(candidateId) {
 
   const rationaleText = sanitizeText(record.rationale, DETAIL_RATIONALE_MAX);
 
-  return {
+  // Criterion 5: evidence_summaries — map evidence[] to sanitized summary objects
+  const evidenceSummaries = Array.isArray(record.evidence)
+    ? record.evidence.map((ev) => ({
+        evidence_id: ev.evidence_id,
+        evidence_type: ev.evidence_type,
+        relevance: sanitizeText(ev.relevance, 200),
+        summary: sanitizeText(ev.summary, 300),
+      }))
+    : [];
+
+  const detail = {
     ...card,
     rationale: rationaleText,
     body_preview: {
       text: bodyPreviewText,
       truncated: bodyTruncated,
     },
+    evidence_summaries: evidenceSummaries,
   };
+
+  // llm_assessment / materialization / activation are spec-allowed on the detail
+  // wire. Sanitize them — these blocks may carry free-text (risk_notes) or paths
+  // (draft_path, active_path_summary) that must be scrubbed before egress.
+  if (record.llm_assessment !== undefined) {
+    detail.llm_assessment = sanitizeAssessmentBlock(record.llm_assessment);
+  }
+  if (record.lifecycle?.materialization !== undefined) {
+    detail.materialization = sanitizeProvenanceBlock(record.lifecycle.materialization);
+  }
+  if (record.lifecycle?.activation !== undefined) {
+    detail.activation = sanitizeProvenanceBlock(record.lifecycle.activation);
+  }
+
+  return detail;
+}
+
+/**
+ * Sanitize a free-text assessment block (llm_assessment) — risk_notes /
+ * uncertainty_notes / rationale_summary all flow through redactObservationText
+ * to scrub any leaked secrets the LLM may have echoed from observations.
+ */
+function sanitizeAssessmentBlock(block) {
+  if (!block || typeof block !== 'object') return undefined;
+  const out = {};
+  for (const [key, value] of Object.entries(block)) {
+    if (typeof value === 'string') {
+      out[key] = redactObservationText(value);
+    } else if (Array.isArray(value)) {
+      out[key] = value.map((v) => (typeof v === 'string' ? redactObservationText(v) : v));
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Sanitize a provenance block (materialization / activation) — paths and any
+ * string-valued field flow through redactObservationText. Non-string fields
+ * (hashes, booleans, numbers, nested objects) are preserved as-is.
+ */
+function sanitizeProvenanceBlock(block) {
+  if (!block || typeof block !== 'object') return undefined;
+  const out = {};
+  for (const [key, value] of Object.entries(block)) {
+    if (typeof value === 'string') {
+      out[key] = redactObservationText(value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,23 +298,51 @@ function generateActionId() {
 /**
  * Handle a dashboard reviewer action request.
  *
- * @param {{ action: string, candidate_id: string }} opts
+ * @param {{ action: string, candidate_id: string, expected_current_status?: string,
+ *           safety_ack?: object, actor?: object, reason?: string }} opts
  * @returns {{ accepted: boolean, action_id: string, reason?: string, ... }}
  */
-function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
+function handleDashboardAction({
+  action,
+  candidate_id: candidateId,
+  expected_current_status: expectedStatus,
+  safety_ack: safetyAck,
+  actor: incomingActor,
+  reason,
+} = {}) {
   const actionId = generateActionId();
   const requestedAt = new Date().toISOString();
 
-  function reject(reason, extra = {}) {
+  // Criterion 4: default actor
+  const actor = incomingActor || { layer: 6, actor_type: 'dashboard', reviewer: 'local_user' };
+
+  function reject(rejectionReason, extra = {}) {
     const result = {
       accepted: false,
       action_id: actionId,
       requested_at: requestedAt,
       action,
       candidate_id: candidateId,
-      reason,
+      actor,
+      reason: rejectionReason,
       ...extra,
     };
+    writeAuditEntry(result);
+    return result;
+  }
+
+  function accept(extra = {}) {
+    const result = {
+      accepted: true,
+      action_id: actionId,
+      requested_at: requestedAt,
+      action,
+      candidate_id: candidateId,
+      actor,
+      ...extra,
+    };
+    // Criterion 4: include user-supplied reason in audit log
+    if (reason !== undefined) result.reason = reason;
     writeAuditEntry(result);
     return result;
   }
@@ -262,13 +366,33 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
 
   const currentStatus = candidate.lifecycle ? candidate.lifecycle.status : undefined;
 
-  // Step 4: check Action × Status matrix
+  // Criterion 2: optimistic concurrency guard — check expected_current_status
+  if (expectedStatus !== undefined && expectedStatus !== null) {
+    if (expectedStatus !== currentStatus) {
+      return reject('stale_status', { expected: expectedStatus, current: currentStatus });
+    }
+  }
+
+  // Step 4: check Action × Status matrix (before safety_ack so illegal actions fail fast)
   if (!isLegalAction(currentStatus, action)) {
     return reject('policy_violation');
   }
 
+  // Criterion 3: safety_ack gate for activate and deactivate (only after policy check passes)
+  if (action === LIFECYCLE_ACTION.ACTIVATE) {
+    const ack = safetyAck || {};
+    if (!ack.reviewer_saw_behavior_change_warning || !ack.reviewer_saw_target_path_summary) {
+      return reject('missing_safety_ack');
+    }
+  }
+  if (action === LIFECYCLE_ACTION.DEACTIVATE) {
+    const ack = safetyAck || {};
+    if (!ack.reviewer_saw_behavior_change_warning) {
+      return reject('missing_safety_ack');
+    }
+  }
+
   // Step 5/6: dispatch by action type
-  const actor = { layer: 6, actor_type: 'dashboard' };
 
   if (action === LIFECYCLE_ACTION.PROMOTE) {
     // Candidate-producing: create a global-scope copy of the source candidate.
@@ -295,16 +419,7 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     appendCandidate(newRecord, { actor });
     appendRelatedEvent(candidateId, { promoted_to_candidate_id: newId }, actor);
 
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
-      new_candidate_id: newId,
-    };
-    writeAuditEntry(result);
-    return result;
+    return accept({ new_candidate_id: newId });
   }
 
   if (action === LIFECYCLE_ACTION.EVOLVE) {
@@ -330,16 +445,7 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     appendCandidate(newRecord, { actor });
     appendRelatedEvent(candidateId, { evolved_to_candidate_id: newId }, actor);
 
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
-      new_candidate_id: newId,
-    };
-    writeAuditEntry(result);
-    return result;
+    return accept({ new_candidate_id: newId });
   }
 
   // DH-1: materialize — delegates to Layer 7 materialize.js
@@ -355,17 +461,10 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!matResult.ok) {
       return reject(matResult.failure.reason, { module_failure: matResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'materialized',
       materialization_id: matResult.record.materialization_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // DH-2: activate — delegates to Layer 8 activate.js
@@ -401,17 +500,10 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!actResult.ok) {
       return reject(actResult.failure.reason, { module_failure: actResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'activated',
       activation_id: actResult.record.activation_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // DH-6: deactivate — delegates to Layer 8 deactivate.js
@@ -439,217 +531,17 @@ function handleDashboardAction({ action, candidate_id: candidateId } = {}) {
     if (!deactResult.ok) {
       return reject(deactResult.failure.reason, { module_failure: deactResult.failure });
     }
-    const result = {
-      accepted: true,
-      action_id: actionId,
-      requested_at: requestedAt,
-      action,
-      candidate_id: candidateId,
+    return accept({
       next_status: 'deactivated',
       activation_id: deactResult.record.activation_id,
-    };
-    writeAuditEntry(result);
-    return result;
+    });
   }
 
   // Status-changing actions: dismiss, approve (materialize, activate, deactivate handled above)
   const nextStatus = applyTransition(currentStatus, action);
   appendTransitionEvent(candidateId, action, nextStatus, actor);
 
-  const result = {
-    accepted: true,
-    action_id: actionId,
-    requested_at: requestedAt,
-    action,
-    candidate_id: candidateId,
-    next_status: nextStatus,
-  };
-  writeAuditEntry(result);
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Security headers
-// ---------------------------------------------------------------------------
-
-const SECURITY_HEADERS = {
-  'X-Frame-Options': 'DENY',
-  'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
-  'X-Content-Type-Options': 'nosniff',
-};
-
-// ---------------------------------------------------------------------------
-// HTTP utilities
-// ---------------------------------------------------------------------------
-
-function sendJson(res, data, status = 200) {
-  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(data));
-}
-
-function sendHtml(res, html) {
-  res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(html);
-}
-
-function sendError(res, status, message) {
-  sendJson(res, { error: message }, status);
-}
-
-function readRequestBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > 64 * 1024) {
-        reject(new Error('request body too large'));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
-
-/**
- * Validate the per-server write token header.
- *
- * @param {object} req
- * @param {string} writeToken
- * @returns {boolean}
- */
-function hasDashboardWriteHeader(req, writeToken) {
-  if (!writeToken || typeof writeToken !== 'string') return false;
-  if (req.headers['x-arcforge-dashboard'] !== '1') return false;
-  return req.headers['x-arcforge-dashboard-token'] === writeToken;
-}
-
-// ---------------------------------------------------------------------------
-// HTTP router
-// ---------------------------------------------------------------------------
-
-/**
- * Create a request handler for the dashboard HTTP server.
- *
- * Routes:
- *   GET  /                         → HTML dashboard
- *   GET  /api/candidates           → DashboardCandidateCard[] list
- *   GET  /api/candidates/:id       → DashboardCandidateDetail
- *   POST /api/candidates/:id/action → action dispatch (requires write token)
- *
- * @param {{ htmlBody: string, writeToken: string }} options
- * @returns {function}
- */
-function createRouter({ htmlBody, writeToken }) {
-  return async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
-    const pathname = url.pathname;
-    const method = req.method || 'GET';
-
-    // GET / — HTML dashboard
-    if (method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
-      return sendHtml(res, htmlBody);
-    }
-
-    // GET /api/candidates — list
-    if (method === 'GET' && pathname === '/api/candidates') {
-      try {
-        return sendJson(res, createDashboardModel());
-      } catch {
-        return sendError(res, 500, 'dashboard failed to load candidates');
-      }
-    }
-
-    // GET /api/candidates/:id — detail
-    const detailMatch = pathname.match(/^\/api\/candidates\/([^/]+)$/);
-    if (method === 'GET' && detailMatch) {
-      try {
-        const detail = sanitizeDashboardDetail(detailMatch[1]);
-        return sendJson(res, detail);
-      } catch (err) {
-        if (err.code === 'NOT_FOUND') return sendError(res, 404, 'candidate not found');
-        return sendError(res, 500, 'dashboard failed to load candidate');
-      }
-    }
-
-    // POST /api/candidates/:id/action — action dispatch
-    const actionMatch = pathname.match(/^\/api\/candidates\/([^/]+)\/action$/);
-    if (method === 'POST' && actionMatch) {
-      if (!hasDashboardWriteHeader(req, writeToken)) {
-        return sendError(res, 403, 'dashboard write header required');
-      }
-
-      let body;
-      try {
-        body = await readRequestBody(req);
-      } catch (err) {
-        return sendError(res, 400, err.message);
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        return sendError(res, 400, 'invalid JSON body');
-      }
-
-      const result = handleDashboardAction({
-        action: parsed.action,
-        candidate_id: actionMatch[1],
-      });
-
-      const status = result.accepted ? 200 : result.reason === 'candidate_not_found' ? 404 : 400;
-      return sendJson(res, result, status);
-    }
-
-    return sendError(res, 404, 'Not found');
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Server
-// ---------------------------------------------------------------------------
-
-function loadHtml(writeToken = '') {
-  const htmlPath = path.join(__dirname, 'learning-dashboard.html');
-  try {
-    return fs.readFileSync(htmlPath, 'utf8').replace(/__ARCFORGE_DASHBOARD_TOKEN__/g, writeToken);
-  } catch {
-    return '<!doctype html><meta charset="utf-8"><title>ArcForge learning</title><h1>Dashboard UI missing</h1>';
-  }
-}
-
-function startServer(options = {}) {
-  const { port = 3334, host = '127.0.0.1' } = options;
-  const writeToken = crypto.randomBytes(24).toString('hex');
-  const htmlBody = loadHtml(writeToken);
-  const router = createRouter({ htmlBody, writeToken });
-
-  const server = http.createServer(async (req, res) => {
-    try {
-      await router(req, res);
-    } catch {
-      sendError(res, 500, 'learning dashboard server error');
-    }
-  });
-
-  server.listen(port, host, () => {
-    console.log(`ArcForge learning dashboard: http://${host}:${port}`);
-    console.log('Press Ctrl+C to stop');
-  });
-
-  const shutdown = () => {
-    server.close();
-    process.exit(0);
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-
-  return server;
+  return accept({ next_status: nextStatus });
 }
 
 module.exports = {
@@ -657,7 +549,11 @@ module.exports = {
   sanitizeDashboardDetail,
   createDashboardModel,
   handleDashboardAction,
-  hasDashboardWriteHeader,
-  createRouter,
-  startServer,
 };
+
+// Re-export HTTP layer for backward compat with existing callers/tests that
+// imported these symbols from learning-dashboard.js before the http extraction.
+const httpLayer = require('./learning-dashboard-http');
+module.exports.hasDashboardWriteHeader = httpLayer.hasDashboardWriteHeader;
+module.exports.createRouter = httpLayer.createRouter;
+module.exports.startServer = httpLayer.startServer;
