@@ -236,6 +236,23 @@ else
   ERRORS+=('C4 PR-F: failure manifest with parse_status=timeout was written')
 fi
 
+# PR-F C4 extension: when all attempts timed out, NO transport_error manifest should be written
+C4_TRANSPORT_STATUS=""
+if [ -d "$C4_RUNS_DIR" ]; then
+  C4_TRANSPORT_STATUS=$(find "$C4_RUNS_DIR" -name '*.manifest.json' 2>/dev/null \
+    -exec grep -l '"transport_error"' {} \; | head -1 || true)
+fi
+
+if [ -z "$C4_TRANSPORT_STATUS" ]; then
+  echo "  PASS: C4 PR-F: no spurious transport_error manifest when all attempts timed out"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL: C4 PR-F: spurious transport_error manifest written when all attempts timed out (should be timeout only)"
+  echo "        manifest: ${C4_TRANSPORT_STATUS}"
+  FAIL=$((FAIL + 1))
+  ERRORS+=('C4 PR-F: no spurious transport_error manifest when all attempts timed out')
+fi
+
 # ─────────────────────────────────────────────
 # PR-F-T1: transport_error — stub claude exits 1 → failure manifest written
 # Strategy: stub claude exits 1 immediately. Daemon should call record-run-failure

@@ -215,6 +215,7 @@ analyze_project() {
   local analysis_success=false
   local retry_count=0
   local max_retries=1
+  local last_was_timeout=false
   local schema_path="${ARCFORGE_ROOT}/scripts/lib/learning-curator/candidate-proposal-schema.json"
   if [ ! -f "$schema_path" ]; then
     log_msg "ERROR: candidate-proposal-schema.json not found at ${schema_path}"
@@ -288,6 +289,9 @@ analyze_project() {
             --parse-status "timeout" \
             --detail "claude CLI exceeded watchdog timeout (${OBSERVER_DAEMON_WATCHDOG_SECS}s)" \
             > /dev/null 2>&1 || true
+          last_was_timeout=true
+        else
+          last_was_timeout=false
         fi
         retry_count=$((retry_count + 1))
         if [ "$retry_count" -le "$max_retries" ]; then
@@ -311,12 +315,15 @@ analyze_project() {
     log_msg "ERROR: Analysis failed after ${max_retries} retries for ${project}"
     echo $((fail_count + 1)) > "$fail_count_file"
     rm -f "$response_file"
-    # PR-F: write failure manifest for transport_error (all retries exhausted)
-    node "$CURATOR_CLI" record-run-failure \
-      --batch-id "$batch_id" \
-      --parse-status "transport_error" \
-      --detail "claude CLI exited non-zero after ${max_retries} retries" \
-      > /dev/null 2>&1 || true
+    # PR-F: write failure manifest for transport_error only if the last attempt was NOT
+    # a watchdog timeout (timeout attempts already wrote their own manifests).
+    if [ "$last_was_timeout" != true ]; then
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "transport_error" \
+        --detail "claude CLI exited non-zero after ${max_retries} retries" \
+        > /dev/null 2>&1 || true
+    fi
     return
   fi
 
