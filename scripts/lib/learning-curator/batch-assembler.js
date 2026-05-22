@@ -497,6 +497,10 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
     snapshot_saved: false,
     // evidence_ids list: needed by ingest-proposal for evidence_ref validation
     evidence_ids: evidenceItems.map((e) => e.evidence_id),
+    // evidence_status_by_id: needed by ingest-proposal for evidence_ref_omitted_upstream check
+    evidence_status_by_id: Object.fromEntries(
+      evidenceItems.map((e) => [e.evidence_id, e.evidence_status]),
+    ),
   };
 
   // Atomic writes (sibling tmp + rename) prevent truncated files on crash —

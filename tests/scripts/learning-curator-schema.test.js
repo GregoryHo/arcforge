@@ -3,6 +3,7 @@
 const {
   validateCandidateV1,
   REJECTION_CODES,
+  VALIDATOR_VERSION,
 } = require('../../scripts/lib/learning-curator/schema');
 
 // ---------------------------------------------------------------------------
@@ -492,5 +493,99 @@ describe('validateCandidateV1 — rejection reason codes', () => {
     const r = makeRecord({ artifact_type: 'unknown' });
     const res = validateCandidateV1(r);
     expect(res.reasons.some((r) => r.code === 'schema_invalid')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion #1 — Full safety metadata required (PR-B Layer 5 Blocker #1)
+// ---------------------------------------------------------------------------
+
+describe('VALIDATOR_VERSION export', () => {
+  it('VALIDATOR_VERSION is exported as a non-empty string', () => {
+    expect(typeof VALIDATOR_VERSION).toBe('string');
+    expect(VALIDATOR_VERSION.length).toBeGreaterThan(0);
+  });
+
+  it('VALIDATOR_VERSION equals "v1"', () => {
+    expect(VALIDATOR_VERSION).toBe('v1');
+  });
+});
+
+describe('validateCandidateV1 — full safety metadata required', () => {
+  it('accepts a record with all required safety fields present', () => {
+    const r = makeRecord();
+    expect(validateCandidateV1(r).ok).toBe(true);
+  });
+
+  it('rejects when safety.validator_version is missing', () => {
+    const r = makeRecord();
+    delete r.safety.validator_version;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.validator_version')).toBe(true);
+  });
+
+  it('rejects when safety.sanitizer_policy_version is missing', () => {
+    const r = makeRecord();
+    delete r.safety.sanitizer_policy_version;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.sanitizer_policy_version')).toBe(true);
+  });
+
+  it('rejects when safety.sanitizer_module is missing', () => {
+    const r = makeRecord();
+    delete r.safety.sanitizer_module;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.sanitizer_module')).toBe(true);
+  });
+
+  it('rejects when safety.secret_scan is missing', () => {
+    const r = makeRecord();
+    delete r.safety.secret_scan;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.secret_scan')).toBe(true);
+  });
+
+  it('rejects when safety.activation_claim_scan is missing', () => {
+    const r = makeRecord();
+    delete r.safety.activation_claim_scan;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.activation_claim_scan')).toBe(true);
+  });
+
+  it('rejects when safety.file_write_claim_scan is missing', () => {
+    const r = makeRecord();
+    delete r.safety.file_write_claim_scan;
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.field_path === 'safety.file_write_claim_scan')).toBe(true);
+  });
+
+  it('rejects when safety.secret_scan.status is not "passed"', () => {
+    const r = makeRecord();
+    r.safety.secret_scan = { status: 'rejected', rule_version: 'v1' };
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.code === 'secret_reconstruction')).toBe(true);
+  });
+
+  it('rejects when safety.activation_claim_scan.status is not "passed"', () => {
+    const r = makeRecord();
+    r.safety.activation_claim_scan = { status: 'rejected' };
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.code === 'activation_claim')).toBe(true);
+  });
+
+  it('rejects when safety.file_write_claim_scan.status is not "passed"', () => {
+    const r = makeRecord();
+    r.safety.file_write_claim_scan = { status: 'rejected' };
+    const res = validateCandidateV1(r);
+    expect(res.ok).toBe(false);
+    expect(res.reasons.some((x) => x.code === 'file_write_claim')).toBe(true);
   });
 });

@@ -77,6 +77,8 @@ function shouldObserve({
   homeDir,
 } = {}) {
   try {
+    if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return false;
+    if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return false;
     if (isSkippedPath(projectRoot)) return false;
     return (
       isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
