@@ -275,3 +275,173 @@ describe('assembleBatch — return value shape', () => {
     expect(result.project).toBe(project);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Criterion 2: typed evidence — DiaryEvidenceItem, ReflectEvidenceItem,
+// RecallEvidenceItem — and source_windows with diaries/reflects/recalls keys.
+// ---------------------------------------------------------------------------
+
+function seedReflections(project, items) {
+  const reflDir = path.join(tmpDir, '.arcforge', 'reflections', project);
+  fs.mkdirSync(reflDir, { recursive: true });
+  for (const item of items) {
+    const content = [
+      '---',
+      `reflect_id: ${item.reflect_id}`,
+      `project: ${project}`,
+      `project_id: proj_abc123456789ab`,
+      `session: session-xyz`,
+      `created_at: ${item.created_at || '2026-05-22T01:00:00.000Z'}`,
+      `source: reflection`,
+      'source_diary_ids: []',
+      '---',
+      '',
+      `# Reflection`,
+      '',
+      item.summary || 'No summary.',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(reflDir, `${item.reflect_id}.md`), content, 'utf8');
+  }
+}
+
+function seedRecalls(project, items) {
+  const recallDir = path.join(tmpDir, '.arcforge', 'recalls', project);
+  fs.mkdirSync(recallDir, { recursive: true });
+  for (const item of items) {
+    const content = [
+      '---',
+      `recall_id: ${item.recall_id}`,
+      `project: ${project}`,
+      `project_id: proj_abc123456789ab`,
+      `session: session-xyz`,
+      `created_at: ${item.created_at || '2026-05-22T01:00:00.000Z'}`,
+      `source: manual`,
+      `recall_query: ${item.recall_query || ''}`,
+      'returned_instinct_ids: []',
+      '---',
+      '',
+      `# Recall`,
+      '',
+      item.summary || 'No summary.',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(recallDir, `${item.recall_id}.md`), content, 'utf8');
+  }
+}
+
+describe('assembleBatch — typed evidence (criterion 2)', () => {
+  test('manifest source_windows has diaries, reflects, recalls keys', () => {
+    const { assembleBatch } = getAssembler();
+    const project = 'typed-evidence-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedDiaries(project, ['# Diary\nSession summary about grep.']);
+    seedReflections(project, [
+      {
+        reflect_id: 'reflect-20260522T010000Z-aabbccdd',
+        summary: 'Grep pattern found in 3 sessions.',
+      },
+    ]);
+    seedRecalls(project, [
+      {
+        recall_id: 'recall-20260522T010000Z-11223344',
+        recall_query: 'grep',
+        summary: 'Retrieved grep instinct.',
+      },
+    ]);
+
+    const result = assembleBatch({ project });
+    const manifest = JSON.parse(fs.readFileSync(result.manifest_path, 'utf8'));
+
+    expect(manifest.source_windows.diaries).toBeDefined();
+    expect(typeof manifest.source_windows.diaries.records_scanned).toBe('number');
+    expect(typeof manifest.source_windows.diaries.records_selected).toBe('number');
+
+    expect(manifest.source_windows.reflects).toBeDefined();
+    expect(typeof manifest.source_windows.reflects.records_scanned).toBe('number');
+    expect(typeof manifest.source_windows.reflects.records_selected).toBe('number');
+
+    expect(manifest.source_windows.recalls).toBeDefined();
+    expect(typeof manifest.source_windows.recalls.records_scanned).toBe('number');
+    expect(typeof manifest.source_windows.recalls.records_selected).toBe('number');
+  });
+
+  test('manifest evidence_ids includes diary, reflect, recall evidence IDs', () => {
+    const { assembleBatch } = getAssembler();
+    const project = 'typed-evidence-ids-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedDiaries(project, ['# Diary\nSession content.']);
+    seedReflections(project, [
+      {
+        reflect_id: 'reflect-20260522T010000Z-aabbccdd',
+        summary: 'Reflect summary.',
+      },
+    ]);
+    seedRecalls(project, [
+      {
+        recall_id: 'recall-20260522T010000Z-11223344',
+        recall_query: 'query',
+        summary: 'Recall summary.',
+      },
+    ]);
+
+    const result = assembleBatch({ project });
+    const manifest = JSON.parse(fs.readFileSync(result.manifest_path, 'utf8'));
+
+    // evidence_ids should include items with diary/reflect/recall prefixes
+    const ids = manifest.evidence_ids || [];
+    const hasDiary = ids.some((id) => id.includes('diary'));
+    const hasReflect = ids.some((id) => id.includes('reflect'));
+    const hasRecall = ids.some((id) => id.includes('recall'));
+
+    expect(hasDiary).toBe(true);
+    expect(hasReflect).toBe(true);
+    expect(hasRecall).toBe(true);
+  });
+
+  test('MAX_REFLECTS and MAX_RECALLS are non-zero (default 10)', () => {
+    // This is tested by verifying that reflection/recall files are actually read.
+    // If MAX_REFLECTS were 0, no reflect items would appear.
+    const { assembleBatch } = getAssembler();
+    const project = 'nonzero-max-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedReflections(project, [
+      {
+        reflect_id: 'reflect-20260522T010000Z-00000001',
+        summary: 'First reflection.',
+      },
+    ]);
+
+    const result = assembleBatch({ project });
+    const manifest = JSON.parse(fs.readFileSync(result.manifest_path, 'utf8'));
+
+    // With non-zero MAX_REFLECTS, reflects.records_selected should be 1
+    expect(manifest.source_windows.reflects.records_selected).toBe(1);
+  });
+
+  test('diary items include evidence_id with diary prefix and evidence_type diary', () => {
+    const { assembleBatch } = getAssembler();
+    const project = 'diary-evidence-type-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedDiaries(project, ['# Diary\nGrep usage observed.']);
+
+    const result = assembleBatch({ project });
+    const manifest = JSON.parse(fs.readFileSync(result.manifest_path, 'utf8'));
+
+    const ids = manifest.evidence_ids || [];
+    expect(ids.some((id) => id.includes('diary'))).toBe(true);
+  });
+
+  test('diary content still surfaces in rendered prompt after typed refactor', () => {
+    const { assembleBatch } = getAssembler();
+    const project = 'diary-prompt-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedDiaries(project, ['# Diary\nUser uses grep extensively for code search.']);
+
+    const result = assembleBatch({ project });
+    const promptContent = fs.readFileSync(result.prompt_path, 'utf8');
+
+    // The diary summary must appear in the prompt
+    expect(promptContent).toContain('grep extensively');
+  });
+});

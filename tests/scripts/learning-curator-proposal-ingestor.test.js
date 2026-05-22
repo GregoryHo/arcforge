@@ -465,7 +465,6 @@ describe('ingestProposal — missing batch manifest', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion #2 — evidence_ref_omitted_upstream (PR-B Layer 5 Blocker #2)
 // ---------------------------------------------------------------------------
 
@@ -555,5 +554,107 @@ describe('ingestProposal — evidence_ref_omitted_upstream', () => {
 
     expect(result.accepted).toBe(1);
     expect(result.rejected).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 4: canonical dedupe_basis + superseded lifecycle
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — dedupe: second candidate with same body superseded (criterion 4)', () => {
+  test('two proposals with same normalized_body_hash: second gets lifecycle_status superseded', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+
+    // First proposal
+    const payload1 = makeValidProposalPayload(batchId, manifest.batch_hash);
+    payload1.proposals[0].name = 'grep-before-edit';
+    payload1.proposals[0].body =
+      'When editing files, first grep for existing patterns to avoid duplication';
+    const responsePath1 = makeResponseFile(payload1);
+    ingestProposal({ batchId, responseFile: responsePath1 });
+
+    // Second proposal with SAME body (and same artifact_type + project scope)
+    // Must be a different response file to avoid idempotency short-circuit
+    const payload2 = makeValidProposalPayload(batchId, manifest.batch_hash);
+    payload2.proposals[0].name = 'grep-before-edit-v2'; // different name
+    payload2.proposals[0].body =
+      'When editing files, first grep for existing patterns to avoid duplication'; // SAME body
+    const responsePath2 = makeResponseFile(payload2);
+    ingestProposal({ batchId, responseFile: responsePath2 });
+
+    // Both candidates should appear in queue
+    const candidates = readCurrentCandidates();
+    const vals = Object.values(candidates);
+    expect(vals.length).toBe(2);
+
+    // One must be pending_review, the other superseded
+    const statuses = vals.map((c) => c.lifecycle.status);
+    expect(statuses).toContain('pending_review');
+    expect(statuses).toContain('superseded');
+
+    // The superseded one must have dedupe.duplicate_of pointing to the first
+    const superseded = vals.find((c) => c.lifecycle.status === 'superseded');
+    expect(superseded).toBeDefined();
+    expect(typeof superseded.dedupe.duplicate_of).toBe('string');
+    expect(superseded.dedupe.duplicate_of.length).toBeGreaterThan(0);
+  });
+
+  test('canonical dedupe_basis shape on accepted candidate', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+
+    ingestProposal({ batchId, responseFile: responsePath });
+
+    const candidates = readCurrentCandidates();
+    const candidate = Object.values(candidates)[0];
+    const basis = candidate.dedupe.dedupe_basis;
+
+    expect(basis).toBeDefined();
+    expect(['project', 'global']).toContain(basis.scope_kind);
+    expect(typeof basis.artifact_type).toBe('string');
+    expect(typeof basis.normalized_name).toBe('string');
+    expect(typeof basis.normalized_body_hash).toBe('string');
+    expect(basis.normalized_body_hash.length).toBeGreaterThan(0);
+
+    // dedupe_key must be sha256[:12] of canonical JSON of basis
+    expect(candidate.dedupe.dedupe_key).toMatch(/^[a-f0-9]{12}$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 5: rule_version namespace split
+// evidence_quality_metadata.rule_version and safety.sanitizer_policy_version
+// must be different strings on a single candidate record.
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — rule_version namespace split (criterion 5)', () => {
+  test('evidence_quality_metadata.rule_version differs from safety.sanitizer_policy_version', () => {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+
+    ingestProposal({ batchId, responseFile: responsePath });
+
+    const candidates = readCurrentCandidates();
+    const vals = Object.values(candidates);
+    expect(vals.length).toBe(1);
+
+    const candidate = vals[0];
+    const eqmRuleVersion = candidate.evidence_quality_metadata.rule_version;
+    const sanitizerVersion = candidate.safety.sanitizer_policy_version;
+
+    // Both fields must be present
+    expect(typeof eqmRuleVersion).toBe('string');
+    expect(typeof sanitizerVersion).toBe('string');
+
+    // They must be DIFFERENT (two independent namespaces)
+    expect(eqmRuleVersion).not.toBe(sanitizerVersion);
+
+    // evidence_quality_metadata.rule_version must be the formula version
+    expect(eqmRuleVersion).toBe('v1-project_obs_count');
   });
 });

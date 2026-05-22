@@ -526,9 +526,18 @@ const REJECTION_CODES = Object.freeze([
   'policy_violation',
 ]);
 
+// ---------------------------------------------------------------------------
+// Evidence quality formula version (independent from sanitizer policy version)
+// ---------------------------------------------------------------------------
+
+// This version string identifies the evidence-quality FORMULA (project_obs_count).
+// It is NOT the same namespace as safety.sanitizer_policy_version.
+const EVIDENCE_QUALITY_RULE_VERSION = 'v1-project_obs_count';
+
 module.exports = {
   validateCandidateV1,
   computeEvidenceQuality,
   REJECTION_CODES,
   VALIDATOR_VERSION,
+  EVIDENCE_QUALITY_RULE_VERSION,
 };
