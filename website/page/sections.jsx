@@ -214,7 +214,7 @@ function SessionLearning({theme:t}) {
         n="07"
         kicker="OPTIONAL WORKFLOW · SESSION MEMORY"
         title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
-        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior.</>}
+        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior. The <em style={{color:t.ink,fontStyle:'italic'}}>learning dashboard</em> (<code>arcforge learn dashboard</code>) is the review and control surface where you approve, promote, or deactivate each candidate.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -264,10 +264,10 @@ function SessionLearning({theme:t}) {
 // ─── Platforms ───
 function Platforms({theme:t}) {
   const plats = [
-    {name:'Claude Code',tag:'PRIMARY',cmd:'/plugin install arcforge@arcforge',note:'Full plugin marketplace. Hooks, agents, teammates, commands — all native.',primary:true},
+    {name:'Claude Code',tag:'PRIMARY',cmd:'/plugin install arcforge@arcforge-dev',note:'Full plugin marketplace. Hooks, agents, teammates, commands — all native.',primary:true},
     {name:'Codex',tag:'SUPPORTED',cmd:'Fetch .codex/INSTALL.md',note:'Manual install. Core skills + SDD pipeline.'},
     {name:'Gemini CLI',tag:'SUPPORTED',cmd:'Fetch .gemini/INSTALL.md',note:'Manual install. Core skills + SDD pipeline.'},
-    {name:'OpenCode',tag:'SUPPORTED',cmd:'Clone + symlink plugin',note:'Plugin-shaped. Lives in ~/.config/opencode/plugin.'},
+    {name:'OpenCode',tag:'SUPPORTED',cmd:'Clone + symlink plugin',note:'Plugin-shaped. Lives in ~/.config/opencode/plugins.'},
   ];
   return (
     <PageSection theme={t} id="platforms">
@@ -462,7 +462,7 @@ function Install({theme:t}) {
           <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Plugin marketplace</h3>
           <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.ink,lineHeight:2,background:t.bg,padding:'16px 20px',border:`1px dashed ${t.line}`}}>
             <div><span style={{color:t.dim}}>$ </span>/plugin marketplace add arcforge</div>
-            <div><span style={{color:t.dim}}>$ </span>/plugin install arcforge@arcforge</div>
+            <div><span style={{color:t.dim}}>$ </span>/plugin install arcforge@arcforge-dev</div>
             <div><span style={{color:t.dim}}>$ </span>/help</div>
           </div>
         </div>

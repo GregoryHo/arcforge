@@ -43,7 +43,7 @@ Register the marketplace:
 Install the plugin:
 
 ```bash
-/plugin install arcforge@arcforge
+/plugin install arcforge@arcforge-dev
 ```
 
 ### Verify Installation
@@ -66,7 +66,7 @@ Check that commands appear:
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/master/.codex/INSTALL.md
+Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.codex/INSTALL.md
 ```
 
 **Detailed docs:** `docs/README.codex.md`
@@ -76,7 +76,7 @@ Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/ma
 Tell Gemini CLI:
 
 ```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/master/.gemini/INSTALL.md
+Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.gemini/INSTALL.md
 ```
 
 **Detailed docs:** `docs/README.gemini.md`
@@ -86,7 +86,7 @@ Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/ma
 Tell OpenCode:
 
 ```
-Clone https://github.com/GregoryHo/arcforge to ~/.config/opencode/arcforge, then create directory ~/.config/opencode/plugin, then symlink ~/.config/opencode/arcforge/.opencode/plugin/arcforge.js to ~/.config/opencode/plugin/arcforge.js, then restart opencode.
+Clone https://github.com/GregoryHo/arcforge to ~/.agents/arcforge, then create directory ~/.config/opencode/skills, then symlink ~/.agents/arcforge/skills to ~/.config/opencode/skills/arcforge, then create directory ~/.config/opencode/plugins, then symlink ~/.agents/arcforge/.opencode/plugins/arcforge.js to ~/.config/opencode/plugins/arcforge.js, then restart opencode.
 ```
 
 **Detailed docs:** `docs/README.opencode.md`
@@ -181,6 +181,8 @@ These are the most frequently used commands:
 - **arc-managing-sessions** - Session save/resume with alias support
 - **arc-researching** - Autonomous hypothesis-driven experimentation
 
+The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
+
 ### Knowledge Base Layer
 
 - **arc-maintaining-obsidian** - Unified Obsidian vault lifecycle: ingest, query, audit (Karpathy LLM Wiki pattern)
@@ -201,6 +203,8 @@ These are the most frequently used commands:
 ## CLI Usage
 
 The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
+
+The bare `arcforge <cmd>` shorthand requires a global npm install (`npm install -g arcforge`); plugin users should invoke `node scripts/cli.js <cmd>` instead.
 
 ```bash
 # Show workflow status
@@ -253,14 +257,15 @@ To develop arcforge itself with live plugin loading, see the [Plugin Development
 ### Running Tests
 
 ```bash
-# Run all tests (4 runners — all must pass)
+# Run all tests (5 runners — all must pass)
 npm test
 
 # Individual runners
-npm run test:scripts   # Jest — CLI engine (scripts/lib/)
-npm run test:hooks     # Node --test — hook behavior (hooks/__tests__/)
-npm run test:node      # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
-npm run test:skills    # pytest — skill content validation (tests/skills/)
+npm run test:scripts          # Jest — CLI engine (scripts/lib/)
+npm run test:hooks            # Node --test — hook behavior (hooks/__tests__/)
+npm run test:node             # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
+npm run test:skills           # pytest — skill content validation (tests/skills/)
+npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-observing/tests/)
 
 # Run CLI
 node scripts/cli.js --help
@@ -287,13 +292,26 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 | Eval System | [MOC-ArcForge-Eval](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Eval) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 
+### In-Repo Guides
+
+These guides live in the repo under `docs/guide/`:
+
+| Guide | Link |
+|-------|------|
+| Eval System | [docs/guide/eval-system.md](docs/guide/eval-system.md) |
+| Composable Skill Eval Coverage | [docs/guide/composable-skill-eval-coverage.md](docs/guide/composable-skill-eval-coverage.md) |
+| Hooks System | [docs/guide/hooks-system.md](docs/guide/hooks-system.md) |
+| Worktree Workflow | [docs/guide/worktree-workflow.md](docs/guide/worktree-workflow.md) |
+| Skills Reference | [docs/guide/skills-reference.md](docs/guide/skills-reference.md) |
+| Learning Dashboard | [docs/guide/learning-dashboard.md](docs/guide/learning-dashboard.md) |
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. It covers:
 
 - **Naming conventions** — `arc-<gerund>[-<object>]` pattern for skills
 - **The Iron Law** — no skill without a failing test first (TDD for documentation)
-- **Test runners** — all 4 runners must pass before submitting a PR
+- **Test runners** — all 5 runners must pass before submitting a PR
 - **PR process** — branch naming, conventional commits, Iron Law compliance
 
 ## Updating

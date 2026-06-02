@@ -61,7 +61,7 @@ git checkout -b feat/my-contribution   # or fix/..., docs/...
 
 # 5. Make your changes (see sections below)
 
-# 6. Run all tests (must pass all 4 runners)
+# 6. Run all tests (must pass all 5 runners)
 npm test
 
 # 7. Submit PR
@@ -218,7 +218,6 @@ Hooks extend Claude Code behavior through event-driven JavaScript modules. See [
 hooks/
   hooks.json              # Hook registration
   run-hook.cmd            # Bash dispatcher
-  lib/                    # Shared utilities (utils.js, package-manager.js)
   <hook-name>/
     main.js               # Entry point
     README.md             # Hook documentation
@@ -335,7 +334,7 @@ You are a [role] specialist.
 
 ## Test Runner Map
 
-arcforge uses four separate test runners. **All must pass before submitting a PR.**
+arcforge uses five separate test runners. **All must pass before submitting a PR.**
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
@@ -343,6 +342,7 @@ arcforge uses four separate test runners. **All must pass before submitting a PR
 | Jest | `npm run test:scripts` | `tests/scripts/` | CLI engine (diary, reflect, session-utils) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
+| Bash | `npm run test:observer-daemon` | `skills/arc-observing/tests/` | Observer daemon behavior |
 | **All** | **`npm test`** | All above | **Run this before every PR** |
 
 ---
@@ -404,7 +404,7 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 
 - Read existing skills, hooks, and tests before writing new ones
 - Follow existing patterns and conventions
-- Run `npm test` before submitting (all 4 runners must pass)
+- Run `npm test` before submitting (all 5 runners must pass)
 - Include tests for new functionality
 - Skill word count tiers (soft guidance): Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w — use `references/` for overflow
 - Use `execFileSync` over `exec` in hooks (prevents shell injection)
