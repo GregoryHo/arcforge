@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — v3.1.0
+## [3.1.0] - 2026-06-02
 
 **Learning Curator 3.1 pivot: LLM-curation replaces statistical pipeline.** The observer daemon's statistical analyzer is retired. In its place, the daemon now orchestrates a four-layer pipeline: Layer 3 assembles batches of sanitized observations, Layer 4 calls the Haiku LLM curator with `--json-schema` structured output to generate candidate proposals, Layer 5 ingests proposals into the persistent candidate queue, and Layer 6 (the new dashboard) provides the browser-based control plane for human review. The dashboard replaces the pre-pivot `arcforge learn analyze` command as the entry point for the learning workflow. All three authorization gates — approve, materialize, activate — remain intact; no candidate changes active session behavior without explicit human action.
 
@@ -15,16 +15,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **Layer 8 activation/deactivation** (`scripts/lib/learning-curator/activate.js`). Promotes materialized drafts to active artifact files. Deactivation path added (Slice G). Activation fails closed if drafts are missing or active files already exist.
 - **`docs/guide/learning-dashboard.md`** — new user-facing operational guide covering dashboard startup, candidate statuses, available actions, CLI equivalents, storage layout, privacy invariants, security model, and common mistakes.
 - **`arcforge learn dashboard [--port N]`** subcommand (`scripts/cli.js`). Starts the local dashboard server; default port 3334.
+- **Layer 3 typed evidence + operation records** (`scripts/lib/learning-curator/batch-assembler.js`, `operation-record-writer.js`, `recall-record-writer.js`, `reflect-record-writer.js`). Batch assembly emits a canonical typed-evidence shape with dedupe; recall / reflect / operation flows write structured operation records.
+- **Layer 4 daemon failure manifest** (`scripts/lib/learning-curator/cli.js`, `observer-daemon.sh`). When the curator call fails, the daemon writes a failure manifest distinguishing `transport_error` from `timeout` instead of failing silently.
 
 ### Changed
 
 - **`arc-learning` SKILL.md updated** for dashboard-first flow. Quick Reference adds the dashboard command as the primary review entry point. Retired `arcforge learn analyze --project` documented explicitly as deprecated (statistical analyzer retired in v3.1). Candidate lifecycle status table added. Global promotion reframed: silent auto-promotion remains unsupported; the dashboard Promote action is the supported path and requires explicit user authorization.
 - **`arc-observing` SKILL.md updated** to reflect post-pivot daemon contract. "How Observations Work" section now describes the four-layer orchestration (capture → batch assembly → LLM curation → ingestion). Direct `.md` instinct file writes by the daemon are retired — all proposals flow through the LLM curator into the candidate queue. Daemon safety section added covering the `.analyzing.lock` re-entrancy guard (30-min stale TTL), 120s watchdog, and `ARCFORGE_OBSERVE_SKIP_PATHS` / `.eval-trials/` skip filter.
 - **Observer daemon** (`skills/arc-observing/scripts/observer-daemon.sh`) retires direct instinct writes. Layer 3 now calls `node $CURATOR_CLI assemble-batch --project`; Layer 4 calls `claude --model haiku --max-turns 15 --print --output-format json --json-schema`; Layer 5 calls `node $CURATOR_CLI ingest-proposal` to route the structured response into the candidate queue.
+- **Layer 5 validator + ingestor hardened** (`scripts/lib/learning-curator/proposal-ingestor.js`, `schema.js`). The proposal validator rejects malformed candidates with one of 7 explicit rejection codes; ingestion fails closed on schema, evidence, or safety-flag violations.
+- **Safety metadata + privacy redaction** added to the candidate path. Records carry explicit safety flags (`raw_prompt_included: false`, etc.); the shared `sanitize-observation.js` pass guarantees raw prompts and project identifiers never reach proposals or the dashboard wire. Deactivation now requires a `reviewer_ack` (`confirmed_behavior_change: true`), matching activation.
 
 ### Deprecated
 
 - **`arcforge learn analyze`** exits with code 1 and the message: "arc learn analyze is deprecated. The statistical analyzer has been retired; candidate review now lives in the dashboard. Run: arc learn dashboard". The command remains registered in the CLI so users see a helpful migration message rather than "unknown command."
+
+### Fixed
+
+- **Schema/audit drifts reconciled** across the Layer 0–8 contracts (retrospective audit). Three spec drifts in `schema.js` / `hooks/observe/main.js` corrected; observation records now carry `schema_version` + a `source` collector metadata field.
+- **`docs/guide/skills-reference.md` learning entries corrected.** The `arc-learning` and `arc-observing` reference entries still described the retired statistical model (Jaccard clustering, confidence-score lifecycle, `>= 0.7` auto-load) as current — they now describe the dashboard-first review flow and the four-layer daemon. A stale "auto-load >= 0.7" line in `arc-observing` SKILL.md (contradicting the removal of SessionStart auto-load) was corrected to "surface prominently."
 
 ## [3.0.1] - 2026-05-06
 
