@@ -590,6 +590,7 @@ async function main() {
 
       case 'eval': {
         const eval_ = require('./lib/eval');
+        const benchmark_ = require('./lib/eval-benchmark');
         const { generateRunId } = require('./lib/utils');
         const subcommand = args.positional[0];
         const model = args.options.model;
@@ -1010,7 +1011,7 @@ async function main() {
           if (scenario && scenario.grader !== 'code') {
             console.log('(Using eval-analyzer agent for qualitative analysis...)\n');
           }
-          const comparison = eval_.compareResults(
+          const comparison = benchmark_.compareResults(
             scenario || { grader: 'code' },
             baseline,
             treatment,
@@ -1050,7 +1051,7 @@ async function main() {
             }
           }
         } else if (subcommand === 'report') {
-          const benchmark = eval_.generateBenchmark(projectRoot, {
+          const benchmark = benchmark_.generateBenchmark(projectRoot, {
             since: args.options.since,
           });
           const name = args.positional[1];
