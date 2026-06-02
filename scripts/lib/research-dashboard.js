@@ -253,7 +253,7 @@ function createRouter(resultsPath, configPath, cachedHtml) {
 // ── Server Entry Point ──────────────────────────────────────
 
 function startServer(options = {}) {
-  const { resultsPath, configPath, port = 3000 } = options;
+  const { resultsPath, configPath, port = 3000, host = '127.0.0.1' } = options;
 
   if (!resultsPath) {
     console.error('Error: --results path required');
@@ -286,8 +286,8 @@ function startServer(options = {}) {
 
   const watcher = setupWatcher(resultsPath, sse);
 
-  server.listen(port, () => {
-    console.log(`Research dashboard: http://localhost:${port}`);
+  server.listen(port, host, () => {
+    console.log(`Research dashboard: http://${host}:${port}`);
     console.log('Press Ctrl+C to stop');
   });
 

@@ -14,6 +14,7 @@
 const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
+const { sanitizeProjectName } = require('./utils');
 
 const ARCFORGE_HOME_NAME = '.arcforge';
 const WORKTREE_SUBDIR = 'worktrees';
@@ -38,19 +39,6 @@ function getWorktreeRoot(homeDir) {
  */
 function stripTrailingSlash(p) {
   return p.length > 1 ? p.replace(/[\\/]+$/, '') : p;
-}
-
-/**
- * Sanitize a project basename for use in the worktree directory name.
- * Replaces runs of non-[a-zA-Z0-9._-] characters with a single hyphen and
- * trims leading/trailing hyphens. Empty result falls back to "project".
- */
-function sanitizeProjectName(name) {
-  const cleaned = name
-    .normalize('NFKD')
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return cleaned || 'project';
 }
 
 /**

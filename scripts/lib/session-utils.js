@@ -7,10 +7,11 @@ const {
   getProjectDiariesDir,
   getDateDiariesDir,
   getProjectSessionsDir,
+  sanitizeSessionId,
 } = require('./utils');
 
 function getDiaryPath(project, date, sessionId) {
-  return path.join(getDateDiariesDir(project, date), `diary-${sessionId}.md`);
+  return path.join(getDateDiariesDir(project, date), `diary-${sanitizeSessionId(sessionId)}.md`);
 }
 
 /**
