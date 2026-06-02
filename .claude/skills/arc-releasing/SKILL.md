@@ -100,7 +100,32 @@ Out-of-scope for this audit (do not modify):
 - `.claude/rules/*` — contributor rules, not shipped surface
 - Tests that *deliberately blacklist* old patterns — they should still reference the old string, that's how they enforce the new convention
 
-### 3. Update `CHANGELOG.md`
+### 3. Benchmark-freshness gate (required for any release that touched eval-backed surface)
+
+A release that changes skill behavior must ship a benchmark that reflects *this* release, not the last one. A stale benchmark silently asserts that behavior nothing has re-measured is still passing — exactly the failure mode eval exists to prevent.
+
+> **Regenerating the benchmark is a live-eval step.** The grading is done by LLM graders, not by code in this skill or in CI's `npm test`. You (or a dedicated CI live-eval job) must run the regeneration manually before tagging; the skill cannot run it for you. Treat this section as the **gate you must clear**, not a command the skill executes.
+
+1. **Regenerate the benchmark** against the release branch (manual/CI live-eval run — see `skills/arc-evaluating/SKILL.md` for the regeneration procedure). This refreshes `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json`.
+
+   > Path note: the canonical report location is `evals/benchmarks/` (`latest.json` + `raw/latest.json`), each carrying a top-level `generated` ISO-8601 timestamp. Older notes that say `evals/reports/latest.json` are referring to this same artifact under its prior name.
+
+2. **Assert freshness.** The `generated` timestamp in both `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json` must be **newer than the previous release tag's commit date**. If the timestamp predates the last tag, the benchmark was never re-run for this release — stop and regenerate.
+
+   ```bash
+   PREV_TAG=$(git tag --sort=-version:refname | head -1)
+   PREV_TAG_DATE=$(git log -1 --format=%cI "$PREV_TAG")
+   GEN=$(node -p "require('./evals/benchmarks/latest.json').generated")
+   RAW_GEN=$(node -p "require('./evals/benchmarks/raw/latest.json').generated")
+   # Both GEN and RAW_GEN must sort AFTER PREV_TAG_DATE.
+   echo "prev tag: $PREV_TAG_DATE | latest: $GEN | raw: $RAW_GEN"
+   ```
+
+3. **No unclassified failing rows on changed scenarios.** For every scenario that changed since the last release, confirm the raw report has **no failing row left unclassified** (every fail must carry a known failure category, not a blank or `unknown` classification). An unclassified failing row means a regression nobody triaged — that is a release blocker until it is either classified as a known/accepted gap or fixed.
+
+If either freshness or the unclassified-failure check fails, **stop and tell the user**. Do not write the CHANGELOG or bump the version against a stale or untriaged benchmark — the release would ship a behavior claim that the eval surface contradicts.
+
+### 4. Update `CHANGELOG.md`
 
 Insert a new section at the top, under the header block, **before** the previous release:
 
@@ -122,9 +147,9 @@ Insert a new section at the top, under the header block, **before** the previous
 
 Include only sections that have entries. Order: Fixed → Changed → Added → Removed.
 
-**Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. This is the text that shows up on the marketplace release page; treat it as a user-facing artifact.
+**Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. The `release.yml` workflow extracts this exact `## [X.Y.Z]` section verbatim into the GitHub Release body when the tag is pushed (it slices from the version header to the next `## [` header), so this is the text users read on the GitHub release page — treat it as a user-facing artifact. The release job **fails** if no matching CHANGELOG section exists, which enforces the "no bump without CHANGELOG entry" rule below.
 
-### 4. Bump the version in **all 9 canonical locations**
+### 5. Bump the version in **all 9 canonical locations**
 
 | File | Where in the file |
 |---|---|
@@ -154,18 +179,20 @@ grep -rn "X\.Y\.Z" package.json .claude-plugin/ .opencode/plugins/arcforge.js RE
 
 Expect **exactly 9 hits**. Fewer means a split-brain bump (dangerous — different platforms or the website disagree about the current version). More means a stale copy elsewhere that also needs attention.
 
+For an authoritative pass/fail that compares every location against the canonical `plugin.json` version, run `npm run check:versions` (zero-dep `scripts/check-version-sync.js`). It prints a location → version table and exits non-zero on any drift. The same check runs in CI and gates `release.yml` before the GitHub Release is created, so a drifted bump fails the release rather than shipping silently.
+
 `package-lock.json` top-level `"version"` is known-stale at an older value. Leave it unless you're doing a dedicated lockfile refresh; never combine that with a release commit, since mixed diffs make rollback painful.
 
 For releases that change **shipped surface area** (new skill, removed CLI flag, new marketing claim), also audit the website **content** — `website/page/hero.jsx`, `sections.jsx`, and `sdd.jsx` carry the project framing. Patch releases usually just need the version label bumped; minor/major releases often need copy adjustments too. Confirm with the user before rewriting hero copy or feature lists.
 
-### 5. Commit, push, open PR
+### 6. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
 - Stage exactly the 10 release files (9 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
 - `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 9-location grep returned exactly 9 hits
 
-### 6. After PR merges to main — tag it
+### 7. After PR merges to main — tag it
 
 Arcforge has tagged every release since `v1.0.0`. Skipping a tag breaks the `git log vPREV..HEAD` workflow that the *next* release relies on to scope its CHANGELOG.
 

@@ -40,7 +40,9 @@ jobs:
       - run: npm ci
       - run: cd hooks && npm install
       - run: pip install pytest pyyaml
+      - run: npm run check:versions
       - run: npm run test:scripts
       - run: npm run test:hooks
       - run: npm run test:node
       - run: npm run test:skills
+      - run: npm run test:observer-daemon

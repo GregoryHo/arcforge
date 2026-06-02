@@ -32,23 +32,32 @@ jobs:
             echo "::error::Tag $TAG_VERSION ≠ package.json $PKG_VERSION"
             exit 1
           fi
-      - name: Generate changelog
+      - name: Verify no version drift across canonical locations
+        run: node scripts/check-version-sync.js
+      - name: Extract release notes from CHANGELOG
         id: changelog
         env:
           TAG_REF: ${{ github.ref_name }}
         run: |
-          PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
-          [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$TAG_REF" ] && \
-            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
-          LOG=$(git log "${PREV_TAG}..${TAG_REF}" --pretty=format:"- %s (%h)" --reverse)
-          FEATS=$(echo "$LOG" | grep -E "^- feat" || true)
-          FIXES=$(echo "$LOG" | grep -E "^- fix" || true)
-          OTHER=$(echo "$LOG" | grep -vE "^- (feat|fix)" || true)
+          VERSION="${TAG_REF#v}"
+          # Slice the matching `## [X.Y.Z]` section: from that header up to (but
+          # excluding) the next `## [` header. The CHANGELOG narrative is the
+          # user-facing release record — far richer than squash-collapsed git
+          # subjects.
+          BODY=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md)
+          # Trim leading/trailing blank lines.
+          BODY=$(printf '%s\n' "$BODY" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)
+          if [ -z "$BODY" ]; then
+            echo "::error::No CHANGELOG.md section found for [$VERSION] — refusing to release without release notes"
+            exit 1
+          fi
           {
             echo "body<<EOF"
-            [ -n "$FEATS" ] && echo "### Features" && echo "$FEATS" && echo ""
-            [ -n "$FIXES" ] && echo "### Fixes" && echo "$FIXES" && echo ""
-            [ -n "$OTHER" ] && echo "### Other" && echo "$OTHER" && echo ""
+            echo "$BODY"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Create GitHub Release
