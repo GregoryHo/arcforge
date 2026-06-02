@@ -162,6 +162,7 @@ const stubPayload = {
       body_source: 'llm_curator',
       evidence_refs: [
         { evidence_id: evidenceIds[0], evidence_type: 'observation', relevance: 'direct' },
+        { evidence_id: evidenceIds[1], evidence_type: 'observation', relevance: 'supporting' },
       ],
       llm_confidence: 'medium',
       risk_notes: [],
@@ -235,8 +236,13 @@ try {
   const result = ingestProposal({ batchId, responseFile, homeDir });
 
   if (!result || result.accepted < 1) {
-    emit('A1', false, `ingestProposal returned accepted=${result?.accepted ?? 0}`);
-    allPass = false;
+    const reason = `ingestProposal returned accepted=${result?.accepted ?? 0}`;
+    emit('A1', false, reason);
+    emit('A2', false, 'proposal not accepted');
+    emit('A3', false, 'proposal not accepted');
+    emit('A4', false, 'proposal not accepted');
+    emit('A5', false, 'proposal not accepted');
+    process.exit(1);
   }
 
   // Read queue.jsonl
