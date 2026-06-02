@@ -169,7 +169,7 @@ Patterns appearing in 2+ projects can be promoted to `~/.arcforge/instincts/glob
 
 ### Ignoring Low-Confidence Instincts
 **Wrong:** Treating all instincts equally
-**Right:** Only auto-load >= 0.7; show summaries for 0.3-0.7; hide < 0.3
+**Right:** Surface >= 0.7 prominently in dashboard / `/recall`; summaries for 0.3-0.7; hide < 0.3. Confidence informs surfacing, not runtime auto-loading (Slice A removed SessionStart auto-load).
 
 ### Not Updating Confidence
 **Wrong:** Showing instincts without offering confirm/contradict

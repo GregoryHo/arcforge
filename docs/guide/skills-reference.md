@@ -647,28 +647,30 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: `~/.arcforge/diaries/{project}/*/diary-*.md`
 - Output: `~/.arcforge/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
 
-**Related:** arc-journaling (5+ entries) --> **arc-reflecting** --> arc-learning (instinct clustering)
+**Related:** arc-journaling (5+ entries) --> **arc-reflecting** --> arc-learning (dashboard review)
 
 ---
 
 ### arc-learning
 
-**Purpose:** Cluster related instincts into higher-level abstractions: skills, commands, or agents.
+**Purpose:** Review observer-curated learning candidates and turn them into activated artifacts through the dashboard.
 
-**When to use:** When you have accumulated instincts and want to cluster related ones into higher-level skills, commands, or agents.
+**When to use:** When optional learning is enabled and you want to review the candidate instincts the observer daemon's LLM curator has proposed.
 
 **Key workflow:**
-1. Scan all instincts from `~/.arcforge/instincts/{project}/` and `global/`
-2. Cluster by domain, then by trigger fingerprint similarity (Jaccard >= 0.6)
-3. Filter: only clusters with 3+ instincts, at least 1 with confidence >= 0.6
-4. Preview candidate clusters for user review
-5. Generate: user decides what to create (skill, command, or agent)
+1. Enable learning: `arcforge learn enable --project`
+2. Open the dashboard: `arcforge learn dashboard` (port 3334)
+3. Review queued candidates (`pending_review` → `approved` → `materialized` → `activated`)
+4. Authorize through three gates: Approve → Materialize → Activate (no candidate changes behavior without explicit action)
+5. Promote / Evolve / Deactivate as needed (Promote and Evolve mint new candidates; silent auto-promotion is not supported)
 
 **Artifacts:**
-- Input: `~/.arcforge/instincts/{project}/` and `global/` instinct files
-- Output: new skill, command, or agent definition
+- Input: `~/.arcforge/learning/candidates/queue.jsonl` (Layer 5 candidate queue)
+- Output: `~/.arcforge/learning/drafts/` (Layer 7 inactive drafts) → `~/.arcforge/instincts/<scope>/` (Layer 8 activation)
 
-**Related:** arc-reflecting --> **arc-learning** --> arc-writing-skills
+**Related:** arc-observing (curates candidates) --> **arc-learning** (dashboard review)
+
+> The pre-pivot `arcforge learn analyze` statistical clustering (Jaccard, confidence thresholds) was retired in v3.1 — see [learning-dashboard.md](learning-dashboard.md).
 
 ---
 
@@ -676,22 +678,22 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/` which is populated by Claude Code PostToolUse hooks.
 
-**Purpose:** Manage automatically detected behavioral patterns (instincts) from tool usage observations.
+**Purpose:** Capture tool-usage observations and feed them into the post-pivot four-layer curation pipeline.
 
-**When to use:** When user asks about behavioral patterns, requests instinct status, or wants to confirm/contradict a detected pattern.
+**When to use:** When user asks about behavioral patterns, requests learning status, or wants to manage the observer daemon.
 
 **Key workflow:**
-1. Capture: hooks record every tool call to observations.jsonl
-2. Analysis: background daemon detects patterns (10+ observations required)
-3. Creation: instincts saved as `.md` files with YAML frontmatter
-4. Lifecycle: confirm (+0.05) / contradict (-0.10, -0.05 for manual/reflection) / decay (-0.02/week, -0.01 for manual/reflection)
-5. Loading: instincts with confidence >= 0.7 auto-loaded into context
+1. Capture: hooks record every tool call to observations.jsonl (skip filter honored)
+2. Batch assembly (Layer 3): daemon calls `assemble-batch` on a batch of sanitized observations
+3. LLM curation (Layer 4): Haiku curator with `--json-schema` produces candidate proposals (failure → `transport_error` / `timeout` manifest)
+4. Ingestion (Layer 5): `ingest-proposal` validates proposals into the candidate queue
+5. Review: candidates are acted on in the dashboard; SessionStart never auto-loads instinct bodies
 
 **Artifacts:**
 - Input: `~/.arcforge/observations/{project}/observations.jsonl`
-- Output: `~/.arcforge/instincts/{project}/*.md`
+- Output: `~/.arcforge/learning/candidates/queue.jsonl` (candidate proposals — the daemon no longer writes instinct `.md` files directly)
 
-**Related:** automatic background process --> **arc-observing** --> arc-learning
+**Related:** background daemon --> **arc-observing** --> arc-learning (dashboard review)
 
 ---
 
