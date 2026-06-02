@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "required": ["schema_version", "source", "proposals"],
+  "properties": {
+    "schema_version": { "type": "integer" },
+    "source": {
+      "type": "object",
+      "required": [
+        "layer",
+        "curator",
+        "run_id",
+        "created_at",
+        "batch_id",
+        "batch_hash",
+        "prompt_policy_version",
+        "output_schema_version"
+      ],
+      "properties": {
+        "layer": { "type": "integer" },
+        "curator": { "type": "string" },
+        "run_id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "batch_id": { "type": "string" },
+        "batch_hash": { "type": "string" },
+        "prompt_policy_version": { "type": "string" },
+        "output_schema_version": { "type": "integer" }
+      }
+    },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "proposal_index",
+          "artifact_type",
+          "proposed_scope",
+          "name",
+          "summary",
+          "rationale",
+          "domain",
+          "body",
+          "body_source",
+          "evidence_refs",
+          "llm_confidence",
+          "risk_notes",
+          "uncertainty_notes",
+          "recommended_review_action"
+        ],
+        "properties": {
+          "proposal_index": { "type": "integer" },
+          "artifact_type": { "type": "string" },
+          "proposed_scope": {
+            "type": "object",
+            "required": ["kind", "project_id"],
+            "properties": {
+              "kind": { "type": "string" },
+              "project_id": { "type": "string" }
+            }
+          },
+          "name": { "type": "string" },
+          "summary": { "type": "string" },
+          "rationale": { "type": "string" },
+          "domain": { "type": "string" },
+          "body": { "type": "string" },
+          "body_source": { "type": "string" },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["evidence_id", "evidence_type", "relevance"],
+              "properties": {
+                "evidence_id": { "type": "string" },
+                "evidence_type": { "type": "string" },
+                "relevance": { "type": "string" }
+              }
+            }
+          },
+          "llm_confidence": { "type": "string" },
+          "risk_notes": { "type": "array", "items": { "type": "string" } },
+          "uncertainty_notes": { "type": "array", "items": { "type": "string" } },
+          "recommended_review_action": { "type": "string" }
+        }
+      }
+    }
+  }
+}

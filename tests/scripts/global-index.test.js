@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 const {
   appendToIndex,
@@ -22,6 +23,27 @@ describe('global-index', () => {
 
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  describe('CLI --check-promote is deprecated', () => {
+    it('exits non-zero with a dashboard pointer regardless of args', () => {
+      const cli = path.join(__dirname, '../../scripts/lib/global-index.js');
+
+      let stderr = '';
+      let exitCode = 0;
+      try {
+        execFileSync('node', [cli, '--check-promote', '--project', 'any-project'], {
+          encoding: 'utf8',
+        });
+      } catch (err) {
+        exitCode = err.status;
+        stderr = err.stderr || '';
+      }
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toMatch(/deprecated/i);
+      expect(stderr).toMatch(/arc learn dashboard/);
+    });
   });
 
   describe('appendToIndex', () => {

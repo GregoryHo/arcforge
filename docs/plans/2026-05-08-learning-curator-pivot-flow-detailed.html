@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learning Curator Pivot — System Flow</title>
+  <style>
+    :root {
+      --bg: #070a12;
+      --panel: #0d1220;
+      --panel-2: #101827;
+      --ink: #eef4ff;
+      --muted: #9aa8bd;
+      --faint: #5c6a80;
+      --line: #223047;
+      --line-strong: #3b82f6;
+      --user: #67e8f9;
+      --claude: #a78bfa;
+      --hooks: #34d399;
+      --store: #fbbf24;
+      --daemon: #fb923c;
+      --dashboard: #60a5fa;
+      --active: #f472b6;
+      --danger: #fb7185;
+      --ok: #4ade80;
+      --radius: 18px;
+      --shadow: 0 20px 70px rgba(0, 0, 0, .35);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(59, 130, 246, .18), transparent 32rem),
+        radial-gradient(circle at 86% 6%, rgba(244, 114, 182, .14), transparent 28rem),
+        linear-gradient(180deg, #070a12 0%, #0a0f1a 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, .06) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: linear-gradient(to bottom, black, transparent 82%);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      backdrop-filter: blur(18px);
+      background: rgba(7, 10, 18, .76);
+      border-bottom: 1px solid rgba(148, 163, 184, .14);
+    }
+
+    .header-inner {
+      max-width: 1720px;
+      margin: 0 auto;
+      padding: 22px 28px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 3vw, 44px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 920px;
+      line-height: 1.55;
+    }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .badge {
+      border: 1px solid rgba(148, 163, 184, .20);
+      background: rgba(15, 23, 42, .72);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: #cbd5e1;
+      font: 12px/1 var(--mono);
+      white-space: nowrap;
+    }
+    .badge.critical { border-color: rgba(251, 113, 133, .45); color: #fecdd3; }
+    .badge.ok { border-color: rgba(74, 222, 128, .45); color: #bbf7d0; }
+
+    main {
+      max-width: 1720px;
+      margin: 0 auto;
+      padding: 24px 28px 56px;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .sidebar, .card {
+      border: 1px solid rgba(148, 163, 184, .16);
+      background: linear-gradient(180deg, rgba(15, 23, 42, .86), rgba(15, 23, 42, .62));
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 116px;
+      align-self: start;
+      padding: 16px;
+      max-height: calc(100vh - 140px);
+      overflow: auto;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font: 700 11px/1 var(--mono);
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .scenario-button {
+      width: 100%;
+      min-height: 58px;
+      text-align: left;
+      border: 1px solid rgba(148, 163, 184, .14);
+      background: rgba(2, 6, 23, .42);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 11px 12px;
+      margin: 8px 0;
+      cursor: pointer;
+      transition: border-color .18s ease, transform .18s ease, background .18s ease;
+    }
+    .scenario-button:hover { transform: translateY(-1px); border-color: rgba(96, 165, 250, .52); }
+    .scenario-button.active {
+      background: linear-gradient(135deg, rgba(59, 130, 246, .22), rgba(167, 139, 250, .16));
+      border-color: rgba(96, 165, 250, .72);
+      box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .12);
+    }
+    .scenario-title { display: block; font-weight: 720; letter-spacing: -.01em; }
+    .scenario-meta { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.35; }
+
+    .legend {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(148, 163, 184, .14);
+      display: grid;
+      gap: 8px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--c); box-shadow: 0 0 20px var(--c); }
+
+    .content { display: grid; gap: 20px; min-width: 0; }
+    .card { padding: 20px; overflow: hidden; }
+    .card-header {
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .system-map {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(130px, 1fr));
+      gap: 12px;
+      min-height: 470px;
+    }
+
+    .lane {
+      position: relative;
+      border: 1px solid rgba(148, 163, 184, .13);
+      background: rgba(2, 6, 23, .35);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 452px;
+    }
+    .lane::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border-top: 3px solid var(--lane);
+      opacity: .9;
+      pointer-events: none;
+    }
+    .lane-label {
+      font: 800 12px/1.2 var(--mono);
+      color: #dbeafe;
+      margin-bottom: 12px;
+      min-height: 30px;
+    }
+
+    .node {
+      border: 1px solid rgba(148, 163, 184, .16);
+      background: rgba(15, 23, 42, .72);
+      border-radius: 14px;
+      padding: 11px;
+      margin: 10px 0;
+      min-height: 70px;
+      opacity: .48;
+      transform: scale(.985);
+      transition: opacity .22s ease, transform .22s ease, border-color .22s ease, background .22s ease;
+    }
+    .node.active {
+      opacity: 1;
+      transform: scale(1);
+      border-color: color-mix(in srgb, var(--node) 70%, white 12%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--node) 18%, transparent), rgba(15, 23, 42, .78));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--node) 22%, transparent), 0 12px 40px rgba(0, 0, 0, .22);
+    }
+    .node strong { display: block; font-size: 13px; line-height: 1.25; }
+    .node span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 5px; }
+    .node code { font: 11px/1.2 var(--mono); color: #c7d2fe; }
+
+    .flow-lines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .flow-path {
+      fill: none;
+      stroke: rgba(148, 163, 184, .25);
+      stroke-width: 2;
+      stroke-dasharray: 6 8;
+      marker-end: url(#arrow);
+    }
+    .flow-path.active {
+      stroke: rgba(96, 165, 250, .88);
+      stroke-width: 3;
+      stroke-dasharray: 10 6;
+      animation: dash 1.1s linear infinite;
+    }
+    @keyframes dash { to { stroke-dashoffset: -32; } }
+
+    .two-col { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); gap: 20px; }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 82px minmax(0, 1fr);
+      gap: 13px;
+      padding: 13px;
+      border: 1px solid rgba(148, 163, 184, .13);
+      background: rgba(2, 6, 23, .35);
+      border-radius: 14px;
+    }
+    .time { color: #bfdbfe; font: 750 12px/1.25 var(--mono); }
+    .step h3 { margin: 0; font-size: 15px; }
+    .step p { margin: 5px 0 0; color: var(--muted); line-height: 1.45; font-size: 13px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .tag {
+      border: 1px solid rgba(148, 163, 184, .16);
+      border-radius: 999px;
+      padding: 5px 8px;
+      color: #cbd5e1;
+      font: 11px/1 var(--mono);
+      background: rgba(15, 23, 42, .65);
+    }
+
+    .decision-panel {
+      display: grid;
+      gap: 12px;
+    }
+    .decision {
+      border: 1px solid rgba(148, 163, 184, .14);
+      border-radius: 14px;
+      padding: 13px;
+      background: rgba(2, 6, 23, .35);
+    }
+    .decision strong { display: block; font-size: 13px; }
+    .decision p { color: var(--muted); margin: 6px 0 0; line-height: 1.45; font-size: 13px; }
+    .decision.ok { border-color: rgba(74, 222, 128, .32); }
+    .decision.warn { border-color: rgba(251, 191, 36, .32); }
+    .decision.danger { border-color: rgba(251, 113, 133, .32); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, .12);
+    }
+    th {
+      color: #dbeafe;
+      font: 760 12px/1 var(--mono);
+      background: rgba(15, 23, 42, .86);
+    }
+    td { color: #cbd5e1; line-height: 1.45; background: rgba(2, 6, 23, .28); }
+    tr:last-child td { border-bottom: 0; }
+    .no { color: #fecdd3; }
+    .yes { color: #bbf7d0; }
+
+    .state-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .state {
+      position: relative;
+      border: 1px solid rgba(148, 163, 184, .15);
+      background: rgba(2, 6, 23, .36);
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 92px;
+    }
+    .state:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -15px;
+      top: 34px;
+      color: var(--faint);
+      z-index: 1;
+    }
+    .state strong { display: block; font-size: 13px; }
+    .state span { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; margin-top: 6px; }
+    .state.gate { border-color: rgba(96, 165, 250, .38); }
+    .state.change { border-color: rgba(244, 114, 182, .45); }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .principle {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, .14);
+      background: rgba(2, 6, 23, .34);
+      min-height: 112px;
+    }
+    .principle b { display: block; font-size: 13px; margin-bottom: 6px; }
+    .principle p { margin: 0; color: var(--muted); line-height: 1.45; font-size: 13px; }
+
+    .footer-note { color: var(--muted); line-height: 1.55; font-size: 13px; }
+    .kbd { font: 11px/1 var(--mono); padding: 3px 6px; border: 1px solid rgba(148, 163, 184, .22); border-radius: 6px; background: rgba(15, 23, 42, .7); color: #cbd5e1; }
+
+    @media (max-width: 1260px) {
+      main { grid-template-columns: 1fr; }
+      .sidebar { position: relative; top: auto; max-height: none; }
+      .system-map { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .lane { min-height: auto; }
+      .flow-lines { display: none; }
+      .two-col { grid-template-columns: 1fr; }
+      .principles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .state-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .state::after { display: none; }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner { grid-template-columns: 1fr; align-items: start; }
+      .badge-row { justify-content: flex-start; }
+      main { padding: 18px 14px 42px; }
+      .system-map, .principles, .state-strip { grid-template-columns: 1fr; }
+      .step { grid-template-columns: 1fr; }
+      table { font-size: 12px; }
+      th, td { padding: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div>
+        <h1>Learning Curator Pivot — 系統運作流程觀察圖</h1>
+        <p class="subtitle">用不同情境觀察 user、Claude Code、hooks、learning system、daemon、dashboard 與 active behavior surface 的互動。重點不是細節結果，而是確認「何時存檔、存什麼、何時分析、如何 review、何時才改變行為」。</p>
+      </div>
+      <div class="badge-row" aria-label="Design constraints">
+        <span class="badge critical">No auto-promote</span>
+        <span class="badge critical">No auto-load</span>
+        <span class="badge ok">Dashboard-gated</span>
+        <span class="badge ok">CandidateV1 only</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar" aria-label="Scenario navigation">
+      <div class="eyebrow">Scenarios</div>
+      <div id="scenarioButtons"></div>
+      <div class="legend">
+        <div class="eyebrow">Roles</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--user)"></span>User</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--claude)"></span>Claude Code</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--hooks)"></span>Hooks / Collector</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--store)"></span>Local Stores</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--daemon)"></span>Daemon / Validator</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--dashboard)"></span>Dashboard</div>
+        <div class="legend-item"><span class="dot" style="--c: var(--active)"></span>Active Surface</div>
+      </div>
+    </aside>
+
+    <section class="content">
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="eyebrow">System Map</div>
+            <h2 id="mapTitle">Runtime flow</h2>
+          </div>
+          <div class="hint">點左側情境切換 highlight。虛線箭頭代表資料/控制流，不代表自動啟用。</div>
+        </div>
+        <div class="system-map" id="systemMap">
+          <svg class="flow-lines" viewBox="0 0 1400 470" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="rgba(96,165,250,.85)"></path>
+              </marker>
+            </defs>
+            <path data-edge="session" class="flow-path" d="M90,72 C170,72 200,72 280,72"></path>
+            <path data-edge="observe" class="flow-path" d="M290,118 C365,118 385,118 462,118"></path>
+            <path data-edge="persist-observation" class="flow-path" d="M462,160 C560,160 585,160 682,160"></path>
+            <path data-edge="persist-diary" class="flow-path" d="M292,245 C455,245 520,245 684,245"></path>
+            <path data-edge="analyze" class="flow-path" d="M690,205 C775,205 805,205 888,205"></path>
+            <path data-edge="queue" class="flow-path" d="M890,260 C955,260 980,260 1045,260"></path>
+            <path data-edge="review" class="flow-path" d="M1045,302 C1120,302 1150,302 1225,302"></path>
+            <path data-edge="activate" class="flow-path" d="M1228,350 C1290,350 1315,350 1375,350"></path>
+          </svg>
+          <div class="lane" style="--lane: var(--user)">
+            <div class="lane-label">User</div>
+            <div class="node" data-node="user-start" style="--node: var(--user)"><strong>Start / continue work</strong><span>提出需求、修正偏好、review 結果。</span></div>
+            <div class="node" data-node="user-dashboard" style="--node: var(--user)"><strong>Review in dashboard</strong><span>Dismiss / Promote / Evolve / Materialize / Activate。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--claude)">
+            <div class="lane-label">Claude Code</div>
+            <div class="node" data-node="claude-tools" style="--node: var(--claude)"><strong>Tool + session activity</strong><span>Bash、Read、Edit、Web 等工具事件與 session lifecycle。</span></div>
+            <div class="node" data-node="claude-future" style="--node: var(--claude)"><strong>Future behavior</strong><span>只讀 explicit activated surface，不讀 pending/draft。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--hooks)">
+            <div class="lane-label">Hooks / Collector</div>
+            <div class="node" data-node="hooks-events" style="--node: var(--hooks)"><strong>Observe hooks</strong><span>PreToolUse / PostToolUse / Stop / PreCompact / SessionStart。</span></div>
+            <div class="node" data-node="sanitizer" style="--node: var(--hooks)"><strong>Allowlist + redaction</strong><span>每個 tool 有可存欄位；統一 scrub secrets。</span></div>
+            <div class="node" data-node="nudge" style="--node: var(--hooks)"><strong>Nudge only</strong><span>SessionStart 顯示「有 candidates 待 review」，不 auto-load。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--store)">
+            <div class="lane-label">Local Stores</div>
+            <div class="node" data-node="obs-store" style="--node: var(--store)"><strong>Observation store</strong><span>bounded tool facts：tool、phase、outcome、sanitized command/path。</span></div>
+            <div class="node" data-node="session-store" style="--node: var(--store)"><strong>Session / diary store</strong><span>bounded summaries、diary、reflect、recall notes。</span></div>
+            <div class="node" data-node="candidate-queue" style="--node: var(--store)"><strong>Candidate queue</strong><span><code>CandidateV1</code> JSONL；status=pending by default。</span></div>
+            <div class="node" data-node="drafts" style="--node: var(--store)"><strong>Draft artifacts</strong><span>Materialized but inactive review files。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--daemon)">
+            <div class="lane-label">Curator / Validator</div>
+            <div class="node" data-node="daemon-read" style="--node: var(--daemon)"><strong>Curator daemon reads evidence</strong><span>讀 observations + diaries + recall，不讀 quarantined backlog。</span></div>
+            <div class="node" data-node="llm-distill" style="--node: var(--daemon)"><strong>LLM distillation</strong><span>頻率只是 signal；LLM 產出 proposed candidate。</span></div>
+            <div class="node" data-node="validator" style="--node: var(--daemon)"><strong>Deterministic validator</strong><span>schema validate、redact、dedupe、atomic append。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--dashboard)">
+            <div class="lane-label">Dashboard</div>
+            <div class="node" data-node="dashboard-list" style="--node: var(--dashboard)"><strong>Candidate review</strong><span>顯示 summary、scope、evidence_quality、safe evidence view。</span></div>
+            <div class="node" data-node="dashboard-actions" style="--node: var(--dashboard)"><strong>Control plane actions</strong><span>Dismiss / Promote / Evolve / Approve / Materialize / Activate。</span></div>
+          </div>
+          <div class="lane" style="--lane: var(--active)">
+            <div class="lane-label">Active Behavior Surface</div>
+            <div class="node" data-node="active-skill" style="--node: var(--active)"><strong>Active skill</strong><span><code>skills/&lt;name&gt;/SKILL.md</code> 可影響未來 Claude 行為。</span></div>
+            <div class="node" data-node="claude-md" style="--node: var(--active)"><strong>CLAUDE.md draft patch</strong><span>仍是 manual apply；不是 dashboard 自動改 repo policy。</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="two-col">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Scenario Timeline</div>
+              <h2 id="scenarioHeading">Scenario</h2>
+            </div>
+            <div class="hint" id="scenarioIntent"></div>
+          </div>
+          <div class="timeline" id="timeline"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Boundaries</div>
+              <h2>這個情境要守住的規則</h2>
+            </div>
+          </div>
+          <div class="decision-panel" id="boundaries"></div>
+        </section>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="eyebrow">Data Ledger</div>
+            <h2>何時存檔、存了哪些內容、不存什麼</h2>
+          </div>
+          <div class="hint">這是流程正確性的主表；之後 implementation plan 應該讓測試對齊這張表。</div>
+        </div>
+        <table aria-label="Data ledger">
+          <thead>
+            <tr>
+              <th>時機</th>
+              <th>存檔位置 / 平面</th>
+              <th>允許存的內容</th>
+              <th>明確不存 / 不暴露</th>
+              <th>誰會讀</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PreToolUse / PostToolUse</td>
+              <td>Observation plane</td>
+              <td class="yes">tool、phase、session/project id、outcome、sanitized command/path metadata、byte count</td>
+              <td class="no">raw env dump、secret、Skill args、Edit/Write full body、PostToolUse raw body</td>
+              <td>Curator daemon；dashboard 只看 safe summary</td>
+            </tr>
+            <tr>
+              <td>Stop / PreCompact</td>
+              <td>Transcript / diary plane</td>
+              <td class="yes">bounded session summary、intent/outcome、diary draft、reflect-ready signal</td>
+              <td class="no">full raw transcript by default；debug-only transcript 不進 dashboard wire model</td>
+              <td>Curator daemon；/reflect；dashboard safe evidence</td>
+            </tr>
+            <tr>
+              <td>Daemon analysis run</td>
+              <td>Candidate plane</td>
+              <td class="yes">CandidateV1：artifact_type、name、summary、body、scope、evidence、evidence_quality、status=pending</td>
+              <td class="no">active instinct write、schema-less JSONL、template/statistical production candidate</td>
+              <td>Dashboard、CLI inspection、materializer</td>
+            </tr>
+            <tr>
+              <td>Dashboard Materialize</td>
+              <td>Draft plane</td>
+              <td class="yes">inactive draft skill / command / claude_md_addition for review</td>
+              <td class="no">automatic behavior change</td>
+              <td>User reviewer；dashboard activation flow</td>
+            </tr>
+            <tr>
+              <td>Dashboard Activate</td>
+              <td>Active behavior plane</td>
+              <td class="yes">reviewed active skill or explicitly approved behavior surface</td>
+              <td class="no">direct global activation；automatic CLAUDE.md mutation</td>
+              <td>Future Claude Code sessions</td>
+            </tr>
+            <tr>
+              <td>3.1 fresh-start</td>
+              <td>Quarantine archive</td>
+              <td class="yes">old experimental observations/candidates moved outside normal reader globs, chmod restrictive</td>
+              <td class="no">compat migration、normal daemon reads、dashboard exposure</td>
+              <td>None by default</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="eyebrow">Candidate Lifecycle</div>
+            <h2>Dashboard-gated 狀態流</h2>
+          </div>
+          <div class="hint">只有最後一格是 behavior-changing。Promote / Evolve / Materialize 都不是 activate。</div>
+        </div>
+        <div class="state-strip">
+          <div class="state"><strong>Pending</strong><span>Validator append CandidateV1。預設完全不影響 Claude。</span></div>
+          <div class="state gate"><strong>Dismiss / Promote</strong><span>Dismiss 結束；Promote 只產生 global pending candidate。</span></div>
+          <div class="state gate"><strong>Evolve</strong><span>選定 instincts，由 LLM 產生更高階 skill candidate。</span></div>
+          <div class="state gate"><strong>Approve</strong><span>使用者同意值得 draft，但仍不改行為。</span></div>
+          <div class="state gate"><strong>Materialize</strong><span>寫 inactive draft artifact，供人工 review。</span></div>
+          <div class="state change"><strong>Activate</strong><span>明確啟用後才進 active behavior surface。</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="eyebrow">Design Principles</div>
+            <h2>流程圖應該補上的幾個漏項</h2>
+          </div>
+        </div>
+        <div class="principles">
+          <div class="principle"><b>1. Nudge ≠ Load</b><p>SessionStart 可以提醒「有候選項待 review」，但不能把 instinct/candidate 注入 Claude context。</p></div>
+          <div class="principle"><b>2. Candidate ≠ Behavior</b><p>Candidate queue 是 review backlog，不是設定檔、skill、或 active memory。</p></div>
+          <div class="principle"><b>3. Materialize ≠ Activate</b><p>寫出 draft artifact 只是讓使用者看得到檔案；沒有 explicit activate 就不生效。</p></div>
+          <div class="principle"><b>4. Quarantine first</b><p>舊 experimental backlog 不 migration；要移出 normal reader globs，避免污染 3.1。</p></div>
+        </div>
+      </section>
+
+      <section class="card footer-note">
+        <b>Artifact scope:</b> 這是 3.1 architecture/design review 用的靜態互動頁，不是 production dashboard。它用來對齊流程與邊界，之後 implementation plan 應該逐條把這裡的節點轉成 files、tests、acceptance criteria。鍵盤可用 <span class="kbd">1</span>–<span class="kbd">6</span> 切換情境。</section>
+    </section>
+  </main>
+
+  <script>
+    const scenarios = [
+      {
+        id: "capture",
+        title: "1. Session evidence capture",
+        meta: "工具事件發生時，何時存檔、存什麼",
+        intent: "確認 collector 只保存 bounded evidence，並在進 store 前先 allowlist + redact。",
+        nodes: ["user-start", "claude-tools", "hooks-events", "sanitizer", "obs-store"],
+        edges: ["session", "observe", "persist-observation"],
+        timeline: [
+          ["T0", "User starts work", "使用者提出需求，Claude Code 開始執行工具。", ["source: user intent", "no persistence yet"]],
+          ["T1", "Claude Code emits tool events", "PreToolUse / PostToolUse 事件進 hooks。", ["Bash", "Read", "Edit", "Web"]],
+          ["T2", "Collector builds allowlisted evidence", "依 tool class 抽取可存欄位，例如 sanitized command/path、operation_kind、outcome。", ["per-tool contract", "no raw payload"]],
+          ["T3", "Observation saved", "寫入 observation plane，供 daemon 後續分析；dashboard 不直接暴露 raw evidence。", ["local-only", "bounded metadata"]]
+        ],
+        boundaries: [
+          ["ok", "先 scrub 再 persist", "不要把 richer evidence 直接等同 raw tool_input。恢復的是 useful transcript evidence，不是 unrestricted payload。"],
+          ["danger", "Skill args / Edit body 禁止保存", "Skill 只存 skill name；Edit/Write 不存 content、old_string、new_string。"],
+          ["warn", "PostToolUse 只存 outcome + size", "工具輸出本體常含機密或大量內容，預設不進 observation。"]
+        ]
+      },
+      {
+        id: "diary",
+        title: "2. Stop / PreCompact diary path",
+        meta: "session 結束或壓縮前，存高階語意摘要",
+        intent: "確認 diary/reflect/recall 是高訊號 context，但仍不能直接改變 Claude 行為。",
+        nodes: ["user-start", "claude-tools", "hooks-events", "session-store", "nudge"],
+        edges: ["session", "persist-diary"],
+        timeline: [
+          ["T0", "Session reaches Stop or PreCompact", "session tracker 觸發 diary draft 或 reflect-ready signal。", ["Stop hook", "PreCompact hook"]],
+          ["T1", "Session summary / diary stored", "保存 bounded intent/outcome summary、diary draft、reflect pattern notes。", ["diary", "reflect", "recall"]],
+          ["T2", "SessionStart can nudge", "下次啟動可以顯示 diary/candidate 待處理，但不注入 active behavior。", ["nudge only", "no auto-load"]]
+        ],
+        boundaries: [
+          ["ok", "Diary 是 curator input", "它幫 daemon 理解 user intent / assistant behavior，但仍是 evidence plane。"],
+          ["danger", "不把 diary 當 prompt injection", "未 activation 的 diary/reflection 不應成為 Claude Code 的行為規則。"],
+          ["warn", "Full transcript debug-only", "若未來要存 full transcript，應為 opt-in、本地 debug、排除 dashboard wire。"]
+        ]
+      },
+      {
+        id: "analysis",
+        title: "3. Curator daemon analysis",
+        meta: "何時分析、讀哪些 store、產生什麼結果",
+        intent: "確認 daemon 只產生 pending CandidateV1，不直接寫 active instinct。",
+        nodes: ["obs-store", "session-store", "daemon-read", "llm-distill", "validator", "candidate-queue", "nudge"],
+        edges: ["analyze", "queue"],
+        timeline: [
+          ["T0", "Daemon is signaled or scheduled", "hook signal 或 daemon polling 觸發分析，但要有 re-entrancy guard 與 watchdog。", ["daemon health", "no parallel spawn"]],
+          ["T1", "Read evidence planes", "讀 recent observations、session summaries、diaries、recall notes；不讀 quarantine。", ["observation plane", "diary plane"]],
+          ["T2", "LLM distills candidates", "頻率只是 signal；LLM 綜合 corrections、outcomes、scope、recency、contradictions。", ["LLM curation", "not statistics-only"]],
+          ["T3", "Validator appends CandidateV1", "deterministic helper schema validate、redact、dedupe、atomic append。", ["CandidateV1", "status=pending"]]
+        ],
+        boundaries: [
+          ["ok", "One canonical schema", "daemon、recall/reflect、dashboard、CLI、materializer 全部使用 CandidateV1。"],
+          ["danger", "Daemon 不直接寫 active files", "直接寫 ~/.arcforge/instincts 或 skills 會重建 auto-behavior 風險。"],
+          ["warn", "3.0 statistical analyzer 退場", "可暫留作 fixture/dev support，但不能是 production candidate generator。"]
+        ]
+      },
+      {
+        id: "dashboard",
+        title: "4. Dashboard review",
+        meta: "使用者如何 review、promote、dismiss",
+        intent: "確認 dashboard 是唯一 control plane；review actions 多數不改變行為。",
+        nodes: ["user-dashboard", "candidate-queue", "dashboard-list", "dashboard-actions"],
+        edges: ["review"],
+        timeline: [
+          ["T0", "User opens dashboard", "Dashboard 從 queue 讀 pending candidates，渲染 summary、scope、evidence quality。", ["safe wire model", "no raw paths by default"]],
+          ["T1", "User reviews evidence", "畫面應回答：學到了什麼、為何可信、如果採用會改變什麼。", ["explainability", "evidence_quality"]],
+          ["T2", "Dismiss / Promote", "Dismiss 結束 candidate；Promote 只產生 global pending candidate，不能直接 activate。", ["manual promote", "still pending"]]
+        ],
+        boundaries: [
+          ["ok", "Dashboard-as-control-plane", "所有 activation path 都應該回到 dashboard 或明確 CLI equivalent。"],
+          ["danger", "Global candidate 不可直接 active", "Promote 是 scope 轉換，不是跨專案啟用。"],
+          ["warn", "Wire model allowlist", "Dashboard 預設不吐 raw evidence、body text、transcript excerpts、local paths。"]
+        ]
+      },
+      {
+        id: "activation",
+        title: "5. Evolve → Materialize → Activate",
+        meta: "何時才真正改變未來 Claude 行為",
+        intent: "確認 materialize 是 inactive draft；activate 才是第一個 behavior-changing step。",
+        nodes: ["user-dashboard", "dashboard-actions", "daemon-read", "llm-distill", "validator", "candidate-queue", "drafts", "active-skill", "claude-future", "claude-md"],
+        edges: ["review", "activate"],
+        timeline: [
+          ["T0", "User selects candidates and clicks Evolve", "Dashboard 將 selected instincts 送去 LLM 產生高階 skill candidate。", ["explicit evolve", "LLM-written body"]],
+          ["T1", "Candidate appended again", "Evolved result 仍是 pending CandidateV1，需要 review。", ["pending", "no behavior change"]],
+          ["T2", "Approve / Materialize", "寫出 inactive draft artifact。這一步讓人可以看檔案，但 Claude 不應自動使用。", ["draft plane", "inactive"]],
+          ["T3", "Activate", "只有使用者明確 activate 後，才進 active behavior surface，例如 skills/<name>/SKILL.md。", ["behavior-changing", "explicit only"]]
+        ],
+        boundaries: [
+          ["ok", "Activate 是唯一生效點", "未 activation 的 observation / candidate / draft 都不應影響未來 Claude。"],
+          ["danger", "Materialize 不能偷啟用", "產生檔案若落在 auto-discovery active path，就會破壞 dashboard-gated 模型。"],
+          ["warn", "CLAUDE.md addition 是 draft-only", "不應由 dashboard 直接改 CLAUDE.md；應提供 manual patch/review。"]
+        ]
+      },
+      {
+        id: "quarantine",
+        title: "6. Fresh-start / quarantine",
+        meta: "舊資料如何不污染 3.1",
+        intent: "確認 no migration 不是留著舊資料，而是先隔離/刪除再開始 fresh production boundary。",
+        nodes: ["obs-store", "session-store", "daemon-read", "candidate-queue"],
+        edges: [],
+        timeline: [
+          ["T0", "Before enabling 3.1 daemon health", "舊 observations 與 statistical candidate queues 先 batch-quarantine 或 delete。", ["fresh boundary", "no compat migration"]],
+          ["T1", "Move outside reader globs", "quarantine path 不能被 daemon/dashboard normal readers 掃到，permissions 應限制。", ["excluded", "chmod restrictive"]],
+          ["T2", "Start from fresh observation stream", "3.1 第一個 healthy daemon run 才是 production learning 起點。", ["fresh stream", "clean candidates"]]
+        ],
+        boundaries: [
+          ["ok", "No migration", "v1/v2/v3 都是 experimental，沒有資料連續性義務。"],
+          ["danger", "Quarantine 不可被 normal reader 讀到", "否則舊 eval fixtures / secret-looking test payload 會污染 learning。"],
+          ["warn", "Retention 要明確", "raw observation archive 建議有 30-day purge 或明確刪除時點。"]
+        ]
+      }
+    ];
+
+    const buttonHost = document.getElementById("scenarioButtons");
+    const timelineHost = document.getElementById("timeline");
+    const boundaryHost = document.getElementById("boundaries");
+    const heading = document.getElementById("scenarioHeading");
+    const intent = document.getElementById("scenarioIntent");
+    const mapTitle = document.getElementById("mapTitle");
+
+    function renderButtons(activeId) {
+      buttonHost.innerHTML = scenarios.map((scenario, index) => `
+        <button class="scenario-button ${scenario.id === activeId ? "active" : ""}" data-scenario="${scenario.id}" aria-pressed="${scenario.id === activeId}">
+          <span class="scenario-title">${scenario.title}</span>
+          <span class="scenario-meta">${scenario.meta}</span>
+        </button>
+      `).join("");
+    }
+
+    function renderScenario(id) {
+      const scenario = scenarios.find(s => s.id === id) || scenarios[0];
+      renderButtons(scenario.id);
+      heading.textContent = scenario.title;
+      mapTitle.textContent = scenario.title;
+      intent.textContent = scenario.intent;
+
+      document.querySelectorAll(".node").forEach(node => {
+        node.classList.toggle("active", scenario.nodes.includes(node.dataset.node));
+      });
+      document.querySelectorAll(".flow-path").forEach(edge => {
+        edge.classList.toggle("active", scenario.edges.includes(edge.dataset.edge));
+      });
+
+      timelineHost.innerHTML = scenario.timeline.map(([time, title, body, tags]) => `
+        <article class="step">
+          <div class="time">${time}</div>
+          <div>
+            <h3>${title}</h3>
+            <p>${body}</p>
+            <div class="tag-row">${tags.map(tag => `<span class="tag">${tag}</span>`).join("")}</div>
+          </div>
+        </article>
+      `).join("");
+
+      boundaryHost.innerHTML = scenario.boundaries.map(([kind, title, body]) => `
+        <article class="decision ${kind}">
+          <strong>${title}</strong>
+          <p>${body}</p>
+        </article>
+      `).join("");
+
+      localStorage.setItem("learning-flow-scenario", scenario.id);
+    }
+
+    buttonHost.addEventListener("click", event => {
+      const button = event.target.closest("button[data-scenario]");
+      if (!button) return;
+      renderScenario(button.dataset.scenario);
+    });
+
+    window.addEventListener("keydown", event => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const index = Number(event.key) - 1;
+      if (index >= 0 && index < scenarios.length) renderScenario(scenarios[index].id);
+    });
+
+    renderScenario(localStorage.getItem("learning-flow-scenario") || scenarios[0].id);
+  </script>
+</body>
+</html>

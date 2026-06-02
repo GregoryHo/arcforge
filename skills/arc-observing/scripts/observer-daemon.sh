@@ -15,17 +15,27 @@ LOCK_DIR="${INSTINCTS_DIR}/.observer.lock"
 LOG_FILE="${INSTINCTS_DIR}/observer.log"
 GLOBAL_INDEX="${INSTINCTS_DIR}/global-index.jsonl"
 
+# ARCFORGE_ROOT: path to the arcforge repo containing scripts/lib/learning-curator/cli.js
+# Prefer env var (set by plugin sessions + tests); fall back to grandparent of SCRIPT_DIR.
+# SCRIPT_DIR is set below, but we need it here — so we derive it first.
+if [ -z "${SCRIPT_DIR:-}" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
+# Derive ARCFORGE_ROOT from SCRIPT_DIR (skills/arc-observing/scripts → repo root = ../../../)
+ARCFORGE_ROOT="${ARCFORGE_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
+CURATOR_CLI="${ARCFORGE_ROOT}/scripts/lib/learning-curator/cli.js"
+
 # Daemon configuration
 POLL_INTERVAL=300      # 5 minutes
 MIN_OBSERVATIONS=10    # Minimum obs before analysis
 IDLE_TIMEOUT=1800      # 30 minutes no new obs → auto-stop
 MAX_AGE=7200           # 2 hours maximum lifetime
 ANALYSIS_COOLDOWN=60   # Minimum 60 seconds between analyses
+# Watchdog timeout for claude CLI invocation (override via env var for tests)
+OBSERVER_DAEMON_WATCHDOG_SECS="${OBSERVER_DAEMON_WATCHDOG_SECS:-120}"
 
-# Path to observer prompt (relative to this script)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Path to observer prompt (relative to this script's directory)
 OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
-OBSERVER_SYSTEM_PROMPT="${SCRIPT_DIR}/observer-system-prompt.md"
 
 # ─────────────────────────────────────────────
 # Logging
@@ -97,7 +107,6 @@ count_observations() {
 analyze_project() {
   local project="$1"
   local obs_file="${OBS_DIR}/${project}/observations.jsonl"
-  local project_instincts="${INSTINCTS_DIR}/${project}"
 
   if [ ! -f "$obs_file" ]; then
     return
@@ -129,109 +138,226 @@ analyze_project() {
 
   log_msg "Analyzing ${project}: ${obs_count} observations"
 
-  # Ensure instincts directory exists
-  mkdir -p "$project_instincts"
-
-  # Count instincts before analysis
-  local before_count=0
-  if [ -d "$project_instincts" ]; then
-    before_count=$(find "$project_instincts" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
+  # Verify Node CLI is available
+  if ! command -v node &>/dev/null; then
+    log_msg "WARNING: node not found, skipping analysis"
+    return
+  fi
+  if [ ! -f "$CURATOR_CLI" ]; then
+    log_msg "ERROR: curator CLI not found at ${CURATOR_CLI} (ARCFORGE_ROOT=${ARCFORGE_ROOT})"
+    return
   fi
 
-  # Read existing instincts for dedup context
-  local existing_instincts=""
-  if [ -d "$project_instincts" ]; then
-    existing_instincts=$(find "$project_instincts" -maxdepth 1 -name '*.md' -exec cat {} + 2>/dev/null || true)
+  # ── Layer 3: Assemble batch via Node CLI ──────────────────────────────────
+  # Bash 'set -e' aborts the function if `var=$(node ...)` non-zero, so the
+  # error check must use `if !` form (a failed assignment via `set -e` skips
+  # the next-line check entirely).
+  local batch_info=""
+  local batch_err_file="${INSTINCTS_DIR}/.assemble-batch.err"
+  mkdir -p "$INSTINCTS_DIR"
+  if ! batch_info=$(node "$CURATOR_CLI" assemble-batch --project "$project" 2>"$batch_err_file"); then
+    log_msg "ERROR: assemble-batch failed for ${project}: $(cat "$batch_err_file" 2>/dev/null || true)"
+    rm -f "$batch_err_file"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
+  rm -f "$batch_err_file"
+  if [ -z "$batch_info" ]; then
+    log_msg "ERROR: assemble-batch returned empty output for ${project}"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
   fi
 
-  # Build prompt with observations and existing instincts
-  local prompt
-  prompt=$(cat "$OBSERVER_PROMPT")
-  prompt="${prompt}
+  # Extract both fields in ONE node call — emits TAB-separated values to stdout.
+  # Halves the per-cycle node startup overhead (was 2 spawns per project).
+  local extracted prompt_path batch_id
+  if ! extracted=$(printf '%s' "$batch_info" | node -e '
+    let d="";
+    process.stdin.on("data", c => d += c);
+    process.stdin.on("end", () => {
+      try {
+        const o = JSON.parse(d);
+        process.stdout.write((o.prompt_path || "") + "\t" + (o.batch_id || ""));
+      } catch {
+        process.exit(1);
+      }
+    });
+  ' 2>/dev/null); then
+    log_msg "ERROR: assemble-batch output was not valid JSON for ${project}"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
+  IFS=$'\t' read -r prompt_path batch_id <<< "$extracted"
 
-## Current Observations (${project})
+  if [ -z "$prompt_path" ] || [ -z "$batch_id" ]; then
+    log_msg "ERROR: could not extract prompt_path or batch_id from assemble-batch output"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
 
-\`\`\`jsonl
-$(tail -200 "$obs_file")
-\`\`\`
+  if [ ! -f "$prompt_path" ]; then
+    log_msg "ERROR: prompt file not found at ${prompt_path}"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
 
-## Existing Instincts (${project})
-
-${existing_instincts:-None yet.}
-
-## Output Directory
-
-Write instinct files to: ${project_instincts}/
-Each file: {id}.md with YAML frontmatter + markdown body.
-"
-
-  # Call Haiku for analysis — clean session with zero MCP overhead
-  local claude_output
+  # ── Layer 4: Call claude with watchdog ────────────────────────────────────
+  # Uses Anthropic structured output (--json-schema) to force the model to emit
+  # a payload conforming to CandidateProposalPayload v1. Without this, claude
+  # CLI's default Code-mode system prompt biases the model to wrap JSON in
+  # markdown code fences (verified E.3). With --json-schema + --output-format
+  # json, the model cannot wrap — the CLI returns an envelope containing the
+  # structured payload under the `structured_output` field.
+  #
+  # Response file: transient, cleaned in EXIT trap and after ingestion.
+  # Note: Layer 4 spec says tool_access=false — no --tools flag.
+  local response_file="${INSTINCTS_DIR}/.curator-response.${batch_id}.json"
   local analysis_success=false
   local retry_count=0
   local max_retries=1
+  local last_was_timeout=false
+  local schema_path="${ARCFORGE_ROOT}/scripts/lib/learning-curator/candidate-proposal-schema.json"
+  if [ ! -f "$schema_path" ]; then
+    log_msg "ERROR: candidate-proposal-schema.json not found at ${schema_path}"
+    echo $((fail_count + 1)) > "$fail_count_file"
+    return
+  fi
+  # Read schema once per analyze_project call so the inner loop reuses it.
+  local schema_json
+  schema_json=$(cat "$schema_path")
+
+  # Ensure INSTINCTS_DIR exists for the response file
+  mkdir -p "$INSTINCTS_DIR"
+
+  # Register response file in EXIT trap (best-effort cleanup)
+  local tmp_out="${INSTINCTS_DIR}/.analyzing.output.tmp"
+  trap 'rm -f "$tmp_out" "$response_file"' RETURN
+
+  # Marker file: set by watchdog subshell before killing claude.
+  # Lets the outer loop distinguish timeout from plain transport_error.
+  local watchdog_fired_marker="${INSTINCTS_DIR}/.watchdog-fired.${batch_id}"
 
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     if command -v claude &>/dev/null; then
-      # Capture stdout and stderr separately
       local exit_code=0
-      claude_output=$(echo "$prompt" | claude --model haiku \
-        --max-turns 3 \
+      local claude_pid=""
+      local watchdog_pid=""
+      rm -f "$watchdog_fired_marker"
+
+      # Pipe prompt file to claude; capture JSON envelope to response_file.
+      # --output-format json + --json-schema forces structured output (no
+      # markdown wrap possible). The payload lives at .structured_output in
+      # the envelope; ingest-proposal extracts it.
+      (claude --model haiku \
+        --max-turns 15 \
         --print \
-        --system-prompt "$(cat "$OBSERVER_SYSTEM_PROMPT")" \
-        --tools "Write,Read,Bash,Grep,Glob" \
+        --output-format json \
+        --json-schema "$schema_json" \
         --disable-slash-commands \
         --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-        2>&1) || exit_code=$?
+        < "$prompt_path" \
+        > "$response_file" 2>"$tmp_out") &
+      claude_pid=$!
+
+      # Watchdog: kill claude if it exceeds OBSERVER_DAEMON_WATCHDOG_SECS.
+      # Touch watchdog_fired_marker before killing so the outer loop can
+      # distinguish timeout from a plain claude crash (transport_error).
+      (sleep "$OBSERVER_DAEMON_WATCHDOG_SECS" && \
+        if kill -0 "$claude_pid" 2>/dev/null; then \
+          log_msg "WATCHDOG: claude exceeded ${OBSERVER_DAEMON_WATCHDOG_SECS}s — killing (PID ${claude_pid})"; \
+          touch "$watchdog_fired_marker" 2>/dev/null || true; \
+          kill "$claude_pid" 2>/dev/null || true; \
+        fi) &
+      watchdog_pid=$!
+
+      wait "$claude_pid" 2>/dev/null && exit_code=0 || exit_code=$?
+      # Cancel watchdog if claude finished normally
+      kill "$watchdog_pid" 2>/dev/null || true
+      wait "$watchdog_pid" 2>/dev/null || true
 
       if [ "$exit_code" -eq 0 ]; then
         analysis_success=true
         log_msg "Claude analysis completed successfully"
       else
         log_msg "ERROR: claude analysis failed (exit code: ${exit_code})"
-        if [ "$retry_count" -lt "$max_retries" ]; then
-          retry_count=$((retry_count + 1))
+        # If watchdog fired, this attempt counts as a timeout.
+        # Write a failure manifest for this attempt (Layer 4 spec §10).
+        if [ -f "$watchdog_fired_marker" ]; then
+          rm -f "$watchdog_fired_marker"
+          node "$CURATOR_CLI" record-run-failure \
+            --batch-id "$batch_id" \
+            --parse-status "timeout" \
+            --detail "claude CLI exceeded watchdog timeout (${OBSERVER_DAEMON_WATCHDOG_SECS}s)" \
+            > /dev/null 2>&1 || true
+          last_was_timeout=true
+        else
+          last_was_timeout=false
+        fi
+        retry_count=$((retry_count + 1))
+        if [ "$retry_count" -le "$max_retries" ]; then
           log_msg "Retrying analysis (attempt ${retry_count}/${max_retries})..."
           sleep 2
         fi
       fi
     else
       log_msg "WARNING: claude CLI not found, skipping analysis"
+      # PR-F: write failure manifest. CLI-binary-missing is recorded as
+      # transport_error per layer-4 spec parse_status enum; detail carries
+      # the "not found in PATH" specific reason.
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "transport_error" \
+        --detail "claude CLI not found in PATH" \
+        > /dev/null 2>&1 || true
       return
     fi
   done
 
   if [ "$analysis_success" = false ]; then
     log_msg "ERROR: Analysis failed after ${max_retries} retries for ${project}"
-    # Circuit breaker — increment failure count
+    echo $((fail_count + 1)) > "$fail_count_file"
+    rm -f "$response_file"
+    # PR-F: write failure manifest for transport_error only if the last attempt was NOT
+    # a watchdog timeout (timeout attempts already wrote their own manifests).
+    if [ "$last_was_timeout" != true ]; then
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "transport_error" \
+        --detail "claude CLI exited non-zero after ${max_retries} retries" \
+        > /dev/null 2>&1 || true
+    fi
+    return
+  fi
+
+  # ── Layer 5: Hand off to queue via Node CLI ───────────────────────────────
+  local ingest_result=""
+  local ingest_err_file="${INSTINCTS_DIR}/.ingest-proposal.err"
+  if ! ingest_result=$(node "$CURATOR_CLI" ingest-proposal \
+      --batch-id "$batch_id" \
+      --response-file "$response_file" 2>"$ingest_err_file"); then
+    log_msg "ERROR: ingest-proposal failed for batch ${batch_id}: $(cat "$ingest_err_file" 2>/dev/null || true)"
+    rm -f "$ingest_err_file" "$response_file"
     echo $((fail_count + 1)) > "$fail_count_file"
     return
   fi
+  rm -f "$ingest_err_file"
+
+  log_msg "Ingest result: ${ingest_result}"
+
+  # Clean up transient response file (also removed by RETURN trap, but be explicit)
+  rm -f "$response_file"
 
   # Circuit breaker — reset on success
   rm -f "$fail_count_file"
 
-  # Verify instinct creation by counting files after analysis
-  local after_count=0
-  if [ -d "$project_instincts" ]; then
-    after_count=$(find "$project_instincts" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
-  fi
-
-  local new_instincts=$((after_count - before_count))
-
-  if [ "$new_instincts" -gt 0 ]; then
-    log_msg "✓ Successfully created ${new_instincts} new instinct(s) for ${project}"
-  elif [ "$after_count" -gt 0 ]; then
-    log_msg "No new instincts created (${after_count} existing instincts)"
-  else
-    log_msg "⚠ No instinct files found after analysis"
-  fi
+  log_msg "Analysis complete for ${project} (batch ${batch_id})"
 
   # Archive processed observations
   archive_observations "$project"
 
-  # Check bubble-up to global
-  check_bubble_up "$project"
+  # Note: direct writes to ~/.arcforge/instincts/<project>/<id>.md are retired.
+  # Candidates now go to ~/.arcforge/learning/candidates/queue.jsonl via Layer 5.
+  # Project → global promotion requires an explicit dashboard [Promote] action.
 }
 
 archive_observations() {
@@ -250,17 +376,26 @@ archive_observations() {
   log_msg "Archived observations for ${project}"
 }
 
-check_bubble_up() {
-  local project="$1"
-
-  # Delegate to Node.js for unified bubble-up logic
-  node "${SCRIPT_DIR}/../../../scripts/lib/global-index.js" --check-promote --project "$project" 2>&1 | while read -r line; do
-    log_msg "$line"
-  done
-}
-
 analyze_all_projects() {
+  local analyzing_lock="${INSTINCTS_DIR}/.analyzing.lock"
+  # Staleness: a SIGKILL/OOM can leave .analyzing.lock behind because EXIT
+  # trap doesn't fire. Treat locks older than 30 minutes as stale and reclaim.
+  local stale_lock_minutes=30
+
+  if [ -f "$analyzing_lock" ]; then
+    if find "$analyzing_lock" -mmin +"$stale_lock_minutes" -print 2>/dev/null | grep -q .; then
+      log_msg "ANALYZING: stale .analyzing.lock (>${stale_lock_minutes}m old) — reclaiming"
+      rm -f "$analyzing_lock"
+    else
+      log_msg "ANALYZING: analysis already in progress (.analyzing.lock exists) — skipping this round"
+      return
+    fi
+  fi
+
+  touch "$analyzing_lock" 2>/dev/null || true
+
   if [ ! -d "$OBS_DIR" ]; then
+    rm -f "$analyzing_lock"
     return
   fi
 
@@ -270,6 +405,8 @@ analyze_all_projects() {
     project=$(basename "$project_dir")
     analyze_project "$project"
   done
+
+  rm -f "$analyzing_lock"
 }
 
 # ─────────────────────────────────────────────
@@ -288,9 +425,10 @@ daemon_loop() {
   # Track observation state to detect actual new data
   local obs_state_file="${OBS_DIR}/.obs_state"
 
-  # Cleanup lock on exit
-  trap 'log_msg "Daemon stopping (EXIT)"; remove_lock' EXIT
-  trap 'log_msg "Daemon stopping (signal)"; remove_lock; exit 0' TERM INT
+  # Cleanup lock + transient analyzer files on exit; also remove ANALYZING lock to prevent stale lock after crash.
+  # Also clean up any transient curator response files left by an interrupted analysis.
+  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock' EXIT
+  trap 'log_msg "Daemon stopping (signal)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock; exit 0' TERM INT
 
   # SIGUSR1 handler with cooldown
   handle_sigusr1() {
@@ -430,12 +568,15 @@ cmd_status() {
 # Main
 # ─────────────────────────────────────────────
 
-case "${1:-status}" in
-  start)  cmd_start ;;
-  stop)   cmd_stop ;;
-  status) cmd_status ;;
-  *)
-    echo "Usage: $0 {start|stop|status}"
-    exit 1
-    ;;
-esac
+# Guard: skip command dispatch when sourced (allows tests to import functions)
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+  case "${1:-status}" in
+    start)  cmd_start ;;
+    stop)   cmd_stop ;;
+    status) cmd_status ;;
+    *)
+      echo "Usage: $0 {start|stop|status}"
+      exit 1
+      ;;
+  esac
+fi

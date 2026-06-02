@@ -13,6 +13,7 @@ const {
 } = require('../../../scripts/lib/session-utils');
 const { saveInstinct } = require('../../../scripts/lib/instinct-writer');
 const { REFLECT_MAX_CONFIDENCE } = require('../../../scripts/lib/confidence');
+const { saveReflectionRecord } = require('../../../scripts/lib/operation-record-writer');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -80,6 +81,34 @@ function cmdAutoCheck(flags) {
   console.log(`${status}|${strategy}|${diaries.length}`);
 }
 
+function cmdSaveRecord(flags) {
+  const { project, session, summary } = flags;
+  const reflectId = flags['reflect-id'];
+  const diariesArg = flags['diaries'];
+  const homeDir = flags['home-dir'];
+
+  if (!project || !reflectId) {
+    console.error('Error: Missing required arguments');
+    console.log('Usage: reflect.js save-record --project X --reflect-id Y [--session Z] [--diaries "a,b,c"] [--summary "..."] [--home-dir DIR]');
+    process.exit(1);
+  }
+
+  const sourceDiaryIds = diariesArg ? diariesArg.split(',').filter(Boolean) : [];
+
+  saveReflectionRecord({
+    reflect_id: reflectId,
+    project,
+    project_id: flags['project-id'] || '',
+    session: session || '',
+    created_at: new Date().toISOString(),
+    source_diary_ids: sourceDiaryIds,
+    summary: summary || '',
+    homeDir,
+  });
+
+  console.log(`✓ Saved reflection record: ${reflectId}`);
+}
+
 function cmdSaveInstinct(flags) {
   const { project, id, trigger, action, domain, evidence } = flags;
   const evidenceCount = parseInt(flags['evidence-count'], 10) || 1;
@@ -128,8 +157,11 @@ function main() {
     case 'save-instinct':
       cmdSaveInstinct(flags);
       break;
+    case 'save-record':
+      cmdSaveRecord(flags);
+      break;
     default:
-      console.log('Usage: reflect.js <strategy|scan|update-log|auto-check|save-instinct> --project X [--strategy Y] [--diaries "a,b,c"] [--reflection Z]');
+      console.log('Usage: reflect.js <strategy|scan|update-log|auto-check|save-instinct|save-record> --project X [--strategy Y] [--diaries "a,b,c"] [--reflection Z]');
       process.exit(1);
   }
 }
@@ -141,7 +173,8 @@ module.exports = {
   cmdScan,
   cmdUpdateLog,
   cmdAutoCheck,
-  cmdSaveInstinct
+  cmdSaveInstinct,
+  cmdSaveRecord,
 };
 
 if (require.main === module) {

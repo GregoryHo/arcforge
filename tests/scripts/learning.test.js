@@ -4,14 +4,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const crypto = require('node:crypto');
 
 const {
+  acceptCandidate,
   activateCandidate,
   appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
   inspectCandidate,
   isLearningEnabled,
+  listLearningInbox,
   loadCandidates,
   materializeCandidate,
   readLearningConfig,
@@ -392,8 +395,9 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('observe redaction removes common secrets before observations are stored', () => {
-    delete require.cache[require.resolve('../../hooks/observe/main')];
-    const { redactObservationText } = require('../../hooks/observe/main');
+    // redactObservationText moved to scripts/lib/sanitize-observation (Slice C)
+    delete require.cache[require.resolve('../../scripts/lib/sanitize-observation')];
+    const { redactObservationText } = require('../../scripts/lib/sanitize-observation');
 
     const apiKeyName = ['api', '_key'].join('');
     const passwordName = ['pass', 'word'].join('');
@@ -406,14 +410,14 @@ describe('learning subsystem MVP-1', () => {
       `${apiKeyName}="${apiKey}" ${passwordName}: "${password}" Authorization: Bearer ${bearer} ${tokenName}=${token}`,
     );
 
-    expect(redacted).toContain('api_key=[REDACTED]');
-    expect(redacted).toContain('password=[REDACTED]');
-    expect(redacted).toContain('Authorization: Bearer [REDACTED]');
-    expect(redacted).toContain('token=[REDACTED]');
+    // Sanitizer preserves delimiter context: api_key="value" → api_key="[REDACTED]"
+    // and password: "value" → password: "[REDACTED]"
     expect(redacted).not.toContain(apiKey);
     expect(redacted).not.toContain(password);
     expect(redacted).not.toContain(bearer);
     expect(redacted).not.toContain(token);
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).toContain('Authorization: Bearer [REDACTED]');
   });
 
   it('observe hook is disabled until project or global learning is explicitly enabled', () => {
@@ -450,25 +454,84 @@ describe('learning subsystem MVP-1', () => {
     return observationPath;
   }
 
-  it('analyzes repeated release observations into one pending project skill candidate', () => {
+  function writeGlobalProjectObservations(projectName, projectPath, records) {
+    const { getProjectId } = require('../../scripts/lib/learning');
+    const observationPath = path.join(
+      homeDir,
+      '.arcforge',
+      'observations',
+      projectName,
+      'observations.jsonl',
+    );
+    fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+    fs.writeFileSync(
+      observationPath,
+      `${records
+        .map((record) => JSON.stringify({ project_id: getProjectId(projectPath), ...record }))
+        .join('\n')}\n`,
+      'utf8',
+    );
+    return observationPath;
+  }
+
+  it('does not contain the old release-specific analyzer entrypoint', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../../scripts/lib/learning.js'), 'utf8');
+
+    expect(source).not.toContain('releaseSignalScore');
+    expect(source).not.toContain('buildReleaseCandidate');
+  });
+
+  it('analyzes repeated project behavior into a pending learned workflow candidate', () => {
     const { analyzeLearning } = require('../../scripts/lib/learning');
     setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
     writeObservations([
       {
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'Read',
+        session: 'session-workflow-a',
         project: path.basename(projectRoot),
-        input: 'npm test && npm run lint && npm version patch && git tag v1.2.3',
+        input: JSON.stringify({ file_path: 'scripts/lib/example.js' }),
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: JSON.stringify({ file_path: 'scripts/lib/example.js' }),
+      },
+      {
+        ts: '2026-05-01T00:02:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: JSON.stringify({ command: 'npm run test:scripts -- learning.test.js' }),
       },
       {
         ts: '2026-05-01T01:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
+        tool: 'Read',
+        session: 'session-workflow-b',
         project: path.basename(projectRoot),
-        input: 'update CHANGELOG then run full tests and prepare release push',
+        input: JSON.stringify({ file_path: 'scripts/lib/other.js' }),
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: JSON.stringify({ file_path: 'scripts/lib/other.js' }),
+      },
+      {
+        ts: '2026-05-01T01:02:00Z',
+        event: 'tool_start',
+        tool: 'Bash',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: JSON.stringify({ command: 'npm run test:scripts -- other.test.js' }),
       },
     ]);
 
@@ -482,22 +545,86 @@ describe('learning subsystem MVP-1', () => {
     expect(result.enabled).toBe(true);
     expect(result.emitted).toBe(1);
     expect(result.candidates[0]).toMatchObject({
-      id: 'arc-releasing-20260501-001',
       scope: 'project',
       artifact_type: 'skill',
-      name: 'arc-releasing',
       status: 'pending',
+      pattern_key: JSON.stringify(['read', 'edit', 'bash']),
     });
-    expect(result.candidates[0].trigger).toContain('release');
+    expect(result.candidates[0].name).toMatch(/^arc-learned-read-edit-bash-[a-f0-9]{8}-workflow$/);
+    expect(result.candidates[0].id).toMatch(
+      /^arc-learned-project-read-edit-bash-[a-f0-9]{8}-workflow$/,
+    );
+    expect(result.candidates[0].trigger).toContain('Read → Edit → Bash');
+    expect(result.candidates[0].summary).not.toMatch(/release/i);
     expect(result.candidates[0].evidence.map((item) => item.session_id).sort()).toEqual([
-      'session-release-a',
-      'session-release-b',
+      'session-workflow-a',
+      'session-workflow-b',
     ]);
     expect(result.candidates[0].evidence[0]).not.toHaveProperty('input');
 
     const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(queued).toHaveLength(1);
-    expect(queued[0].name).toBe('arc-releasing');
+    expect(queued[0].name).toMatch(/^arc-learned-read-edit-bash-[a-f0-9]{8}-workflow$/);
+  });
+
+  it('reads active and archived observations when analyzing project behavior', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const observationPath = writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'session-archive-a',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-archive-a',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+    ]);
+    const archiveDir = path.join(path.dirname(observationPath), 'archive');
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(archiveDir, 'observations-2026-05-01.jsonl'),
+      `${[
+        {
+          project_id: require('../../scripts/lib/learning').getProjectId(projectRoot),
+          ts: '2026-05-01T01:00:00Z',
+          event: 'tool_start',
+          tool: 'Read',
+          session: 'session-archive-b',
+          project: path.basename(projectRoot),
+          input: '{}',
+        },
+        {
+          project_id: require('../../scripts/lib/learning').getProjectId(projectRoot),
+          ts: '2026-05-01T01:01:00Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 'session-archive-b',
+          project: path.basename(projectRoot),
+          input: '{}',
+        },
+      ]
+        .map((record) => JSON.stringify(record))
+        .join('\n')}\n`,
+      'utf8',
+    );
+
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+
+    expect(result.emitted).toBe(1);
+    expect(result.candidates[0].name).toMatch(/^arc-learned-read-edit-[a-f0-9]{8}-workflow$/);
+    expect(result.candidates[0].evidence.map((item) => item.session_id).sort()).toEqual([
+      'session-archive-a',
+      'session-archive-b',
+    ]);
   });
 
   it('does not emit candidates when learning is disabled or evidence is below threshold', () => {
@@ -506,10 +633,18 @@ describe('learning subsystem MVP-1', () => {
       {
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'Read',
+        session: 'session-workflow-a',
         project: path.basename(projectRoot),
-        input: 'npm test && npm run lint && git tag v1.2.3',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
     ]);
 
@@ -531,18 +666,34 @@ describe('learning subsystem MVP-1', () => {
       {
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'Read',
+        session: 'session-workflow-a',
         project: path.basename(projectRoot),
-        input: 'npm version patch && npm test && git tag v1.2.3',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
       {
         ts: '2026-05-01T01:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
+        tool: 'Read',
+        session: 'session-workflow-b',
         project: path.basename(projectRoot),
-        input: 'release notes and full tests before tag and push',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
     ]);
     fs.appendFileSync(observationPath, '{not-json}\n', 'utf8');
@@ -562,19 +713,37 @@ describe('learning subsystem MVP-1', () => {
         project_id: getProjectId(otherProjectRoot),
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'Read',
+        session: 'session-workflow-a',
         project: path.basename(projectRoot),
-        input: 'npm version patch && npm test && git tag v1.2.3',
+        input: '{}',
+      },
+      {
+        project_id: getProjectId(otherProjectRoot),
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
       {
         project_id: getProjectId(otherProjectRoot),
         ts: '2026-05-01T01:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
+        tool: 'Read',
+        session: 'session-workflow-b',
         project: path.basename(projectRoot),
-        input: 'release notes and full tests before tag and push',
+        input: '{}',
+      },
+      {
+        project_id: getProjectId(otherProjectRoot),
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
     ]);
 
@@ -591,18 +760,34 @@ describe('learning subsystem MVP-1', () => {
       {
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'Read',
+        session: 'session-workflow-a',
         project: path.basename(projectRoot),
-        input: 'npm version patch && npm test && git tag v1.2.3',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
       {
         ts: '2026-05-01T01:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
+        tool: 'Read',
+        session: 'session-workflow-b',
         project: path.basename(projectRoot),
-        input: 'release notes and full tests before tag and push',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
     ]);
 
@@ -625,62 +810,352 @@ describe('learning subsystem MVP-1', () => {
 
     const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(queued).toHaveLength(1);
-    expect(queued[0].id).toBe('arc-releasing-20260501-001');
+    expect(queued[0].id).toMatch(/^arc-learned-project-read-edit-[a-f0-9]{8}-workflow$/);
   });
 
-  it('CLI learn analyze queues candidates from enabled project observations', () => {
+  it('CLI learn analyze is deprecated and exits non-zero with a dashboard pointer', () => {
     setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
-    writeObservations([
-      {
-        ts: '2026-05-01T00:00:00Z',
-        event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
-        project: path.basename(projectRoot),
-        input: 'npm version minor; update changelog; npm test; git tag v1.3.0',
-      },
-      {
-        ts: '2026-05-01T01:00:00Z',
-        event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
-        project: path.basename(projectRoot),
-        input: '準備發版: release notes, full tests, tag and push',
-      },
-    ]);
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
-    const analyzed = JSON.parse(
-      execFileSync('node', [cli, 'learn', 'analyze', '--project', '--json'], {
-        env,
-        encoding: 'utf8',
-      }),
-    );
+    let stderr = '';
+    let exitCode = 0;
+    try {
+      execFileSync('node', [cli, 'learn', 'analyze', '--project'], { env, encoding: 'utf8' });
+    } catch (err) {
+      exitCode = err.status;
+      stderr = err.stderr || '';
+    }
 
-    expect(analyzed.emitted).toBe(1);
-    expect(analyzed.candidates[0].name).toBe('arc-releasing');
-    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(1);
+    expect(exitCode).toBe(1);
+    expect(stderr).toMatch(/deprecated/i);
+    expect(stderr).toMatch(/arc learn dashboard/);
+    // After deprecation, the analyzer must not silently enqueue candidates.
+    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
   });
 
-  it('automatically analyzes enabled project learning after new observations without activating artifacts', () => {
+  it('global analyzer emits cross-project learned behavior candidates', () => {
+    const { analyzeLearning, getProjectId } = require('../../scripts/lib/learning');
+    const alphaRoot = path.join(testDir, 'alpha');
+    const betaRoot = path.join(testDir, 'beta');
+    const recordsByProject = [
+      { root: alphaRoot, project: 'alpha', session: 'alpha-session' },
+      { root: betaRoot, project: 'beta', session: 'beta-session' },
+    ];
+    for (const item of recordsByProject) {
+      const dir = path.join(homeDir, '.arcforge', 'observations', item.project);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'observations.jsonl'),
+        `${[
+          {
+            project_id: getProjectId(item.root),
+            ts: '2026-05-01T00:00:00Z',
+            event: 'tool_start',
+            tool: 'Read',
+            session: item.session,
+            project: item.project,
+            input: '{}',
+          },
+          {
+            project_id: getProjectId(item.root),
+            ts: '2026-05-01T00:01:00Z',
+            event: 'tool_start',
+            tool: 'Edit',
+            session: item.session,
+            project: item.project,
+            input: '{}',
+          },
+        ]
+          .map((record) => JSON.stringify(record))
+          .join('\n')}\n`,
+        'utf8',
+      );
+    }
+    setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+
+    const result = analyzeLearning({ scope: 'global', projectRoot, homeDir });
+
+    expect(result.enabled).toBe(true);
+    expect(result.emitted).toBe(1);
+    expect(result.candidates[0]).toMatchObject({
+      scope: 'global',
+      status: 'pending',
+      pattern_key: JSON.stringify(['read', 'edit']),
+    });
+    expect(result.candidates[0].name).toMatch(/^arc-global-read-edit-[a-f0-9]{8}-workflow$/);
+    expect(result.candidates[0].summary).toContain('2 projects');
+    expect(result.candidates[0].evidence.map((item) => item.session_id).sort()).toEqual([
+      'alpha-session',
+      'beta-session',
+    ]);
+    expect(loadCandidates({ scope: 'global', projectRoot, homeDir })).toHaveLength(1);
+  });
+
+  it('global analyzer trusts observation directory identity over spoofable record project fields', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    const alphaRoot = path.join(testDir, 'alpha');
+    writeGlobalProjectObservations('alpha', alphaRoot, [
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'alpha-session-a',
+        project: 'alpha',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'alpha-session-a',
+        project: 'alpha',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'alpha-session-b',
+        project: 'spoofed-beta',
+        project_id: 'spoofed-beta-project-id',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'alpha-session-b',
+        project: 'spoofed-beta',
+        project_id: 'spoofed-beta-project-id',
+        input: '{}',
+      },
+    ]);
+    setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+
+    const result = analyzeLearning({ scope: 'global', projectRoot, homeDir });
+
+    expect(result.emitted).toBe(0);
+    expect(loadCandidates({ scope: 'global', projectRoot, homeDir })).toHaveLength(0);
+  });
+
+  it('global analyzer treats identical session ids in different projects as separate evidence', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    writeGlobalProjectObservations('alpha', path.join(testDir, 'alpha'), [
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'same-session',
+        project: 'alpha',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'same-session',
+        project: 'alpha',
+        input: '{}',
+      },
+    ]);
+    writeGlobalProjectObservations('beta', path.join(testDir, 'beta'), [
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'same-session',
+        project: 'beta',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'same-session',
+        project: 'beta',
+        input: '{}',
+      },
+    ]);
+    setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+
+    const result = analyzeLearning({ scope: 'global', projectRoot, homeDir });
+
+    expect(result.emitted).toBe(1);
+    expect(result.candidates[0].evidence.map((item) => item.source).sort()).toEqual([
+      'project:alpha',
+      'project:beta',
+    ]);
+  });
+
+  it('normalizes analyzer-generated tool workflow names so candidates can materialize', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
     setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
     writeObservations([
       {
         ts: '2026-05-01T00:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-a',
+        tool: 'mcp__server__tool',
+        session: 'session-a',
         project: path.basename(projectRoot),
-        input: 'npm version patch && npm test && git tag v1.2.3',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-a',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
       {
         ts: '2026-05-01T01:00:00Z',
         event: 'tool_start',
-        tool: 'Bash',
-        session: 'session-release-b',
+        tool: 'mcp__server__tool',
+        session: 'session-b',
         project: path.basename(projectRoot),
-        input: 'release notes and full tests before tag and push',
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-b',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+    ]);
+
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+    const candidateId = result.candidates[0].id;
+    transitionCandidate(candidateId, 'approved', { scope: 'project', projectRoot, homeDir });
+    const materialized = materializeCandidate(candidateId, {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+    });
+
+    expect(result.candidates[0].name).toMatch(
+      /^arc-learned-mcp-server-tool-edit-[a-f0-9]{8}-workflow$/,
+    );
+    expect(materialized.draft_paths[0]).toBe(`skills/${result.candidates[0].name}/SKILL.md.draft`);
+  });
+
+  it('keeps distinct tool sequences separate even when their human slugs would collide', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const records = [];
+    for (const [session, tools] of [
+      ['ab-c-a', ['a-b', 'c']],
+      ['ab-c-b', ['a-b', 'c']],
+      ['a-bc-a', ['a', 'b-c']],
+      ['a-bc-b', ['a', 'b-c']],
+    ]) {
+      tools.forEach((tool) => {
+        records.push({
+          ts: `2026-05-01T00:0${records.length}:00Z`,
+          event: 'tool_start',
+          tool,
+          session,
+          project: path.basename(projectRoot),
+          input: '{}',
+        });
+      });
+    }
+    writeObservations(records);
+
+    const result = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+    const ids = result.candidates.map((candidate) => candidate.id);
+
+    expect(result.emitted).toBe(2);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids.every((id) => id.startsWith('arc-learned-project-a-b-c'))).toBe(true);
+  });
+
+  it('does not duplicate an existing workflow when a slug-colliding pattern appears in a later analysis run', () => {
+    const { analyzeLearning } = require('../../scripts/lib/learning');
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    const recordsFor = (sessions) => {
+      const records = [];
+      for (const [session, tools] of sessions) {
+        tools.forEach((tool) => {
+          records.push({
+            ts: `2026-05-01T00:${String(records.length).padStart(2, '0')}:00Z`,
+            event: 'tool_start',
+            tool,
+            session,
+            project: path.basename(projectRoot),
+            input: '{}',
+          });
+        });
+      }
+      return records;
+    };
+
+    writeObservations(
+      recordsFor([
+        ['ab-c-a', ['a-b', 'c']],
+        ['ab-c-b', ['a-b', 'c']],
+      ]),
+    );
+    const firstRun = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+    expect(firstRun.emitted).toBe(1);
+    const firstCandidate = loadCandidates({ scope: 'project', projectRoot, homeDir })[0];
+    expect(firstCandidate.id).toMatch(/^arc-learned-project-a-b-c-[a-f0-9]{8}-workflow$/);
+    expect(firstCandidate.pattern_key).toBe(JSON.stringify(['a-b', 'c']));
+
+    writeObservations(
+      recordsFor([
+        ['ab-c-a', ['a-b', 'c']],
+        ['ab-c-b', ['a-b', 'c']],
+        ['a-bc-a', ['a', 'b-c']],
+        ['a-bc-b', ['a', 'b-c']],
+      ]),
+    );
+    const secondRun = analyzeLearning({ scope: 'project', projectRoot, homeDir });
+    const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
+
+    expect(secondRun.emitted).toBe(1);
+    expect(queued).toHaveLength(2);
+    expect(queued.map((candidate) => candidate.id)).toContain(firstCandidate.id);
+    expect(new Set(queued.map((candidate) => candidate.pattern_key)).size).toBe(2);
+  });
+
+  it('automatically analyzes enabled project and global learning after new observations without activating artifacts', () => {
+    setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+    setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+    writeObservations([
+      {
+        ts: '2026-05-01T00:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T00:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-a',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:00:00Z',
+        event: 'tool_start',
+        tool: 'Read',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: '{}',
+      },
+      {
+        ts: '2026-05-01T01:01:00Z',
+        event: 'tool_start',
+        tool: 'Edit',
+        session: 'session-workflow-b',
+        project: path.basename(projectRoot),
+        input: '{}',
       },
     ]);
 
@@ -692,14 +1167,16 @@ describe('learning subsystem MVP-1', () => {
 
     expect(result.project.enabled).toBe(true);
     expect(result.project.emitted).toBe(1);
+    expect(result.global.enabled).toBe(true);
+    expect(result.global.emitted).toBe(0);
     const queued = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({
-      name: 'arc-releasing',
       status: 'pending',
     });
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+    expect(queued[0].name).toMatch(/^arc-learned-read-edit-[a-f0-9]{8}-workflow$/);
+    expect(fs.existsSync(path.join(projectRoot, 'skills', queued[0].name, 'SKILL.md'))).toBe(false);
+    expect(fs.existsSync(path.join(projectRoot, 'skills', queued[0].name, 'SKILL.md.draft'))).toBe(
       false,
     );
   });
@@ -730,6 +1207,132 @@ describe('learning subsystem MVP-1', () => {
     );
     expect(approved.status).toBe('approved');
     expect(approved.evidence[0].session_id).toBe('session-abc');
+  });
+
+  it('lists an actionable learning inbox grouped by status and artifact type', () => {
+    appendCandidate(
+      candidate({ id: 'pending-instinct', artifact_type: 'instinct', name: 'prefer-tests' }),
+      {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      },
+    );
+    appendCandidate(
+      candidate({
+        id: 'approved-command',
+        artifact_type: 'command',
+        name: 'arc-fast-review',
+        status: 'approved',
+        confidence: 0.91,
+      }),
+      { scope: 'project', projectRoot, homeDir },
+    );
+    appendCandidate(
+      candidate({
+        id: 'rejected-skill',
+        artifact_type: 'skill',
+        name: 'obsolete-flow',
+        status: 'rejected',
+        confidence: 0.99,
+      }),
+      { scope: 'project', projectRoot, homeDir },
+    );
+
+    const inbox = listLearningInbox({ scope: 'project', projectRoot, homeDir });
+
+    expect(inbox.counts).toEqual({ pending: 1, approved: 1, rejected: 1 });
+    expect(inbox.groups.by_status.pending).toEqual(['pending-instinct']);
+    expect(inbox.groups.by_artifact_type.command).toEqual(['approved-command']);
+    expect(inbox.candidates.map((entry) => entry.id)).toEqual([
+      'approved-command',
+      'pending-instinct',
+      'rejected-skill',
+    ]);
+    expect(inbox.candidates[0]).toMatchObject({
+      id: 'approved-command',
+      next_command: 'arc learn materialize approved-command --project',
+    });
+    expect(inbox.candidates[0].evidence).toBeUndefined();
+  });
+
+  it('accepts a pending project candidate by approving and materializing drafts without activation', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+
+    const result = acceptCandidate('arc-releasing-20260501-001', {
+      scope: 'project',
+      projectRoot,
+      homeDir,
+      now: '2026-05-01T00:05:00Z',
+    });
+
+    expect(result.scope).toBe('project');
+    expect(result.candidate.status).toBe('materialized');
+    expect(result.candidate.draft_paths).toEqual([
+      'skills/arc-releasing/SKILL.md.draft',
+      'tests/skills/test_skill_arc_releasing.py.draft',
+    ]);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
+  });
+
+  it('keeps the accept shortcut project-only and fails closed for global candidates', () => {
+    appendCandidate(candidate({ scope: 'global' }), { scope: 'global', projectRoot, homeDir });
+
+    expect(() =>
+      acceptCandidate('arc-releasing-20260501-001', {
+        scope: 'global',
+        projectRoot,
+        homeDir,
+      }),
+    ).toThrow('only project candidate accept flow is supported');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
+      false,
+    );
+  });
+
+  it('points approved global inbox entries to inspection instead of unsupported materialization', () => {
+    appendCandidate(candidate({ scope: 'global', status: 'approved' }), {
+      scope: 'global',
+      projectRoot,
+      homeDir,
+    });
+
+    const inbox = listLearningInbox({ scope: 'global', projectRoot, homeDir });
+
+    expect(inbox.candidates[0]).toMatchObject({
+      id: 'arc-releasing-20260501-001',
+      next_command: 'arc learn inspect arc-releasing-20260501-001 --global',
+    });
+  });
+
+  it('CLI learn inbox and accept support the compact review flow', () => {
+    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    const cli = path.join(__dirname, '../../scripts/cli.js');
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+
+    const inbox = JSON.parse(
+      execFileSync('node', [cli, 'learn', 'inbox', '--project', '--json'], {
+        env,
+        encoding: 'utf8',
+      }),
+    );
+    expect(inbox.candidates[0].next_command).toBe(
+      'arc learn approve arc-releasing-20260501-001 --project',
+    );
+
+    const accepted = JSON.parse(
+      execFileSync(
+        'node',
+        [cli, 'learn', 'accept', 'arc-releasing-20260501-001', '--project', '--json'],
+        {
+          env,
+          encoding: 'utf8',
+        },
+      ),
+    );
+    expect(accepted.candidate.status).toBe('materialized');
+    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
   });
 
   it('activates a materialized project candidate by promoting drafts to active artifacts', () => {
@@ -1517,5 +2120,649 @@ describe('learning subsystem MVP-1', () => {
       }),
     );
     expect(disabled.enabled).toBe(false);
+  });
+});
+
+describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts', () => {
+  let testDir;
+  let projectRoot;
+  let homeDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-learning-mvp2-'));
+    projectRoot = path.join(testDir, 'project');
+    homeDir = path.join(testDir, 'home');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(homeDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function baseCandidate(overrides = {}) {
+    return {
+      id: 'arc-learned-project-test-001',
+      scope: 'project',
+      artifact_type: 'instinct',
+      name: 'arc-learned-test',
+      summary: 'Test learned habit summary.',
+      trigger: 'when this scenario recurs',
+      evidence: [
+        { session_id: 'session-1', source: 'observation', reason: 'recurs across sessions' },
+      ],
+      confidence: 0.6,
+      status: 'pending',
+      created_at: '2026-05-01T00:00:00Z',
+      updated_at: '2026-05-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  describe('artifact_type validation', () => {
+    it('accepts the five new artifact types and rejects unknown ones', () => {
+      const learning = require('../../scripts/lib/learning');
+      for (const t of ['skill', 'instinct', 'command', 'agent', 'eval', 'repo_convention_patch']) {
+        expect(
+          learning.validateCandidate(baseCandidate({ artifact_type: t, name: 'arc-test' })).ok,
+        ).toBe(true);
+      }
+      const invalid = learning.validateCandidate(
+        baseCandidate({ artifact_type: 'arbitrary-type' }),
+      );
+      expect(invalid.ok).toBe(false);
+      expect(invalid.errors.some((m) => /artifact_type/.test(m))).toBe(true);
+    });
+  });
+
+  describe('materialization across artifact types', () => {
+    function approvedCandidate(artifactType, name) {
+      return baseCandidate({
+        id: `arc-learned-project-${artifactType}-${name}`,
+        artifact_type: artifactType,
+        name,
+        status: 'approved',
+      });
+    }
+
+    it('materializes an instinct candidate as a draft markdown file under the instincts dir', () => {
+      const learning = require('../../scripts/lib/learning');
+      const c = approvedCandidate('instinct', 'arc-learned-instinct-x');
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      const result = learning.materializeCandidate(c.id, {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.candidate.draft_paths).toEqual([
+        '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft',
+      ]);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft'),
+        ),
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md'),
+        ),
+      ).toBe(false);
+    });
+
+    it('materializes command/agent/eval candidates as inactive drafts under their dirs', () => {
+      const learning = require('../../scripts/lib/learning');
+      const cases = [
+        { type: 'command', name: 'arc-learned-cmd', expected: 'commands/arc-learned-cmd.md.draft' },
+        { type: 'agent', name: 'arc-learned-agent', expected: 'agents/arc-learned-agent.md.draft' },
+        {
+          type: 'eval',
+          name: 'arc-learned-eval',
+          expected: 'evals/arc-learned-eval/EVAL.md.draft',
+        },
+      ];
+      for (const c of cases) {
+        const cand = approvedCandidate(c.type, c.name);
+        learning.appendCandidate(cand, { scope: 'project', projectRoot, homeDir });
+        const result = learning.materializeCandidate(cand.id, {
+          scope: 'project',
+          projectRoot,
+          homeDir,
+        });
+        expect(result.candidate.draft_paths).toEqual([c.expected]);
+        expect(fs.existsSync(path.join(projectRoot, c.expected))).toBe(true);
+        // Active path must not exist after materialization.
+        expect(fs.existsSync(path.join(projectRoot, c.expected.replace('.draft', '')))).toBe(false);
+      }
+    });
+
+    it('materializes repo_convention_patch candidates only as draft text proposals', () => {
+      const learning = require('../../scripts/lib/learning');
+      const c = approvedCandidate('repo_convention_patch', 'arc-learned-convention-x');
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      const result = learning.materializeCandidate(c.id, {
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.candidate.draft_paths).toEqual([
+        '.arcforge/learning/patches/arc-learned-convention-x.patch.draft',
+      ]);
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-x.patch.draft'),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe('activation across artifact types', () => {
+    function setupMaterialized(artifactType, name) {
+      const learning = require('../../scripts/lib/learning');
+      const c = baseCandidate({
+        id: `arc-learned-project-${artifactType}-${name}`,
+        artifact_type: artifactType,
+        name,
+        status: 'approved',
+      });
+      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      learning.materializeCandidate(c.id, { scope: 'project', projectRoot, homeDir });
+      return c.id;
+    }
+
+    it('activates instinct/command/agent/eval drafts by promoting to active artifacts', () => {
+      const learning = require('../../scripts/lib/learning');
+      const cases = [
+        {
+          type: 'instinct',
+          name: 'arc-learned-instinct-y',
+          active: '.arcforge/learning/instincts/arc-learned-instinct-y.md',
+        },
+        { type: 'command', name: 'arc-learned-cmd-y', active: 'commands/arc-learned-cmd-y.md' },
+        { type: 'agent', name: 'arc-learned-agent-y', active: 'agents/arc-learned-agent-y.md' },
+        { type: 'eval', name: 'arc-learned-eval-y', active: 'evals/arc-learned-eval-y/EVAL.md' },
+      ];
+      for (const c of cases) {
+        const id = setupMaterialized(c.type, c.name);
+        const result = learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir });
+        expect(result.candidate.status).toBe('activated');
+        expect(result.candidate.active_paths).toEqual([c.active]);
+        expect(fs.existsSync(path.join(projectRoot, c.active))).toBe(true);
+        expect(fs.existsSync(path.join(projectRoot, `${c.active}.draft`))).toBe(false);
+      }
+    });
+
+    it('refuses activation for repo_convention_patch — draft-only artifact type', () => {
+      const learning = require('../../scripts/lib/learning');
+      const id = setupMaterialized('repo_convention_patch', 'arc-learned-convention-y');
+      expect(() =>
+        learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/draft-only|cannot be activated|refus/i);
+      // Draft must remain on disk.
+      expect(
+        fs.existsSync(
+          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-y.patch.draft'),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe('path safety', () => {
+    it('refuses activation when the candidate name escapes the artifact dir', () => {
+      const learning = require('../../scripts/lib/learning');
+      // Inject a hostile candidate directly into the queue file (skipping append validation
+      // which already rejects bad names).
+      const queuePath = learning.getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+      fs.writeFileSync(
+        queuePath,
+        `${JSON.stringify(
+          baseCandidate({
+            id: 'evil-1',
+            artifact_type: 'instinct',
+            name: '../../escape',
+            status: 'materialized',
+            draft_paths: ['../../escape.md.draft'],
+          }),
+        )}\n`,
+        'utf8',
+      );
+      expect(() =>
+        learning.activateCandidate('evil-1', { scope: 'project', projectRoot, homeDir }),
+      ).toThrow(/lowercase kebab-case|relative|parent|normalized/i);
+    });
+  });
+
+  describe('global scoring metadata', () => {
+    it('attaches distinct_project_count, session_count, and score to global candidates', () => {
+      const learning = require('../../scripts/lib/learning');
+      const alphaRoot = path.join(testDir, 'alpha');
+      const betaRoot = path.join(testDir, 'beta');
+      for (const item of [
+        { root: alphaRoot, project: 'alpha', session: 'alpha-session' },
+        { root: betaRoot, project: 'beta', session: 'beta-session' },
+      ]) {
+        const dir = path.join(homeDir, '.arcforge', 'observations', item.project);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, 'observations.jsonl'),
+          `${[
+            {
+              project_id: learning.getProjectId(item.root),
+              ts: '2026-05-01T00:00:00Z',
+              event: 'tool_start',
+              tool: 'Read',
+              session: item.session,
+              project: item.project,
+            },
+            {
+              project_id: learning.getProjectId(item.root),
+              ts: '2026-05-01T00:01:00Z',
+              event: 'tool_start',
+              tool: 'Edit',
+              session: item.session,
+              project: item.project,
+            },
+          ]
+            .map((r) => JSON.stringify(r))
+            .join('\n')}\n`,
+          'utf8',
+        );
+      }
+      learning.setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+
+      const result = learning.analyzeLearning({ scope: 'global', projectRoot, homeDir });
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0].distinct_project_count).toBe(2);
+      expect(result.candidates[0].session_count).toBe(2);
+      expect(result.candidates[0].score).toBeGreaterThan(0);
+      expect(result.candidates[0].score_factors).toMatchObject({
+        project_diversity: expect.any(Number),
+        session_diversity: expect.any(Number),
+        recency: expect.any(Number),
+        outcome: expect.any(Number),
+        user_confirmation: expect.any(Number),
+        contradiction_absence: expect.any(Number),
+        project_specificity: expect.any(Number),
+        privacy_risk: expect.any(Number),
+      });
+      expect(result.candidates[0].status).toBe('pending');
+    });
+  });
+
+  describe('outcome-aware learning', () => {
+    it('emits an instinct candidate from an error → edit → success workflow', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      const events = [
+        // session 1 — error then edit then bash success
+        {
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's1',
+          project_id: projectId,
+          semantic: { command_kind: 'test', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T00:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's1',
+          project_id: projectId,
+        },
+        // session 2 — same shape
+        {
+          ts: '2026-05-01T01:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's2',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T01:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's2',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T01:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's2',
+          project_id: projectId,
+          semantic: { command_kind: 'build', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T01:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's2',
+          project_id: projectId,
+        },
+      ];
+      fs.writeFileSync(
+        observationPath,
+        `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
+        'utf8',
+      );
+
+      const result = learning.analyzeOutcomeRepair({
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-01T02:00:00Z',
+      });
+
+      expect(result.emitted).toBe(1);
+      const c = result.candidates[0];
+      expect(c.artifact_type).toBe('instinct');
+      expect(c.status).toBe('pending');
+      expect(c.evidence.length).toBeGreaterThanOrEqual(2);
+      // Privacy: no raw payload words allowed in evidence reasons.
+      const evidenceText = JSON.stringify(c.evidence);
+      expect(evidenceText).not.toContain('npm');
+      expect(evidenceText).toMatch(/test command passed after edit/);
+    });
+
+    it('does not emit when there is no error→edit→success sequence', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      fs.writeFileSync(
+        observationPath,
+        `${JSON.stringify({
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_start',
+          tool: 'Read',
+          session: 's1',
+          project_id: projectId,
+        })}\n`,
+        'utf8',
+      );
+      const result = learning.analyzeOutcomeRepair({ scope: 'project', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+    it('does not emit when a non-test bash command succeeds after the edit', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const projectId = learning.getProjectId(projectRoot);
+      const observationPath = learning.getObservationPath({ projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(observationPath), { recursive: true });
+      const events = [
+        {
+          ts: '2026-05-01T00:00:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'error',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:30Z',
+          event: 'tool_start',
+          tool: 'Edit',
+          session: 's1',
+          project_id: projectId,
+        },
+        {
+          ts: '2026-05-01T00:00:45Z',
+          event: 'tool_start',
+          tool: 'Bash',
+          session: 's1',
+          project_id: projectId,
+          semantic: { command_kind: 'git', payload_saved: false },
+        },
+        {
+          ts: '2026-05-01T00:01:00Z',
+          event: 'tool_end',
+          tool: 'Bash',
+          outcome: 'success',
+          session: 's1',
+          project_id: projectId,
+        },
+      ];
+      fs.writeFileSync(
+        observationPath,
+        `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
+        'utf8',
+      );
+      const result = learning.analyzeOutcomeRepair({ scope: 'project', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+
+    it('does not merge same session ids across projects in global outcome learning', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      const root = path.join(homeDir, '.arcforge', 'observations');
+      const alphaPath = path.join(root, 'alpha', 'observations.jsonl');
+      const betaPath = path.join(root, 'beta', 'observations.jsonl');
+      fs.mkdirSync(path.dirname(alphaPath), { recursive: true });
+      fs.mkdirSync(path.dirname(betaPath), { recursive: true });
+      fs.writeFileSync(
+        alphaPath,
+        `${[
+          {
+            ts: '2026-05-01T00:00:00Z',
+            event: 'tool_end',
+            tool: 'Bash',
+            outcome: 'error',
+            session: 'same',
+          },
+          { ts: '2026-05-01T00:00:30Z', event: 'tool_start', tool: 'Edit', session: 'same' },
+        ]
+          .map((e) => JSON.stringify(e))
+          .join('\n')}\n`,
+        'utf8',
+      );
+      fs.writeFileSync(
+        betaPath,
+        `${[
+          {
+            ts: '2026-05-01T00:00:45Z',
+            event: 'tool_start',
+            tool: 'Bash',
+            session: 'same',
+            semantic: { command_kind: 'test', payload_saved: false },
+          },
+          {
+            ts: '2026-05-01T00:01:00Z',
+            event: 'tool_end',
+            tool: 'Bash',
+            outcome: 'success',
+            session: 'same',
+          },
+        ]
+          .map((e) => JSON.stringify(e))
+          .join('\n')}\n`,
+        'utf8',
+      );
+
+      const result = learning.analyzeOutcomeRepair({ scope: 'global', projectRoot, homeDir });
+      expect(result.emitted).toBe(0);
+    });
+  });
+
+  describe('transcript habit extraction', () => {
+    function writeTranscript(lines) {
+      const transcriptPath = path.join(testDir, 'transcript.jsonl');
+      fs.writeFileSync(transcriptPath, lines.map((l) => JSON.stringify(l)).join('\n'), 'utf8');
+      return transcriptPath;
+    }
+
+    it('extracts privacy-safe instinct candidates from corrections in user messages', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: "don't push to main without review" } },
+        { type: 'assistant', message: { content: [{ type: 'text', text: 'understood' }] } },
+        { type: 'user', message: { content: 'always run tests before commit' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-x',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+        now: '2026-05-01T00:00:00Z',
+      });
+
+      expect(result.emitted).toBe(2);
+      const types = result.candidates.map((c) => c.artifact_type);
+      expect(types).toEqual(['instinct', 'instinct']);
+      const reasons = result.candidates.flatMap((c) => c.evidence.map((item) => item.reason));
+      // Evidence reasons stay bounded — no full text echoes.
+      for (const r of reasons) expect(r.length).toBeLessThan(220);
+      for (const c of result.candidates) {
+        expect(c.evidence[0].source).toBe('transcript');
+        expect(c.status).toBe('pending');
+      }
+    });
+
+    it('emits a repo_convention_patch candidate for "from now on" preferences', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: 'from now on, prefer kebab-case for filenames' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-x',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(result.emitted).toBe(1);
+      expect(result.candidates[0].artifact_type).toBe('repo_convention_patch');
+      expect(result.candidates[0].status).toBe('pending');
+    });
+
+    it('extracts Traditional Chinese correction and preference habits', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: '不要自動重啟 Hermes gateway' } },
+        { type: 'user', message: { content: '以後 repo convention 要先提出 AGENTS.md patch' } },
+      ]);
+
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 'session-zh',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(result.emitted).toBe(2);
+      expect(result.candidates.map((c) => c.artifact_type)).toEqual([
+        'instinct',
+        'repo_convention_patch',
+      ]);
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('Hermes gateway');
+      expect(serialized).not.toContain('AGENTS.md patch');
+    });
+
+    it('does not persist raw transcript text in candidate evidence', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const secret = "don't leak super-secret-token-abcdef123";
+      const transcriptPath = writeTranscript([{ type: 'user', message: { content: secret } }]);
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('super-secret-token-abcdef123');
+      const contentHash = crypto
+        .createHash('sha256')
+        .update('leak super-secret-token-abcdef123')
+        .digest('hex')
+        .slice(0, 8);
+      expect(serialized).not.toContain(contentHash);
+      expect(result.candidates[0].id).toMatch(
+        /arc-learned-project-habit-instinct-habit-[a-f0-9]{8}$/,
+      );
+      expect(result.candidates[0].pattern_key).toMatch(/^transcript:instinct:habit-[a-f0-9]{8}$/);
+    });
+
+    it('does not derive transcript candidate identifiers from captured text', () => {
+      const learning = require('../../scripts/lib/learning');
+      learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      const firstTranscript = writeTranscript([
+        { type: 'user', message: { content: "don't expose alpha-secret-value" } },
+      ]);
+      const first = learning.analyzeTranscriptHabits({
+        transcriptPath: firstTranscript,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      fs.rmSync(path.join(projectRoot, '.arcforge', 'learning', 'candidates'), {
+        recursive: true,
+        force: true,
+      });
+      const secondTranscript = writeTranscript([
+        { type: 'user', message: { content: "don't expose beta-secret-value" } },
+      ]);
+      const second = learning.analyzeTranscriptHabits({
+        transcriptPath: secondTranscript,
+        sessionId: 's2',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+
+      expect(first.candidates[0].id).toBe(second.candidates[0].id);
+      expect(first.candidates[0].name).toBe(second.candidates[0].name);
+      expect(first.candidates[0].pattern_key).toBe(second.candidates[0].pattern_key);
+    });
+
+    it('does nothing when learning is disabled', () => {
+      const learning = require('../../scripts/lib/learning');
+      const transcriptPath = writeTranscript([
+        { type: 'user', message: { content: 'never use arrow functions' } },
+      ]);
+      const result = learning.analyzeTranscriptHabits({
+        transcriptPath,
+        sessionId: 's1',
+        scope: 'project',
+        projectRoot,
+        homeDir,
+      });
+      expect(result.enabled).toBe(false);
+      expect(result.emitted).toBe(0);
+    });
   });
 });

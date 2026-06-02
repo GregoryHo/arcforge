@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ArcForge — Candidate Review Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #111;
+        --muted: #666;
+        --card-bg: #fff;
+        --border: #e0e0e0;
+        --accent: #0b6cff;
+        --danger: #b32424;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161616;
+          --fg: #f1f1f1;
+          --muted: #a8a8a8;
+          --card-bg: #1f1f1f;
+          --border: #2c2c2c;
+          --accent: #5aa6ff;
+          --danger: #ff6f6f;
+        }
+      }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+      header { padding: 24px 32px 8px; border-bottom: 1px solid var(--border); }
+      header h1 { margin: 0; font-size: 20px; }
+      header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+      .toolbar { padding: 12px 32px; display: flex; gap: 12px; align-items: center; }
+      .toolbar button { font: inherit; padding: 6px 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--fg); border-radius: 6px; cursor: pointer; }
+      main { padding: 16px 32px 64px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+      .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+      .card .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+      .card .name { font-weight: 600; font-size: 15px; }
+      .card .summary { font-size: 14px; line-height: 1.4; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .actions button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--card-bg); color: var(--fg); cursor: pointer; }
+      .actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+      .actions button.danger { color: var(--danger); }
+      .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 48px 0; }
+      .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--border); color: var(--fg); font-size: 11px; }
+      .chip { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+      .chip-low_signal { background: #ffe0e0; color: #b32424; }
+      .chip-medium_signal { background: #fff3cd; color: #856404; }
+      .chip-high_signal { background: #d4edda; color: #155724; }
+      @media (prefers-color-scheme: dark) {
+        .chip-low_signal { background: #4a1a1a; color: #ff8888; }
+        .chip-medium_signal { background: #4a3a00; color: #ffd966; }
+        .chip-high_signal { background: #1a3a1a; color: #66bb66; }
+      }
+      .evidence-counts { font-size: 11px; color: var(--muted); }
+      .note-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+      .note-badge { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: var(--border); }
+      .detail-panel { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+      .detail-section { font-size: 13px; }
+      .detail-section summary { cursor: pointer; font-weight: 600; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      .evidence-summary-item { padding: 6px 0; border-bottom: 1px solid var(--border); }
+      .evidence-summary-item:last-child { border-bottom: none; }
+      .llm-block, .lifecycle-block { background: var(--border); border-radius: 6px; padding: 8px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ArcForge candidate review</h1>
+      <p>Review learning candidates and use the action buttons to approve, dismiss, or promote them.</p>
+    </header>
+    <div class="toolbar">
+      <button id="refresh">Refresh</button>
+      <span id="counts" class="badge"></span>
+    </div>
+    <main id="cards"></main>
+    <script>
+      const DASHBOARD_TOKEN = '__ARCFORGE_DASHBOARD_TOKEN__';
+      const cardsEl = document.getElementById('cards');
+      const refreshEl = document.getElementById('refresh');
+      const countsEl = document.getElementById('counts');
+
+      const ACTION_LABELS = { dismiss: 'Dismiss', approve: 'Approve', materialize: 'Materialize', activate: 'Activate', deactivate: 'Deactivate', promote: 'Promote', evolve: 'Evolve' };
+      const ACTION_AVAILABLE_FROM = {
+        dismiss: ['pending_review', 'needs_more_evidence'],
+        approve: ['pending_review'],
+        materialize: ['approved', 'deactivated'],
+        activate: ['materialized', 'deactivated'],
+        deactivate: ['activated'],
+        promote: ['pending_review', 'approved'],
+        evolve: ['pending_review', 'approved'],
+      };
+
+      function availableActions(lifecycleStatus) {
+        return Object.keys(ACTION_AVAILABLE_FROM).filter((a) => ACTION_AVAILABLE_FROM[a].includes(lifecycleStatus));
+      }
+
+      function createCard(c) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const typeEl = document.createElement('span');
+        typeEl.textContent = c.artifact_type || 'candidate';
+        const statusEl = document.createElement('span');
+        statusEl.className = 'badge';
+        statusEl.textContent = c.lifecycle_status || 'unknown';
+        meta.appendChild(typeEl);
+        meta.appendChild(statusEl);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'name';
+        nameEl.textContent = c.name || '(unnamed)';
+
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'summary';
+        summaryEl.textContent = c.summary || '';
+
+        // evidence_quality_chip pill
+        const chipEl = document.createElement('div');
+        if (c.evidence_quality_chip) {
+          const pill = document.createElement('span');
+          pill.className = 'chip chip-' + c.evidence_quality_chip;
+          pill.textContent = c.evidence_quality_chip.replace('_signal', '') + ' signal';
+          chipEl.appendChild(pill);
+        }
+
+        // evidence_counts breakdown
+        const evidenceEl = document.createElement('div');
+        evidenceEl.className = 'evidence-counts';
+        const counts = c.evidence_counts || {};
+        const total = counts.total || 0;
+        const byType = counts.by_type || {};
+        const byTypeStr = Object.entries(byType).map(([t, n]) => t + ':' + n).join(', ');
+        evidenceEl.textContent = 'Evidence: ' + total + (byTypeStr ? ' (' + byTypeStr + ')' : '') + ' — quality: ' + (c.evidence_quality || 'unknown');
+
+        // risk/uncertainty note badges
+        const noteBadgesEl = document.createElement('div');
+        noteBadgesEl.className = 'note-badges';
+        if ((c.risk_note_count || 0) > 0) {
+          const rb = document.createElement('span');
+          rb.className = 'note-badge';
+          rb.title = 'risk_note_count';
+          rb.textContent = c.risk_note_count + ' risk';
+          noteBadgesEl.appendChild(rb);
+        }
+        if ((c.uncertainty_note_count || 0) > 0) {
+          const ub = document.createElement('span');
+          ub.className = 'note-badge';
+          ub.title = 'uncertainty_note_count';
+          ub.textContent = c.uncertainty_note_count + ' uncertain';
+          noteBadgesEl.appendChild(ub);
+        }
+
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'actions';
+        const acts = availableActions(c.lifecycle_status);
+        for (const action of acts) {
+          const btn = document.createElement('button');
+          btn.dataset.act = action;
+          btn.textContent = ACTION_LABELS[action] || action;
+          if (action === 'approve' || action === 'promote') btn.className = 'primary';
+          if (action === 'dismiss') btn.className = 'danger';
+          btn.addEventListener('click', () => performAction(c.candidate_id, action, btn));
+          actionsEl.appendChild(btn);
+        }
+
+        card.appendChild(meta);
+        card.appendChild(nameEl);
+        card.appendChild(summaryEl);
+        card.appendChild(chipEl);
+        card.appendChild(evidenceEl);
+        card.appendChild(noteBadgesEl);
+        // relationships link
+        if (c.relationships) {
+          const relEl = document.createElement('div');
+          relEl.style.fontSize = '11px';
+          relEl.style.color = 'var(--muted)';
+          const relKeys = Object.keys(c.relationships).join(', ');
+          relEl.textContent = 'Related: ' + relKeys;
+          card.appendChild(relEl);
+        }
+        card.appendChild(actionsEl);
+        // Detail view (collapsible)
+        card.appendChild(createDetailTrigger(c));
+        return card;
+      }
+
+      function createDetailTrigger(c) {
+        const container = document.createElement('div');
+        container.style.marginTop = '4px';
+        const btn = document.createElement('button');
+        btn.textContent = 'Details';
+        btn.style.fontSize = '11px';
+        btn.addEventListener('click', async () => {
+          const existing = container.querySelector('.detail-panel');
+          if (existing) { existing.remove(); return; }
+          try {
+            const res = await fetch('/api/candidates/' + encodeURIComponent(c.candidate_id));
+            const detail = await res.json();
+            container.appendChild(renderDetailPanel(detail));
+          } catch (e) {
+            const errEl = document.createElement('div');
+            errEl.textContent = 'Detail load failed';
+            container.appendChild(errEl);
+          }
+        });
+        container.appendChild(btn);
+        return container;
+      }
+
+      function renderDetailPanel(d) {
+        const panel = document.createElement('div');
+        panel.className = 'detail-panel';
+
+        // Helper: append a labeled section with content; uses textContent (XSS-safe)
+        function appendLabeledSection(parent, className, label, contentBuilder) {
+          const el = document.createElement('div');
+          el.className = className;
+          const strong = document.createElement('strong');
+          strong.textContent = label;
+          el.appendChild(strong);
+          contentBuilder(el);
+          parent.appendChild(el);
+        }
+
+        // evidence_summaries
+        if (d.evidence_summaries && d.evidence_summaries.length > 0) {
+          const details = document.createElement('details');
+          details.className = 'detail-section';
+          const summary = document.createElement('summary');
+          summary.textContent = 'Evidence summaries (' + d.evidence_summaries.length + ')';
+          details.appendChild(summary);
+          for (const ev of d.evidence_summaries) {
+            const item = document.createElement('div');
+            item.className = 'evidence-summary-item';
+            const strong = document.createElement('strong');
+            strong.textContent = ev.evidence_type || '';
+            item.appendChild(strong);
+            item.appendChild(document.createTextNode(': ' + (ev.summary || '')));
+            if (ev.relevance) {
+              item.appendChild(document.createElement('br'));
+              const em = document.createElement('em');
+              em.textContent = ev.relevance;
+              item.appendChild(em);
+            }
+            details.appendChild(item);
+          }
+          panel.appendChild(details);
+        }
+
+        // llm_assessment block
+        if (d.llm_assessment) {
+          appendLabeledSection(panel, 'llm-block detail-section', 'LLM assessment', (el) => {
+            const conf = d.llm_assessment.llm_confidence || 'unknown';
+            const risks = (d.llm_assessment.risk_notes || []).join('; ');
+            const unc = (d.llm_assessment.uncertainty_notes || []).join('; ');
+            el.appendChild(document.createTextNode(': confidence=' + conf));
+            if (risks) {
+              el.appendChild(document.createElement('br'));
+              el.appendChild(document.createTextNode('Risks: ' + risks));
+            }
+            if (unc) {
+              el.appendChild(document.createElement('br'));
+              el.appendChild(document.createTextNode('Uncertain: ' + unc));
+            }
+          });
+        }
+
+        // materialization block — JSON stringified, textContent (no HTML interpretation)
+        if (d.materialization) {
+          appendLabeledSection(panel, 'lifecycle-block detail-section', 'Materialization', (el) => {
+            el.appendChild(document.createTextNode(': ' + JSON.stringify(d.materialization)));
+          });
+        }
+
+        // activation block — same, XSS-safe
+        if (d.activation) {
+          appendLabeledSection(panel, 'lifecycle-block detail-section', 'Activation', (el) => {
+            el.appendChild(document.createTextNode(': ' + JSON.stringify(d.activation)));
+          });
+        }
+
+        return panel;
+      }
+
+      function render(model) {
+        while (cardsEl.firstChild) cardsEl.removeChild(cardsEl.firstChild);
+        countsEl.textContent = model.count + ' candidate' + (model.count === 1 ? '' : 's');
+        if (!model.candidates || model.candidates.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No candidates to review. The daemon will surface new ones as it runs.';
+          cardsEl.appendChild(empty);
+          return;
+        }
+        for (const c of model.candidates) {
+          cardsEl.appendChild(createCard(c));
+        }
+      }
+
+      function renderError(message) {
+        while (cardsEl.firstChild) cardsEl.removeChild(cardsEl.firstChild);
+        countsEl.textContent = 'Error';
+        const errEl = document.createElement('div');
+        errEl.className = 'empty';
+        errEl.textContent = message;
+        cardsEl.appendChild(errEl);
+      }
+
+      async function load() {
+        try {
+          const res = await fetch('/api/candidates');
+          const model = await res.json();
+          if (!res.ok) throw new Error(model.error || 'Failed to load candidates');
+          render(model);
+        } catch (e) {
+          renderError('Could not load candidates. Refresh or restart the dashboard.');
+        }
+      }
+
+      async function performAction(candidateId, action, button) {
+        if (button) button.disabled = true;
+        try {
+          const res = await fetch('/api/candidates/' + encodeURIComponent(candidateId) + '/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-ArcForge-Dashboard': '1', 'X-ArcForge-Dashboard-Token': DASHBOARD_TOKEN },
+            body: JSON.stringify({ action: action }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.accepted) { alert(data.error || data.reason || 'Action failed'); }
+        } catch (e) {
+          alert('Action failed');
+        } finally {
+          await load();
+        }
+      }
+
+      refreshEl.addEventListener('click', load);
+      load();
+    </script>
+  </body>
+</html>

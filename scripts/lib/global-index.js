@@ -130,26 +130,14 @@ function promoteToGlobal(sourcePath, globalDir, indexPath) {
   return targetPath;
 }
 
-/**
- * CLI entry point for bubble-up checks
- * Usage: node global-index.js --check-promote --project <project-name>
- */
+// CLI --check-promote is retired; promotion now requires explicit dashboard [Promote].
 function main() {
-  const args = process.argv.slice(2);
-
-  if (args.includes('--check-promote')) {
-    const projectIdx = args.indexOf('--project');
-    if (projectIdx === -1 || !args[projectIdx + 1]) {
-      console.error('Usage: node global-index.js --check-promote --project <project-name>');
-      process.exit(1);
-    }
-
-    const project = args[projectIdx + 1];
-    checkBubbleUpForProject(project);
-  } else {
-    console.error('Usage: node global-index.js --check-promote --project <project-name>');
-    process.exit(1);
-  }
+  console.error(
+    'global-index.js --check-promote is deprecated. Auto-promotion of project ' +
+      'instincts to global has been retired. Use the dashboard [Promote] action ' +
+      'instead: arc learn dashboard',
+  );
+  process.exit(1);
 }
 
 /**

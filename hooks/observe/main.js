@@ -10,6 +10,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 
 const {
   getProjectName,
@@ -23,11 +24,13 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
+const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
 const {
-  getProjectId,
-  isLearningEnabled,
-  triggerAutomaticLearning,
-} = require('../../scripts/lib/learning');
+  sanitizeObservationPayload,
+  EVIDENCE_STATUS,
+} = require('../../scripts/lib/sanitize-observation');
+// summarizeToolInput is available for read-time consumers via:
+// require('../../scripts/lib/learning-observation-view').summarizeToolInput
 
 // ─────────────────────────────────────────────
 // Configuration
@@ -38,6 +41,8 @@ const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SIGNAL_COOLDOWN_MS = 30000; // 30 seconds between SIGUSR1 signals
 const SIGNAL_TIMESTAMP_FILE = getObserverSignalFile();
+const LAZY_START_THRESHOLD = Number(process.env.ARCFORGE_LAZY_START_THRESHOLD) || 50;
+const SKIP_SPAWN = process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1';
 
 /**
  * Get observations archive directory for a project.
@@ -48,11 +53,33 @@ function getArchiveDir(project) {
 
 const getPidFile = getObserverPidFile;
 
+// Eval harness isolation — observations from eval trial dirs are not real user activity.
+const EVAL_TRIAL_SEGMENT_RE = /\/\.eval-trials\//;
+const EVAL_TRIAL_SUFFIX_RE = /-t\d+-[A-Za-z0-9]{6}$/;
+
+// User-configured skip list — parsed once at module load (hook is a fresh process per event).
+const USER_SKIP_ENTRIES = (process.env.ARCFORGE_OBSERVE_SKIP_PATHS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isSkippedPath(projectRoot) {
+  if (EVAL_TRIAL_SEGMENT_RE.test(projectRoot)) return true;
+  if (EVAL_TRIAL_SUFFIX_RE.test(projectRoot)) return true;
+  for (const entry of USER_SKIP_ENTRIES) {
+    if (projectRoot.includes(entry)) return true;
+  }
+  return false;
+}
+
 function shouldObserve({
   projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   homeDir,
 } = {}) {
   try {
+    if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return false;
+    if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return false;
+    if (isSkippedPath(projectRoot)) return false;
     return (
       isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
       isLearningEnabled({ scope: 'global', projectRoot, homeDir })
@@ -65,26 +92,6 @@ function shouldObserve({
 // ─────────────────────────────────────────────
 // Core Functions
 // ─────────────────────────────────────────────
-
-/**
- * Truncate string to max length with indicator.
- */
-function truncate(str, maxLen) {
-  if (!str || str.length <= maxLen) return str || '';
-  return `${str.substring(0, maxLen)}...[truncated]`;
-}
-
-function redactObservationText(value) {
-  return String(value || '')
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*"[^"]*"/gi, '$1="[REDACTED]"')
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*'[^']*'/gi, "$1='[REDACTED]'")
-    .replace(/\b(api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*[^\s,}]+/gi, '$1=[REDACTED]')
-    .replace(/\bAuthorization\s*:\s*Bearer\s+[^\s,}]+/gi, 'Authorization: Bearer [REDACTED]');
-}
-
-function sanitizeObservationPayload(value, maxLen) {
-  return truncate(redactObservationText(value), maxLen);
-}
 
 /**
  * Extract the skill name from a Skill tool invocation. Returns null when the
@@ -130,12 +137,165 @@ function responseByteSize(toolResponse) {
   }
 }
 
-function buildObservedToolInput(toolName, toolInput) {
-  if (!toolInput || typeof toolInput !== 'object') return toolInput;
-  if (toolName !== 'Skill') return toolInput;
-  const skillName = extractSkillName(toolName, toolInput);
-  return skillName ? { skill: skillName } : {};
+// ---------------------------------------------------------------------------
+// Per-tool collection contract (Layer 2 — SafeEvidencePatch)
+//
+// Returns a SafeEvidencePatch object. The patch is spread directly into the
+// observation record — no nested `evidence` key.
+//
+// evidence_status values:
+//   "present"                 — safe evidence fields were added
+//   "omitted_no_input"        — no tool_input present
+//   "omitted_unsupported_tool"— tool class not in the allowlist
+//   "omitted_safety"          — payload existed but post-sanitize result is empty
+//
+// Fail-closed: raw fallback is forbidden. When a field cannot be proven safe,
+// it is omitted. An empty post-sanitize result becomes omitted_safety.
+// ---------------------------------------------------------------------------
+
+/** Tool classes in the Layer 2 allowlist. */
+const SUPPORTED_TOOLS = new Set([
+  'Bash',
+  'Read',
+  'Edit',
+  'Write',
+  'Grep',
+  'Glob',
+  'NotebookEdit',
+  'Skill',
+  'WebFetch',
+  'WebSearch',
+]);
+
+/**
+ * Build a SafeEvidencePatch from a tool name and (optional) raw tool_input.
+ * The returned object is spread into the observation record alongside the
+ * Layer 1 event skeleton fields.
+ *
+ * @param {string} toolName
+ * @param {object|null|undefined} toolInput
+ * @returns {object} SafeEvidencePatch
+ */
+// Helper: classify the omit reason — empty raw input is omitted_no_input,
+// non-empty raw that the sanitizer strips entirely is omitted_safety. Per
+// Layer 2 spec these are semantically distinct and must not be conflated.
+function classifyOmission(raw, sanitized) {
+  if (!raw || !raw.trim()) return EVIDENCE_STATUS.OMITTED_NO_INPUT;
+  if (!sanitized.trim()) return EVIDENCE_STATUS.OMITTED_SAFETY;
+  return null;
 }
+
+function buildObservedEvidence(toolName, toolInput) {
+  if (!toolInput || typeof toolInput !== 'object') {
+    return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
+  }
+
+  if (!SUPPORTED_TOOLS.has(toolName)) {
+    return { evidence_status: EVIDENCE_STATUS.OMITTED_UNSUPPORTED_TOOL };
+  }
+
+  switch (toolName) {
+    case 'Bash': {
+      const raw = typeof toolInput.command === 'string' ? toolInput.command : '';
+      const sanitized = sanitizeObservationPayload(raw, MAX_INPUT_LENGTH);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return {
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        input: sanitized,
+        operation_kind: 'shell',
+      };
+    }
+    case 'Read': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'read' };
+    }
+    case 'Edit': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'edit' };
+    }
+    case 'Write': {
+      const raw = typeof toolInput.file_path === 'string' ? toolInput.file_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'write' };
+    }
+    case 'Grep': {
+      const patternRaw = typeof toolInput.pattern === 'string' ? toolInput.pattern : '';
+      const pathRaw = typeof toolInput.path === 'string' ? toolInput.path : '';
+      const pattern = sanitizeObservationPayload(patternRaw, 512);
+      const pathVal = sanitizeObservationPayload(pathRaw, 1024);
+      const noRaw = !patternRaw.trim() && !pathRaw.trim();
+      const noSanitized = !pattern.trim() && !pathVal.trim();
+      if (noRaw) return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
+      if (noSanitized) return { evidence_status: EVIDENCE_STATUS.OMITTED_SAFETY };
+      const patch = { evidence_status: EVIDENCE_STATUS.PRESENT, operation_kind: 'search' };
+      if (pattern.trim()) patch.pattern = pattern;
+      if (pathVal.trim()) patch.path = pathVal;
+      return patch;
+    }
+    case 'Glob': {
+      const raw = typeof toolInput.pattern === 'string' ? toolInput.pattern : '';
+      const sanitized = sanitizeObservationPayload(raw, 512);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, glob: sanitized, operation_kind: 'glob' };
+    }
+    case 'NotebookEdit': {
+      const raw = typeof toolInput.notebook_path === 'string' ? toolInput.notebook_path : '';
+      const sanitized = sanitizeObservationPayload(raw, 1024);
+      const omit = classifyOmission(raw, sanitized);
+      if (omit) return { evidence_status: omit };
+      return { evidence_status: EVIDENCE_STATUS.PRESENT, path: sanitized, operation_kind: 'edit' };
+    }
+    case 'Skill': {
+      const skillName = extractSkillName(toolName, toolInput);
+      if (!skillName) return { evidence_status: EVIDENCE_STATUS.OMITTED_NO_INPUT };
+      // Skill args are never persisted.
+      return {
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        skill: skillName,
+        operation_kind: 'skill',
+      };
+    }
+    case 'WebFetch':
+    case 'WebSearch': {
+      const urlRaw =
+        typeof toolInput.url === 'string'
+          ? toolInput.url
+          : typeof toolInput.query === 'string'
+            ? toolInput.query
+            : '';
+      const sanitized = sanitizeObservationPayload(urlRaw, 1024);
+      const omit = classifyOmission(urlRaw, sanitized);
+      if (omit) return { evidence_status: omit };
+      let domain = '';
+      try {
+        domain = new URL(sanitized).hostname;
+      } catch {
+        domain = sanitized.split('/')[0] || '';
+      }
+      return {
+        evidence_status: EVIDENCE_STATUS.PRESENT,
+        url: sanitized,
+        ...(domain ? { domain } : {}),
+        operation_kind: 'network',
+      };
+    }
+    default:
+      return { evidence_status: EVIDENCE_STATUS.OMITTED_UNSUPPORTED_TOOL };
+  }
+}
+
+// summarizeToolInput is now a read-time helper imported from
+// scripts/lib/learning-observation-view (Decision 4 — not persisted).
 
 /**
  * Archive observations file if it exceeds MAX_FILE_SIZE.
@@ -183,13 +343,35 @@ function signalDaemon() {
   }
 }
 
-function runAutomaticLearningTrigger(
-  projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd(),
-) {
+/**
+ * Spawn the observer daemon if observations >= LAZY_START_THRESHOLD and daemon not running.
+ * Non-blocking, silent catch — never throws. Returns a status string for testability:
+ *   'pid-exists' | 'no-file' | 'below-threshold' | 'no-spawn-env' | 'spawned' | 'error'
+ */
+function spawnDaemonIfNeeded(obsPath) {
   try {
-    triggerAutomaticLearning({ projectRoot });
+    const pidFile = getPidFile();
+    if (fs.existsSync(pidFile)) return 'pid-exists';
+    if (!fs.existsSync(obsPath)) return 'no-file';
+
+    const content = fs.readFileSync(obsPath, 'utf-8');
+    const lineCount = content.split('\n').filter((l) => l.trim()).length;
+    if (lineCount < LAZY_START_THRESHOLD) return 'below-threshold';
+
+    if (SKIP_SPAWN) return 'no-spawn-env';
+
+    const daemonScript = path.resolve(
+      __dirname,
+      '../../skills/arc-observing/scripts/observer-daemon.sh',
+    );
+    const child = spawn('bash', [daemonScript, 'start'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    return 'spawned';
   } catch {
-    // Learning analysis is best-effort and must never block tool execution.
+    return 'error';
   }
 }
 
@@ -221,28 +403,41 @@ function main() {
     const toolName = input.tool_name || input.tool || 'unknown';
     const event = phase === 'pre' ? 'tool_start' : 'tool_end';
 
-    // Build observation entry
+    // Build observation entry — Layer 1 ObservationSkeleton per
+    // docs/plans/references/learning-curator-schema/layer-1-observation-collection.md.
     const observation = {
+      schema_version: 1,
       ts: new Date().toISOString(),
       event,
       tool: toolName,
       session: sessionId,
       project,
       project_id: getProjectId(process.env.CLAUDE_PROJECT_DIR || process.cwd()),
+      source: {
+        collector: 'hooks/observe/main.js',
+        phase,
+      },
     };
 
-    // Coarse skill-usage signal: when the call is a Skill invocation, record
-    // only the skill name. This lets us answer "are non-learning skills used?"
-    // without storing the args payload.
+    // Coarse skill-usage shortcut: record skill name at top level for both
+    // pre and post phases when the tool is Skill. This preserves the backward-
+    // compatible signal "which skills were used this session?" without storing args.
     const skillName = extractSkillName(toolName, input.tool_input);
     if (skillName) observation.skill = skillName;
 
-    // Add input/output based on phase
-    if (phase === 'pre' && input.tool_input) {
-      const observedInput = buildObservedToolInput(toolName, input.tool_input);
-      const inputStr =
-        typeof observedInput === 'string' ? observedInput : JSON.stringify(observedInput);
-      observation.input = sanitizeObservationPayload(inputStr, MAX_INPUT_LENGTH);
+    // Layer 2: build SafeEvidencePatch and spread into observation record.
+    // Decision 4: no semantic field is persisted; summarizeToolInput is read-time only.
+    // Decision 5: all evidence fields pass through the shared sanitizer.
+    if (phase === 'pre') {
+      try {
+        const patch = buildObservedEvidence(toolName, input.tool_input);
+        Object.assign(observation, patch);
+      } catch {
+        // Best-effort: if buildObservedEvidence throws (e.g. unexpected input
+        // shape from a future tool), label as no-input rather than safety so
+        // we don't pollute downstream signal with a fake safety event.
+        observation.evidence_status = EVIDENCE_STATUS.OMITTED_NO_INPUT;
+      }
     }
 
     // PostToolUse uses `tool_response` per the Claude hook schema; older
@@ -267,10 +462,11 @@ function main() {
     // Append observation
     fs.appendFileSync(obsPath, `${JSON.stringify(observation)}\n`, 'utf-8');
 
-    // Signal daemon and run the lightweight automatic analyzer. The analyzer only
-    // appends pending candidates; it never materializes or activates artifacts.
+    // Lazy-start daemon when enough observations have accumulated.
+    spawnDaemonIfNeeded(obsPath);
+
+    // Wake the LLM-curation daemon; statistical auto-trigger retired (Slice A).
     signalDaemon();
-    runAutomaticLearningTrigger(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   } catch {
     // Non-blocking — never fail the hook
   }
@@ -283,17 +479,15 @@ if (require.main === module) {
 }
 
 module.exports = {
-  truncate,
-  redactObservationText,
-  sanitizeObservationPayload,
   extractSkillName,
   classifyOutcome,
   responseByteSize,
-  buildObservedToolInput,
+  buildObservedEvidence,
   getArchiveDir,
   getPidFile,
   shouldObserve,
-  runAutomaticLearningTrigger,
+  spawnDaemonIfNeeded,
   MAX_INPUT_LENGTH,
   MAX_OUTPUT_LENGTH,
+  LAZY_START_THRESHOLD,
 };

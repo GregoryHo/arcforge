@@ -117,6 +117,18 @@ function atomicWriteFile(destPath, content, options = { encoding: 'utf8' }) {
 }
 
 /**
+ * SHA-256 hash of `text`, truncated to `len` hex characters. Shared helper
+ * for content-addressed IDs (candidate_id, batch_id, event_id, etc.).
+ */
+function sha256Truncated(text, len = 12) {
+  return require('node:crypto')
+    .createHash('sha256')
+    .update(String(text))
+    .digest('hex')
+    .slice(0, len);
+}
+
+/**
  * Read and parse a JSON file. Returns the fallback on any read or parse
  * failure (missing file, malformed JSON). Use for optional state files
  * where "no file yet" is a normal condition.
@@ -628,6 +640,7 @@ module.exports = {
   readFileSafe,
   writeFileSafe,
   atomicWriteFile,
+  sha256Truncated,
   readJsonFile,
   writeJsonFile,
   getTempDir,
