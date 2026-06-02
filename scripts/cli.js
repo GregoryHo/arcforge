@@ -327,8 +327,8 @@ COMMANDS:
                                      Explicitly enable learning for project or global scope.
   learn disable --project|--global [--json]
                                      Disable new learning observations/analyzer runs for a scope.
-  learn analyze --project|--global [--json]
-                                     Analyze enabled observations and queue candidate learnings.
+  learn analyze                      DEPRECATED — the statistical analyzer was retired;
+                                     use 'learn dashboard' for candidate review.
   learn inbox --project|--global [--json]
                                      Compact grouped review queue with next commands.
   learn review --project|--global [--json]
@@ -348,7 +348,7 @@ COMMANDS:
   learn dashboard [--port N]
                                      Start a localhost review dashboard for learning suggestions
                                      (default port: 3334). User-friendly alternative to the
-                                     analyze/inbox/inspect/accept/activate CLI flow.
+                                     inbox/inspect/accept/activate CLI flow.
 
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
