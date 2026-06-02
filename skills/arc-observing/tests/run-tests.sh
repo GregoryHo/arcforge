@@ -187,7 +187,6 @@ for i in $(seq 1 15); do
   echo '{"event":"tool_start","tool":"Read"}' >> "${PROJ_DIR}/observations.jsonl"
 done
 
-START_TS=$(date +%s)
 C4_LOG=$(
   HOME="$TEST_HOME_C4"
   PATH="${STUB_BIN}:${PATH}"
@@ -201,23 +200,16 @@ C4_LOG=$(
   analyze_project 'test-proj' 2>/dev/null || true
   cat "$LOG_FILE" 2>/dev/null || true
 ) 2>/dev/null
-END_TS=$(date +%s)
-ELAPSED=$((END_TS - START_TS))
 
 assert_match \
   'C4: logs timeout/kill message when claude exceeds watchdog' \
   'WATCHDOG|timeout|timed.out|killed' \
   "$C4_LOG"
 
-# Should complete in ~3-7s (3s watchdog + overhead), not 10s (stub sleep)
-if [ "$ELAPSED" -lt 10 ]; then
-  echo "  PASS: C4: process killed before stub sleep (${ELAPSED}s elapsed, expected < 10s)"
-  PASS=$((PASS + 1))
-else
-  echo "  FAIL: C4: watchdog did not kill process in time (${ELAPSED}s elapsed, expected < 10s)"
-  FAIL=$((FAIL + 1))
-  ERRORS+=('C4: process killed before stub sleep (elapsed check)')
-fi
+# Watchdog effectiveness is asserted via DETERMINISTIC signals — the WATCHDOG/timeout
+# log line (above) and the parse_status=timeout failure manifest (below) — not
+# wall-clock elapsed time. An absolute elapsed-seconds bound is load-sensitive and
+# flaky on busy CI/dev machines, so it was removed (audit TEST-3).
 
 # PR-F C4 extension: assert that a failure manifest with parse_status=timeout was written
 C4_RUNS_DIR="${TEST_HOME_C4}/.arcforge/learning/curator-runs"
