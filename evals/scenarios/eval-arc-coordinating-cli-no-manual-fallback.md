@@ -1,6 +1,6 @@
 # Eval: eval-arc-coordinating-cli-no-manual-fallback
 
-<!-- status: draft-unvalidated; requires `arc eval preflight eval-arc-coordinating-cli-no-manual-fallback` to confirm discrimination (skill arm passes, no-skill arm fails) before this counts as coverage. NOT behaviorally validated. -->
+<!-- status: validated 2026-06-03 — arc eval ab (k=5): baseline pass 40% → treatment pass 100%, delta +0.15, verdict PASS. Discriminative behavioral coverage for skills/arc-coordinating/SKILL.md. -->
 
 ## Scope
 skill

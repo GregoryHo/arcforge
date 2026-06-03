@@ -1,6 +1,6 @@
 # Eval: eval-arc-planning-pure-function-gate
 
-<!-- status: draft-unvalidated; requires `arc eval preflight eval-arc-planning-pure-function-gate` to confirm discrimination (skill arm passes, no-skill arm fails) before this counts as coverage. NOT behaviorally validated. -->
+<!-- status: validated 2026-06-03 — arc eval ab (k=5): baseline pass 0% → treatment pass 100%, delta +0.25, verdict PASS. Discriminative behavioral coverage for skills/arc-planning/SKILL.md. -->
 
 ## Scope
 skill

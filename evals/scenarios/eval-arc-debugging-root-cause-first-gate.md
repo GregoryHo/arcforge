@@ -1,6 +1,6 @@
 # Eval: eval-arc-debugging-root-cause-first-gate
 
-<!-- status: draft-unvalidated; requires `arc eval preflight eval-arc-debugging-root-cause-first-gate` to confirm discrimination (skill arm passes, no-skill arm fails) before this counts as coverage. NOT behaviorally validated. -->
+<!-- status: draft-unvalidated — arc eval ab (k=5) 2026-06-03 did NOT validate: baseline pass 100% (at-ceiling; preflight k=3 had shown 67%, so the trap is non-robust) → treatment pass 40%, delta -0.15, verdict REGRESSED. NOT coverage. Needs a harder trap where the no-skill baseline reliably fails root-cause-first before this can validate. -->
 
 ## Scope
 skill

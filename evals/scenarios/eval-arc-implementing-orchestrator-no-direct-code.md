@@ -1,6 +1,6 @@
 # Eval: eval-arc-implementing-orchestrator-no-direct-code
 
-<!-- status: draft-unvalidated; requires `arc eval preflight eval-arc-implementing-orchestrator-no-direct-code` to confirm discrimination (skill arm passes, no-skill arm fails) before this counts as coverage. NOT behaviorally validated. -->
+<!-- status: draft-unvalidated — arc eval ab (k=5) 2026-06-03 did NOT validate: baseline pass 20% → treatment pass 0%, delta -0.05 with CI spanning 0 (no significant skill effect; both arms struggle). NOT coverage. The trap/grader needs redesign so the orchestrator-role behavior is cleanly separable before this can validate. -->
 <!-- note: distinct from sdd-v2-arc-implementing-delegation (which asserts the Write/Agent behavioral chain). This draft targets the stated-plan orchestrator-role + Phase 0 blocked_by gate, read-only. -->
 
 ## Scope

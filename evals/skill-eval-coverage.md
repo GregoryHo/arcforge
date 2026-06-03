@@ -19,55 +19,57 @@ Two tiers, and they are NOT interchangeable:
 
 | Tier | Definition | Counts toward the metric? |
 |------|------------|---------------------------|
-| **Validated** | A non-draft scenario in the active suite whose `## Target` is `skills/<skill>/SKILL.md` — i.e. the audit's existing 9. | **Yes** |
+| **Validated** | A non-draft scenario whose `## Target` is `skills/<skill>/SKILL.md`: the audit's inherited 9, plus 3 promoted on 2026-06-03 by a recorded passing `arc eval ab` run. | **Yes** |
 | **Draft (unvalidated)** | Has a `## Target → skills/<skill>/SKILL.md` scenario marked `status: draft-unvalidated`. Structurally lint-clean, but discrimination NOT yet proven by a live run. | **No** |
 
-**Operational proxy, not a live-run check.** The metric (and the recompute
-snippet below) classify a skill as validated by **absence of the
-`status: draft-unvalidated` marker**, NOT by confirming a passing live run. The
-snippet does not — and cannot, here — execute `eval preflight`/`ab`. The 9
-"validated" skills are inherited from the EVAL-1 audit's coverage assertion; this
-doc has not independently re-run them. (`evals/benchmarks/latest.json` is a
-recency-bounded snapshot and does not list a passing entry for every one of the
-9, so it cannot be used as proof either way.) True validation is still the live
-discriminative run.
+**Operational proxy vs. recorded runs.** The recompute snippet classifies a
+skill as validated by **absence of the `status: draft-unvalidated` marker** — it
+does not itself execute `eval preflight`/`ab`. For the inherited 9, that marker
+absence is the only signal; they trace to the EVAL-1 audit's coverage assertion
+and this doc has not independently re-run them (`evals/benchmarks/latest.json` is
+a recency-bounded snapshot and does not list a passing entry for every one, so it
+isn't proof either way). The **3 promoted on 2026-06-03** (arc-tdd, arc-planning,
+arc-coordinating) are different: each carries a recorded live `arc eval ab` result
+in its scenario marker (baseline→treatment delta, verdict PASS), so for those the
+marker is backed by an actual discriminative run, not just an audit assertion.
 
 A draft is a *candidate* for coverage, not coverage. Do not promote a draft to
 validated until `arc eval preflight <name>` (or an `arc eval ab` run) confirms it
 discriminates; then remove the `status: draft-unvalidated` marker from the file.
 
-## Current coverage (as of 2026-06-02)
+## Current coverage (as of 2026-06-03)
 
-**Validated coverage: 9 / 33 shippable skills.**
+**Validated coverage: 12 / 33 shippable skills.**
 
 Shippable skills = directories under `skills/` containing a `SKILL.md`, excluding
 `*-workspace` (in-progress eval scratch dirs, out of scope per `.claude/rules/obsidian-wiki.md`).
 
-### Skills with a VALIDATED scenario (9)
+### Skills with a VALIDATED scenario (12)
 
 - arc-brainstorming
+- arc-coordinating  *(promoted 2026-06-03 — arc eval ab: 40%→100%, Δ+0.15, PASS)*
 - arc-evaluating
 - arc-learning
 - arc-managing-sessions
-- arc-refining
+- arc-planning  *(promoted 2026-06-03 — arc eval ab: 0%→100%, Δ+0.25, PASS)*
 - arc-reflecting
+- arc-refining
+- arc-tdd  *(promoted 2026-06-03 — arc eval ab: 0%→100%, Δ+0.25, PASS)*
 - arc-using
 - arc-verifying
 - arc-writing-skills
 
-### Skills with only a DRAFT scenario (5) — NOT counted as covered
+### Skills with a DRAFT scenario that did NOT validate (2) — NOT counted as covered
 
-These are the five core workflow skills called out by EVAL-1. Each now has a
-structurally valid draft scenario, but **none has a live discriminative run**, so
-none counts toward the 9/33 metric until validated.
+Of the five core-workflow drafts authored for EVAL-1, three validated on
+2026-06-03 (now in the list above). The remaining two were run through
+`arc eval ab` (k=5) the same day but **regressed** — the skill arm did not beat
+the no-skill baseline — so they do NOT count toward coverage and need redesign:
 
-| Skill | Draft scenario | Validate with |
-|-------|----------------|---------------|
-| arc-tdd | `eval-arc-tdd-test-first-gate` | `node scripts/cli.js eval preflight eval-arc-tdd-test-first-gate` |
-| arc-debugging | `eval-arc-debugging-root-cause-first-gate` | `node scripts/cli.js eval preflight eval-arc-debugging-root-cause-first-gate` |
-| arc-planning | `eval-arc-planning-pure-function-gate` | `node scripts/cli.js eval preflight eval-arc-planning-pure-function-gate` |
-| arc-coordinating | `eval-arc-coordinating-cli-no-manual-fallback` | `node scripts/cli.js eval preflight eval-arc-coordinating-cli-no-manual-fallback` |
-| arc-implementing | `eval-arc-implementing-orchestrator-no-direct-code` | `node scripts/cli.js eval preflight eval-arc-implementing-orchestrator-no-direct-code` |
+| Skill | Draft scenario | A/B result (k=5) | Why it failed / next step |
+|-------|----------------|------------------|---------------------------|
+| arc-debugging | `eval-arc-debugging-root-cause-first-gate` | baseline 100% → treatment 40%, Δ−0.15, REGRESSED | Baseline at-ceiling (preflight k=3 had shown 67%, so the trap is non-robust). Needs a harder trap where the no-skill agent reliably skips root-cause analysis. |
+| arc-implementing | `eval-arc-implementing-orchestrator-no-direct-code` | baseline 20% → treatment 0%, Δ−0.05 (CI spans 0), REGRESSED | No significant skill effect; both arms struggle. Trap/grader needs redesign so the orchestrator-role behavior is cleanly separable. |
 
 > Note: `arc-implementing` also has `sdd-v2-arc-implementing-delegation`, a
 > behavioral scenario whose `## Target` is prose (not a `SKILL.md` path), so it is
@@ -117,6 +119,7 @@ console.log("draft-only skills:", [...draft].sort().join(", "));
 '
 ```
 
-Expected today: `validated: 9/33`, with the five core skills listed as draft-only.
-When a draft is promoted (marker removed after a passing live run), it moves from
-the draft list into the validated count automatically.
+Expected today: `validated: 12/33`, with arc-debugging and arc-implementing as the
+only draft-only skills (their A/B runs regressed — see above). When a draft is
+promoted (the `status: draft-unvalidated` marker removed after a passing live run),
+it moves from the draft list into the validated count automatically.
