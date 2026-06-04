@@ -24,8 +24,6 @@ const {
   passAtK,
   passAllK,
   computeDelta,
-  generateBenchmark,
-  generateRawBenchmarkData,
   getVerdict,
   ensureEvalsDir,
   gradeWithCode,
@@ -44,13 +42,17 @@ const {
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
-  compareResults,
   snapScore,
   validateGraderResponse,
   SCENARIOS_DIR,
   RESULTS_DIR,
   BENCHMARKS_DIR,
 } = require('../../scripts/lib/eval');
+const {
+  generateBenchmark,
+  generateRawBenchmarkData,
+  compareResults,
+} = require('../../scripts/lib/eval-benchmark');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-eval-'));

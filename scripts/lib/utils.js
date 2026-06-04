@@ -407,11 +407,46 @@ function outputDecisionHighlight(reason) {
 }
 
 /**
+ * Sanitize a raw session id for safe use as a path component.
+ * Valid ids (UUIDs, ppid numbers) pass through unchanged. On any
+ * traversal/control-char failure, fail-safe to a stable hash rather than
+ * throwing — callers use this id to build filesystem paths and must never
+ * crash the session.
+ *
+ * @param {string|number} rawId - Untrusted session identifier.
+ * @returns {string} A filesystem-safe id.
+ */
+function sanitizeSessionId(rawId) {
+  const id = String(rawId);
+  try {
+    return sanitizeFilename(id);
+  } catch {
+    return sha256Truncated(id);
+  }
+}
+
+/**
  * Get session ID from cache, environment, or generate one
  * Priority: _cachedSessionId > CLAUDE_SESSION_ID > process.ppid > 'default'
  */
 function getSessionId() {
-  return `session-${_cachedSessionId || process.env.CLAUDE_SESSION_ID || process.ppid || 'default'}`;
+  const rawId = _cachedSessionId || process.env.CLAUDE_SESSION_ID || process.ppid || 'default';
+  return `session-${sanitizeSessionId(rawId)}`;
+}
+
+/**
+ * Sanitize a project basename for use as a path component. Mirrors the
+ * worktree layer (worktree-paths.js sanitizeProjectName) so session/diary
+ * paths and worktree paths derive the same safe name from the same input.
+ * Replaces runs of non-[a-zA-Z0-9._-] characters with a single hyphen and
+ * trims leading/trailing hyphens. Empty result falls back to "project".
+ */
+function sanitizeProjectName(name) {
+  const cleaned = name
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return cleaned || 'project';
 }
 
 /**
@@ -419,7 +454,7 @@ function getSessionId() {
  */
 function getProjectName() {
   const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  return path.basename(projectDir);
+  return sanitizeProjectName(path.basename(projectDir));
 }
 
 /**
@@ -482,7 +517,10 @@ function getDateDiariesDir(project, date) {
 }
 
 function getDiaryDraftPath(project, date, sessionId) {
-  return path.join(getDateDiariesDir(project, date), `diary-${sessionId}-draft.md`);
+  return path.join(
+    getDateDiariesDir(project, date),
+    `diary-${sanitizeSessionId(sessionId)}-draft.md`,
+  );
 }
 
 function getDiaryFilePath() {
@@ -681,6 +719,8 @@ module.exports = {
   ensureDir,
   normalizeArray,
   sanitizeFilename,
+  sanitizeSessionId,
+  sanitizeProjectName,
   createSessionCounter,
   getSessionFilePath,
   loadSession,

@@ -11,13 +11,13 @@
 
 - Soft limit: 400 lines
 - Hard limit: 700 lines
-- Largest file (coordinator.js) is 702 lines — avoid growing beyond this
+- Several engine files in `scripts/lib/` currently exceed the hard limit and are tracked for decomposition — don't treat them as license to grow new files past 700
 - Extract utilities when a file exceeds 400 lines
 
 ## Function Size
 
 - Target: <50 lines
-- Accept up to 70 for state coordination functions (e.g., `expandWorktrees`)
+- Accept up to 70 for state coordination functions
 - If a function exceeds 50 lines, look for extraction opportunities
 
 ## Nesting

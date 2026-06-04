@@ -6,9 +6,9 @@ paths:
 
 # Testing
 
-## 4 Runners — All Must Pass
+## 5 Runners — All Must Pass
 
-Run `npm test` before every PR. It executes 4 separate runners:
+Run `npm test` before every PR. It executes 5 separate runners:
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
@@ -16,6 +16,7 @@ Run `npm test` before every PR. It executes 4 separate runners:
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
 | pytest | `npm run test:skills` | `tests/skills/` | Skill content validation |
+| Bash | `npm run test:observer-daemon` | `skills/arc-observing/tests/` | Observer daemon behavior |
 
 ## Jest Tests (`tests/scripts/`)
 

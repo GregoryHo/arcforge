@@ -31,9 +31,15 @@ derivation rules and `skills/arc-using/SKILL.md` for the agent Worktree Rule.
 | `agents/` | Specialized subagent definitions | N/A |
 | `docs/` | Design docs, platform guides | N/A |
 
+**Exception:** the learning dashboard control plane (an HTTP server plus inline
+HTML — `scripts/lib/learning-dashboard-http.js` and
+`scripts/lib/learning-dashboard.html`) lives in `scripts/lib/` as an
+intentional exception to the file-based-engine role. It is a local review/control
+surface, not part of the DAG engine, but it ships in the canonical lib directory.
+
 ## Canonical Source Rule
 
-`scripts/lib/` is canonical. `hooks/lib/` re-exports from it to prevent drift. Never duplicate logic — import from the canonical location.
+`scripts/lib/` is canonical. Hooks import directly from it (e.g. `require('../../scripts/lib/utils')`) — there is no `hooks/lib/` re-export layer. Never duplicate logic — import from the canonical location.
 
 ## Skill Routing & Composition
 

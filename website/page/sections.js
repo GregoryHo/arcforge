@@ -576,7 +576,12 @@ function SessionLearning({
         color: t.ink,
         fontStyle: 'italic'
       }
-    }, "off until you turn it on per project"), "; once enabled, three explicit gates stand between any pattern and active behavior."),
+    }, "off until you turn it on per project"), "; once enabled, three explicit gates stand between any pattern and active behavior. The ", /*#__PURE__*/React.createElement("em", {
+      style: {
+        color: t.ink,
+        fontStyle: 'italic'
+      }
+    }, "learning dashboard"), " (", /*#__PURE__*/React.createElement("code", null, "arcforge learn dashboard"), ") is the review and control surface where you approve, promote, or deactivate each candidate."),
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -722,7 +727,7 @@ function Platforms({
   const plats = [{
     name: 'Claude Code',
     tag: 'PRIMARY',
-    cmd: '/plugin install arcforge@arcforge',
+    cmd: '/plugin install arcforge@arcforge-dev',
     note: 'Full plugin marketplace. Hooks, agents, teammates, commands — all native.',
     primary: true
   }, {
@@ -739,7 +744,7 @@ function Platforms({
     name: 'OpenCode',
     tag: 'SUPPORTED',
     cmd: 'Clone + symlink plugin',
-    note: 'Plugin-shaped. Lives in ~/.config/opencode/plugin.'
+    note: 'Plugin-shaped. Lives in ~/.config/opencode/plugins.'
   }];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
@@ -1115,7 +1120,7 @@ function Install({
     style: {
       color: t.dim
     }
-  }, "$ "), "/plugin install arcforge@arcforge"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "$ "), "/plugin install arcforge@arcforge-dev"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.dim
     }

@@ -575,7 +575,7 @@ function createRouter(projectRoot, cachedHtml) {
 // ── Server Entry Point ────────────────────────────────────────
 
 function startServer(projectRoot, options = {}) {
-  const { port = 3333 } = options;
+  const { port = 3333, host = '127.0.0.1' } = options;
 
   const htmlPath = path.join(__dirname, 'eval-dashboard-ui.html');
   if (!fs.existsSync(htmlPath)) {
@@ -595,8 +595,8 @@ function startServer(projectRoot, options = {}) {
 
   const watcher = setupWatchers(projectRoot);
 
-  server.listen(port, () => {
-    console.log(`Eval dashboard: http://localhost:${port}`);
+  server.listen(port, host, () => {
+    console.log(`Eval dashboard: http://${host}:${port}`);
     console.log('Press Ctrl+C to stop');
   });
 
