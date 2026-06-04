@@ -203,7 +203,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" aliases
 │   ├── {sessionId}.json                  # Auto-saved session metrics
 │   ├── session-{alias}.md                # User-archived session (from save)
 │   ├── handover-{slug}.md                # Optional handover file (from handover --save)
-│   ├── diary-{sessionId}.md              # Diary entry (from /diary)
+│   ├── diary-{sessionId}.md              # Diary entry (from /journal)
 ```
 
 ## Common Mistakes

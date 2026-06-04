@@ -49,7 +49,7 @@ Use this skill when:
    - Design decisions → `docs/plans/` or memory
    - Task progress → update dag.yaml or TodoWrite
    - Observations → memory files
-2. **Run `/diary`** if the session was substantial — captures session insights before they're lost
+2. **Run `/journal`** if the session was substantial — captures session insights before they're lost
 3. **Check for un-committed work** — ensure valuable changes are committed
 
 ### During Compact

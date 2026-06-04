@@ -15,7 +15,7 @@ Records context compaction events for session tracking and triggers diary prompt
 3. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
    - Updates session with current user/tool counts
    - Generates markdown summary file (`<sessionId>.md`)
-   - Prompts user to run `/diary` skill
+   - Prompts user to run `/journal` skill
    - Resets both counters (user messages and tool calls)
 
 4. **Below threshold**:
@@ -38,7 +38,7 @@ This ensures diary prompts only appear for meaningful sessions.
 ```
 📝 Context compaction detected. (15 messages, 47 tool calls)
 
-Please use /diary skill immediately to capture session reflections before context is compacted.
+Please use /journal skill immediately to capture session reflections before context is compacted.
 ```
 
 **Below threshold:**
