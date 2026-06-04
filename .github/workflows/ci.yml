@@ -21,6 +21,23 @@ jobs:
           version: latest
       - run: biome ci .
 
+  skill-eval-annotation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Annotate skill changes lacking eval evidence
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          node scripts/check-skill-eval-annotation.js
+
   test:
     runs-on: ubuntu-latest
     strategy:
