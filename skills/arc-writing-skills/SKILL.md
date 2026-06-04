@@ -70,7 +70,7 @@ Two orthogonal axes are useful when designing a skill — composition (how it ge
 |------|-------------------|-------------|---------|
 | **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
 | **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
-| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
+| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-auditing-spec` |
 
 When creating a new skill:
 
