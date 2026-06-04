@@ -1,5 +1,6 @@
 ---
 description: "Run a read-only advisory audit of an arcforge SDD spec family (design.md, spec.xml, dag.yaml) across three axes — cross-artifact alignment, internal consistency, state-transition integrity. Usage: /arc-auditing-spec <spec-id> [--save]"
+argument-hint: "<spec-id> [--save]"
 disable-model-invocation: true
 ---
 

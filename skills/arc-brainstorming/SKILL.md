@@ -278,6 +278,10 @@ Stop immediately if you catch yourself thinking:
 - Be flexible — Go back and clarify when something doesn't make sense
 - Explicit routing — Always confirm new-topic vs iteration with the user
 
+## After This Skill
+
+Hand off to `/arc-refining` — the refiner reads the committed `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` and formalizes it into `specs/<spec-id>/spec.xml`. Full SDD pipeline: refining → planning → coordinating.
+
 ## Stage Completion Format
 
 ```

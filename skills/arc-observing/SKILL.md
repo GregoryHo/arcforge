@@ -129,7 +129,7 @@ No activity → -0.02/week, -0.01/week for manual/reflection sources
 ## When NOT to Use
 
 - User wants to extract reusable techniques (use /learn)
-- User wants to capture session reflections (use /diary)
+- User wants to capture session reflections (use /journal)
 - User wants to analyze diary entries (use /reflect)
 
 ## Process

@@ -377,7 +377,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Key workflow:**
 1. Check phase transition — compact between phases (when state is persisted to files), not during
-2. Pre-compact: save decisions to files/memory, run `/diary` if session was substantial
+2. Pre-compact: save decisions to files/memory, run `/journal` if session was substantial
 3. Check for un-committed work — ensure valuable changes are committed
 4. Compact with focused seed text: `/compact Focus on implementing [next task]`
 5. Post-compact: run `arcforge reboot`, re-read needed files
@@ -614,7 +614,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Capture session reflections as structured diary entries for future pattern extraction.
 
-**When to use:** When user explicitly requests /diary, when PreCompact hook triggers, or at end of significant work session.
+**When to use:** When user explicitly requests /journal, when PreCompact hook triggers, or at end of significant work session.
 
 **Key workflow:**
 1. Pre-diary check — verify session had non-trivial decisions or challenges

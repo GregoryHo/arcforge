@@ -1,6 +1,6 @@
 ---
 name: arc-journaling
-description: Use when user explicitly requests /diary, when PreCompact hook triggers, or at end of significant work session
+description: Use when user explicitly requests /journal, when PreCompact hook triggers, or at end of significant work session
 ---
 
 # Session Diary Capture
@@ -71,11 +71,11 @@ Before creating a diary entry, verify at least ONE of these criteria is met:
 - Pure exploration (reading files without decisions)
 - Trivial fixes (typos, formatting, single-line changes)
 
-This is a **soft gate**: Claude judges based on conversation memory. User can always override with explicit `/diary`.
+This is a **soft gate**: Claude judges based on conversation memory. User can always override with explicit `/journal`.
 
 ## When to Use
 
-- User runs `/diary`
+- User runs `/journal`
 - PreCompact hook triggers (conversation getting long)
 - End of significant work session
 - After important design decisions
@@ -214,7 +214,7 @@ Keep entries focused. Don't over-document routine work.
 
 ```
 ~/.arcforge/diaries/{project}/{YYYY-MM-DD}/
-└── diary-{sessionId}.md      # Diary entry (from /diary)
+└── diary-{sessionId}.md      # Diary entry (from /journal)
 
 ~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
 ├── {sessionId}.json          # Session data (auto-generated)

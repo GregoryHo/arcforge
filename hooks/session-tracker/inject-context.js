@@ -172,7 +172,7 @@ function loadPendingActions(project) {
     );
 
     if (diaryActions.length > 0) {
-      lines.push('**📝 Diary draft ready — use /diary to review and finalize.**');
+      lines.push('**📝 Diary draft ready — use /journal to review and finalize.**');
       summaryParts.push('diary draft ready');
     }
 

@@ -70,7 +70,7 @@ Two orthogonal axes are useful when designing a skill — composition (how it ge
 |------|-------------------|-------------|---------|
 | **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
 | **Discipline** | Conditional — fires during ANY workflow when condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
-| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-evaluating` |
+| **Meta** | Independent — user, maintainer, or project-level task invokes directly | No routing needed | `arc-writing-skills`, `arc-auditing-spec` |
 
 When creating a new skill:
 
@@ -504,6 +504,8 @@ Agent found new rationalization? Add explicit counter. Re-test until bulletproof
 **Testing methodology:** See `testing-skills-with-subagents.md` for complete testing methodology.
 
 **Structured evaluation:** Use `agents/` templates for structured grading (`skill-grader.md`), blind comparison (`skill-comparator.md`), pattern analysis (`skill-analyzer.md`), and description testing (`description-tester.md`). See `references/eval-schemas.md` for data formats.
+
+**Division of labor with arc-evaluating:** The agents above specialize in *discipline-skill pressure testing* — compliance under combined pressures and rationalization extraction (`rationalizations[]` + compliance verdict in `eval-schemas.md`), which arc-evaluating's general graders do not provide. For *statistical behavior-change measurement* — baseline-vs-treatment `delta`, CI95, k≥5 trials, and the SHIP/NEEDS-WORK verdict via `arc eval ab` — use arc-evaluating. They compose: arc-evaluating proves a skill changes behavior; these agents pressure-test discipline compliance and mine rationalizations for the REFACTOR loop.
 
 ## Anti-Patterns
 

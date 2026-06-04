@@ -1,5 +1,6 @@
 ---
 description: Create detailed execution tasks for a feature
+argument-hint: "<feature-name>"
 disable-model-invocation: true
 ---
 

@@ -77,7 +77,7 @@ For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) 
 
 - Fewer than 3 diary entries exist
 - User wants patterns auto-loaded (use /recall instead)
-- Single-session insights (use /diary instead)
+- Single-session insights (use /journal instead)
 - No meaningful patterns found
 
 ## Storage
@@ -141,7 +141,7 @@ Search for diary files:
 ```
 
 Count entries. If fewer than 3:
-> "Found only X diary entries. Run more sessions with /diary before reflecting."
+> "Found only X diary entries. Run more sessions with /journal before reflecting."
 
 ### 3. Read CLAUDE.md Rules (if exists)
 
