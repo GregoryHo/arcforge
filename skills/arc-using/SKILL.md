@@ -107,6 +107,18 @@ These skills activate during a workflow when the condition is present. They are 
 | User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` audit mode | Propose changes, never auto-modify without approval |
 | About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | Eval evidence that does not return `INSUFFICIENT_DATA` |
 
+## Instinct & Learning Routes
+
+Five skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
+
+| User intent | Skill |
+|-------------|-------|
+| Capture THIS session's reflections as a diary entry | `arc-journaling` (`/journal`) |
+| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` (`/reflect`) |
+| Manually save ONE insight as an instinct right now | `arc-recalling` (`/recall`) |
+| Review / confirm / contradict auto-detected instincts | `arc-observing` |
+| Review the learning-candidate queue (when optional learning is enabled) | `arc-learning` |
+
 ## When Not to Route
 
 Do not force an ArcForge workflow when the task is:
