@@ -21,35 +21,12 @@ const {
   parseWorktreePath,
   getEpicBranchName,
 } = require('./worktree-paths');
+const { readArcforgeMarker } = require('./marker');
 
 // Lock timeouts for DAG transactions that include slow git operations.
 // Default withLock timeout is 5s; these accommodate heavier workloads.
 const EXPAND_LOCK_TIMEOUT = 30000; // git worktree add + fs ops
 const MERGE_LOCK_TIMEOUT = 60000; // git merge can be slow on large repos
-
-/**
- * Read the `.arcforge-epic` marker from a directory, returning the parsed
- * object or null if the file is missing / unreadable. The marker schema
- * carries at least `{ epic, spec_id, base_worktree, base_branch, local }`
- * when authored by `expandWorktrees`.
- *
- * Shared by `Coordinator.dagPath`, `Coordinator._inferEpicIdFromWorktree`,
- * and `cli.resolveSpecId` — the worktree marker is the single source of
- * truth linking a checkout back to its spec-id, so all three callers
- * must stay in lockstep on how they parse it.
- *
- * @param {string} dir - Directory containing the marker (typically projectRoot).
- * @returns {Object|null} parsed marker or null
- */
-function readArcforgeMarker(dir) {
-  const markerPath = path.join(dir, '.arcforge-epic');
-  if (!fs.existsSync(markerPath)) return null;
-  try {
-    return parseDagYaml(fs.readFileSync(markerPath, 'utf8'));
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Coordinator class - manages DAG operations for a single spec
