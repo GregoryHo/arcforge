@@ -1,5 +1,6 @@
 ---
 description: "Save/resume sessions, list sessions, manage aliases."
+argument-hint: "save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <id> <name> | aliases"
 disable-model-invocation: true
 ---
 

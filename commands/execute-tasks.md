@@ -1,5 +1,6 @@
 ---
 description: Execute tasks in batches with review checkpoints
+argument-hint: "<task-list-name>"
 disable-model-invocation: true
 ---
 

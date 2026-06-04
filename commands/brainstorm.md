@@ -1,5 +1,6 @@
 ---
 description: "Use this before any creative work - exploring requirements and design before implementation."
+argument-hint: "[topic or feature to explore]"
 disable-model-invocation: true
 ---
 
