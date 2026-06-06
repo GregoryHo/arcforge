@@ -18,9 +18,12 @@
  *   ship a skill  `git commit`/`push` after editing a SKILL.md (once/session)
  *                                         -> re-run the eval (arc-writing-skills
  *                                            Iron Law)
+ *   SDD stage     write `specs/<id>/spec.xml` while its `dag.yaml` is missing
+ *                                         -> plan next (arc-planning); once/spec-id
+ *   edit on main  first code edit on main/master (once/session) -> prefer a branch
  *
- * State: per-session counters (test-seen, skill-edited, skill-ship-warned) so
- * nudges stay rare and context-aware.
+ * State: per-session counters (test-seen, skill-edited, skill-ship-warned,
+ * main-warned, spec-planned-<id>) so nudges stay rare and context-aware.
  */
 
 const fs = require('node:fs');
@@ -40,6 +43,8 @@ const PR_BOUNDARY_RE = /\bgh\s+pr\s+(?:create|merge)\b/;
 const WORKTREE_ADD_RE = /\bgit\s+worktree\s+add\b/;
 const SHIP_RE = /\bgit\s+(?:commit|push)\b/;
 const SKILL_FILE_RE = /(?:^|\/)SKILL\.md$/;
+// A spec body written by arc-refining: specs/<id>/spec.xml. Captures the spec-id.
+const SPEC_XML_RE = /(?:^|\/)specs\/([^/]+)\/spec\.xml$/;
 // Doc-ish extensions that don't count as "implementing" — editing these on main
 // is not the signal we want to nudge on.
 const DOC_EXTENSIONS = new Set(['.md', '.mdx', '.txt', '.rst']);
@@ -58,6 +63,27 @@ function isShipCommand(command) {
 }
 function isSkillFile(filePath) {
   return typeof filePath === 'string' && SKILL_FILE_RE.test(filePath);
+}
+
+/** The spec-id if filePath is a specs/<id>/spec.xml, else null. */
+function specIdFromSpecXml(filePath) {
+  if (typeof filePath !== 'string') return null;
+  const m = filePath.match(SPEC_XML_RE);
+  return m ? m[1] : null;
+}
+
+/**
+ * After a spec.xml is written, is its sibling dag.yaml still missing? That is the
+ * deterministic "refined, not yet planned" signal — checked from the written path's
+ * own directory, never a global specs/ scan (a repo can hold several spec families).
+ */
+function dagMissingForSpec(filePath, cwd) {
+  try {
+    const abs = path.resolve(cwd, filePath);
+    return !fs.existsSync(path.join(path.dirname(abs), 'dag.yaml'));
+  } catch {
+    return false;
+  }
 }
 
 /** A code (non-doc) file — the kind of edit that signals "implementing". */
@@ -130,6 +156,14 @@ function evalBeforeShipNudge() {
   );
 }
 
+function planAfterSpecNudge(specId) {
+  return (
+    `\n📐 \`specs/${specId}/spec.xml\` is written but there's no \`dag.yaml\` yet. ` +
+    'The next SDD stage is planning — see arc-planning to turn the refined spec into an ' +
+    'executable DAG before implementing. Ignore if you’re still refining.\n'
+  );
+}
+
 function counter(name) {
   return createSessionCounter(name);
 }
@@ -150,6 +184,19 @@ function main() {
       const filePath = input.tool_input?.file_path || '';
       const cwd = input.cwd || process.cwd();
       if (isSkillFile(filePath)) bump('arc-remind-skill-edited');
+
+      // SDD stage nudge: spec.xml written but its dag.yaml is missing -> plan next.
+      // Once per spec-id (spec.xml is written across several edits).
+      const specId = specIdFromSpecXml(filePath);
+      if (specId && dagMissingForSpec(filePath, cwd)) {
+        const warned = `arc-remind-spec-planned-${specId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        if (counter(warned).read() === 0) {
+          bump(warned);
+          output({ systemMessage: planAfterSpecNudge(specId) });
+          return;
+        }
+      }
+
       if (
         isCodeFile(filePath) &&
         counter('arc-remind-main-warned').read() === 0 &&
@@ -203,6 +250,8 @@ module.exports = {
   isShipCommand,
   isSkillFile,
   isCodeFile,
+  specIdFromSpecXml,
+  dagMissingForSpec,
   branchFromHead,
   isMainBranch,
   isArcforgeProject,
@@ -210,8 +259,10 @@ module.exports = {
   worktreeAddNudge,
   evalBeforeShipNudge,
   mainBranchNudge,
+  planAfterSpecNudge,
   TEST_CMD_RE,
   PR_BOUNDARY_RE,
+  SPEC_XML_RE,
 };
 
 if (require.main === module) {

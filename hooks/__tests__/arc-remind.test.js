@@ -151,3 +151,43 @@ describe('arc-remind main-branch nudge', () => {
     assert.ok(msg.includes('arc-executing-tasks') || msg.includes('branch'));
   });
 });
+
+describe('arc-remind SDD spec→dag nudge', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  beforeEach(() => {
+    delete require.cache[require.resolve('../arc-remind/main')];
+  });
+
+  it('extracts the spec-id only from specs/<id>/spec.xml', () => {
+    const { specIdFromSpecXml } = require('../arc-remind/main');
+    assert.strictEqual(specIdFromSpecXml('specs/my-feature/spec.xml'), 'my-feature');
+    assert.strictEqual(specIdFromSpecXml('/abs/specs/sdd-x/spec.xml'), 'sdd-x');
+    assert.strictEqual(specIdFromSpecXml('specs/my-feature/details/x.xml'), null);
+    assert.strictEqual(specIdFromSpecXml('spec.xml'), null);
+    assert.strictEqual(specIdFromSpecXml('src/specs.xml'), null);
+  });
+
+  it('reports dag missing from the spec.xml sibling dir, not a global scan', () => {
+    const { dagMissingForSpec } = require('../arc-remind/main');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-remind-sdd-'));
+    try {
+      // spec A: no dag yet → missing; spec B: has a dag → present
+      fs.mkdirSync(path.join(root, 'specs', 'a'), { recursive: true });
+      fs.mkdirSync(path.join(root, 'specs', 'b'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'specs', 'b', 'dag.yaml'), 'nodes: []\n');
+      assert.strictEqual(dagMissingForSpec('specs/a/spec.xml', root), true);
+      assert.strictEqual(dagMissingForSpec('specs/b/spec.xml', root), false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('names the spec and points to arc-planning', () => {
+    const { planAfterSpecNudge } = require('../arc-remind/main');
+    const msg = planAfterSpecNudge('my-feature');
+    assert.ok(msg.includes('my-feature'));
+    assert.ok(msg.includes('arc-planning'));
+  });
+});
