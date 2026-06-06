@@ -121,14 +121,33 @@ describe('arc-guard evaluate', () => {
 
   it('blocks starting an arcforge loop inside a worktree', () => {
     const { evaluate } = require('../arc-guard/main');
-    const reason = evaluate({
-      tool_name: 'Bash',
-      tool_input: { command: 'node scripts/cli.js loop --spec my-spec' },
-      cwd: wt(),
-    });
-    assert.ok(reason, 'should deny');
-    assert.ok(reason.includes('loop'), 'should mention loops');
-    assert.ok(reason.includes('base'), 'should steer to the base session');
+    for (const cmd of [
+      'node scripts/cli.js loop --spec my-spec',
+      'node scripts/loop.js --pattern dag',
+      'arcforge loop --max-runs 20',
+    ]) {
+      const reason = evaluate({ tool_name: 'Bash', tool_input: { command: cmd }, cwd: wt() });
+      assert.ok(reason, `should deny: ${cmd}`);
+      assert.ok(reason.includes('loop'), 'should mention loops');
+      assert.ok(reason.includes('base'), 'should steer to the base session');
+    }
+  });
+
+  it('does NOT block running a project file that ends in loop.js (FP guard)', () => {
+    const { evaluate } = require('../arc-guard/main');
+    // Inside an epic worktree the agent runs the USER's own project code — a
+    // game/event/render loop named *loop.js must not be mistaken for arcforge's loop.
+    for (const cmd of [
+      'node game-loop.js',
+      'node src/event-loop.js',
+      'node render-loop.js --watch',
+    ]) {
+      assert.strictEqual(
+        evaluate({ tool_name: 'Bash', tool_input: { command: cmd }, cwd: wt() }),
+        null,
+        `should allow project loop file: ${cmd}`,
+      );
+    }
   });
 
   it('allows benign commands inside a worktree', () => {
@@ -231,6 +250,27 @@ describe('arc-guard research-config blocks (Edit/Write)', () => {
     assert.strictEqual(
       evaluate({ tool_name: 'Edit', tool_input: { file_path: path.join(cwd, 'any.js') }, cwd }),
       null,
+    );
+  });
+
+  it('no-op when research-config.md is not an arc-researching contract (FP guard)', () => {
+    const { evaluate } = require('../arc-guard/main');
+    // A research/ML repo can legitimately have a root research-config.md for
+    // unrelated reasons — without the contract's title/scope markers it must not fence.
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-guard-foreign-'));
+    dirs.push(cwd);
+    fs.writeFileSync(
+      path.join(cwd, 'research-config.md'),
+      '# Hyperparameters\n\nlearning_rate: 0.001\nbatch_size: 64\nepochs: 100\n',
+    );
+    assert.strictEqual(
+      evaluate({
+        tool_name: 'Edit',
+        tool_input: { file_path: path.join(cwd, 'research-config.md') },
+        cwd,
+      }),
+      null,
+      'should not block editing a foreign research-config.md',
     );
   });
 

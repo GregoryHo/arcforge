@@ -40,7 +40,10 @@ const { hasArcforgeMarker, readArcforgeMarker } = require('../../scripts/lib/mar
 // arc-finishing-epic conflict flow, so blocking them would misdirect.
 const GIT_MERGE_RE = /\bgit\s+merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
 // Arcforge loop INVOCATIONS only — not reading/diffing a file named loop.js.
-const LOOP_RE = /\bnode\s+\S*loop\.js\b|\bcli\.js\s+loop\b|\barcforge\s+loop\b/;
+// Matches arcforge's own loop invocation (scripts/loop.js, `cli.js loop`,
+// `arcforge loop`) — NOT any project file ending in loop.js (game-loop.js,
+// event-loop.js, render-loop.js are legitimate inside an epic worktree).
+const LOOP_RE = /\bnode\s+\S*scripts\/loop\.js\b|\bcli\.js\s+loop\b|\barcforge\s+loop\b/;
 
 const RESEARCH_CONFIG = 'research-config.md';
 
@@ -110,6 +113,19 @@ function parseCannotPaths(configText, cwd) {
   return entries;
 }
 
+/**
+ * Heuristic: does this file look like a real arc-researching contract, rather
+ * than an unrelated file that merely shares the name `research-config.md`
+ * (a plausible name in ML / data-science / research repos)? Requires the
+ * contract's title or its immutable scope declaration. Erring toward NOT
+ * recognizing is safe: a missed fence is recoverable, a false block is not.
+ * @param {string} configText
+ * @returns {boolean}
+ */
+function looksLikeResearchContract(configText) {
+  return /^#\s+Research Config\b/m.test(configText) || /CANNOT\s+modify\s*:/i.test(configText);
+}
+
 /** Edit/Write rule dispatch (research-config immutability + scope fence). */
 function evaluateFileEdit(input, cwd) {
   const filePath = input.tool_input?.file_path;
@@ -118,6 +134,16 @@ function evaluateFileEdit(input, cwd) {
   const configPath = path.resolve(cwd, RESEARCH_CONFIG);
   // No-op invariant: only active when a locked research contract exists in cwd.
   if (!fs.existsSync(configPath)) return null;
+
+  let configText;
+  try {
+    configText = fs.readFileSync(configPath, 'utf8');
+  } catch {
+    return null;
+  }
+  // Collision guard: a file named research-config.md that isn't an arc-researching
+  // contract (no title, no CANNOT-modify scope) must not trip the fence.
+  if (!looksLikeResearchContract(configText)) return null;
 
   const target = path.resolve(cwd, filePath);
 
@@ -130,12 +156,6 @@ function evaluateFileEdit(input, cwd) {
     );
   }
 
-  let configText;
-  try {
-    configText = fs.readFileSync(configPath, 'utf8');
-  } catch {
-    return null;
-  }
   for (const entry of parseCannotPaths(configText, cwd)) {
     if (target === entry || target.startsWith(entry + path.sep)) {
       return (
