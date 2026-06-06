@@ -119,7 +119,7 @@ skills/
 
 **Flat namespace** - all skills in one searchable namespace
 
-**What stays in SKILL.md:** Iron law, decision logic, routing, red flags, checklists — anything the agent needs to make the right choice.
+**What stays in SKILL.md:** Core rule, decision logic, routing, red flags, checklists — anything the agent needs to make the right choice.
 
 **What moves to `references/`:** Detailed examples, API docs, comprehensive syntax, lengthy tables, extended rationale. Reference from SKILL.md so the agent knows when to load them.
 
@@ -427,23 +427,28 @@ skill; arc-evaluating decides whether it ships.
 
 **Success criteria:** Agent finds and correctly applies reference
 
-## Common Rationalizations for Skipping Testing
+## Common Rationalizations for Skipping the Baseline
 
-| Excuse | Reality |
-|--------|---------|
-| "Skill is obviously clear" | Clear to you ≠ clear to other agents. Test it. |
-| "It's just a reference" | References can have gaps. Test retrieval. |
-| "Testing is overkill" | Untested skills have issues. Always. |
-| "I'll test if problems emerge" | Problems = agents can't use skill. Test BEFORE deploying. |
-| "Too tedious to test" | Testing is less tedious than debugging bad skill. |
-| "I'm confident it's good" | Overconfidence guarantees issues. Test anyway. |
-| "No time to test" | Deploying untested skill wastes more time fixing it later. |
+These come up when deciding whether to run the baseline. Each has a measured answer:
 
-## Bulletproofing Against Rationalization
+| Rationalization | Why the baseline still helps |
+|-----------------|------------------------------|
+| "The skill is obviously clear" | Clear to the author isn't the same as clear to another agent; the baseline shows the gap. |
+| "It's just a reference" | Reference skills can have retrieval gaps a baseline surfaces. |
+| "I'll test if problems emerge" | By then the cost is a confused agent mid-task, not a quick check up front. |
+| "I'm confident it's good" | The baseline is cheap — it either confirms the confidence or corrects it. |
+| "No time to test" | A skill that doesn't land costs more downstream than the baseline does now. |
+
+## Bulletproofing a Discipline Skill Against Rationalization
+
+This section is about writing a *discipline* skill — one the agent must hold under pressure.
+The examples below are intentionally firm because that firmness belongs in the discipline
+skill you're authoring (this is how `arc-tdd`, say, talks); it's the subject being taught,
+not the tone of this guide. Technique, pattern, and reference skills don't need it.
 
 ### Close Every Loophole Explicitly
 
-Don't just state the rule - forbid specific workarounds:
+Don't just state the rule — forbid specific workarounds:
 
 ```markdown
 # BAD
