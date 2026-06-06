@@ -372,23 +372,24 @@ BAD: Long narrative with no headings, no checklist, no red flags
 GOOD: Overview → When to Use → Core Pattern → Common Mistakes → Checklist
 ```
 
-## The Iron Law
+## Test-Driven Skill Creation
 
-```
-NO SKILL WITHOUT A FAILING TEST FIRST
-```
+Create a skill the way you'd write tested code: observe the failure first, then write
+the fix.
 
-This applies to NEW skills AND EDITS to existing skills.
+Before writing the skill, run your pressure scenarios against a subagent *without* the
+skill and watch what it actually does — the choices it makes and the reasons it gives for
+the wrong one. Those observed rationalizations are your spec: the skill exists to counter
+them. Write the skill first and test after, and you're writing against imagined failures
+instead of real ones — the skill ends up heavy where it doesn't matter and thin where it
+does. Baseline first, write to what you saw, then close the gaps that show up on re-test
+(the RED → GREEN → REFACTOR section below spells this out).
 
-Write skill before testing? Delete it. Start over.
-Edit skill without testing? Same violation.
-
-**No exceptions:**
-- Not for "simple additions"
-- Not for "just adding a section"
-- Not for "documentation updates"
-- Don't keep untested changes as "reference"
-- Delete means delete
+Whether the skill actually changes behavior — and, for an edit to an existing skill,
+whether a re-run is even needed — is a measurement question. That belongs to
+**arc-evaluating**, which owns the ship gate (and exempts changes with no behavioral
+footprint, such as a typo or a metadata tweak). This skill is about producing a good
+skill; arc-evaluating decides whether it ships.
 
 ## Testing Skill Types
 
@@ -501,11 +502,14 @@ Run same scenarios WITH skill. Agent should now comply.
 
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
-**Testing methodology:** See `testing-skills-with-subagents.md` for complete testing methodology.
+**Testing methodology:** See `testing-skills-with-subagents.md` for the pressure-scenario method.
 
-**Structured evaluation:** Use `agents/` templates for structured grading (`skill-grader.md`), blind comparison (`skill-comparator.md`), pattern analysis (`skill-analyzer.md`), and description testing (`description-tester.md`). See `references/eval-schemas.md` for data formats.
-
-**Division of labor with arc-evaluating:** The agents above specialize in *discipline-skill pressure testing* — compliance under combined pressures and rationalization extraction (`rationalizations[]` + compliance verdict in `eval-schemas.md`), which arc-evaluating's general graders do not provide. For *statistical behavior-change measurement* — baseline-vs-treatment `delta`, CI95, k≥5 trials, and the SHIP/NEEDS-WORK verdict via `arc eval ab` — use arc-evaluating. They compose: arc-evaluating proves a skill changes behavior; these agents pressure-test discipline compliance and mine rationalizations for the REFACTOR loop.
+**Structured grading and measurement belong to arc-evaluating.** When you need to grade
+compliance, mine rationalizations from a transcript, compare two versions blind, or prove a
+behavior change before shipping, use **arc-evaluating** — it owns the graders (including the
+discipline-skill `skill-grader` with its `rationalizations[]` output), the A/B loop
+(`arc eval ab`), and the SHIP verdict. Keep this skill focused on writing the skill well, and
+hand measurement to arc-evaluating.
 
 ## Anti-Patterns
 
@@ -533,24 +537,18 @@ helper1, helper2, step3
 
 ---
 
-## STOP: Before Moving to Next Skill
+## Finish One Skill Before Starting the Next
 
-**After writing ANY skill, you MUST STOP and complete the deployment process.**
-
-**Do NOT:**
-- Create multiple skills in batch without testing each
-- Move to next skill before current one is verified
-- Skip testing because "batching is more efficient"
-
-**The deployment checklist below is MANDATORY for EACH skill.**
-
-Deploying untested skills = deploying untested code. It's a violation of quality standards.
+When you're creating several skills, finish and verify each one before moving on. Batching the
+writing and deferring all the testing to the end is how untested skills slip through — the
+baseline check and the per-skill verification are the point, not overhead. Run the checklist
+below for each skill.
 
 ---
 
 ## Skill Creation Checklist
 
-**IMPORTANT: Use TodoWrite to create todos for EACH checklist item.**
+Track these as you go (TodoWrite helps when you're working through a multi-skill batch).
 
 **RED Phase - Write Failing Test:**
 - [ ] Create pressure scenarios (3+ combined pressures for discipline skills)
@@ -592,14 +590,9 @@ This skill includes supporting files for comprehensive skill development:
 - `graphviz-conventions.dot` - Style guide for graphviz flowcharts (node shapes, edge labels, naming patterns)
 - `render-graphs.js` - Utility to render SKILL.md flowcharts to SVG
 
-**Evaluation Agents (subagent templates):**
-- `agents/skill-grader.md` - Grades behavioral compliance under pressure, extracts rationalizations
-- `agents/skill-comparator.md` - Blind A/B comparison of skill versions for REFACTOR phase
-- `agents/skill-analyzer.md` - Assertion discrimination, benchmark pattern analysis, pressure scenario quality
-- `agents/description-tester.md` - Automated description trigger testing with train/test split
-
-**Evaluation Reference:**
-- `references/eval-schemas.md` - JSON schemas for evals, grading, benchmarks, and comparisons
+**Evaluation:**
+- Grading, blind comparison, rationalization extraction, and behavior-change measurement live
+  in **arc-evaluating** (`skills/arc-evaluating/`), not here — use it to validate a skill.
 
 **Examples:**
 - `examples/CLAUDE_MD_TESTING.md` - Example of testing documentation variants with pressure scenarios
@@ -619,10 +612,8 @@ How future Claude finds your skill:
 
 ## The Bottom Line
 
-**Creating skills IS TDD for process documentation.**
+**Creating a skill is TDD for process documentation.**
 
-Same Iron Law: No skill without failing test first.
-Same cycle: RED (baseline) → GREEN (write skill) → REFACTOR (close loopholes).
-Same benefits: Better quality, fewer surprises, bulletproof results.
-
-If you follow TDD for code, follow it for skills. It's the same discipline applied to documentation.
+Same idea: see the failure first (RED baseline), write to it (GREEN), close the gaps
+(REFACTOR). Same payoff: the skill is grounded in real failures, not imagined ones.
+Measuring whether it actually changed behavior is arc-evaluating's job.
