@@ -915,7 +915,8 @@ def test_fr_rf_014_ac3_axis3_llm_coverage_in_phase55b():
 def test_fr_rf_014_ac4_r3_severity_no_warn():
     """fr-rf-014-ac4: Phase 5.5 MUST state that ANY finding (5.5a or 5.5b) is R3
     enforcement severity — exit non-zero, no spec.xml, no details/, no narrative report.
-    Findings MUST NOT be downgraded to WARNING. Must cite Pattern 3 rationale.
+    Findings MUST NOT be downgraded to WARNING. Must cite the rationale (a WARN would
+    let the spec ship with internal contradictions).
     """
     text = _read_skill()
     phase55 = _get_phase55_section(text)
@@ -944,13 +945,10 @@ def test_fr_rf_014_ac4_r3_severity_no_warn():
         "fr-rf-014-ac4: Phase 5.5 must explicitly state findings MUST NOT be downgraded to WARNING"
     )
 
-    # Must cite Pattern 3 rationale
-    has_pattern3 = (
-        "pattern 3" in lower55
-        or "pattern3" in lower55
-    )
-    assert has_pattern3, (
-        "fr-rf-014-ac4: Phase 5.5 must cite Pattern 3 rationale for why WARN is forbidden "
+    # Must cite the rationale for why WARN is forbidden
+    has_warn_rationale = "internal contradiction" in lower55
+    assert has_warn_rationale, (
+        "fr-rf-014-ac4: Phase 5.5 must cite why WARN is forbidden "
         "(a WARN would let the spec ship with internal contradictions)"
     )
 

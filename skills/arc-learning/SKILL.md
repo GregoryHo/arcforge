@@ -17,7 +17,7 @@ The default scope is project-local. Promotion to global scope is an explicit das
 
 ## Quick Reference
 
-**Post-pivot (v3.1) primary surface — dashboard-driven**:
+**Primary surface — dashboard-driven**:
 
 | Task | Command |
 |---|---|
@@ -30,13 +30,13 @@ Once the daemon is running and learning is enabled, the **dashboard** is where a
 
 ### Retired / Deprecated CLI commands
 
-The following `arcforge learn ...` subcommands remain in the CLI for backward compatibility with older instinct-clustering tests but operate on the **pre-pivot legacy data model** in `${ARCFORGE_ROOT}/scripts/lib/learning.js` — they do not read or write the post-pivot candidate queue. Use the dashboard for new workflows.
+The following `arcforge learn ...` subcommands remain in the CLI but do not read or write the candidate queue. Use the dashboard for new workflows.
 
-- `arcforge learn analyze --project` — retired in v3.1; the command exits with a deprecation notice. The statistical pipeline is replaced by the LLM curator (observer daemon Layer 3+4).
+- `arcforge learn analyze --project` — the command exits with a deprecation notice; candidate curation is handled by the LLM curator (observer daemon Layer 3+4).
 - `arcforge learn review --project` — legacy CLI summary; use dashboard instead.
 - `arcforge learn inbox --project` — legacy pending list; use dashboard.
-- `arcforge learn approve <candidate-id> --project` / `arcforge learn reject <candidate-id> --project` — legacy approval/rejection against pre-pivot data; use dashboard `[Approve]` / `[Dismiss]`.
-- `arcforge learn materialize <candidate-id> --project` — legacy materialization (writes project-relative `.draft` siblings); post-pivot drafts live in `~/.arcforge/learning/drafts/<cid>/<mid>/instincts/<name>.md` via dashboard `[Materialize]`.
+- `arcforge learn approve <candidate-id> --project` / `arcforge learn reject <candidate-id> --project` — legacy approval/rejection; use dashboard `[Approve]` / `[Dismiss]`.
+- `arcforge learn materialize <candidate-id> --project` — legacy materialization (writes project-relative `.draft` siblings); current drafts live in `~/.arcforge/learning/drafts/<cid>/<mid>/instincts/<name>.md` via dashboard `[Materialize]`.
 - `arcforge learn activate <candidate-id> --project` — legacy activation; use dashboard `[Activate]` (Layer 8 activate.js).
 - `arcforge learn inspect <candidate-id> --project` / `arcforge learn drafts --project` — legacy inspection; use dashboard candidate card.
 
@@ -47,7 +47,7 @@ Use `--json` on any command when another tool or test needs machine-readable out
 1. **Confirm enablement.** Run `arcforge learn status [--json]`. Learning is disabled by default for both project and global scopes.
 2. **Enable only when requested.** Run `arcforge learn enable --project` for project-local learning. After enablement, the observer daemon assembles evidence batches, calls the LLM curator, and automatically queues **pending candidates** in the candidate queue.
 3. **Automatic candidate queueing.** Once enabled, the daemon's LLM curator converts batched observations into pending candidates. The automatic trigger only appends candidate records; it does not approve, materialize, activate, tag, push, publish, or change runtime behavior.
-4. **Review via dashboard.** Run `arcforge learn dashboard` to open the browser control plane at `http://localhost:3334`. The dashboard is the canonical post-pivot review surface.
+4. **Review via dashboard.** Run `arcforge learn dashboard` to open the browser control plane at `http://localhost:3334`. The dashboard is the canonical review surface.
 5. **Approve or dismiss.** Use the dashboard `[Approve]` or `[Dismiss]` action. Approval is required before any artifact is written.
 6. **Materialize as inactive drafts.** Use the dashboard `[Materialize]` action. Draft artifacts are written to `~/.arcforge/learning/drafts/<candidate-id>/<materialization-id>/instincts/<name>.md` — these are inactive review files; they are not loaded into Claude context.
 7. **Inspect before activation.** Open the candidate card on the dashboard; preview the draft body before activating.
@@ -93,4 +93,4 @@ The full set of statuses a candidate moves through:
 
 ## Legacy Compatibility
 
-`skills/arc-learning/scripts/learn.js` remains in the tree for older instinct-clustering tests and compatibility, but the supported MVP surface is the `arcforge learn ...` lifecycle above. Do not use the legacy script to bypass candidate approval, inactive draft materialization, or explicit activation gates.
+The supported surface is the `arcforge learn ...` lifecycle above. Do not use the legacy `skills/arc-learning/scripts/learn.js` to bypass candidate approval, inactive draft materialization, or explicit activation gates.

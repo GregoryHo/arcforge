@@ -551,8 +551,7 @@ module.exports = {
   handleDashboardAction,
 };
 
-// Re-export HTTP layer for backward compat with existing callers/tests that
-// imported these symbols from learning-dashboard.js before the http extraction.
+// Re-export HTTP layer symbols for callers that import them from this module.
 const httpLayer = require('./learning-dashboard-http');
 module.exports.hasDashboardWriteHeader = httpLayer.hasDashboardWriteHeader;
 module.exports.createRouter = httpLayer.createRouter;

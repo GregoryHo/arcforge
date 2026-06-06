@@ -51,9 +51,6 @@ function computeScenarioHash(contents) {
  * keeps per-model preflight records distinct and prevents one model's
  * PASS from silently unblocking A/B runs on another model.
  *
- * Pre-fix records used `${hash}.json` and will simply orphan after this
- * change. Users re-run preflight once; no migration required.
- *
  * @param {string} hash - Scenario content hash from computeScenarioHash
  * @param {string|undefined} model - Model identifier from --model, or
  *   undefined if not specified (which means "harness default model")
@@ -269,8 +266,8 @@ module.exports = {
   // Exported so other CLI dispatchers (e.g. `arc eval lint`) share one
   // resolver. Lookup-by-`# Eval:` name with filename fallback is the
   // semantics `arc eval run` / `arc eval ab` already use; centralizing
-  // here keeps the lint command from re-implementing the broken
-  // hardcoded-filename pattern that F7 originally fixed.
+  // here keeps the lint command from re-implementing a hardcoded-filename
+  // pattern.
   resolveScenarioFile,
   runPreflight,
   checkPreflightGate,

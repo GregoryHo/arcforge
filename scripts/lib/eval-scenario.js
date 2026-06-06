@@ -1,9 +1,9 @@
 /**
  * eval-scenario.js - Scenario parsing, discovery, and claim-type classification
  *
- * Extracted from eval.js to maintain file size limits. Parses eval scenario
- * markdown into structured objects, lists/finds scenarios under a project, and
- * normalizes/infers evidence claim types. Also owns SCENARIOS_DIR.
+ * Parses eval scenario markdown into structured objects, lists/finds scenarios
+ * under a project, and normalizes/infers evidence claim types. Also owns
+ * SCENARIOS_DIR.
  *
  * Dependency direction is one-way: eval.js imports and re-exports the public
  * functions and SCENARIOS_DIR here; this module never imports from ./eval.
@@ -146,10 +146,7 @@ function parseScenario(filePath, projectRoot) {
   // Assertion bullets can be markdown checkboxes (`- [ ]` / `- [x]`) for text
   // assertions OR behavioral forms like `- [tool_called] Bash:cmd`. Strip ONLY
   // the markdown checkbox shell; leave behavioral `[tool_*]` prefixes intact so
-  // downstream parseBehavioralAssertion can recognise them. An earlier strip
-  // pattern `[ x\w_]*` was greedy enough to eat `tool_called` too, which caused
-  // behavioral assertions to be silently reclassified as text and routed to the
-  // model grader.
+  // downstream parseBehavioralAssertion can recognise them.
   const assertions = (sections.assertions || [])
     .filter((line) => line.match(/^-\s*\[[^\]]*\]/))
     .map((line) =>

@@ -141,19 +141,6 @@ still running. If you see this error:
    hasn't finished), you should not be at Step 8 yet — go back to
    Step 5 (monitor) and wait for terminal state.
 
-## Rationale recap
-
-The whole wrap-up sequence exists because the observed baseline
-(qmd 2026-04-11 dispatch) ended with the lead emitting a Final Report
-and stopping. The team was never torn down, panes were never closed,
-worktrees were never cleaned. The user manually discovered all three
-leaks.
-
-The fix is structural: make Step 8 explicit about the three actions,
-put the detailed reasoning in this reference so the SKILL.md body
-stays terse, and surface the "evidence per epic" format so the lead
-self-audits whether Step 6 actually happened.
-
 ## Known limitation: dag.yaml is race-prone during active dispatch
 
 dag.yaml is a shared mutable file in the base worktree. During an
@@ -165,8 +152,7 @@ active dispatch, it can be read/written by:
 - `arcforge expand` for queued epics
 - `arcforge cleanup` at wrap-up
 
-The `_dagTransaction` helper (introduced in the `fix: serialize merge
-dag transaction` series) serializes Coordinator-to-Coordinator races
+The `_dagTransaction` helper serializes Coordinator-to-Coordinator races
 via file locking. But it does **NOT** protect against:
 
 1. **Lead editing dag.yaml directly in a text editor** while a
@@ -175,10 +161,9 @@ via file locking. But it does **NOT** protect against:
 2. **Non-Coordinator scripts** that write dag.yaml directly (e.g., a
    custom hook that updates status via `fs.writeFileSync`).
 
-The qmd 2026-04-12 dispatch observed multiple dag.yaml conflicts
-during expand/cleanup/lead-edit interplay — all resolvable but
-surprising to the lead who didn't expect the file to be a shared
-concurrent resource.
+These dag.yaml conflicts during expand/cleanup/lead-edit interplay are
+resolvable but can surprise a lead who doesn't expect the file to be a
+shared concurrent resource.
 
 ### Practical advice for the lead
 

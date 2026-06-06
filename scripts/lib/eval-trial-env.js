@@ -1,9 +1,9 @@
 /**
  * eval-trial-env.js - Trial directory lifecycle and isolation settings
  *
- * Extracted from eval.js to maintain file size limits. Manages the isolated
- * temp directories each trial runs in: creation, git boundary, cleanup, setup
- * command execution, and the .claude/settings.json isolation payload.
+ * Manages the isolated temp directories each trial runs in: creation, git
+ * boundary, cleanup, setup command execution, and the .claude/settings.json
+ * isolation payload.
  *
  * Dependency direction is one-way: eval.js imports and re-exports the public
  * functions here; this module never imports from ./eval.

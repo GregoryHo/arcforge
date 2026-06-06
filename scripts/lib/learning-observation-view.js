@@ -100,9 +100,6 @@ function extractSkillNameFromInput(toolName, toolInput) {
 /**
  * Derive a DerivedSemanticView from a tool name and tool input at read time.
  *
- * The signature is intentionally compatible with the function previously
- * inlined in hooks/observe/main.js so callers can import from this module.
- *
  * @param {string} toolName
  * @param {object|null|undefined} toolInput
  * @returns {object} DerivedSemanticView

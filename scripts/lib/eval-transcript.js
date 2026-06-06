@@ -1,9 +1,9 @@
 /**
  * eval-transcript.js - Stream-json parsing and transcript action extraction
  *
- * Extracted from eval.js to maintain file size limits. Self-contained leaf:
- * pure functions that parse Claude stream-json output into text/rich
- * transcripts and structured Action objects. No dependencies beyond each other.
+ * Self-contained leaf: pure functions that parse Claude stream-json output into
+ * text/rich transcripts and structured Action objects. No dependencies beyond
+ * each other.
  *
  * Dependency direction is one-way: eval.js imports and re-exports the public
  * functions here; this module never imports from ./eval.

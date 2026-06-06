@@ -294,8 +294,8 @@ function buildObservedEvidence(toolName, toolInput) {
   }
 }
 
-// summarizeToolInput is now a read-time helper imported from
-// scripts/lib/learning-observation-view (Decision 4 — not persisted).
+// summarizeToolInput is a read-time helper in
+// scripts/lib/learning-observation-view — not persisted here.
 
 /**
  * Archive observations file if it exceeds MAX_FILE_SIZE.
@@ -465,7 +465,7 @@ function main() {
     // Lazy-start daemon when enough observations have accumulated.
     spawnDaemonIfNeeded(obsPath);
 
-    // Wake the LLM-curation daemon; statistical auto-trigger retired (Slice A).
+    // Wake the LLM-curation daemon.
     signalDaemon();
   } catch {
     // Non-blocking — never fail the hook

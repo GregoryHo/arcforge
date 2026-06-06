@@ -1,9 +1,10 @@
 /**
  * sdd-rules.js — Schema rule constants for _pending-conflict.md and decision-log.
  *
- * Extracted from sdd-utils.js to avoid a circular dependency between
- * sdd-utils.js and sdd-validators.js. Both modules import from here.
- * sdd-utils.js re-exports these constants so the public API is unchanged.
+ * These constants live here, separate from sdd-utils.js, to avoid a circular
+ * dependency between sdd-utils.js and sdd-validators.js. Both modules import
+ * from here; sdd-utils.js re-exports them so callers can import from either
+ * module.
  *
  * These are fr-sd-012 (PENDING_CONFLICT_RULES) and fr-sd-013 (DECISION_LOG_RULES)
  * schema constants — single source of truth for downstream validators and tests.

@@ -98,7 +98,7 @@ Always use Grep to find the exact location before using Edit.
 
 ## Confidence Lifecycle
 
-Confidence is metadata stored on the candidate / activated instinct record. It does **not** drive runtime auto-loading (Slice A removed SessionStart auto-load). It informs which records to surface in dashboard / `/recall` / history views.
+Confidence is metadata stored on the candidate / activated instinct record. It does **not** drive runtime auto-loading. It informs which records to surface in dashboard / `/recall` / history views.
 
 ```
 Auto-detected by daemon: confidence 0.5
@@ -169,7 +169,7 @@ Patterns appearing in 2+ projects can be promoted to `~/.arcforge/instincts/glob
 
 ### Ignoring Low-Confidence Instincts
 **Wrong:** Treating all instincts equally
-**Right:** Surface >= 0.7 prominently in dashboard / `/recall`; summaries for 0.3-0.7; hide < 0.3. Confidence informs surfacing, not runtime auto-loading (Slice A removed SessionStart auto-load).
+**Right:** Surface >= 0.7 prominently in dashboard / `/recall`; summaries for 0.3-0.7; hide < 0.3. Confidence informs surfacing, not runtime auto-loading.
 
 ### Not Updating Confidence
 **Wrong:** Showing instincts without offering confirm/contradict

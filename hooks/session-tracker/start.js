@@ -7,12 +7,10 @@
  * 2. Check/start observer daemon
  * 3. Run decay cycles on instincts
  *
- * IMPORTANT: This file was split from the original start.js:
- * - inject-context.js (sync): Handles context injection to Claude
- * - start.js (async): Handles background tasks (this file)
- *
- * If you need context-related functions (findRecentSessions, formatSessionContext, etc.),
- * import from inject-context.js instead of this file.
+ * Context injection to Claude lives in inject-context.js (sync); this file
+ * handles async background tasks. If you need context-related functions
+ * (findRecentSessions, formatSessionContext, etc.), import them from
+ * inject-context.js.
  *
  * Note: Counters accumulate until threshold is met in end.js or pre-compact/main.js.
  */

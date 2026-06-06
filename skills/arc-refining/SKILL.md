@@ -249,7 +249,7 @@ Before Phase 6 output validation, re-read each requirement's `<description>` aga
 - **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test. Remediation hint: "widen ACs to cover failure path, or narrow description to match ACs."
 - **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes. Remediation hint: "align verbs across description and ACs for the same axis."
 
-If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions, which is precisely Pattern 3 of the eval evidence.
+If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions.
 
 **Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):** call `writeConflictMarker` (recipe above in Phase 4) with these values:
 - `axis_fired: '3'`
@@ -263,7 +263,7 @@ This is the single recovery surface for every R3 BLOCK — self-contradiction is
 
 Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) citable source. This is the LLM-judgment layer of axis 3 (the mechanical layer runs at Phase 6 via `mechanicalAuthorizationCheck` — Phase 5.5b is LLM judgment, Phase 6 is the mechanical follow-up over `<trace>` elements). Criteria with no citable source trigger BLOCK per fr-rf-001 axis 3.
 
-If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1, R3 enforcement severity).** Phase 5.5 findings MUST NOT be downgraded to WARNING — Pattern 3 applies here too. Before exiting non-zero:
+If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1, R3 enforcement severity).** Phase 5.5 findings MUST NOT be downgraded to WARNING. Before exiting non-zero:
 
 1. Call `writeConflictMarker` (same pattern as Phase 4 block shown above), setting `axis_fired: '3'`.
 2. Print to terminal: which criterion has no source, and the 1–3 candidate resolutions.

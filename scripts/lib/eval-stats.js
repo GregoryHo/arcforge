@@ -2,7 +2,6 @@
  * eval-stats.js - Statistical analysis for eval results
  *
  * Pure functions for computing metrics, confidence intervals, and verdicts.
- * Extracted from eval.js to keep orchestration and analysis separate.
  *
  * Zero external dependencies — Node.js standard library only.
  */
