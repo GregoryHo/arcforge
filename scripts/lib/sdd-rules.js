@@ -187,7 +187,155 @@ const DECISION_LOG_RULES = Object.freeze({
   ]),
 });
 
+// -----------------------------------------------------------------------------
+// VISION_RULES — schema constants for vision.md artifacts (product + per-spec).
+// -----------------------------------------------------------------------------
+// Two tiers (both date-less, outside DESIGN_DOC_RULES.path_regex governance):
+//   product/vision.md       — product-level north star; LLM-readonly; human-edited.
+//                             Defines P-n principles referenced by decisions.
+//   specs/<id>/vision.md    — per-spec scope chapter; references product P-n via
+//                             principle_ref fields on decision entries.
+//
+// VISION_RULES is deliberately NOT registered in sdd-rules-invariants.test.js
+// RULE_REGISTRY. Its two-tier structure (product principles list + per-spec chapter)
+// does not map cleanly to a single {key,type}[] required-fields array that satisfies
+// the cross-rules invariant contract. Shape coverage is carried by validateVision's
+// own tests (tests/scripts/sdd-d6-vision.test.js).
+//
+// Deep-frozen: nested arrays and objects are also frozen so mutation at any depth
+// is rejected.
+const VISION_RULES = Object.freeze({
+  // Product-level north star: single file, shared across all specs.
+  product_canonical_path: 'product/vision.md',
+  // Per-spec scope chapter: one per spec, references product P-n.
+  spec_canonical_path: 'specs/<spec-id>/vision.md',
+  // Principle identifier pattern in product/vision.md.
+  // Matches e.g. "P-1", "P-12" at the start of a line (typically "P-1." or "P-1:").
+  principle_id_re: Object.freeze(/^(P-\d+)/m),
+  // principle_ref field in per-spec decisions.yml entries; value must resolve to
+  // a P-n identifier present in product/vision.md.
+  principle_ref_key: 'principle_ref',
+  // LLM access: vision files are human-written anchors. Agents MUST NOT write
+  // to vision.md. Enforcement is via write-path blocking in the harness; this
+  // constant documents the intent for validators and schema views.
+  llm_access: 'readonly',
+});
+
+// -----------------------------------------------------------------------------
+// DECISION_LEDGER_RULES — schema constants for decisions.yml (per-spec, append-only).
+// -----------------------------------------------------------------------------
+// Mirrors DECISION_LOG_RULES's {key,type,description}[] shape so generic schema
+// tooling (print-schema, cross-rules lints) can iterate both constants uniformly.
+//
+// decisions.yml is the cross-iteration strategic WHY ledger, distinct from the
+// per-session decision-log.yml Q&A trace.
+//
+// Required fields (MUST appear in every entry — missing any is ERROR):
+//   D-id, date, spec_version, status, decision, why, authorized_values
+// Optional fields (MAY be absent — absence is benign, not an error):
+//   supersedes, ratified_by, principle_ref
+//
+// status semantics:
+//   'proposed'           — drafted, awaiting attended ratification.
+//   'accepted'           — ratified by a human via 'arcforge ratify'.
+//   'superseded-by:D-NNN'— superseded by a newer entry (open-ended string).
+//
+// status is typed 'string' (not 'enum') because 'superseded-by:D-NNN' is
+// open-ended and the invariant test hard-pairs type='enum' with an 'allowed' array.
+//
+// Deep-frozen: nested arrays and objects are also frozen so mutation at any depth
+// is rejected.
+const DECISION_LEDGER_RULES = Object.freeze({
+  canonical_path: 'specs/<spec-id>/decisions.yml',
+  // Required fields: MUST appear in every ledger entry.
+  required_fields: Object.freeze([
+    Object.freeze({
+      key: 'D-id',
+      type: 'string',
+      description:
+        'Monotonically increasing unique decision identifier (e.g. D-001, D-002). ' +
+        'Non-increasing or duplicate D-id within a ledger is ERROR.',
+    }),
+    Object.freeze({
+      key: 'date',
+      type: 'string',
+      description: 'ISO date when this decision was recorded (YYYY-MM-DD).',
+    }),
+    Object.freeze({
+      key: 'spec_version',
+      type: 'string',
+      description: 'Spec version (design_iteration) active when this decision was recorded.',
+    }),
+    Object.freeze({
+      key: 'status',
+      type: 'string',
+      description:
+        "Decision status. One of: 'proposed' (drafted, not yet ratified), " +
+        "'accepted' (ratified by human via arcforge ratify), or " +
+        "'superseded-by:D-NNN' (superseded by a newer entry — open-ended string form). " +
+        'Status transitions other than via supersede are ERROR.',
+    }),
+    Object.freeze({
+      key: 'decision',
+      type: 'string',
+      description:
+        'Prose description of the decision made. Once recorded, this text is immutable — ' +
+        'editing it against HEAD is ERROR. Corrections require a superseding entry.',
+    }),
+    Object.freeze({
+      key: 'why',
+      type: 'string',
+      description:
+        'Rationale for the decision. Once recorded, this text is immutable — ' +
+        'editing it against HEAD is ERROR. Corrections require a superseding entry.',
+    }),
+    Object.freeze({
+      key: 'authorized_values',
+      type: 'list',
+      description:
+        'Structured list of concrete values authorized by this decision (e.g. ["window=60s"]). ' +
+        'mechanicalAuthorizationCheck compares cited trace values against this list (exact match, ' +
+        'not substring). Required even if empty ([]) so the field is always present.',
+    }),
+  ]),
+  // Optional fields: MAY appear in entries; absence is benign.
+  // Documented here for schema views and validators; not enforced as required.
+  optional_fields: Object.freeze([
+    Object.freeze({
+      key: 'supersedes',
+      type: 'string',
+      description:
+        'D-id of the entry this decision supersedes (e.g. D-007). Required when status of ' +
+        'the referenced entry is being set to superseded-by:D-NNN.',
+    }),
+    Object.freeze({
+      key: 'ratified_by',
+      type: 'string',
+      description:
+        'Provenance marker set by arcforge ratify: identifies who ratified and when. ' +
+        'Required for status=accepted entries; absent on proposed entries.',
+    }),
+    Object.freeze({
+      key: 'principle_ref',
+      type: 'string',
+      description:
+        'Optional reference to a product-level vision principle (e.g. P-1). ' +
+        'validateDecisionLedger does not enforce this field; validateVision cross-checks it.',
+    }),
+  ]),
+  // Immutability contract (documented for validators and schema views):
+  //   decision and why text MUST NOT be edited after first commit.
+  //   Enforcement is HEAD-relative (git show HEAD:<path> diff).
+  //   Known limitation: within-session append-then-edit escapes the check
+  //   (same-session pre-commit modifications are not visible via HEAD).
+  //   Correcting a typo in frozen text has no in-place edit path:
+  //   record a correcting supersede entry, or amend the commit.
+  immutability: 'HEAD-relative; see validateDecisionLedger for enforcement semantics.',
+});
+
 module.exports = {
   PENDING_CONFLICT_RULES,
   DECISION_LOG_RULES,
+  VISION_RULES,
+  DECISION_LEDGER_RULES,
 };

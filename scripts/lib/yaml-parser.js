@@ -324,10 +324,41 @@ function stringifyDagYaml(dag) {
   return stringify(clean);
 }
 
+// ---------------------------------------------------------------------------
+// parseYamlSequence — helper for YAML root-level arrays.
+// ---------------------------------------------------------------------------
+// yaml-parser.js only supports YAML with an object at the root. Decision-log
+// and decision-ledger files are YAML sequences (root `- ` items). This helper
+// wraps the sequence in a `__seq__:` key, calls the existing parse(), and unwraps.
+//
+// Relocated from sdd-validators.js (where it was private) so sdd-utils.js can
+// import it without creating a circular dependency (sdd-utils -> sdd-validators
+// -> sdd-utils). yaml-parser.js is a leaf with no sdd-* dependencies.
+//
+// Supported row formats for sequence items:
+//   - key: value    (key-value lines at item indent)
+//
+function parseYamlSequence(content) {
+  // Wrap root-level `- ` items under a synthetic key so the existing parser
+  // can handle them. Each `- ` at column 0 becomes `  - ` under `__seq__:`.
+  const wrapped =
+    `__seq__:\n` +
+    content
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n');
+  const obj = parse(wrapped);
+  if (!obj || !Array.isArray(obj.__seq__)) {
+    return null;
+  }
+  return obj.__seq__;
+}
+
 module.exports = {
   parse,
   parseValue,
   stringify,
   parseDagYaml,
   stringifyDagYaml,
+  parseYamlSequence,
 };

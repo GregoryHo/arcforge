@@ -6,6 +6,8 @@ const {
   renderSpecMarkdown,
   renderDecisionLog,
   renderPendingConflict,
+  renderVision,
+  renderDecisionLedger,
 } = require('../../scripts/lib/print-schema');
 
 // ---------------------------------------------------------------------------
@@ -60,6 +62,18 @@ const SCHEMAS = [
     file: path.join(SCHEMAS_DIR, 'pending-conflict.md'),
     render: () => renderPendingConflict({ markdown: true }),
     sourceConstant: 'PENDING_CONFLICT_RULES',
+  },
+  {
+    target: 'vision',
+    file: path.join(SCHEMAS_DIR, 'vision.md'),
+    render: () => renderVision({ markdown: true }),
+    sourceConstant: 'VISION_RULES',
+  },
+  {
+    target: 'decision-ledger',
+    file: path.join(SCHEMAS_DIR, 'decision-ledger.md'),
+    render: () => renderDecisionLedger({ markdown: true }),
+    sourceConstant: 'DECISION_LEDGER_RULES',
   },
 ];
 
