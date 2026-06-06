@@ -76,6 +76,7 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 **Start with context:**
 
 - Check current project state (files, docs, recent commits)
+- If `product/vision.md` exists, read it as context (read-only) — it states the product's long-horizon intent and `P-n` principles, so a new spec aligns with stated direction
 - Understand the domain and constraints
 
 **Ask questions one at a time:**
@@ -103,6 +104,10 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 - Propose a kebab-case spec-id based on the topic
 - Ask user to confirm or modify: `"Proposed spec-id: <suggestion>. OK?"`
 - The spec-id MUST NOT be finalized before Phase 2 completes
+
+### Phase 2 Decision-Ledger Output (D6)
+
+After the proposed approaches and trade-offs are clear, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant design decision. Follow the `DECISION_LEDGER_RULES` field shape (same as the "When Prior Spec Exists" branch above). If `specs/<spec-id>/decisions.yml` does not yet exist, create it as a YAML sequence. The B2 immutability hook enforces append-only on all writes to `decisions.yml`.
 
 ### Phase 3: Presenting
 
@@ -146,7 +151,9 @@ Before asking the user anything:
 
 1. Read `specs/<spec-id>/spec.xml` — understand the current spec version and scope
 2. Read all previous design iterations under `docs/plans/<spec-id>/*/design.md` — understand the evolution history
-3. Summarize the current state briefly to the user so they have shared context
+3. If `specs/<spec-id>/vision.md` exists, read it as context (read-only). Vision P-n describes the product's long-horizon intent and informs which change directions align with the stated vision. Do NOT write to or modify `vision.md` — it is an input artifact only.
+4. If `specs/<spec-id>/decisions.yml` exists, read it as context (read-only). The existing ledger entries show which decisions are already recorded, their rationale, and their current status.
+5. Summarize the current state briefly to the user so they have shared context
 
 ### Phase 2: Elicit the Change Intent
 
@@ -175,6 +182,26 @@ That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
 Brainstorming MUST set `deferral_signal: true` according to `DECISION_LOG_RULES.deferral_signal_canonical_phrases` from the generated schema/source constants (currently including `use defaults`, `covered.`, `skip`, and `you decide`). Implementations MAY extend this list with additional deferral phrases, but any extension MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is authoritative — when the list changes there, the detection rule changes automatically.
 
 **Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
+
+#### Phase 2 Decision-Ledger Output (D6)
+
+After the user's change intent is clear and the key rationale is established, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant design decision made during this brainstorming session. Follow the `DECISION_LEDGER_RULES` field shape exported from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`:
+
+```yaml
+- D-id: D-NNN          # monotonically increasing, e.g. D-001, D-002
+  date: YYYY-MM-DD
+  spec_version: N      # current spec version number
+  status: proposed
+  decision: "<one-sentence statement of the decision>"
+  why: "<rationale — what problem it solves and why this choice>"
+  authorized_values: "<the specific value or range authorized, or 'any'>"
+```
+
+**Append-only:** never edit existing entries — `decisions.yml` is an append-only ledger. The B2 immutability hook will deny any write that modifies a frozen entry's `decision` or `why` text. If a decision changes, record a new superseding entry (`supersedes: D-NNN`) instead of editing in-place.
+
+**Mode-agnostic:** recording `status: proposed` decisions applies to both new-spec and iteration brainstorming sessions.
+
+If `specs/<spec-id>/decisions.yml` does not yet exist, create it as a YAML sequence.
 
 ### Phase 3 Output
 

@@ -100,6 +100,54 @@ node -e "
 - If `valid` is `false` with only WARNINGs — proceed but surface the warnings to the user.
 - If `valid` is `true` — proceed.
 
+## Phase 2.5 — Vision and Decision-Ledger Context (D6)
+
+After input validation passes, load vision and ledger context (read-only), then validate them.
+
+### 2.5a — Load Context
+
+If `specs/<spec-id>/vision.md` exists, read it as context — it describes the product's long-horizon intent and informs which design changes align with the stated vision. If `specs/<spec-id>/decisions.yml` exists, read it as context — the existing ledger entries show which decisions are already recorded and their status.
+
+Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do NOT edit existing ledger entries; the B2 immutability hook will deny any such write.
+
+### 2.5b — Validate Vision and Ledger (node -e gate)
+
+```bash
+node -e "
+  const { parseVision, validateVision, parseDecisionLedger, validateDecisionLedger,
+          getHeadLedgerContent, parseDecisionLedgerContent } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
+  const fs = require('fs');
+
+  // Vision gate — no-op when spec vision absent.
+  const productVisionPath = 'product/vision.md';
+  const specVisionPath = 'specs/<spec-id>/vision.md';
+  const productParsed = fs.existsSync(productVisionPath) ? parseVision(productVisionPath) : null;
+  const specParsed = fs.existsSync(specVisionPath) ? parseVision(specVisionPath) : null;
+  const visionResult = validateVision(productParsed, specParsed);
+  if (!visionResult.valid) {
+    console.log(JSON.stringify(visionResult, null, 2));
+    process.exit(1);
+  }
+
+  // Ledger gate — no-op when absent.
+  const ledgerPath = 'specs/<spec-id>/decisions.yml';
+  const current = parseDecisionLedger(ledgerPath);
+  if (current !== null) {
+    const headContent = getHeadLedgerContent(ledgerPath, process.cwd());
+    const previous = parseDecisionLedgerContent(headContent);
+    const result = validateDecisionLedger(current, previous);
+    if (!result.valid) {
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+  }
+
+  console.log('vision+ledger gate: OK');
+"
+```
+
+No-op rule: when `specs/<spec-id>/decisions.yml` and `specs/<spec-id>/vision.md` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
+
 ## Phase 3 — Detect Behavior Context
 
 Check the filesystem for a prior spec at the canonical path:
@@ -231,6 +279,7 @@ Rules for the **new** (current sprint's) delta:
 - `delta.version` MUST equal the new `spec_version`
 - `delta.iteration` MUST equal the new `source/design_iteration`
 - `<added>` and `<modified>` ref MUST correspond to a real requirement in current detail files
+- `<added>` and `<modified>` items SHOULD carry a `decision` attribute pointing to the relevant ledger entry when a `specs/<spec-id>/decisions.yml` entry exists that authorized the addition or change. Example: `<added ref="fr-foo-001" decision="D-003" />`. Use the D-id of the `proposed` or `accepted` ledger entry that captures the rationale. Omit the attribute when no ledger entry covers this item.
 - `<removed>` MUST include a `<reason>` child; `<migration>` is optional. The implementer LLM reads both as teardown guidance — phrase them with that reader in mind, not just for human archive purposes.
 - `<renamed>` is **body-unchanged only** — `ref_new` MUST exist in current detail files; semantic changes use `<removed>` + `<added>`, never `<renamed>` + `<modified>`.
 

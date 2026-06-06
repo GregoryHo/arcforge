@@ -90,6 +90,24 @@
         ]
       },
       {
+        "matcher": "tool == \"Edit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-ledger-guard/main.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "tool == \"Write\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-ledger-guard/main.js\""
+          }
+        ]
+      },
+      {
         "matcher": ".*",
         "hooks": [
           {
