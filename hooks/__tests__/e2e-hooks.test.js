@@ -50,10 +50,6 @@ function runBashHook(scriptPath, stdinJson, env = {}) {
   return runHook('bash', scriptPath, { stdinJson, env });
 }
 
-function runPythonHook(scriptPath, stdinJson, env = {}) {
-  return runHook('python3', scriptPath, { stdinJson, env, cwd: PROJECT_ROOT });
-}
-
 /**
  * Build hook event input JSON matching real Claude Code schema.
  * Fields based on captured live session input (2026-03-30).
@@ -240,85 +236,6 @@ describe('E2E: session-tracker/start.js', () => {
   it('should exit 0 with empty stdin', () => {
     const result = runNodeHook(scriptPath, '', { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-});
-
-// ─────────────────────────────────────────────
-// SessionStart: log-lightweight.py
-// ─────────────────────────────────────────────
-
-describe('E2E: log-lightweight.py', () => {
-  const scriptPath = path.join(HOOKS_DIR, 'log-lightweight.py');
-  let testDir;
-
-  beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-log-lw-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('should create state file and log on SessionStart', () => {
-    const input = makeSessionStartInput('startup', { cwd: testDir });
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-
-    const logDir = path.join(testDir, '.claude', 'logs', 'lightweight');
-    assert.ok(fs.existsSync(path.join(logDir, '.state.json')), 'Should create state file');
-  });
-
-  it('should build timeline across SessionStart + PostToolUse', () => {
-    const sessionId = 'test-timeline';
-    const transcriptPath = '/tmp/test-timeline.jsonl';
-
-    // SessionStart
-    runPythonHook(
-      scriptPath,
-      makeSessionStartInput('startup', {
-        cwd: testDir,
-        session_id: sessionId,
-        transcript_path: transcriptPath,
-      }),
-      { PYTHONPATH: HOOKS_DIR },
-    );
-
-    // PostToolUse (Write)
-    runPythonHook(
-      scriptPath,
-      makeToolUseInput(
-        'PostToolUse',
-        'Write',
-        { file_path: '/tmp/test.js' },
-        {
-          cwd: testDir,
-          session_id: sessionId,
-          transcript_path: transcriptPath,
-          tool_response: { type: 'create' },
-        },
-      ),
-      { PYTHONPATH: HOOKS_DIR },
-    );
-
-    // Verify state has timeline with tool entry
-    const stateFile = path.join(testDir, '.claude', 'logs', 'lightweight', '.state.json');
-    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
-    assert.ok(Array.isArray(state.timeline), 'Should have timeline array');
-    const toolEntries = state.timeline.filter((e) => e.type === 'tool');
-    assert.ok(toolEntries.length > 0, 'Timeline should contain tool entries');
-    assert.strictEqual(toolEntries[0].tool, 'Write', 'Should track Write tool');
-  });
-
-  it('should exit 0 with empty stdin and no stderr', () => {
-    const result = runPythonHook(scriptPath, '', { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0);
-    assert.strictEqual(result.stderr.trim(), '', 'Should not produce stderr on empty stdin');
-  });
-
-  it('should exit 0 with malformed JSON', () => {
-    const result = runPythonHook(scriptPath, 'not valid json', { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0);
   });
 });
 
@@ -612,68 +529,5 @@ describe('E2E: session-tracker/end.js', () => {
       TMPDIR: testDir,
     });
     assert.strictEqual(result.exitCode, 0);
-  });
-});
-
-// ─────────────────────────────────────────────
-// log-lightweight.py (Other Events)
-// ─────────────────────────────────────────────
-
-describe('E2E: log-lightweight.py (Other Events)', () => {
-  const scriptPath = path.join(HOOKS_DIR, 'log-lightweight.py');
-  let testDir;
-
-  beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-log-other-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('should exit 0 on UserPromptSubmit', () => {
-    const input = makeUserPromptInput('hello world', { cwd: testDir });
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-
-  it('should exit 0 on PostToolUse', () => {
-    const input = makeToolUseInput(
-      'PostToolUse',
-      'Edit',
-      { file_path: '/tmp/test.js' },
-      { cwd: testDir, tool_response: { type: 'edit' } },
-    );
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-
-  it('should exit 0 on Stop', () => {
-    const input = makeStopInput({ cwd: testDir });
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-
-  it('should exit 0 on SessionEnd', () => {
-    const input = makeHookInput('SessionEnd', { reason: 'other' }, { cwd: testDir });
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-
-  it('should exit 0 on SubagentStop', () => {
-    const input = makeHookInput('SubagentStop', {}, { cwd: testDir });
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-
-  it('should exit 0 on PermissionRequest', () => {
-    const input = makeToolUseInput(
-      'PermissionRequest',
-      'Bash',
-      { command: 'ls' },
-      { cwd: testDir },
-    );
-    const result = runPythonHook(scriptPath, input, { PYTHONPATH: HOOKS_DIR });
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
   });
 });
