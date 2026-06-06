@@ -5,10 +5,9 @@ logic; everything procedural and example-heavy lives here.
 
 ## Why acceptance is subagent-delegated, not inline
 
-Baseline behavior of a naive lead (observed in the qmd 2026-04-11
-dispatch): on teammate completion SendMessage, implicitly accept by
-mapping test names to acceptance criteria ("the test is named 'handles
-per-collection breakdown' → AC covered → pass"). Defer any genuine
+A naive lead will implicitly accept on the teammate's completion message
+by mapping test names to acceptance criteria ("the test is named 'handles
+per-collection breakdown' → AC covered → pass"), deferring any genuine
 "is this right?" check to a single aggregate `arc-verifying` after the
 whole dispatch. This fails in **three** ways:
 
@@ -141,12 +140,12 @@ overrule with inline reasoning.
 ## Spec defect vs implementation defect
 
 Sometimes spec-reviewer reports FAIL because **the spec itself is
-wrong**, not the implementation. The qmd 2026-04-12 dispatch observed
-this: the spec referenced `src/db.ts` but the codebase convention was
-`src/store.ts` — teammates correctly followed the convention, and
-spec-reviewer flagged a mismatch against the literal spec text. This
-appeared across 2 separate epics (epic-history and epic-bookmark),
-proving it was a spec-level typo, not an implementation-level mistake.
+wrong**, not the implementation. For example: a spec references
+`src/db.ts` but the codebase convention is `src/store.ts` — teammates
+correctly follow the convention, and spec-reviewer flags a mismatch
+against the literal spec text. When the same "mistake" appears across
+multiple independent epics, that is a signal of a spec-level typo, not an
+implementation-level mistake.
 
 ### How to distinguish
 

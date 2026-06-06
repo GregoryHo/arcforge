@@ -103,7 +103,7 @@ See references/grading-and-execution.md for environment setup, trial execution, 
 
 ### Grader Selection
 
-Three graders: **code** (deterministic checks), **model** (intent/quality/reasoning), **human** (audience-dependent taste or domain expertise). Match grader to assertion nature — not convenience.
+Three graders: **code** (deterministic checks), **model** (intent/quality/reasoning), **human** (audience-dependent taste or domain expertise). Match grader to assertion nature — not convenience. For discipline-skill compliance, `agents/skill-grader.md` also extracts and classifies rationalizations.
 
 **Grader selection principle:** Structured output (JSON, typed fields) does not make semantic quality deterministic. An agent can return valid JSON while producing poor analysis. Code-grade structure; model-grade quality.
 

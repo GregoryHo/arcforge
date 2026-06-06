@@ -1,9 +1,8 @@
 /**
  * eval-benchmark.js - Benchmark, metrics, and comparison reporting for the eval harness
  *
- * Extracted from eval.js to maintain file size limits. Provides token/duration
- * accounting, per-trial raw benchmark generation, benchmark summaries, and A/B
- * result comparison.
+ * Provides token/duration accounting, per-trial raw benchmark generation,
+ * benchmark summaries, and A/B result comparison.
  *
  * Dependency direction is one-way: this module imports orchestration helpers
  * (loadResults, listScenarios, parseScenario, inferClaimType, compactDate) from

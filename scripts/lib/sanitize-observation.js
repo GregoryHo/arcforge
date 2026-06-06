@@ -180,8 +180,8 @@ const EVIDENCE_STATUS = Object.freeze({
 
 // Sanitizer policy version — bumped when the redaction rule set changes in a
 // way that Layer 4 / Layer 5 / Layer 6 should treat as a different policy.
-// Per PR #31 reconcile 1.9: Layer 4 + Layer 5 must stamp the SAME value so the
-// secret-scan rule is consistent at both prompt-build time and queue-append time.
+// Layer 4 + Layer 5 must stamp the SAME value so the secret-scan rule is
+// consistent at both prompt-build time and queue-append time.
 const SANITIZER_POLICY_VERSION = 'v1';
 
 module.exports = {

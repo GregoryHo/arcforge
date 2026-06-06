@@ -212,21 +212,13 @@ In `hooks.json`:
 | SessionStart | inject-skills | sync | Inject arc-using skill content into Claude |
 | SessionStart | inject-context | sync | Inject active instincts + pending actions |
 | SessionStart | session-tracker/start | async | Initialize session file, run decay |
-| SessionStart | log-lightweight | async | Log session event |
 | UserPromptSubmit | user-message-counter | sync | Count user prompts |
-| UserPromptSubmit | log-lightweight | async | Log prompt |
 | PreToolUse | observe | async | Record tool call to observations |
-| PreToolUse | log-lightweight | async | Log pending tool |
 | PostToolUse | quality-check | sync | Auto-format, type-check, console.log warn |
 | PostToolUse | observe | async | Record tool result |
 | PostToolUse | compact-suggester | sync | Suggest /compact at threshold |
-| PostToolUse | log-lightweight | async | Log tool completion |
 | PreCompact | pre-compact | sync | Log compaction, update session |
 | Stop | session-tracker/end | sync | Update session, generate diary |
-| Stop | log-lightweight | async | Final log write |
-| SessionEnd | log-lightweight | async | Clear state |
-| SubagentStop | log-lightweight | async | Track subagent completion |
-| PermissionRequest | log-lightweight | async | Log permission request |
 
 ## Testing Hooks
 

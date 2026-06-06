@@ -61,8 +61,7 @@ Stop immediately if you catch yourself thinking:
    canonical path is derived at runtime; putting it elsewhere makes every
    downstream tool fail to find it.
 3. **"I'll hardcode `~/.arcforge/worktrees/...` in my output"** — NO. Read
-   the `path` field from the CLI's JSON output. The derivation rule has
-   evolved before and will evolve again.
+   the `path` field from the CLI's JSON output.
 4. **"I'll skip the dag.yaml check"** — NO. If the epic is not in the DAG,
    `arcforge expand` will refuse and that refusal is correct.
 5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a

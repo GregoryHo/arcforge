@@ -158,7 +158,7 @@ Apply YAGNI ruthlessly: only capture what the user explicitly states is changing
 
 #### Phase 2 Decision-Log Output (fr-bs-009)
 
-Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The v1 free-form `decision-log.md` is **replaced** by this structured format — the refiner now mechanically parses the decision-log via `parseDecisionLog`, so brainstorming MUST NOT emit the old free-form prose.
+Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The refiner parses this decision-log mechanically via `parseDecisionLog`, so brainstorming MUST NOT emit free-form prose.
 
 **Output path:** `<brainstorming-output-dir>/decision-log.yml`
 

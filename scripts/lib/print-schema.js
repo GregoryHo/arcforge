@@ -3,17 +3,10 @@
  * print-schema.js — single canonical way for skills / agents to learn the
  * shape of SDD artifacts.
  *
- * Why this exists:
- *   Skills used to embed hand-authored schema templates (e.g., arc-brainstorming
- *   Phase 3 Output had a literal `## Context (from spec v<N>)` code block).
- *   That created two sources of truth — skill and validator — and they drifted.
- *   One iteration the validator rejected the exact form the skill instructed.
- *
- *   This module replaces every embedded template. Skills now say "run
- *   print-schema.js to get the current schema" instead of copying it. The data
- *   comes directly from sdd-utils.js's exported rule constants, which are also
- *   what the validators consume. Drift is structurally impossible: there is
- *   one rule object and everything derives from it.
+ * Skills and agents run this to get the current schema instead of embedding
+ * hand-authored templates. The data comes directly from sdd-utils.js's exported
+ * rule constants, which are also what the validators consume — so there is one
+ * source of truth and the printed schema cannot drift from the validator.
  *
  * Usage:
  *   node scripts/lib/print-schema.js design               → terminal-friendly text (default)

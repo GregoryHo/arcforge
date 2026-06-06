@@ -71,7 +71,7 @@ evals/
 |-------|------|---------|
 | **eval-grader** | Grade individual eval outputs against rubrics | `arc eval run` (automated, model-graded scenarios) + manual dispatch |
 | **eval-analyzer** | Post-hoc qualitative analysis of A/B results | `arc eval compare` (automated, model/human-graded scenarios) + manual dispatch |
-| **eval-blind-comparator** | Anonymized paired-preference rating of A/B outputs | Manual dispatch (auto-trigger wired in grader-blind epic) |
+| **eval-blind-comparator** | Anonymized paired-preference rating of A/B outputs | Manual dispatch |
 
 **Important:** Numeric comparison is programmatic. The harness computes averages, `delta`, confidence intervals, and verdicts directly from saved results. `eval-analyzer` adds **qualitative** analysis for model/human-graded A/B results; it does not replace the programmatic numeric verdict.
 

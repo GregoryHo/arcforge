@@ -174,13 +174,13 @@ Aggregated results from multiple grading runs. Located at `benchmarks/<timestamp
 - `run_summary`: Statistical aggregates per configuration
   - Includes `compliance_rate` and `rationalization_count` alongside `pass_rate`
   - `delta`: Difference between with/without skill (negative rationalization_count delta = improvement)
-- `notes`: Freeform observations from the skill-analyzer agent
+- `notes`: Freeform observations from the eval-analyzer agent
 
 ---
 
 ## comparison.json
 
-Output from the skill-comparator agent (blind A/B comparison). Located at `<iteration-dir>/comparison.json`.
+Output from the eval-blind-comparator agent (blind A/B comparison). Located at `<iteration-dir>/comparison.json`.
 
 ```json
 {

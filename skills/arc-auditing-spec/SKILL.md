@@ -320,11 +320,11 @@ If you find yourself doing any of these, STOP immediately:
 
 ## Implementation Delegation
 
-Per fr-sc-003, this skill's phase content, the three sub-agent system prompts, and the eval scenarios validating audit correctness were produced through `arc-writing-skills`' TDD (RED → GREEN → REFACTOR) with recorded baseline-without-skill scenarios. Evals live under `skills/arc-auditing-spec/evals/` and exercise each of the three audit axes (fr-sc-003-ac2); the suite MUST pass before shipping.
+Per fr-sc-003, evals live under `skills/arc-auditing-spec/evals/` and exercise each of the three audit axes (fr-sc-003-ac2); the suite MUST pass before shipping.
 
 ## Cross-References
 
 - Agents: `agents/arc-auditing-spec-cross-artifact-alignment.md`, `agents/arc-auditing-spec-internal-consistency.md`, `agents/arc-auditing-spec-state-transition-integrity.md`
 - Spec: `specs/arc-auditing-spec/spec.xml` + `specs/arc-auditing-spec/details/{skill-contract,audit-agents,output-and-interaction}.xml`
-- Design: `docs/plans/arc-auditing-spec/2026-04-22/design.md` (v1, frozen) · `docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md` (v2 Change Intent — ceremony threshold rules)
+- Design: `docs/plans/arc-auditing-spec/2026-04-22/design.md` · `docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md`
 - Eval scenarios: `skills/arc-auditing-spec/evals/`

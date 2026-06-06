@@ -127,64 +127,22 @@ class TestSkillCreationChecklist:
         assert "checklist" in lowered or ("[ ]" in text)
 
 
-class TestEvaluationAgents:
-    """Test that evaluation agent templates exist and are properly structured."""
+class TestEvaluationOwnedByArcEvaluating:
+    """Eval/measurement is owned by arc-evaluating, not arc-writing-skills.
 
-    AGENT_FILES = [
-        "agents/skill-grader.md",
-        "agents/skill-comparator.md",
-        "agents/skill-analyzer.md",
-        "agents/description-tester.md",
-    ]
+    The grading/comparison/analysis agents and eval-schemas were consolidated into
+    skills/arc-evaluating/ — this skill must point there for structured evaluation
+    and must not re-host its own eval agent templates.
+    """
 
-    def test_agent_files_exist(self):
-        """All 4 agent templates must exist."""
-        for agent_file in self.AGENT_FILES:
-            path = SKILL_DIR / agent_file
-            assert path.exists(), f"Missing agent template: {agent_file}"
+    def test_no_local_eval_agents(self):
+        """arc-writing-skills must not carry its own eval agent templates."""
+        assert not (SKILL_DIR / "agents").exists(), "eval agents should live in arc-evaluating"
 
-    def test_agent_files_have_role_section(self):
-        """Each agent template must define its Role."""
-        for agent_file in self.AGENT_FILES:
-            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
-            assert "## Role" in content, f"{agent_file} missing ## Role section"
+    def test_points_to_arc_evaluating(self):
+        """SKILL.md must direct structured evaluation to arc-evaluating."""
+        assert "arc-evaluating" in _read_skill()
 
-    def test_agent_files_have_process_section(self):
-        """Each agent template must define its Process."""
-        for agent_file in self.AGENT_FILES:
-            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
-            assert "## Process" in content, f"{agent_file} missing ## Process section"
-
-    def test_agent_files_have_output_or_guidelines(self):
-        """Each agent template must define output format or guidelines."""
-        for agent_file in self.AGENT_FILES:
-            content = (SKILL_DIR / agent_file).read_text(encoding="utf-8")
-            has_output = "## Output" in content or "## Guidelines" in content
-            assert has_output, f"{agent_file} missing ## Output or ## Guidelines section"
-
-    def test_eval_schemas_exist(self):
-        """Evaluation schemas reference file must exist."""
-        path = SKILL_DIR / "references/eval-schemas.md"
-        assert path.exists(), "Missing references/eval-schemas.md"
-
-    def test_eval_schemas_has_required_schemas(self):
-        """Schemas file must define evals, grading, benchmark, and comparison."""
-        content = (SKILL_DIR / "references/eval-schemas.md").read_text(encoding="utf-8")
-        for schema in ["evals.json", "grading.json", "benchmark.json", "comparison.json"]:
-            assert schema in content, f"Missing schema definition: {schema}"
-
-
-class TestSupportingFilesReferenced:
-    """Test that all supporting files are referenced in SKILL.md."""
-
-    def test_agent_templates_referenced(self):
-        """All agent templates must be listed in Supporting Files."""
-        text = _read_skill()
-        for agent in ["skill-grader.md", "skill-comparator.md",
-                       "skill-analyzer.md", "description-tester.md"]:
-            assert agent in text, f"Agent {agent} not referenced in SKILL.md"
-
-    def test_eval_schemas_referenced(self):
-        """Eval schemas must be referenced in Supporting Files."""
-        text = _read_skill()
-        assert "eval-schemas.md" in text
+    def test_skill_grader_moved_to_arc_evaluating(self):
+        """The discipline-skill rationalization grader now lives in arc-evaluating."""
+        assert (Path("skills/arc-evaluating/agents/skill-grader.md")).exists()

@@ -40,7 +40,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-.claude/log-lightweight.config.json
 
 # Serena IDE config — contributor-only IDE state (per .claude/rules/dev-context.md "Ships = No")
 .serena/

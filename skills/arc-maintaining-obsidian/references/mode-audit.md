@@ -28,7 +28,7 @@ Mechanical primitives (schema compliance, orphan detection, untyped notes, tag h
 - **No Raw Source, referenced from 3+ notes** → flag for user decision.
 - **No Raw Source, referenced from 1-2 notes** → convert to plain text (preserves relationship without creating unsourced stubs).
 
-Never create stub entity notes without source backing — this was identified as an anti-pattern in prior audits.
+Never create stub entity notes without source backing.
 
 LINT generates/updates `index.md` in vault root — organized per vault-declared note types. This is what query mode reads first in Orient.
 

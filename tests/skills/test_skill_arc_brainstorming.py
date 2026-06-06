@@ -365,22 +365,21 @@ def test_arc_brainstorming_phase2_decision_log_schema_reference():
     )
 
 
-def test_arc_brainstorming_phase2_replaces_v1_free_form():
-    """fr-bs-009: v1 free-form decision-log.md is REPLACED by structured YAML.
+def test_arc_brainstorming_phase2_structured_decision_log():
+    """fr-bs-009: Phase 2 emits a structured YAML decision-log, not free-form prose.
 
-    SKILL.md must state that the structured format replaces the v1 free-form,
-    and must NOT describe emitting free-form prose decision-log.md.
+    SKILL.md must instruct structured decision-log emission and must NOT
+    describe emitting free-form prose decision-log.md.
     """
     text = _read_skill()
 
-    # Must say v1 free-form is replaced
-    has_replacement_notice = (
-        "replaced" in text.lower() and "decision-log" in text.lower()
-        or "replaces" in text.lower() and "decision-log" in text.lower()
-        or "no longer" in text.lower() and "decision-log" in text.lower()
+    # Must instruct structured decision-log emission
+    has_structured_rule = (
+        "structured decision-log" in text.lower()
+        or ("decision-log" in text.lower() and "yaml" in text.lower())
     )
-    assert has_replacement_notice, (
-        "SKILL.md must state that the v1 free-form decision-log.md is REPLACED by structured YAML"
+    assert has_structured_rule, (
+        "SKILL.md must instruct emitting the decision-log as structured YAML"
     )
 
     # Must NOT instruct brainstorming to emit free-form prose decision-log.md

@@ -6,18 +6,16 @@ SKILL.md references this file — do not duplicate the template there.
 ## Why the Authority section exists
 
 A terse spawn prompt (`"cd to X, invoke /arc-implementing, SendMessage on
-completion"`) was the original pattern. It caused a real failure mode in
-the qmd 2026-04-10 session: `worker-epic-history` stopped after Phase 0
-waiting for the lead to dispatch Phase 1, because the prompt never
-explicitly granted autonomous end-to-end execution authority.
+completion"`) is not enough: without an explicit grant of autonomous
+end-to-end execution authority, a teammate can stop after an early phase
+and wait for the lead to dispatch the next one.
 
 In a teammate context, the Claude session's default behavior is **more
 cautious than an interactive session**. An interactive session has zero
 cost to ask "should I proceed?" — the user responds immediately. A
 dispatched teammate asking the same question incurs a SendMessage
-round-trip to the lead (seconds to minutes), AND worse, the cautious
-teammate in the qmd incident did not even send the question — it just
-stopped.
+round-trip to the lead (seconds to minutes), AND worse, a cautious
+teammate may not even send the question — it just stops.
 
 The Authority section makes the grant **explicit**. It is the written
 form of what a mode-1 user says verbally when they open a session: "just
