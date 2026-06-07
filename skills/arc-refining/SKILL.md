@@ -11,6 +11,8 @@ description: Use when converting design documents to structured specs, when spec
 
 Every criterion the refiner emits MUST trace to a design phrase or a user Q&A row — invention from training-data inference is forbidden. No overwrite of earlier `<delta>` elements. No `refiner-report.md` artifact. No escape hatch from the DAG completion gate. On R3 axis block: write only `_pending-conflict.md` (the explicit ephemeral exception per fr-rf-015), exit non-zero, no authoritative state (`spec.xml`, `details/`). On non-R3 blocks: terminal output only, exit non-zero, zero filesystem state. If you find yourself wanting to fill an unbound axis with a "sensible default", trim history, write a block report, or add a `--force` flag, stop and surface the underlying need to the user instead.
 
+**Third authorization source (attended-only).** A `status: accepted` ledger entry in `specs/<spec-id>/decisions.yml` that carries `ratified_by` (minted by `arcforge ratify`) is a valid authorization source for a concrete MUST — but ONLY in attended mode (`ARCFORGE_MODE=attended`). In unattended mode this third source cannot be produced by the agent, and the three legal moves (see Phase 5's "No invention without authorization" section and the Mode-Split subsection) are unchanged. Authorization granularity is the VALUE, not the decision-id: citing an accepted decision authorizes ONLY the exact values listed in its `authorized_values` that the human confirmed at ratify, never arbitrary values derived from the decision's prose. A `<trace>D-NNN:value</trace>` cites a specific value from `authorized_values`; that exact value must appear in the accepted entry's list.
+
 **REQUIRED BACKGROUND:**
 - Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md` before producing any spec.xml (primary form) — it carries the canonical identity-header schema (required fields, supersedes format, delta-element rules), auto-generated from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`'s `SPEC_HEADER_RULES`. The CLI alternative `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec` produces equivalent content. This is the single source of truth — no templates, no hand-authored examples, no drift.
 - `references/spec-structure.md` — supplementary field tables for per-spec directory layout and detail-file requirement rules. Load when about to write files in Phase 5.
@@ -258,6 +260,26 @@ Inventing a concrete MUST from training-data common practice ("most rate-limiter
 **Every concrete MUST must be sourced (ac3).** For every concrete MUST the refiner is about to author, it MUST be able to point to a non-deferral source — either a design phrase that contains the concrete value, or a Q&A row whose `user_answer_verbatim` contains the concrete value with `deferral_signal=false`. If no such source exists, the criterion is invention and MUST NOT be authored; use one of the three legitimate moves instead. This rule is the runtime invariant that `mechanicalAuthorizationCheck` (in `${ARCFORGE_ROOT}/scripts/lib/sdd-validators.js`) verifies at Phase 6 — every concrete MUST in the produced spec will be checked mechanically, so any invention the LLM drafts here will be caught and cause a block downstream.
 
 Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
+
+### Mode-Split: Unattended vs. Attended
+
+The refiner reads `ARCFORGE_MODE` from the environment (set by the calling environment — NOT agent self-report). Any value other than `attended` is treated as UNATTENDED. The default when the variable is absent is UNATTENDED.
+
+**UNATTENDED path (default, byte-for-byte the same as before D6).** On a deferral or unbound/qualitative axis, the three legal moves above apply without change: downgrade to SHOULD/MAY, leave unbound, or BLOCK via `_pending-conflict.md`. In addition, the refiner MUST NOT take any of these actions in unattended mode:
+
+- MUST NOT write a `status: accepted` ledger entry.
+- MUST NOT self-ratify (i.e., set `ratified_by` on any entry without the `arcforge ratify` command having run).
+- MUST NOT treat a `D-NNN:` decision-trace as authorization for a concrete MUST unless the referenced entry already has `status: accepted` and `ratified_by` — which the agent itself cannot produce in unattended mode.
+- No "agent self-labels low-risk → auto-accept" escape hatch exists.
+
+**ATTENDED path (ARCFORGE_MODE=attended) — draft-then-ratify.** When the refiner is in attended mode and encounters a deferral signal ("you decide", "use defaults", "covered.", "skip") or an unbound/qualitative axis:
+
+1. **Draft a `status: proposed` ledger entry** in `specs/<spec-id>/decisions.yml` with `authorized_values` as a structured list (not prose). This records what the refiner would do but does NOT authorize any concrete MUST yet.
+2. **Stop and instruct the human:** print "Run `arcforge ratify <spec-id> D-NNN` to authorize the proposed values before this criterion can be written as a MUST."
+3. **Do NOT author the concrete MUST** until a ratified (`status: accepted` + `ratified_by`) entry exists in the ledger.
+4. Once ratification has occurred (the human has run `arcforge ratify`), the refiner may cite `<trace>D-NNN:value</trace>` where `value` is an exact item from `authorized_values` — the value the human confirmed at ratify.
+
+The refiner NEVER mints an `accepted` entry itself and NEVER authors the concrete MUST without a pre-existing ratified entry. The attended deferral clause (fr-rf-013) is a scoped addition to the unattended path: the unattended behavior is unchanged; the attended path adds a draft-then-ratify exit rather than unconditionally leaving the axis unbound or blocking.
 
 ### Version Increment (when prior spec exists)
 
