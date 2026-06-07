@@ -16,10 +16,12 @@ artifact is missing. Use the directory absence marker
 spec-id: <spec-id>
 
 Artifact paths (use absolute paths):
-  design.md:      <absolute-path-to-design.md OR "(absent — file does not exist)">
-  spec.xml:       <absolute-path-to-spec.xml OR "(absent — file does not exist)">
-  details/*.xml:  <absolute-path-to-details/ OR "(absent — directory does not exist)">
-  dag.yaml:       <absolute-path-to-dag.yaml OR "(absent — file does not exist)">
+  design.md:        <absolute-path-to-design.md OR "(absent — file does not exist)">
+  spec.xml:         <absolute-path-to-spec.xml OR "(absent — file does not exist)">
+  details/*.xml:    <absolute-path-to-details/ OR "(absent — directory does not exist)">
+  dag.yaml:         <absolute-path-to-dag.yaml OR "(absent — file does not exist)">
+  decisions.yml:    <absolute-path-to-decisions.yml OR "(absent — file does not exist)">
+  product/vision.md: <absolute-path-to-product/vision.md OR "(absent — file does not exist)">
 
 You are the <axis-name> audit axis. Follow your agent body exactly.
 Return your findings conforming to skills/arc-auditing-spec/references/finding-schema.md.
@@ -35,6 +37,8 @@ Resolve paths before dispatching:
 | `spec.xml` | `specs/<spec-id>/spec.xml` |
 | `details/*.xml` | `specs/<spec-id>/details/` directory |
 | `dag.yaml` | `specs/<spec-id>/dag.yaml` |
+| `decisions.yml` | `specs/<spec-id>/decisions.yml` |
+| `product/vision.md` | `product/vision.md` (repo root-relative) |
 
 If a file or directory does not exist, use the absence marker string
 verbatim in the prompt — do not omit the line, do not invent a placeholder

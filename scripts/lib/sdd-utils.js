@@ -1125,6 +1125,86 @@ function validateDecisionLedger(current, previous) {
   return { valid: errors.length === 0, errors };
 }
 
+// ---------------------------------------------------------------------------
+// checkSpecDecisionGraph — D6 P2 graph audit (S10: single shared helper).
+// ---------------------------------------------------------------------------
+// Pure function. No-op semantics: absent inputs skip their checks (valid:true).
+// B3 constraint: no git-based checks — structural delegation uses null previous.
+// Drift guard (S10): the read-only advisory mirror of checks (a)/(b)/(c) lives as
+// patterns 7/8/9 in agents/arc-auditing-spec-cross-artifact-alignment.md — keep
+// the two in sync when editing either.
+
+/**
+ * Audit the spec↔decision↔anchor graph for three categories of issues:
+ *
+ * (a) Every <added>/<modified> delta item carrying decision="D-NNN" must have
+ *     D-NNN present in the ledger. Missing D-ids are broken links.
+ *
+ * (b) Every ledger entry's principle_ref (when present) must resolve to a P-n
+ *     identifier present in productVision.principles. Absent productVision
+ *     skips this check.
+ *
+ * (c) Structural ledger validation via validateDecisionLedger(ledger, null).
+ *     Passing null as previous skips git-based immutability checks (B3).
+ *
+ * @param {{ specXmlContent: string|null, ledger: Array<Object>|null,
+ *            productVision: { principles: string[] }|null,
+ *            specVision: unknown }} options
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function checkSpecDecisionGraph({ specXmlContent, ledger, productVision }) {
+  // No-op: absent ledger means nothing to check.
+  if (!Array.isArray(ledger)) {
+    return { valid: true, errors: [] };
+  }
+
+  const errors = [];
+
+  // Build a Set of known D-ids from the ledger for O(1) lookup.
+  const ledgerDids = new Set();
+  for (const entry of ledger) {
+    const did = entry['D-id'];
+    if (typeof did === 'string' && did) ledgerDids.add(did);
+  }
+
+  // (a) Delta decision links → D-id must exist in ledger.
+  if (specXmlContent) {
+    const parsed = parseSpecHeader(specXmlContent);
+    if (parsed) {
+      for (const delta of parsed.deltas) {
+        for (const item of [...delta.added, ...delta.modified]) {
+          if (item.decision && !ledgerDids.has(item.decision)) {
+            errors.push(
+              `Delta item ref="${item.ref}" references decision="${item.decision}" but ${item.decision} is not in the decision ledger.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // (b) principle_ref in ledger entries → must resolve to P-n in productVision.
+  if (productVision && Array.isArray(productVision.principles)) {
+    const principleSet = new Set(productVision.principles);
+    for (const entry of ledger) {
+      const ref = entry.principle_ref;
+      if (ref && !principleSet.has(ref)) {
+        errors.push(
+          `Ledger entry ${entry['D-id'] || '(unknown)'} has principle_ref="${ref}" but ${ref} is not in product/vision.md.`,
+        );
+      }
+    }
+  }
+
+  // (c) Structural ledger validation — null previous skips git immutability (B3).
+  const structuralResult = validateDecisionLedger(ledger, null);
+  for (const err of structuralResult.errors) {
+    errors.push(err);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 module.exports = {
   // Schema rule constants — SoT for downstream schema consumers (print-schema.js,
   // tests). Exported so drift between code and docs is impossible by construction.
@@ -1157,4 +1237,6 @@ module.exports = {
   mechanicalAuthorizationCheck,
   // fr-rf-015: conflict marker writer — called by refiner on R3 axis-1/2/3 block.
   writeConflictMarker,
+  // D6 P2: spec↔decision↔anchor graph audit (S10 shared lib helper).
+  checkSpecDecisionGraph,
 };

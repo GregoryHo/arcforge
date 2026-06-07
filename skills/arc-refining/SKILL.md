@@ -115,7 +115,8 @@ Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do 
 ```bash
 node -e "
   const { parseVision, validateVision, parseDecisionLedger, validateDecisionLedger,
-          getHeadLedgerContent, parseDecisionLedgerContent } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
+          getHeadLedgerContent, parseDecisionLedgerContent,
+          checkSpecDecisionGraph } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const fs = require('fs');
 
   // Vision gate — no-op when spec vision absent.
@@ -142,11 +143,25 @@ node -e "
     }
   }
 
-  console.log('vision+ledger gate: OK');
+  // Graph gate — spec↔decision↔anchor consistency (D6 P2, S10). No-op when absent.
+  const specXmlPath = 'specs/<spec-id>/spec.xml';
+  const specXmlContent = fs.existsSync(specXmlPath) ? fs.readFileSync(specXmlPath, 'utf8') : null;
+  const graphResult = checkSpecDecisionGraph({
+    specXmlContent,
+    ledger: current,
+    productVision: productParsed,
+    specVision: specParsed,
+  });
+  if (!graphResult.valid) {
+    console.log(JSON.stringify(graphResult, null, 2));
+    process.exit(1);
+  }
+
+  console.log('vision+ledger+graph gate: OK');
 "
 ```
 
-No-op rule: when `specs/<spec-id>/decisions.yml` and `specs/<spec-id>/vision.md` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
+No-op rule: when `specs/<spec-id>/decisions.yml`, `specs/<spec-id>/vision.md`, and `specs/<spec-id>/spec.xml` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
 
 ## Phase 3 — Detect Behavior Context
 

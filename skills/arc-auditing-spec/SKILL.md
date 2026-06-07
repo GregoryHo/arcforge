@@ -1,6 +1,6 @@
 ---
 name: arc-auditing-spec
-description: Use when the user explicitly runs the slash command `/arc-auditing-spec <spec-id>` to produce a read-only advisory audit of an arcforge SDD spec family (design.md, spec.xml, dag.yaml). Only triggered by direct user invocation; never auto-invoked from any pipeline skill (arc-brainstorming, arc-refining, arc-planning).
+description: Use when the user explicitly runs the slash command `/arc-auditing-spec <spec-id>` to produce a read-only advisory audit of an arcforge SDD spec family (design.md, spec.xml, dag.yaml, and the D6 anchor artifacts decisions.yml and product/vision.md). Only triggered by direct user invocation; never auto-invoked from any pipeline skill (arc-brainstorming, arc-refining, arc-planning).
 ---
 
 # Skill: arc-auditing-spec
@@ -81,11 +81,15 @@ Assemble the sub-agent prompt per `references/phase1-prompt.md` — that file
 is the authoritative layout. The prompt carries the `spec-id` plus resolved
 absolute paths to `design.md` (newest `docs/plans/<spec-id>/*/design.md`),
 `spec.xml` (`specs/<spec-id>/spec.xml`), `details/*.xml`
-(`specs/<spec-id>/details/`), and `dag.yaml` (`specs/<spec-id>/dag.yaml`).
+(`specs/<spec-id>/details/`), `dag.yaml` (`specs/<spec-id>/dag.yaml`),
+`decisions.yml` (`specs/<spec-id>/decisions.yml`), and
+`product/vision.md`.
 When an artifact is missing, substitute the literal absence marker
 `(absent — file does not exist)` verbatim — do not omit the line, do not
 invent placeholder paths. The axis agents depend on the marker for their
-graceful-degradation branches (fr-aa-004).
+graceful-degradation branches (fr-aa-004). Absent `decisions.yml` or
+`product/vision.md` causes the cross-artifact-alignment agent to skip its
+spec↔decision↔anchor graph checks (patterns 7–9) without error.
 
 **REQUIRED BACKGROUND:** `skills/arc-auditing-spec/references/phase1-prompt.md`
 

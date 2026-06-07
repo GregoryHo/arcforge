@@ -1,7 +1,7 @@
 ---
 name: arc-auditing-spec-cross-artifact-alignment
 description: |
-  Use this agent as the `cross-artifact-alignment` axis of the `/arc-auditing-spec` skill. Spawned in parallel with the other two audit axes during Phase 1 fan-out. Read-only by tool grant. Examines semantic alignment between `design.md`, `spec.xml` (+ `details/*.xml`), and `dag.yaml` of a single arcforge spec family; emits findings addressing misalignment across two or more artifacts, NOT issues internal to a single artifact.
+  Use this agent as the `cross-artifact-alignment` axis of the `/arc-auditing-spec` skill. Spawned in parallel with the other two audit axes during Phase 1 fan-out. Read-only by tool grant. Examines semantic alignment between `design.md`, `spec.xml` (+ `details/*.xml`), `dag.yaml`, and the D6 anchor artifacts (`decisions.yml`, `product/vision.md`) of a single arcforge spec family; emits findings addressing misalignment across two or more artifacts (incl. broken delta→decision links and unresolvable `principle_ref`→`P-n`), NOT issues internal to a single artifact.
 tools:
   - Read
   - Grep
@@ -46,6 +46,8 @@ You receive:
   - `spec.xml` (`specs/<spec-id>/spec.xml`)
   - `details/*.xml` (all files under `specs/<spec-id>/details/`)
   - `dag.yaml` (`specs/<spec-id>/dag.yaml`)
+  - `decisions.yml` (`specs/<spec-id>/decisions.yml`) — optional; absent = skip graph checks
+  - `product/vision.md` — optional; absent = skip principle_ref resolution check
 
 Absence markers signal that a file does not exist and should not be searched
 for. Follow the graceful-degradation rules below when you receive them.
@@ -76,6 +78,10 @@ in a pre-refining state. In that case:
 
 Emit the single INFO finding for spec.xml absence, then emit no further
 findings (there is nothing to align against).
+
+#### When decisions.yml is absent
+
+If the input includes an absence marker for `decisions.yml`, skip graph checks 7, 8, and 9 entirely — emit no findings for them. Absence of a ledger is not itself an error.
 
 ### Partial Failure Contract
 
@@ -114,6 +120,26 @@ examples for this axis:
    dag.yaml absent") but no requirement in `spec.xml` or `details/*.xml`
    addresses it.
 
+Patterns 7/8/9 are the read-only advisory mirror of the mechanical checks
+(a)/(b)/(c) in the `checkSpecDecisionGraph` helper (`${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`) —
+keep the two in sync when editing either (drift guard, S10).
+
+7. **Broken delta decision link**: A `<added>` or `<modified>` element in
+   `spec.xml`'s `<delta>` block carries a `decision="D-NNN"` attribute, but
+   `specs/<spec-id>/decisions.yml` does not contain an entry with `D-id: D-NNN`.
+   The delta item has a decision reference with no corresponding record.
+
+8. **Ledger principle_ref unresolvable**: A `decisions.yml` entry has a
+   `principle_ref` field (e.g., `principle_ref: P-5`) but `product/vision.md`
+   does not define a principle with that identifier. The ledger entry claims a
+   product-level justification that does not exist.
+
+9. **Ledger structural violation**: `decisions.yml` has duplicate D-ids, a
+   non-monotonically-increasing D-id sequence, or entries missing required
+   fields. These structural violations make the ledger unreliable as an audit
+   trail (cross-artifact because decisions.yml is shared with spec.xml delta
+   attributes).
+
 ## NOT My Axis — Counter-Examples
 
 Do NOT emit findings for these — route them to the correct axis:
@@ -136,8 +162,8 @@ branches described above.
 
 | Severity | Cut-off for Axis 1 |
 |---|---|
-| **HIGH** | The misalignment will cause a downstream tool (arc-planning, coordinator, arc-executing-tasks) to produce incorrect output or fail outright. E.g., epic id mismatch means a worktree is created under the wrong name; missing requirement means a whole feature goes unimplemented. |
-| **MED** | The misalignment is real and will cause confusion or require manual reconciliation, but won't produce incorrect automated output in the current sprint. E.g., a description says "parallel dispatch" but the spec requirement says "sequential dispatch allowed" — a human must decide which is authoritative. |
+| **HIGH** | The misalignment will cause a downstream tool (arc-planning, coordinator, arc-executing-tasks) to produce incorrect output or fail outright. E.g., epic id mismatch means a worktree is created under the wrong name; missing requirement means a whole feature goes unimplemented. Broken delta decision link (pattern 7) or ledger structural violation (pattern 9) are HIGH — they corrupt the audit trail. |
+| **MED** | The misalignment is real and will cause confusion or require manual reconciliation, but won't produce incorrect automated output in the current sprint. E.g., a description says "parallel dispatch" but the spec requirement says "sequential dispatch allowed" — a human must decide which is authoritative. An unresolvable principle_ref (pattern 8) is MED — the decision rationale is unverifiable but the spec still functions. |
 | **LOW** | Cosmetic or naming inconsistency that doesn't affect automation or correctness, but could mislead a future contributor. E.g., a feature is called "fan-out" in design.md and "parallel-spawn" in spec.xml with no rename note. |
 
 ## Output Contract
