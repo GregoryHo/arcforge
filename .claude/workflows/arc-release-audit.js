@@ -15,10 +15,22 @@ export const meta = {
 // ---------------------------------------------------------------------------
 // Inputs (args). Reusable across releases — nothing is hardcoded to 3.2.0.
 // ---------------------------------------------------------------------------
-const version = (args && args.version) || 'UNKNOWN';
-const prevTag = (args && args.prevTag) || '';
-const prevVersion = (args && args.prevVersion) || (prevTag ? prevTag.replace(/^v/, '') : '');
-const date = (args && args.date) || 'YYYY-MM-DD'; // Date.now() is unavailable in scripts
+// The runtime serializes the Workflow `args` value, so it arrives here as a JSON
+// string (not the object literal passed at the call site). Coerce before reading.
+const a = ((v) => {
+  if (typeof v === 'string') {
+    try {
+      return JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  return v && typeof v === 'object' ? v : {};
+})(args);
+const version = a.version || 'UNKNOWN';
+const prevTag = a.prevTag || '';
+const prevVersion = a.prevVersion || (prevTag ? prevTag.replace(/^v/, '') : '');
+const date = a.date || 'YYYY-MM-DD'; // Date.now() is unavailable in scripts
 
 // ---------------------------------------------------------------------------
 // Schemas — structured output forces clean, parseable agent returns.
