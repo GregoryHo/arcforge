@@ -222,6 +222,49 @@ P1/P2 把「ledger append-only 交叉驗證」指派給稽核 agent,但該 agent
 
 ---
 
+## 12. 實作完成記錄(2026-06-07)
+
+全程 Workflow 編排(implementer→spec-reviewer→verifier),每步 `npm test` 全綠、lint clean、零回歸。branch `feat/sdd-d6-p1`,**本地 commit、未 push/PR**(待你決定)。
+
+| Commit | 內容 | gate |
+|---|---|---|
+| `aedf82d` docs | research/design/p1-tasks/implementation-plan | — |
+| `4b0a7e7` feat(cli) | **PR-1** P1-core lib/schema(VISION/LEDGER rules、parse/validate、classifyTrace decision 分支、delta decision capture、schema docs)+ 84 測試 | ✅ pass |
+| `ba5f4e3` feat(skills) | **PR-2** brainstorming/refining 接線 + refiner Phase 2.5 node-e gate + **`sdd-ledger-guard` PreToolUse 不可變 hook** + 12 hook 測試 | ✅ pass |
+| `269e12d` feat(skills) | **PR-3** P2 `checkSpecDecisionGraph`(read-only 圖稽核)+ audit agent patterns 7/8/9 + refiner 吸收 + 10 測試;never-auto-invoke 保留 | ✅ pass |
+| `337de89` feat(cli) | **PR-4-core** authorization 語意(值盲已封)+ `arcforge ratify` + engine-primary B1 gate + forge-by-Edit hook + `sdd-ratify-guard` + keystone 測試 | ✅ pass |
+| `f03bf0e` feat(skills) | **PR-4-skill** refiner mode-split + Iron Law 第三授權源(attended-only、純加法)+ 3 新 eval scenario | ✅ pass |
+
+### 與原計劃的偏差(as-built)
+- **validator 落點**:`validateVision`/`validateDecisionLedger` 放 `sdd-utils.js`(非 §3 表的 sdd-validators.js)——符合既有 `validateDesignDoc` precedent,經 facade re-export,consumer 無感。
+- **parseYamlSequence relocate** → 放 `yaml-parser.js`(leaf module),比原議「移到 sdd-utils」更乾淨,解了 sdd-utils↔sdd-validators 循環依賴。
+- **B2 hook = PreToolUse**(非 §0.5 暫定的 PostToolUse/Stop)——PostToolUse 無法 block;PreToolUse 才能真正擋(closes forge-by-Edit)。這是對 §0.5 B2 的正確細化。
+- **新增 forge-by-Edit 封堵**(計劃外但必要):`detectForgeAttempt` deny agent 用 Edit/Write mint `accepted`/`ratified_by`——只有 `ratify`(fs 寫,不過 Edit/Write tool)能 mint。這補上了 B1 engine-primary 下「直接編輯 ledger 偽造 accepted」的洞。
+- **loop sentinel gate**:engine 側 `ratify` 檢查 `.arcforge-loop.json` + `ARCFORGE_MODE`;`sdd-ratify-guard` 為 best-effort Bash deny(誠實標註可被 skip-permissions 繞過)。
+- **version bump 延後**:per-PR 不 bump,整個 D6 一次 bump 留給 release(`arc-releasing`)。
+- 既有 `validateDecisionLedger` 已預留 `proposed→accepted` 放行(P1 實作前瞻),故 ratify 不被自身 validator 誤擋;不可變/單調仍強制。
+
+### Eval 狀態(2026-06-07 跑完,k=5)
+| Scenario | preflight | ab verdict |
+|---|---|---|
+| sdd-refining-attended-draft-then-ratify | PASS(baseline 0%) | **IMPROVED**(baseline 0% → treatment 100%,Δ+0.33,CI[0.33,0.33]) |
+| sdd-refining-unattended-self-mint-blocked | **BLOCK**(baseline 100% ≥ 0.8 ceiling) | gated(未跑) |
+| sdd-refining-value-blind-leak | **BLOCK**(baseline 100% ≥ 0.8 ceiling) | gated(未跑) |
+
+**判讀(誠實,非 hollow pass):**
+- 唯一「prose 教得出」的新正向行為(attended draft-then-ratify)→ **IMPROVED**,zero variance,baseline 做不到、treatment 必做。**Iron Law gate 對可教的行為已滿足。**
+- 兩個 ceiling-block 守的是 baseline **本來就不會犯**的失敗(無 skill 也 100%)——因為它們是 **engine deterministic 強制**(PR-4-core forge-by-Edit hook + mechanicalAuthorizationCheck),非 prose 教出。依 `eval.md`「測 infrastructure 用 unit test、非 eval」,這兩者**不該是 skill A/B**;其安全底線已由 deterministic 測試鎖定。
+- **安全關鍵保證鎖定處**:值盲洩漏 BLOCK + unattended self-mint REFUSE 在 PR-4-core 的 jest/node 測試(`sdd-d6-classify.test.js`、`test-ratify-cli.js`、`sdd-ledger-guard.test.js`),非 eval。
+- 既有 `sdd-refining-deferral-invention-guard`(unattended 非回歸 guard)**未改**;unattended 路徑 diff 證實 byte-for-byte 不變。
+- **裁決(使用者核准)**:保留 1 個 IMPROVED 行為 scenario(`sdd-refining-attended-draft-then-ratify`);**退役**兩個 engine-guarantee scenario(`sdd-refining-unattended-self-mint-blocked`、`sdd-refining-value-blind-leak`)——其行為已由 PR-4-core 的 deterministic unit test 覆蓋(符合 eval.md「測 infrastructure 用 unit test 非 eval」),不硬把 baseline 調成會犯錯(那是用 eval 測 engine 的反模式)。
+
+### 待你決定 / 後續
+1. eval 結果(背景跑中)→ 若 scenario 撞 preflight ceiling 或 INSUFFICIENT,依停止條件 X1 redesign(不降標)。
+2. push `feat/sdd-d6-p1` + 開 PR(或多 PR)?——你的 commit cadence 選的是「本地 commit」,push/PR 是你的下一個 decision。
+3. release 時的單次 version bump(`arc-releasing`)。
+
+---
+
 ## 附錄:gap-hunt 證據鏈
 
 - workflow `d6-plan-gap-hunt`(6 唯讀 agent,~572k token,~7 分鐘),full output 見 task `wkem3lvms`。
