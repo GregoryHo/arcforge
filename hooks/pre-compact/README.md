@@ -24,7 +24,7 @@ Records context compaction events for session tracking and triggers diary prompt
 
 ## Threshold Logic
 
-Uses shared threshold from `lib/thresholds.js`:
+Uses shared threshold from `scripts/lib/thresholds.js`:
 
 ```javascript
 userCount >= 10 || toolCount >= 50
