@@ -47,6 +47,7 @@ const { output } = require('./cli/shared');
 const { runEvalCommand } = require('./cli/eval-command');
 const { runLearnCommand } = require('./cli/learn-command');
 const { runObsidianCommand } = require('./cli/obsidian-command');
+const { runRatifyCommand } = require('./cli/ratify-command');
 
 /**
  * Resolve the spec id for a CLI invocation.
@@ -633,6 +634,13 @@ async function main() {
         } else {
           runSequential(loopOptions);
         }
+        break;
+      }
+
+      case 'ratify': {
+        // arcforge ratify <spec-id> <D-id>
+        // Engine B1 gate + interactive informed confirm. See scripts/cli/ratify-command.js.
+        await runRatifyCommand(args.positional, projectRoot);
         break;
       }
 

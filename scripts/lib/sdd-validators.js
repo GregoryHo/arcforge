@@ -18,7 +18,7 @@
  */
 
 const path = require('node:path');
-const { parse } = require('./yaml-parser');
+const { parse, parseYamlSequence } = require('./yaml-parser');
 const { readFileSafe, atomicWriteFile } = require('./utils');
 const { PENDING_CONFLICT_RULES, DECISION_LOG_RULES } = require('./sdd-rules');
 
@@ -28,38 +28,15 @@ const TRACE_TOKEN_RE =
   /<requirement\s+id="([^"]*)"|<criterion\s+id="([^"]*)"|<trace>([^<]*)<\/trace>/g;
 const TRACE_LEGACY_RE = /^REQ-[A-Z]\d+/;
 const TRACE_DESIGN_RE = /^(\d{4}-\d{2}-\d{2}):(.+)$/;
+// D6 P1 T4: TRACE_DECISION_RE must be tested BEFORE TRACE_QA_RE.
+// TRACE_QA_RE matches any letter-prefix:content, which would capture D-014:… as qa.
+// Inserting the decision check after design and before qa fixes this ordering bug.
+// Exported so tests can verify the regex contract directly.
+const TRACE_DECISION_RE = /^(D-\d+):(.+)$/;
 const TRACE_QA_RE = /^([a-zA-Z][a-zA-Z0-9_-]*):(.+)$/;
 // YAML scalar quoting predicate: quote if value contains characters the parser
 // could misread, has surrounding whitespace, or is empty.
 const YAML_NEEDS_QUOTING_RE = /[:#[\]{},&*!|>'"%@`]/;
-
-// ---------------------------------------------------------------------------
-// parseYamlSequence — internal helper for YAML root-level arrays.
-// ---------------------------------------------------------------------------
-// yaml-parser.js only supports YAML with an object at the root. Decision-log
-// files are YAML sequences (root `- ` items). This minimal helper wraps the
-// sequence in a `__seq__:` key, calls the existing parse(), and unwraps.
-// Relies on parseValue() from yaml-parser.js for scalar values.
-//
-// Supported row formats for sequence items:
-//   - key: value          (key-value lines at item indent)
-//   - Multi-line strings  (not needed; all four decision-log fields are scalars)
-//
-function parseYamlSequence(content) {
-  // Wrap root-level `- ` items under a synthetic key so the existing parser
-  // can handle them. Each `- ` at column 0 becomes `  - ` under `__seq__:`.
-  const wrapped =
-    `__seq__:\n` +
-    content
-      .split('\n')
-      .map((line) => `  ${line}`)
-      .join('\n');
-  const obj = parse(wrapped);
-  if (!obj || !Array.isArray(obj.__seq__)) {
-    return null;
-  }
-  return obj.__seq__;
-}
 
 // ---------------------------------------------------------------------------
 // parseConflictMarker — fr-sd-014-ac1
@@ -283,16 +260,23 @@ function validateDecisionLog(parsed) {
  *     section or phrase appears anywhere in the design file content.
  *   - q_id trace (<q_id>:<cited-content>): checks the cited content appears
  *     in that row's user_answer_verbatim in the decision-log.
+ *   - Decision trace (D-NNN:<content>): P1 existence-only check — verifies
+ *     the D-id exists in the provided ledger. No authorization semantics in P1
+ *     (value-exact-match against authorized_values is P3).
  *   - Legacy REQ-F* / plain identifier traces: SKIPPED — not flagged.
  *
  * @param {string} specXmlContent - Raw in-memory spec XML.
  * @param {string} designFilePath - Path to design.md file.
  * @param {string|null} decisionLogFilePath - Path to decision-log file, or null.
+ * @param {Array<Object>|null|undefined} [ledger] - Optional parsed decision ledger
+ *   entries (from parseDecisionLedger). When provided, D-NNN: traces are checked
+ *   for existence. When absent/null, D-NNN: traces are flagged as unauthorized
+ *   (no source = invention).
  * @returns {{ valid: boolean, unauthorized_traces: Array<{
  *   trace_value: string, requirement_id: string,
  *   criterion_id: string, reason: string }> }}
  */
-function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLogFilePath) {
+function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLogFilePath, ledger) {
   if (typeof specXmlContent !== 'string') {
     throw new Error('mechanicalAuthorizationCheck: specXmlContent must be a string');
   }
@@ -351,6 +335,100 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
           requirement_id,
           criterion_id,
           reason: `Design section/phrase "${cited}" not found in design file.`,
+        });
+      }
+    } else if (classification.type === 'decision') {
+      // Decision trace (D6 P3 Task 1): authorization semantics.
+      // §4.3 a–d + §4.5: ALL of (a)–(d) must hold to authorize; otherwise ERROR.
+      // (a) D-id exists in ledger.
+      // (b) status === 'accepted' AND non-empty ratified_by (not agent-mint).
+      // (c) cited value EXACTLY equals one item in authorized_values (not substring, not prose).
+      // (d) No self-mint: ratified_by presence is the human-attended marker (set by ratify CLI).
+      //
+      // SECURITY NOTE: ratified_by is a human-asserted marker, NOT forgery-proof (zero-dep,
+      // no credential layer per security.md). Its real strength is the engine mode-gate in
+      // ratify CLI (ARCFORGE_MODE!==attended refuses to mint) + the hook guard. This check
+      // enforces the structural invariant: a field that can only be set by ratify CLI.
+      const dId = classification.d_id;
+      const citedValue = classification.cited;
+      const ledgerEntries = Array.isArray(ledger) ? ledger : null;
+
+      if (ledgerEntries === null) {
+        // No ledger provided: decision traces are unauthorized (no source = invention).
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason: `No decision ledger provided; decision trace "${dId}" cannot be verified.`,
+        });
+        continue;
+      }
+
+      // (a) D-id must exist in ledger.
+      const entry = ledgerEntries.find((e) => e && String(e['D-id'] || '') === String(dId));
+      if (!entry) {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason: `D-id "${dId}" not found in decision ledger.`,
+        });
+        continue;
+      }
+
+      // (b) status must be 'accepted'.
+      if (String(entry.status || '') !== 'accepted') {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" has status "${entry.status}" — only accepted decisions authorize values. ` +
+            `Run "arcforge ratify <spec-id> ${dId}" to ratify this decision.`,
+        });
+        continue;
+      }
+
+      // (b) ratified_by must be present and non-empty (human-attended gate marker).
+      const ratifiedBy = entry.ratified_by;
+      if (!ratifiedBy || String(ratifiedBy).trim() === '') {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" is accepted but missing ratified_by — ` +
+            `only decisions ratified via "arcforge ratify" (with human confirmation) authorize values.`,
+        });
+        continue;
+      }
+
+      // (c) cited value must EXACTLY match an item in authorized_values (case-sensitive, not substring).
+      // authorized_values must be an array; if not, fail closed.
+      const authValues = entry.authorized_values;
+      if (!Array.isArray(authValues)) {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" has authorized_values that is not an array — ` +
+            `cannot authorize cited value "${citedValue}".`,
+        });
+        continue;
+      }
+
+      // Exact string match against the list (§4.5 keystone: value-blind leak blocked).
+      const exactMatch = authValues.some((v) => String(v) === citedValue);
+      if (!exactMatch) {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `Cited value "${citedValue}" is not in authorized_values for D-id "${dId}". ` +
+            `Authorized values: [${authValues.map((v) => `"${v}"`).join(', ')}]. ` +
+            `(Exact match required — substring matches are not accepted.)`,
         });
       }
     } else if (classification.type === 'qa') {
@@ -465,6 +543,12 @@ function classifyTrace(traceValue) {
   const designMatch = trimmed.match(TRACE_DESIGN_RE);
   if (designMatch) {
     return { type: 'design', cited: designMatch[2].trim() };
+  }
+  // D6 P1 T4: decision branch MUST come BEFORE qa. TRACE_QA_RE matches any
+  // letter-start:content, so D-014:… would be misclassified as qa without this check.
+  const decisionMatch = trimmed.match(TRACE_DECISION_RE);
+  if (decisionMatch) {
+    return { type: 'decision', d_id: decisionMatch[1], cited: decisionMatch[2].trim() };
   }
   const qaMatch = trimmed.match(TRACE_QA_RE);
   if (qaMatch) {
@@ -603,4 +687,8 @@ module.exports = {
   validateDecisionLog,
   mechanicalAuthorizationCheck,
   writeConflictMarker,
+  // D6 P1 T4: exported for testing. classifyTrace is the trace classifier used
+  // by mechanicalAuthorizationCheck. TRACE_DECISION_RE is the pattern for D-NNN: traces.
+  classifyTrace,
+  TRACE_DECISION_RE,
 };

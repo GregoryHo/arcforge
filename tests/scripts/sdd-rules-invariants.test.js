@@ -25,6 +25,12 @@ const {
   SPEC_HEADER_RULES,
   PENDING_CONFLICT_RULES,
   DECISION_LOG_RULES,
+  DECISION_LEDGER_RULES,
+  // VISION_RULES is intentionally NOT registered here (S2 exemption):
+  // VISION_RULES has a two-tier structure (product principles + per-spec chapter)
+  // that does not conform to the single {key,type}[] required-fields array the
+  // cross-rules invariant contract requires. Shape coverage for VISION_RULES is
+  // carried by validateVision's own tests (tests/scripts/sdd-d6-vision.test.js).
 } = require('../../scripts/lib/sdd-utils');
 
 // -----------------------------------------------------------------------------
@@ -48,6 +54,11 @@ const RULE_REGISTRY = [
     name: 'DECISION_LOG_RULES',
     constant: DECISION_LOG_RULES,
     fieldsProperty: 'required_fields_per_row',
+  },
+  {
+    name: 'DECISION_LEDGER_RULES',
+    constant: DECISION_LEDGER_RULES,
+    fieldsProperty: 'required_fields',
   },
 ];
 

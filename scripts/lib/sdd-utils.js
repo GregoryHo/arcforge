@@ -10,9 +10,15 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { parseDagYaml } = require('./yaml-parser');
+const { execFileSync } = require('node:child_process');
+const { parseDagYaml, parseYamlSequence } = require('./yaml-parser');
 const { DAG, TaskStatus } = require('./models');
-const { PENDING_CONFLICT_RULES, DECISION_LOG_RULES } = require('./sdd-rules');
+const {
+  PENDING_CONFLICT_RULES,
+  DECISION_LOG_RULES,
+  VISION_RULES,
+  DECISION_LEDGER_RULES,
+} = require('./sdd-rules');
 const {
   parseConflictMarker,
   parseDecisionLog,
@@ -398,15 +404,32 @@ function parseSingleDelta(attrsStr, deltaBody) {
   // documents:
   //   Self-closing:  <added ref="x" />
   //   Text content:  <added ref="x">Short description</added>
+  // D6 P1 T5: also captures optional decision="D-NNN" attribute for P2 audit.
+  // .ref extraction is byte-identical — the [^>]* in existing regexes already
+  // ignores sibling attributes; we add a second pass to extract decision.
+  function extractDecision(attrsStr) {
+    const m = attrsStr.match(/decision="([^"]*)"/);
+    return m ? m[1] : undefined;
+  }
   function parseDeltaItems(tag) {
     const results = [];
-    const selfCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"[^>]*\\/>`, 'g');
+    // Self-closing: <tag ref="..." [decision="..."] />
+    // group 1 = ref value, group 2 = remaining attrs (for decision= extraction)
+    const selfCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"([^>]*)\\/>`, 'g');
     for (const m of deltaBody.matchAll(selfCloseRe)) {
-      results.push({ ref: m[1], text: '' });
+      const entry = { ref: m[1], text: '' };
+      const dec = extractDecision(m[2]);
+      if (dec !== undefined) entry.decision = dec;
+      results.push(entry);
     }
-    const openCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"[^>]*>([^<]*)</${tag}>`, 'g');
+    // Open/close: <tag ref="..." [decision="..."]>text</tag>
+    // group 1 = ref value, group 2 = remaining attrs, group 3 = text content
+    const openCloseRe = new RegExp(`<${tag}\\s+ref="([^"]*)"([^>]*)>([^<]*)</${tag}>`, 'g');
     for (const m of deltaBody.matchAll(openCloseRe)) {
-      results.push({ ref: m[1], text: m[2].trim() });
+      const entry = { ref: m[1], text: m[3].trim() };
+      const dec = extractDecision(m[2]);
+      if (dec !== undefined) entry.decision = dec;
+      results.push(entry);
     }
     return results;
   }
@@ -713,6 +736,115 @@ function validateSpecHeader(parsed, options = {}) {
   return { valid, issues };
 }
 
+// ---------------------------------------------------------------------------
+// parseVision — parse a vision.md file (product or spec tier).
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a vision.md file and return structured metadata.
+ *
+ * Two tiers are supported:
+ *   type: 'product' — product/vision.md. Extracts P-n principle identifiers.
+ *   type: 'spec'    — specs/<id>/vision.md. Extracts principle_ref values.
+ *
+ * Vision files are date-less and outside DESIGN_DOC_RULES.path_regex —
+ * validateDesignDoc never touches these paths.
+ *
+ * @param {string} filePath - Absolute path to the vision.md file.
+ * @param {{ type?: 'product'|'spec' }} [options]
+ * @returns {{ principles?: string[], principle_refs?: string[] } | null}
+ *   Returns null if the file does not exist.
+ */
+function parseVision(filePath, options = {}) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+
+  const type = options.type || 'product';
+
+  if (type === 'product') {
+    // Extract P-n identifiers: lines like "P-1.", "P-2:", "P-1 " etc.
+    const principles = [];
+    for (const m of content.matchAll(/^(P-\d+)/gm)) {
+      const id = m[1];
+      if (!principles.includes(id)) {
+        principles.push(id);
+      }
+    }
+    return { type: 'product', principles };
+  }
+
+  // type === 'spec': extract principle_ref values.
+  const principle_refs = [];
+  for (const m of content.matchAll(/^principle_ref:\s*(P-\d+)/gm)) {
+    const ref = m[1];
+    if (!principle_refs.includes(ref)) {
+      principle_refs.push(ref);
+    }
+  }
+  return { type: 'spec', principle_refs };
+}
+
+// ---------------------------------------------------------------------------
+// validateVision — cross-file two-layer validation (pure function).
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate per-spec vision against product vision — verify every principle_ref
+ * in the spec resolves to a P-n present in product/vision.md.
+ *
+ * This is a PURE function: it takes already-parsed results from parseVision
+ * rather than file paths. The caller is responsible for loading and parsing;
+ * this design mirrors the T3 seam (validateDecisionLedger is also pure).
+ *
+ * Absent-file contracts:
+ *   - productParsed === null, specParsed has principle_refs → ERROR (unresolvable).
+ *   - productParsed === null, specParsed has no principle_refs → PASS (nothing to resolve).
+ *   - specParsed === null → PASS (per-spec vision is optional; absence is benign).
+ *
+ * @param {{ principles: string[] } | null} productParsed - Parsed product/vision.md,
+ *   or null if the file is absent.
+ * @param {{ principle_refs: string[] } | null} specParsed - Parsed specs/<id>/vision.md,
+ *   or null if the file is absent.
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateVision(productParsed, specParsed) {
+  // Per-spec vision absent → benign.
+  if (specParsed === null) {
+    return { valid: true, errors: [] };
+  }
+
+  const refs = specParsed.principle_refs || [];
+
+  // No refs to resolve → benign (regardless of product vision presence).
+  if (refs.length === 0) {
+    return { valid: true, errors: [] };
+  }
+
+  // Refs present but product vision absent → refs are unresolvable.
+  if (productParsed === null) {
+    return {
+      valid: false,
+      errors: [
+        `product/vision.md is absent but spec has principle_ref(s) [${refs.join(', ')}] that cannot be resolved.`,
+      ],
+    };
+  }
+
+  const productPrinciples = new Set(productParsed.principles || []);
+  const errors = [];
+  for (const ref of refs) {
+    if (!productPrinciples.has(ref)) {
+      errors.push(
+        `principle_ref "${ref}" in spec vision does not exist in product/vision.md (known: ${[...productPrinciples].join(', ') || 'none'}).`,
+      );
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 /**
  * Check completion status of a sprint's dag.yaml.
  *
@@ -747,6 +879,354 @@ function checkDagStatus(dagYamlPath) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// getHeadLedgerContent — git helper for HEAD-relative ledger content.
+// ---------------------------------------------------------------------------
+// S3 seam: this is the ONLY function that shells out to git. validateDecisionLedger
+// is a pure function that takes parsed content; this helper provides the "previous"
+// snapshot for the caller to pass in.
+//
+// S4 edge-case contract (documented per implementation-plan §0.5 S4):
+//   - In-repo, file tracked at HEAD → returns UTF-8 content string.
+//   - In-repo, file NOT tracked at HEAD (new file) → returns null (all-new, pass).
+//   - Not a git repo / git binary absent → returns null (advisory no-op;
+//     zero-dep portability is preserved; enforcement is advisory in non-repo contexts).
+//   - Detached HEAD / staged-but-uncommitted: git show HEAD:<path> reads committed
+//     HEAD regardless of staged state. Same-session pre-commit append-then-edit
+//     escapes the check (documented S8 limitation).
+//
+// @param {string} absPath - Absolute path to the decisions.yml file.
+// @param {string} projectRoot - Project root for execFileSync cwd.
+// @returns {string | null}
+
+/**
+ * Return the content of a file as it exists at HEAD, or null if absent/untracked/non-repo.
+ *
+ * Uses execFileSync with array args per security.md (no shell interpolation).
+ * Models _runGit pattern from coordinator.js.
+ *
+ * @param {string} absPath - Absolute path to decisions.yml.
+ * @param {string} projectRoot - Project root (cwd for git commands).
+ * @returns {string | null}
+ */
+function getHeadLedgerContent(absPath, projectRoot) {
+  // Compute the path relative to projectRoot for git show.
+  const relPath = path.relative(projectRoot, absPath);
+  try {
+    return execFileSync('git', ['show', `HEAD:${relPath}`], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+  } catch {
+    // File not in HEAD (new file), not a git repo, git absent, detached HEAD with no
+    // tracked file, etc. — all map to null (advisory no-op).
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// parseDecisionLedger — parse a decisions.yml file.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse decisions.yml content (YAML root-level sequence) into an array of entries.
+ *
+ * S3 seam: this is the content-based form so the pipeline
+ *   getHeadLedgerContent → parseDecisionLedgerContent → validateDecisionLedger
+ * can be composed without touching the filesystem twice.
+ *
+ * @param {string} content - Raw YAML string.
+ * @returns {Array<Object> | null} Array of entry objects, or null if empty/unparseable.
+ */
+function parseDecisionLedgerContent(content) {
+  if (!content || !content.trim()) {
+    return null;
+  }
+  try {
+    const entries = parseYamlSequence(content);
+    if (!Array.isArray(entries)) {
+      return null;
+    }
+    return entries;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a decisions.yml file (YAML root-level sequence) into an array of entries.
+ *
+ * Thin wrapper over parseDecisionLedgerContent — reads the file then delegates.
+ *
+ * @param {string} filePath - Absolute path to decisions.yml.
+ * @returns {Array<Object> | null} Array of entry objects, or null if file absent/unparseable.
+ */
+function parseDecisionLedger(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return parseDecisionLedgerContent(fs.readFileSync(filePath, 'utf8'));
+}
+
+// ---------------------------------------------------------------------------
+// validateDecisionLedger — pure function for append-only + immutability.
+// ---------------------------------------------------------------------------
+// S3: this function is PURE — no filesystem or git access. The caller provides
+// both current parsed content and previous parsed content (from getHeadLedgerContent
+// + parseDecisionLedger). This enables unit testing without git fixtures.
+//
+// Enforces:
+//   (a) D-id monotonic and unique (non-increasing or duplicate = ERROR).
+//   (b) Per-entry-by-D-id alignment: for each D-id in both HEAD and working tree,
+//       decision and why text must be unchanged. (NOT whole-file diff — attack is
+//       "append new entry while editing an old one".)
+//   (c) Status transitions only via supersede: accepted→superseded-by:D-NNN requires
+//       a matching new entry with supersedes field pointing back to this D-id.
+//
+// S4 known limitation (S8 — documented): immutability is HEAD-relative. Same-session
+// pre-commit append-then-edit escapes the check. A legit typo in frozen text has no
+// in-place edit path: record a correcting supersede, or amend the commit.
+//
+// Required fields per DECISION_LEDGER_RULES:
+//   D-id, date, spec_version, status, decision, why, authorized_values.
+
+const REQUIRED_LEDGER_FIELDS = [
+  'D-id',
+  'date',
+  'spec_version',
+  'status',
+  'decision',
+  'why',
+  'authorized_values',
+];
+
+/**
+ * Validate a parsed decision ledger for append-only integrity.
+ *
+ * @param {Array<Object>} current - Current ledger entries (from parseDecisionLedger).
+ * @param {Array<Object> | null} previous - Entries from HEAD (null if new file / non-repo).
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateDecisionLedger(current, previous) {
+  const errors = [];
+
+  if (!Array.isArray(current)) {
+    return { valid: false, errors: ['validateDecisionLedger: current must be an array.'] };
+  }
+
+  // (a) D-id monotonicity and uniqueness.
+  const seenIds = new Set();
+  let lastNum = 0;
+  for (const entry of current) {
+    // Required fields check.
+    for (const field of REQUIRED_LEDGER_FIELDS) {
+      if (entry[field] === null || entry[field] === undefined) {
+        errors.push(
+          `Entry missing required field "${field}"${entry['D-id'] ? ` (D-id: ${entry['D-id']})` : ''}.`,
+        );
+      }
+    }
+
+    const did = entry['D-id'];
+    if (typeof did !== 'string') continue;
+
+    // Parse numeric part of D-NNN.
+    const match = did.match(/^D-(\d+)$/);
+    if (!match) {
+      errors.push(`D-id "${did}" does not match expected format D-NNN (e.g. D-001).`);
+      continue;
+    }
+    const num = parseInt(match[1], 10);
+
+    if (seenIds.has(did)) {
+      errors.push(`Duplicate D-id "${did}" in ledger — D-ids must be unique.`);
+    } else if (num <= lastNum) {
+      errors.push(
+        `D-id "${did}" (${num}) is not monotonically increasing after previous D-id (${lastNum}) — entries must appear in ascending order.`,
+      );
+    }
+    seenIds.add(did);
+    lastNum = Math.max(lastNum, num);
+  }
+
+  // (b) Per-D-id immutability check against previous.
+  if (previous !== null && Array.isArray(previous)) {
+    const prevMap = new Map();
+    for (const entry of previous) {
+      const did = entry['D-id'];
+      if (did) prevMap.set(String(did), entry);
+    }
+
+    for (const entry of current) {
+      const did = entry['D-id'];
+      if (!did) continue;
+      const prev = prevMap.get(String(did));
+      if (!prev) continue; // new entry — fine
+
+      // decision text immutability.
+      if (String(entry.decision || '') !== String(prev.decision || '')) {
+        errors.push(
+          `Immutability violation: D-id "${did}" decision text was edited. ` +
+            `Frozen text cannot be changed in-place; record a correcting supersede instead.`,
+        );
+      }
+      // why text immutability.
+      if (String(entry.why || '') !== String(prev.why || '')) {
+        errors.push(
+          `Immutability violation: D-id "${did}" why text was edited. ` +
+            `Frozen text cannot be changed in-place; record a correcting supersede instead.`,
+        );
+      }
+    }
+  }
+
+  // (c) Status transitions only via supersede.
+  if (previous !== null && Array.isArray(previous)) {
+    const prevMap = new Map();
+    for (const entry of previous) {
+      const did = entry['D-id'];
+      if (did) prevMap.set(String(did), entry);
+    }
+
+    // Build a set of D-ids that have a new superseding entry.
+    const supersedingFor = new Set();
+    for (const entry of current) {
+      if (entry.supersedes) {
+        supersedingFor.add(String(entry.supersedes));
+      }
+    }
+
+    for (const entry of current) {
+      const did = entry['D-id'];
+      if (!did) continue;
+      const prev = prevMap.get(String(did));
+      if (!prev) continue; // new entry — status transitions not applicable
+
+      const prevStatus = String(prev.status || '');
+      const currStatus = String(entry.status || '');
+
+      if (prevStatus !== currStatus && currStatus.startsWith('superseded-by:')) {
+        // Transition to superseded-by requires a new entry with supersedes: this D-id.
+        if (!supersedingFor.has(String(did))) {
+          errors.push(
+            `D-id "${did}" status changed to "${currStatus}" but no new entry with supersedes: "${did}" was found. ` +
+              `Status transitions must be accompanied by a superseding entry.`,
+          );
+        }
+      } else if (prevStatus !== currStatus) {
+        // Other status transitions (e.g. proposed→accepted outside of ratify) are
+        // permitted in validateDecisionLedger itself (ratify enforcement is in the
+        // ratify CLI + hook layer). We only enforce the supersede-path rule here.
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// ---------------------------------------------------------------------------
+// checkSpecDecisionGraph — D6 P2 graph audit (S10: single shared helper).
+// ---------------------------------------------------------------------------
+// Pure function. No-op semantics: absent inputs skip their checks (valid:true).
+// B3 constraint: no git-based checks — structural delegation uses null previous.
+// Drift guard (S10): the read-only advisory mirror of checks (a)/(b)/(c) lives as
+// patterns 7/8/9 in agents/arc-auditing-spec-cross-artifact-alignment.md — keep
+// the two in sync when editing either.
+
+/**
+ * Audit the spec↔decision↔anchor graph for three categories of issues:
+ *
+ * (a) Every <added>/<modified> delta item carrying decision="D-NNN" must have
+ *     D-NNN present in the ledger. Missing D-ids are broken links.
+ *
+ * (b) Every ledger entry's principle_ref (when present) must resolve to a P-n
+ *     identifier present in productVision.principles. Absent productVision
+ *     skips this check.
+ *
+ * (c) Structural ledger validation via validateDecisionLedger(ledger, null).
+ *     Passing null as previous skips git-based immutability checks (B3).
+ *
+ * @param {{ specXmlContent: string|null, ledger: Array<Object>|null,
+ *            productVision: { principles: string[] }|null,
+ *            specVision: unknown }} options
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function checkSpecDecisionGraph({ specXmlContent, ledger, productVision }) {
+  // No-op: absent ledger means nothing to check.
+  if (!Array.isArray(ledger)) {
+    return { valid: true, errors: [] };
+  }
+
+  const errors = [];
+
+  // Build a Set of known D-ids from the ledger for O(1) lookup.
+  const ledgerDids = new Set();
+  for (const entry of ledger) {
+    const did = entry['D-id'];
+    if (typeof did === 'string' && did) ledgerDids.add(did);
+  }
+
+  // (a) Delta decision links → D-id must exist in ledger.
+  if (specXmlContent) {
+    const parsed = parseSpecHeader(specXmlContent);
+    if (parsed) {
+      for (const delta of parsed.deltas) {
+        for (const item of [...delta.added, ...delta.modified]) {
+          if (item.decision && !ledgerDids.has(item.decision)) {
+            errors.push(
+              `Delta item ref="${item.ref}" references decision="${item.decision}" but ${item.decision} is not in the decision ledger.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // (b) principle_ref in ledger entries → must resolve to P-n in productVision.
+  if (productVision && Array.isArray(productVision.principles)) {
+    const principleSet = new Set(productVision.principles);
+    for (const entry of ledger) {
+      const ref = entry.principle_ref;
+      if (ref && !principleSet.has(ref)) {
+        errors.push(
+          `Ledger entry ${entry['D-id'] || '(unknown)'} has principle_ref="${ref}" but ${ref} is not in product/vision.md.`,
+        );
+      }
+    }
+  }
+
+  // (c) Structural ledger validation — null previous skips git immutability (B3).
+  const structuralResult = validateDecisionLedger(ledger, null);
+  for (const err of structuralResult.errors) {
+    errors.push(err);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// ---------------------------------------------------------------------------
+// B1 loop sentinel — canonical location (scripts/loop.js LOOP_STATE_FILE is the owner).
+// Imported by ratify-command.js and hooks/sdd-ratify-guard to avoid duplication.
+// ---------------------------------------------------------------------------
+
+/** File name of the loop sentinel placed at project root by scripts/loop.js. */
+const LOOP_SENTINEL = '.arcforge-loop.json';
+
+/**
+ * Returns true if the loop sentinel exists at projectRoot.
+ * Fail-closed: returns false on any I/O error.
+ * @param {string} projectRoot
+ * @returns {boolean}
+ */
+function loopSentinelPresent(projectRoot) {
+  try {
+    return fs.existsSync(path.join(projectRoot, LOOP_SENTINEL));
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   // Schema rule constants — SoT for downstream schema consumers (print-schema.js,
   // tests). Exported so drift between code and docs is impossible by construction.
@@ -754,6 +1234,17 @@ module.exports = {
   SPEC_HEADER_RULES,
   PENDING_CONFLICT_RULES,
   DECISION_LOG_RULES,
+  // D6 P1 new constants — re-exported from sdd-rules.js (canonical source).
+  // print-schema.js, invariants tests, and validators import from here (facade).
+  VISION_RULES,
+  DECISION_LEDGER_RULES,
+  // D6 P1 new parsers/validators — vision and decision ledger.
+  parseVision,
+  validateVision,
+  parseDecisionLedgerContent,
+  parseDecisionLedger,
+  validateDecisionLedger,
+  getHeadLedgerContent,
   // Parsers / validators.
   parseDesignDoc,
   validateDesignDoc,
@@ -768,4 +1259,9 @@ module.exports = {
   mechanicalAuthorizationCheck,
   // fr-rf-015: conflict marker writer — called by refiner on R3 axis-1/2/3 block.
   writeConflictMarker,
+  // D6 P2: spec↔decision↔anchor graph audit (S10 shared lib helper).
+  checkSpecDecisionGraph,
+  // D6 P3: B1 loop sentinel — canonical export for ratify-command + hook.
+  LOOP_SENTINEL,
+  loopSentinelPresent,
 };
