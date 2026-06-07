@@ -1205,6 +1205,28 @@ function checkSpecDecisionGraph({ specXmlContent, ledger, productVision }) {
   return { valid: errors.length === 0, errors };
 }
 
+// ---------------------------------------------------------------------------
+// B1 loop sentinel — canonical location (scripts/loop.js LOOP_STATE_FILE is the owner).
+// Imported by ratify-command.js and hooks/sdd-ratify-guard to avoid duplication.
+// ---------------------------------------------------------------------------
+
+/** File name of the loop sentinel placed at project root by scripts/loop.js. */
+const LOOP_SENTINEL = '.arcforge-loop.json';
+
+/**
+ * Returns true if the loop sentinel exists at projectRoot.
+ * Fail-closed: returns false on any I/O error.
+ * @param {string} projectRoot
+ * @returns {boolean}
+ */
+function loopSentinelPresent(projectRoot) {
+  try {
+    return fs.existsSync(path.join(projectRoot, LOOP_SENTINEL));
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   // Schema rule constants — SoT for downstream schema consumers (print-schema.js,
   // tests). Exported so drift between code and docs is impossible by construction.
@@ -1239,4 +1261,7 @@ module.exports = {
   writeConflictMarker,
   // D6 P2: spec↔decision↔anchor graph audit (S10 shared lib helper).
   checkSpecDecisionGraph,
+  // D6 P3: B1 loop sentinel — canonical export for ratify-command + hook.
+  LOOP_SENTINEL,
+  loopSentinelPresent,
 };

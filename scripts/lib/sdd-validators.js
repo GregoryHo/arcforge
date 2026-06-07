@@ -338,10 +338,19 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
         });
       }
     } else if (classification.type === 'decision') {
-      // Decision trace (D6 P1 T4): existence-only check — verify the D-id exists in ledger.
-      // Authorization semantics (authorized_values exact-match, ratified_by, attended-mint)
-      // are P3 — DO NOT add them here.
+      // Decision trace (D6 P3 Task 1): authorization semantics.
+      // §4.3 a–d + §4.5: ALL of (a)–(d) must hold to authorize; otherwise ERROR.
+      // (a) D-id exists in ledger.
+      // (b) status === 'accepted' AND non-empty ratified_by (not agent-mint).
+      // (c) cited value EXACTLY equals one item in authorized_values (not substring, not prose).
+      // (d) No self-mint: ratified_by presence is the human-attended marker (set by ratify CLI).
+      //
+      // SECURITY NOTE: ratified_by is a human-asserted marker, NOT forgery-proof (zero-dep,
+      // no credential layer per security.md). Its real strength is the engine mode-gate in
+      // ratify CLI (ARCFORGE_MODE!==attended refuses to mint) + the hook guard. This check
+      // enforces the structural invariant: a field that can only be set by ratify CLI.
       const dId = classification.d_id;
+      const citedValue = classification.cited;
       const ledgerEntries = Array.isArray(ledger) ? ledger : null;
 
       if (ledgerEntries === null) {
@@ -355,13 +364,71 @@ function mechanicalAuthorizationCheck(specXmlContent, designFilePath, decisionLo
         continue;
       }
 
-      const found = ledgerEntries.some((e) => e && String(e['D-id'] || '') === String(dId));
-      if (!found) {
+      // (a) D-id must exist in ledger.
+      const entry = ledgerEntries.find((e) => e && String(e['D-id'] || '') === String(dId));
+      if (!entry) {
         unauthorizedTraces.push({
           trace_value,
           requirement_id,
           criterion_id,
           reason: `D-id "${dId}" not found in decision ledger.`,
+        });
+        continue;
+      }
+
+      // (b) status must be 'accepted'.
+      if (String(entry.status || '') !== 'accepted') {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" has status "${entry.status}" — only accepted decisions authorize values. ` +
+            `Run "arcforge ratify <spec-id> ${dId}" to ratify this decision.`,
+        });
+        continue;
+      }
+
+      // (b) ratified_by must be present and non-empty (human-attended gate marker).
+      const ratifiedBy = entry.ratified_by;
+      if (!ratifiedBy || String(ratifiedBy).trim() === '') {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" is accepted but missing ratified_by — ` +
+            `only decisions ratified via "arcforge ratify" (with human confirmation) authorize values.`,
+        });
+        continue;
+      }
+
+      // (c) cited value must EXACTLY match an item in authorized_values (case-sensitive, not substring).
+      // authorized_values must be an array; if not, fail closed.
+      const authValues = entry.authorized_values;
+      if (!Array.isArray(authValues)) {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `D-id "${dId}" has authorized_values that is not an array — ` +
+            `cannot authorize cited value "${citedValue}".`,
+        });
+        continue;
+      }
+
+      // Exact string match against the list (§4.5 keystone: value-blind leak blocked).
+      const exactMatch = authValues.some((v) => String(v) === citedValue);
+      if (!exactMatch) {
+        unauthorizedTraces.push({
+          trace_value,
+          requirement_id,
+          criterion_id,
+          reason:
+            `Cited value "${citedValue}" is not in authorized_values for D-id "${dId}". ` +
+            `Authorized values: [${authValues.map((v) => `"${v}"`).join(', ')}]. ` +
+            `(Exact match required — substring matches are not accepted.)`,
         });
       }
     } else if (classification.type === 'qa') {

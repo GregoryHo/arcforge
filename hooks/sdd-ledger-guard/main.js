@@ -39,6 +39,93 @@ const {
 // ---------------------------------------------------------------------------
 
 /**
+ * Task 3a: Detect forge-by-Edit attempts — deny any Edit/Write to decisions.yml that
+ * introduces status:accepted or adds/changes ratified_by on an entry that did not have
+ * it at HEAD.
+ *
+ * These fields may ONLY be minted by `arcforge ratify` (which writes via fs, NOT the
+ * Edit/Write tool). An agent trying to self-ratify would use Edit/Write, which this
+ * function blocks.
+ *
+ * Semantics:
+ *   - For each entry in current: if it has status==='accepted' or non-empty ratified_by,
+ *     look up the same D-id in previous (HEAD snapshot).
+ *     - If previous is null (new file) → DENY (every accepted/ratified_by is a forge).
+ *     - If D-id not in HEAD → DENY (new entry cannot be born accepted/ratified).
+ *     - If D-id in HEAD but had different status/ratified_by → DENY (forged upgrade).
+ *     - If D-id in HEAD with same values → ALLOW (legitimate carry-forward).
+ *
+ * FAIL-OPEN: if current doesn't parse → ALLOW (handled by caller).
+ *
+ * @param {Array<Object>} current - Parsed current ledger entries.
+ * @param {Array<Object> | null} previous - Parsed HEAD entries, or null for new file.
+ * @returns {string|null} Deny reason, or null to allow.
+ */
+function detectForgeAttempt(current, previous) {
+  // Build a map from D-id → entry for HEAD snapshot.
+  const prevMap = new Map();
+  if (Array.isArray(previous)) {
+    for (const e of previous) {
+      if (e?.['D-id']) prevMap.set(String(e['D-id']), e);
+    }
+  }
+
+  for (const entry of current) {
+    if (!entry || !entry['D-id']) continue;
+    const dId = String(entry['D-id']);
+    const currStatus = String(entry.status || '');
+    const currRatifiedBy = String(entry.ratified_by || '').trim();
+
+    const hasAccepted = currStatus === 'accepted';
+    const hasRatifiedBy = currRatifiedBy !== '';
+
+    if (!hasAccepted && !hasRatifiedBy) continue; // benign entry
+
+    // This entry has accepted status or ratified_by — check if it was already so at HEAD.
+    if (previous === null) {
+      // New file: no HEAD → every accepted/ratified entry is a forge.
+      return (
+        `decisions.yml forge attempt blocked — D-id "${dId}" has ` +
+        `${hasAccepted ? 'status:accepted' : ''}${hasAccepted && hasRatifiedBy ? ' and ' : ''}` +
+        `${hasRatifiedBy ? 'ratified_by' : ''} on a new file. ` +
+        `These fields can only be set by "arcforge ratify", not by Edit/Write tool calls.`
+      );
+    }
+
+    const prev = prevMap.get(dId);
+    if (!prev) {
+      // D-id not in HEAD: this is a new entry born with accepted/ratified_by.
+      return (
+        `decisions.yml forge attempt blocked — new D-id "${dId}" cannot be created with ` +
+        `${hasAccepted ? 'status:accepted' : ''}${hasAccepted && hasRatifiedBy ? ' or ' : ''}` +
+        `${hasRatifiedBy ? 'ratified_by' : ''}. ` +
+        `Only "arcforge ratify" may set these fields.`
+      );
+    }
+
+    const prevStatus = String(prev.status || '');
+    const prevRatifiedBy = String(prev.ratified_by || '').trim();
+
+    // Check if accepted/ratified_by are being forged (changed vs HEAD).
+    if (hasAccepted && prevStatus !== 'accepted') {
+      return (
+        `decisions.yml forge attempt blocked — D-id "${dId}" status changed to "accepted" ` +
+        `via Edit/Write tool. Only "arcforge ratify" may transition a decision to accepted.`
+      );
+    }
+    if (hasRatifiedBy && prevRatifiedBy !== currRatifiedBy) {
+      return (
+        `decisions.yml forge attempt blocked — D-id "${dId}" ratified_by ` +
+        `added or changed via Edit/Write tool. Only "arcforge ratify" may set ratified_by.`
+      );
+    }
+    // Falls through: accepted/ratified_by at HEAD matches current → legitimate carry-forward.
+  }
+
+  return null;
+}
+
+/**
  * Decide whether the proposed resulting content of a decisions.yml write is valid.
  *
  * @param {string|null} resultingContent - The YAML that would be written to disk.
@@ -54,6 +141,11 @@ function decideLedgerEdit(resultingContent, headContent) {
   // headContent null (new file, non-repo) → previous=null →
   // validateDecisionLedger skips immutability/status-transition checks → ALLOW.
   const previous = parseDecisionLedgerContent(headContent);
+
+  // Task 3a: Check for forge-by-Edit attempts FIRST. This closes the hole where an agent
+  // writes status:accepted or ratified_by via Edit/Write (which bypasses the ratify CLI).
+  const forgeReason = detectForgeAttempt(current, previous);
+  if (forgeReason) return forgeReason;
 
   const { valid, errors } = validateDecisionLedger(current, previous);
   if (valid) return null;
@@ -186,6 +278,7 @@ module.exports = {
   decideLedgerEdit,
   computeWriteContent,
   computeEditContent,
+  detectForgeAttempt,
 };
 
 if (require.main === module) {

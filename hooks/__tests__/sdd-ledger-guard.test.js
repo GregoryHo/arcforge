@@ -37,19 +37,17 @@ function makeLedgerYaml(overrides = {}) {
 
 /** Serialize an array of objects to simple YAML sequence (for test inputs). */
 function yamlSerialize(entries) {
-  return (
-    entries
-      .map((e) => {
-        const lines = ['- D-id: ' + JSON.stringify(e['D-id'])];
-        for (const [k, v] of Object.entries(e)) {
-          if (k === 'D-id') continue;
-          if (v === undefined || v === null) continue;
-          lines.push('  ' + k + ': ' + JSON.stringify(v));
-        }
-        return lines.join('\n');
-      })
-      .join('\n') + '\n'
-  );
+  return `${entries
+    .map((e) => {
+      const lines = [`- D-id: ${JSON.stringify(e['D-id'])}`];
+      for (const [k, v] of Object.entries(e)) {
+        if (k === 'D-id') continue;
+        if (v === undefined || v === null) continue;
+        lines.push(`  ${k}: ${JSON.stringify(v)}`);
+      }
+      return lines.join('\n');
+    })
+    .join('\n')}\n`;
 }
 
 function makeDir() {
@@ -286,5 +284,117 @@ describe('sdd-ledger-guard main() wire format', () => {
     assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PreToolUse');
     assert.strictEqual(parsed.hookSpecificOutput.permissionDecision, 'deny');
     assert.ok(parsed.hookSpecificOutput.permissionDecisionReason.length > 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: Task 3a — forge-by-Edit guard (decideForgeAttempt)
+// Deny Edit/Write that introduces status:accepted or adds ratified_by on an entry
+// that did not have it at HEAD. This closes the forge-by-Edit hole.
+// ---------------------------------------------------------------------------
+
+describe('sdd-ledger-guard decideLedgerEdit — Task 3a forge guard', () => {
+  beforeEach(() => {
+    delete require.cache[require.resolve('../sdd-ledger-guard/main')];
+  });
+
+  // Forge proposed→accepted via Edit → DENY
+  it('3a: Edit flipping proposed→accepted is denied (forge-by-Edit blocked)', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    // HEAD: D-001 proposed, no ratified_by
+    const headYaml = makeLedgerYaml({ status: 'proposed' });
+
+    // Current: D-001 flipped to accepted (no ratify CLI involved)
+    const currentYaml = makeLedgerYaml({ status: 'accepted' });
+
+    const reason = decideLedgerEdit(currentYaml, headYaml);
+    assert.ok(reason !== null, 'Forge proposed→accepted via Edit must be denied');
+    assert.ok(typeof reason === 'string' && reason.length > 0, 'Deny reason must be a string');
+  });
+
+  // Forge by adding ratified_by via Edit → DENY
+  it('3a: Edit adding ratified_by to a proposed entry is denied', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    // HEAD: D-001 proposed, no ratified_by
+    const headYaml = makeLedgerYaml({ status: 'proposed' });
+
+    // Current: D-001 still proposed but now has ratified_by (agent trying to fake it)
+    const currentYaml = makeLedgerYaml({ status: 'proposed', ratified_by: 'agent@fake' });
+
+    const reason = decideLedgerEdit(currentYaml, headYaml);
+    assert.ok(reason !== null, 'Forge ratified_by via Edit must be denied');
+  });
+
+  // Forge both at once (accepted + ratified_by) → DENY
+  it('3a: Edit flipping proposed→accepted+ratified_by is denied', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    const headYaml = makeLedgerYaml({ status: 'proposed' });
+    const currentYaml = makeLedgerYaml({ status: 'accepted', ratified_by: 'agent@fake' });
+
+    const reason = decideLedgerEdit(currentYaml, headYaml);
+    assert.ok(reason !== null, 'Forge accepted+ratified_by via Edit must be denied');
+  });
+
+  // Legal proposed append (no accepted/ratified_by introduced) → ALLOW
+  it('3a: legal proposed append (no accepted/ratified_by) returns null (ALLOW)', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    const headYaml = makeLedgerYaml(); // D-001 proposed
+
+    // Current: D-001 (unchanged) + D-002 (new, proposed)
+    const currentEntries = [
+      {
+        'D-id': 'D-001',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'Use YAML for decision ledger format.',
+        why: 'Human-readable, git-diffable, toolable.',
+        authorized_values: 'any',
+      },
+      {
+        'D-id': 'D-002',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'Second proposed decision.',
+        why: 'Reason.',
+        authorized_values: 'any',
+      },
+    ];
+    const currentYaml = yamlSerialize(currentEntries);
+
+    const reason = decideLedgerEdit(currentYaml, headYaml);
+    assert.strictEqual(reason, null, 'Legal proposed append must be allowed');
+  });
+
+  // New file (headContent null): new accepted entry → DENY (previous=null ⇒ every accepted is forge)
+  it('3a: new accepted entry on new file (headContent null) is denied', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    const currentYaml = makeLedgerYaml({ status: 'accepted', ratified_by: 'agent@fake' });
+
+    const reason = decideLedgerEdit(currentYaml, null);
+    assert.ok(reason !== null, 'New accepted entry on new file must be denied');
+  });
+
+  // New proposed entry on new file → ALLOW
+  it('3a: new proposed entry on new file (headContent null) is allowed', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+
+    const currentYaml = makeLedgerYaml({ status: 'proposed' });
+
+    const reason = decideLedgerEdit(currentYaml, null);
+    assert.strictEqual(reason, null, 'New proposed entry on new file must be allowed');
+  });
+
+  // Fail-open: malformed current → ALLOW (no false deny)
+  it('3a: malformed current content does not deny (fail-open)', () => {
+    const { decideLedgerEdit } = require('../sdd-ledger-guard/main');
+    const reason = decideLedgerEdit('not valid yaml }{', null);
+    assert.strictEqual(reason, null, 'Malformed YAML must fail-open');
   });
 });

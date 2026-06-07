@@ -163,13 +163,14 @@ function makeSpec(traces) {
   return `<spec>${traceXml}</spec>`;
 }
 
-describe('mechanicalAuthorizationCheck — decision trace existence-only (T4)', () => {
-  it('decision trace with D-id present in ledger passes (existence-only)', () => {
+describe('mechanicalAuthorizationCheck — decision trace authorization (T4/P3)', () => {
+  it('decision trace with D-id present but proposed (no ratify) is unauthorized (P3 semantics)', () => {
+    // P3 upgrade: existence-only is no longer sufficient. proposed entries do not authorize.
     const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
     const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:window=60s' }]);
     const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_WITH_D014);
-    expect(result.valid).toBe(true);
-    expect(result.unauthorized_traces).toHaveLength(0);
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
   });
 
   it('decision trace with D-id NOT in ledger is flagged as unauthorized', () => {
@@ -240,6 +241,148 @@ Rate limit is 60 requests per minute.
     const designPath = writeFile(tmpDir, 'design.md', DESIGN_RICH);
     const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'REQ-F010' }]);
     const result = mechanicalAuthorizationCheck(spec, designPath, null);
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mechanicalAuthorizationCheck — P3: authorization semantics (Task 1)
+// §4.3 a-d + §4.5: exact-match authorized_values, ratified_by required,
+// status===accepted required. The keystone: value-blind leak BLOCKED.
+// ---------------------------------------------------------------------------
+
+// Shared ledger fixtures for Task 1 tests
+const LEDGER_D014_ACCEPTED = [
+  {
+    'D-id': 'D-014',
+    date: '2026-06-06',
+    spec_version: 'v1',
+    status: 'accepted',
+    decision: 'Use window=60s for rate limiting. Considered 30s-600s range.',
+    why: 'Balances security and usability.',
+    authorized_values: ['window=60s'],
+    ratified_by: 'alice@2026-06-06T10:00:00Z',
+  },
+];
+
+const LEDGER_D014_PROPOSED = [
+  {
+    'D-id': 'D-014',
+    date: '2026-06-06',
+    spec_version: 'v1',
+    status: 'proposed',
+    decision: 'Use window=60s for rate limiting.',
+    why: 'Balances security and usability.',
+    authorized_values: ['window=60s'],
+  },
+];
+
+const LEDGER_D014_ACCEPTED_NO_RATIFY = [
+  {
+    'D-id': 'D-014',
+    date: '2026-06-06',
+    spec_version: 'v1',
+    status: 'accepted',
+    decision: 'Use window=60s.',
+    why: 'Reason.',
+    authorized_values: ['window=60s'],
+    // no ratified_by
+  },
+];
+
+describe('mechanicalAuthorizationCheck — P3: authorization semantics (Task 1)', () => {
+  // KEYSTONE TEST: value-blind leak blocked
+  // "MUST window=600s" against ledger with authorized_values=["window=60s"] must ERROR
+  it('KEYSTONE: value-blind leak blocked — wrong value 600s is unauthorized', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
+    // Criterion says window=600s; ledger only authorizes window=60s
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:window=600s' }]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_ACCEPTED);
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
+    expect(result.unauthorized_traces[0].trace_value).toBe('D-014:window=600s');
+  });
+
+  // KEYSTONE POSITIVE: legitimate authorized value passes
+  it('KEYSTONE: legitimate value window=60s is authorized', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:window=60s' }]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_ACCEPTED);
+    expect(result.valid).toBe(true);
+    expect(result.unauthorized_traces).toHaveLength(0);
+  });
+
+  // D-014 status=proposed (not ratified) → ERROR
+  it('proposed status (not accepted) is unauthorized', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:window=60s' }]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_PROPOSED);
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
+    expect(result.unauthorized_traces[0].reason).toMatch(/accepted/i);
+  });
+
+  // D-014 accepted but no ratified_by → ERROR
+  it('accepted without ratified_by is unauthorized', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:window=60s' }]);
+    const result = mechanicalAuthorizationCheck(
+      spec,
+      designPath,
+      null,
+      LEDGER_D014_ACCEPTED_NO_RATIFY,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
+    expect(result.unauthorized_traces[0].reason).toMatch(/ratified_by/i);
+  });
+
+  // Substring must NOT pass: authorized_values=["window=60s"], cited "60s" → ERROR
+  it('substring of authorized value is NOT authorized (exact match required)', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_CONTENT);
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'D-014:60s' }]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_ACCEPTED);
+    expect(result.valid).toBe(false);
+    expect(result.unauthorized_traces).toHaveLength(1);
+  });
+
+  // Regression: existing date/q_id/REQ-F traces still authorize exactly as before
+  const DESIGN_RICH_P3 = `
+## Architecture
+
+Some architecture details here.
+Rate limit is 60 requests per minute.
+`;
+
+  it('regression: design trace still authorized when section appears in design', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_RICH_P3);
+    const spec = makeSpec([
+      { req: 'fr-001', crit: 'fr-001-ac1', trace: '2026-06-06:Architecture' },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_ACCEPTED);
+    expect(result.valid).toBe(true);
+  });
+
+  it('regression: qa trace still authorized when content in user_answer_verbatim', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_RICH_P3);
+    const DECISION_LOG_YAML = `
+- q_id: q1
+  question: What is the rate limit?
+  user_answer_verbatim: 60 requests per minute
+  deferral_signal: false
+`;
+    const logPath = writeFile(tmpDir, 'decision-log-p3.yaml', DECISION_LOG_YAML);
+    const spec = makeSpec([
+      { req: 'fr-001', crit: 'fr-001-ac1', trace: 'q1:60 requests per minute' },
+    ]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, logPath, LEDGER_D014_ACCEPTED);
+    expect(result.valid).toBe(true);
+  });
+
+  it('regression: REQ-F* legacy trace still skipped (not flagged)', () => {
+    const designPath = writeFile(tmpDir, 'design.md', DESIGN_RICH_P3);
+    const spec = makeSpec([{ req: 'fr-001', crit: 'fr-001-ac1', trace: 'REQ-F010' }]);
+    const result = mechanicalAuthorizationCheck(spec, designPath, null, LEDGER_D014_ACCEPTED);
     expect(result.valid).toBe(true);
   });
 });
