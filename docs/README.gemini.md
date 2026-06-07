@@ -123,6 +123,17 @@ for skill in ~/.agents/arcforge/skills/arc-*/; do
 done
 ```
 
+### Uninstalling (PowerShell)
+
+Remove each skill junction (`rmdir`, which detaches the junction without touching the source):
+
+```powershell
+Get-ChildItem "$env:USERPROFILE\.gemini\skills\arc-*" -Directory | ForEach-Object {
+  cmd /c rmdir $_.FullName
+}
+Remove-Item -Recurse -Force "$env:USERPROFILE\.agents\arcforge"  # optional
+```
+
 ## Troubleshooting
 
 ### Skills not found
