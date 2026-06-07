@@ -7,7 +7,7 @@ Guide for using arcforge with OpenAI Codex.
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/master/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.codex/INSTALL.md
 ```
 
 ## Manual Installation

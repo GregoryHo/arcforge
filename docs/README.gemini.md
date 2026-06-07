@@ -7,7 +7,7 @@ Guide for using arcforge with Gemini CLI.
 Tell Gemini CLI:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/master/.gemini/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.gemini/INSTALL.md
 ```
 
 ## Manual Installation

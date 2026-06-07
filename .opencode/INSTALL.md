@@ -23,7 +23,7 @@ Enable agentic skills in OpenCode via native skill discovery and system transfor
 3. **Symlink the plugin:**
    ```bash
    mkdir -p ~/.config/opencode/plugins
-   ln -s ~/.agents/arcforge/.opencode/plugins/arcforge.js ~/.config/opencode/plugins/arcforge.js
+   ln -sf ~/.agents/arcforge/.opencode/plugins/arcforge.js ~/.config/opencode/plugins/arcforge.js
    ```
 
 4. **Restart OpenCode** to discover skills and load the plugin.
