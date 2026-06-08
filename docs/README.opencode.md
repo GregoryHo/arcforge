@@ -129,7 +129,7 @@ git clone https://github.com/GregoryHo/arcforge.git "%USERPROFILE%\.agents\arcfo
 mkdir "%USERPROFILE%\.config\opencode\skills"
 mklink /J "%USERPROFILE%\.config\opencode\skills\arcforge" "%USERPROFILE%\.agents\arcforge\skills"
 mkdir "%USERPROFILE%\.config\opencode\plugins"
-mklink /J "%USERPROFILE%\.config\opencode\plugins\arcforge.js" "%USERPROFILE%\.agents\arcforge\.opencode\plugins\arcforge.js"
+mklink "%USERPROFILE%\.config\opencode\plugins\arcforge.js" "%USERPROFILE%\.agents\arcforge\.opencode\plugins\arcforge.js"
 ```
 
 ### PowerShell
@@ -139,8 +139,10 @@ git clone https://github.com/GregoryHo/arcforge.git "$env:USERPROFILE\.agents\ar
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\opencode\skills"
 cmd /c mklink /J "$env:USERPROFILE\.config\opencode\skills\arcforge" "$env:USERPROFILE\.agents\arcforge\skills"
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\opencode\plugins"
-cmd /c mklink /J "$env:USERPROFILE\.config\opencode\plugins\arcforge.js" "$env:USERPROFILE\.agents\arcforge\.opencode\plugins\arcforge.js"
+cmd /c mklink "$env:USERPROFILE\.config\opencode\plugins\arcforge.js" "$env:USERPROFILE\.agents\arcforge\.opencode\plugins\arcforge.js"
 ```
+
+> **Note:** The skills link is a directory junction (`/J`) and needs no special privileges. The plugin link is a *file* symbolic link (`mklink` without `/J`), which requires **Developer Mode** enabled (Settings → For developers) or an elevated prompt. Without either, use the Git Bash variant below, or `copy` the file in place of the symlink and re-copy it after each update.
 
 ### Git Bash
 
@@ -150,6 +152,16 @@ mkdir -p ~/.config/opencode/skills
 ln -s ~/.agents/arcforge/skills ~/.config/opencode/skills/arcforge
 mkdir -p ~/.config/opencode/plugins
 ln -sf ~/.agents/arcforge/.opencode/plugins/arcforge.js ~/.config/opencode/plugins/arcforge.js
+```
+
+### Uninstalling (PowerShell)
+
+Remove the skills junction (`rmdir`) and the plugin file link (`del`):
+
+```powershell
+cmd /c rmdir "$env:USERPROFILE\.config\opencode\skills\arcforge"
+del "$env:USERPROFILE\.config\opencode\plugins\arcforge.js"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.agents\arcforge"  # optional
 ```
 
 ## Testing
