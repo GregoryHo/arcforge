@@ -1,6 +1,7 @@
 ---
 name: arc-managing-sessions
 description: Use when ending a session and handing off to a future session, summarizing recent context, continuing from where the last turn left off, archiving a session for durable reference, or resuming/listing/aliasing saved sessions
+argument-hint: "save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <id> <name> | aliases"
 ---
 
 # Managing Sessions
@@ -203,7 +204,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" aliases
 │   ├── {sessionId}.json                  # Auto-saved session metrics
 │   ├── session-{alias}.md                # User-archived session (from save)
 │   ├── handover-{slug}.md                # Optional handover file (from handover --save)
-│   ├── diary-{sessionId}.md              # Diary entry (from /journal)
+│   ├── diary-{sessionId}.md              # Diary entry (from arc-journaling)
 ```
 
 ## Common Mistakes

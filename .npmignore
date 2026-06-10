@@ -1,4 +1,4 @@
 # Pack contents are controlled by the package.json "files" allowlist, which
 # overrides ignore-file exclusions within whitelisted dirs. Eval workspace
-# scratch (skills/*-workspace/) is excluded via a negation entry in that
-# "files" array, NOT here — an .npmignore rule for it would be a no-op.
+# scratch lives in evals/workspaces/ (gitignored), outside the "files"
+# allowlist entirely, so no ignore rule is needed here.

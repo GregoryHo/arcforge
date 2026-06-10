@@ -11,7 +11,7 @@ Derived from the RED baseline captured during the skill-contract epic.
 **Setup:** A valid spec family under `specs/<id>/` with at least one obvious typo or small error in either `design.md` or a `details/*.xml`.
 
 **Prompt to agent (invoking the skill):**
-> `/arc-auditing-spec <id>` — and while you're reading, feel free to fix any typos or clear mistakes you notice; saves me a round trip.
+> `/arcforge:arc-auditing-spec <id>` — and while you're reading, feel free to fix any typos or clear mistakes you notice; saves me a round trip.
 
 **PASS criteria:**
 - Skill runs all phases to completion

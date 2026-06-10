@@ -1,6 +1,6 @@
 ---
 name: arc-journaling
-description: Use when user explicitly requests /journal, when PreCompact hook triggers, or at end of significant work session
+description: Use when the user asks to journal session reflections (/arcforge:arc-journaling), when the PreCompact hook triggers, or at end of a significant work session
 ---
 
 # Session Diary Capture
@@ -71,11 +71,11 @@ Before creating a diary entry, verify at least ONE of these criteria is met:
 - Pure exploration (reading files without decisions)
 - Trivial fixes (typos, formatting, single-line changes)
 
-This is a **soft gate**: Claude judges based on conversation memory. User can always override with explicit `/journal`.
+This is a **soft gate**: Claude judges based on conversation memory. User can always override by invoking `arc-journaling` explicitly.
 
 ## When to Use
 
-- User runs `/journal`
+- User invokes `/arcforge:arc-journaling`
 - PreCompact hook triggers (conversation getting long)
 - End of significant work session
 - After important design decisions
@@ -86,7 +86,7 @@ This is a **soft gate**: Claude judges based on conversation memory. User can al
 - Quick Q&A sessions (< 5 tool calls)
 - Pure research without decisions
 - Already captured in previous diary entry this session
-- Pattern extraction needed (use /recall instead)
+- Pattern extraction needed (use arc-recalling instead)
 - **Fails Pre-Diary Check** — unless user explicitly requests
 
 ## Process
@@ -128,7 +128,7 @@ Use this diary template:
 
 - **Challenge**: [What went wrong]
 - **Solution**: [How resolved]
-- **Generalizable?**: [Yes/No - pre-flags for /reflect]
+- **Generalizable?**: [Yes/No - pre-flags for arc-reflecting]
 
 ## PR/Review Feedback (if any)
 
@@ -153,13 +153,13 @@ _Captured at {timestamp}_
 
 After saving, briefly mention:
 
-> "Diary saved. If you noticed reusable patterns, run `/reflect` to extract them."
+> "Diary saved. If you noticed reusable patterns, run `/arcforge:arc-reflecting` to extract them."
 
 ## Key Principles
 
 ### Observation Over Prescription
 
-Record what happened, not rules. Patterns that should become rules belong in `/reflect`.
+Record what happened, not rules. Patterns that should become rules belong in `arc-reflecting`.
 
 ### User Intent Over Implementation
 
@@ -199,7 +199,7 @@ Keep entries focused. Don't over-document routine work.
 ### Skipping the Generalizable Marker
 
 **Wrong:** Leaving Generalizable? empty or omitting it
-**Right:** Always mark solutions as Yes/No - helps /reflect identify patterns
+**Right:** Always mark solutions as Yes/No - helps arc-reflecting identify patterns
 
 ## Template Variables
 
@@ -214,7 +214,7 @@ Keep entries focused. Don't over-document routine work.
 
 ```
 ~/.arcforge/diaries/{project}/{YYYY-MM-DD}/
-└── diary-{sessionId}.md      # Diary entry (from /journal)
+└── diary-{sessionId}.md      # Diary entry (from arc-journaling)
 
 ~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
 ├── {sessionId}.json          # Session data (auto-generated)

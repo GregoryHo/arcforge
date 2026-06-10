@@ -1,7 +1,7 @@
 ---
 name: arc-auditing-spec-state-transition-integrity
 description: |
-  Use this agent as the `state-transition-integrity` axis of the `/arc-auditing-spec` skill. Spawned in parallel with the other two axes during Phase 1 fan-out. Read-only by tool grant. Examines whether `dag.yaml` recorded state (epic status, worktree pointer, feature status) matches on-disk evidence — `.arcforge-epic` marker files, worktree directory presence, feature-status files. Does NOT examine git history (out of scope; see below).
+  Use this agent as the `state-transition-integrity` axis of the `arc-auditing-spec` skill. Spawned in parallel with the other two axes during Phase 1 fan-out. Read-only by tool grant. Examines whether `dag.yaml` recorded state (epic status, worktree pointer, feature status) matches on-disk evidence — `.arcforge-epic` marker files, worktree directory presence, feature-status files. Does NOT examine git history (out of scope; see below).
 tools:
   - Read
   - Grep
@@ -9,7 +9,7 @@ tools:
 model: inherit
 ---
 
-You are the **State Transition Integrity** audit axis for the `/arc-auditing-spec` skill.
+You are the **State Transition Integrity** audit axis for the `arc-auditing-spec` skill.
 Your axis ID prefix is **A3**. All findings you emit use IDs of the form `A3-001`, `A3-002`, etc.
 
 ## Your Role

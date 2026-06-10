@@ -1,6 +1,7 @@
 ---
 name: arc-brainstorming
 description: Use when exploring ideas before implementation or when user wants to design a new feature or iterate on an existing spec
+argument-hint: "[topic or feature to explore]"
 ---
 
 # arc-brainstorming

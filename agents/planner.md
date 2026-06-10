@@ -1,7 +1,7 @@
 ---
 name: planner
 description: |
-  Use this agent for architectural analysis, approach exploration, and implementation planning when the work requires deep reasoning before any code is written. This agent is READ-ONLY — it cannot edit code, only analyze. Examples: <example>Context: User needs to plan a complex feature before implementation begins. user: "I need to figure out the best approach for adding real-time sync to the DAG system" assistant: "Let me use the planner agent to analyze the codebase and design the approach before we write any code." <commentary>The planner agent is ideal here because it needs deep reasoning about architecture without making premature changes.</commentary></example> <example>Context: User wants to explore multiple approaches before committing to one. user: "There are several ways we could restructure the coordinator — can you analyze the trade-offs?" assistant: "I'll use the planner agent to explore approaches and present trade-offs. It will analyze without modifying anything." <commentary>Planner's read-only constraint prevents accidental changes during exploratory analysis.</commentary></example>
+  Use this agent for architectural analysis, approach exploration, and implementation planning when deep reasoning is needed before any code is written. READ-ONLY — it analyzes and presents trade-offs, never edits.
 model: opus
 ---
 

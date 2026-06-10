@@ -351,28 +351,28 @@ def test_agent_frontmatter_identity(path: Path):
     assert front.get("name") == path.stem
 
 
-def test_command_wrapper_exists_and_delegates():
-    """fr-sc-001-ac1: `/arc-auditing-spec <spec-id>` must be a real slash command."""
-    cmd_path = Path("commands/arc-auditing-spec.md")
-    assert cmd_path.exists(), (
-        "commands/arc-auditing-spec.md must exist so `/arc-auditing-spec` "
-        "resolves per fr-sc-001-ac1"
-    )
-    text = cmd_path.read_text(encoding="utf-8")
-    front, body = _parse_frontmatter(text)
+def test_skill_is_the_slash_command():
+    """fr-sc-001-ac1: `/arcforge:arc-auditing-spec <spec-id>` is the skill itself.
 
-    dmi = front.get("disable-model-invocation")
-    assert dmi is True or str(dmi).strip().lower() == "true", (
-        "commands/arc-auditing-spec.md must set `disable-model-invocation: true`"
+    The former commands/arc-auditing-spec.md wrapper was removed when the
+    invocation surface was unified; the namespaced skill invocation is the
+    only slash command, carrying the argument hint in SKILL.md frontmatter.
+    """
+    assert not Path("commands/arc-auditing-spec.md").exists(), (
+        "command wrapper must not return — the skill is the slash command"
     )
-    assert "arc-auditing-spec" in body, "command wrapper must delegate to the skill"
-    assert "skill" in body.lower(), (
-        "command wrapper must explicitly delegate to a skill (thin wrapper rule)"
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    front, _ = _parse_frontmatter(text)
+    assert front.get("argument-hint") == "<spec-id> [--save]", (
+        "SKILL.md frontmatter must carry the argument hint per fr-sc-001-ac1"
+    )
+    assert "/arcforge:arc-auditing-spec" in front.get("description", ""), (
+        "description must document the namespaced invocation token"
     )
 
 
 def test_no_pipeline_auto_invocation_of_audit_skill():
-    """sc-001-ac3: no pipeline skill's SKILL.md may invoke /arc-auditing-spec."""
+    """sc-001-ac3: no pipeline skill's SKILL.md may invoke arc-auditing-spec."""
     pipeline_skills = [
         "skills/arc-brainstorming/SKILL.md",
         "skills/arc-refining/SKILL.md",
@@ -383,8 +383,8 @@ def test_no_pipeline_auto_invocation_of_audit_skill():
         if not path.exists():
             continue
         content = path.read_text(encoding="utf-8")
-        assert "/arc-auditing-spec" not in content, (
-            f"{skill} must not invoke /arc-auditing-spec — pipeline auto-invocation "
+        assert "/arc-auditing-spec" not in content and "/arcforge:arc-auditing-spec" not in content, (
+            f"{skill} must not invoke arc-auditing-spec — pipeline auto-invocation "
             f"is forbidden by fr-sc-001-ac3"
         )
 

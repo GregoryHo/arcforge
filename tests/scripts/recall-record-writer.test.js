@@ -1,6 +1,6 @@
 // tests/scripts/recall-record-writer.test.js
 //
-// Criterion 1: recall-record-writer.js saves operation records to
+// Criterion 1: operation-record-writer.js saves recall operation records to
 // ~/.arcforge/recalls/<project>/<recall_id>.md with atomic write.
 
 const fs = require('node:fs');

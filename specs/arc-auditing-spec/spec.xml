@@ -28,7 +28,7 @@
     </description>
     <scope>
       <includes>
-        <feature id="skill-contract">Public contract of the /arc-auditing-spec skill: user-invoked invocation semantics, hard read-only boundaries enforced via tool grants, no pipeline auto-invocation, implementation delegated to arc-writing-skills.</feature>
+        <feature id="skill-contract">Public contract of the arc-auditing-spec skill (invoked as /arcforge:arc-auditing-spec): user-invoked invocation semantics, hard read-only boundaries enforced via tool grants, no pipeline auto-invocation, implementation delegated to arc-writing-skills.</feature>
         <feature id="audit-agents">Three parallel fan-out sub-agents (cross-artifact-alignment, internal-consistency, state-transition-integrity), their finding schema, axis-scope separation, and graceful degradation on missing inputs.</feature>
         <feature id="output-and-interaction">Markdown-table report format, U3 two-stage AskUserQuestion triage UX (multiSelect Stage 1, batched Stage 2 with diff previews), Decisions table output, and optional L4-path persistence via --save flag. v2 adds ceremony-threshold rules: Phase 3 only fires when N_HIGH >= 2, Phase 4 only fires per finding with >= 2 resolutions, Decisions table only renders when ceremony ran at all, and the Phase 2 Overview row carries visual emphasis when exactly one HIGH is present.</feature>
       </includes>

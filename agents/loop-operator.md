@@ -1,7 +1,7 @@
 ---
 name: loop-operator
 description: |
-  Use this agent to monitor an active autonomous loop. It reads loop state, detects stalls and retry storms, and recommends actions. NOT auto-invoked — user spawns it to monitor a running loop. Examples: <example>Context: An autonomous loop has been running for a while. user: "How's the loop doing? Any issues?" assistant: "I'll dispatch the loop-operator agent to check the loop state and look for stalls or errors." <commentary>The loop-operator reads .arcforge-loop.json and provides a health assessment of the running loop.</commentary></example> <example>Context: User suspects the loop is stuck. user: "The loop seems stuck — can you check what's happening?" assistant: "Let me use the loop-operator to diagnose the issue — it can detect stalls and retry storms." <commentary>The loop-operator has specific stall and retry storm detection logic.</commentary></example>
+  Use this agent to monitor an active autonomous loop — reads loop state, detects stalls and retry storms, recommends actions. Not auto-invoked; the user spawns it to check on a running loop.
 model: sonnet
 ---
 

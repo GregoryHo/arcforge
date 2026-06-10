@@ -19,7 +19,8 @@ const path = require('node:path');
 //     mechanism for cross-project safety).
 //   - skill-local files under skills/<name>/scripts/ or skills/<name>/agents/
 //     (those are JS / agent definitions, not LLM-facing prose).
-//   - skills/*-workspace/ (eval workspaces, not shipped surface).
+//   - evals/workspaces/ (eval scratch, outside skills/; the -workspace
+//     skip below is kept as belt-and-suspenders for stray local dirs).
 //   - The fenced Anti-patterns example block in arc-writing-skills only;
 //     those WRONG examples are deliberately invalid teaching material.
 //

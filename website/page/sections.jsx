@@ -461,7 +461,7 @@ function Install({theme:t}) {
           <div style={{fontSize:10,letterSpacing:3,color:t.ember,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>CLAUDE CODE · RECOMMENDED</div>
           <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Plugin marketplace</h3>
           <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.ink,lineHeight:2,background:t.bg,padding:'16px 20px',border:`1px dashed ${t.line}`}}>
-            <div><span style={{color:t.dim}}>$ </span>/plugin marketplace add arcforge</div>
+            <div><span style={{color:t.dim}}>$ </span>/plugin marketplace add GregoryHo/arcforge</div>
             <div><span style={{color:t.dim}}>$ </span>/plugin install arcforge@arcforge-dev</div>
             <div><span style={{color:t.dim}}>$ </span>/help</div>
           </div>

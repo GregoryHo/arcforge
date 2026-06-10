@@ -39,7 +39,7 @@
 ## Plugin Directory Layout
 
 - `.claude-plugin/` — only `plugin.json` + `marketplace.json` go here
-- Component dirs at plugin root: `skills/`, `hooks/`, `commands/`, `agents/`, `templates/`
+- Component dirs at plugin root: `skills/`, `hooks/`, `agents/`, `templates/`
 - Skills become namespaced when installed: `/arcforge:arc-brainstorming`
 
 ## Multi-Platform Packaging

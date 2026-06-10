@@ -15,11 +15,9 @@
   },
   "files": [
     "skills/",
-    "!skills/*-workspace/",
     "hooks/",
     "scripts/",
     "templates/",
-    "commands/",
     "agents/",
     ".claude-plugin/",
     ".codex/",

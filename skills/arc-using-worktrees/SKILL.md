@@ -1,6 +1,6 @@
 ---
 name: arc-using-worktrees
-description: Use when setting up an isolated workspace for a single epic, when starting work on a specific epic id from dag.yaml, or when any task mentions creating a branch or checkout for epic-level work. Use this skill even if the user doesn't say "worktree" — if they're scoping work to one epic, this applies. For batch (multi-epic) expansion, use arc-coordinating expand instead.
+description: Use when setting up an isolated workspace for a single epic from dag.yaml, or when a task means scoping work to one epic — even if the user never says "worktree". For batch multi-epic expansion, use arc-coordinating expand.
 ---
 
 # arc-using-worktrees

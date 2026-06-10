@@ -1,6 +1,6 @@
 # Contributing to arcforge
 
-Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, commands, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
+Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Contributions are welcome across skills, CLI engine, hooks, templates, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
 
 ## Table of Contents
 
@@ -11,7 +11,6 @@ Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code, Cod
 - [Contributing to the CLI Engine](#contributing-to-the-cli-engine)
 - [Contributing Hooks](#contributing-hooks)
 - [Contributing Templates](#contributing-templates)
-- [Contributing Commands](#contributing-commands)
 - [Contributing Agents](#contributing-agents)
 - [Test Runner Map](#test-runner-map)
 - [Platform Considerations](#platform-considerations)
@@ -271,32 +270,6 @@ Templates use `{VARIABLE}` placeholders and follow a consistent structure:
 - Anti-patterns
 
 Follow the structure of existing templates (`implementer-prompt.md`, `quality-reviewer-prompt.md`, `spec-reviewer-prompt.md`).
-
----
-
-## Contributing Commands
-
-Commands are thin delegation wrappers that invoke skills via `/command-name`.
-
-### Location
-
-```
-commands/
-  <name>.md
-```
-
-### Format
-
-```yaml
----
-description: "Brief description shown in /help"
-disable-model-invocation: true
----
-
-Invoke the arc-<skill-name> skill and follow it exactly as presented to you
-```
-
-Commands are not standalone workflows — they delegate to skills. Keep them minimal.
 
 ---
 

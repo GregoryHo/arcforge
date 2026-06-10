@@ -34,8 +34,8 @@ The following evidence items are the ONLY evidence you may cite. Each item has a
 Evidence comes in four types:
 - **observation** — individual tool call events captured from Claude Code sessions
 - **diary** — bounded session diary summaries
-- **reflect** — cross-session reflection patterns from past `/reflect` operations
-- **recall** — manually captured insights from past `/recall` operations
+- **reflect** — cross-session reflection patterns from past `arc-reflecting` operations
+- **recall** — manually captured insights from past `arc-recalling` operations
 
 Every item in the batch below has an `evidence_id`. You MUST use those IDs when citing evidence in `evidence_refs`.
 

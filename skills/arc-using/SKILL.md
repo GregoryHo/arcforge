@@ -93,6 +93,18 @@ Examples:
 - "Implement epic" → `arc-planning` if no `specs/<spec-id>/dag.yaml`; coordination/implementation skills if the DAG exists.
 - "Audit this skill/workflow" → `arc-evaluating` when shipping/merge/completion evidence matters.
 
+## Execution & Finishing Choosers
+
+When two skills cover the same step, pick by the concrete condition:
+
+| Decision | Pick |
+|----------|------|
+| Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + two-stage review) |
+| Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-epic via DAG, lead present) |
+| Finish work | `arc-finishing-epic` when `.arcforge-epic` exists in the worktree, else `arc-finishing` |
+
+Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.
+
 ## Discipline Skills — Conditional Triggers
 
 These skills activate during a workflow when the condition is present. They are not mandatory pipeline steps for every message.
@@ -113,9 +125,9 @@ Five skills touch the diary/instinct system. Route by the concrete trigger, not 
 
 | User intent | Skill |
 |-------------|-------|
-| Capture THIS session's reflections as a diary entry | `arc-journaling` (`/journal`) |
-| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` (`/reflect`) |
-| Manually save ONE insight as an instinct right now | `arc-recalling` (`/recall`) |
+| Capture THIS session's reflections as a diary entry | `arc-journaling` |
+| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` |
+| Manually save ONE insight as an instinct right now | `arc-recalling` |
 | Review / confirm / contradict auto-detected instincts | `arc-observing` |
 | Review the learning-candidate queue (when optional learning is enabled) | `arc-learning` |
 

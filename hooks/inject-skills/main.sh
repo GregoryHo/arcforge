@@ -32,6 +32,7 @@ Use ArcForge as a minimal, composable toolkit:
 - Respect higher-priority instructions, explicit user constraints, and harness/eval isolation.
 - Prefer the smallest useful workflow; skills are tools, not laws.
 - For ArcForge workflow tasks, read or invoke the relevant skill on demand.
+- For routing help or a full skill index, invoke the arcforge:arc-using skill.
 - For simple answers, read-only inspection, grading, or isolated evals, proceed directly when no workflow is needed.
 EOF_CONTEXT
 )

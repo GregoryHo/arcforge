@@ -12,6 +12,18 @@ hooks/
 ├── inject-skills/          # Injects arc-using skill at session start
 │   ├── main.sh
 │   └── README.md
+├── arc-guard/              # Blocks unsafe ops (raw git merge / arcforge loop in epic worktrees, research scope violations)
+│   ├── main.js
+│   └── README.md
+├── arc-remind/             # Post-action nudges: PR boundary, skill-shipping eval, main-branch warning
+│   ├── main.js
+│   └── README.md
+├── sdd-ledger-guard/       # Blocks decision-ledger append-only violations and status forgery
+│   ├── main.js
+│   └── README.md
+├── sdd-ratify-guard/       # Blocks `arcforge ratify` in unattended loop context
+│   ├── main.js
+│   └── README.md
 ├── quality-check/          # Auto-format & type-check on Edit
 │   ├── main.js
 │   ├── prettier.js
@@ -63,6 +75,9 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
+| arc-guard | Bash, Edit, Write | Blocking guard: denies raw `git merge`/`arcforge loop` inside epic worktrees and research-config scope violations (fail-open on errors) |
+| sdd-ledger-guard | Edit, Write | Blocking guard: denies decision-ledger append-only violations and any attempt to mint `status: accepted` via Edit/Write |
+| sdd-ratify-guard | Bash | Blocking guard: denies `arcforge ratify` while the unattended-loop sentinel is present |
 | observe | All | Captures tool calls for behavioral pattern observation |
 
 ### PostToolUse
@@ -72,6 +87,7 @@ hooks/
 | quality-check | Edit on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
 | observe | All | Captures tool call results for behavioral pattern observation |
 | compact-suggester | All | Counts tool calls, suggests /compact at 50, then every 25 |
+| arc-remind | Bash, Edit, Write | Contextual nudges: PR boundary after green tests, eval-before-ship on skill edits, spec planning, main-branch warning |
 
 ### Stop
 

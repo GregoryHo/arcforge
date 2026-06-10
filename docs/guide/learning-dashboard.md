@@ -111,4 +111,4 @@ Deactivation moves the active file to a `.disabled/` backup archive, so you can 
 ### Confusing Approve with Activate
 **Approve** only authorizes materialization — no file is written yet.
 **Materialize** writes the inactive draft under `~/.arcforge/learning/drafts/<cid>/<mid>/`.
-**Activate** is the only action that produces an active artifact under `~/.arcforge/instincts/<scope>/`. Even after activation, instincts are **not** auto-loaded into Claude context at SessionStart — they surface through dashboard, `/recall`, and explicit Read tool calls only.
+**Activate** is the only action that produces an active artifact under `~/.arcforge/instincts/<scope>/`. Even after activation, instincts are **not** auto-loaded into Claude context at SessionStart — they surface through dashboard, `arc-recalling`, and explicit Read tool calls only.

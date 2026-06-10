@@ -44,7 +44,7 @@ __pycache__/
 # Serena IDE config — contributor-only IDE state (per .claude/rules/dev-context.md "Ships = No")
 .serena/
 
-skills/*-workspace/
+evals/workspaces/
 hooks/.claude/
 
 # Implementation task lists — contributor-only, ephemeral (per .claude/rules/dev-context.md)

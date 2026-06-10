@@ -1,6 +1,7 @@
 ---
 name: arc-recalling
-description: Use when the user wants to manually save a pattern or insight as an instinct from the current session context. Use when the user says /recall followed by a description. Use when the user identifies a reusable technique worth preserving.
+description: Use when the user wants to manually save a pattern or insight as an instinct from the current session context, invokes /arcforge:arc-recalling with a description, or identifies a reusable technique worth preserving
+argument-hint: "<description of the pattern to remember>"
 ---
 
 # Manual Instinct Creation
@@ -45,7 +46,7 @@ fi
 
 ## When to Use
 
-- User explicitly says "/recall" or "remember this"
+- User explicitly says "remember this" or invokes /arcforge:arc-recalling
 - User identifies a reusable technique during work
 - User wants to preserve a pattern without waiting for automatic detection
 - User wants to save an insight from the current conversation
@@ -53,7 +54,7 @@ fi
 ## When NOT to Use
 
 - Pattern was already auto-detected by arc-observing (use confirm instead)
-- User wants to analyze multiple diaries for patterns (use /reflect)
+- User wants to analyze multiple diaries for patterns (use arc-reflecting)
 - User wants to cluster instincts into higher-level skills (use /learn)
 - User is just discussing patterns without wanting to save them
 

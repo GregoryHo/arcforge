@@ -1116,7 +1116,7 @@ function Install({
     style: {
       color: t.dim
     }
-  }, "$ "), "/plugin marketplace add arcforge"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "$ "), "/plugin marketplace add GregoryHo/arcforge"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.dim
     }

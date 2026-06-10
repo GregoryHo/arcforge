@@ -43,8 +43,8 @@ discriminates; then remove the `status: draft-unvalidated` marker from the file.
 see the discrimination-vs-non-regression tiers below — 2 of the 14 are
 non-regression passes with Δ≈0, weaker than the discrimination passes).
 
-Shippable skills = directories under `skills/` containing a `SKILL.md`, excluding
-`*-workspace` (in-progress eval scratch dirs, out of scope per `.claude/rules/obsidian-wiki.md`).
+Shippable skills = directories under `skills/` containing a `SKILL.md`. Eval scratch
+lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`).
 
 ### Skills with a VALIDATED scenario (14)
 

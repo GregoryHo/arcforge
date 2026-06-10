@@ -98,7 +98,7 @@ Always use Grep to find the exact location before using Edit.
 
 ## Confidence Lifecycle
 
-Confidence is metadata stored on the candidate / activated instinct record. It does **not** drive runtime auto-loading. It informs which records to surface in dashboard / `/recall` / history views.
+Confidence is metadata stored on the candidate / activated instinct record. It does **not** drive runtime auto-loading. It informs which records to surface in dashboard / `arc-recalling` / history views.
 
 ```
 Auto-detected by daemon: confidence 0.5
@@ -106,7 +106,7 @@ Confirmed → +0.05 (cap 0.9)
 Contradicted → -0.10 (floor 0.1), -0.05 for manual/reflection sources
 No activity → -0.02/week, -0.01/week for manual/reflection sources
 
->= 0.7 → Surfaced prominently in dashboard / /recall
+>= 0.7 → Surfaced prominently in dashboard / arc-recalling
 0.3-0.7 → Listed as summary
 < 0.3 → Silent
 < 0.15 → Archived (moved to archived/ subdir)
@@ -129,8 +129,8 @@ No activity → -0.02/week, -0.01/week for manual/reflection sources
 ## When NOT to Use
 
 - User wants to extract reusable techniques (use /learn)
-- User wants to capture session reflections (use /journal)
-- User wants to analyze diary entries (use /reflect)
+- User wants to capture session reflections (use arc-journaling)
+- User wants to analyze diary entries (use arc-reflecting)
 
 ## Process
 
@@ -169,7 +169,7 @@ Patterns appearing in 2+ projects can be promoted to `~/.arcforge/instincts/glob
 
 ### Ignoring Low-Confidence Instincts
 **Wrong:** Treating all instincts equally
-**Right:** Surface >= 0.7 prominently in dashboard / `/recall`; summaries for 0.3-0.7; hide < 0.3. Confidence informs surfacing, not runtime auto-loading.
+**Right:** Surface >= 0.7 prominently in dashboard / `arc-recalling`; summaries for 0.3-0.7; hide < 0.3. Confidence informs surfacing, not runtime auto-loading.
 
 ### Not Updating Confidence
 **Wrong:** Showing instincts without offering confirm/contradict
