@@ -97,21 +97,32 @@ These are the most frequently used commands:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
+| `/arcforge:arc-using` | Routing help + skill index | When unsure which skill or workflow applies |
 | `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
 | `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
 | `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
 | `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
 | `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
 
-### How Skills Connect
+Shortcut slash commands (thin wrappers that delegate to the skill of the same purpose):
 
-![ArcForge Overview](assets/arcforge-overview.png)
-
-`arc-using` is a bounded router and index, not an always-on policy engine. Skills fan out into workflow, quality, infrastructure, and learning categories; agents should pick the smallest useful path for the task.
+| Shortcut | Delegates to |
+|----------|--------------|
+| `/arcforge:brainstorm` | arc-brainstorming |
+| `/arcforge:write-tasks` | arc-writing-tasks |
+| `/arcforge:execute-tasks` | arc-executing-tasks |
+| `/arcforge:journal` | arc-journaling |
+| `/arcforge:reflect` | arc-reflecting |
+| `/arcforge:recall` | arc-recalling |
+| `/arcforge:sessions` | arc-managing-sessions |
+| `/arcforge:instinct-status` | arc-observing |
+| `/arcforge:arc-auditing-spec` | arc-auditing-spec |
 
 ## How Skills Compose
 
-`arc-using` helps choose a path when routing is useful. You can also enter at any skill directly.
+![ArcForge Overview](assets/arcforge-overview.png)
+
+**`arc-using` is the canonical in-session router.** When you're unsure which skill applies, invoke it — it maps concrete conditions to the smallest useful workflow. It is a bounded router and index, not an always-on policy engine: you can also enter at any skill directly. The **[Skills Reference](docs/guide/skills-reference.md)** is the offline companion with full per-skill detail.
 
 | Context | Recommended skills | Entry point |
 |---------|-------------------|-------------|
@@ -137,41 +148,39 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-### Core Toolkit Skills
+All 33 skills, each listed once. Workflow skills hand off sequentially, discipline skills fire as quality gates when their condition is present, and meta skills are invoked directly (see `arc-using` for routing).
 
-- **arc-using** - Bounded routing help for task scale
+### Routing
+
+- **arc-using** - Canonical router: maps task conditions to the smallest useful skill or workflow
+
+### Workflow Skills (idea → spec → tasks → integration)
+
 - **arc-brainstorming** - Design exploration
-- **arc-refining** - Spec generation
-- **arc-planning** - DAG breakdown
-- **arc-tdd** - Test-driven development
-- **arc-debugging** - Systematic debugging with four phases
-- **arc-verifying** - Verification evidence before completion claims
-- **arc-evaluating** - Measure whether skills and workflows change agent behavior
-
-### Optional Workflow Skills
-
-- **arc-coordinating** - Worktree management
-- **arc-implementing** - TDD implementation
-- **arc-using-worktrees** - Create isolated workspace for epic development
-- **arc-finishing-epic** - Epic completion with merge decision
-- **arc-finishing** - Branch completion with merge decision
+- **arc-refining** - Convert design documents to structured specs
+- **arc-planning** - Break a spec into an executable DAG of epics
 - **arc-writing-tasks** - Break epics or features into executable tasks
+- **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
+- **arc-agent-driven** - Automated execution with subagent per task and two-stage review
+- **arc-implementing** - Orchestrate large project implementation in a worktree
+- **arc-coordinating** - Worktree management for multi-epic projects
+- **arc-using-worktrees** - Create isolated workspace for epic development
 - **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
-- **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
+- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via agent teammates
+- **arc-looping** - Autonomous cross-session loop execution
+- **arc-finishing** - Branch completion with merge decision
+- **arc-finishing-epic** - Epic completion with merge decision (worktrees)
 
-### Project-Level Meta Skills
-
-- **arc-writing-skills** - ArcForge project-level meta skill for maintaining ArcForge's own skills and skill tests
-
-### Execution Layer
+### Discipline Skills (quality gates)
 
 - **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
-- **arc-agent-driven** - Automated execution with subagent per task and two-stage review
-- **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
-- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via Claude Code agent teammates
-- **arc-looping** - Autonomous cross-session loop execution
+- **arc-debugging** - Systematic debugging with four phases
+- **arc-verifying** - Verification evidence before completion claims
+- **arc-requesting-review** - When and how to request code review
+- **arc-receiving-review** - How to handle review feedback with technical rigor
+- **arc-evaluating** - Measure whether skills and workflows change agent behavior
 
-### Session & Learning Layer
+### Session & Learning Skills
 
 - **arc-journaling** - Session journaling for capturing reflections before compaction
 - **arc-reflecting** - Analyze diary entries for insights and patterns
@@ -179,20 +188,42 @@ These are the most frequently used commands:
 - **arc-observing** - Tool call observation for behavioral pattern detection
 - **arc-recalling** - Manual instinct creation from session insights
 - **arc-managing-sessions** - Session save/resume with alias support
+- **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
 - **arc-researching** - Autonomous hypothesis-driven experimentation
 
 The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
 
-### Knowledge Base Layer
+### Knowledge Base Skills
 
 - **arc-maintaining-obsidian** - Unified Obsidian vault lifecycle: ingest, query, audit (Karpathy LLM Wiki pattern)
 - **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
 
-### Review Layer
+### Meta & Audit Skills
 
-- **arc-requesting-review** - When and how to request code review
-- **arc-receiving-review** - How to handle review feedback with technical rigor
-- **arc-evaluating** - Measure whether skills and workflows change agent behavior
+- **arc-writing-skills** - Maintain ArcForge's own skills and skill tests (project-level meta)
+- **arc-auditing-spec** - Read-only advisory audit of an SDD spec family (`/arc-auditing-spec <spec-id>`)
+
+### Agents
+
+Skills delegate focused work to 11 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
+
+| Agent | Role |
+|-------|------|
+| `planner` | Architectural analysis and implementation planning (arc-planning, arc-brainstorming) |
+| `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
+| `spec-reviewer` | Stage 1 review: implementation matches spec exactly (arc-agent-driven) |
+| `quality-reviewer` | Stage 2 review: architecture, testing, error handling (arc-agent-driven) |
+| `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
+| `debugger` | 4-phase root-cause investigation (arc-debugging) |
+| `verifier` | Independent acceptance-criteria verification (arc-verifying) |
+| `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
+| `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
+| `arc-auditing-spec-cross-artifact-alignment` | Spec audit axis 2 (arc-auditing-spec) |
+| `arc-auditing-spec-state-transition-integrity` | Spec audit axis 3 (arc-auditing-spec) |
+
+### Hooks
+
+ArcForge registers event hooks (Claude Code only) that work silently in the background: a SessionStart bootstrap, session tracking, observation logging, SDD guards, and journaling triggers. They inject at most a few hundred tokens per session and never block normal work. See the **[Hooks System guide](docs/guide/hooks-system.md)** for the full list and how each one behaves.
 
 ### Review Templates
 

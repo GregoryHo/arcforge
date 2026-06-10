@@ -1,5 +1,24 @@
 # arcforge Skills Reference
 
+This is the offline reference for all 33 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Skill Categories](#skill-categories)
+- [Complete Skill Catalog](#complete-skill-catalog)
+  - Planning: [arc-brainstorming](#arc-brainstorming) · [arc-refining](#arc-refining) · [arc-writing-tasks](#arc-writing-tasks) · [arc-planning](#arc-planning)
+  - Execution: [arc-executing-tasks](#arc-executing-tasks) · [arc-agent-driven](#arc-agent-driven) · [arc-implementing](#arc-implementing) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping)
+  - Coordination: [arc-using](#arc-using) · [arc-using-worktrees](#arc-using-worktrees) · [arc-compacting](#arc-compacting) · [arc-coordinating](#arc-coordinating) · [arc-finishing](#arc-finishing) · [arc-finishing-epic](#arc-finishing-epic) · [arc-managing-sessions](#arc-managing-sessions)
+  - Quality: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-evaluating](#arc-evaluating) · [arc-requesting-review](#arc-requesting-review) · [arc-receiving-review](#arc-receiving-review)
+  - Learning: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-observing](#arc-observing) · [arc-recalling](#arc-recalling) · [arc-researching](#arc-researching)
+  - Knowledge Base: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
+  - Meta: [arc-writing-skills](#arc-writing-skills) · [arc-auditing-spec](#arc-auditing-spec)
+- [Workflow Patterns](#workflow-patterns)
+- [Comparison Tables](#comparison-tables)
+- [Operating Principles](#operating-principles)
+- [Living SDD Responsibility Boundary](#living-sdd-responsibility-boundary)
+
 ## Quick Start
 
 arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
@@ -56,7 +75,7 @@ The complete catalog still uses functional categories for lookup:
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-writing-skills | Project-level meta skill for maintaining ArcForge's own skills |
+| **Meta** | arc-writing-skills, arc-auditing-spec | Maintain ArcForge's own skills; audit SDD spec families |
 
 **How skills flow through a project:**
 
@@ -810,6 +829,26 @@ Rule in `skills/arc-using/SKILL.md`.
 - Output: `skills/<skill-name>/SKILL.md`, pytest test file
 
 **Related:** ArcForge maintainer task --> **arc-writing-skills** --> deployed ArcForge skill
+
+---
+
+### arc-auditing-spec
+
+**Purpose:** Read-only advisory audit of an SDD spec family (design.md, spec.xml, dag.yaml, decisions.yml, product/vision.md) across three axes: internal consistency, cross-artifact alignment, and state-transition integrity.
+
+**When to use:** When the user explicitly runs `/arc-auditing-spec <spec-id>`. Never auto-invoked from pipeline skills (arc-brainstorming, arc-refining, arc-planning) — invocation is always user-initiated.
+
+**Key workflow:**
+1. Phase 0 — verify `specs/<spec-id>/` exists (graceful degradation: only design.md is required)
+2. Fan out three parallel audit subagents, one per axis
+3. Aggregate findings into a single advisory report
+4. Print a Decisions table and exit — the skill never edits anything (`--save` optionally writes the report to `~/.arcforge/reviews/`)
+
+**Artifacts:**
+- Input: `specs/<spec-id>/` family + D6 anchor artifacts
+- Output: advisory report (display only, or saved via `--save`); zero mutations
+
+**Related:** user runs `/arc-auditing-spec <spec-id>` --> **arc-auditing-spec** --> main session owns any actual edits
 
 ---
 
