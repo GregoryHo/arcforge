@@ -1,6 +1,7 @@
 ---
 name: arc-writing-tasks
 description: Use when breaking down features into executable tasks, when preparing for implementation, or when tasks need exact code and commands
+argument-hint: "<feature-name>"
 ---
 
 # Writing Tasks

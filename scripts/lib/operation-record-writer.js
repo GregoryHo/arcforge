@@ -6,7 +6,7 @@
  * and differ only in the field set the operation emits.
  *
  * Operation records are distinct from instinct files (instinct-writer.js):
- * they track that a /reflect or /recall session happened, not the learned
+ * they track that an arc-reflecting or arc-recalling session happened, not the learned
  * instincts themselves. Keeping the storage roots separate prevents
  * provenance loops with Layer 8 activated instincts.
  */

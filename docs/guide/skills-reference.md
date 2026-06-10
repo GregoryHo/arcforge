@@ -396,7 +396,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Key workflow:**
 1. Check phase transition — compact between phases (when state is persisted to files), not during
-2. Pre-compact: save decisions to files/memory, run `/journal` if session was substantial
+2. Pre-compact: save decisions to files/memory, invoke `arc-journaling` if session was substantial
 3. Check for un-committed work — ensure valuable changes are committed
 4. Compact with focused seed text: `/compact Focus on implementing [next task]`
 5. Post-compact: run `arcforge reboot`, re-read needed files
@@ -633,14 +633,14 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Capture session reflections as structured diary entries for future pattern extraction.
 
-**When to use:** When user explicitly requests /journal, when PreCompact hook triggers, or at end of significant work session.
+**When to use:** When the user asks to journal session reflections (/arcforge:arc-journaling), when PreCompact hook triggers, or at end of significant work session.
 
 **Key workflow:**
 1. Pre-diary check — verify session had non-trivial decisions or challenges
 2. Reflect on conversation from memory (do NOT read files)
 3. Fill template: decisions, preferences, challenges, solutions
 4. Save to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`
-5. Offer follow-up: "run `/reflect` to extract patterns"
+5. Offer follow-up: "run `/arcforge:arc-reflecting` to extract patterns"
 
 **Artifacts:**
 - Output: `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
@@ -653,7 +653,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Analyze multiple diary entries to identify recurring patterns and save insights.
 
-**When to use:** When user requests /reflect, after 5+ diary entries accumulated, or when asked to summarize preferences from past sessions.
+**When to use:** When the user asks to reflect on accumulated diaries (/arcforge:arc-reflecting), after 5+ diary entries accumulate, or when asked to summarize preferences from past sessions.
 
 **Key workflow:**
 1. Smart filter selection (unprocessed, project_focused, or recent_window)
@@ -720,7 +720,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Manually save patterns and insights as instincts from the current session context.
 
-**When to use:** When the user wants to manually save a pattern or insight as an instinct. When the user says /recall followed by a description.
+**When to use:** When the user wants to manually save a pattern or insight as an instinct. When the user invokes /arcforge:arc-recalling with a description.
 
 **Key workflow:**
 1. Receive user's natural language description

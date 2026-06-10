@@ -106,20 +106,6 @@ These are the most frequently used commands:
 | `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
 | `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
 
-Shortcut slash commands (thin wrappers that delegate to the skill of the same purpose):
-
-| Shortcut | Delegates to |
-|----------|--------------|
-| `/arcforge:brainstorm` | arc-brainstorming |
-| `/arcforge:write-tasks` | arc-writing-tasks |
-| `/arcforge:execute-tasks` | arc-executing-tasks |
-| `/arcforge:journal` | arc-journaling |
-| `/arcforge:reflect` | arc-reflecting |
-| `/arcforge:recall` | arc-recalling |
-| `/arcforge:sessions` | arc-managing-sessions |
-| `/arcforge:instinct-status` | arc-observing |
-| `/arcforge:arc-auditing-spec` | arc-auditing-spec |
-
 ## How Skills Compose
 
 ![ArcForge Overview](assets/arcforge-overview.png)

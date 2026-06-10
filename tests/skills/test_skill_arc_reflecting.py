@@ -81,11 +81,11 @@ def test_documents_rule_violation_detection():
 
 
 def test_distinguishes_from_recall():
-    """Skill should explain difference from /recall."""
+    """Skill should explain difference from arc-recalling."""
     text = _read_skill()
     lower_text = text.lower()
-    # Check that it references /recall and distinguishes
-    has_recall_reference = "/recall" in lower_text
+    # Check that it references arc-recalling and distinguishes
+    has_recall_reference = "arc-recalling" in lower_text
     has_diaryed = "diaryed" in lower_text
     assert has_recall_reference and has_diaryed
 

@@ -61,9 +61,7 @@ function loadAutoInstincts(project) {
     lines.push(`- **${inst.id}** (${pctStr}%): ${inst.trigger || inst.action || ''}`);
   }
 
-  lines.push(
-    '\nUse /instinct-status or invoke arc-observing to confirm/contradict these patterns.',
-  );
+  lines.push('\nInvoke /arcforge:arc-observing to confirm/contradict these patterns.');
 
   return { text: lines.join('\n'), count: autoLoaded.length };
 }
@@ -172,7 +170,7 @@ function loadPendingActions(project) {
     );
 
     if (diaryActions.length > 0) {
-      lines.push('**📝 Diary draft ready — use /journal to review and finalize.**');
+      lines.push('**📝 Diary draft ready — use /arcforge:arc-journaling to review and finalize.**');
       summaryParts.push('diary draft ready');
     }
 
@@ -180,7 +178,7 @@ function loadPendingActions(project) {
       const latest = reflectActions[reflectActions.length - 1];
       const count = latest.payload?.count || reflectActions.length;
       lines.push(
-        `**${count} unprocessed diaries ready for reflection.** Run /reflect to analyze patterns.`,
+        `**${count} unprocessed diaries ready for reflection.** Run /arcforge:arc-reflecting to analyze patterns.`,
       );
       summaryParts.push(`${count} diaries pending reflection`);
     }

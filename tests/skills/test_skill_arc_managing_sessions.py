@@ -29,7 +29,7 @@ def test_arc_managing_sessions_frontmatter():
     assert front.get("name") == "arc-managing-sessions"
     assert front.get("description", "").startswith("Use when")
     assert len((front.get("name", "") + front.get("description", ""))) < 1024
-    assert set(front.keys()) == {"name", "description"}
+    assert set(front.keys()) == {"name", "description", "argument-hint"}
 
     # No @ symbols in skill content
     assert "@" not in text

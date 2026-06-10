@@ -113,9 +113,9 @@ Five skills touch the diary/instinct system. Route by the concrete trigger, not 
 
 | User intent | Skill |
 |-------------|-------|
-| Capture THIS session's reflections as a diary entry | `arc-journaling` (`/journal`) |
-| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` (`/reflect`) |
-| Manually save ONE insight as an instinct right now | `arc-recalling` (`/recall`) |
+| Capture THIS session's reflections as a diary entry | `arc-journaling` |
+| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` |
+| Manually save ONE insight as an instinct right now | `arc-recalling` |
 | Review / confirm / contradict auto-detected instincts | `arc-observing` |
 | Review the learning-candidate queue (when optional learning is enabled) | `arc-learning` |
 

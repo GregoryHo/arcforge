@@ -81,7 +81,7 @@ function cmdResume(args) {
   }
 
   if (!sessionPath) {
-    console.log('No saved session found. Use /sessions save to create one.');
+    console.log('No saved session found. Use /arcforge:arc-managing-sessions save to create one.');
     process.exit(1);
   }
 
@@ -142,7 +142,7 @@ function cmdAlias(args) {
   const alias = args[1];
 
   if (!sessionPath || !alias) {
-    console.log('Usage: /sessions alias <session-path> <name>');
+    console.log('Usage: /arcforge:arc-managing-sessions alias <session-path> <name>');
     process.exit(1);
   }
 
@@ -159,7 +159,7 @@ function cmdAliases() {
   const aliases = listAliases(project);
 
   if (aliases.length === 0) {
-    console.log('No saved sessions. Use /sessions save <name> to create one.');
+    console.log('No saved sessions. Use /arcforge:arc-managing-sessions save <name> to create one.');
     process.exit(0);
   }
 

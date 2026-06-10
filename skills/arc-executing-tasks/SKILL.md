@@ -1,6 +1,7 @@
 ---
 name: arc-executing-tasks
 description: Use when executing a prepared task list, when running batch implementation, or when tasks are already broken down
+argument-hint: "<task-list-name>"
 ---
 
 # Executing Tasks

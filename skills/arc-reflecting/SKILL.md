@@ -1,6 +1,6 @@
 ---
 name: arc-reflecting
-description: Use when user requests /reflect, after 5+ diary entries accumulated, or when asked to summarize preferences from past sessions
+description: Use when the user asks to reflect on accumulated diaries (/arcforge:arc-reflecting), after 5+ diary entries accumulate, or when asked to summarize preferences from past sessions
 ---
 
 # Diary Reflection & Pattern Extraction
@@ -61,14 +61,14 @@ node "${SKILL_ROOT}/scripts/reflect.js" update-log \
 For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) to read diaries in an isolated context without polluting the main conversation.
 
 **Integration with instincts:**
-- `/reflect` → `~/.arcforge/diaryed/` (reflections) + instincts saved via `save-instinct`
-- `/recall` → retrieves instincts and learned patterns
+- `arc-reflecting` → `~/.arcforge/diaryed/` (reflections) + instincts saved via `save-instinct`
+- `arc-recalling` → retrieves instincts and learned patterns
 
 **Core principle:** Patterns must appear 3+ times across diary entries to be considered "Pattern". 1-2 occurrences are labeled "Observation".
 
 ## When to Use
 
-- User runs `/reflect`
+- User invokes `/arcforge:arc-reflecting`
 - 5+ diary entries accumulated
 - User asks "what have I learned?" or "show me patterns"
 - User wants to review preferences across sessions
@@ -76,8 +76,8 @@ For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) 
 ## When NOT to Use
 
 - Fewer than 3 diary entries exist
-- User wants patterns auto-loaded (use /recall instead)
-- Single-session insights (use /journal instead)
+- User wants patterns auto-loaded (use arc-recalling instead)
+- Single-session insights (use arc-journaling instead)
 - No meaningful patterns found
 
 ## Storage
@@ -141,7 +141,7 @@ Search for diary files:
 ```
 
 Count entries. If fewer than 3:
-> "Found only X diary entries. Run more sessions with /journal before reflecting."
+> "Found only X diary entries. Run more sessions with arc-journaling before reflecting."
 
 ### 3. Read CLAUDE.md Rules (if exists)
 
@@ -272,7 +272,7 @@ Reflections and instincts are auto-saved. Inform user of what was saved.
 Insights are observations, not rules. User decides how to act on them.
 
 ### Separate from Recall
-Diaryed patterns are for reflection. If user wants auto-loading, redirect to /recall.
+Diaryed patterns are for reflection. If user wants auto-loading, redirect to arc-recalling.
 
 ## Common Mistakes
 
@@ -284,7 +284,7 @@ Diaryed patterns are for reflection. If user wants auto-loading, redirect to /re
 **Wrong:** "You seem to prefer X"
 **Right:** "Based on sessions from Jan 15 and Jan 20, you consistently chose X"
 
-### Confusing with /recall
+### Confusing with arc-recalling
 **Wrong:** Putting reusable techniques here
 **Right:** Observations go to diaryed; techniques go to learned
 
