@@ -27,7 +27,6 @@ derivation rules and `skills/arc-using/SKILL.md` for the agent Worktree Rule.
 | `hooks/` | Event-driven extensions | Silent catch |
 | `skills/` | Markdown definitions (TDD for docs) | N/A |
 | `templates/` | Subagent prompts with `{VARIABLE}` placeholders | N/A |
-| `commands/` | Thin delegation wrappers to skills | N/A |
 | `agents/` | Specialized subagent definitions | N/A |
 | `docs/` | Design docs, platform guides | N/A |
 
@@ -71,7 +70,6 @@ scripts/          # Node.js CLI and core engine
 hooks/            # Claude Code event hooks
 skills/           # Markdown skill definitions
 templates/        # Subagent prompt templates
-commands/         # Thin CLI command wrappers
 agents/           # Specialized subagent definitions
 docs/             # Design docs, platform guides
 ```

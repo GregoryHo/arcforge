@@ -1,6 +1,7 @@
 ---
 name: arc-auditing-spec
-description: Use when the user explicitly runs the slash command `/arc-auditing-spec <spec-id>` to produce a read-only advisory audit of an arcforge SDD spec family (design.md, spec.xml, dag.yaml, and the D6 anchor artifacts decisions.yml and product/vision.md). Only triggered by direct user invocation; never auto-invoked from any pipeline skill (arc-brainstorming, arc-refining, arc-planning).
+description: Use when the user explicitly invokes `/arcforge:arc-auditing-spec <spec-id>` to produce a read-only advisory audit of an arcforge SDD spec family (design.md, spec.xml, dag.yaml, and the D6 anchor artifacts decisions.yml and product/vision.md). Only triggered by direct user invocation; never auto-invoked from any pipeline skill (arc-brainstorming, arc-refining, arc-planning).
+argument-hint: "<spec-id> [--save]"
 ---
 
 # Skill: arc-auditing-spec
@@ -15,7 +16,7 @@ No `--apply` flag, no "while I'm here let me fix this typo" shortcut, no Phase 6
 
 ## When to Use
 
-- User types `/arc-auditing-spec <spec-id>` wanting cross-artifact alignment, internal consistency, and state-transition integrity checked across the spec family
+- User types `/arcforge:arc-auditing-spec <spec-id>` wanting cross-artifact alignment, internal consistency, and state-transition integrity checked across the spec family
 - The spec has reached a state where at least `design.md` exists (spec.xml and dag.yaml optional; graceful degradation per fr-aa-004)
 
 ## When NOT to Use
@@ -27,7 +28,7 @@ No `--apply` flag, no "while I'm here let me fix this typo" shortcut, no Phase 6
 ## Invocation Contract
 
 ```
-/arc-auditing-spec <spec-id> [--save]
+/arcforge:arc-auditing-spec <spec-id> [--save]
 ```
 
 - `<spec-id>` — directory name under `specs/`. Exact match only; no fuzzy resolution.

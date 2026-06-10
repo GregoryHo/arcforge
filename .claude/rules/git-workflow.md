@@ -17,7 +17,7 @@ Format: `<type>(<scope>): <description>`
 
 ### Scopes
 
-`skills`, `cli`, `hooks`, `learning`, `templates`, `agents`, `commands`
+`skills`, `cli`, `hooks`, `learning`, `templates`, `agents`
 
 ## Branch Naming
 

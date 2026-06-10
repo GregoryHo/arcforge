@@ -836,7 +836,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Read-only advisory audit of an SDD spec family (design.md, spec.xml, dag.yaml, decisions.yml, product/vision.md) across three axes: internal consistency, cross-artifact alignment, and state-transition integrity.
 
-**When to use:** When the user explicitly runs `/arc-auditing-spec <spec-id>`. Never auto-invoked from pipeline skills (arc-brainstorming, arc-refining, arc-planning) — invocation is always user-initiated.
+**When to use:** When the user explicitly runs `/arcforge:arc-auditing-spec <spec-id>`. Never auto-invoked from pipeline skills (arc-brainstorming, arc-refining, arc-planning) — invocation is always user-initiated.
 
 **Key workflow:**
 1. Phase 0 — verify `specs/<spec-id>/` exists (graceful degradation: only design.md is required)
@@ -848,7 +848,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: `specs/<spec-id>/` family + D6 anchor artifacts
 - Output: advisory report (display only, or saved via `--save`); zero mutations
 
-**Related:** user runs `/arc-auditing-spec <spec-id>` --> **arc-auditing-spec** --> main session owns any actual edits
+**Related:** user runs `/arcforge:arc-auditing-spec <spec-id>` --> **arc-auditing-spec** --> main session owns any actual edits
 
 ---
 

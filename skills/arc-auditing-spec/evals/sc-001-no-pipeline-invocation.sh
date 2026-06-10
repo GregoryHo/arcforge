@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Eval: fr-sc-001-ac3 — no pipeline skill may auto-invoke /arc-auditing-spec.
+# Eval: fr-sc-001-ac3 — no pipeline skill may auto-invoke arc-auditing-spec.
 #
 # This is the cheapest possible check for the whole audit contract: a literal
 # grep for the slash-command name in the pipeline-skill bodies. If any of them
-# ever reference /arc-auditing-spec in a way that implies invocation (vs. pure
+# ever reference /arcforge:arc-auditing-spec in a way that implies invocation (vs. pure
 # documentation), this script exits non-zero.
 #
 # Also codified as test_no_pipeline_auto_invocation_of_audit_skill in
@@ -21,14 +21,14 @@ for skill in skills/arc-brainstorming/SKILL.md \
   if [[ ! -f "$skill" ]]; then
     continue
   fi
-  if grep -nF "/arc-auditing-spec" "$skill" > /dev/null 2>&1; then
-    echo "FAIL: $skill references /arc-auditing-spec (fr-sc-001-ac3 violation)"
-    grep -nF "/arc-auditing-spec" "$skill"
+  if grep -nE "/(arcforge:)?arc-auditing-spec" "$skill" > /dev/null 2>&1; then
+    echo "FAIL: $skill references the arc-auditing-spec invocation (fr-sc-001-ac3 violation)"
+    grep -nE "/(arcforge:)?arc-auditing-spec" "$skill"
     FAIL=1
   fi
 done
 
 if [[ $FAIL -eq 0 ]]; then
-  echo "PASS: sc-001-ac3 — no pipeline skill invokes /arc-auditing-spec"
+  echo "PASS: sc-001-ac3 — no pipeline skill invokes arc-auditing-spec"
 fi
 exit $FAIL

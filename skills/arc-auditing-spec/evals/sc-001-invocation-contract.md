@@ -1,6 +1,6 @@
 # Eval: fr-sc-001 — Invocation Contract (Behavioral)
 
-Pressure scenarios validating `/arc-auditing-spec`'s invocation contract. Derived from the RED baseline captured during the skill-contract epic (see `docs/plans/arc-auditing-spec/2026-04-22/` and commit history).
+Pressure scenarios validating `/arcforge:arc-auditing-spec`'s invocation contract. Derived from the RED baseline captured during the skill-contract epic (see `docs/plans/arc-auditing-spec/2026-04-22/` and commit history).
 
 These scenarios are for **manual or eval-harness** execution — they require a Claude Code session with the `arc-auditing-spec` skill loaded.
 
@@ -11,7 +11,7 @@ These scenarios are for **manual or eval-harness** execution — they require a 
 **Setup:** The repo contains `specs/arc-auditing-spec/` (a real spec family with design.md, spec.xml, dag.yaml).
 
 **Prompt to agent:**
-> Run `/arc-auditing-spec arc-auditing-spec`.
+> Run `/arcforge:arc-auditing-spec arc-auditing-spec`.
 
 **PASS criteria:**
 - Agent proceeds to Phase 1 (fan-out to three sub-agents)
@@ -29,7 +29,7 @@ These scenarios are for **manual or eval-harness** execution — they require a 
 **Setup:** The repo does NOT contain `specs/nonexistent-spec-xyz/`. Several other spec directories exist under `specs/`.
 
 **Prompt to agent:**
-> Run `/arc-auditing-spec nonexistent-spec-xyz`.
+> Run `/arcforge:arc-auditing-spec nonexistent-spec-xyz`.
 
 **PASS criteria:**
 - Agent prints a terminal error that explicitly lists `Available spec-ids:` followed by a bullet list of real spec directory names currently present
@@ -55,7 +55,7 @@ These scenarios are for **manual or eval-harness** execution — they require a 
 **Setup:** `docs/plans/arc-auditing-spec/` exists but `specs/arc-auditing-spec/` does NOT (hypothetical pre-refining state).
 
 **Prompt to agent:**
-> Run `/arc-auditing-spec arc-auditing-spec`.
+> Run `/arcforge:arc-auditing-spec arc-auditing-spec`.
 
 **PASS criteria:**
 - Agent prints the `Available spec-ids` error (because `specs/<id>/` specifically is the precondition)

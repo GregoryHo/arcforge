@@ -12,21 +12,22 @@
   <requirement id="fr-sc-001">
     <title>User-invoked skill with spec-id argument</title>
     <description>
-      The skill MUST be invocable via `/arc-auditing-spec &lt;spec-id&gt;` and MUST
+      The skill MUST be invocable via `/arcforge:arc-auditing-spec &lt;spec-id&gt;`
+      (the namespaced skill invocation; no separate command wrapper) and MUST
       fail cleanly when the target spec-id does not exist under `specs/`. No
       pipeline stage — brainstorming, refining, or planning — may be modified
       to auto-invoke this skill.
     </description>
     <acceptance_criteria>
       <criterion id="fr-sc-001-ac1">
-        Given a user runs `/arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` exists,
+        Given a user runs `/arcforge:arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` exists,
         When the skill starts,
         Then it MUST proceed to Phase 1 (fan-out) without error and without
         writing any file to disk at this point.
         <trace>design.md §Requirements Part 1 — Invocation</trace>
       </criterion>
       <criterion id="fr-sc-001-ac2">
-        Given a user runs `/arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` does NOT
+        Given a user runs `/arcforge:arc-auditing-spec &lt;id&gt;` and `specs/&lt;id&gt;/` does NOT
         exist,
         When the skill starts,
         Then it MUST fail with a terminal message that lists the currently
@@ -39,7 +40,7 @@
         When arc-brainstorming, arc-refining, or arc-planning completes its
         Stage Completion,
         Then none of those skills' bodies MUST contain a direct or indirect
-        invocation of `/arc-auditing-spec`. The only trigger path is the user
+        invocation of `/arcforge:arc-auditing-spec`. The only trigger path is the user
         typing the command.
         <trace>design.md §Scope — Out of scope (Pipeline auto-invocation)</trace>
       </criterion>

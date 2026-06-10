@@ -1,6 +1,6 @@
 # arc-auditing-spec — Eval Suite
 
-Evaluation scenarios validating the `/arc-auditing-spec` skill. Organized by the epic that produces each file.
+Evaluation scenarios validating the `arc-auditing-spec` skill. Organized by the epic that produces each file.
 
 ## Harness-executable vs Behavioral Review
 
