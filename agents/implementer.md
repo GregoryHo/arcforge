@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: |
-  Use this agent to implement a specific task using TDD in an isolated subagent context. Each implementer gets a fresh context to avoid cross-task pollution. Examples: <example>Context: A task from a plan needs to be coded. user: "Implement the SyncResult dataclass as described in task 1" assistant: "I'll dispatch the implementer agent with the full task context to implement this using TDD." <commentary>The implementer agent handles the full TDD cycle — RED, GREEN, REFACTOR — then reports back with evidence.</commentary></example> <example>Context: arc-agent-driven is executing a task list and needs a subagent per task. user: "Execute task 3: add the loop CLI command" assistant: "Dispatching implementer agent with task spec and acceptance criteria." <commentary>Each task gets a fresh implementer to prevent context pollution between tasks.</commentary></example>
+  Use this agent to implement one specific task via TDD (RED, GREEN, REFACTOR) in a fresh, isolated subagent context — one implementer per task to avoid cross-task pollution; reports back with evidence.
 model: sonnet
 ---
 

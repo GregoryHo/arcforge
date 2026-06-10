@@ -93,6 +93,18 @@ Examples:
 - "Implement epic" → `arc-planning` if no `specs/<spec-id>/dag.yaml`; coordination/implementation skills if the DAG exists.
 - "Audit this skill/workflow" → `arc-evaluating` when shipping/merge/completion evidence matters.
 
+## Execution & Finishing Choosers
+
+When two skills cover the same step, pick by the concrete condition:
+
+| Decision | Pick |
+|----------|------|
+| Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + two-stage review) |
+| Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-epic via DAG, lead present) |
+| Finish work | `arc-finishing-epic` when `.arcforge-epic` exists in the worktree, else `arc-finishing` |
+
+Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.
+
 ## Discipline Skills — Conditional Triggers
 
 These skills activate during a workflow when the condition is present. They are not mandatory pipeline steps for every message.

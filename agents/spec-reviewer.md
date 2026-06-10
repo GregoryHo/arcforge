@@ -1,7 +1,7 @@
 ---
 name: spec-reviewer
 description: |
-  Use this agent to verify that an implementation matches its spec EXACTLY — nothing missing, nothing extra, nothing misunderstood. This is the first review gate in the two-stage review process. Examples: <example>Context: An implementer has completed a task and needs spec compliance review. user: "The implementer finished task 2 — run the spec review" assistant: "I'll dispatch the spec-reviewer agent to independently verify every acceptance criterion against the actual code." <commentary>Spec review must happen BEFORE code quality review — it gates whether the right thing was built.</commentary></example> <example>Context: arc-agent-driven workflow needs spec compliance check between implementation and quality review. user: "Check if the eval-grader agent matches the eval harness spec" assistant: "Dispatching spec-reviewer to compare implementation against spec. It will read the actual code, not trust any reports." <commentary>The spec-reviewer reads actual code and independently verifies — it never trusts implementer reports.</commentary></example>
+  Use this agent as the first review gate — verify an implementation matches its spec EXACTLY, nothing missing, nothing extra. Reads the actual code; never trusts implementer reports. Runs before quality review.
 model: sonnet
 ---
 

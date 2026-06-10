@@ -1,6 +1,6 @@
 ---
 name: arc-diagramming-obsidian
-description: Use when the user wants to create an Excalidraw diagram, architecture visualization, flowchart, mind map, or any visual representation of concepts and relationships. Trigger on mentions of drawing, diagramming, visualizing, mapping, or illustrating ideas. Also trigger when arc-maintaining-obsidian delegates for Synthesis visuals that need more than embedded Mermaid. Even if the user just says "show me how this works visually" or "can you draw that?" — this skill applies.
+description: Use when the user wants an Excalidraw diagram or any visual representation — architecture, flowchart, mind map — including casual "draw this" / "show me how this works visually". Also use when arc-maintaining-obsidian delegates Synthesis visuals beyond embedded Mermaid.
 ---
 
 # arc-diagramming-obsidian

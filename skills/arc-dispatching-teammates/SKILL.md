@@ -1,6 +1,6 @@
 ---
 name: arc-dispatching-teammates
-description: Use when specs/<spec-id>/dag.yaml has 2+ epics in a ready state, the user is staying at their keyboard to monitor (not walking away), and the context is epic-level parallel work where arc-looping's unattended mode is a wrong fit. Use when the user mentions agent teams or teammates in the context of multi-epic work, asks what to do after arc-planning produces multiple ready epics, or is in an arcforge session where epic-level parallelism has arisen and the lead can stay present. For walk-away overnight execution, use arc-looping instead.
+description: Use when specs/<spec-id>/dag.yaml has 2+ ready epics and the lead is staying present to monitor epic-level parallel work via agent teammates. Trigger on mentions of agent teams/teammates for multi-epic work, or after arc-planning yields multiple ready epics. For walk-away unattended execution, use arc-looping.
 ---
 
 # arc-dispatching-teammates

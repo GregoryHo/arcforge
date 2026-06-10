@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: |
-  Use this agent to investigate and fix bugs using a structured 4-phase methodology that separates root cause analysis from fix attempts. Examples: <example>Context: A test is failing and the cause isn't obvious. user: "The sync command is returning stale data after worktree merge" assistant: "I'll use the debugger agent to investigate — it will isolate the root cause before attempting any fix." <commentary>The debugger's 4-phase methodology prevents the common pattern of jumping to fixes before understanding the problem.</commentary></example> <example>Context: A user reports unexpected behavior in production. user: "The compact-suggester fires twice at the 50-call threshold" assistant: "Let me dispatch the debugger agent to trace this through the counter logic and find the root cause." <commentary>Debugger agent systematically traces data flow rather than guessing at fixes.</commentary></example>
+  Use this agent to investigate and fix bugs with a 4-phase methodology that isolates root cause before any fix attempt — for failing tests or unexpected behavior where the cause is not obvious.
 model: sonnet
 ---
 

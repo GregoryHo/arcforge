@@ -1,7 +1,7 @@
 ---
 name: quality-reviewer
 description: |
-  Use this agent for code quality review AFTER spec compliance has been verified. It assesses architecture, testing, error handling, and production readiness. This is the second review gate in the two-stage review process. Examples: <example>Context: Spec compliance review passed, now need quality review. user: "Spec review passed for the loop command — now check code quality" assistant: "I'll dispatch the quality-reviewer agent to assess architecture, testing, and production readiness." <commentary>Quality review is the second gate — it only runs after spec compliance passes. It checks HOW the code was built, not WHAT was built.</commentary></example> <example>Context: arc-agent-driven workflow needs quality gate after spec review. user: "The eval harness passed spec review — run quality check" assistant: "Dispatching quality-reviewer to assess code quality, architecture patterns, and test coverage." <commentary>The quality-reviewer focuses on engineering quality rather than spec compliance, which was already verified.</commentary></example>
+  Use this agent as the second review gate, after spec compliance passes — assess architecture, testing, error handling, and production readiness (HOW the code was built, not WHAT).
 model: sonnet
 ---
 

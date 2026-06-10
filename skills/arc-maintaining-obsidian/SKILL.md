@@ -1,6 +1,6 @@
 ---
 name: arc-maintaining-obsidian
-description: Use when the user wants to create, query, audit, or initialize an Obsidian vault — wiki / knowledge base / second brain, project tracker, news pipeline, journal, or any typed-note vault. Trigger on saving notes / capturing ideas / sharing URLs to document; querying the vault ("what do I know about", "search my vault"); auditing health (missing links, orphans, drift); ingesting raw files; "init a new vault" or "register vault"; mentions of any registered vault. Also triggers on casual "save this" / "file this back". Do NOT trigger for Excalidraw diagram creation (use arc-diagramming-obsidian), general code, debugging, PR reviews, web searches.
+description: Use when the user wants to create, query, audit, or initialize an Obsidian vault — saving notes/ideas/URLs into it ("save this" / "file this back" included), querying vault knowledge, auditing health (missing links, orphans, drift), ingesting files, or registering vaults. Not for Excalidraw diagrams — use arc-diagramming-obsidian.
 argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>] | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
 ---
 

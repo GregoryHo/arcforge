@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: |
-  Use this agent to independently verify that completed work actually meets its acceptance criteria. The verifier trusts nothing — it runs commands, reads output, and checks evidence. Examples: <example>Context: An implementer reports a task is complete. user: "The implementer says the loop command is done — can you verify?" assistant: "I'll dispatch the verifier agent to independently check every acceptance criterion with fresh evidence." <commentary>The verifier never trusts reports — it runs the actual commands and reads the actual output.</commentary></example> <example>Context: Before marking a feature as complete in the DAG. user: "Verify that all the eval harness components are working before I mark this done" assistant: "The verifier agent will check each component against its spec and run all tests independently." <commentary>Verifier provides the confidence gate before status transitions.</commentary></example>
+  Use this agent to independently verify completed work against its acceptance criteria. It trusts no reports — it reruns commands, reads real output, and gates status transitions on fresh evidence.
 model: sonnet
 ---
 
