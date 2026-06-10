@@ -1,6 +1,6 @@
 // tests/scripts/reflect-record-writer.test.js
 //
-// Criterion 1: reflect-record-writer.js saves operation records to
+// Criterion 1: operation-record-writer.js saves reflection operation records to
 // ~/.arcforge/reflections/<project>/<reflect_id>.md with atomic write.
 
 const fs = require('node:fs');
