@@ -21,5 +21,5 @@ The Obsidian vault is arcforge's knowledge base. Use `arc-maintaining-obsidian` 
 - Code files (`.js`) — implementation, not knowledge
 - Auto-generated reference dumps (`.txt` >30KB) — low signal-to-noise
 - Task lists (`docs/tasks/`) — ephemeral
-- Eval workspace directories (`skills/*-workspace/`) — in-progress experiments
+- Eval workspace directories (`evals/workspaces/`) — in-progress experiments
 - Test files — verified by CI

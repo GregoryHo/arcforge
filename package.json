@@ -15,7 +15,6 @@
   },
   "files": [
     "skills/",
-    "!skills/*-workspace/",
     "hooks/",
     "scripts/",
     "templates/",
