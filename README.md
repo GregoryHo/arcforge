@@ -37,7 +37,7 @@ Skills are tools, not laws. You can enter through `arc-using` for routing help o
 Register the marketplace:
 
 ```bash
-/plugin marketplace add arcforge
+/plugin marketplace add GregoryHo/arcforge
 ```
 
 Install the plugin:
@@ -60,6 +60,8 @@ Check that commands appear:
 # /arcforge:arc-writing-tasks - Break epics or features into executable tasks
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
+
+Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:arc-tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
 
 ### Codex
 
@@ -235,7 +237,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 
 The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
 
-The bare `arcforge <cmd>` shorthand requires a global npm install (`npm install -g arcforge`); plugin users should invoke `node scripts/cli.js <cmd>` instead.
+The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>` — the SessionStart hook sets `ARCFORGE_ROOT` to the installed plugin directory. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
 
 ```bash
 # Show workflow status
