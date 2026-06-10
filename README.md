@@ -189,7 +189,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 ### Meta & Audit Skills
 
 - **arc-writing-skills** - Maintain ArcForge's own skills and skill tests (project-level meta)
-- **arc-auditing-spec** - Read-only advisory audit of an SDD spec family (`/arc-auditing-spec <spec-id>`)
+- **arc-auditing-spec** - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
 
 ### Agents
 

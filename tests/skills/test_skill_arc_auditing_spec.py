@@ -372,7 +372,7 @@ def test_skill_is_the_slash_command():
 
 
 def test_no_pipeline_auto_invocation_of_audit_skill():
-    """sc-001-ac3: no pipeline skill's SKILL.md may invoke /arc-auditing-spec."""
+    """sc-001-ac3: no pipeline skill's SKILL.md may invoke arc-auditing-spec."""
     pipeline_skills = [
         "skills/arc-brainstorming/SKILL.md",
         "skills/arc-refining/SKILL.md",
@@ -383,8 +383,8 @@ def test_no_pipeline_auto_invocation_of_audit_skill():
         if not path.exists():
             continue
         content = path.read_text(encoding="utf-8")
-        assert "/arc-auditing-spec" not in content, (
-            f"{skill} must not invoke /arc-auditing-spec — pipeline auto-invocation "
+        assert "/arc-auditing-spec" not in content and "/arcforge:arc-auditing-spec" not in content, (
+            f"{skill} must not invoke arc-auditing-spec — pipeline auto-invocation "
             f"is forbidden by fr-sc-001-ac3"
         )
 

@@ -288,7 +288,7 @@
     </description>
     <acceptance_criteria>
       <criterion id="fr-oi-005-ac1">
-        Given the user invokes `/arc-auditing-spec &lt;id&gt;` without the
+        Given the user invokes `/arcforge:arc-auditing-spec &lt;id&gt;` without the
         `--save` flag,
         When the skill ends (successful completion or partial-failure
         completion),
@@ -296,7 +296,7 @@
         <trace>design.md §Requirements Part 2 — Persistence</trace>
       </criterion>
       <criterion id="fr-oi-005-ac2">
-        Given the user invokes `/arc-auditing-spec &lt;id&gt; --save`,
+        Given the user invokes `/arcforge:arc-auditing-spec &lt;id&gt; --save`,
         When Phase 5 completes,
         Then a markdown file containing the full Phase 2 report plus the
         Phase 5 Decisions table MUST be written to
