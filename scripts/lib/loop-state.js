@@ -2,8 +2,9 @@
  * loop-state.js - Loop state persistence for the autonomous loop orchestrator.
  *
  * Owns the .arcforge-loop.json state file: load/initialize, save, error
- * recording, and finalization. scripts/loop.js keeps the orchestration
- * flow and delegates all state-file IO here.
+ * recording, finalization, and state-derived safety checks (stall,
+ * retry storm, stop conditions, summary). scripts/loop.js keeps the
+ * orchestration flow and delegates all state handling here.
  */
 
 const fs = require('node:fs');
@@ -12,6 +13,7 @@ const { getTimestamp, readFileSafe } = require('./utils');
 
 const LOOP_STATE_FILE = '.arcforge-loop.json';
 const MAX_ERRORS_KEPT = 20;
+const STALL_THRESHOLD = 2; // iterations without progress
 
 /**
  * Load or initialize loop state
@@ -90,9 +92,80 @@ function finalizeLoop(state, maxRuns, projectRoot) {
   saveLoopState(state, projectRoot);
 }
 
+/**
+ * Detect stall — no progress across multiple iterations.
+ * Uses ISO string comparison (lexicographically sortable) to avoid Date construction.
+ * @param {Object} state - Loop state
+ * @returns {boolean} Whether the loop is stalled
+ */
+function isStalled(state) {
+  if (!state.last_progress_at) {
+    return state.iteration >= STALL_THRESHOLD;
+  }
+  const recentErrors = state.errors.filter((e) => e.timestamp > state.last_progress_at);
+  return recentErrors.length >= STALL_THRESHOLD;
+}
+
+/**
+ * Detect retry storm — same error repeated 3+ times
+ * @param {Object} state - Loop state
+ * @returns {boolean} Whether a retry storm is detected
+ */
+function isRetryStorm(state) {
+  if (state.errors.length < 3) return false;
+
+  const recentErrors = state.errors.slice(-6);
+  const taskCounts = {};
+  for (const err of recentErrors) {
+    taskCounts[err.task_id] = (taskCounts[err.task_id] || 0) + 1;
+  }
+  return Object.values(taskCounts).some((count) => count >= 3);
+}
+
+/**
+ * Check stop conditions common to all loop patterns.
+ * @returns {string|null} Stop reason, or null to continue
+ */
+function checkStopConditions(state, maxCost) {
+  if (maxCost && state.total_cost >= maxCost) {
+    console.log(`[loop] Cost limit reached ($${state.total_cost})`);
+    return 'cost_limit';
+  }
+  if (isStalled(state)) {
+    console.log('[loop] Stall detected — no progress in recent iterations');
+    return 'stalled';
+  }
+  if (isRetryStorm(state)) {
+    console.log('[loop] Retry storm detected — same errors repeating');
+    return 'retry_storm';
+  }
+  return null;
+}
+
+/**
+ * Print loop summary
+ * @param {Object} state - Loop state
+ */
+function printSummary(state) {
+  console.log('\n--- Loop Summary ---');
+  console.log(`Status: ${state.status}`);
+  console.log(`Iterations: ${state.iteration}`);
+  console.log(`Completed: ${state.completed_tasks.length} tasks`);
+  console.log(`Failed: ${state.failed_tasks.length} tasks`);
+  console.log(`Errors: ${state.errors.length} total`);
+  if (state.started_at && state.finished_at) {
+    const duration = new Date(state.finished_at) - new Date(state.started_at);
+    console.log(`Duration: ${Math.round(duration / 1000)}s`);
+  }
+}
+
 module.exports = {
   loadLoopState,
   saveLoopState,
   recordError,
   finalizeLoop,
+  isStalled,
+  isRetryStorm,
+  checkStopConditions,
+  printSummary,
 };

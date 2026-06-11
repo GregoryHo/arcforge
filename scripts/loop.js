@@ -18,14 +18,14 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
 const { Coordinator } = require('./lib/coordinator');
+const { spawnSession, spawnSessionAsync } = require('./lib/loop-session');
 const { loadLoopState, saveLoopState, recordError, finalizeLoop } = require('./lib/loop-state');
+const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
 const { Feature } = require('./lib/models');
-const { execCommand, getTimestamp, readFileSafe, CLAUDE_MAX_BUFFER } = require('./lib/utils');
+const { getTimestamp, readFileSafe } = require('./lib/utils');
 
 const MAX_RETRIES = 1;
-const STALL_THRESHOLD = 2; // iterations without progress
 
 /**
  * Parse loop CLI arguments
@@ -210,73 +210,6 @@ function buildTaskPrompt(task, coord, projectRoot) {
 }
 
 /**
- * Spawn a Claude session for a task.
- * Uses JSON output to capture cost data for --max-cost budget tracking.
- * @param {string} prompt - Task prompt
- * @param {string} projectRoot - Project root directory
- * @returns {{ exitCode: number, stdout: string, stderr: string, costUsd: number }}
- */
-/**
- * Extract cost data from a Claude JSON response, replacing stdout with the text result.
- * Mutates the result object in place.
- * @param {{ exitCode: number, stdout: string }} result
- * @returns {{ exitCode: number, stdout: string, costUsd: number }}
- */
-function extractCost(result) {
-  let costUsd = 0;
-  if (result.exitCode === 0 && result.stdout) {
-    try {
-      const parsed = JSON.parse(result.stdout);
-      costUsd = parsed.total_cost_usd || 0;
-      result.stdout = parsed.result || '';
-    } catch {
-      /* non-JSON output — keep stdout as-is */
-    }
-  }
-  result.costUsd = costUsd;
-  return result;
-}
-
-function spawnSession(prompt, projectRoot) {
-  const result = execCommand(
-    'claude',
-    ['-p', '--output-format', 'json', '--no-session-persistence'],
-    {
-      input: prompt,
-      cwd: projectRoot,
-      timeout: 600000,
-      maxBuffer: CLAUDE_MAX_BUFFER,
-    },
-  );
-  return extractCost(result);
-}
-
-/**
- * Spawn a Claude session asynchronously (for parallel DAG execution).
- * Returns a Promise with the same shape as spawnSession.
- * @param {string} prompt - Task prompt
- * @param {string} projectRoot - Project root directory
- * @returns {Promise<{ exitCode: number, stdout: string, stderr: string, costUsd: number }>}
- */
-function spawnSessionAsync(prompt, projectRoot) {
-  return new Promise((resolve) => {
-    const child = execFile(
-      'claude',
-      ['-p', '--output-format', 'json', '--no-session-persistence'],
-      { cwd: projectRoot, timeout: 600000, maxBuffer: CLAUDE_MAX_BUFFER },
-      (error, stdout, stderr) => {
-        const exitCode = error ? (error.status ?? 1) : 0;
-        resolve(extractCost({ stdout: stdout || '', stderr: stderr || '', exitCode }));
-      },
-    );
-    if (child.stdin) {
-      child.stdin.write(prompt);
-      child.stdin.end();
-    }
-  });
-}
-
-/**
  * Run a single task iteration
  * @param {Object} task - Task from coordinator
  * @param {Coordinator} coord - Coordinator instance
@@ -325,56 +258,6 @@ function runTask(task, coord, state, projectRoot) {
     return false;
   }
   return true;
-}
-
-/**
- * Detect stall — no progress across multiple iterations.
- * Uses ISO string comparison (lexicographically sortable) to avoid Date construction.
- * @param {Object} state - Loop state
- * @returns {boolean} Whether the loop is stalled
- */
-function isStalled(state) {
-  if (!state.last_progress_at) {
-    return state.iteration >= STALL_THRESHOLD;
-  }
-  const recentErrors = state.errors.filter((e) => e.timestamp > state.last_progress_at);
-  return recentErrors.length >= STALL_THRESHOLD;
-}
-
-/**
- * Detect retry storm — same error repeated 3+ times
- * @param {Object} state - Loop state
- * @returns {boolean} Whether a retry storm is detected
- */
-function isRetryStorm(state) {
-  if (state.errors.length < 3) return false;
-
-  const recentErrors = state.errors.slice(-6);
-  const taskCounts = {};
-  for (const err of recentErrors) {
-    taskCounts[err.task_id] = (taskCounts[err.task_id] || 0) + 1;
-  }
-  return Object.values(taskCounts).some((count) => count >= 3);
-}
-
-/**
- * Check stop conditions common to all loop patterns.
- * @returns {string|null} Stop reason, or null to continue
- */
-function checkStopConditions(state, maxCost) {
-  if (maxCost && state.total_cost >= maxCost) {
-    console.log(`[loop] Cost limit reached ($${state.total_cost})`);
-    return 'cost_limit';
-  }
-  if (isStalled(state)) {
-    console.log('[loop] Stall detected — no progress in recent iterations');
-    return 'stalled';
-  }
-  if (isRetryStorm(state)) {
-    console.log('[loop] Retry storm detected — same errors repeating');
-    return 'retry_storm';
-  }
-  return null;
 }
 
 /**
@@ -550,23 +433,6 @@ async function runDag(options) {
 
   finalizeLoop(state, maxRuns, projectRoot);
   printSummary(state);
-}
-
-/**
- * Print loop summary
- * @param {Object} state - Loop state
- */
-function printSummary(state) {
-  console.log('\n--- Loop Summary ---');
-  console.log(`Status: ${state.status}`);
-  console.log(`Iterations: ${state.iteration}`);
-  console.log(`Completed: ${state.completed_tasks.length} tasks`);
-  console.log(`Failed: ${state.failed_tasks.length} tasks`);
-  console.log(`Errors: ${state.errors.length} total`);
-  if (state.started_at && state.finished_at) {
-    const duration = new Date(state.finished_at) - new Date(state.started_at);
-    console.log(`Duration: ${Math.round(duration / 1000)}s`);
-  }
 }
 
 /**
