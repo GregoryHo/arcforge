@@ -12,6 +12,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { parseYamlSequence } = require('./yaml-parser');
 const { parseSpecHeader } = require('./sdd-spec-header');
+const { readArcforgeMarker } = require('./marker');
 
 // ---------------------------------------------------------------------------
 // getHeadLedgerContent — git helper for HEAD-relative ledger content.
@@ -348,14 +349,59 @@ function checkSpecDecisionGraph({ specXmlContent, ledger, productVision }) {
 const LOOP_SENTINEL = '.arcforge-loop.json';
 
 /**
- * Returns true if the loop sentinel exists at projectRoot.
- * Fail-closed: returns false on any I/O error.
- * @param {string} projectRoot
+ * Heartbeat staleness window for a sentinel that claims to be running.
+ * scripts/loop.js saveLoopState rewrites the file every iteration, so a live
+ * loop always has a fresh mtime. 30 minutes is the plan-proposed value
+ * (AF-2) — changing it requires owner confirmation.
+ */
+const LOOP_HEARTBEAT_STALE_MS = 30 * 60 * 1000;
+
+/**
+ * Lifecycle-aware check: is an autonomous loop LIVE for this directory?
+ *
+ * Effective-root resolution (AF-2 / S6-1): when `dir` carries a
+ * `.arcforge-epic` marker (epic worktree), the sentinel is checked at the
+ * marker's `base_worktree` — the sentinel is an untracked file at the loop's
+ * project root and never exists inside a fresh worktree.
+ *
+ * Lifecycle semantics:
+ *   - no sentinel file                        → false
+ *   - parsed `finished_at` present            → false (loop finished)
+ *   - parsed terminal status (!== 'running')  → false (loop reached a
+ *     terminal state: complete/failed/max_runs/…)
+ *   - status 'running', unparseable JSON, or
+ *     missing status (ambiguous)              → mtime heartbeat: fresh
+ *     (within LOOP_HEARTBEAT_STALE_MS) → true; stale → false.
+ *
+ * The state file is NEVER deleted or moved here — loop resume depends on it.
+ * Returns false on any I/O error (a broken check must not block ratify).
+ * @param {string} dir - cwd or project root to check (worktree-aware).
  * @returns {boolean}
  */
-function loopSentinelPresent(projectRoot) {
+function loopSentinelPresent(dir) {
   try {
-    return fs.existsSync(path.join(projectRoot, LOOP_SENTINEL));
+    let root = dir;
+    const marker = readArcforgeMarker(dir);
+    if (marker && typeof marker.base_worktree === 'string' && marker.base_worktree) {
+      root = marker.base_worktree;
+    }
+    const sentinelPath = path.join(root, LOOP_SENTINEL);
+    if (!fs.existsSync(sentinelPath)) return false;
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(fs.readFileSync(sentinelPath, 'utf8'));
+    } catch {
+      // Unparseable → fall through to the conservative heartbeat check.
+    }
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.finished_at) return false;
+      if (typeof parsed.status === 'string' && parsed.status !== 'running') return false;
+    }
+
+    // 'running', unparseable, or ambiguous: trust the heartbeat.
+    const mtimeMs = fs.statSync(sentinelPath).mtimeMs;
+    return Date.now() - mtimeMs < LOOP_HEARTBEAT_STALE_MS;
   } catch {
     return false;
   }
@@ -368,5 +414,6 @@ module.exports = {
   validateDecisionLedger,
   checkSpecDecisionGraph,
   LOOP_SENTINEL,
+  LOOP_HEARTBEAT_STALE_MS,
   loopSentinelPresent,
 };

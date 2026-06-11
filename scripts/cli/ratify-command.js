@@ -5,9 +5,11 @@
  * status: proposed → accepted with a human-asserted ratified_by marker.
  *
  * B1 ENGINE GATE (PRIMARY, deterministic):
- *   Refuses to mint when ARCFORGE_MODE !== 'attended' OR loop sentinel
- *   (.arcforge-loop.json) is present at project root. This is the real floor —
- *   not harness-dependent.
+ *   Refuses to mint when ARCFORGE_MODE !== 'attended' OR a LIVE loop is
+ *   detected via the lifecycle-aware sentinel check (loopSentinelPresent:
+ *   .arcforge-loop.json with status "running" and a fresh heartbeat; a
+ *   finished loop's sentinel stays on disk and does not block). This is the
+ *   real floor — not harness-dependent.
  *
  * HONEST SCOPING (security note):
  *   ratified_by is a HUMAN-ASSERTED marker, NOT forgery-proof. Zero external
@@ -161,9 +163,15 @@ async function runRatifyCommand(positional, projectRoot) {
 
   if (loopSentinelPresent(projectRoot)) {
     console.error(
-      `Error: "arcforge ratify" refused — loop sentinel ${LOOP_SENTINEL} detected.\n` +
-        `Ratification must not occur inside an autonomous loop. Stop the loop first,\n` +
-        `then run "arcforge ratify" in an attended session.`,
+      `Error: "arcforge ratify" refused — a live autonomous loop was detected\n` +
+        `(${LOOP_SENTINEL} reports a running loop with a fresh heartbeat).\n` +
+        `Ratification is a human decision and must not happen while a loop is running.\n` +
+        `Recovery: wait for the loop to finish — a finished loop records a terminal\n` +
+        `status and no longer blocks — then re-run in an attended session:\n` +
+        `  arcforge ratify ${specId} ${dId}\n` +
+        `If the loop was killed without finishing, this gate clears on its own once\n` +
+        `the heartbeat is stale (30 minutes). Never delete ${LOOP_SENTINEL} — it is\n` +
+        `the loop's resume state.`,
     );
     process.exit(1);
   }
