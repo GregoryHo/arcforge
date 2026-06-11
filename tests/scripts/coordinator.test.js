@@ -1,4 +1,6 @@
+const path = require('node:path');
 const { DAG, TaskStatus } = require('../../scripts/lib/models');
+const { parseWorktreePath } = require('../../scripts/lib/worktree-paths');
 
 // We test Coordinator's pure scheduling logic by injecting a DAG directly,
 // bypassing file I/O. For methods that call _saveDag (which uses withLock + fs),
@@ -70,6 +72,23 @@ describe('Coordinator', () => {
       const result = coord.status({ blockedOnly: true });
       expect(result.epics).toHaveLength(1);
       expect(result.epics[0].id).toBe('epic-1');
+    });
+
+    it('should report path: null for epics without a worktree', () => {
+      const coord = createCoordinator(twoEpicDag());
+      const result = coord.status();
+      expect(result.epics[0].path).toBeNull();
+      expect(result.epics[1].path).toBeNull();
+    });
+
+    it('should derive an absolute, parseable path for an expanded epic without touching worktree', () => {
+      const coord = createCoordinator(twoEpicDag({ epic1Worktree: 'epic-1' }));
+      const result = coord.status();
+      // The raw dag value stays in `worktree`; `path` is strictly additive.
+      expect(result.epics[0].worktree).toBe('epic-1');
+      expect(path.isAbsolute(result.epics[0].path)).toBe(true);
+      expect(parseWorktreePath(result.epics[0].path)).not.toBeNull();
+      expect(result.epics[1].path).toBeNull();
     });
 
     it('should report progress as completion ratio', () => {
