@@ -20,13 +20,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { Coordinator } = require('./lib/coordinator');
+const { loadLoopState, saveLoopState, recordError, finalizeLoop } = require('./lib/loop-state');
 const { Feature } = require('./lib/models');
 const { execCommand, getTimestamp, readFileSafe, CLAUDE_MAX_BUFFER } = require('./lib/utils');
 
-const LOOP_STATE_FILE = '.arcforge-loop.json';
 const MAX_RETRIES = 1;
 const STALL_THRESHOLD = 2; // iterations without progress
-const MAX_ERRORS_KEPT = 20;
 
 /**
  * Parse loop CLI arguments
@@ -148,39 +147,6 @@ function resolveEpicScope(epic, projectRoot) {
     console.log(`[loop] Detected worktree for epic ${scope} — auto-scoping`);
   }
   return scope;
-}
-
-/**
- * Load or initialize loop state
- * @param {string} projectRoot - Project root directory
- * @returns {Object} Loop state
- */
-function loadLoopState(projectRoot) {
-  const content = readFileSafe(path.join(projectRoot, LOOP_STATE_FILE));
-  if (content) {
-    return JSON.parse(content);
-  }
-  return {
-    iteration: 0,
-    pattern: 'sequential',
-    started_at: getTimestamp(),
-    completed_tasks: [],
-    failed_tasks: [],
-    errors: [],
-    total_cost: 0,
-    last_progress_at: null,
-    status: 'running',
-  };
-}
-
-/**
- * Save loop state
- * @param {Object} state - Loop state
- * @param {string} projectRoot - Project root directory
- */
-function saveLoopState(state, projectRoot) {
-  const statePath = path.join(projectRoot, LOOP_STATE_FILE);
-  fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 /**
@@ -308,23 +274,6 @@ function spawnSessionAsync(prompt, projectRoot) {
       child.stdin.end();
     }
   });
-}
-
-/**
- * Record an error to loop state, capping at MAX_ERRORS_KEPT
- */
-function recordError(state, taskId, errorMsg, attempt) {
-  state.errors.push({
-    task_id: taskId,
-    iteration: state.iteration,
-    error: errorMsg.slice(0, 500),
-    timestamp: getTimestamp(),
-    attempt,
-  });
-  // Cap errors to prevent unbounded growth in long runs
-  if (state.errors.length > MAX_ERRORS_KEPT) {
-    state.errors = state.errors.slice(-MAX_ERRORS_KEPT);
-  }
 }
 
 /**
@@ -456,18 +405,6 @@ function tryCreateCoordinator(projectRoot, state, specId = null) {
 }
 
 /**
- * Finalize loop state and print summary.
- */
-function finalizeLoop(state, maxRuns, projectRoot) {
-  if (state.iteration >= maxRuns) {
-    state.status = 'max_runs';
-  }
-  state.finished_at = getTimestamp();
-  saveLoopState(state, projectRoot);
-  printSummary(state);
-}
-
-/**
  * Run sequential loop pattern
  * @param {Object} options - Loop options
  */
@@ -509,6 +446,7 @@ function runSequential(options) {
   }
 
   finalizeLoop(state, maxRuns, projectRoot);
+  printSummary(state);
 }
 
 /**
@@ -611,6 +549,7 @@ async function runDag(options) {
   }
 
   finalizeLoop(state, maxRuns, projectRoot);
+  printSummary(state);
 }
 
 /**
@@ -649,8 +588,6 @@ if (require.main === module) {
 
 module.exports = {
   parseLoopArgs,
-  loadLoopState,
-  saveLoopState,
   buildTaskPrompt,
   spawnSession,
   spawnSessionAsync,
