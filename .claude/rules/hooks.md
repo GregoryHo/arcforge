@@ -62,7 +62,8 @@ Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
 |-----------|----------|----------|---------|
 | `stderr` (`log()`, `console.error()`) | **Nobody** | **NO** — condensed into "N hooks ran", invisible even in Ctrl+O | Internal diagnostics only |
 | `stdout` `{"systemMessage": "..."}` | **User** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings, notifications |
-| `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | YES — injected into context | Context injection (SessionStart, UserPromptSubmit only) |
+| `stdout` `{"hookSpecificOutput": {"additionalContext": "..."}}` | **Claude** | YES — injected into context | Context injection (SessionStart, UserPromptSubmit, PostToolUse — PostToolUse spike-verified v2.1.172, incl. Task-subagent tool calls; rendered as "PostToolUse:Tool hook additional context:") |
+| `stdout` `{"decision": "block", "reason": "..."}` | **Claude** | YES — reason fed back to the model (PostToolUse renders it as "hook blocking error"; spike-verified v2.1.172) | Stop hooks (`outputDecision`); PostToolUse corrective blocking only — for non-error feedback prefer `additionalContext` |
 | Exit code 2 | Claude Code engine | N/A — blocks action | Blocking hooks only (PreToolUse, UserPromptSubmit, Stop) |
 
 **CRITICAL**: `stderr` is **invisible** in all events (verified: PostToolUse, Stop). Claude Code condenses it regardless of hook count. Do NOT use stderr for anything the user needs to see.
@@ -71,8 +72,9 @@ Use `readStdinSync()` + `parseStdinJson()` from `scripts/lib/utils.js` to read.
 
 **Rules:**
 - User-visible message → `output({ systemMessage: "..." })` (only mechanism that works)
-- Context for Claude → `outputContext(text, eventName)` (SessionStart/UserPromptSubmit only)
+- Context for Claude → `outputContext(text, eventName)` (SessionStart/UserPromptSubmit)
 - Both at once → `outputCombined(userMsg, claudeCtx, eventName)` (verified: Claude Code processes all keys in a single JSON)
+- PostToolUse feedback for Claude → `outputPostToolUseFeedback(reason, { systemMessage })` (exactly one merged JSON object; spike-verified v2.1.172 — model still receives `additionalContext` when `systemMessage` is present)
 - Internal diagnostics → `log(msg)` (stderr, but user will never see it)
 - Never use `console.log` — goes to stdout, contaminates hook protocol
 
