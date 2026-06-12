@@ -11,12 +11,27 @@ Dispatches by tool; emits a user-facing `systemMessage` for these triggers:
 |---------|------|-------|
 | `gh pr create` / `gh pr merge` | Bash | verify (`arc-verifying`) + review (`arc-requesting-review`); notes whether a test ran this session |
 | `git worktree add` in an arcforge project (`specs/`) | Bash | prefer `arcforge expand` for epic worktrees (`arc-using-worktrees`) |
-| `git commit` / `push` after a SKILL.md edit (once/session) | Bash + Edit/Write | re-run the eval before shipping (`arc-writing-skills` Iron Law) |
+| `git commit` / `push` after a SKILL.md edit (once/session) | Bash + Edit/Write | freshness-aware eval-before-ship: compares `evals/benchmarks/latest.json` against the session's SKILL.md edits (`arc-writing-skills` Iron Law) |
 | first code (non-doc) edit on `main`/`master` (once/session) | Edit/Write | prefer a branch / epic worktree for feature work (`arc-executing-tasks`) |
 
 The last one is the shippable, user-facing half of eval-before-ship; the
 `ci.yml` annotation is the arcforge-repo half (the plugin is disabled here).
-Edit/Write events are observed only to track that a `SKILL.md` was edited.
+Edit/Write events are observed only to track which `SKILL.md` files were edited.
+
+## Eval-before-ship freshness
+
+The ship-a-skill nudge is evidence-based, not a slogan. At commit/push time it
+compares the mtime of the SKILL.md files edited this session against
+`evals/benchmarks/latest.json` (the `generated` ISO timestamp; file mtime when
+the JSON is malformed). Three branches:
+
+| Evidence | Message |
+|----------|---------|
+| no `latest.json` (or no datable edit) | the generic Iron Law nudge — identical to the pre-freshness behavior |
+| benchmark older than the last skill edit | stale: "no eval result newer than your skill edit exists", naming the edited skills |
+| benchmark newer than the last skill edit | fresh: evidence postdates the edit; confirm it covers the edited skills |
+
+Still once per session, still a user-facing `systemMessage`.
 
 ## Why the PR boundary
 
@@ -36,6 +51,8 @@ ever reminds.
 ## State
 
 Tracks a per-session `arc-remind-test-seen` counter (incremented when a test
-runner command is seen) so the reminder can note when no verification ran.
+runner command is seen) so the reminder can note when no verification ran, and
+a hook-local per-session JSON list of the SKILL.md paths edited this session
+(feeding the freshness comparison above).
 
 See `docs/plans/hook-hardening-design.md` for the full tier analysis.
