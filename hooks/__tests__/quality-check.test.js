@@ -112,7 +112,7 @@ describe('quality-check: checkConsoleLogs', () => {
 describe('quality-check: hooks.json registration', () => {
   const hooksJsonPath = path.join(__dirname, '..', 'hooks.json');
 
-  it('should parse hooks.json and register quality-check for both Edit and Write', () => {
+  it('should parse hooks.json and register quality-check once with plain "Edit|Write" matcher', () => {
     const config = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
     const postToolUse = config.hooks.PostToolUse;
     assert.ok(Array.isArray(postToolUse), 'PostToolUse should be an array');
@@ -122,18 +122,16 @@ describe('quality-check: hooks.json registration', () => {
     );
     assert.strictEqual(
       qualityCheckEntries.length,
-      2,
-      `Expected exactly 2 quality-check matchers, got ${qualityCheckEntries.length}`,
+      1,
+      `Expected exactly 1 quality-check entry, got ${qualityCheckEntries.length}`,
     );
 
-    const matchers = qualityCheckEntries.map((entry) => entry.matcher);
-    for (const tool of ['Edit', 'Write']) {
-      const matcher = matchers.find((m) => m.includes(`tool == "${tool}"`));
-      assert.ok(matcher, `Should have a matcher for tool == "${tool}". Got: ${matchers}`);
-      assert.ok(
-        matcher.includes('tool_input.file_path matches "\\\\.(ts|tsx|js|jsx)$"'),
-        `${tool} matcher should gate on ts/tsx/js/jsx file_path. Got: ${matcher}`,
-      );
-    }
+    // Plain tool-name regex — the only matcher syntax verified to fire on
+    // PostToolUse (v2.1.173). The ts/tsx/js/jsx gate lives in main.js.
+    assert.strictEqual(
+      qualityCheckEntries[0].matcher,
+      'Edit|Write',
+      `Matcher must be the plain tool-name regex "Edit|Write". Got: ${qualityCheckEntries[0].matcher}`,
+    );
   });
 });
