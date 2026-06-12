@@ -30,16 +30,22 @@ describe('quality-check: checkConsoleLogs', () => {
     assert.strictEqual(result[0].line, 2);
   });
 
-  it('should detect console.warn, console.error, console.debug, console.info', () => {
+  it('should detect console.debug and console.info', () => {
     const { checkConsoleLogs } = require('../quality-check/main');
     const filePath = path.join(testDir, 'test.js');
-    fs.writeFileSync(
-      filePath,
-      'console.warn("w");\nconsole.error("e");\nconsole.debug("d");\nconsole.info("i");\n',
-    );
+    fs.writeFileSync(filePath, 'console.debug("d");\nconsole.info("i");\n');
 
     const result = checkConsoleLogs(filePath);
-    assert.strictEqual(result.length, 4);
+    assert.strictEqual(result.length, 2);
+  });
+
+  it('should NOT flag console.warn or console.error (prescribed CLI error layer)', () => {
+    const { checkConsoleLogs } = require('../quality-check/main');
+    const filePath = path.join(testDir, 'test.js');
+    fs.writeFileSync(filePath, 'console.warn("w");\nconsole.error("e");\n');
+
+    const result = checkConsoleLogs(filePath);
+    assert.strictEqual(result.length, 0);
   });
 
   it('should skip lines starting with //', () => {
@@ -99,6 +105,33 @@ describe('quality-check: checkConsoleLogs', () => {
     assert.ok(
       result[0].content.length <= 60,
       `Content should be <= 60 chars, got ${result[0].content.length}`,
+    );
+  });
+});
+
+describe('quality-check: hooks.json registration', () => {
+  const hooksJsonPath = path.join(__dirname, '..', 'hooks.json');
+
+  it('should parse hooks.json and register quality-check once with plain "Edit|Write" matcher', () => {
+    const config = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+    const postToolUse = config.hooks.PostToolUse;
+    assert.ok(Array.isArray(postToolUse), 'PostToolUse should be an array');
+
+    const qualityCheckEntries = postToolUse.filter((entry) =>
+      entry.hooks.some((h) => h.command.includes('quality-check/main.js')),
+    );
+    assert.strictEqual(
+      qualityCheckEntries.length,
+      1,
+      `Expected exactly 1 quality-check entry, got ${qualityCheckEntries.length}`,
+    );
+
+    // Plain tool-name regex — the only matcher syntax verified to fire on
+    // PostToolUse (v2.1.173). The ts/tsx/js/jsx gate lives in main.js.
+    assert.strictEqual(
+      qualityCheckEntries[0].matcher,
+      'Edit|Write',
+      `Matcher must be the plain tool-name regex "Edit|Write". Got: ${qualityCheckEntries[0].matcher}`,
     );
   });
 });

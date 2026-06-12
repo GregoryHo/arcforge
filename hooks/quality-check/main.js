@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Quality check orchestrator for PostToolUse (Edit tool)
+ * Quality check orchestrator for PostToolUse (Edit and Write tools)
  *
- * Runs automatically after editing TypeScript/JavaScript files:
+ * Runs automatically after Edit/Write of TypeScript/JavaScript files:
  * 1. Auto-format with Prettier (if available)
  * 2. Type-check with TypeScript (if available)
- * 3. Warn about console.log statements
+ * 3. Warn about console.log/debug/info statements
+ *    (console.warn/error are intentionally NOT flagged — they are the
+ *    prescribed CLI error-output layer; see coding standards)
  *
  * Warnings output via systemMessage (user-visible)
  * Prettier auto-formats files in-place
@@ -27,7 +29,8 @@ const { runPrettier } = require('./prettier');
 const { runTypeCheck } = require('./typescript');
 
 /**
- * Check for console.log statements in a file
+ * Check for console.log/debug/info statements in a file.
+ * console.warn/error are excluded: they are the prescribed CLI error layer.
  */
 function checkConsoleLogs(filePath) {
   const content = readFileSafe(filePath);
@@ -42,7 +45,7 @@ function checkConsoleLogs(filePath) {
     // Skip commented lines
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
-    if (/\bconsole\.(log|warn|error|debug|info)\s*\(/.test(line)) {
+    if (/\bconsole\.(log|debug|info)\s*\(/.test(line)) {
       matches.push({ line: i + 1, content: trimmed.slice(0, 60) });
     }
   }
