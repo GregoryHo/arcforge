@@ -398,3 +398,239 @@ describe('sdd-ledger-guard decideLedgerEdit — Task 3a forge guard', () => {
     assert.strictEqual(reason, null, 'Malformed YAML must fail-open');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: SDD-3 — on-disk baseline fallback (closes the S8 hole for
+// untracked/uncommitted decisions.yml). When the file has no HEAD version,
+// evaluate() validates against the pre-edit on-disk content instead of
+// skipping all checks. HEAD stays authoritative when available.
+// ---------------------------------------------------------------------------
+
+describe('sdd-ledger-guard evaluate — SDD-3 on-disk baseline fallback', () => {
+  let dirs;
+
+  beforeEach(() => {
+    dirs = [];
+    delete require.cache[require.resolve('../sdd-ledger-guard/main')];
+  });
+
+  afterEach(() => {
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  /** Git repo with one seed commit — decisions.yml stays UNTRACKED unless committed. */
+  function makeGitRepo() {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'slg-sdd3-'));
+    dirs.push(cwd);
+    execFileSync('git', ['init'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd, stdio: 'pipe' });
+    fs.writeFileSync(path.join(cwd, 'README.md'), 'seed\n');
+    execFileSync('git', ['add', 'README.md'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', 'seed'], { cwd, stdio: 'pipe' });
+    return cwd;
+  }
+
+  // (1) Untracked flip proposed→accepted → DENY (forge against on-disk baseline)
+  it('SDD-3: untracked file, Edit flipping proposed→accepted is denied', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    const ledgerPath = path.join(cwd, 'decisions.yml');
+    fs.writeFileSync(ledgerPath, makeLedgerYaml({ status: 'proposed' }));
+
+    const reason = evaluate({
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: ledgerPath,
+        old_string: 'status: "proposed"',
+        new_string: 'status: "accepted"',
+      },
+      cwd,
+    });
+    assert.ok(reason !== null, 'Untracked proposed→accepted flip must be denied');
+    assert.ok(typeof reason === 'string' && reason.length > 0);
+  });
+
+  // (2) Untracked frozen-text mutation → DENY (the S8 hole this task closes)
+  it('SDD-3: untracked file, Edit mutating frozen decision text is denied', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    const ledgerPath = path.join(cwd, 'decisions.yml');
+    fs.writeFileSync(ledgerPath, makeLedgerYaml({ decision: 'Original decision text.' }));
+
+    const reason = evaluate({
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: ledgerPath,
+        old_string: '"Original decision text."',
+        new_string: '"REWRITTEN decision text."',
+      },
+      cwd,
+    });
+    assert.ok(reason !== null, 'Untracked frozen-text mutation must be denied (S8 hole)');
+    assert.ok(/[Ii]mmutability/.test(reason), 'Deny reason should cite immutability');
+  });
+
+  // (3) Untracked legal append of a new proposed entry → ALLOW
+  it('SDD-3: untracked file, Write appending a new proposed entry is allowed', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    const ledgerPath = path.join(cwd, 'decisions.yml');
+    fs.writeFileSync(ledgerPath, makeLedgerYaml({ status: 'proposed' }));
+
+    const appended = yamlSerialize([
+      {
+        'D-id': 'D-001',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'Use YAML for decision ledger format.',
+        why: 'Human-readable, git-diffable, toolable.',
+        authorized_values: 'any',
+      },
+      {
+        'D-id': 'D-002',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'Second proposed decision.',
+        why: 'Reason.',
+        authorized_values: 'any',
+      },
+    ]);
+    const reason = evaluate({
+      tool_name: 'Write',
+      tool_input: { file_path: ledgerPath, content: appended },
+      cwd,
+    });
+    assert.strictEqual(reason, null, 'Untracked legal append must be allowed');
+  });
+
+  // (4) Brand-new file (nothing on disk), proposed-only Write → ALLOW (previous=null preserved)
+  it('SDD-3: brand-new file, proposed-only Write is allowed', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    const ledgerPath = path.join(cwd, 'decisions.yml'); // does not exist on disk
+
+    const reason = evaluate({
+      tool_name: 'Write',
+      tool_input: { file_path: ledgerPath, content: makeLedgerYaml({ status: 'proposed' }) },
+      cwd,
+    });
+    assert.strictEqual(reason, null, 'Proposed-only Write to a brand-new file must be allowed');
+  });
+
+  // (5) HEAD-tracked file → HEAD baseline wins over on-disk content
+  it('SDD-3: HEAD-tracked file uses HEAD as baseline, not on-disk content', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    const ledgerPath = path.join(cwd, 'decisions.yml');
+
+    // Commit the original ledger at HEAD.
+    fs.writeFileSync(ledgerPath, makeLedgerYaml({ decision: 'Original frozen decision.' }));
+    execFileSync('git', ['add', 'decisions.yml'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', 'ledger'], { cwd, stdio: 'pipe' });
+
+    // Tamper the working tree copy (simulates a bash-level edit the hook never saw).
+    fs.writeFileSync(ledgerPath, makeLedgerYaml({ decision: 'TAMPERED frozen decision.' }));
+
+    // Write keeps the tampered text and appends a new proposed entry.
+    // Against the on-disk baseline this would be a legal append (ALLOW);
+    // against HEAD it is a frozen-text mutation (DENY). DENY proves HEAD wins.
+    const written = yamlSerialize([
+      {
+        'D-id': 'D-001',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'TAMPERED frozen decision.',
+        why: 'Human-readable, git-diffable, toolable.',
+        authorized_values: 'any',
+      },
+      {
+        'D-id': 'D-002',
+        date: '2026-06-07',
+        spec_version: 1,
+        status: 'proposed',
+        decision: 'Second proposed decision.',
+        why: 'Reason.',
+        authorized_values: 'any',
+      },
+    ]);
+    const reason = evaluate({
+      tool_name: 'Write',
+      tool_input: { file_path: ledgerPath, content: written },
+      cwd,
+    });
+    assert.ok(reason !== null, 'HEAD-tracked file must be validated against HEAD, not on-disk');
+  });
+
+  // (6) fs error reading the on-disk baseline → ALLOW (fail-open, no crash)
+  it('SDD-3: unreadable on-disk baseline fails open (ALLOW, no crash)', () => {
+    const { evaluate } = require('../sdd-ledger-guard/main');
+    const cwd = makeGitRepo();
+    // A DIRECTORY named decisions.yml: untracked (HEAD null) and unreadable as a file.
+    fs.mkdirSync(path.join(cwd, 'decisions.yml'));
+
+    const reason = evaluate({
+      tool_name: 'Write',
+      tool_input: {
+        file_path: path.join(cwd, 'decisions.yml'),
+        content: makeLedgerYaml({ status: 'proposed' }),
+      },
+      cwd,
+    });
+    assert.strictEqual(reason, null, 'fs error reading on-disk baseline must fail open');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wire-format test: SDD-3 stdin fixture — untracked frozen-text mutation
+// produces a deny JSON through main() (the full stdin → stdout path).
+// ---------------------------------------------------------------------------
+
+describe('sdd-ledger-guard main() wire format — SDD-3 untracked baseline', () => {
+  const hookPath = require.resolve('../sdd-ledger-guard/main');
+  let dirs;
+
+  beforeEach(() => {
+    dirs = [];
+  });
+
+  afterEach(() => {
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  it('emits permissionDecision:deny for a frozen-field Write on an UNTRACKED ledger', () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'slg-wire-sdd3-'));
+    dirs.push(cwd);
+
+    execFileSync('git', ['init'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd, stdio: 'pipe' });
+    fs.writeFileSync(path.join(cwd, 'README.md'), 'seed\n');
+    execFileSync('git', ['add', 'README.md'], { cwd, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', 'seed'], { cwd, stdio: 'pipe' });
+
+    // Untracked decisions.yml on disk — never committed.
+    const decisionsPath = path.join(cwd, 'decisions.yml');
+    fs.writeFileSync(decisionsPath, makeLedgerYaml({ decision: 'Original frozen decision.' }));
+
+    const out = execFileSync('node', [hookPath], {
+      input: JSON.stringify({
+        tool_name: 'Write',
+        tool_input: {
+          file_path: decisionsPath,
+          content: makeLedgerYaml({ decision: 'MUTATED frozen decision.' }),
+        },
+        cwd,
+      }),
+      encoding: 'utf8',
+    }).trim();
+
+    const parsed = JSON.parse(out);
+    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PreToolUse');
+    assert.strictEqual(parsed.hookSpecificOutput.permissionDecision, 'deny');
+    assert.ok(parsed.hookSpecificOutput.permissionDecisionReason.length > 0);
+  });
+});
