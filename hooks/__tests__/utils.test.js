@@ -19,6 +19,8 @@ const {
   getTimestamp,
   createSessionCounter,
   parseStdinJson,
+  buildPostToolUseFeedback,
+  outputPostToolUseFeedback,
 } = require('../../scripts/lib/utils');
 
 describe('escapeForJson', () => {
@@ -330,5 +332,62 @@ describe('parseStdinJson', () => {
   it('should return null for invalid JSON', () => {
     assert.strictEqual(parseStdinJson('not json'), null);
     assert.strictEqual(parseStdinJson(''), null);
+  });
+});
+
+describe('buildPostToolUseFeedback', () => {
+  it('should return the spike-verified pure field object', () => {
+    assert.deepStrictEqual(buildPostToolUseFeedback('fix the type error'), {
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext: 'fix the type error',
+      },
+    });
+  });
+
+  it('should throw on non-string or empty reason', () => {
+    assert.throws(() => buildPostToolUseFeedback(null), /non-empty string/);
+    assert.throws(() => buildPostToolUseFeedback(42), /non-empty string/);
+    assert.throws(() => buildPostToolUseFeedback('   '), /non-empty string/);
+  });
+});
+
+describe('outputPostToolUseFeedback', () => {
+  const originalLog = console.log;
+  let stdoutLines;
+
+  beforeEach(() => {
+    stdoutLines = [];
+    console.log = (...args) => stdoutLines.push(args.join(' '));
+  });
+
+  afterEach(() => {
+    console.log = originalLog;
+  });
+
+  it('should emit exactly one JSON object containing both fields when systemMessage given', () => {
+    outputPostToolUseFeedback('fix the type error', { systemMessage: 'Formatted: file.ts' });
+    assert.strictEqual(stdoutLines.length, 1);
+    const parsed = JSON.parse(stdoutLines[0]);
+    assert.deepStrictEqual(parsed, {
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext: 'fix the type error',
+      },
+      systemMessage: 'Formatted: file.ts',
+    });
+  });
+
+  it('should emit exactly one JSON object with only the model field when no systemMessage', () => {
+    outputPostToolUseFeedback('fix the type error');
+    assert.strictEqual(stdoutLines.length, 1);
+    const parsed = JSON.parse(stdoutLines[0]);
+    assert.deepStrictEqual(parsed, {
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext: 'fix the type error',
+      },
+    });
+    assert.ok(!('systemMessage' in parsed));
   });
 });

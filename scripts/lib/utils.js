@@ -407,6 +407,54 @@ function outputDecisionHighlight(reason) {
 }
 
 /**
+ * Build the model-visible PostToolUse feedback fields (pure — no I/O).
+ *
+ * Spike-verified on Claude Code v2.1.172 (2026-06-11, neutral-cwd /tmp/pthook-spike):
+ * - PostToolUse `hookSpecificOutput.additionalContext` REACHES THE MODEL,
+ *   rendered as "PostToolUse:<Tool> hook additional context: <text>"
+ *   (canary HOOK-CANARY-2/PLUGH echoed verbatim by the model).
+ * - The same channel also reaches Task-tool subagent implementers
+ *   (canary HOOK-CANARY-3 echoed verbatim from inside a subagent Write).
+ * - `{ decision: 'block', reason }` also reaches the model but is rendered as a
+ *   "hook blocking error" (canary HOOK-CANARY-1/XYZZY) — error framing, so it is
+ *   reserved for corrective blocking, not routine feedback.
+ *
+ * @param {string} reason - Model-visible feedback text
+ * @returns {Object} { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext } }
+ */
+function buildPostToolUseFeedback(reason) {
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new Error('buildPostToolUseFeedback: reason must be a non-empty string');
+  }
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: reason,
+    },
+  };
+}
+
+/**
+ * Emit model-visible PostToolUse feedback as EXACTLY ONE JSON object on stdout.
+ * An optional user-visible systemMessage is merged into the SAME object
+ * (single-output pattern — two separate JSON lines were never verified).
+ * Merged-object delivery spike-verified on Claude Code v2.1.172: the model
+ * still receives additionalContext when systemMessage is present
+ * (canary HOOK-CANARY-4/FILFRE echoed verbatim).
+ *
+ * @param {string} reason - Model-visible feedback text
+ * @param {Object} [options]
+ * @param {string} [options.systemMessage] - User-visible message merged into the same JSON object
+ */
+function outputPostToolUseFeedback(reason, { systemMessage } = {}) {
+  const result = buildPostToolUseFeedback(reason);
+  if (systemMessage) {
+    result.systemMessage = systemMessage;
+  }
+  output(result);
+}
+
+/**
  * Sanitize a raw session id for safe use as a path component.
  * Valid ids (UUIDs, ppid numbers) pass through unchanged. On any
  * traversal/control-char failure, fail-safe to a stable hash rather than
@@ -698,6 +746,8 @@ module.exports = {
   outputCombined,
   outputDecision,
   outputDecisionHighlight,
+  buildPostToolUseFeedback,
+  outputPostToolUseFeedback,
   // Color utilities (internal: colors, colorize, supportsColor)
   // Session management
   getSessionId,
