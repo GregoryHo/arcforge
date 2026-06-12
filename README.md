@@ -317,6 +317,7 @@ These guides live in the repo under `docs/guide/`:
 
 | Guide | Link |
 |-------|------|
+| CLI Invocation Convention | [docs/guide/cli-invocation.md](docs/guide/cli-invocation.md) |
 | Eval System | [docs/guide/eval-system.md](docs/guide/eval-system.md) |
 | Composable Skill Eval Coverage | [docs/guide/composable-skill-eval-coverage.md](docs/guide/composable-skill-eval-coverage.md) |
 | Hooks System | [docs/guide/hooks-system.md](docs/guide/hooks-system.md) |
