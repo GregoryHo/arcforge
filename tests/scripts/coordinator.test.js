@@ -329,6 +329,41 @@ describe('Coordinator', () => {
       expect(context.completed_count).toBeDefined();
       expect(context.blocked_count).toBeDefined();
     });
+
+    it('should surface the next actionable task as current_task', () => {
+      const coord = createCoordinator(twoEpicDag({ epic1Status: TaskStatus.IN_PROGRESS }));
+      const context = coord.rebootContext();
+      expect(context.current_task).toEqual({
+        id: 'feat-1a',
+        name: 'Setup',
+        type: 'feature',
+        status: TaskStatus.PENDING,
+      });
+    });
+
+    it('should report current_task null when nothing is actionable', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.COMPLETED,
+          epic2Status: TaskStatus.COMPLETED,
+          epic1Features: [
+            { id: 'feat-1a', name: 'Setup', status: TaskStatus.COMPLETED },
+            { id: 'feat-1b', name: 'Core', status: TaskStatus.COMPLETED },
+          ],
+          epic2Features: [{ id: 'feat-2a', name: 'Plugin', status: TaskStatus.COMPLETED }],
+        }),
+      );
+      expect(coord.rebootContext().current_task).toBeNull();
+    });
+
+    it('should degrade project_goal/research_files to null/[] when no spec is resolvable', () => {
+      // Injected-dag coordinator has no specId and no marker — the derived
+      // fields must degrade gracefully, never throw or invent a goal.
+      const coord = createCoordinator(twoEpicDag());
+      const context = coord.rebootContext();
+      expect(context.project_goal).toBeNull();
+      expect(context.research_files).toEqual([]);
+    });
   });
 
   describe('sync status validation', () => {
