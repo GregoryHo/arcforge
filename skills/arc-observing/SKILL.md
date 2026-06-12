@@ -128,7 +128,7 @@ No activity → -0.02/week, -0.01/week for manual/reflection sources
 
 ## When NOT to Use
 
-- User wants to extract reusable techniques (use /learn)
+- User wants to combine related instincts into a higher-level candidate (use the dashboard Evolve action: `arcforge learn dashboard`)
 - User wants to capture session reflections (use arc-journaling)
 - User wants to analyze diary entries (use arc-reflecting)
 
@@ -165,7 +165,7 @@ Patterns appearing in 2+ projects can be promoted to `~/.arcforge/instincts/glob
 
 ### Confusing Instincts with Learned Skills
 **Wrong:** Manually creating instincts for techniques
-**Right:** Instincts are auto-detected from behavior; techniques go to /learn
+**Right:** Instincts are auto-detected from behavior; combine them via the dashboard Evolve action (`arcforge learn dashboard`)
 
 ### Ignoring Low-Confidence Instincts
 **Wrong:** Treating all instincts equally

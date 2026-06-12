@@ -52,7 +52,7 @@ node "${SKILL_ROOT}/scripts/diary.js" path \
 **Core distinction:**
 
 - **Diary = observations, context, decisions made** (stored in session directory)
-- **Learn = instinct clustering** (combines related instincts into skills)
+- **Evolve = instinct combination** (the dashboard Evolve action — `arcforge learn dashboard` — combines related instincts into a successor candidate)
 
 **Storage:** `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
@@ -217,8 +217,7 @@ Keep entries focused. Don't over-document routine work.
 └── diary-{sessionId}.md      # Diary entry (from arc-journaling)
 
 ~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
-├── {sessionId}.json          # Session data (auto-generated)
-└── {sessionId}.md            # Session summary (auto-generated)
+└── {sessionId}.json          # Session data (auto-generated)
 ```
 
 Diary files live under `~/.arcforge/diaries/` (not `~/.claude/sessions/`)

@@ -4,21 +4,16 @@ Records context compaction events for session tracking and triggers diary prompt
 
 ## What It Does
 
-1. **Logs compaction events** to `~/.arcforge/sessions/<project>/compaction-log.txt`
-   - Format: `[YYYY-MM-DDTHH:MM:SS.sssZ] Context compaction - sessionId: <id>`
-   - Append-only log for historical tracking
-
-2. **Updates current session file** with compaction markers
+1. **Updates current session file** with compaction markers
    - Adds timestamp to `compactions` array
    - Sets `lastCompaction` field
 
-3. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
+2. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
    - Updates session with current user/tool counts
-   - Generates markdown summary file (`<sessionId>.md`)
    - Prompts user to run the `arc-journaling` skill
    - Resets both counters (user messages and tool calls)
 
-4. **Below threshold**:
+3. **Below threshold**:
    - Preserves counters for future accumulation
    - Shows current count status
 

@@ -584,14 +584,6 @@ function getDiaryedDir(project = null) {
 }
 
 /**
- * Get compaction log file path for a project
- * Located at ~/.arcforge/sessions/{project}/compaction-log.txt
- */
-function getCompactionLogPath(project) {
-  return path.join(getProjectSessionsDir(project), 'compaction-log.txt');
-}
-
-/**
  * Sanitize a filename to prevent path traversal attacks.
  * Rejects names containing path separators, parent-dir sequences,
  * null bytes, or control characters. Throws on invalid input.
@@ -765,7 +757,6 @@ module.exports = {
   getDiaryFilePath,
   getDiaryDraftPath,
   getDiaryedDir,
-  getCompactionLogPath,
   ensureDir,
   normalizeArray,
   sanitizeFilename,
