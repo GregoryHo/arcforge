@@ -16,14 +16,17 @@
  *   worktree add  `git worktree add` in an arcforge project -> prefer `arcforge
  *                                            expand` for epic worktrees
  *   ship a skill  `git commit`/`push` after editing a SKILL.md (once/session)
- *                                         -> re-run the eval (arc-writing-skills
- *                                            Iron Law)
+ *                                         -> freshness-aware eval nudge: compares
+ *                                            evals/benchmarks/latest.json (`generated`,
+ *                                            mtime fallback) against the session's
+ *                                            SKILL.md edits (arc-writing-skills Iron Law)
  *   SDD stage     write `specs/<id>/spec.xml` while its `dag.yaml` is missing
  *                                         -> plan next (arc-planning); once/spec-id
  *   edit on main  first code edit on main/master (once/session) -> prefer a branch
  *
  * State: per-session counters (test-seen, skill-edited, skill-ship-warned,
- * main-warned, spec-planned-<id>) so nudges stay rare and context-aware.
+ * main-warned, spec-planned-<id>) plus a hook-local record of the SKILL.md
+ * paths edited this session, so nudges stay rare and context-aware.
  */
 
 const fs = require('node:fs');
@@ -34,6 +37,8 @@ const {
   setSessionIdFromInput,
   output,
   createSessionCounter,
+  getTempDir,
+  getSessionId,
 } = require('../../scripts/lib/utils');
 
 // Common test runners — broad enough to catch the usual suspects, scoped to avoid noise.
@@ -156,6 +161,117 @@ function evalBeforeShipNudge() {
   );
 }
 
+// ── Freshness-aware eval-before-ship ─────────────────────────────────────────
+// Hook-local session state (this hook is the only consumer of a path list, so
+// it stays here rather than growing the shared utils.js API): a JSON array of
+// the SKILL.md paths edited this session, stored beside the session counters.
+
+/** Path of the hook-local session state file recording edited SKILL.md paths. */
+function skillEditStatePath() {
+  return path.join(getTempDir(), `arcforge-arc-remind-skill-paths-${getSessionId()}`);
+}
+
+/** Record a SKILL.md edit for this session (absolute path, deduped). */
+function recordSkillEdit(filePath, cwd) {
+  try {
+    const abs = path.resolve(cwd, filePath);
+    const paths = readSkillEdits();
+    if (!paths.includes(abs)) {
+      paths.push(abs);
+      fs.writeFileSync(skillEditStatePath(), JSON.stringify(paths));
+    }
+  } catch {
+    // Non-blocking — the nudge degrades to its generic form without this state.
+  }
+}
+
+/** The SKILL.md paths recorded this session ([] when none or unreadable). */
+function readSkillEdits() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(skillEditStatePath(), 'utf8'));
+    return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Timestamp (ms) of the latest benchmark evidence in cwd, or null when none
+ * exists. Prefers latest.json's `generated` ISO field (written by the eval
+ * engine); falls back to file mtime when the JSON is malformed or `generated`
+ * is missing/unparseable.
+ */
+function latestBenchmarkTime(cwd) {
+  try {
+    const file = path.join(cwd, 'evals', 'benchmarks', 'latest.json');
+    if (!fs.existsSync(file)) return null;
+    let generated = NaN;
+    try {
+      generated = Date.parse(JSON.parse(fs.readFileSync(file, 'utf8')).generated);
+    } catch {
+      // Malformed JSON — fall through to the mtime fallback.
+    }
+    return Number.isFinite(generated) ? generated : fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/** Latest mtime (ms) across the recorded SKILL.md paths, or null when none stat. */
+function lastSkillEditTime(paths) {
+  let latest = null;
+  for (const p of paths) {
+    try {
+      const t = fs.statSync(p).mtimeMs;
+      if (latest === null || t > latest) latest = t;
+    } catch {
+      // Deleted since the edit — skip.
+    }
+  }
+  return latest;
+}
+
+/** Skill names (the SKILL.md's parent directory) for the recorded edit paths. */
+function skillNamesFromPaths(paths) {
+  return [...new Set(paths.map((p) => path.basename(path.dirname(p))))];
+}
+
+function staleEvalNudge(skillNames, benchTime) {
+  return (
+    `\n🧪 You edited ${skillNames} this session and are committing. No eval result newer ` +
+    `than your skill edit exists — evals/benchmarks/latest.json was generated ` +
+    `${new Date(benchTime).toISOString()}, before the edit. arc-writing-skills’ Iron Law: ` +
+    're-run the skill’s eval (RED → GREEN → REFACTOR) before shipping a behavioral change.\n'
+  );
+}
+
+function freshEvalNudge(skillNames, benchTime) {
+  return (
+    `\n🧪 You edited ${skillNames} this session and are committing. ` +
+    `evals/benchmarks/latest.json (generated ${new Date(benchTime).toISOString()}) is newer ` +
+    `than your skill edit — fresh eval evidence exists. Confirm it covers ${skillNames} ` +
+    'before shipping.\n'
+  );
+}
+
+/**
+ * Freshness-aware eval-before-ship nudge. Three branches:
+ *   no benchmark / no datable edit -> the generic Iron Law nudge (byte-identical
+ *                                     to the pre-freshness behavior)
+ *   benchmark older than the last SKILL.md edit -> stale: says concretely that
+ *                                     no eval result newer than the edit exists
+ *   benchmark strictly newer       -> fresh: evidence postdates the edit
+ */
+function buildEvalShipNudge(cwd) {
+  const edits = readSkillEdits();
+  const editTime = lastSkillEditTime(edits);
+  const benchTime = latestBenchmarkTime(cwd);
+  if (benchTime === null || editTime === null) return evalBeforeShipNudge();
+  const names = skillNamesFromPaths(edits).join(', ');
+  if (benchTime > editTime) return freshEvalNudge(names, benchTime);
+  return staleEvalNudge(names, benchTime);
+}
+
 function planAfterSpecNudge(specId) {
   return (
     `\n📐 \`specs/${specId}/spec.xml\` is written but there's no \`dag.yaml\` yet. ` +
@@ -183,7 +299,10 @@ function main() {
     if (tool === 'Edit' || tool === 'Write') {
       const filePath = input.tool_input?.file_path || '';
       const cwd = input.cwd || process.cwd();
-      if (isSkillFile(filePath)) bump('arc-remind-skill-edited');
+      if (isSkillFile(filePath)) {
+        bump('arc-remind-skill-edited');
+        recordSkillEdit(filePath, cwd);
+      }
 
       // SDD stage nudge: spec.xml written but its dag.yaml is missing -> plan next.
       // Once per spec-id (spec.xml is written across several edits).
@@ -236,7 +355,7 @@ function main() {
       counter('arc-remind-skill-ship-warned').read() === 0
     ) {
       bump('arc-remind-skill-ship-warned');
-      output({ systemMessage: evalBeforeShipNudge() });
+      output({ systemMessage: buildEvalShipNudge(cwd) });
     }
   } catch {
     // Non-blocking — never crash the session.
@@ -258,6 +377,15 @@ module.exports = {
   buildReminder,
   worktreeAddNudge,
   evalBeforeShipNudge,
+  skillEditStatePath,
+  recordSkillEdit,
+  readSkillEdits,
+  latestBenchmarkTime,
+  lastSkillEditTime,
+  skillNamesFromPaths,
+  staleEvalNudge,
+  freshEvalNudge,
+  buildEvalShipNudge,
   mainBranchNudge,
   planAfterSpecNudge,
   TEST_CMD_RE,
