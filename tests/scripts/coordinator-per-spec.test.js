@@ -34,6 +34,25 @@ function simpleEpic(id, status = TaskStatus.PENDING) {
   };
 }
 
+function writeSpecXml(root, specId, title) {
+  const dir = path.join(root, 'specs', specId);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'spec.xml'),
+    [
+      '<spec>',
+      '  <overview>',
+      `    <spec_id>${specId}</spec_id>`,
+      '    <spec_version>1</spec_version>',
+      '    <status>active</status>',
+      `    <title>${title}</title>`,
+      '    <description>Fixture spec</description>',
+      '  </overview>',
+      '</spec>',
+    ].join('\n'),
+  );
+}
+
 describe('Coordinator constructor — lazy dagPath resolution', () => {
   let root;
   beforeEach(() => {
@@ -119,6 +138,100 @@ describe('rebootAllSpecs', () => {
     expect(Object.keys(result.specs).sort()).toEqual(['spec-a', 'spec-b']);
     expect(result.totals.completed_count).toBe(1);
     expect(result.totals.remaining_count).toBe(2);
+  });
+
+  test('per-spec entries carry spec-derived handover fields without changing totals shape', () => {
+    writeSpec(root, 'spec-a', [
+      {
+        ...simpleEpic('epic-1', TaskStatus.IN_PROGRESS),
+        features: [{ id: 'f-1', name: 'f-1', status: TaskStatus.PENDING, depends_on: [] }],
+      },
+    ]);
+    writeSpecXml(root, 'spec-a', 'Goal A');
+    const result = rebootAllSpecs(root);
+    expect(result.specs['spec-a'].project_goal).toBe('Goal A');
+    expect(result.specs['spec-a'].current_task).toMatchObject({ id: 'f-1', type: 'feature' });
+    expect(result.totals).toEqual({
+      completed_count: 0,
+      remaining_count: 1,
+      blocked_count: 0,
+    });
+  });
+});
+
+describe('rebootContext — spec-derived handover', () => {
+  let root;
+  beforeEach(() => {
+    root = tmpProject();
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('derives project_goal from the spec.xml title', () => {
+    writeSpec(root, 'spec-a', [simpleEpic('epic-1')]);
+    writeSpecXml(root, 'spec-a', 'Ship the payments API');
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.project_goal).toBe('Ship the payments API');
+  });
+
+  test('project_goal is null when spec.xml is absent (dag-only project)', () => {
+    writeSpec(root, 'spec-a', [simpleEpic('epic-1')]);
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.project_goal).toBeNull();
+  });
+
+  test('project_goal is null when spec.xml has no parseable title', () => {
+    writeSpec(root, 'spec-a', [simpleEpic('epic-1')]);
+    fs.writeFileSync(
+      path.join(root, 'specs', 'spec-a', 'spec.xml'),
+      '<spec><overview><spec_id>spec-a</spec_id></overview></spec>',
+    );
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.project_goal).toBeNull();
+  });
+
+  test('current_task surfaces the in-progress feature', () => {
+    writeSpec(root, 'spec-a', [
+      {
+        ...simpleEpic('epic-1', TaskStatus.IN_PROGRESS),
+        features: [
+          { id: 'f-1', name: 'auth', status: TaskStatus.IN_PROGRESS, depends_on: [] },
+          { id: 'f-2', name: 'tokens', status: TaskStatus.PENDING, depends_on: [] },
+        ],
+      },
+    ]);
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.current_task).toEqual({
+      id: 'f-1',
+      name: 'auth',
+      type: 'feature',
+      status: TaskStatus.IN_PROGRESS,
+    });
+  });
+
+  test('research_files enumerates spec-dir docs and details, excluding dag.yaml', () => {
+    writeSpec(root, 'spec-a', [simpleEpic('epic-1')]);
+    writeSpecXml(root, 'spec-a', 'Ship the payments API');
+    const dir = path.join(root, 'specs', 'spec-a');
+    fs.writeFileSync(path.join(dir, 'vision.md'), '# vision');
+    fs.writeFileSync(path.join(dir, 'decisions.yml'), 'decisions: []');
+    fs.mkdirSync(path.join(dir, 'details'));
+    fs.writeFileSync(path.join(dir, 'details', 'fr-2.xml'), '<detail/>');
+    fs.writeFileSync(path.join(dir, 'details', 'fr-1.xml'), '<detail/>');
+    fs.writeFileSync(path.join(dir, 'details', 'notes.txt'), 'not xml');
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.research_files).toEqual([
+      'specs/spec-a/vision.md',
+      'specs/spec-a/spec.xml',
+      'specs/spec-a/decisions.yml',
+      'specs/spec-a/details/fr-1.xml',
+      'specs/spec-a/details/fr-2.xml',
+    ]);
+  });
+
+  test('research_files is empty when the spec dir holds only dag.yaml', () => {
+    writeSpec(root, 'spec-a', [simpleEpic('epic-1')]);
+    const ctx = new Coordinator(root, 'spec-a').rebootContext();
+    expect(ctx.research_files).toEqual([]);
   });
 });
 
