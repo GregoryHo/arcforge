@@ -30,16 +30,22 @@ describe('quality-check: checkConsoleLogs', () => {
     assert.strictEqual(result[0].line, 2);
   });
 
-  it('should detect console.warn, console.error, console.debug, console.info', () => {
+  it('should detect console.debug and console.info', () => {
     const { checkConsoleLogs } = require('../quality-check/main');
     const filePath = path.join(testDir, 'test.js');
-    fs.writeFileSync(
-      filePath,
-      'console.warn("w");\nconsole.error("e");\nconsole.debug("d");\nconsole.info("i");\n',
-    );
+    fs.writeFileSync(filePath, 'console.debug("d");\nconsole.info("i");\n');
 
     const result = checkConsoleLogs(filePath);
-    assert.strictEqual(result.length, 4);
+    assert.strictEqual(result.length, 2);
+  });
+
+  it('should NOT flag console.warn or console.error (prescribed CLI error layer)', () => {
+    const { checkConsoleLogs } = require('../quality-check/main');
+    const filePath = path.join(testDir, 'test.js');
+    fs.writeFileSync(filePath, 'console.warn("w");\nconsole.error("e");\n');
+
+    const result = checkConsoleLogs(filePath);
+    assert.strictEqual(result.length, 0);
   });
 
   it('should skip lines starting with //', () => {
@@ -100,5 +106,34 @@ describe('quality-check: checkConsoleLogs', () => {
       result[0].content.length <= 60,
       `Content should be <= 60 chars, got ${result[0].content.length}`,
     );
+  });
+});
+
+describe('quality-check: hooks.json registration', () => {
+  const hooksJsonPath = path.join(__dirname, '..', 'hooks.json');
+
+  it('should parse hooks.json and register quality-check for both Edit and Write', () => {
+    const config = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+    const postToolUse = config.hooks.PostToolUse;
+    assert.ok(Array.isArray(postToolUse), 'PostToolUse should be an array');
+
+    const qualityCheckEntries = postToolUse.filter((entry) =>
+      entry.hooks.some((h) => h.command.includes('quality-check/main.js')),
+    );
+    assert.strictEqual(
+      qualityCheckEntries.length,
+      2,
+      `Expected exactly 2 quality-check matchers, got ${qualityCheckEntries.length}`,
+    );
+
+    const matchers = qualityCheckEntries.map((entry) => entry.matcher);
+    for (const tool of ['Edit', 'Write']) {
+      const matcher = matchers.find((m) => m.includes(`tool == "${tool}"`));
+      assert.ok(matcher, `Should have a matcher for tool == "${tool}". Got: ${matchers}`);
+      assert.ok(
+        matcher.includes('tool_input.file_path matches "\\\\.(ts|tsx|js|jsx)$"'),
+        `${tool} matcher should gate on ts/tsx/js/jsx file_path. Got: ${matcher}`,
+      );
+    }
   });
 });

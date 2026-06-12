@@ -378,6 +378,44 @@ describe('E2E: quality-check/main.js', () => {
     const result = runNodeHook(scriptPath, input);
     assert.strictEqual(result.exitCode, 0);
   });
+
+  it('should detect console.log in Write-created JS file', () => {
+    // Write tool: the file exists on disk by the time PostToolUse fires
+    const content = 'function foo() {\n  console.log("debug");\n  return 42;\n}\n';
+    const jsFile = path.join(testDir, 'written.js');
+    fs.writeFileSync(jsFile, content);
+
+    const input = makeToolUseInput('PostToolUse', 'Write', { file_path: jsFile, content });
+    const result = runNodeHook(scriptPath, input);
+
+    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.ok(
+      parsed.systemMessage,
+      `Should output systemMessage. stdout: "${result.stdout.trim()}"`,
+    );
+    assert.ok(
+      parsed.systemMessage.includes('console'),
+      `systemMessage should mention console. Got: "${parsed.systemMessage}"`,
+    );
+  });
+
+  it('should NOT emit output for Write-created file with only console.error', () => {
+    const content = 'function fail(msg) {\n  console.error("Error: " + msg);\n}\n';
+    const jsFile = path.join(testDir, 'cli-errors.js');
+    fs.writeFileSync(jsFile, content);
+
+    const input = makeToolUseInput('PostToolUse', 'Write', { file_path: jsFile, content });
+    const result = runNodeHook(scriptPath, input);
+
+    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
+    assert.strictEqual(
+      result.stdout.trim(),
+      '',
+      `console.error-only file should produce no output. Got: "${result.stdout.trim()}"`,
+    );
+  });
 });
 
 // ─────────────────────────────────────────────
