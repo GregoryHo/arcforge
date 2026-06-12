@@ -275,9 +275,16 @@ The refiner reads `ARCFORGE_MODE` from the environment (set by the calling envir
 **ATTENDED path (ARCFORGE_MODE=attended) — draft-then-ratify.** When the refiner is in attended mode and encounters a deferral signal ("you decide", "use defaults", "covered.", "skip") or an unbound/qualitative axis:
 
 1. **Draft a `status: proposed` ledger entry** in `specs/<spec-id>/decisions.yml` with `authorized_values` as a structured list (not prose). This records what the refiner would do but does NOT authorize any concrete MUST yet.
-2. **Stop and instruct the human:** print "Run `arcforge ratify <spec-id> D-NNN` to authorize the proposed values before this criterion can be written as a MUST."
-3. **Do NOT author the concrete MUST** until a ratified (`status: accepted` + `ratified_by`) entry exists in the ledger.
-4. Once ratification has occurred (the human has run `arcforge ratify`), the refiner may cite `<trace>D-NNN:value</trace>` where `value` is an exact item from `authorized_values` — the value the human confirmed at ratify.
+2. **Commit the drafted ledger entry** before stopping, so the proposed decision survives the session boundary:
+
+   ```
+   git add specs/<spec-id>/decisions.yml
+   git commit -m "docs: draft proposed ledger entry for <spec-id>"
+   ```
+
+3. **Stop and instruct the human:** print "Run `arcforge ratify <spec-id> D-NNN` to authorize the proposed values before this criterion can be written as a MUST."
+4. **Do NOT author the concrete MUST** until a ratified (`status: accepted` + `ratified_by`) entry exists in the ledger.
+5. Once ratification has occurred (the human has run `arcforge ratify`), the refiner may cite `<trace>D-NNN:value</trace>` where `value` is an exact item from `authorized_values` — the value the human confirmed at ratify.
 
 The refiner NEVER mints an `accepted` entry itself and NEVER authors the concrete MUST without a pre-existing ratified entry. The attended deferral clause (fr-rf-013) is a scoped addition to the unattended path: the unattended behavior is unchanged; the attended path adds a draft-then-ratify exit rather than unconditionally leaving the axis unbound or blocking.
 
@@ -386,11 +393,12 @@ Phase 6 runs two checks:
 ```bash
 node -e "
   const fs = require('fs');
-  const { mechanicalAuthorizationCheck, writeConflictMarker } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
+  const { mechanicalAuthorizationCheck, writeConflictMarker, parseDecisionLedger } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
   const result = mechanicalAuthorizationCheck(
     fs.readFileSync('_draft_spec.xml', 'utf-8'),
     'docs/plans/<spec-id>/<date>/design.md',
-    'docs/plans/<spec-id>/<date>/decision-log.yml'
+    'docs/plans/<spec-id>/<date>/decision-log.yml',
+    parseDecisionLedger('specs/<spec-id>/decisions.yml')
   );
   if (!result.valid) {
     console.log(JSON.stringify(result.unauthorized_traces, null, 2));
@@ -433,7 +441,7 @@ Before writing files, confirm:
 - [ ] Phase 5.5a sub-pass clean (no description ↔ AC scope or verb mismatches)
 - [ ] Phase 5.5b axis-3 LLM judgment clean (every criterion has a citable source)
 - [ ] Phase 6a identity-header validation passed (`validateSpecHeader` returns no ERROR)
-- [ ] Phase 6b mechanical authorization check passed (`mechanicalAuthorizationCheck` returns `valid: true` — every `<trace>` resolves to design.md or decision-log content)
+- [ ] Phase 6b mechanical authorization check passed (`mechanicalAuthorizationCheck` returns `valid: true` — every `<trace>` resolves to design.md content, decision-log content, or a ratified ledger value (`specs/<spec-id>/decisions.yml` entry with `status: accepted` + `ratified_by`, cited value in `authorized_values`))
 - [ ] user confirms: "Is this spec complete?"
 
 ## Red Flags — Stop
