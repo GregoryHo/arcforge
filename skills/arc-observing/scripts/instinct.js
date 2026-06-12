@@ -288,7 +288,7 @@ function cmdEvolve(project) {
       for (const inst of items) {
         console.log(`    - ${inst.id} (${pct(inst.frontmatter.confidence || 0)})`);
       }
-      console.log('  Run /learn to cluster these into a higher-level skill.');
+      console.log('  Run `arcforge learn dashboard` and use the Evolve action to combine these.');
     }
   }
 

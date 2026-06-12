@@ -374,34 +374,7 @@ describe('pending-actions create + consume flow', () => {
 });
 
 // ─────────────────────────────────────────────
-// 10. learn.js has new commands
-// ─────────────────────────────────────────────
-
-describe('learn.js has new commands', () => {
-  it('should export loadInstincts', () => {
-    const learn = require('../../skills/arc-learning/scripts/learn');
-    assert.ok(typeof learn.loadInstincts === 'function', 'loadInstincts should be exported');
-  });
-
-  it('should export clusterInstincts', () => {
-    const learn = require('../../skills/arc-learning/scripts/learn');
-    assert.ok(typeof learn.clusterInstincts === 'function', 'clusterInstincts should be exported');
-  });
-
-  it('should export parseArgs', () => {
-    const learn = require('../../skills/arc-learning/scripts/learn');
-    assert.ok(typeof learn.parseArgs === 'function', 'parseArgs should be exported');
-  });
-
-  it('should export scan and preview commands', () => {
-    const learn = require('../../skills/arc-learning/scripts/learn');
-    assert.ok(typeof learn.cmdScan === 'function', 'cmdScan should be exported');
-    assert.ok(typeof learn.cmdPreview === 'function', 'cmdPreview should be exported');
-  });
-});
-
-// ─────────────────────────────────────────────
-// 11. No getLearnedSkillsDir in scripts/ or hooks/
+// 10. No getLearnedSkillsDir in scripts/ or hooks/
 // ─────────────────────────────────────────────
 
 describe('no getLearnedSkillsDir in scripts/ or hooks/', () => {
@@ -463,7 +436,7 @@ describe('no getLearnedSkillsDir in scripts/ or hooks/', () => {
 });
 
 // ─────────────────────────────────────────────
-// 12. Fingerprint Jaccard is available
+// 11. Fingerprint Jaccard is available
 // ─────────────────────────────────────────────
 
 describe('fingerprint Jaccard is available', () => {

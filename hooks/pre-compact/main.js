@@ -2,9 +2,8 @@
 /**
  * PreCompact Hook
  *
- * Runs before context compaction to:
- * 1. Log the compaction event to compaction-log.txt
- * 2. Update current session file with compaction marker
+ * Runs before context compaction to update the current session file
+ * with a compaction marker.
  *
  * Non-blocking: Always exits 0 to avoid disrupting compaction flow.
  */
@@ -12,14 +11,11 @@
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const {
-  getProjectSessionsDir,
   getSessionDir,
-  getCompactionLogPath,
   getTimestamp,
   getDateString,
   getProjectName,
   getSessionId,
-  ensureDir,
   readFileSafe,
   writeFileSafe,
   createSessionCounter,
@@ -33,20 +29,7 @@ const {
   resetCounter: resetUserCounter,
 } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
-const { generateMarkdownSummary } = require('../session-tracker/summary');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-
-/**
- * Record compaction event to log file
- */
-function logCompactionEvent(project, timestamp, sessionId) {
-  const logPath = getCompactionLogPath(project);
-  const logEntry = `[${timestamp}] Context compaction - sessionId: ${sessionId}\n`;
-
-  ensureDir(getProjectSessionsDir(project));
-  const existingLog = readFileSafe(logPath) || '';
-  writeFileSafe(logPath, existingLog + logEntry);
-}
 
 /**
  * Update session file with compaction marker
@@ -72,13 +55,6 @@ function updateSessionFile(project, date, timestamp, sessionId) {
 }
 
 /**
- * Get markdown summary file path
- */
-function getMarkdownFilePath(project, date, sessionId) {
-  return path.join(getSessionDir(project, date), `${sessionId}.md`);
-}
-
-/**
  * Main entry point
  */
 function main() {
@@ -92,8 +68,7 @@ function main() {
     const sessionId = getSessionId();
     const timestamp = getTimestamp();
 
-    // Log compaction event and update session file
-    logCompactionEvent(project, timestamp, sessionId);
+    // Update session file with compaction marker
     updateSessionFile(project, date, timestamp, sessionId);
 
     // Read counters
@@ -102,17 +77,12 @@ function main() {
 
     // Check threshold for diary trigger
     if (shouldTrigger(userCount, toolCount)) {
-      // Update session with current counts and generate markdown
+      // Update session with current counts
       const session = loadSession();
       if (session) {
         session.userMessages = userCount;
         session.toolCalls = toolCount;
         saveSession(session);
-
-        // Generate markdown summary
-        const markdownPath = getMarkdownFilePath(project, date, sessionId);
-        const markdown = generateMarkdownSummary(session);
-        writeFileSafe(markdownPath, markdown);
       }
 
       // Generate auto-diary draft (silent, best-effort)
@@ -156,7 +126,7 @@ function main() {
 }
 
 // Export for testing
-module.exports = { logCompactionEvent, updateSessionFile, getMarkdownFilePath };
+module.exports = { updateSessionFile };
 
 // Run if executed directly
 if (require.main === module) {

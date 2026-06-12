@@ -12,7 +12,6 @@ const {
   getProjectName,
   getSessionsDir,
   getProjectSessionsDir,
-  getCompactionLogPath,
   getDiaryedDir,
   clearCachedSessionId,
 } = require('../../scripts/lib/utils');
@@ -173,12 +172,6 @@ describe('path helpers', () => {
   it('getProjectSessionsDir should append project name', () => {
     expect(getProjectSessionsDir('foo')).toBe(
       path.join(os.homedir(), '.arcforge', 'sessions', 'foo'),
-    );
-  });
-
-  it('getCompactionLogPath should build correct path', () => {
-    expect(getCompactionLogPath('bar')).toBe(
-      path.join(os.homedir(), '.arcforge', 'sessions', 'bar', 'compaction-log.txt'),
     );
   });
 

@@ -43,14 +43,11 @@ def test_documents_retired_legacy_cli():
     """Post-pivot SKILL.md must clearly mark pre-pivot CLI subcommands as legacy."""
     text = _read_skill()
     assert "Retired" in text or "Deprecated" in text or "Legacy" in text
-    assert "arcforge learn analyze" in text  # mentioned as retired
-    # Legacy CLI commands listed in the retired section to warn users away
-    for legacy in [
-        "arcforge learn approve",
-        "arcforge learn materialize",
-        "arcforge learn activate",
-    ]:
+    # Legacy CLI subcommands named in the one-line retired notice to warn users away
+    for legacy in ["analyze", "approve", "materialize", "activate"]:
         assert legacy in text
+    # The retired notice routes users to the dashboard
+    assert "use the dashboard" in text
 
 
 def test_has_workflow_with_approval_and_activation_gates():
@@ -99,7 +96,9 @@ def test_position_documents_queue_and_draft_path():
     assert "active artifact" in text  # singular or plural
 
 
-def test_scripts_exist_as_legacy_compatibility_only():
-    assert Path("skills/arc-learning/scripts/learn.js").exists()
+def test_legacy_learn_js_removed():
+    """The retired clustering script no longer ships; the dashboard Evolve action replaced it."""
+    assert not Path("skills/arc-learning/scripts/learn.js").exists()
     text = _read_skill().lower()
     assert "legacy" in text
+    assert "learn.js" not in text
