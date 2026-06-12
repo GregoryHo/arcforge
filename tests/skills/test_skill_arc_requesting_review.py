@@ -1,9 +1,19 @@
+import re
 from pathlib import Path
 
 
 def _read_skill() -> str:
     skill_path = Path("skills/arc-requesting-review/SKILL.md")
     return skill_path.read_text(encoding="utf-8")
+
+
+def _read_template() -> str:
+    template_path = Path("skills/arc-requesting-review/code-reviewer.md")
+    return template_path.read_text(encoding="utf-8")
+
+
+def _placeholder_set(text: str) -> set:
+    return set(re.findall(r"\{[A-Z][A-Z0-9_]*\}", text))
 
 
 def _parse_frontmatter(text: str) -> dict:
@@ -49,3 +59,28 @@ def test_arc_requesting_review_contains_required_sections():
 
     # Must reference code-reviewer dispatch
     assert "code-reviewer" in text
+
+
+def test_arc_requesting_review_dispatches_skill_local_template():
+    text = _read_skill()
+
+    # Dispatch must point at the skill-local placeholder template, not the
+    # agents/ persona file (agents/code-reviewer.md has zero placeholders
+    # by design and stays as the agent persona).
+    assert "arc-requesting-review/code-reviewer.md" in text
+    assert "agents/code-reviewer.md" not in text
+
+
+def test_template_placeholders_match_skill_required_list():
+    """Seam test: the {UPPER_SNAKE} token set in the skill-local template
+    must equal the placeholder set the SKILL.md tells dispatchers to fill.
+    A token in the template but not in SKILL.md can never be filled at
+    dispatch time; a token in SKILL.md but not in the template is dead
+    instruction."""
+    skill_placeholders = _placeholder_set(_read_skill())
+    template_placeholders = _placeholder_set(_read_template())
+
+    assert template_placeholders == skill_placeholders, (
+        f"template-only: {sorted(template_placeholders - skill_placeholders)}, "
+        f"skill-only: {sorted(skill_placeholders - template_placeholders)}"
+    )
