@@ -4,7 +4,8 @@
  *
  * Intercepts Edit and Write tool calls whose target file basename is
  * `decisions.yml`, computes the resulting content, and validates it against
- * the ledger stored in HEAD via validateDecisionLedger. DENY on any
+ * a baseline ledger via validateDecisionLedger — HEAD when the file is
+ * tracked, otherwise the pre-edit on-disk content. DENY on any
  * immutability / monotonicity violation. All other paths are no-ops.
  *
  * BLOCK MECHANISM: same as arc-guard — stdout JSON
@@ -18,16 +19,20 @@
  * COVERAGE BOUNDARY (documented, not code-enforced):
  *   - Only intercepts Edit and Write tool calls. Bash-level writes
  *     (echo >>, sed -i, tee) bypass this hook entirely.
- *   - Immutability is HEAD-relative. A same-session pre-commit
- *     append-then-edit within a single session escapes the check
- *     (S8 limitation from validateDecisionLedger's doc comment).
- *   - Non-git-repo or detached-HEAD cwd → getHeadLedgerContent returns null
- *     → previous=null → immutability checks skip → ALLOW (fail-open).
+ *   - Baseline priority: HEAD when the file is tracked (binding remedy);
+ *     otherwise (untracked/uncommitted ledger, non-git-repo, detached HEAD)
+ *     the pre-edit on-disk content read in evaluate() — so every new spec's
+ *     uncommitted decisions.yml keeps append-only protection (former S8 hole).
+ *   - Residual S8 gap: for HEAD-tracked files HEAD stays authoritative, so a
+ *     same-session pre-commit append-then-edit of a not-yet-committed entry
+ *     still escapes (validateDecisionLedger's documented limitation).
+ *   - Brand-new file (no HEAD version, nothing readable on disk) →
+ *     previous=null → immutability checks skip → ALLOW (fail-open).
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { readStdinSync, parseStdinJson, output } = require('../../scripts/lib/utils');
+const { readStdinSync, parseStdinJson, output, readFileSafe } = require('../../scripts/lib/utils');
 const {
   parseDecisionLedgerContent,
   validateDecisionLedger,
@@ -246,10 +251,17 @@ function evaluate(input) {
 
   if (resultingContent === null) return null; // uncertain → ALLOW
 
-  // Fetch HEAD state (null if new file / non-repo / git absent).
+  // Fetch HEAD state (null if file untracked / non-repo / git absent).
   const headContent = getHeadLedgerContent(absPath, cwd);
 
-  return decideLedgerEdit(resultingContent, headContent);
+  // SDD-3 (S8 hole): no HEAD version → fall back to the pre-edit on-disk
+  // content as the baseline, so uncommitted/untracked ledgers (every new spec
+  // before its first commit) keep append-only protection. HEAD wins when
+  // available (binding remedy). Brand-new or unreadable file → readFileSafe
+  // returns null → previous=null semantics preserved (fail-open).
+  const baselineContent = headContent !== null ? headContent : readFileSafe(absPath);
+
+  return decideLedgerEdit(resultingContent, baselineContent);
 }
 
 // ---------------------------------------------------------------------------
