@@ -35,6 +35,7 @@ const {
   validateDecisionLedger,
   checkSpecDecisionGraph,
   LOOP_SENTINEL,
+  LOOP_HEARTBEAT_STALE_MS,
   loopSentinelPresent,
 } = require('./sdd-decision-ledger');
 const {
@@ -87,5 +88,6 @@ module.exports = {
   checkSpecDecisionGraph,
   // D6 P3: B1 loop sentinel — canonical export for ratify-command + hook.
   LOOP_SENTINEL,
+  LOOP_HEARTBEAT_STALE_MS,
   loopSentinelPresent,
 };

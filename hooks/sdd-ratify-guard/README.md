@@ -4,7 +4,7 @@ PreToolUse hook that provides best-effort denial of `arcforge ratify` Bash invoc
 
 ## What It Does
 
-Intercepts `Bash` tool calls whose command matches `arcforge ratify` or `node <path>/cli.js ratify`. If the loop sentinel (`.arcforge-loop.json`) is present at project root, the hook **denies** the tool call.
+Intercepts `Bash` tool calls whose command matches `arcforge ratify` or `node <path>/cli.js ratify`. If the loop sentinel (`.arcforge-loop.json`) reports a **live** loop — status `running` (or unreadable) with a fresh heartbeat (mtime within 30 minutes) — the hook **denies** the tool call. A finished loop (terminal status or `finished_at`) or a stale heartbeat does not block. When the cwd is an epic worktree (`.arcforge-epic` marker), the sentinel is checked at the marker's `base_worktree`.
 
 ## Why This Exists
 
@@ -12,7 +12,7 @@ Intercepts `Bash` tool calls whose command matches `arcforge ratify` or `node <p
 
 This hook is the **best-effort harness layer** (Task 3b). The **primary deterministic gate** is the engine-side check in `scripts/cli/ratify-command.js`:
 - Refuses to mint when `ARCFORGE_MODE !== 'attended'`
-- Refuses to mint when `.arcforge-loop.json` sentinel is present
+- Refuses to mint when `.arcforge-loop.json` reports a live loop (same lifecycle-aware check)
 
 ## Honest Limits
 
@@ -22,7 +22,7 @@ Do not rely on this hook alone for security — the combination of engine gate +
 
 ## Sentinel File
 
-The sentinel is `.arcforge-loop.json` at project root — the same file maintained by `scripts/loop.js`. Its presence signals an active or recently interrupted autonomous loop.
+The sentinel is `.arcforge-loop.json` at project root — the same file maintained by `scripts/loop.js`. The file persists after a loop finishes (it is the loop's resume state and is never deleted by this gate); only a live loop blocks: status `running` (or an unreadable file) with an mtime heartbeat fresher than 30 minutes (`LOOP_HEARTBEAT_STALE_MS`).
 
 ## Fail-Open
 

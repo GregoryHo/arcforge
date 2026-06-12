@@ -91,6 +91,33 @@ describe('sdd-ratify-guard evaluate', () => {
     assert.strictEqual(reason, null, 'Should allow arcforge ratify when no sentinel');
   });
 
+  // (a2) worktree cwd (.arcforge-epic marker) + running sentinel at BASE → DENY
+  // AF-2 / S6-1: the sentinel lives at the loop's project root (base), never in
+  // a fresh worktree — the guard must resolve the marker's base_worktree first.
+  it('(a2) ratify from an epic-worktree cwd is denied when the base has a running sentinel', () => {
+    const { evaluate } = require(HOOK_PATH);
+    const base = dir();
+    const worktree = dir();
+    fs.writeFileSync(
+      path.join(base, SENTINEL),
+      JSON.stringify({ iteration: 1, status: 'running' }),
+    );
+    fs.writeFileSync(
+      path.join(worktree, '.arcforge-epic'),
+      `epic: epic-1\nspec_id: my-spec\nbase_worktree: ${base}\nbase_branch: main\n`,
+    );
+
+    const reason = evaluate({
+      tool_name: 'Bash',
+      tool_input: { command: 'arcforge ratify my-spec D-001' },
+      cwd: worktree,
+    });
+    assert.ok(
+      reason !== null,
+      'Should deny ratify from a worktree cwd when the base sentinel is running',
+    );
+  });
+
   // (d) non-ratify command + sentinel → ALLOW
   it('(d) non-ratify Bash command with sentinel is allowed', () => {
     const { evaluate } = require(HOOK_PATH);

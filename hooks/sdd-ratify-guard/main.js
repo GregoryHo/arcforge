@@ -3,8 +3,10 @@
  * sdd-ratify-guard — PreToolUse best-effort guard for "arcforge ratify" in loop context.
  *
  * Task 3b (B1 "辅"): Intercepts Bash tool calls containing "arcforge ratify" or
- * "node scripts/cli.js ratify" and DENIES them when the loop sentinel
- * (.arcforge-loop.json) is present at project root.
+ * "node scripts/cli.js ratify" and DENIES them when a LIVE loop is detected
+ * via the lifecycle-aware sentinel check (loopSentinelPresent: status
+ * "running" + fresh heartbeat; worktree cwds resolve to their base via the
+ * .arcforge-epic marker; a finished loop's sentinel does not block).
  *
  * HONEST LIMITS (per implementation-plan.md §0.5 B1 decision):
  *   - This hook IS bypassable with --dangerously-skip-permissions. That is a known,
@@ -48,15 +50,19 @@ function evaluate(input) {
 
   const cwd = input.cwd || process.cwd();
 
-  // Check for loop sentinel.
+  // Lifecycle-aware live-loop check (worktree cwds resolve to their base).
   if (!sentinelPresent(cwd)) return null;
 
   return (
-    `"arcforge ratify" denied — loop sentinel ${LOOP_SENTINEL} detected at ${cwd}.\n` +
-    `Ratification must not occur inside an autonomous loop (B1 harness guard).\n` +
-    `Note: the primary engine gate (ARCFORGE_MODE check in ratify-command.js) provides\n` +
-    `the deterministic guarantee. This hook is best-effort and bypassable by\n` +
-    `--dangerously-skip-permissions (known limit, per implementation-plan.md §0.5 B1).`
+    `"arcforge ratify" denied — a live autonomous loop was detected for ${cwd}\n` +
+    `(${LOOP_SENTINEL} reports a running loop with a fresh heartbeat).\n` +
+    `Ratification is a human decision and must not happen while a loop is running.\n` +
+    `Recovery: wait for the loop to finish — a finished loop records a terminal\n` +
+    `status and this gate clears automatically; a killed loop clears once its\n` +
+    `heartbeat is stale (30 minutes). Then re-run the ratify command in an\n` +
+    `attended session. Never delete ${LOOP_SENTINEL} — it is the loop's resume state.\n` +
+    `Note: the primary engine gate in ratify-command.js provides the deterministic\n` +
+    `guarantee; this hook is the best-effort harness layer (B1).`
   );
 }
 
