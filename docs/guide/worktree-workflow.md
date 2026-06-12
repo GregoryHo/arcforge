@@ -41,8 +41,11 @@ derived at runtime, and the derivation rule has evolved before (previously
 `.worktrees/<epic>/` inside the repo). Use the CLI:
 
 ```bash
-arcforge status --json   # returns epic.worktree.path absolutely
+arcforge status --json   # each epic carries .path — the absolute worktree path (null until expanded)
 ```
+
+Read `.path` from the **base checkout**. Inside a worktree, the local dag
+copy has `worktree: null` for every epic, so `.path` is always null there.
 
 ## The `.arcforge-epic` Marker
 
@@ -165,8 +168,8 @@ arcforge status        # 看哪些 epic ready
 # 2. 為 ready 的 epic 建立 worktree
 arcforge expand --epic epic-auth --project-setup
 
-# 3. 用 arcforge status --json 取得 worktree 絕對路徑，然後進入
-cd "$(arcforge status --json | jq -r '.epics[] | select(.id=="epic-auth") | .worktree')"
+# 3. 用 arcforge status --json 取得 worktree 絕對路徑（.path 欄位），然後進入
+cd "$(arcforge status --json | jq -r '.epics[] | select(.id=="epic-auth") | .path')"
 
 # 4. 檢查依賴
 arcforge sync --direction from-base
@@ -196,11 +199,11 @@ arcforge status
 cd /path/to/project
 arcforge status
 
-# 2. 取得 in_progress 的 worktree 絕對路徑
+# 2. 在 base 取得 in_progress epic 的 worktree 絕對路徑（.path 欄位）
 arcforge status --json
 
 # 3. 進入該路徑並繼續
-cd "<path from JSON>"
+cd "$(arcforge status --json | jq -r '.epics[] | select(.id=="epic-auth") | .path')"
 arcforge sync --direction from-base
 ```
 
@@ -257,4 +260,4 @@ clear the DAG entry.
 2. **不要手動 git merge / Never hand-merge**：使用 `arcforge merge`，它會正確更新 DAG
 3. **Blocked 就停止 / Stop when blocked**：如果 sync 顯示 blocked_by 不為空，先完成依賴的 epic
 4. **`.arcforge-epic` 是關鍵 / The marker is load-bearing**：這個檔案標記你在 worktree 內，包含同步資訊
-5. **絕不硬寫路徑 / Never hardcode paths**：讀取 `arcforge status --json` 或呼叫 `scripts/lib/worktree-paths.js` 取得絕對路徑
+5. **絕不硬寫路徑 / Never hardcode paths**：在 base checkout 讀取 `arcforge status --json` 的 `.path` 欄位，或呼叫 `scripts/lib/worktree-paths.js` 取得絕對路徑。在 worktree 內 `.path` 恆為 null（本地 dag 副本 `worktree: null`），不要從 worktree 內讀取

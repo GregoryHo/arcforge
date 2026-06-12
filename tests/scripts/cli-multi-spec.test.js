@@ -3,8 +3,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const { stringifyDagYaml } = require('../../scripts/lib/yaml-parser');
+const { stringifyDagYaml, parseDagYaml } = require('../../scripts/lib/yaml-parser');
 const { TaskStatus } = require('../../scripts/lib/models');
+const { getWorktreePath } = require('../../scripts/lib/worktree-paths');
 
 const CLI = path.resolve(__dirname, '../../scripts/cli.js');
 
@@ -73,6 +74,23 @@ describe('CLI multi-spec UX', () => {
     expect(parsed).toHaveProperty('specs');
     expect(Object.keys(parsed.specs).sort()).toEqual(['spec-a', 'spec-b']);
     expect(parsed.specs['spec-a'].epics).toHaveLength(1);
+  });
+
+  test('status aggregation carries per-epic path (derived when worktree set, null otherwise)', () => {
+    writeSpec(root, 'spec-a', ['epic-a1']);
+    writeSpec(root, 'spec-b', ['epic-b1']);
+    // Mark spec-a's epic as expanded — status derives the absolute path
+    // from the stored worktree value at read time (no real worktree dir
+    // is needed for derivation).
+    const dagPath = path.join(root, 'specs', 'spec-a', 'dag.yaml');
+    const dag = parseDagYaml(fs.readFileSync(dagPath, 'utf8'));
+    dag.epics[0].worktree = 'epic-a1';
+    fs.writeFileSync(dagPath, stringifyDagYaml(dag));
+
+    const { stdout } = runCli(root, ['status', '--json']);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.specs['spec-a'].epics[0].path).toBe(getWorktreePath(root, 'spec-a', 'epic-a1'));
+    expect(parsed.specs['spec-b'].epics[0].path).toBeNull();
   });
 
   test('next with two specs requires --spec-id', () => {

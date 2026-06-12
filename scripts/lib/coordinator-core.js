@@ -105,6 +105,11 @@ class Coordinator {
         status: epic.status,
         progress: epic.completionRatio(),
         worktree: epic.worktree,
+        // Absolute worktree path, derived at read time from the stored
+        // worktree value (additive — `worktree` keeps the raw dag value).
+        // null when the epic has not been expanded; always null when read
+        // from a worktree's local dag copy, where every worktree is null.
+        path: epic.worktree ? this._resolveWorktreePath(epic.worktree) : null,
         features: epic.features.map((f) => ({
           id: f.id,
           name: f.name,
