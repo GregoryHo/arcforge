@@ -265,6 +265,25 @@ module.exports = {
   cleanupWorktrees(options = {}) {
     const { epicIds } = options;
 
+    // Find base worktree
+    const basePath = this._findBaseWorktree();
+    if (!basePath) {
+      throw new Error('Base worktree not found via git worktree list');
+    }
+
+    // If not in base, delegate to the base coordinator (same delegation as
+    // mergeEpics). A worktree's local dag copy carries `worktree: null` for
+    // every epic, so running cleanup from a worktree cwd would otherwise be
+    // a silent no-op.
+    if (basePath !== this.projectRoot) {
+      const baseCoord = new this.constructor(basePath, this.specId);
+      return baseCoord._cleanupWorktreesInBase(epicIds);
+    }
+
+    return this._cleanupWorktreesInBase(epicIds);
+  },
+
+  _cleanupWorktreesInBase(epicIds) {
     let epics;
     if (epicIds) {
       epics = this.dag.epics.filter((e) => epicIds.includes(e.id));

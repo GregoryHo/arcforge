@@ -13,6 +13,7 @@
  *   cleanup [epic_ids...]           Remove worktrees for completed epics
  *   sync [--direction from-base|to-base|both|scan]  Sync state
  *   reboot                          Get context for new session
+ *   worktree add|list|remove        Generic (non-epic) worktree management
  *   schema [--json] [--example]     Show dag.yaml schema
  *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
  *   eval list                        List eval scenarios
@@ -115,6 +116,15 @@ async function main() {
       case 'reboot':
       case 'loop': {
         runDagCommand(args, { projectRoot, asJson });
+        break;
+      }
+
+      case 'worktree': {
+        // Generic (non-epic) worktree management. Engine + dispatch live in
+        // scripts/lib/worktree-generic.js; epic worktrees stay with
+        // expand/cleanup (remove redirects marker'd trees there).
+        const { runWorktreeCommand } = require('./lib/worktree-generic');
+        output(runWorktreeCommand(args, projectRoot), asJson);
         break;
       }
 

@@ -53,6 +53,20 @@ COMMANDS:
   cleanup [epic_ids...] [--spec-id <id>]
       Remove worktrees for completed epics.
 
+  worktree add <name> [--branch <b>] [--from <ref>] [--setup]
+      Create a generic (non-epic) worktree at ~/.arcforge/worktrees/.
+      --branch         Branch to check out (default: <name>; created if missing)
+      --from           Base ref when creating a new branch (default: HEAD)
+      --setup          Auto-detect and run installer (npm/pip/cargo/go)
+
+  worktree list [--json]
+      List all worktrees annotated by kind: base|epic|generic|external.
+
+  worktree remove <name> [--force]
+      Remove a generic worktree and prune git metadata. Epic worktrees
+      are refused — use 'cleanup' for those.
+      --force          Remove even with uncommitted changes
+
   sync [--direction from-base|to-base|both|scan] [--spec-id <id>]
       Synchronize state between worktree and base DAG.
       --direction      Sync direction (auto-detected if omitted)
