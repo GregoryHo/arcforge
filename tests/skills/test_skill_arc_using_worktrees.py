@@ -16,6 +16,19 @@ def _extract_fenced_code_blocks(text: str) -> list[str]:
     return re.findall(r"```[a-zA-Z]*\n(.*?)\n```", text, re.DOTALL)
 
 
+def _extract_section(text: str, heading: str) -> str:
+    """Return the body of a `## <heading>...` section, up to the next `## `.
+
+    Matches by prefix so headings carrying a parenthetical or trailing
+    punctuation (e.g. "## Generic Tier (any git repo)") still resolve.
+    """
+    pattern = rf"^## {re.escape(heading)}.*?(?=^## |\Z)"
+    match = re.search(pattern, text, re.DOTALL | re.MULTILINE)
+    if match is None:
+        raise AssertionError(f"missing section: {heading}")
+    return match.group(0)
+
+
 def _parse_frontmatter(text: str) -> dict:
     if not text.startswith("---\n"):
         raise AssertionError("missing frontmatter start")
@@ -32,7 +45,7 @@ def _parse_frontmatter(text: str) -> dict:
     return data
 
 
-def test_arc_using_worktrees_frontmatter_and_rules():
+def test_arc_using_worktrees_frontmatter():
     text = _read_skill()
     front = _parse_frontmatter(text)
 
@@ -48,17 +61,83 @@ def test_arc_using_worktrees_frontmatter_and_rules():
     assert "⚠️" in text
 
 
-def test_arc_using_worktrees_is_thin_wrapper():
-    """The skill must delegate to coordinator.js, not create worktrees by hand."""
+def test_arc_using_worktrees_blessed_invocation():
+    """Generic + composition tiers invoke the CLI via the blessed ARCFORGE_ROOT form."""
     text = _read_skill()
 
-    # Must delegate to coordinator.js expand --epic.
-    assert 'coordinator.js" expand --epic' in text
+    # Blessed CLI form (AF-1 convention), not the broken SKILL_ROOT coordinator.js path.
+    assert "ARCFORGE_ROOT}/scripts/cli.js" in text
+    assert "SKILL_ROOT}/scripts/coordinator.js" not in text
 
-    # `git worktree add` must NEVER appear in a fenced code block — those are
-    # the parts an agent is most likely to execute verbatim. It may appear in
-    # inline backticks inside prose (e.g., inside a Red Flag paragraph that
-    # frames it as forbidden), but not as an executable instruction.
+    # AF-1 blessed fallback header (`:=`), NOT the abort `:?` form that breaks
+    # the first command on non-Claude platforms.
+    assert ': "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"' in text
+    assert ":?" not in text
+
+
+def test_arc_using_worktrees_detection_table():
+    """The 4-row tier-detection table must be present with all four signals."""
+    text = _read_skill()
+    section = _extract_section(text, "Which Tier Am I In?")
+
+    # Four data rows in the markdown table → at least four numbered signals.
+    rows = [line for line in section.splitlines() if re.match(r"\|\s*[1-4]\s*\|", line)]
+    assert len(rows) == 4, f"expected a 4-row detection table, found {len(rows)} rows"
+
+    # The four signals named in the RFC contract.
+    assert ".arcforge-epic" in section
+    assert "dag.yaml" in section
+    assert "No arcforge state" in section
+
+
+def test_arc_using_worktrees_composition_tier_delegates():
+    """Composition tier is a single expand pointer — it must NOT re-document
+    the epic lifecycle (no merge/cleanup), per the WT-3 acceptance grep."""
+    text = _read_skill()
+    section = _extract_section(text, "Composition Tier")
+
+    # Exactly one expand command.
+    assert section.count("expand --epic") == 1
+
+    # The section delegates; it does not re-document merge/cleanup (those live
+    # in arc-coordinating / the Finishing section, not here).
+    assert "merge" not in section.lower()
+    assert "cleanup" not in section.lower()
+
+    # Branch is engine-derived `<spec-id>/<epic-id>` — the stale `-b <epic-id>`
+    # claim must be gone from the whole skill.
+    assert "<spec-id>/<epic-id>" in section
+    assert "-b <epic-id>" not in text
+
+
+def test_arc_using_worktrees_generic_tier_cli():
+    """Generic tier wires to the WT-2 engine: add/list/remove via the CLI."""
+    text = _read_skill()
+    section = _extract_section(text, "Generic Tier")
+
+    assert "worktree add" in section
+    assert "worktree list --json" in section
+    assert "worktree remove" in section
+
+    # There is no `switch` subcommand — moving in is `cd` to the JSON path.
+    assert "worktree switch" not in text
+
+
+def test_arc_using_worktrees_red_flags():
+    """All five red flags from the RFC are carried over."""
+    text = _read_skill()
+    section = _extract_section(text, "Red Flags")
+
+    flags = [line for line in section.splitlines() if re.match(r"\d+\.\s", line.strip())]
+    assert len(flags) == 5, f"expected 5 red flags, found {len(flags)}"
+
+
+def test_arc_using_worktrees_no_manual_git_worktree_add():
+    """`git worktree add` must NEVER appear in a fenced code block — those are
+    the parts an agent is most likely to execute verbatim. It may appear in
+    inline backticks inside prose (a Red Flag counterexample), but never as an
+    executable instruction."""
+    text = _read_skill()
     for block in _extract_fenced_code_blocks(text):
         assert "git worktree add" not in block, (
             "`git worktree add` appears inside a fenced code block — agents "
@@ -66,30 +145,15 @@ def test_arc_using_worktrees_is_thin_wrapper():
             "mention it as a Red Flag counterexample."
         )
 
-    # Must reference .arcforge-epic for context (explaining what the CLI does).
-    assert ".arcforge-epic" in text
-
-    # Must reference SKILL_ROOT for CLI invocation.
-    assert "SKILL_ROOT" in text
-
-
-def test_arc_using_worktrees_references_worktree_rule():
-    """The skill should point at arc-using for the Worktree Rule background."""
-    text = _read_skill()
-    assert "arc-using" in text
-    # The Worktree Rule lives in arc-using — this skill must reference it.
-    assert "Worktree Rule" in text
-
 
 def test_arc_using_worktrees_no_hardcoded_paths():
     """The skill must teach agents to read paths from CLI output, not hardcode them."""
     text = _read_skill()
     lower = text.lower()
 
-    # Must contain the specific instruction that the path comes from the CLI's
-    # JSON output — this is the positive invariant that shapes agent behavior.
-    assert "path from arcforge expand" in lower, (
-        "skill must tell agents to read the path from `arcforge expand` output"
+    # Positive invariant: read the path from the CLI's JSON output.
+    assert "path` field" in text or "path field" in lower, (
+        "skill must tell agents to read the `path` field from CLI JSON output"
     )
 
     # Must explicitly warn against hardcoding / reconstructing the path.
@@ -97,16 +161,13 @@ def test_arc_using_worktrees_no_hardcoded_paths():
         "skill must explicitly forbid hardcoding/reconstructing worktree paths"
     )
 
-    # Structural check: the canonical worktree root string
-    # (`~/.arcforge-worktrees/` or `/.arcforge-worktrees/`) must NOT appear in
-    # any fenced code block as a literal path an agent would execute. It may
-    # appear in prose (e.g., in the Worktree Rule reference) because prose is
-    # documentation, not instructions.
-    hardcoded_patterns = ("~/.arcforge-worktrees/", "/.arcforge-worktrees/")
+    # Structural check: the canonical worktree root string must NOT appear in
+    # any fenced code block as a literal path an agent would execute.
+    hardcoded_patterns = ("~/.arcforge/worktrees/", "/.arcforge/worktrees/")
     for block in _extract_fenced_code_blocks(text):
         for pattern in hardcoded_patterns:
             assert pattern not in block, (
                 f"hardcoded worktree path `{pattern}` appears inside a fenced "
                 "code block — agents will execute it verbatim. Use an "
-                "abstract placeholder like `<path from arcforge expand JSON>`."
+                "abstract placeholder like `<path from CLI JSON>`."
             )

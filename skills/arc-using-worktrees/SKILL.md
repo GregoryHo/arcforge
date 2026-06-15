@@ -1,83 +1,132 @@
 ---
 name: arc-using-worktrees
-description: Use when setting up an isolated workspace for a single epic from dag.yaml, or when a task means scoping work to one epic — even if the user never says "worktree". For batch multi-epic expansion, use arc-coordinating expand.
+description: Use when work needs an isolated workspace — a parallel branch, an experiment, a review checkout, or scoping to one epic — in ANY git repo, even if the user never says "worktree". Epic context auto-escalates to the coordinator; everything else uses the generic worktree CLI.
 ---
 
 # arc-using-worktrees
 
-## When to Use
+Isolated git worktrees for any repo. Two tiers: a **generic tier** for any
+branch, experiment, or review checkout, and a **composition tier** that hands
+epic work to the coordinator. Both derive the canonical path at runtime — you
+never invent one.
 
-Create an isolated workspace for a single epic. This skill is a thin wrapper
-around `arcforge expand --epic <id>` — it does not create worktrees by hand.
+## Which Tier Am I In?
 
-For multi-epic batch expansion, use `arc-coordinating expand` instead.
+Evaluate top-down; first match wins.
 
-**REQUIRED BACKGROUND:** `arc-using` — read the Worktree Rule for the three
-norms (no hardcoded paths, no manual `git worktree add`, enter via
-`arcforge status --json`).
+| # | Signal | Tier / Route |
+|---|--------|--------------|
+| 1 | `.arcforge-epic` exists in cwd | Already inside an epic worktree. Never create a nested worktree. Work → `arc-implementing`; integration → `arc-finishing-epic`. Raw `git merge` here is denied by arc-guard — that refusal is correct; don't fight it. |
+| 2 | `specs/<spec-id>/dag.yaml` exists AND the work matches an epic id in it | Composition tier — escalate to the coordinator (below). |
+| 3 | `dag.yaml` exists but the work is NOT an epic (experiment, hotfix, review checkout) | Generic tier. Legitimate inside an arcforge project. |
+| 4 | No arcforge state at all | Generic tier. Full standalone value. |
 
-## Core Workflow
+A user-stated custom path overrides everything — honor it via raw git;
+`worktree list` will still show it, annotated `external`.
 
-### Step 1: Identify the epic
+## Generic Tier (any git repo)
 
-Read the epic id from `dag.yaml` or the user's request. Abort if the epic id
-is unknown — you cannot create a worktree for an epic that is not in the DAG.
-
-### Step 2: Delegate to coordinator
+Invoke the CLI through the blessed convention. Put this header at the top of
+the shell block (under Claude Code the SessionStart hook already exports
+`ARCFORGE_ROOT`, so the fallback is a harmless no-op):
 
 ```bash
-node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <epic-id> --project-setup
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+if [ ! -d "$ARCFORGE_ROOT" ]; then
+  echo "ERROR: ARCFORGE_ROOT=$ARCFORGE_ROOT does not exist. Set ARCFORGE_ROOT to your arcforge checkout." >&2
+  exit 1
+fi
 ```
 
-What this does (single authoritative implementation in `${ARCFORGE_ROOT}/scripts/lib/coordinator.js`):
+### add
 
-- Derives the canonical worktree path via `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`
-  (`~/.arcforge/worktrees/<project>-<hash>-<epic>/`).
-- Runs `git worktree add <path> -b <epic-id>`.
-- Writes the `.arcforge-epic` marker with base worktree + base branch.
-- Auto-detects the project installer (`package.json` → `npm install`,
-  `pyproject.toml` → `pip install -e .`, `Cargo.toml` → `cargo build`,
-  `go.mod` → `go mod download`) when `--project-setup` is passed.
-- Updates `dag.yaml` epic status and worktree field.
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
+```
 
-### Step 3: Read the returned path
+The command prints JSON. Read the `path` field for the worktree location — do
+not reconstruct it from pattern knowledge, and do not hardcode it.
 
-The command prints JSON. Read the `path` field — do not reconstruct it from
-pattern knowledge, and do not hardcode it in subsequent messages.
+Conventions:
+- Branch defaults to `<name>`. An existing branch is checked out as-is.
+- A missing branch is created from `--from` (default: base HEAD).
+- `--setup` auto-detects and runs the project installer in the new worktree.
 
-### Step 4: Report to the user
+### list
 
-Use the completion format below, filling the absolute path from the command
-output.
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
+```
+
+The generic status surface. Each entry is annotated `kind`:
+`base` | `epic` | `generic` | `external`. (Use this, not `status --json` —
+`status` is the epic-tier surface.)
+
+### switch
+
+There is no `switch` subcommand. To move into a worktree, `cd` to the `path`
+field from the `add` or `list` JSON.
+
+### remove
+
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove <name> [--force]
+```
+
+A dirty worktree refuses removal without `--force`. A worktree carrying an
+`.arcforge-epic` marker is refused outright and redirected to the coordinator —
+that one is epic-tier state, not yours to remove here.
+
+## Composition Tier (epic context)
+
+When the work matches an epic id in `specs/<spec-id>/dag.yaml`, do **not** use
+the generic tier. Escalate to the coordinator with one command:
+
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <id> --project-setup
+```
+
+The branch is `<spec-id>/<epic-id>` (engine-derived — do not pass `-b`). Read
+the absolute `path` from the JSON output. The full epic lifecycle is owned by
+`arc-coordinating`; this skill only points you there.
+
+## Finishing (both tiers)
+
+- `.arcforge-epic` present → `/arc-finishing-epic` (coordinator integrates;
+  arc-guard enforces).
+- Absent → `/arc-finishing` (4-option gate). Its cleanup step removes the
+  generic worktree via `node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove <name>`.
 
 ## Red Flags
 
 Stop immediately if you catch yourself thinking:
 
-1. **"I'll just `git worktree add` it directly"** — NO. Bypasses the
-   `.arcforge-epic` marker and dag.yaml update that `arc-coordinating sync`
-   depends on, producing silently broken state.
+1. **"I'll just `git worktree add` it directly"** — NO. The CLI derives the
+   canonical path; raw git loses list/remove/finish coherence, and in epic
+   context it breaks the `.arcforge-epic` marker + dag.yaml update that the
+   coordinator depends on.
 2. **"I'll put it somewhere convenient like `./worktrees/`"** — NO. The
    canonical path is derived at runtime; putting it elsewhere makes every
    downstream tool fail to find it.
-3. **"I'll hardcode `~/.arcforge/worktrees/...` in my output"** — NO. Read
-   the `path` field from the CLI's JSON output.
-4. **"I'll skip the dag.yaml check"** — NO. If the epic is not in the DAG,
-   `arcforge expand` will refuse and that refusal is correct.
-5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a
-   real problem, not a prompt to bypass the mechanism. Report blocked.
+3. **"I'll hardcode the worktree path in my output"** — NO. Read the `path`
+   field from the CLI's JSON output.
+4. **"It's epic work but `expand` refused"** — NO. The refusal is correct
+   (epic not in DAG, dependencies incomplete). Report blocked; do not drop to
+   the generic tier to route around it.
+5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a real
+   problem, not a prompt to bypass the mechanism. Report blocked and stop.
 
 ## Stage Completion Format
 
 ```
 ─────────────────────────────────────────────────
-✅ Worktree created for <epic-id>
+✅ Worktree ready: <name>
 
-Path: <absolute path from arcforge expand JSON>
-Branch: <epic-id>
-Tracking: .arcforge-epic
+Path: <absolute path from CLI JSON>
+Branch: <branch from CLI JSON>
+Kind: <generic | epic>
 
-Next: cd to the path, then use `/arc-finishing-epic` when work is complete
+Next: cd to the path, then /arc-finishing (generic) or /arc-finishing-epic (epic) when work is complete
 ─────────────────────────────────────────────────
 ```
 
@@ -85,15 +134,14 @@ Next: cd to the path, then use `/arc-finishing-epic` when work is complete
 
 ```
 ─────────────────────────────────────────────────
-⚠️ Worktree creation blocked
+⚠️ Worktree operation blocked
 
-Epic: <epic-id>
-Reason: <stderr from arcforge expand>
+Target: <name or epic id>
+Reason: <exact stderr from the CLI>
 
 Common causes:
-- Epic not in dag.yaml
-- Epic not ready (dependencies incomplete)
-- Git worktree add failed (uncommitted changes, branch conflict)
+- Generic: name already exists, dirty tree without --force, branch conflict
+- Epic: epic not in dag.yaml, dependencies incomplete, marker'd tree (use the coordinator)
 
 Report the exact CLI error and stop.
 ─────────────────────────────────────────────────
@@ -101,6 +149,6 @@ Report the exact CLI error and stop.
 
 ## Related Skills
 
-- **Called by:** `arc-coordinating` (when a single epic needs expansion), `arc-agent-driven`, `arc-executing-tasks`
-- **After this skill:** Work in the created worktree, then `/arc-finishing-epic` to integrate
-- **Alternative:** `arc-coordinating expand` (batch mode — all ready epics at once, no `--epic` flag)
+- **Called by:** `arc-coordinating` (single-epic expansion), `arc-agent-driven`, `arc-executing-tasks`
+- **Composition tier:** `arc-coordinating` (full epic lifecycle)
+- **After this skill:** Work in the created worktree, then `/arc-finishing` (generic) or `/arc-finishing-epic` (epic) to integrate
