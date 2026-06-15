@@ -9,6 +9,7 @@
 
 const { Coordinator, syncAllSpecs, rebootAllSpecs } = require('../lib/coordinator');
 const { getWorktreePath } = require('../lib/worktree-paths');
+const { parseVerifyCommand } = require('../lib/loop-verify');
 const { output } = require('./shared');
 const {
   resolveSpecId,
@@ -92,10 +93,12 @@ function runExpand(args, { projectRoot, asJson, specFlag }) {
   const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'expand');
   const coord = new Coordinator(projectRoot, resolved);
   const verifyCmd = args.options['verify-cmd'];
+  // Tokenize as a proper argv carrier (quote-aware, no shell) — never split(' ').
+  // A command needing shell features is rejected by parseVerifyCommand (security.md).
   const created = coord.expandWorktrees({
     epicId: args.options.epic,
     verify: args.flags.verify,
-    verifyCommand: verifyCmd ? verifyCmd.split(' ') : undefined,
+    verifyCommand: verifyCmd ? parseVerifyCommand(verifyCmd) : undefined,
     projectSetup: args.flags['project-setup'] || false,
   });
   output(
@@ -214,6 +217,19 @@ function runLoop(args, { projectRoot, specFlag }) {
     process.exit(1);
   }
 
+  // --verify-cmd: deterministic acceptance floor run after each session exits 0,
+  // before the task completes. Tokenized as an argv array (no shell); a command
+  // needing shell features exits with the security.md error.
+  let verifyCommand = null;
+  if (args.options['verify-cmd']) {
+    try {
+      verifyCommand = parseVerifyCommand(args.options['verify-cmd']);
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
   // --reset archives any existing state file before this run starts, so the
   // loop begins from a clean state. Deliberate pre-run action — never mid-run.
   if (args.flags.reset) {
@@ -237,6 +253,7 @@ function runLoop(args, { projectRoot, specFlag }) {
     taskTimeoutMs: taskTimeout ? taskTimeout * 1000 : null,
     permissionMode: args.options['permission-mode'] || null,
     allowedTools: args.options['allowed-tools'] || null,
+    verifyCommand,
   };
   if (pattern === 'dag') {
     runDag(loopOptions);

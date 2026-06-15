@@ -29,6 +29,7 @@ const {
 } = require('./lib/loop-state');
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
 const { warnIfBaseBranch, selectRoundEpics, runDagRound } = require('./lib/loop-dag');
+const { parseVerifyCommand, runVerify, recordVerifyResult } = require('./lib/loop-verify');
 const { Feature } = require('./lib/models');
 const {
   detectPackageManager,
@@ -59,6 +60,7 @@ function parseLoopArgs(args) {
     taskTimeoutMs: null,
     permissionMode: null,
     allowedTools: null,
+    verifyCommand: null,
     projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   };
 
@@ -113,6 +115,14 @@ function parseLoopArgs(args) {
       case '--allowed-tools':
         options.allowedTools = args[++i];
         break;
+      case '--verify-cmd':
+        try {
+          options.verifyCommand = parseVerifyCommand(args[++i]);
+        } catch (err) {
+          console.error(`Error: ${err.message}`);
+          process.exit(1);
+        }
+        break;
       case '--help':
       case '-h':
         printLoopHelp();
@@ -148,6 +158,8 @@ OPTIONS:
   --task-timeout N           Per-session timeout in seconds (default: 600)
   --permission-mode <mode>   Pass --permission-mode through to spawned claude sessions
   --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
+  --verify-cmd "<cmd>"       Run this command after each session exits 0; a
+                             non-zero exit fails the task (retry/block, no complete)
   --help, -h                 Show this help
 
 PATTERNS:
@@ -341,6 +353,33 @@ function buildTaskPrompt(task, coord, projectRoot, workspaceRoot) {
 }
 
 /**
+ * Run the deterministic acceptance floor for a task whose session exited 0.
+ * When no --verify-cmd is configured this is a no-op returning true, so the
+ * loop's behavior is byte-identical to today's. With a verify command it runs
+ * it as an argv array (no shell) in `cwd`, persists the result for AF-9, and
+ * returns whether it passed — a non-zero verify exit means the task did NOT
+ * actually pass and must route to retry/block, not completeTask.
+ * @param {Object} task - Task whose session just succeeded
+ * @param {Object} state - Loop state (verify result persisted here)
+ * @param {Object} options - Loop options (verifyCommand, taskTimeoutMs)
+ * @param {string} cwd - Working directory to run verify in
+ * @param {number} attempt - Attempt number (for error recording)
+ * @returns {boolean} Whether verification passed (or was not configured)
+ */
+function runVerifyFloor(task, state, options, cwd, attempt) {
+  if (!options.verifyCommand) return true;
+  console.log(`[loop] Verifying ${task.id}: ${options.verifyCommand.join(' ')}`);
+  const result = runVerify(options.verifyCommand, cwd, { timeoutMs: options.taskTimeoutMs });
+  recordVerifyResult(state, task.id, result);
+  if (result.exitCode !== 0) {
+    console.log(`[loop] Verify failed for ${task.id} (exit ${result.exitCode})`);
+    recordError(state, task.id, `verify-cmd failed: ${result.stderr || result.stdout}`, attempt);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Run a single task iteration
  * @param {Object} task - Task from coordinator
  * @param {Coordinator} coord - Coordinator instance
@@ -356,17 +395,21 @@ function runTask(task, coord, state, options) {
   const prompt = buildTaskPrompt(task, coord, projectRoot);
   let result = spawnSession(prompt, projectRoot, options);
   state.total_cost += result.costUsd;
+  // An attempt only succeeds when the session exits 0 AND the acceptance floor
+  // passes — a clean exit with a failing verify must still route to retry.
+  let attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, options, projectRoot, 1);
 
-  if (result.exitCode !== 0) {
+  if (!attemptOk) {
     console.log(`[loop] Task ${task.id} failed, retrying once...`);
-    recordError(state, task.id, result.stderr, 1);
+    if (result.exitCode !== 0) recordError(state, task.id, result.stderr, 1);
 
     // Retry once
     result = spawnSession(prompt, projectRoot, options);
     state.total_cost += result.costUsd;
-    if (result.exitCode !== 0) {
+    attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, options, projectRoot, 2);
+    if (!attemptOk) {
       console.log(`[loop] Task ${task.id} failed after retry — blocking`);
-      recordError(state, task.id, result.stderr, 2);
+      if (result.exitCode !== 0) recordError(state, task.id, result.stderr, 2);
       state.failed_tasks.push(task.id);
 
       try {
