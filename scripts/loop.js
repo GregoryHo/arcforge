@@ -23,6 +23,12 @@ const { spawnSession, spawnSessionAsync } = require('./lib/loop-session');
 const { loadLoopState, saveLoopState, recordError, finalizeLoop } = require('./lib/loop-state');
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
 const { Feature } = require('./lib/models');
+const {
+  detectPackageManager,
+  getDefaultTestCommand,
+  getPmRunCommand,
+  hasScript,
+} = require('./lib/package-manager');
 const { getTimestamp, readFileSafe } = require('./lib/utils');
 
 const MAX_RETRIES = 1;
@@ -38,6 +44,9 @@ function parseLoopArgs(args) {
     maxRuns: 50,
     maxCost: null,
     epic: null,
+    taskTimeoutMs: null,
+    permissionMode: null,
+    allowedTools: null,
     projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   };
 
@@ -66,6 +75,21 @@ function parseLoopArgs(args) {
         break;
       case '--epic':
         options.epic = args[++i];
+        break;
+      case '--task-timeout': {
+        const seconds = parseInt(args[++i], 10);
+        if (Number.isNaN(seconds) || seconds < 1) {
+          console.error('Error: --task-timeout must be a positive integer (seconds)');
+          process.exit(1);
+        }
+        options.taskTimeoutMs = seconds * 1000;
+        break;
+      }
+      case '--permission-mode':
+        options.permissionMode = args[++i];
+        break;
+      case '--allowed-tools':
+        options.allowedTools = args[++i];
         break;
       case '--help':
       case '-h':
@@ -97,6 +121,9 @@ OPTIONS:
   --max-runs N               Maximum iterations (default: 50)
   --max-cost N               Maximum cost in dollars (default: unlimited)
   --epic <id>                Scope loop to a single epic (safe for parallel loops)
+  --task-timeout N           Per-session timeout in seconds (default: 600)
+  --permission-mode <mode>   Pass --permission-mode through to spawned claude sessions
+  --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
   --help, -h                 Show this help
 
 PATTERNS:
@@ -150,6 +177,80 @@ function resolveEpicScope(epic, projectRoot) {
 }
 
 /**
+ * Resolve an epic's spec_path to a spawn-cwd-relative path.
+ * Resolution order: spec-dir-relative (`specs/<specId>/<spec_path>`, the
+ * sdd-v2 planner convention) first, then project-root-relative. Only paths
+ * that exist on disk are emitted — a path the spawned session cannot
+ * resolve from its cwd is worse than no path at all.
+ * @param {string} specPath - Raw spec_path value from dag.yaml
+ * @param {string} projectRoot - Spawn cwd for loop sessions
+ * @param {string|null} specId - Spec id for spec-dir-relative resolution
+ * @returns {string|null} Spawn-cwd-relative path, or null when unresolvable
+ */
+function resolveSpecPath(specPath, projectRoot, specId) {
+  if (!specPath || typeof specPath !== 'string') return null;
+  const candidates = [];
+  if (specId) {
+    candidates.push(path.resolve(projectRoot, 'specs', specId, specPath));
+  }
+  candidates.push(path.resolve(projectRoot, specPath));
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return path.relative(projectRoot, candidate);
+  }
+  return null;
+}
+
+/**
+ * Build the `## Specs` lines for a task's epic.
+ * Emits the epic's spec document and the spec epic directory when they
+ * exist on disk; legacy dags without spec_path gracefully omit both.
+ * @param {Object|null} epic - Epic carrying spec_path (null → no lines)
+ * @param {Coordinator} coord - Coordinator instance (provides specId)
+ * @param {string} projectRoot - Spawn cwd for loop sessions
+ * @returns {string[]} Lines for the Specs section (may be empty)
+ */
+function buildSpecLines(epic, coord, projectRoot) {
+  if (!epic) return [];
+  const lines = [];
+  const specId = coord.specId || null;
+  const specDoc = resolveSpecPath(epic.spec_path, projectRoot, specId);
+  if (specDoc) {
+    lines.push(`Spec: ${specDoc}`);
+  }
+  if (specId) {
+    const epicDir = path.join('specs', specId, 'epics', epic.id);
+    if (fs.existsSync(path.join(projectRoot, epicDir))) {
+      lines.push(`Epic docs: ${epicDir}${path.sep}`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * Build verification instructions from detected project commands.
+ * Returns [] when the project type is unknown (no package.json or
+ * pyproject.toml) — the verification block is omitted rather than
+ * prescribing commands that don't exist.
+ * @param {string} projectRoot - Project root directory
+ * @returns {string[]} Ordered instruction lines (numbering added by caller)
+ */
+function buildVerificationLines(projectRoot) {
+  let testCommand;
+  try {
+    testCommand = getDefaultTestCommand(projectRoot).join(' ');
+  } catch {
+    return [];
+  }
+  const lines = [`Run \`${testCommand}\` and verify all tests pass`];
+  if (hasScript('lint', projectRoot)) {
+    const pmName = detectPackageManager(projectRoot) || 'npm';
+    lines.push(`Run \`${getPmRunCommand('lint', pmName).join(' ')}\` and fix any issues`);
+  }
+  lines.push('Commit with format: type(scope): description');
+  return lines;
+}
+
+/**
  * Build a task context prompt for a spawned Claude session.
  * Uses coordinator.taskContext() for enriched task data.
  * @param {Object} task - Task from coordinator
@@ -161,10 +262,13 @@ function buildTaskPrompt(task, coord, projectRoot) {
   const taskType = task instanceof Feature ? 'feature' : 'epic';
   const parts = [`# Task: ${task.name}`, ``, `## Task ID: ${task.id}`, `## Type: ${taskType}`];
 
-  // Enrich with coordinator context (dependencies, parent epic, siblings)
+  // Enrich with coordinator context (dependencies, parent epic, siblings).
+  // The epic resolved here also carries spec_path for the Specs section.
+  let specEpic = taskType === 'epic' ? task : null;
   try {
     const ctx = coord.taskContext(task.id);
     if (ctx.parent_epic) {
+      if (!specEpic) specEpic = coord.dag.getTask(ctx.parent_epic.id);
       parts.push(
         `## Parent Epic: ${ctx.parent_epic.name} (${Math.round(ctx.parent_epic.progress)}% complete)`,
       );
@@ -191,19 +295,17 @@ function buildTaskPrompt(task, coord, projectRoot) {
     `Commit your changes with a conventional commit message.`,
     ``,
     `## Project Root: ${projectRoot}`,
-    ``,
-    `## Verification`,
-    ``,
-    `After implementation:`,
-    `1. Run \`npm test\` and verify all tests pass`,
-    `2. Run \`npm run lint\` and fix any issues`,
-    `3. Commit with format: type(scope): description`,
   );
 
-  // Try to read the epic/feature spec if available
-  const epicDir = path.join(projectRoot, 'epics');
-  if (fs.existsSync(epicDir)) {
-    parts.push(``, `## Specs`, `Read specs from: ${epicDir}`);
+  const verification = buildVerificationLines(projectRoot);
+  if (verification.length > 0) {
+    parts.push(``, `## Verification`, ``, `After implementation:`);
+    parts.push(...verification.map((line, idx) => `${idx + 1}. ${line}`));
+  }
+
+  const specLines = buildSpecLines(specEpic, coord, projectRoot);
+  if (specLines.length > 0) {
+    parts.push(``, `## Specs`, ...specLines);
   }
 
   return parts.join('\n');
@@ -214,15 +316,16 @@ function buildTaskPrompt(task, coord, projectRoot) {
  * @param {Object} task - Task from coordinator
  * @param {Coordinator} coord - Coordinator instance
  * @param {Object} state - Loop state
- * @param {string} projectRoot - Project root directory
+ * @param {Object} options - Loop options (projectRoot + spawn pass-through)
  * @returns {boolean} Whether the task succeeded
  */
-function runTask(task, coord, state, projectRoot) {
+function runTask(task, coord, state, options) {
+  const { projectRoot } = options;
   const taskType = task instanceof Feature ? 'feature' : 'epic';
   console.log(`[loop] Iteration ${state.iteration}: Running ${taskType} ${task.id} — ${task.name}`);
 
   const prompt = buildTaskPrompt(task, coord, projectRoot);
-  let result = spawnSession(prompt, projectRoot);
+  let result = spawnSession(prompt, projectRoot, options);
   state.total_cost += result.costUsd;
 
   if (result.exitCode !== 0) {
@@ -230,7 +333,7 @@ function runTask(task, coord, state, projectRoot) {
     recordError(state, task.id, result.stderr, 1);
 
     // Retry once
-    result = spawnSession(prompt, projectRoot);
+    result = spawnSession(prompt, projectRoot, options);
     state.total_cost += result.costUsd;
     if (result.exitCode !== 0) {
       console.log(`[loop] Task ${task.id} failed after retry — blocking`);
@@ -318,7 +421,7 @@ function runSequential(options) {
       break;
     }
 
-    const success = runTask(task, coord, state, projectRoot);
+    const success = runTask(task, coord, state, options);
     saveLoopState(state, projectRoot);
 
     if (!success) {
@@ -368,7 +471,7 @@ async function runDag(options) {
         prompt: buildTaskPrompt(epicItem, coord, projectRoot),
       }));
       const spawnResults = await Promise.all(
-        taskEntries.map((entry) => spawnSessionAsync(entry.prompt, projectRoot)),
+        taskEntries.map((entry) => spawnSessionAsync(entry.prompt, projectRoot, options)),
       );
 
       // Process results sequentially (state + DAG updates are not concurrent-safe)
@@ -417,7 +520,7 @@ async function runDag(options) {
       break;
     }
 
-    const success = runTask(task, coord, state, projectRoot);
+    const success = runTask(task, coord, state, options);
     saveLoopState(state, projectRoot);
 
     if (!success) {

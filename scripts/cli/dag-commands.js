@@ -191,8 +191,26 @@ function runLoop(args, { projectRoot, specFlag }) {
     process.exit(1);
   }
 
+  const taskTimeout = args.options['task-timeout']
+    ? parseInt(args.options['task-timeout'], 10)
+    : null;
+  if (args.options['task-timeout'] && (Number.isNaN(taskTimeout) || taskTimeout < 1)) {
+    console.error('Error: --task-timeout must be a positive integer (seconds)');
+    process.exit(1);
+  }
+
   const epic = args.options.epic || null;
-  const loopOptions = { pattern, maxRuns, maxCost, epic, projectRoot, specId: resolved };
+  const loopOptions = {
+    pattern,
+    maxRuns,
+    maxCost,
+    epic,
+    projectRoot,
+    specId: resolved,
+    taskTimeoutMs: taskTimeout ? taskTimeout * 1000 : null,
+    permissionMode: args.options['permission-mode'] || null,
+    allowedTools: args.options['allowed-tools'] || null,
+  };
   if (pattern === 'dag') {
     runDag(loopOptions);
   } else {
