@@ -109,6 +109,98 @@ describe('quality-check: checkConsoleLogs', () => {
   });
 });
 
+describe('quality-check: collectFindings buckets by audience (RV-3)', () => {
+  const originalEnv = { ...process.env };
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-quality-buckets-'));
+    delete require.cache[require.resolve('../quality-check/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('routes console.* findings to the model channel, never systemMessage', () => {
+    const { collectFindings } = require('../quality-check/main');
+    const file = path.join(testDir, 'app.js');
+    fs.writeFileSync(file, 'console.log("debug");\n');
+    // No prettier/typescript devDeps in the temp dir → no Formatted notice.
+    const { modelReason, systemMessage } = collectFindings(file, file, testDir);
+    assert.ok(modelReason?.includes('console.* found'), 'console finding → model');
+    assert.ok(modelReason.includes('Line 1'), 'cites the line');
+    assert.strictEqual(systemMessage, null, '`Formatted:` must never leak into systemMessage');
+  });
+
+  it('returns no findings for a clean file', () => {
+    const { collectFindings } = require('../quality-check/main');
+    const file = path.join(testDir, 'clean.js');
+    fs.writeFileSync(file, 'const x = 1;\n');
+    assert.deepStrictEqual(collectFindings(file, file, testDir), {
+      modelReason: null,
+      systemMessage: null,
+    });
+  });
+});
+
+describe('quality-check: main() channel routing (RV-3 e2e)', () => {
+  const { spawnSync } = require('node:child_process');
+  const script = path.join(__dirname, '..', 'quality-check', 'main.js');
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-quality-e2e-'));
+  });
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function run(filePath) {
+    const input = {
+      cwd: testDir,
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Write',
+      tool_input: { file_path: filePath },
+    };
+    return spawnSync('node', [script], {
+      input: JSON.stringify(input),
+      encoding: 'utf-8',
+      timeout: 15000,
+    });
+  }
+
+  it('emits exactly one JSON object carrying findings in the model channel', () => {
+    const file = path.join(testDir, 'app.js');
+    fs.writeFileSync(file, 'const x = 1;\nconsole.log("oops");\n');
+    const r = run(file);
+    const out = (r.stdout || '').trim();
+    assert.ok(out, 'should produce stdout for a console.log finding');
+    // Exactly one JSON object — a parse of the whole trimmed stdout must succeed.
+    const parsed = JSON.parse(out);
+    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
+    assert.ok(
+      parsed.hookSpecificOutput.additionalContext.includes('console.* found'),
+      'finding must reach the model via additionalContext',
+    );
+    assert.ok(
+      !('systemMessage' in parsed),
+      'no Formatted notice (no prettier devDep) → no systemMessage key',
+    );
+  });
+
+  it('stays silent for a clean file (no output, exit 0)', () => {
+    const file = path.join(testDir, 'clean.js');
+    fs.writeFileSync(file, 'const x = 1;\n');
+    const r = run(file);
+    assert.strictEqual((r.stdout || '').trim(), '', 'clean file → no output');
+    assert.strictEqual(r.status, 0, 'exit 0');
+  });
+});
+
 describe('quality-check: hooks.json registration', () => {
   const hooksJsonPath = path.join(__dirname, '..', 'hooks.json');
 
