@@ -12,6 +12,18 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "export ARCFORGE_ROOT=\"${PLUGIN_ROOT}\"" >> "$CLAUDE_ENV_FILE"
 fi
 
+# Attended-mode opt-in: when the project carries an .arcforge-attended marker,
+# export ARCFORGE_MODE=attended so the refiner's attended draft-then-ratify path
+# and `arcforge ratify` are reachable for a human at the terminal. The marker is
+# the ONLY opt-in mechanism — a deliberate, per-project file the human drops in;
+# sessions the loop spawns never inherit it (the loop scrubs ARCFORGE_MODE from
+# spawn env — see docs/guide/sdd-pipeline.md). CLAUDE_PROJECT_DIR is provided to
+# every hook; if it is unset we simply do not opt in (we never parse stdin here).
+if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -n "${CLAUDE_PROJECT_DIR:-}" ] &&
+  [ -f "${CLAUDE_PROJECT_DIR}/.arcforge-attended" ]; then
+  echo "export ARCFORGE_MODE=attended" >> "$CLAUDE_ENV_FILE"
+fi
+
 # Escape outputs for JSON using pure bash
 escape_for_json() {
     local s="$1"

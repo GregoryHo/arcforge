@@ -288,6 +288,8 @@ The refiner reads `ARCFORGE_MODE` from the environment (set by the calling envir
 
 The refiner NEVER mints an `accepted` entry itself and NEVER authors the concrete MUST without a pre-existing ratified entry. The attended deferral clause (fr-rf-013) is a scoped addition to the unattended path: the unattended behavior is unchanged; the attended path adds a draft-then-ratify exit rather than unconditionally leaving the axis unbound or blocking.
 
+For how attended mode is opted into, how the human resolves and runs `arcforge ratify` under a plugin install, and where draft-then-ratify sits in the end-to-end pipeline, see `${ARCFORGE_ROOT}/docs/guide/sdd-pipeline.md`.
+
 ### Version Increment (when prior spec exists)
 
 - `spec_version` = previous version + 1
