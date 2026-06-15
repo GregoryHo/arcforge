@@ -270,6 +270,13 @@ const CLI_MANIFEST = {
     flags: [],
     output: null,
   },
+  // Stages need spec fixtures + a draft on stdin to exercise; a deterministic
+  // full-key-set live --json belongs to SRH-3's fixture charter, so output is
+  // deliberately not pinned here (see the null criterion in the header).
+  'sdd-gate': {
+    flags: ['--spec-id', '--design', '--decision-log', '--draft'],
+    output: null,
+  },
 };
 
 module.exports = { CLI_MANIFEST };
