@@ -72,7 +72,7 @@ Based on feedback:
 
 ### Step 6: Finish
 
-After all tasks: use arc-finishing (or arc-finishing-epic for epic worktrees)
+After all tasks: use arc-finishing (Step 0 discriminates on `.arcforge-epic`)
 
 ## Core Rules
 
@@ -168,7 +168,7 @@ Actual: PASSED ✓
 
 - **Required:** arc-using-worktrees (set up isolated workspace before starting)
 - **Alternative:** arc-agent-driven (automated mode)
-- **After:** arc-finishing (or arc-finishing-epic for epic worktrees)
+- **After:** arc-finishing (Step 0 discriminates on `.arcforge-epic`)
 
 ## Red Flags - STOP
 

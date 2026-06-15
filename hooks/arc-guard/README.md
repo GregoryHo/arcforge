@@ -10,7 +10,7 @@ otherwise; it denies via `permissionDecision: 'deny'`.
 
 | Rule | Tool | Gate (signal) | Trigger → redirect |
 |------|------|---------------|--------------------|
-| G2 | Bash | `.arcforge-epic` in cwd | raw `git merge` → arc-finishing-epic flow (`finish-epic.js merge`/`sync`) |
+| G2 | Bash | `.arcforge-epic` in cwd | raw `git merge` → arc-finishing flow, epic path (`finish-epic.js merge`/`sync`) |
 | G3 | Bash | `.arcforge-epic` in cwd | arcforge loop invocation → run it from the base session (`arc-looping`) |
 | R-immutable | Edit/Write | `research-config.md` in cwd | editing the locked contract → it's the immutable judge (names the human-approved unlock escape) |
 | R-scope | Edit/Write | `research-config.md` in cwd | editing a CANNOT-modify path → out-of-scope write |

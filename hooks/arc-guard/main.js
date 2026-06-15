@@ -8,7 +8,7 @@
  * (users disable arcforge hooks wholesale), so every rule is narrow.
  *
  * Bash rules — gated by the `.arcforge-epic` marker in cwd (i.e. inside a worktree):
- *   G2  raw `git merge`        -> redirect to the arc-finishing-epic coordinator flow
+ *   G2  raw `git merge`        -> redirect to the arc-finishing coordinator flow (epic path)
  *   G3  arcforge loop launch   -> loops run from the base session, not a worktree
  *
  * Edit/Write rules — gated by `research-config.md` in cwd (i.e. an arc-researching
@@ -37,7 +37,7 @@ const { hasArcforgeMarker, readArcforgeMarker } = require('../../scripts/lib/mar
 // `git merge` that INITIATES a merge. Excludes `git merge-base`/`-file` (lookahead:
 // next char is whitespace or end) AND conflict-recovery (`--abort`/`--continue`/
 // `--quit`) — those are exactly what a worktree implementer runs during the
-// arc-finishing-epic conflict flow, so blocking them would misdirect.
+// arc-finishing conflict flow (epic path), so blocking them would misdirect.
 const GIT_MERGE_RE = /\bgit\s+merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
 // Arcforge loop INVOCATIONS only — not reading/diffing a file named loop.js.
 // Matches arcforge's own loop invocation (scripts/loop.js, `cli.js loop`,
@@ -59,7 +59,7 @@ function denyReason(command, specId) {
     return (
       `You're inside an arcforge epic worktree${scope} (an .arcforge-epic marker is present). ` +
       "Raw `git merge` here bypasses the coordinator's DAG and marker bookkeeping. " +
-      'Use the arc-finishing-epic flow instead: `finish-epic.js merge` to merge the epic out, ' +
+      'Use the arc-finishing flow instead (its epic path): `finish-epic.js merge` to merge the epic out, ' +
       'or `finish-epic.js sync --direction from-base` to pull base in. ' +
       'A genuine manual merge belongs in the base checkout, not the worktree.'
     );

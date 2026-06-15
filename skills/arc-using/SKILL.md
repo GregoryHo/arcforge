@@ -42,14 +42,15 @@ SDD pipeline v2 uses per-spec layout:
 
 ## Worktree Rule
 
-ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<epic>/`, computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` and managed by `coordinator.js`.
+ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`, computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`. Two tiers exist: **epic worktrees** carry an `.arcforge-epic` marker and are coordinator-managed; **generic worktrees** (experiments, hotfixes, review checkouts) carry no marker.
 
 When touching worktrees:
 
 - Don't hardcode paths in output. Use abstract language like "the worktree" or fill paths from CLI output.
-- Don't create worktrees manually. Delegate to `arc-coordinating expand` or `arc-using-worktrees` so marker schema and DAG sync stay valid.
-- Enter worktrees via `arcforge status --json`; do not reconstruct paths from memory.
-- Use direct file-editing tools only where `.arcforge-epic` lives. Base sessions coordinate; worktree sessions implement.
+- Don't create worktrees manually. For epic work, delegate to `arc-coordinating expand`; for everything else, delegate to `arc-using-worktrees` — so marker schema and DAG sync stay valid.
+- Re-entering an **epic** worktree: read its absolute `.path` from `arcforge status --json` (the epic-tier surface); do not reconstruct paths from memory.
+- Locating a **generic** worktree: read its `path` from `arcforge worktree list --json` (the generic surface) — never `status --json`, which only knows epic worktrees.
+- Direct file-editing belongs in a worktree; base sessions coordinate, worktree sessions implement. The `.arcforge-epic` marker distinguishes an epic worktree from a generic one.
 
 For derivation rules, marker schema, and cleanup semantics, see `docs/guide/worktree-workflow.md`.
 
@@ -101,7 +102,8 @@ When two skills cover the same step, pick by the concrete condition:
 |----------|------|
 | Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + two-stage review) |
 | Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-epic via DAG, lead present) |
-| Finish work | `arc-finishing-epic` when `.arcforge-epic` exists in the worktree, else `arc-finishing` |
+| Set up an isolated workspace | `arc-coordinating expand` for epic work (DAG-tracked, marker'd); `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo, no DAG) |
+| Finish work | `arc-finishing` (Step 0 discriminates on `.arcforge-epic`: epic path = coordinator merge; non-epic path = 4-option gate) |
 
 Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.
 

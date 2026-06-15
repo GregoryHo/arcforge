@@ -148,8 +148,10 @@ def test_arc_dispatching_teammates_references_related_skills():
     # Must reference arc-implementing as what each teammate runs
     assert "arc-implementing" in text
 
-    # Must reference arc-finishing-epic as the teammate wrap-up
-    assert "arc-finishing-epic" in text
+    # Must reference arc-finishing as the teammate wrap-up (WT-6 merged the
+    # finishing twins; Step 0 of arc-finishing selects the epic path).
+    assert "arc-finishing" in text
+    assert "arc-finishing-epic" not in text
 
 
 def test_arc_dispatching_teammates_is_single_spec_in_phase_1():

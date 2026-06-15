@@ -72,7 +72,7 @@ Minor: Magic number for reporting interval
 When reviewer feedback arrives:
 1. Use `arc-receiving-review` to process feedback with technical rigor
 2. After all feedback addressed → re-review until approved
-3. Once approved → `arc-verifying` → `arc-finishing` / `arc-finishing-epic`
+3. Once approved → `arc-verifying` → `arc-finishing` (Step 0 discriminates on `.arcforge-epic`)
 
 ## Integration
 

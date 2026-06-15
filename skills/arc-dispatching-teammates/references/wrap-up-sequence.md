@@ -130,7 +130,7 @@ Per Agent Teams docs, graceful shutdown:
 > teammate can approve, exiting gracefully, or reject with an
 > explanation."
 
-In practice, a teammate that finished its epic and ran `arc-finishing-epic`
+In practice, a teammate that finished its epic and ran `arc-finishing`
 is already idle and will approve shutdown immediately. Iterate over
 the team members; shut down each one.
 

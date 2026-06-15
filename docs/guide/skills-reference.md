@@ -9,7 +9,7 @@ This is the offline reference for all 33 arcforge skills. In a live session, **`
 - [Complete Skill Catalog](#complete-skill-catalog)
   - Planning: [arc-brainstorming](#arc-brainstorming) · [arc-refining](#arc-refining) · [arc-writing-tasks](#arc-writing-tasks) · [arc-planning](#arc-planning)
   - Execution: [arc-executing-tasks](#arc-executing-tasks) · [arc-agent-driven](#arc-agent-driven) · [arc-implementing](#arc-implementing) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping)
-  - Coordination: [arc-using](#arc-using) · [arc-using-worktrees](#arc-using-worktrees) · [arc-compacting](#arc-compacting) · [arc-coordinating](#arc-coordinating) · [arc-finishing](#arc-finishing) · [arc-finishing-epic](#arc-finishing-epic) · [arc-managing-sessions](#arc-managing-sessions)
+  - Coordination: [arc-using](#arc-using) · [arc-using-worktrees](#arc-using-worktrees) · [arc-compacting](#arc-compacting) · [arc-coordinating](#arc-coordinating) · [arc-finishing](#arc-finishing) · [arc-managing-sessions](#arc-managing-sessions)
   - Quality: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-evaluating](#arc-evaluating) · [arc-requesting-review](#arc-requesting-review) · [arc-receiving-review](#arc-receiving-review)
   - Learning: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-observing](#arc-observing) · [arc-recalling](#arc-recalling) · [arc-researching](#arc-researching)
   - Knowledge Base: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
@@ -71,7 +71,7 @@ The complete catalog still uses functional categories for lookup:
 |----------|--------|---------|
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
 | **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping | Build and ship |
-| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-finishing-epic, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
+| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
 | **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
 | **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
@@ -217,7 +217,7 @@ The complete catalog still uses functional categories for lookup:
 - Input: `docs/tasks/<name>-tasks.md`
 - Output: committed code, checkpoint reports
 
-**Related:** arc-writing-tasks --> **arc-executing-tasks** --> arc-finishing or arc-finishing-epic
+**Related:** arc-writing-tasks --> **arc-executing-tasks** --> arc-finishing
 
 ---
 
@@ -239,7 +239,7 @@ The complete catalog still uses functional categories for lookup:
 - Input: `docs/tasks/<name>-tasks.md`
 - Output: committed code per task, review reports
 
-**Related:** arc-writing-tasks --> **arc-agent-driven** --> arc-finishing or arc-finishing-epic
+**Related:** arc-writing-tasks --> **arc-agent-driven** --> arc-finishing
 
 ---
 
@@ -260,7 +260,7 @@ The complete catalog still uses functional categories for lookup:
 - Input: `specs/<spec-id>/dag.yaml`, `specs/<spec-id>/epics/<epic-name>/epic.md`, `specs/<spec-id>/epics/<epic-name>/features/*.md`
 - Output: completed code via delegated skills
 
-**Related:** arc-planning + arc-coordinating --> **arc-implementing** --> arc-finishing-epic
+**Related:** arc-planning + arc-coordinating --> **arc-implementing** --> arc-finishing (epic path)
 
 ---
 
@@ -308,7 +308,7 @@ The complete catalog still uses functional categories for lookup:
 - Output: per-epic worktrees at `~/.arcforge/worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
 - Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
 
-**Related:** arc-planning → **arc-dispatching-teammates** → (per completion: spec-reviewer + verifier subagents); each teammate runs arc-implementing → arc-finishing-epic on its own
+**Related:** arc-planning → **arc-dispatching-teammates** → (per completion: spec-reviewer + verifier subagents); each teammate runs arc-implementing → arc-finishing (epic path) on its own
 
 ---
 
@@ -332,7 +332,7 @@ The complete catalog still uses functional categories for lookup:
 - Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
-**Related:** arc-planning --> **arc-looping** --> arc-finishing or arc-finishing-epic
+**Related:** arc-planning --> **arc-looping** --> arc-finishing
 
 ---
 
@@ -430,43 +430,24 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-finishing
 
-**Purpose:** Guide completion of development work on regular branches with structured options.
+**Purpose:** Guide completion of development work with structured options. One skill, two paths — Step 0 discriminates on `.arcforge-epic`: an **epic path** (coordinator integration + DAG updates for marker'd worktrees) and a **non-epic path** (plain git for regular branches and generic worktrees).
 
-**When to use:** When implementation is complete on a regular branch (no .arcforge-epic file), all tests pass, and you need to decide how to integrate.
-
-**Key workflow:**
-1. Verify all tests pass (auto-detect test command)
-2. Determine base branch
-3. Present 4 options: merge locally, create PR, keep as-is, discard
-4. Execute chosen option
-5. Cleanup worktree for Options 1 and 4 only
-
-**Artifacts:**
-- Input: completed branch with passing tests
-- Output: merged code, PR, preserved branch, or discarded work
-
-**Related:** arc-executing-tasks or arc-agent-driven --> **arc-finishing** --> done
-
----
-
-### arc-finishing-epic
-
-**Purpose:** Guide completion of epic work in worktrees with coordinator integration and DAG updates.
-
-**When to use:** When epic implementation in a worktree is complete (.arcforge-epic file exists), all tests pass, and you need to decide how to integrate.
+**When to use:** When implementation is complete and all tests pass, and you need to decide how to integrate — whether in an epic worktree (`.arcforge-epic` present) or on a regular branch.
 
 **Key workflow:**
-1. Verify `.arcforge-epic` exists and read epic context
-2. Sync from base branch via finish-epic.js
-3. Verify all tests pass
-4. Present 4 options: merge (via coordinator), create PR, keep as-is, discard
-5. Sync DAG after Option 2 (PR) — other options handle DAG updates internally
+1. Step 0 — read `.arcforge-epic` to pick the path (epic vs non-epic)
+2. Epic path only: sync from base via finish-epic.js
+3. Verify all tests pass (auto-detect test command)
+4. Determine base branch
+5. Present 4 options: merge (epic: via coordinator; non-epic: into the base checkout), create PR, keep as-is, discard
+6. Look up the worktree path (epic: `status --json` on the base dag; non-epic: `worktree list --json`)
+7. Cleanup worktree for Options 1 and 4 only (cd to base first)
 
 **Artifacts:**
-- Input: completed epic worktree with `.arcforge-epic` and passing tests
-- Output: merged epic, PR, preserved branch, or discarded work + DAG updated
+- Input: completed branch or epic worktree with passing tests
+- Output: merged code/epic, PR, preserved branch, or discarded work (+ DAG updated on the epic path)
 
-**Related:** arc-implementing --> **arc-finishing-epic** --> arc-coordinating status
+**Related:** arc-executing-tasks / arc-agent-driven / arc-implementing --> **arc-finishing** --> done / arc-coordinating status
 
 ---
 
@@ -556,7 +537,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: any completion claim
 - Output: verified status with evidence (test output, build output, etc.)
 
-**Related:** embedded in all skills as a mindset, especially arc-finishing, arc-finishing-epic, arc-tdd
+**Related:** embedded in all skills as a mindset, especially arc-finishing, arc-tdd
 
 ---
 
@@ -879,7 +860,7 @@ arc-brainstorming --> arc-refining --> arc-planning --> arc-using-worktrees
                               arc-dispatching      arc-agent-driven
                               -parallel                 |
                                                         v
-                                                  arc-finishing-epic
+                                                  arc-finishing
 ```
 
 Full workflow for complex projects. Explore design, refine to spec, plan DAG, isolate in worktrees, coordinate parallel epics, implement with subagents.
@@ -920,13 +901,15 @@ Capture session insights in diaries, extract patterns after 5+ entries, and clus
 | **Best for** | Tasks needing judgment | Mechanical tasks with clear specs |
 | **Risk** | Slower (human bottleneck) | May diverge without oversight |
 
-### arc-finishing vs arc-finishing-epic
+### arc-finishing: epic path vs non-epic path
 
-| | arc-finishing | arc-finishing-epic |
+`arc-finishing` is one skill; Step 0 reads `.arcforge-epic` and selects the path.
+
+| | Non-epic path | Epic path |
 |---|---|---|
-| **Scope** | Regular branch | Worktree with `.arcforge-epic` |
+| **Scope** | Regular branch / generic worktree | Worktree with `.arcforge-epic` |
 | **DAG** | No DAG involvement | Updates dag.yaml status |
-| **Cleanup** | Branch only | Worktree + branch |
+| **Cleanup** | Branch + generic worktree | Worktree + branch (via coordinator) |
 | **Trigger** | No `.arcforge-epic` file | `.arcforge-epic` file exists |
 
 ### arc-brainstorming vs arc-writing-tasks

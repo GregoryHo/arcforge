@@ -16,7 +16,7 @@ Evaluate top-down; first match wins.
 
 | # | Signal | Tier / Route |
 |---|--------|--------------|
-| 1 | `.arcforge-epic` exists in cwd | Already inside an epic worktree. Never create a nested worktree. Work → `arc-implementing`; integration → `arc-finishing-epic`. Raw `git merge` here is denied by arc-guard — that refusal is correct; don't fight it. |
+| 1 | `.arcforge-epic` exists in cwd | Already inside an epic worktree. Never create a nested worktree. Work → `arc-implementing`; integration → `arc-finishing` (its Step 0 selects the epic path). Raw `git merge` here is denied by arc-guard — that refusal is correct; don't fight it. |
 | 2 | `specs/<spec-id>/dag.yaml` exists AND the work matches an epic id in it | Composition tier — escalate to the coordinator (below). |
 | 3 | `dag.yaml` exists but the work is NOT an epic (experiment, hotfix, review checkout) | Generic tier. Legitimate inside an arcforge project. |
 | 4 | No arcforge state at all | Generic tier. Full standalone value. |
@@ -92,9 +92,12 @@ the absolute `path` from the JSON output. The full epic lifecycle is owned by
 
 ## Finishing (both tiers)
 
-- `.arcforge-epic` present → `/arc-finishing-epic` (coordinator integrates;
-  arc-guard enforces).
-- Absent → `/arc-finishing` (4-option gate). Its cleanup step removes the
+Both tiers hand off to `/arc-finishing`; its Step 0 discriminates on
+`.arcforge-epic` and runs the right path:
+
+- `.arcforge-epic` present → epic path (coordinator integrates; arc-guard
+  enforces).
+- Absent → non-epic path (4-option gate). Its cleanup step removes the
   generic worktree via `node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove <name>`.
 
 ## Red Flags
@@ -126,7 +129,7 @@ Path: <absolute path from CLI JSON>
 Branch: <branch from CLI JSON>
 Kind: <generic | epic>
 
-Next: cd to the path, then /arc-finishing (generic) or /arc-finishing-epic (epic) when work is complete
+Next: cd to the path, then /arc-finishing (Step 0 discriminates on .arcforge-epic) when work is complete
 ─────────────────────────────────────────────────
 ```
 
@@ -151,4 +154,4 @@ Report the exact CLI error and stop.
 
 - **Called by:** `arc-coordinating` (single-epic expansion), `arc-agent-driven`, `arc-executing-tasks`
 - **Composition tier:** `arc-coordinating` (full epic lifecycle)
-- **After this skill:** Work in the created worktree, then `/arc-finishing` (generic) or `/arc-finishing-epic` (epic) to integrate
+- **After this skill:** Work in the created worktree, then `/arc-finishing` (Step 0 discriminates on `.arcforge-epic`) to integrate

@@ -123,7 +123,7 @@ These are the most frequently used commands:
 
 **Within each path:** TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
 
-**Finishing:** `arc-finishing-epic` for worktrees, `arc-finishing` for normal branches.
+**Finishing:** `arc-finishing` for both — its Step 0 discriminates on `.arcforge-epic` (epic worktree vs normal branch).
 
 ## Terminology
 
@@ -156,8 +156,7 @@ All 33 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
 - **arc-dispatching-teammates** - Lead-present multi-epic parallelism via agent teammates
 - **arc-looping** - Autonomous cross-session loop execution
-- **arc-finishing** - Branch completion with merge decision
-- **arc-finishing-epic** - Epic completion with merge decision (worktrees)
+- **arc-finishing** - Completion with merge decision; Step 0 discriminates epic worktree vs normal branch on `.arcforge-epic`
 
 ### Discipline Skills (quality gates)
 
