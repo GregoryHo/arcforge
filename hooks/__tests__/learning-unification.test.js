@@ -171,10 +171,10 @@ describe('inject-context loads instincts', () => {
 });
 
 // ─────────────────────────────────────────────
-// 5b. SessionStart does NOT auto-inject instincts into Claude context
+// 5b. SessionStart injection is activation-GATED, not confidence-gated (ICL-4)
 // ─────────────────────────────────────────────
 
-describe('SessionStart does not auto-inject instincts', () => {
+describe('SessionStart does not inject non-activated instincts', () => {
   let testDir;
   let projectRoot;
   const originalEnv = { ...process.env };
@@ -186,9 +186,9 @@ describe('SessionStart does not auto-inject instincts', () => {
     process.env.HOME = testDir;
     process.env.CLAUDE_PROJECT_DIR = projectRoot;
 
-    // Seed a high-confidence instinct that the retired auto-loader would have
-    // injected into Claude context. After Slice A, SessionStart must not
-    // surface it.
+    // Seed a HIGH-confidence instinct with NO ActivationRecord. Under ICL-4 the
+    // gate is the activation lifecycle, not confidence — so even a 0.9 instinct
+    // must NOT be injected unless a reviewer explicitly activated it.
     const projectName = path.basename(projectRoot);
     const instinctsDir = path.join(testDir, '.arcforge', 'instincts', projectName);
     fs.mkdirSync(instinctsDir, { recursive: true });
@@ -205,7 +205,7 @@ describe('SessionStart does not auto-inject instincts', () => {
     Object.assign(process.env, originalEnv);
   });
 
-  it('does not emit Active Behavioral Instincts header in SessionStart output', () => {
+  it('does not emit Active Behavioral Instincts header for a non-activated instinct', () => {
     const { spawnSync } = require('node:child_process');
     const hookInput = {
       session_id: 'no-autoload',
@@ -222,11 +222,11 @@ describe('SessionStart does not auto-inject instincts', () => {
     });
     assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
 
-    // The auto-loader prepended this exact header. If it ever re-appears in
-    // stdout, the auto-load behavior has regressed.
+    // Confidence alone must never inject. If this header re-appears for a
+    // non-activated instinct, the confidence-auto-load behavior has regressed.
     assert.ok(
       !result.stdout.includes('Active Behavioral Instincts'),
-      `SessionStart must not auto-inject instincts. Got stdout: ${result.stdout}`,
+      `SessionStart must not inject non-activated instincts. Got stdout: ${result.stdout}`,
     );
     assert.ok(
       !result.stdout.includes('high-conf-test'),

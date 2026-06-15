@@ -70,6 +70,7 @@ let activate;
 let deactivate;
 let defaultActivationPolicy;
 let buildActiveInstinctPath;
+let listActivatedCandidateIds;
 
 beforeEach(() => {
   jest.resetModules();
@@ -82,6 +83,7 @@ beforeEach(() => {
     deactivate,
     defaultActivationPolicy,
     buildActiveInstinctPath,
+    listActivatedCandidateIds,
   } = require('../../scripts/lib/learning-curator/activate'));
 });
 
@@ -1054,5 +1056,54 @@ describe('deactivate — reviewer_ack enforcement', () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ICL-4: listActivatedCandidateIds folds ActivationRecords (latest wins)
+// ---------------------------------------------------------------------------
+
+describe('listActivatedCandidateIds — activation gate (ICL-4)', () => {
+  it('returns empty when no activations dir exists', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    expect(listActivatedCandidateIds(arcforgeRoot).size).toBe(0);
+  });
+
+  it('includes activated candidates and excludes deactivated (latest wins)', () => {
+    const a = runMaterialize();
+    const b = runMaterialize();
+
+    // Activate both.
+    activate({
+      candidate: a.candidate,
+      materializationRecord: a.materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: a.candidate.candidate_id }),
+      activationPolicy: defaultActivationPolicy(a.arcforgeRoot),
+      arcforgeRoot: a.arcforgeRoot,
+    });
+    const actB = activate({
+      candidate: b.candidate,
+      materializationRecord: b.materializationRecord,
+      activationRequest: makeActivationRequest({ candidate_id: b.candidate.candidate_id }),
+      activationPolicy: defaultActivationPolicy(b.arcforgeRoot),
+      arcforgeRoot: b.arcforgeRoot,
+    });
+
+    // Deactivate b — its latest record must now win and exclude it.
+    deactivate({
+      candidate: { ...b.candidate, lifecycle: { status: 'activated', status_changed_at: 'x' } },
+      activationRecord: actB.record,
+      activationRequest: {
+        ...makeActivationRequest({ candidate_id: b.candidate.candidate_id }),
+        action: 'deactivate',
+        expected_candidate_status: 'activated',
+      },
+      activationPolicy: defaultActivationPolicy(b.arcforgeRoot),
+      arcforgeRoot: b.arcforgeRoot,
+    });
+
+    const set = listActivatedCandidateIds(a.arcforgeRoot);
+    expect(set.has(a.candidate.candidate_id)).toBe(true);
+    expect(set.has(b.candidate.candidate_id)).toBe(false);
   });
 });

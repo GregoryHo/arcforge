@@ -11,8 +11,10 @@ const {
   appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
+  getLearningConfigPath,
   inspectCandidate,
   isLearningEnabled,
+  isInjectActivatedInstinctsEnabled,
   listLearningInbox,
   loadCandidates,
   materializeCandidate,
@@ -90,6 +92,33 @@ describe('learning subsystem MVP-1', () => {
     });
 
     expect(isLearningEnabled({ scope: 'project', projectRoot, homeDir })).toBe(false);
+  });
+
+  describe('inject_activated_instincts kill-switch (ICL-4)', () => {
+    function writeGlobalConfig(obj) {
+      const configPath = getLearningConfigPath({ scope: 'global', homeDir });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify(obj), 'utf8');
+    }
+
+    it('defaults ON when no config exists', () => {
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);
+    });
+
+    it('defaults ON when the field is absent', () => {
+      writeGlobalConfig({ scope: 'global', enabled: true });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);
+    });
+
+    it('stays ON when explicitly true', () => {
+      writeGlobalConfig({ scope: 'global', inject_activated_instincts: true });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);
+    });
+
+    it('turns OFF only on explicit false', () => {
+      writeGlobalConfig({ scope: 'global', inject_activated_instincts: false });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
+    });
   });
 
   it('validates required candidate queue schema fields', () => {
