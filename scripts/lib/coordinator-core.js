@@ -20,6 +20,8 @@ const { withLock } = require('./locking');
 const { objectToYaml } = require('./dag-schema');
 const { getWorktreePath, parseWorktreePath } = require('./worktree-paths');
 const { readArcforgeMarker } = require('./marker');
+const { parseSpecHeader } = require('./sdd-spec-header');
+const { readFileSafe } = require('./utils');
 
 /**
  * Coordinator class - manages DAG operations for a single spec
@@ -283,7 +285,15 @@ class Coordinator {
   }
 
   /**
-   * Reboot context - get summary for new session
+   * Reboot context - post-compaction handover summary for a new session.
+   *
+   * Counts are kept cheap and additive (rebootAllSpecs aggregates them
+   * across specs). The remaining fields are derived from data the
+   * Coordinator already scopes: `project_goal` from the spec header,
+   * `current_task` via the existing nextTask priority (in-progress
+   * feature > ready feature > ready epic), `research_files` from the
+   * spec directory's documentation artifacts.
+   *
    * @returns {Object} Context summary
    */
   rebootContext() {
@@ -300,14 +310,72 @@ class Coordinator {
       }
     }
 
+    const next = this.nextTask();
+
     return {
-      current_task: null,
+      current_task: next
+        ? {
+            id: next.id,
+            name: next.name,
+            type: next instanceof Feature ? 'feature' : 'epic',
+            status: next.status,
+          }
+        : null,
       remaining_count: remaining,
       completed_count: completed,
       blocked_count: this.dag.blocked.length,
-      project_goal: 'Build a skill-based autonomous agent toolkit',
-      research_files: [],
+      project_goal: this._projectGoalFromSpec(),
+      research_files: this._enumerateResearchFiles(),
     };
+  }
+
+  /**
+   * Derive the project goal from the spec header (`specs/<id>/spec.xml`
+   * `<title>`). Returns null when the spec id is unresolved, spec.xml is
+   * absent, or the header carries no title — reboot must stay useful for
+   * dag-only projects, so a missing goal degrades to null rather than
+   * throwing (title is a required header field; its absence is a spec
+   * problem the validator reports, not a reboot failure).
+   *
+   * @returns {string|null}
+   */
+  _projectGoalFromSpec() {
+    if (!this.specId) return null;
+    const specXmlPath = path.join(this.projectRoot, 'specs', this.specId, 'spec.xml');
+    const content = readFileSafe(specXmlPath);
+    if (!content) return null;
+    const header = parseSpecHeader(content);
+    return header?.title ? header.title : null;
+  }
+
+  /**
+   * Enumerate handover reading material in the spec directory: top-level
+   * documentation artifacts (vision.md, spec.xml, decisions.yml) plus
+   * `details/*.xml`, as paths relative to the project root. dag.yaml is
+   * excluded — it is live state the reboot output already summarizes,
+   * not research. Empty array when the spec id is unresolved or no
+   * artifacts exist.
+   *
+   * @returns {string[]}
+   */
+  _enumerateResearchFiles() {
+    if (!this.specId) return [];
+    const specDir = path.join(this.projectRoot, 'specs', this.specId);
+    const files = [];
+    for (const name of ['vision.md', 'spec.xml', 'decisions.yml']) {
+      if (fs.existsSync(path.join(specDir, name))) {
+        files.push(path.relative(this.projectRoot, path.join(specDir, name)));
+      }
+    }
+    const detailsDir = path.join(specDir, 'details');
+    if (fs.existsSync(detailsDir)) {
+      for (const entry of fs.readdirSync(detailsDir).sort()) {
+        if (entry.endsWith('.xml')) {
+          files.push(path.relative(this.projectRoot, path.join(detailsDir, entry)));
+        }
+      }
+    }
+    return files;
   }
 
   // ==================== Private Methods ====================
