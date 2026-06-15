@@ -367,3 +367,87 @@ describe('arc-remind freshness-aware eval-before-ship nudge', () => {
     }
   });
 });
+
+describe('arc-remind autopilot model channel (RV-5)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+  const script = path.join(__dirname, '..', 'arc-remind', 'main.js');
+
+  let root;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../arc-remind/main')];
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-remind-rv5-'));
+  });
+
+  const { afterEach } = require('node:test');
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  // Each run uses a fresh session id so the per-session counters never collide.
+  function runPr(cwd) {
+    const sessionId = `rv5-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const r = spawnSync('node', [script], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        cwd,
+        hook_event_name: 'PostToolUse',
+        tool_name: 'Bash',
+        tool_input: { command: 'gh pr create --fill' },
+      }),
+      encoding: 'utf-8',
+      timeout: 15000,
+    });
+    return JSON.parse((r.stdout || '').trim());
+  }
+
+  function writeRunningSentinel(dir) {
+    fs.writeFileSync(path.join(dir, '.arcforge-loop.json'), JSON.stringify({ status: 'running' }));
+  }
+
+  it('autopilot (live sentinel in cwd) → both fields, PR-boundary nudge reaches the model', () => {
+    writeRunningSentinel(root);
+    const parsed = runPr(root);
+    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
+    assert.ok(
+      parsed.hookSpecificOutput.additionalContext.includes('PR boundary'),
+      'model channel carries the PR-boundary nudge',
+    );
+    assert.ok(parsed.systemMessage.includes('PR boundary'), 'systemMessage still emitted');
+  });
+
+  it('attended (no sentinel) → systemMessage only, never the model channel', () => {
+    const parsed = runPr(root);
+    assert.ok(parsed.systemMessage.includes('PR boundary'), 'attended nudge is user-facing');
+    assert.ok(!('hookSpecificOutput' in parsed), 'attended must NOT reach the model channel');
+  });
+
+  it('S6-1: cwd = epic worktree whose base has a running sentinel → both fields', () => {
+    // base = the loop's project root (holds the sentinel); worktree = an epic
+    // checkout with no sentinel of its own but an .arcforge-epic marker whose
+    // base_worktree points back to base. AF-2's worktree-aware resolution checks
+    // the sentinel at base, so the autopilot nudge must reach the model.
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-remind-base-'));
+    const worktree = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-remind-wt-'));
+    try {
+      writeRunningSentinel(base);
+      // The marker is parsed as YAML (parseDagYaml) — simple key: value lines.
+      fs.writeFileSync(
+        path.join(worktree, '.arcforge-epic'),
+        `epic: epic-x\nspec_id: sdd-y\nbase_worktree: ${base}\n`,
+      );
+      const parsed = runPr(worktree);
+      assert.ok(
+        parsed.hookSpecificOutput.additionalContext.includes('PR boundary'),
+        'worktree-aware: base sentinel makes the nudge reach the model',
+      );
+      assert.ok(parsed.systemMessage.includes('PR boundary'), 'systemMessage still emitted');
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+      fs.rmSync(worktree, { recursive: true, force: true });
+    }
+  });
+});

@@ -11,7 +11,7 @@ Automatically runs quality checks after editing TypeScript/JavaScript files.
 ## Trigger
 
 Runs on `PostToolUse` when:
-- Tool is `Edit`
+- Tool is `Edit` or `Write` (matcher `Edit|Write`)
 - File matches `\.(ts|tsx|js|jsx)$`
 
 ## Requirements
@@ -21,15 +21,31 @@ Runs on `PostToolUse` when:
 
 ## Output
 
-- Warnings are logged to stderr (visible in Claude Code output)
-- stdin is passed through to stdout unchanged (hook chaining)
+Findings are split by audience over a single stdout JSON object:
+
+- **TypeScript errors + `console.*` findings → the model** via
+  `hookSpecificOutput.additionalContext` (spike-verified v2.1.172 — the model
+  receives it on the next turn and can fix the defect). These are actionable
+  problems the next turn should resolve.
+- **`Formatted: <file>` → the user** via `systemMessage`. Prettier already
+  rewrote the file, so this is a notice, not an action item — it never enters
+  the model channel. When model findings are also present, the formatted notice
+  is merged into the same JSON object as the model output.
+- Nothing actionable → no output.
 
 ## Examples
 
+Model channel (`additionalContext`) when type errors / console.* are found:
+
 ```
-[quality-check] Formatted: Component.tsx
-[quality-check] TypeScript errors in Component.tsx:
+TypeScript errors in Component.tsx:
   Line 42: Property 'foo' does not exist on type 'Props' (TS2339)
-[quality-check] console.* found in Component.tsx:
+console.* found in Component.tsx:
   Line 15: console.log('debug', data)...
+```
+
+User channel (`systemMessage`) when Prettier reformatted the file:
+
+```
+Formatted: Component.tsx
 ```

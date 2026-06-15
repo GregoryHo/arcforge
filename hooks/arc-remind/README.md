@@ -40,13 +40,22 @@ commit is not a completion claim, a PR is. Anchoring here keeps the reminder rar
 and high-signal. Anchoring to every commit, or to every edit on `main`, would be
 a noise machine that gets the hook disabled (arcforge itself develops on `main`).
 
-## Audience: the user, not Claude
+## Audience: attended → user; autopilot → user + Claude
 
-A PostToolUse `systemMessage` is shown to the **user** (additionalContext-to-
-Claude is SessionStart / UserPromptSubmit only). This is deliberate: verification
-is human-in-the-loop, and a user-facing nudge avoids the model performatively
-running a test just to satisfy a hook. PostToolUse cannot block; this hook only
-ever reminds.
+A PostToolUse `systemMessage` is shown to the **user**. In an **attended**
+session that is the whole story: verification is human-in-the-loop, and a
+user-facing-only nudge avoids the model performatively running a test just to
+satisfy a hook. The worktree-add, main-branch and spec→dag nudges are always
+user-only for this reason.
+
+When an autonomous loop is **live** for this checkout — `loopSentinelPresent(cwd)`
+is true (worktree-aware: an epic worktree resolves to its base via the
+`.arcforge-epic` marker) — there is no human watching the systemMessage, so the
+**PR-boundary** and **eval-before-ship** nudges ADDITIONALLY reach the model over
+the PostToolUse model channel (`hookSpecificOutput.additionalContext`,
+spike-verified v2.1.172). Both fields ride a single merged JSON object; the
+`systemMessage` is still emitted so a human reviewing the transcript sees it too.
+PostToolUse cannot block; this hook only ever reminds.
 
 ## State
 

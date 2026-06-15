@@ -361,16 +361,12 @@ describe('E2E: quality-check/main.js', () => {
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
 
-    // quality-check outputs systemMessage via stdout JSON
-    const parsed = JSON.parse(result.stdout);
-    assert.ok(
-      parsed.systemMessage,
-      `Should output systemMessage. stdout: "${result.stdout.trim()}"`,
-    );
-    assert.ok(
-      parsed.systemMessage.includes('console'),
-      `systemMessage should mention console. Got: "${parsed.systemMessage}"`,
-    );
+    // RV-3: console.* is model-actionable → the model channel (additionalContext),
+    // emitted as exactly one JSON object on stdout.
+    const parsed = JSON.parse(result.stdout.trim());
+    const ctx = parsed.hookSpecificOutput?.additionalContext;
+    assert.ok(ctx, `Should output additionalContext. stdout: "${result.stdout.trim()}"`);
+    assert.ok(ctx.includes('console'), `model channel should mention console. Got: "${ctx}"`);
   });
 
   it('should exit 0 on non-JS file', () => {
@@ -390,15 +386,11 @@ describe('E2E: quality-check/main.js', () => {
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
 
-    const parsed = JSON.parse(result.stdout);
-    assert.ok(
-      parsed.systemMessage,
-      `Should output systemMessage. stdout: "${result.stdout.trim()}"`,
-    );
-    assert.ok(
-      parsed.systemMessage.includes('console'),
-      `systemMessage should mention console. Got: "${parsed.systemMessage}"`,
-    );
+    // RV-3: console.* finding reaches the model via the PostToolUse model channel.
+    const parsed = JSON.parse(result.stdout.trim());
+    const ctx = parsed.hookSpecificOutput?.additionalContext;
+    assert.ok(ctx, `Should output additionalContext. stdout: "${result.stdout.trim()}"`);
+    assert.ok(ctx.includes('console'), `model channel should mention console. Got: "${ctx}"`);
   });
 
   it('should NOT emit output for Write-created file with only console.error', () => {

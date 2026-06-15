@@ -5,9 +5,17 @@
  * Hardens discipline triggers that are otherwise pure ICL (they only fire if the
  * relevant skill happens to be loaded) into deterministically-fired nudges. A hook
  * fires regardless — that is the point of moving them here. PostToolUse cannot
- * block; this hook only ever reminds, and reminders go to the USER (a PostToolUse
- * `systemMessage` reaches the user, not Claude). That is deliberate: these are
- * human-in-the-loop nudges, not instructions for the model to perform.
+ * block; this hook only ever reminds.
+ *
+ * Audience depends on whether an autonomous loop is LIVE for this checkout
+ * (RV-5). In an ATTENDED session a human is present, so every nudge is a
+ * user-facing `systemMessage` — human-in-the-loop, not an instruction for the
+ * model to perform. When `loopSentinelPresent(cwd)` is true (a loop is driving
+ * the session, possibly inside an epic worktree resolved via its `.arcforge-epic`
+ * marker), the PR-boundary and eval-before-ship nudges ADDITIONALLY reach the
+ * model over the PostToolUse model channel (same JSON object) — there is no
+ * human watching the systemMessage, so the autopilot needs to see the gate
+ * itself. The worktree-add, main-branch and spec→dag nudges stay user-only.
  *
  * Reminders (all rare / high-signal by construction):
  *   PR boundary   `gh pr create`/`merge`  -> verify (arc-verifying) + review
@@ -36,10 +44,12 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   output,
+  outputPostToolUseFeedback,
   createSessionCounter,
   getTempDir,
   getSessionId,
 } = require('../../scripts/lib/utils');
+const { loopSentinelPresent } = require('../../scripts/lib/sdd-utils');
 
 // Common test runners — broad enough to catch the usual suspects, scoped to avoid noise.
 const TEST_CMD_RE =
@@ -288,6 +298,22 @@ function bump(name) {
   c.write(c.read() + 1);
 }
 
+/**
+ * Emit an autopilot-aware nudge (RV-5). Attended (no live loop sentinel for
+ * cwd): user-facing `systemMessage` only — unchanged behavior. Autopilot
+ * (`loopSentinelPresent(cwd)` true, worktree-aware via AF-2): ADDITIONALLY
+ * surface the same text to the model over the PostToolUse model channel, kept
+ * in the single merged JSON object the helper guarantees. systemMessage stays
+ * present in both modes.
+ */
+function emitNudge(cwd, text) {
+  if (loopSentinelPresent(cwd)) {
+    outputPostToolUseFeedback(text, { systemMessage: text });
+  } else {
+    output({ systemMessage: text });
+  }
+}
+
 function main() {
   try {
     const input = parseStdinJson(readStdinSync());
@@ -339,7 +365,7 @@ function main() {
     }
 
     if (isPrBoundary(command)) {
-      output({ systemMessage: buildReminder(command, counter('arc-remind-test-seen').read() > 0) });
+      emitNudge(cwd, buildReminder(command, counter('arc-remind-test-seen').read() > 0));
       return;
     }
 
@@ -355,7 +381,7 @@ function main() {
       counter('arc-remind-skill-ship-warned').read() === 0
     ) {
       bump('arc-remind-skill-ship-warned');
-      output({ systemMessage: buildEvalShipNudge(cwd) });
+      emitNudge(cwd, buildEvalShipNudge(cwd));
     }
   } catch {
     // Non-blocking — never crash the session.
@@ -388,6 +414,7 @@ module.exports = {
   buildEvalShipNudge,
   mainBranchNudge,
   planAfterSpecNudge,
+  emitNudge,
   TEST_CMD_RE,
   PR_BOUNDARY_RE,
   SPEC_XML_RE,

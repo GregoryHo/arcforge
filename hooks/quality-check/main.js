@@ -9,8 +9,12 @@
  *    (console.warn/error are intentionally NOT flagged — they are the
  *    prescribed CLI error-output layer; see coding standards)
  *
- * Warnings output via systemMessage (user-visible)
- * Prettier auto-formats files in-place
+ * Output channels (RV-3):
+ * - TypeScript errors + console.* findings are actionable for the model →
+ *   the model-visible PostToolUse channel (additionalContext) so the next
+ *   turn can fix them.
+ * - The `Formatted:` notice is a fait accompli (Prettier already rewrote the
+ *   file) — user-visible systemMessage only, never the model channel.
  */
 
 const path = require('node:path');
@@ -18,6 +22,7 @@ const {
   readStdinSync,
   parseStdinJson,
   output,
+  outputPostToolUseFeedback,
   log,
   readFileSafe,
 } = require('../../scripts/lib/utils');
@@ -54,6 +59,56 @@ function checkConsoleLogs(filePath) {
 }
 
 /**
+ * Run the quality checks for one file and bucket their output by audience.
+ *
+ * Pure given its inputs (it does run Prettier/tsc as side effects, but returns
+ * no I/O of its own): callers decide how to emit the two channels.
+ *   - modelReason: actionable defects the next turn should fix (TypeScript
+ *     errors, console.* findings) → the model-visible PostToolUse channel.
+ *   - systemMessage: the `Formatted:` notice (Prettier already rewrote the
+ *     file) → user-visible only.
+ *
+ * @returns {{ modelReason: string|null, systemMessage: string|null }}
+ */
+function collectFindings(absolutePath, filePath, projectDir) {
+  const fileName = path.basename(filePath);
+  const pm = detectPackageManager(projectDir);
+  const modelLines = [];
+  let systemMessage = null;
+
+  // 1. Run Prettier (if available) — user-visible only (fait accompli).
+  if (pm && hasDevDependency('prettier', projectDir)) {
+    const prettierResult = runPrettier(absolutePath, pm);
+    if (prettierResult.formatted) {
+      systemMessage = `Formatted: ${fileName}`;
+    }
+  }
+
+  // 2. Run TypeScript check (for .ts/.tsx files) — model-actionable.
+  if (/\.(ts|tsx)$/.test(filePath) && pm && hasDevDependency('typescript', projectDir)) {
+    const tsResult = runTypeCheck(absolutePath, pm);
+    if (tsResult.errors && tsResult.errors.length > 0) {
+      modelLines.push(`TypeScript errors in ${fileName}:`);
+      for (const err of tsResult.errors) modelLines.push(`  ${err}`);
+    }
+  }
+
+  // 3. Check for console.log statements — model-actionable.
+  const consoleLogs = checkConsoleLogs(absolutePath);
+  if (consoleLogs.length > 0) {
+    modelLines.push(`console.* found in ${fileName}:`);
+    consoleLogs.slice(0, 15).forEach((match) => {
+      modelLines.push(`  Line ${match.line}: ${match.content}...`);
+    });
+    if (consoleLogs.length > 15) {
+      modelLines.push(`  ... and ${consoleLogs.length - 15} more`);
+    }
+  }
+
+  return { modelReason: modelLines.length > 0 ? modelLines.join('\n') : null, systemMessage };
+}
+
+/**
  * Main entry point
  */
 function main() {
@@ -71,48 +126,22 @@ function main() {
   }
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-  const projectDir = process.cwd();
-  const pm = detectPackageManager(projectDir);
-  const fileName = path.basename(filePath);
-  const warnings = [];
+  const { modelReason, systemMessage } = collectFindings(absolutePath, filePath, process.cwd());
 
-  // 1. Run Prettier (if available)
-  if (pm && hasDevDependency('prettier', projectDir)) {
-    const prettierResult = runPrettier(absolutePath, pm);
-    if (prettierResult.formatted) {
-      warnings.push(`Formatted: ${fileName}`);
-    }
-  }
-
-  // 2. Run TypeScript check (for .ts/.tsx files)
-  if (/\.(ts|tsx)$/.test(filePath) && pm && hasDevDependency('typescript', projectDir)) {
-    const tsResult = runTypeCheck(absolutePath, pm);
-    if (tsResult.errors && tsResult.errors.length > 0) {
-      warnings.push(`TypeScript errors in ${fileName}:`);
-      for (const err of tsResult.errors) warnings.push(`  ${err}`);
-    }
-  }
-
-  // 3. Check for console.log statements
-  const consoleLogs = checkConsoleLogs(absolutePath);
-  if (consoleLogs.length > 0) {
-    warnings.push(`console.* found in ${fileName}:`);
-    consoleLogs.slice(0, 15).forEach((match) => {
-      warnings.push(`  Line ${match.line}: ${match.content}...`);
-    });
-    if (consoleLogs.length > 15) {
-      warnings.push(`  ... and ${consoleLogs.length - 15} more`);
-    }
-  }
-
-  if (warnings.length > 0) {
-    output({ systemMessage: warnings.join('\n') });
+  // Model-actionable findings go to the model channel (additionalContext),
+  // merging the `Formatted:` notice as a user-visible systemMessage into the
+  // same JSON object when present. The formatted-only case must NOT call the
+  // helper — it throws on an empty reason — so route it through plain output().
+  if (modelReason) {
+    outputPostToolUseFeedback(modelReason, systemMessage ? { systemMessage } : undefined);
+  } else if (systemMessage) {
+    output({ systemMessage });
   }
 
   process.exit(0);
 }
 
-module.exports = { checkConsoleLogs };
+module.exports = { checkConsoleLogs, collectFindings };
 
 try {
   if (require.main === module) main();
