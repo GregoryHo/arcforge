@@ -33,7 +33,7 @@ const {
   log,
 } = require('../../scripts/lib/utils');
 
-const { getInstinctsDir } = require('../../scripts/lib/session-utils');
+const { getInstinctsDir, migrateInstinctsToNameKey } = require('../../scripts/lib/session-utils');
 
 const { runDecayCycle } = require('../../scripts/lib/confidence');
 
@@ -87,6 +87,20 @@ function checkDaemon() {
 }
 
 /**
+ * One-time, idempotent migration of any stale hash-keyed instinct files into
+ * the canonical name-keyed dir for this project (ICL-3). Runs before decay so
+ * relocated files participate in the same session's decay cycle. Silent-catch
+ * — never blocks the session.
+ */
+function migrateInstincts(project) {
+  try {
+    return migrateInstinctsToNameKey(project);
+  } catch {
+    return { moved: [], skipped: [] };
+  }
+}
+
+/**
  * Run decay cycle on instincts.
  */
 function runDecayCycles(project) {
@@ -117,6 +131,7 @@ function main() {
 
   initializeSession();
   checkDaemon();
+  migrateInstincts(project);
   runDecayCycles(project);
 
   log('Session tracker initialized (background tasks)');
@@ -127,6 +142,7 @@ function main() {
 module.exports = {
   initializeSession,
   checkDaemon,
+  migrateInstincts,
   runDecayCycles,
 };
 

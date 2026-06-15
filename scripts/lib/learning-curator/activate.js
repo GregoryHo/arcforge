@@ -12,7 +12,12 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 
-const { sanitizeFilename, atomicWriteFile, sha256Truncated } = require('../utils');
+const {
+  atomicWriteFile,
+  sha256Truncated,
+  sanitizeProjectName,
+  getProjectName,
+} = require('../utils');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 
@@ -27,8 +32,29 @@ const FIRST_SLICE_TARGET_KINDS = ['instinct'];
 // ---------------------------------------------------------------------------
 
 /**
+ * Resolve the instinct directory name for a candidate scope.
+ *
+ * Project-scoped instincts are keyed by the NAME slug (`scope.project`), not
+ * the hashed `scope.project_id`. `scope.project` is set at capture time from
+ * the batch manifest and equals the capture-time `getProjectName()` slug —
+ * the exact key the injection/decay side uses via `getInstinctsDir(project)`.
+ * Keying by `project_id` would write to a directory the loader never reads.
+ *
+ * Falls back to `getProjectName()` only when `scope.project` is absent
+ * (legacy candidates predating the manifest-sourced field).
+ *
+ * @param {object} scope
+ * @returns {string} directory name under `instincts/`
+ */
+function projectScopeDir(scope) {
+  if (scope.kind === 'global') return 'global';
+  const project = scope.project || getProjectName();
+  return sanitizeProjectName(project);
+}
+
+/**
  * Build the active instinct path for a candidate.
- * Project-scoped: <arcforgeRoot>/instincts/<project_id>/<candidate_id>.md
+ * Project-scoped: <arcforgeRoot>/instincts/<project>/<candidate_id>.md
  * Global-scoped: <arcforgeRoot>/instincts/global/<candidate_id>.md
  *
  * @param {string} arcforgeRoot
@@ -36,20 +62,7 @@ const FIRST_SLICE_TARGET_KINDS = ['instinct'];
  * @returns {string}
  */
 function buildActiveInstinctPath(arcforgeRoot, candidate) {
-  const scope = candidate.scope || {};
-  let scopeDir;
-  if (scope.kind === 'global') {
-    scopeDir = 'global';
-  } else {
-    // sanitize project_id for path use
-    let projectId = scope.project_id || 'unknown';
-    try {
-      projectId = sanitizeFilename(projectId);
-    } catch {
-      projectId = projectId.replace(/[^a-zA-Z0-9_-]/g, '_');
-    }
-    scopeDir = projectId;
-  }
+  const scopeDir = projectScopeDir(candidate.scope || {});
   return path.join(arcforgeRoot, 'instincts', scopeDir, `${candidate.candidate_id}.md`);
 }
 
@@ -498,11 +511,8 @@ function deactivate({
     const activationId = `act8_deact_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
     const archivedArtifactId = `aart_dis_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
-    // Determine archive destination
-    const scopeDir =
-      candidate.scope && candidate.scope.kind === 'global'
-        ? 'global'
-        : candidate.scope?.project_id || 'unknown';
+    // Determine archive destination (name-keyed, matching the active path)
+    const scopeDir = projectScopeDir(candidate.scope || {});
     const disabledDir = path.join(effectiveRoot, 'instincts', scopeDir, '.disabled');
     const archiveName = `${candidate.candidate_id}-${Date.now()}.md`;
     const archivePath = path.join(disabledDir, archiveName);

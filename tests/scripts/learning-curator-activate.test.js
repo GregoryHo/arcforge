@@ -337,16 +337,40 @@ describe('L8-5: reject non-instinct target_kind in first slice', () => {
 // ---------------------------------------------------------------------------
 
 describe('L8-6: active path computation', () => {
-  it('project-scoped candidate → instincts/<project_id>/<candidate_id>.md', () => {
+  it('project-scoped candidate → instincts/<project>/<candidate_id>.md (name-keyed, ICL-3)', () => {
     const candidate = makeCandidateRecord({
       scope: { kind: 'project', project: 'my-project', project_id: 'proj-xyz' },
     });
     const arcforgeRoot = path.join(tmpDir, '.arcforge');
     const activePath = buildActiveInstinctPath(arcforgeRoot, candidate);
     expect(activePath).toContain('instincts');
-    expect(activePath).toContain('proj-xyz');
+    // Keyed by the NAME slug (scope.project), which equals the injection-side
+    // getInstinctsDir() key — NOT the hashed project_id the loader never reads.
+    expect(activePath).toContain('my-project');
+    expect(activePath).not.toContain('proj-xyz');
     expect(activePath).toContain(candidate.candidate_id);
     expect(activePath).toMatch(/\.md$/);
+  });
+
+  it('falls back to getProjectName() only when scope.project is absent (ICL-3)', () => {
+    const prevDir = process.env.CLAUDE_PROJECT_DIR;
+    process.env.CLAUDE_PROJECT_DIR = '/tmp/legacy-fallback-proj';
+    try {
+      jest.resetModules();
+      const {
+        buildActiveInstinctPath: build,
+      } = require('../../scripts/lib/learning-curator/activate');
+      const candidate = makeCandidateRecord({
+        scope: { kind: 'project', project_id: 'proj-legacy' },
+      });
+      const arcforgeRoot = path.join(tmpDir, '.arcforge');
+      const activePath = build(arcforgeRoot, candidate);
+      expect(activePath).toContain('legacy-fallback-proj');
+      expect(activePath).not.toContain('proj-legacy');
+    } finally {
+      if (prevDir === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+      else process.env.CLAUDE_PROJECT_DIR = prevDir;
+    }
   });
 
   it('global-scoped candidate → instincts/global/<candidate_id>.md', () => {

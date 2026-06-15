@@ -1111,9 +1111,11 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
     });
     expect(actResult.accepted).toBe(true);
 
-    // Verify active file exists before deactivate
+    // Verify active file exists before deactivate. Active instinct files are
+    // keyed by the NAME slug (scope.project) — the injection-side key — not the
+    // hashed scope.project_id (ICL-3 keyspace unification).
     const instinctsBase = path.join(tmpDir, '.arcforge', 'instincts');
-    const scopeDir = record.scope.project_id || 'unknown';
+    const scopeDir = record.scope.project || 'unknown';
     const activePath = path.join(instinctsBase, scopeDir, `${record.candidate_id}.md`);
     expect(fs.existsSync(activePath)).toBe(true);
 
