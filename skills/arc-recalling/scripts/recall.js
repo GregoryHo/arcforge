@@ -111,7 +111,8 @@ function main() {
       console.log('Usage: recall.js <command> [options]\n');
       console.log('Commands:');
       console.log('  save                  Save a new instinct');
-      console.log('  check-duplicate       Check if instinct name exists\n');
+      console.log('  check-duplicate       Check if instinct name exists');
+      console.log('  save-record           Save a recall operation record (curator evidence)\n');
       console.log('Options:');
       console.log('  --id <name>           Instinct ID (kebab-case)');
       console.log('  --trigger "..."       When to apply');
@@ -119,7 +120,13 @@ function main() {
       console.log('  --project <name>      Project name');
       console.log('  --domain <name>       Category (default: uncategorized)');
       console.log('  --evidence "..."      Supporting context');
-      console.log('  --evidence-count <N>  Number of times observed (default: 1)');
+      console.log('  --evidence-count <N>  Number of times observed (default: 1)\n');
+      console.log('save-record options:');
+      console.log('  --recall-id <id>      Record ID — MUST start with "recall-"');
+      console.log('  --project <name>      Project name');
+      console.log('  --query "..."         The recall query (optional)');
+      console.log('  --instinct-ids "a,b"  Returned instinct ids, comma-separated (optional)');
+      console.log('  --summary "..."       Summary of the recall (optional)');
       break;
   }
 }

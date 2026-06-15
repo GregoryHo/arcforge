@@ -184,7 +184,7 @@ counter.getFilePath();             // Get file path (for debugging)
 
 Counter files are stored at `{TMPDIR}/arcforge-{name}-session-{sessionId}`.
 
-**Important**: If multiple systems need independent counters, use different names. Shared counter names create coupling (e.g., compact-suggester uses `compact-count`, diary system uses `tool-count`).
+**Important**: If multiple systems need independent counters, use different names. Shared counter names create coupling (e.g., user-message-counter uses `user-count`, diary system uses `tool-count`).
 
 ## Sync vs Async Hooks
 
@@ -262,6 +262,6 @@ For hooks that inject context into Claude (inject-skills, inject-context), use t
 | Using `console.log` for debug | Use `log()` (stderr) — console.log goes to stdout and corrupts hook protocol |
 | Using `logHighlight()` or `log()` for user-facing messages | Use `output({ systemMessage: "..." })` — stderr is completely invisible (not just condensed) |
 | Reading `input.trigger` on SessionStart | Use `input.source` — official field name is `source` |
-| Sharing counter names across independent systems | Use separate counter names (e.g., `compact-count` vs `tool-count`) |
+| Sharing counter names across independent systems | Use separate counter names (e.g., `user-count` vs `tool-count`) |
 | Using `execFileSync` in tests | Use `spawnSync` — captures stderr on success |
 | Testing only exit code 0 | Test actual behavior: check stdout JSON, stderr content, file side-effects |
