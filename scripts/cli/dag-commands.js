@@ -199,6 +199,13 @@ function runLoop(args, { projectRoot, specFlag }) {
     process.exit(1);
   }
 
+  // --reset archives any existing state file before this run starts, so the
+  // loop begins from a clean state. Deliberate pre-run action — never mid-run.
+  if (args.flags.reset) {
+    const { resetLoopState } = require('../lib/loop-state');
+    resetLoopState(projectRoot);
+  }
+
   const epic = args.options.epic || null;
   const loopOptions = {
     pattern,

@@ -4,11 +4,16 @@ const path = require('node:path');
 const {
   loadLoopState,
   saveLoopState,
+  beginRun,
+  resetLoopState,
   recordError,
   finalizeLoop,
+  isStalled,
+  isRetryStorm,
 } = require('../../scripts/lib/loop-state');
 
 const LOOP_STATE_FILE = '.arcforge-loop.json';
+const LOOP_ARCHIVE_DIR = '.arcforge-loop.archive';
 
 describe('loop-state', () => {
   let tmpDir;
@@ -113,6 +118,117 @@ describe('loop-state', () => {
       finalizeLoop(state, 50, tmpDir);
       expect(state.status).toBe('max_runs');
       expect(loadLoopState(tmpDir).status).toBe('max_runs');
+    });
+  });
+
+  describe('beginRun', () => {
+    it('persists pattern, max_runs, max_cost, and a fresh run_id', () => {
+      const state = loadLoopState(tmpDir);
+      beginRun(state, { pattern: 'dag', maxRuns: 30, maxCost: 12 });
+      expect(state.pattern).toBe('dag');
+      expect(state.max_runs).toBe(30);
+      expect(state.max_cost).toBe(12);
+      expect(typeof state.run_id).toBe('string');
+      expect(state.run_id.length).toBeGreaterThan(0);
+    });
+
+    it('defaults max_cost to null and records the run-start iteration', () => {
+      const state = loadLoopState(tmpDir);
+      state.iteration = 7;
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      expect(state.max_cost).toBeNull();
+      expect(state.run_started_iteration).toBe(7);
+    });
+
+    it('assigns a new run_id on each run (resume gets its own scope)', () => {
+      const state = loadLoopState(tmpDir);
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      const first = state.run_id;
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      expect(state.run_id).not.toBe(first);
+    });
+  });
+
+  describe('recordError run_id stamping', () => {
+    it('stamps the current run_id onto each error entry', () => {
+      const state = loadLoopState(tmpDir);
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      recordError(state, 'task-1', 'boom', 1);
+      expect(state.errors[0].run_id).toBe(state.run_id);
+    });
+
+    it('omits run_id on legacy state with no active run', () => {
+      const state = loadLoopState(tmpDir);
+      recordError(state, 'task-1', 'boom', 1);
+      expect(state.errors[0].run_id).toBeUndefined();
+    });
+  });
+
+  describe('run-scoped safety detection', () => {
+    it('isRetryStorm ignores errors from a previous run', () => {
+      const state = loadLoopState(tmpDir);
+      // Three task-1 failures belong to a prior run.
+      state.errors = [
+        { task_id: 'task-1', error: 'x', timestamp: 't1', attempt: 1, run_id: 'run-old' },
+        { task_id: 'task-1', error: 'x', timestamp: 't2', attempt: 1, run_id: 'run-old' },
+        { task_id: 'task-1', error: 'x', timestamp: 't3', attempt: 1, run_id: 'run-old' },
+      ];
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      // No current-run errors → not a storm despite the prior run's failures.
+      expect(isRetryStorm(state)).toBe(false);
+    });
+
+    it('isRetryStorm fires on a storm within the current run only', () => {
+      const state = loadLoopState(tmpDir);
+      beginRun(state, { pattern: 'sequential', maxRuns: 20 });
+      for (let i = 0; i < 3; i++) recordError(state, 'task-1', 'x', 1);
+      expect(isRetryStorm(state)).toBe(true);
+    });
+
+    it('isStalled does not flag a resumed run on entry despite high cumulative iteration', () => {
+      const state = loadLoopState(tmpDir);
+      // Simulate a resume: 30 cumulative iterations, no progress ever, but a
+      // brand-new run that has not iterated yet.
+      state.iteration = 30;
+      state.last_progress_at = null;
+      beginRun(state, { pattern: 'sequential', maxRuns: 50 });
+      expect(isStalled(state)).toBe(false);
+    });
+
+    it('isStalled flags the current run once it accrues no-progress iterations', () => {
+      const state = loadLoopState(tmpDir);
+      state.iteration = 30;
+      state.last_progress_at = null;
+      beginRun(state, { pattern: 'sequential', maxRuns: 50 });
+      // Two iterations into the new run with still no progress → stalled.
+      state.iteration = 32;
+      expect(isStalled(state)).toBe(true);
+    });
+  });
+
+  describe('resetLoopState', () => {
+    it('archives the existing state to .arcforge-loop.archive/<started_at>.json', () => {
+      const state = loadLoopState(tmpDir);
+      state.started_at = '2026-03-17T22:00:00Z';
+      state.iteration = 9;
+      saveLoopState(state, tmpDir);
+
+      const fresh = resetLoopState(tmpDir);
+      expect(fresh.iteration).toBe(0);
+      expect(fresh.status).toBe('running');
+
+      const archivePath = path.join(tmpDir, LOOP_ARCHIVE_DIR, '2026-03-17T22-00-00Z.json');
+      expect(fs.existsSync(archivePath)).toBe(true);
+      const archived = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+      expect(archived.iteration).toBe(9);
+      // Live state file is gone after archive (loadLoopState would re-init).
+      expect(fs.existsSync(path.join(tmpDir, LOOP_STATE_FILE))).toBe(false);
+    });
+
+    it('is a no-op returning fresh state when no state file exists', () => {
+      const fresh = resetLoopState(tmpDir);
+      expect(fresh.iteration).toBe(0);
+      expect(fs.existsSync(path.join(tmpDir, LOOP_ARCHIVE_DIR))).toBe(false);
     });
   });
 });

@@ -22,6 +22,9 @@ Read `.arcforge-loop.json` in the project root:
   "iteration": 12,
   "pattern": "sequential",
   "started_at": "...",
+  "max_runs": 50,
+  "max_cost": 10,
+  "run_id": "...",
   "completed_tasks": ["feat-001-01", ...],
   "failed_tasks": ["feat-002-03"],
   "errors": [...],
@@ -31,19 +34,26 @@ Read `.arcforge-loop.json` in the project root:
 }
 ```
 
+`max_runs`, `max_cost`, and `run_id` are persisted at run start. Use them
+as denominators: budget headroom is `max_cost - total_cost` (or "unbounded"
+when `max_cost` is null), iteration headroom is `max_runs - iteration`.
+A resumed loop carries a new `run_id`; `errors` may include entries from
+earlier runs, so weigh recent (current-`run_id`) errors most heavily.
+
 ### Step 2: Check for Problems
 
 | Problem | Detection | Severity |
 |---------|-----------|----------|
 | **Stall** | No progress across 2+ iterations | High — loop is wasting resources |
 | **Retry storm** | Same task_id appears 3+ times in errors | High — fundamental issue |
-| **Cost overrun** | total_cost exceeding expected | Medium — budget risk |
+| **Cost overrun** | total_cost approaching/exceeding `max_cost` (budget denominator) | Medium — budget risk |
+| **Iteration exhaustion** | iteration approaching `max_runs` with work remaining | Medium — loop will hit max_runs before completing |
 | **Error accumulation** | Error count growing faster than completions | Medium — degrading quality |
 | **Blocked cascade** | Multiple tasks blocked by same dependency | Medium — needs manual unblock |
 
 ### Step 3: Check DAG Status
 
-Run `node scripts/cli.js status --json` to see:
+Run `node "${ARCFORGE_ROOT}/scripts/cli.js" status --json` to see:
 - How many tasks are completed vs remaining
 - Whether blocked tasks are preventing progress
 - Whether the completion ratio matches expectations

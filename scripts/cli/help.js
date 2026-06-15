@@ -82,7 +82,7 @@ COMMANDS:
       --example    Show complete example
 
   loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>] [--spec-id <id>]
-       [--task-timeout N] [--permission-mode <mode>] [--allowed-tools <tools>]
+       [--task-timeout N] [--permission-mode <mode>] [--allowed-tools <tools>] [--reset]
       Run autonomous cross-session execution loop.
       --pattern          Execution pattern: sequential (default) or dag
       --epic             Scope loop to a single epic (auto-detected in worktrees)
@@ -91,6 +91,7 @@ COMMANDS:
       --task-timeout     Per-session timeout in seconds (default: 600)
       --permission-mode  Pass --permission-mode through to spawned claude sessions
       --allowed-tools    Pass --allowed-tools through to spawned claude sessions
+      --reset            Archive prior state to .arcforge-loop.archive/ and start fresh
 
   eval list                          List eval scenarios
   eval run <name> [--k N] [--model]  Run eval trials

@@ -39,7 +39,7 @@ digraph when_to_use {
 ### Sequential (Default — Safest)
 
 ```
-node scripts/loop.js --pattern sequential --max-runs 20
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
 ```
 
 - One task at a time
@@ -49,7 +49,7 @@ node scripts/loop.js --pattern sequential --max-runs 20
 ### DAG (Parallel-aware)
 
 ```
-node scripts/loop.js --pattern dag --max-runs 20
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 20
 ```
 
 - Uses `parallelTasks()` to find independent epics
@@ -76,7 +76,7 @@ If you are in a worktree (`.arcforge-epic` exists), the loop auto-detects both t
 
 For scoped single-epic execution, use `--epic`:
 ```bash
-node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --epic epic-001 --pattern sequential --max-runs 20
 ```
 
 ### During Execution
@@ -124,29 +124,38 @@ It reads `.arcforge-loop.json` and reports:
   "iteration": 12,
   "pattern": "sequential",
   "started_at": "2026-03-17T22:00:00Z",
+  "max_runs": 20,
+  "max_cost": 10,
+  "run_id": "a1b2c3d4-...",
   "completed_tasks": ["feat-001-01", "feat-001-02"],
   "failed_tasks": ["feat-002-03"],
-  "errors": [{"task_id": "...", "error": "...", "timestamp": "..."}],
+  "errors": [{"task_id": "...", "error": "...", "timestamp": "...", "run_id": "..."}],
   "total_cost": 0,
   "last_progress_at": "2026-03-17T23:15:00Z",
   "status": "running"
 }
 ```
 
+`pattern`, `max_runs`, `max_cost`, and a fresh `run_id` are stamped at the
+start of each run. Stall and retry-storm detection count only the current
+run's errors, so resuming a loop is not penalized by a previous run's
+failures. `--reset` archives the prior state to
+`.arcforge-loop.archive/<started_at>.json` and starts fresh.
+
 ## CLI Usage
 
 ```bash
 # Sequential — safest
-node scripts/cli.js loop --pattern sequential --max-runs 20
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
 
 # DAG — parallel-aware
-node scripts/cli.js loop --pattern dag --max-runs 50
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50
 
 # With cost limit
-node scripts/cli.js loop --max-cost 10 --max-runs 100
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --max-cost 10 --max-runs 100
 
 # Scoped to one epic (safe for parallel execution)
-node scripts/cli.js loop --epic epic-001 --pattern sequential --max-runs 20
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --epic epic-001 --pattern sequential --max-runs 20
 ```
 
 ## Red Flags
