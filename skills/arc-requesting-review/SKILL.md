@@ -30,7 +30,7 @@ description: Use when completing tasks or features to request code review
    HEAD_SHA=$(git rev-parse HEAD)
    ```
 
-2. Dispatch code-reviewer subagent (arcforge:code-reviewer) using template at `agents/code-reviewer.md` and fill placeholders:
+2. Dispatch code-reviewer subagent (arcforge:code-reviewer) using the template at `arc-requesting-review/code-reviewer.md` (this skill's directory) and fill placeholders:
 
 Required placeholders:
 - `{WHAT_WAS_IMPLEMENTED}`

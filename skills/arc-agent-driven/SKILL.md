@@ -154,9 +154,6 @@ The full agent roster for arc-agent-driven workflows:
 | **implementer** | TDD implementation | sonnet | Read, Write, Edit, Bash, Grep |
 | **spec-reviewer** | Spec compliance check | sonnet | Read, Grep, Glob |
 | **quality-reviewer** | Code quality review | sonnet | Read, Grep, Glob, Bash |
-| **planner** | Architecture analysis | opus | Read, Grep, Glob (read-only) |
-| **debugger** | Bug investigation | sonnet | Read, Grep, Glob, Bash |
-| **verifier** | Independent verification | sonnet | Read, Grep, Glob, Bash |
 
 ## Subagents Should Use
 
@@ -196,7 +193,7 @@ The full agent roster for arc-agent-driven workflows:
 - Accept "close enough" on spec compliance
 - Skip review loops
 - Let implementer self-review replace actual review
-- **Start code quality review before spec compliance ✅**
+- **Start code quality review before spec compliance**
 - Move to next task while either review has open issues
 
 **If subagent asks questions:**
