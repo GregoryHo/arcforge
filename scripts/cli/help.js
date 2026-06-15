@@ -137,6 +137,23 @@ COMMANDS:
                                      (default port: 3334). User-friendly alternative to the
                                      inbox/inspect/accept/activate CLI flow.
 
+  sdd-gate <stage> --spec-id <id> [--design <path>] [--decision-log <path>] [--draft <path>]
+      Deterministic SDD validation gates (refiner / planner). Stable JSON;
+      exit 0 = proceed, 1 = block, 2 = usage error.
+      Stages:
+        dag        DAG completion gate (refiner Phase 1).
+        design     Design-doc validation — needs --design (refiner Phase 2).
+        context    Vision + ledger + graph gate (refiner Phase 2.5b).
+        header     Spec identity-header validation; emits parsed spec_id,
+                   spec_version, latest_delta (planner Phase 1 scope source).
+                   Reads the spec.xml <overview> from stdin (heredoc) or --draft.
+        authorize  Axis-3 mechanical authorization check (refiner Phase 6b);
+                   on block writes specs/<id>/_pending-conflict.md. Needs
+                   --design; reads the combined in-memory draft (overview +
+                   requirements + traces) from stdin or --draft.
+        conflict   Write a _pending-conflict.md from a JSON payload on stdin
+                   (refiner Phase 4 / 5.5a / 5.5b).
+
   research dashboard [--results path] [--config path] [--port N]
                                      Live research experiment dashboard (default port: 3000)
 

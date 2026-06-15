@@ -45,6 +45,7 @@ const { printHelp } = require('./cli/help');
 const { runLearnCommand } = require('./cli/learn-command');
 const { runObsidianCommand } = require('./cli/obsidian-command');
 const { runRatifyCommand } = require('./cli/ratify-command');
+const { runSddGateCommand } = require('./cli/sdd-gate-command');
 
 // Parse command line arguments
 function parseArgs(args) {
@@ -184,6 +185,15 @@ async function main() {
         // arcforge ratify <spec-id> <D-id>
         // Engine B1 gate + interactive informed confirm. See scripts/cli/ratify-command.js.
         await runRatifyCommand(args.positional, projectRoot);
+        break;
+      }
+
+      case 'sdd-gate': {
+        // arcforge sdd-gate <dag|design|context|header|authorize|conflict> ...
+        // Deterministic SDD gates lifting refiner/planner inline node -e recipes.
+        // Stable JSON + exit 0/1/2; header/authorize read draft spec.xml from
+        // stdin. See scripts/cli/sdd-gate-command.js.
+        runSddGateCommand(args, projectRoot);
         break;
       }
 
