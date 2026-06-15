@@ -94,6 +94,23 @@ function isLearningEnabled({ scope = 'project', projectRoot = process.cwd(), hom
   return readScopeConfig({ scope, projectRoot, homeDir }).enabled === true;
 }
 
+/**
+ * Kill-switch for SessionStart injection of activated instincts (ICL-4).
+ *
+ * DEFAULT ON: injection happens unless `inject_activated_instincts` is set to
+ * the literal `false` in the global learning config. Any other value (absent,
+ * true, missing config file) leaves injection enabled. The switch is read from
+ * the global-scope config because activated-instinct injection is a HOME-global
+ * behavior, not project-scoped.
+ *
+ * @returns {boolean} true when injection is enabled
+ */
+function isInjectActivatedInstinctsEnabled({ homeDir } = {}) {
+  const config = readJsonFile(getLearningConfigPath({ scope: 'global', homeDir }), null);
+  if (config && config.inject_activated_instincts === false) return false;
+  return true;
+}
+
 function setLearningEnabled({
   scope = 'project',
   enabled,
@@ -733,6 +750,7 @@ module.exports = {
   getProjectId,
   inspectCandidate,
   isLearningEnabled,
+  isInjectActivatedInstinctsEnabled,
   listLearningInbox,
   listMaterializedDrafts,
   loadCandidates,

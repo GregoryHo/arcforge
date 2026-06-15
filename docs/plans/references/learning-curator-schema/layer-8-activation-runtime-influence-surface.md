@@ -175,13 +175,13 @@ The exact active root must be explicit and allowlisted. Layer 8 must not infer a
 
 | Candidate `artifact_type` | Activation target | Runtime influence contract |
 |---|---|---|
-| `instinct` | `~/.arcforge/instincts/<project>/<id>.md` or `~/.arcforge/instincts/global/<id>.md` according to candidate scope | Active instinct record only; must not auto-load into Claude context. |
+| `instinct` | `~/.arcforge/instincts/<project>/<id>.md` or `~/.arcforge/instincts/global/<id>.md` according to candidate scope | Active instinct record. May be surfaced at SessionStart only through the **activation-gated** injection path (ICL-4): a reviewer must have explicitly activated it. Confidence-based auto-load remains forbidden. |
 | `skill` | allowed `skills/<name>/SKILL.md` active root | May influence future Claude behavior through normal skill discovery only after activation. |
 | `command` | allowed active command root | May influence command availability only after activation. |
 | `agent` | allowed active agent root | May influence agent availability only after activation. |
 | `claude_md_addition` | manual patch artifact / instructions | No automatic edit to `CLAUDE.md`; user applies manually if desired. |
 
-For the pivot, activated instincts are durable learning atoms, not automatic LLM influence units. The SessionStart auto-load behavior remains forbidden. Influence reaches Claude only through explicitly activated skills / commands / agents or a manually applied CLAUDE.md patch outside automatic activation.
+Activated instincts are durable learning atoms. **Reviewed slice 2 (ICL-4) revision:** an instinct that a reviewer has explicitly activated on the dashboard MAY be surfaced into Claude context at SessionStart through the activation-gated injection path. The gate is the activation lifecycle, not confidence — the retired confidence-based auto-load (any high-confidence file surfacing automatically) remains forbidden. The injection is governed by the `inject_activated_instincts` kill-switch (default ON; explicit `false` silences it), is capped at the top five by confidence, and folds ActivationRecords by candidate_id (latest wins, so a deactivated instinct stops injecting). Influence still reaches Claude only after an explicit reviewer activation — never from pending/approved/materialized candidates, and never via an automatic CLAUDE.md patch.
 
 ## Primary output — ActivationRecord
 
@@ -343,6 +343,9 @@ type ActivationSafetyMetadata = {
   claude_md_auto_apply: false;
 
   runtime_boundary: {
+    // Confidence-based auto-load (any high-confidence file surfacing without
+    // review) stays disabled; the field name predates ICL-4. The ICL-4
+    // activation-gated injection is a distinct, reviewer-gated path.
     session_start_instinct_autoload_disabled_required: true;
     global_auto_promote_disabled_required: true;
   };
@@ -352,8 +355,8 @@ type ActivationSafetyMetadata = {
 Before enabling Layer 8 activation in production, implementation must verify the old behavior-changing shortcuts are disabled:
 
 ```text
-SessionStart instinct auto-load  disabled
-project → global auto-promote    disabled
+SessionStart confidence auto-load  disabled   (ICL-4 gated injection is separate)
+project → global auto-promote      disabled
 statistical analyzer production candidate path disabled
 ```
 
@@ -431,7 +434,7 @@ Runtime consumers may read active behavior surfaces only after Layer 8 has creat
 
 - Claude Code skill discovery may read activated skills in the allowed active skills root.
 - Command/agent discovery may read activated command/agent roots if those artifact types are implemented.
-- Instinct readers may read activated instinct files for dashboard/history/evolve input, but SessionStart must not auto-load instinct body into Claude context.
+- Instinct readers may read activated instinct files for dashboard/history/evolve input. SessionStart may additionally inject an activated instinct's trigger/body summary into Claude context through the activation-gated path (ICL-4); it must never confidence-auto-load a non-activated instinct.
 - Manual `CLAUDE.md` patch remains outside automatic runtime write; user applies it manually if desired.
 
 Layer 5 consumes Layer 8 success reports as lifecycle transition events.
@@ -450,7 +453,7 @@ Layer 8 must not:
 - generate or modify candidate meaning;
 - materialize drafts from candidate body if Layer 7 materialization is missing;
 - auto-apply `claude_md_addition` to `CLAUDE.md`;
-- re-enable SessionStart instinct auto-load;
+- re-enable confidence-based SessionStart instinct auto-load (the activation-gated injection of ICL-4 is the only permitted SessionStart instinct path);
 - auto-promote project candidates to global;
 - activate directly from pending or approved state;
 - treat activation registry as a replacement for Layer 5 lifecycle source of truth;
@@ -480,7 +483,8 @@ Blocked shortcuts:
 Pending Candidate → Active Surface       BLOCKED
 Approved Candidate → Active Surface      BLOCKED
 Materialized Draft → Active Surface      BLOCKED without explicit Activate
-Activated Instinct → SessionStart load   BLOCKED
+Non-activated Instinct → SessionStart    BLOCKED (no confidence auto-load)
+Activated Instinct → SessionStart inject ALLOWED (gated, kill-switch, top-5)
 claude_md_addition → auto-edit CLAUDE.md  BLOCKED
 ```
 
@@ -493,7 +497,7 @@ claude_md_addition → auto-edit CLAUDE.md  BLOCKED
 5. Active writes are atomic, lock-protected, and backed up when superseding existing artifacts.
 6. Activation records are persisted before reporting lifecycle success.
 7. Layer 5 receives `activated` / `deactivated` transitions only after side effects are durable.
-8. `instinct` activation does not reintroduce SessionStart auto-load into Claude context.
+8. `instinct` activation does not reintroduce confidence-based SessionStart auto-load. Activated instincts MAY surface at SessionStart only through the ICL-4 activation-gated injection (kill-switch default ON, top-5 by confidence, deactivation removes them).
 9. `skill` activation writes only to an allowed active skills root.
 10. `claude_md_addition` is never automatically applied to `CLAUDE.md`.
 11. Failed activation creates no `activated` lifecycle event.
@@ -507,7 +511,7 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
 
 1. Activation supports **`instinct` targets only**, written under `~/.arcforge/instincts/<project>/` for project-scoped candidates or `~/.arcforge/instincts/global/` for global-scoped candidates. Global instinct activation is first-slice behavior but still does not auto-load into Claude context. No active skills root is enabled by default. Future skill activation must require an explicit dashboard-selected, allowlisted skills root.
 2. `command` and `agent` activation are **reserved** until skill activation is implemented, reviewed, and proven safe. `claude_md_addition` remains manual-only and is never auto-applied.
-3. Activated instincts are consumed by dashboard/history/evolve surfaces only in the first slice. They must not be auto-loaded into Claude context at SessionStart and must not become direct runtime instructions.
+3. **Revised by ICL-4 (reviewed slice 2):** activated instincts are consumed by dashboard/history/evolve surfaces AND, when explicitly activated, by the SessionStart activation-gated injection path (kill-switch `inject_activated_instincts` default ON, top-5 by confidence, latest-wins fold over ActivationRecords). They are never confidence-auto-loaded and never become hard runtime instructions — they are surfaced as advisory context the model applies where relevant.
 4. Deactivation uses `move_to_disabled_archive` with a backup record. The first dashboard UX exposes deactivate status and backup metadata; full rollback/supersede UX is deferred.
 5. **Overwrite policy defaults**:
    - `instinct`: `"supersede_with_backup"` — re-activating an instinct after manual edit must preserve the prior body as a backup record, not hard-fail. The instinct path includes a candidate-derived `<id>`, so collisions are intended re-activations.
@@ -519,5 +523,5 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
 
 1. Active skills root selection and policy for future skill activation.
 2. Command/agent activation after skill activation is proven safe.
-3. Any non-runtime reader for activated instincts beyond dashboard/history/evolve.
+3. ~~Any non-runtime reader for activated instincts beyond dashboard/history/evolve.~~ **RESOLVED (ICL-4):** the SessionStart activation-gated injection is the first such consumer — it reads only explicitly-activated instinct files, gated by the `inject_activated_instincts` kill-switch (default ON) and capped at the top five by confidence.
 4. Rich rollback/supersede dashboard UX.

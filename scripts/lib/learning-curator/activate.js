@@ -70,6 +70,112 @@ function getActivationsDir(arcforgeRoot) {
   return path.join(arcforgeRoot, 'learning', 'activations');
 }
 
+// ---------------------------------------------------------------------------
+// Draft → active content transform (ICL-4 / S5-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Map a candidate's evidence_quality to an initial confidence value.
+ * Activated instincts enter the confidence lifecycle at a deliberately modest
+ * starting point; subsequent confirm/contradict/decay moves it from there.
+ * Falls back to 0.5 (the shared INITIAL constant) for unknown/absent quality.
+ *
+ * @param {string|undefined} evidenceQuality
+ * @returns {number} initial confidence in [0,1]
+ */
+function initialConfidenceFor(evidenceQuality) {
+  switch (evidenceQuality) {
+    case 'high':
+      return 0.6;
+    case 'medium':
+      return 0.55;
+    case 'low':
+      return 0.5;
+    default:
+      return 0.5;
+  }
+}
+
+/**
+ * Escape a value for safe inclusion inside a double-quoted YAML scalar.
+ * Mirrors the confidence.js frontmatter writer's quoting expectations: strip
+ * control characters and escape embedded double quotes.
+ */
+function yamlQuote(value) {
+  const str = String(value == null ? '' : value)
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char sanitization
+    .replace(/[\x00-\x1f\x7f]/g, ' ');
+  return `"${str.replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * Transform a materialized INACTIVE DRAFT into active instinct content.
+ *
+ * The materializer (materialize.js) emits a draft whose header is a fenced
+ * ```json metadata block plus an "INACTIVE DRAFT" banner — a shape the
+ * injection/decay readers (loadInstinctFiles, instinct.js, confidence.js)
+ * cannot parse, because they require leading `---` YAML frontmatter with a
+ * numeric `confidence` field. Without this transform every dashboard-activated
+ * instinct would be silently filtered out (frontmatter.confidence === undefined).
+ *
+ * This emits the canonical active form: YAML `---` frontmatter carrying
+ * id / confidence / source / domain / trigger, followed by the candidate body.
+ * The embedded ```json scope block is preserved so the keyspace migration
+ * (readInstinctProjectScope) can still recover the source scope.
+ *
+ * @param {object} candidate
+ * @returns {string} active instinct file content
+ */
+function buildActiveInstinctContent(candidate) {
+  const id = candidate.candidate_id;
+  const confidence = initialConfidenceFor(candidate.evidence_quality);
+  const domain = candidate.domain || 'general';
+  const trigger = candidate.trigger || candidate.summary || '';
+  const today = new Date().toISOString().split('T')[0];
+
+  // Provenance metadata block — readInstinctProjectScope (session-utils.js)
+  // reads scope.project from this fenced JSON to keyspace-migrate the file.
+  const provenance = {
+    candidate_id: id,
+    scope: candidate.scope,
+    source: 'curator',
+    activated_at: new Date().toISOString(),
+  };
+
+  const lines = [
+    '---',
+    `id: ${id}`,
+    `trigger: ${yamlQuote(trigger)}`,
+    `domain: ${domain}`,
+    'source: curator',
+    `confidence: ${confidence.toFixed(2)}`,
+    `extracted: ${today}`,
+    `last_confirmed: ${today}`,
+    'confirmations: 0',
+    'contradictions: 0',
+    '---',
+    '',
+    '```json',
+    JSON.stringify(provenance, null, 2),
+    '```',
+    '',
+    `# ${candidate.name || id}`,
+    '',
+  ];
+
+  if (candidate.summary) {
+    lines.push(`> **Summary:** ${candidate.summary}`, '');
+  }
+
+  lines.push('## Action', '', candidate.body || '', '');
+
+  if (candidate.trigger) {
+    lines.push('## Trigger', '', candidate.trigger, '');
+  }
+
+  return lines.join('\n');
+}
+
 function getActivationLockPath(arcforgeRoot) {
   return path.join(getActivationsDir(arcforgeRoot), 'activation.lock');
 }
@@ -371,9 +477,15 @@ function activate({
       }
     }
 
-    // Write active file atomically
-    atomicWriteFile(activePath, draftContent);
-    const activeContentHash = sha256Truncated(draftContent, 64);
+    // Write active file atomically. The draft is verbatim-verified above, but
+    // the active artifact is a TRANSFORM (ICL-4 / S5-1): the INACTIVE DRAFT
+    // banner is stripped and YAML `---` frontmatter (id/confidence/source/
+    // domain/trigger) is emitted so the injection/decay readers can parse it.
+    // active_content_hash records the on-disk active form; the audit trail keeps
+    // source_draft_content_hash (the draft) separately.
+    const activeContent = buildActiveInstinctContent(candidate);
+    atomicWriteFile(activePath, activeContent);
+    const activeContentHash = sha256Truncated(activeContent, 64);
 
     // Build active artifact record
     const activePathHash = sha256Truncated(activePath, 32);
@@ -631,6 +743,57 @@ function findLatestActivation(arcforgeRoot, candidateId) {
 }
 
 // ---------------------------------------------------------------------------
+// listActivatedCandidateIds — fold all ActivationRecords (latest wins)
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan learning/activations, fold every record by candidate_id keeping the most
+ * recent (by created_at, file-name tiebreak), and return the set of candidate
+ * ids whose latest record is an `activate` (i.e. currently active, not since
+ * deactivated). This is the activation GATE for SessionStart injection (ICL-4):
+ * influence reaches the model only for candidates a reviewer explicitly
+ * activated and has not deactivated.
+ *
+ * @param {string} arcforgeRoot
+ * @returns {Set<string>} candidate ids whose latest action === 'activate'
+ */
+function listActivatedCandidateIds(arcforgeRoot) {
+  const activated = new Set();
+  const activationsDir = getActivationsDir(arcforgeRoot);
+  if (!fs.existsSync(activationsDir)) return activated;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(activationsDir).sort();
+  } catch {
+    return activated;
+  }
+
+  // candidate_id -> { action, created_at }
+  const latestByCandidate = new Map();
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    try {
+      const record = JSON.parse(fs.readFileSync(path.join(activationsDir, entry), 'utf8'));
+      const id = record.candidate_id;
+      if (!id || (record.action !== 'activate' && record.action !== 'deactivate')) continue;
+      const prev = latestByCandidate.get(id);
+      // Sorted file iteration gives a stable tiebreak when created_at ties.
+      if (!prev || record.created_at >= prev.created_at) {
+        latestByCandidate.set(id, { action: record.action, created_at: record.created_at });
+      }
+    } catch {
+      // Corrupted record — skip
+    }
+  }
+
+  for (const [id, latest] of latestByCandidate) {
+    if (latest.action === 'activate') activated.add(id);
+  }
+  return activated;
+}
+
+// ---------------------------------------------------------------------------
 // findLatestMaterialization — scan candidate drafts dir for the latest record
 // ---------------------------------------------------------------------------
 
@@ -674,6 +837,9 @@ module.exports = {
   deactivate,
   defaultActivationPolicy,
   buildActiveInstinctPath,
+  buildActiveInstinctContent,
+  initialConfidenceFor,
   findLatestActivation,
+  listActivatedCandidateIds,
   findLatestMaterialization,
 };

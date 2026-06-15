@@ -110,8 +110,24 @@ describe('start.js migrateInstincts', () => {
   });
 });
 
+// Seed an ActivationRecord so an instinct passes the ICL-4 activation gate.
+function seedActivation(candidateId) {
+  const dir = path.join(testDir, '.arcforge', 'learning', 'activations');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, `act_${candidateId}.json`),
+    JSON.stringify({
+      schema_version: 1,
+      activation_id: `act_${candidateId}`,
+      action: 'activate',
+      created_at: new Date().toISOString(),
+      candidate_id: candidateId,
+    }),
+  );
+}
+
 describe('inject-context loadAutoInstincts — first-session window (S5-6)', () => {
-  it('lazily migrates on a basename miss, then loads the migrated instinct', () => {
+  it('lazily migrates on a basename miss, then loads the migrated (activated) instinct', () => {
     const { getProjectName } = require(UTILS);
     const { getInstinctsDir } = require(SESSION_UTILS);
     const inject = require(INJECT);
@@ -125,16 +141,44 @@ describe('inject-context loadAutoInstincts — first-session window (S5-6)', () 
       path.join(hashDir, 'cand_inject.md'),
       instinctFile('cand_inject', project, 'proj-hash-www', 0.9),
     );
+    // ICL-4: injection is activation-gated. Activate the candidate so it loads.
+    seedActivation('cand_inject');
 
     const result = inject.loadAutoInstincts(project);
 
-    // The instinct was migrated and then loaded (count reflects the high-conf
-    // migrated file).
-    assert.strictEqual(result.count, 1, 'migrated instinct should be loaded');
+    // The instinct was migrated and then loaded (it is activated).
+    assert.strictEqual(result.count, 1, 'migrated + activated instinct should be loaded');
     assert.ok(/cand_inject/.test(result.text), 'loaded text should mention the instinct');
 
     // And it physically moved into the name-keyed dir.
     const nameFile = path.join(getInstinctsDir(project), 'cand_inject.md');
     assert.ok(fs.existsSync(nameFile), 'file should be migrated to the name-keyed dir');
+  });
+
+  it('still migrates a non-activated instinct on basename miss, but does not inject it', () => {
+    const { getProjectName } = require(UTILS);
+    const { getInstinctsDir } = require(SESSION_UTILS);
+    const inject = require(INJECT);
+
+    const project = getProjectName();
+    const hashDir = path.join(testDir, '.arcforge', 'instincts', 'proj-hash-www');
+    fs.mkdirSync(hashDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(hashDir, 'cand_noact.md'),
+      instinctFile('cand_noact', project, 'proj-hash-www', 0.9),
+    );
+    // No activation record seeded.
+
+    const result = inject.loadAutoInstincts(project);
+
+    // Activation gate: a non-activated instinct never injects, however high its
+    // confidence.
+    assert.strictEqual(result.count, 0, 'non-activated instinct must not inject');
+    // But the S5-6 first-session migration still ran as a side effect.
+    const nameFile = path.join(getInstinctsDir(project), 'cand_noact.md');
+    assert.ok(
+      fs.existsSync(nameFile),
+      'migration should still move the file to the name-keyed dir',
+    );
   });
 });

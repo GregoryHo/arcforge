@@ -33,19 +33,35 @@ const {
   getInstinctsDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
+  getInstinctsRoot,
   migrateInstinctsToNameKey,
 } = require('../../scripts/lib/session-utils');
 
-const { parseConfidenceFrontmatter, shouldAutoLoad } = require('../../scripts/lib/confidence');
+const { parseConfidenceFrontmatter } = require('../../scripts/lib/confidence');
+const { getArcforgeHome } = require('../../scripts/lib/utils');
+const { listActivatedCandidateIds } = require('../../scripts/lib/learning-curator/activate');
+const { isInjectActivatedInstinctsEnabled } = require('../../scripts/lib/learning');
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
 const { draftIsStale } = require('../../scripts/lib/diary-capture');
 
+// Max activated instincts injected into SessionStart context (ICL-4).
+const MAX_INJECTED_INSTINCTS = 5;
+
 /**
- * Load instincts with confidence >= AUTO_LOAD_THRESHOLD
+ * Load activated instincts for SessionStart context injection (ICL-4).
+ *
+ * The GATE is the activation lifecycle, not confidence: an instinct is injected
+ * only when a reviewer explicitly activated it on the dashboard and has not
+ * since deactivated it (`listActivatedCandidateIds` folds ActivationRecords by
+ * candidate_id, latest wins). Confidence is used ONLY to sort and cap the top
+ * five — never as a threshold. The `inject_activated_instincts` kill-switch is
+ * DEFAULT ON; only an explicit `false` in the global learning config silences it.
  */
 function loadAutoInstincts(project) {
+  if (!isInjectActivatedInstinctsEnabled()) return { text: null, count: 0 };
+
   let projectInstincts = loadInstinctFiles(getInstinctsDir(project));
   // First-session window (ICL-3, S5-6): start.js runs async and is skipped on
   // source=compact, so the name-keyed dir may still be empty while stale
@@ -60,25 +76,40 @@ function loadAutoInstincts(project) {
     }
   }
   const globalInstincts = loadInstinctFiles(getGlobalInstinctsDir());
-  const autoLoaded = [...projectInstincts, ...globalInstincts].filter((i) =>
-    shouldAutoLoad(i.confidence),
-  );
 
-  if (autoLoaded.length === 0) return { text: null, count: 0 };
+  let activated;
+  try {
+    // Active instinct files live under <home>/instincts; ActivationRecords live
+    // under <home>/learning/activations — both rooted at the same arcforge home.
+    const arcforgeRoot = path.dirname(getInstinctsRoot()) || getArcforgeHome();
+    activated = listActivatedCandidateIds(arcforgeRoot);
+  } catch {
+    activated = new Set();
+  }
+  if (activated.size === 0) return { text: null, count: 0 };
+
+  // Gate: a file is injected only when its basename (candidate_id) is in the
+  // activated set. Confidence is NOT a gate here.
+  const gated = [...projectInstincts, ...globalInstincts].filter((i) => activated.has(i.id));
+  if (gated.length === 0) return { text: null, count: 0 };
+
+  // Confidence sorts + caps the top five; it does not exclude anything.
+  gated.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+  const top = gated.slice(0, MAX_INJECTED_INSTINCTS);
 
   const lines = [
     '## Active Behavioral Instincts\n',
-    'These patterns were auto-detected from your tool usage:\n',
+    'These patterns were activated for this project. Apply them where relevant:\n',
   ];
 
-  for (const inst of autoLoaded) {
-    const pctStr = Math.round(inst.confidence * 100);
+  for (const inst of top) {
+    const pctStr = Math.round((inst.confidence || 0) * 100);
     lines.push(`- **${inst.id}** (${pctStr}%): ${inst.trigger || inst.action || ''}`);
   }
 
   lines.push('\nInvoke /arcforge:arc-observing to confirm/contradict these patterns.');
 
-  return { text: lines.join('\n'), count: autoLoaded.length };
+  return { text: lines.join('\n'), count: top.length };
 }
 
 /**
@@ -327,9 +358,15 @@ function main() {
   const contextParts = [];
   const userParts = [];
 
-  // loadAutoInstincts is intentionally not called — SessionStart must not
-  // auto-inject instinct text into Claude context. Influence reaches the
-  // model only through explicit activation.
+  // Activated behavioral instincts (ICL-4). Influence reaches the model only
+  // through explicit dashboard activation (activation-gated, top-5 by
+  // confidence, kill-switch default ON) — never via the retired confidence
+  // auto-load.
+  const { text: instinctContext, count: instinctCount } = loadAutoInstincts(project);
+  if (instinctContext) {
+    contextParts.push(instinctContext);
+    userParts.push(`${instinctCount} active instinct${instinctCount === 1 ? '' : 's'}`);
+  }
 
   // Pending action notifications
   const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project);
