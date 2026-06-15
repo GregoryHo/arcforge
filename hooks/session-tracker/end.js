@@ -33,8 +33,16 @@ const {
   resetCounter: resetUserCounter,
 } = require('../user-message-counter/main');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
-const { calculateDurationMinutes } = require('./summary');
 const { parseTranscript } = require('../../scripts/lib/transcript');
+
+/**
+ * Calculate duration in minutes between two ISO timestamps
+ */
+function calculateDurationMinutes(startISO, endISO) {
+  if (!startISO || !endISO) return null;
+  const durationMs = new Date(endISO) - new Date(startISO);
+  return Math.round(durationMs / 60000);
+}
 
 /**
  * Create default session if none exists
@@ -250,6 +258,7 @@ function main() {
 
 // Export for testing
 module.exports = {
+  calculateDurationMinutes,
   getOrCreateSession,
   saveSessionJson,
   formatStats,

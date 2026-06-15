@@ -30,15 +30,7 @@ Once the daemon is running and learning is enabled, the **dashboard** is where a
 
 ### Retired / Deprecated CLI commands
 
-The following `arcforge learn ...` subcommands remain in the CLI but do not read or write the candidate queue. Use the dashboard for new workflows.
-
-- `arcforge learn analyze --project` — the command exits with a deprecation notice; candidate curation is handled by the LLM curator (observer daemon Layer 3+4).
-- `arcforge learn review --project` — legacy CLI summary; use dashboard instead.
-- `arcforge learn inbox --project` — legacy pending list; use dashboard.
-- `arcforge learn approve <candidate-id> --project` / `arcforge learn reject <candidate-id> --project` — legacy approval/rejection; use dashboard `[Approve]` / `[Dismiss]`.
-- `arcforge learn materialize <candidate-id> --project` — legacy materialization (writes project-relative `.draft` siblings); current drafts live in `~/.arcforge/learning/drafts/<cid>/<mid>/instincts/<name>.md` via dashboard `[Materialize]`.
-- `arcforge learn activate <candidate-id> --project` — legacy activation; use dashboard `[Activate]` (Layer 8 activate.js).
-- `arcforge learn inspect <candidate-id> --project` / `arcforge learn drafts --project` — legacy inspection; use dashboard candidate card.
+Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI but do not read or write the candidate queue — use the dashboard instead.
 
 Use `--json` on any command when another tool or test needs machine-readable output.
 
@@ -93,4 +85,4 @@ The full set of statuses a candidate moves through:
 
 ## Legacy Compatibility
 
-The supported surface is the `arcforge learn ...` lifecycle above. Do not use the legacy `skills/arc-learning/scripts/learn.js` to bypass candidate approval, inactive draft materialization, or explicit activation gates.
+The supported surface is the `arcforge learn ...` lifecycle above. Do not bypass candidate approval, inactive draft materialization, or explicit activation gates with ad-hoc scripts — combining related instincts into a higher-level candidate is the dashboard's Evolve action.

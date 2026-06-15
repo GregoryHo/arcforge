@@ -55,7 +55,7 @@ fi
 
 - Pattern was already auto-detected by arc-observing (use confirm instead)
 - User wants to analyze multiple diaries for patterns (use arc-reflecting)
-- User wants to cluster instincts into higher-level skills (use /learn)
+- User wants to combine related instincts into a higher-level candidate (use the dashboard Evolve action: `arcforge learn dashboard`)
 - User is just discussing patterns without wanting to save them
 
 ## Key Principles

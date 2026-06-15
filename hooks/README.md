@@ -39,9 +39,7 @@ hooks/
 │   ├── inject-context.js   # Context injection at session start
 │   ├── start.js
 │   ├── end.js
-│   ├── summary.js          # Markdown summary generator
 │   ├── session.json.template
-│   ├── session.md.template
 │   └── README.md
 ├── user-message-counter/   # Counts user prompts
 │   ├── main.js

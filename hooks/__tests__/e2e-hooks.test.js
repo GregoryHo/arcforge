@@ -502,26 +502,51 @@ describe('E2E: pre-compact/main.js', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  it('should log compaction event', () => {
+  it('should only append compactions[] — no markdown file, no compaction log', () => {
+    // getSessionId() prefixes the env value with 'session-'
+    const sessionId = 'session-test-precompact';
+    const projectName = path.basename(testDir);
+    const date = new Date().toISOString().split('T')[0];
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', projectName, date);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({ project: projectName, date, toolCalls: 3, compactions: [] }),
+    );
+
+    // Push counters above threshold so the diary-trigger branch runs
+    fs.writeFileSync(path.join(testDir, `arcforge-user-count-${sessionId}`), '15');
+    fs.writeFileSync(path.join(testDir, `arcforge-tool-count-${sessionId}`), '60');
+
     const input = makeHookInput('PreCompact', {}, { session_id: 'test-precompact' });
     const result = runNodeHook(scriptPath, input, {
       CLAUDE_PROJECT_DIR: testDir,
       HOME: testDir,
       TMPDIR: testDir,
+      CLAUDE_SESSION_ID: 'test-precompact',
     });
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
 
-    // Check compaction log was written
-    const projectName = path.basename(testDir);
-    const logPath = path.join(testDir, '.arcforge', 'sessions', projectName, 'compaction-log.txt');
-    if (fs.existsSync(logPath)) {
-      const content = fs.readFileSync(logPath, 'utf-8');
-      assert.ok(
-        content.includes('compaction') || content.includes('Context'),
-        'Should log compaction event',
-      );
-    }
+    const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    assert.strictEqual(updated.compactions.length, 1, 'should append one compaction timestamp');
+    // Counter reset proves the threshold branch (former markdown writer) executed
+    assert.strictEqual(
+      fs.readFileSync(path.join(testDir, `arcforge-user-count-${sessionId}`), 'utf-8'),
+      '0',
+      'threshold branch should run and reset the user counter',
+    );
+    assert.ok(
+      !fs.existsSync(path.join(sessionDir, `${sessionId}.md`)),
+      'should not write a markdown summary file',
+    );
+    assert.ok(
+      !fs.existsSync(
+        path.join(testDir, '.arcforge', 'sessions', projectName, 'compaction-log.txt'),
+      ),
+      'should not write compaction-log.txt',
+    );
   });
 
   it('should exit 0 with empty stdin', () => {

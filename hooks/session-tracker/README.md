@@ -24,13 +24,11 @@ Provides session persistence across Claude Code sessions.
 
 ## Storage
 
-Sessions stored in `~/.arcforge/sessions/` in both JSON and Markdown formats:
+Sessions stored in `~/.arcforge/sessions/` as JSON:
 ```
 ~/.arcforge/sessions/
 ├── my-project-2025-01-24.json    # Machine-readable
-├── my-project-2025-01-24.md      # Human-readable summary
 ├── my-project-2025-01-23.json
-├── my-project-2025-01-23.md
 └── other-project-2025-01-24.json
 ```
 
@@ -48,34 +46,6 @@ Sessions stored in `~/.arcforge/sessions/` in both JSON and Markdown formats:
   ],
   "notes": "Working on hooks implementation"
 }
-```
-
-## Markdown Summary Format
-
-Each session also generates a human-readable `.md` file:
-
-```markdown
-# Session: my-project
-**Date:** 2025-01-24
-
-## Metrics
-- **Duration:** ~45 minutes
-- **Tool calls:** 47
-- **Compactions:** 2
-
-## Files Modified
-- `src/foo.ts`
-- `tests/foo.test.ts`
-
-## Compaction Timeline
-1. 11:00 - Compaction
-2. 12:00 - Compaction
-
-## Notes
-Working on hooks implementation
-
----
-*Generated at 2025-01-24T12:30:00.000Z*
 ```
 
 ## Output Examples
