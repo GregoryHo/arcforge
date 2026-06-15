@@ -289,7 +289,7 @@ Work with one instance of Claude ("Claude A") to create a Skill that will be use
 
 Always use forward slashes in file paths, even on Windows:
 
-* Good: `scripts/helper.py`, `reference/guide.md`
+* Good: `scripts/helper.py`, `reference/guide.md` <!-- doc-ref-lint: ignore R1 illustrative path example, not a real repo file -->
 * Avoid: `scripts\helper.py`, `reference\guide.md`
 
 ### Avoid Offering Too Many Options
