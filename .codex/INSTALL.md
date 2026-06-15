@@ -5,12 +5,22 @@ Enable agentic skills in Codex via native skill discovery. One clone, one symlin
 ## Prerequisites
 
 - Git
+- Node.js — the arcforge CLI (`scripts/cli.js`) runs on Node; skills that
+  call it need it on your `PATH`
 
 ## Installation
 
 1. **Clone arcforge:**
    ```bash
    git clone https://github.com/GregoryHo/arcforge ~/.agents/arcforge
+   ```
+
+   This is the **standard clone location**, and skills resolve the CLI
+   through `ARCFORGE_ROOT`. Codex has no SessionStart hook to export it, so
+   skills fall back to `~/.agents/arcforge` automatically. If you clone
+   somewhere else, export it in your shell profile so the CLI resolves:
+   ```bash
+   export ARCFORGE_ROOT=/your/arcforge/checkout
    ```
 
 2. **Create the skills directory:**

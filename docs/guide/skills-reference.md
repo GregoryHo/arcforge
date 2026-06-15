@@ -363,24 +363,32 @@ The complete catalog still uses functional categories for lookup:
 
 ### arc-using-worktrees
 
-**Purpose:** Thin wrapper around `arcforge expand --epic <id>` for creating
-an isolated worktree for a single epic. Delegates all path derivation,
-marker writing, and project setup to `scripts/lib/coordinator.js`.
+**Purpose:** Isolated git worktrees for **any** repo, in two tiers. A
+**generic tier** (`arcforge worktree add|list|remove`) handles a parallel
+branch, an experiment, or a review checkout in any project; a **composition
+tier** hands single-epic work to the coordinator. Both derive the canonical
+path at runtime — you never invent one.
 
-**When to use:** When creating isolated workspace for epic development.
+**When to use:** When work needs an isolated workspace — a parallel branch,
+an experiment, a review checkout, or scoping to one epic — in any git repo.
 
-**Key workflow:**
-1. Identify the epic id from `dag.yaml` or the user's request
-2. Invoke `node "${SKILL_ROOT}/scripts/coordinator.js" expand --epic <id> --project-setup`
-3. Read the absolute worktree path from the command's JSON output
-4. Report it verbatim to the user — do not reconstruct or hardcode
+**Key workflow (top-down, first match wins):**
+1. `.arcforge-epic` exists in cwd → already inside an epic worktree; never
+   nest. Work → arc-implementing; integration → arc-finishing.
+2. `specs/<id>/dag.yaml` exists and the work matches an epic id → composition
+   tier: escalate to the coordinator (`arcforge expand --epic <id>`).
+3. Anything else (a branch, experiment, or review checkout) → generic tier:
+   `arcforge worktree add <name>`, then read the absolute `path` from the
+   JSON output and `cd` there.
 
 **Artifacts:**
-- Output: worktree at the canonical path
-  (`~/.arcforge/worktrees/<project>-<hash>-<epic>/`), `.arcforge-epic` marker
-  authored by the coordinator, `dag.yaml` epic status updated
+- Generic: a managed worktree at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`
+  with **no** marker (`kind: generic`)
+- Epic (composition tier): worktree + `.arcforge-epic` marker authored by the
+  coordinator, `dag.yaml` epic status updated
 
-For the full derivation rules see
+For the full derivation rules — including the generic null-spec path, kind
+annotation, and the sync/merge invisibility guarantee — see
 [`docs/guide/worktree-workflow.md`](worktree-workflow.md) and the Worktree
 Rule in `skills/arc-using/SKILL.md`.
 

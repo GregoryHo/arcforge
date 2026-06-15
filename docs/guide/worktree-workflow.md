@@ -91,6 +91,92 @@ which delegates to `git worktree remove <absolute-path>`.
 - After cleanup the epic's `worktree` field in `specs/<spec-id>/dag.yaml`
   is cleared to `null`.
 
+## Generic (non-epic) worktrees
+
+Not every worktree is an epic. A throwaway branch, an experiment, or a
+review checkout needs the same isolation without the DAG machinery. The
+`arcforge worktree add|list|remove` subcommands (engine:
+`scripts/lib/worktree-generic.js`) manage these **generic** worktrees, and
+they live beside epic worktrees under `~/.arcforge/worktrees/` with no path
+collision.
+
+### Null-spec path derivation
+
+A generic worktree reuses the canonical derivation with **no spec id** —
+`getWorktreePath(projectRoot, /* specId = */ null, slug)`, the documented
+legacy-null hash branch. The directory name is
+`<project>-<hash6>-<slug>/`, where `<slug>` is the sanitized worktree name
+and `<hash6>` folds only the project path (epic hashes additionally fold
+the spec id in, so the two namespaces never collide). As always, **the
+path is derived, never hardcoded** — read it from the CLI's JSON output.
+
+```bash
+arcforge worktree add my-experiment --json
+# { "name": "my-experiment", "slug": "my-experiment", "branch": "my-experiment",
+#   "branch_created": true,
+#   "path": "/Users/alice/.arcforge/worktrees/proj-3f2a91-my-experiment" }
+```
+
+`add` defaults the branch to the worktree name; an existing branch is
+checked out as-is, a missing one is created from `--from` (default: base
+HEAD). `--setup` auto-detects and runs the project installer in the fresh
+worktree (adds a `setup_command` field to the JSON).
+
+### Kind annotation
+
+`arcforge worktree list --json` enumerates every worktree git knows about
+and tags each with a `kind`:
+
+```bash
+arcforge worktree list --json
+# { "count": N, "worktrees": [
+#   { "path": "...", "branch": "...", "head": "...", "kind": "base" },
+#   { "path": "...", "branch": "...", "head": "...", "kind": "epic",
+#     "epic": "epic-001", "spec_id": "spec-x" },
+#   { "path": "...", "branch": "...", "head": "...", "kind": "generic" } ] }
+```
+
+| `kind` | Meaning |
+|--------|---------|
+| `base` | The main checkout — first non-managed entry |
+| `epic` | A managed path carrying an `.arcforge-epic` marker (`epic`/`spec_id` attached) |
+| `generic` | A managed path with **no** marker — created by `arcforge worktree add` |
+| `external` | Any other non-managed entry (e.g. a user-placed raw-git worktree) |
+
+The discrimination needs **no new marker file**: `kind` is derived from
+`parseWorktreePath × hasArcforgeMarker`. A generic worktree is, by
+definition, the managed-but-markerless case.
+
+### Sync / merge invisibility guarantee
+
+Because a generic worktree has no `.arcforge-epic` marker, the
+coordinator's DAG machinery cannot see it and never touches it:
+
+- `arc-coordinating sync` keys off marker files, so a generic worktree is
+  skipped — its progress is never carried into any `dag.yaml`.
+- `_findBaseWorktree` / `arcforge merge` walk the worktree list and reason
+  only over base + epic entries; the generic one is inert to them.
+- `arc-guard`'s worktree rules self-gate on the marker, so raw `git merge`
+  or a loop launch inside a generic worktree is **not** blocked — it is the
+  user's own business, not coordinator territory.
+
+This is the build-time seam fix: a generic worktree is invisible to epic
+tooling by construction, not by special-casing.
+
+### Finishing and removing a generic worktree
+
+A generic worktree is finished through the **non-epic path** of
+`arc-finishing` (its Step 0 marker check routes there when no
+`.arcforge-epic` is present). Cleanup is `arcforge worktree remove <name>`,
+which refuses to touch an epic (marker-bearing) worktree — those belong to
+`arcforge cleanup` — refuses a non-managed path, and refuses a dirty tree
+unless `--force` is given:
+
+```bash
+arcforge worktree remove my-experiment --json
+# { "removed": true, "path": "/Users/alice/.arcforge/worktrees/proj-3f2a91-my-experiment" }
+```
+
 ## 概念總覽 / Concept Overview
 
 ```
