@@ -109,7 +109,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx|js|jsx)$\"",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
