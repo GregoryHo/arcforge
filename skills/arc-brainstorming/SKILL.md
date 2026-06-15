@@ -251,12 +251,17 @@ The schema accepts any `YYYY-MM-DD(-.+)?` — the suffix is human convention, no
 
 **1) Write the validated design doc to the confirmed path**
 
-**2) Commit the design doc**
+**2) Commit the brainstorming artifacts**
+
+Commit the entire dated plans directory (design.md plus decision-log.yml) and the decision ledger:
 
 ```
-git add docs/plans/<spec-id>/<YYYY-MM-DD>/design.md
-git commit -m "docs: add <spec-id> design"
+git add docs/plans/<spec-id>/<YYYY-MM-DD>/
+git add specs/<spec-id>/decisions.yml
+git commit -m "docs: add <spec-id> design and decision artifacts"
 ```
+
+If no ledger entries were appended this session and `specs/<spec-id>/decisions.yml` does not exist, skip its `git add` line.
 
 **3) Hand off to refiner**
 
