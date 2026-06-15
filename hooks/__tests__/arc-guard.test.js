@@ -101,6 +101,53 @@ describe('arc-guard evaluate', () => {
     }
   });
 
+  // WT-5: arc-finishing-epic's conflict recovery now runs `finish-epic.js merge
+  // --abort`, which the coordinator executes against the BASE worktree via
+  // `git -C <base> merge --abort` (execFileSync, not the Bash tool — so it never
+  // reaches this hook in production). These two cases pin the regex so that even
+  // if such a command were typed into the Bash tool from a worktree, the `-C
+  // <path>` form of conflict-recovery is NOT matched (the --abort/--continue
+  // lookahead still applies through the `-C` operand).
+  it('does NOT block `git -C <base> merge --abort` (WT-5 conflict recovery)', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    assert.strictEqual(
+      GIT_MERGE_RE.test('git -C /home/u/.arcforge/worktrees/proj-abc-base merge --abort'),
+      false,
+      'the -C form of conflict-recovery must not match GIT_MERGE_RE',
+    );
+    const { evaluate } = require('../arc-guard/main');
+    assert.strictEqual(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: { command: 'git -C /home/u/.arcforge/worktrees/proj-abc-base merge --abort' },
+        cwd: wt(),
+      }),
+      null,
+      'should allow `git -C <base> merge --abort` from a worktree',
+    );
+  });
+
+  it('does NOT block `git -C <base> merge --continue` (WT-5 conflict recovery)', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    assert.strictEqual(
+      GIT_MERGE_RE.test('git -C /home/u/.arcforge/worktrees/proj-abc-base merge --continue'),
+      false,
+      'the -C form of --continue must not match GIT_MERGE_RE',
+    );
+    const { evaluate } = require('../arc-guard/main');
+    assert.strictEqual(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: {
+          command: 'git -C /home/u/.arcforge/worktrees/proj-abc-base merge --continue',
+        },
+        cwd: wt(),
+      }),
+      null,
+      'should allow `git -C <base> merge --continue` from a worktree',
+    );
+  });
+
   it('still blocks a real merge with flags (`git merge --no-ff main`)', () => {
     const { evaluate } = require('../arc-guard/main');
     assert.ok(

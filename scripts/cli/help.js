@@ -45,10 +45,12 @@ COMMANDS:
       --verify         Run tests after creation
       --verify-cmd     Custom test command (default: auto-detect)
 
-  merge [epic_ids...] [--base branch] [--spec-id <id>]
+  merge [epic_ids...] [--base branch] [--abort] [--spec-id <id>]
       Merge completed epics to base branch. Without --spec-id, positional
       epic ids are reverse-looked-up across specs.
       --base           Target branch (default: current)
+      --abort          Abort an in-progress merge in the base checkout
+                       (conflict recovery; runs even from a worktree cwd)
 
   cleanup [epic_ids...] [--spec-id <id>]
       Remove worktrees for completed epics.
