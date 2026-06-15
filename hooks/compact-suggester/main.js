@@ -21,6 +21,7 @@ const {
   output,
   createSessionCounter,
 } = require('../../scripts/lib/utils');
+const { incrementSharedToolCount } = require('../../scripts/lib/diary-capture');
 
 const THRESHOLD = 50; // First suggestion
 const INTERVAL = 25; // Subsequent reminders
@@ -141,9 +142,10 @@ function main() {
   const newCount = currentCount + 1;
   counter.write(newCount);
 
-  // Also increment shared tool-count (used by diary threshold in session-tracker/end)
-  const diaryCounter = createSessionCounter('tool-count');
-  diaryCounter.write(diaryCounter.read() + 1);
+  // Also increment shared tool-count (used by diary threshold in session-tracker/end).
+  // SOLE increment path — owned by diary-capture so the diary and suggester
+  // thresholds share one source of truth (counter-ownership contract).
+  incrementSharedToolCount();
 
   // Check if suggestion is needed (suppress during write-heavy phases at non-threshold counts)
   if (shouldSuggest(newCount)) {
