@@ -75,7 +75,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 8. **Wrap up (three actions, in order).** When every epic reaches a terminal state:
 
-   - **8a.** Emit the Final Report (format below). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
+   - **8a.** Emit the Final Report (format in `references/wrap-up-sequence.md` §8a). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
    - **8b.** Clean up **accepted** worktrees from the project root: `node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
    - **8c.** Shut down any remaining teammates (most already down from Steps 6/7), then call `TeamDelete`. See `references/wrap-up-sequence.md` for ordering and failure handling.
 
