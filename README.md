@@ -152,7 +152,7 @@ All 33 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-implementing** - Orchestrate large project implementation in a worktree
 - **arc-coordinating** - Worktree management for multi-epic projects
-- **arc-using-worktrees** - Create isolated workspace for epic development
+- **arc-using-worktrees** - Isolated git worktree for any repo: a branch, experiment, or review checkout via the generic CLI; epic work auto-escalates to the coordinator
 - **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
 - **arc-dispatching-teammates** - Lead-present multi-epic parallelism via agent teammates
 - **arc-looping** - Autonomous cross-session loop execution

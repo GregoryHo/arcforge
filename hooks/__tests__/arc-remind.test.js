@@ -104,6 +104,33 @@ describe('arc-remind worktree-add + ship-a-skill nudges', () => {
     assert.ok(worktreeAddNudge().includes('arcforge expand'));
     assert.ok(evalBeforeShipNudge().includes('arc-writing-skills'));
   });
+
+  it('worktree-add nudge points BOTH directions (epic + non-epic)', () => {
+    const { worktreeAddNudge } = require('../arc-remind/main');
+    const msg = worktreeAddNudge();
+    // Epic direction: the coordinator's expand.
+    assert.ok(msg.includes('arcforge expand'), 'epic direction → arcforge expand');
+    // Non-epic direction (WT-2 CLI): the generic worktree subcommand.
+    assert.ok(msg.includes('arcforge worktree add'), 'non-epic direction → arcforge worktree add');
+  });
+
+  it('the CLI-routed worktree add does NOT fire the nudge (seam solved by construction)', () => {
+    // The nudge is gated on the raw `git worktree add` regex. A command routed
+    // through the arcforge CLI never contains that literal, so it never trips —
+    // this is the build-time seam fix (WT-2/WT-7), pinned here.
+    const { isWorktreeAdd } = require('../arc-remind/main');
+    assert.strictEqual(
+      isWorktreeAdd('node /opt/arcforge/scripts/cli.js worktree add t1'),
+      false,
+      'CLI-routed worktree add must not match',
+    );
+    assert.strictEqual(
+      isWorktreeAdd('arcforge worktree add t1'),
+      false,
+      'bare arcforge worktree add must not match',
+    );
+    assert.ok(isWorktreeAdd('git worktree add ../wt feat'), 'raw git form still matches');
+  });
 });
 
 describe('arc-remind main-branch nudge', () => {

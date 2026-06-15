@@ -21,8 +21,10 @@
  *   PR boundary   `gh pr create`/`merge`  -> verify (arc-verifying) + review
  *                                            (arc-requesting-review); notes whether
  *                                            a test ran this session
- *   worktree add  `git worktree add` in an arcforge project -> prefer `arcforge
- *                                            expand` for epic worktrees
+ *   worktree add  raw `git worktree add` in an arcforge project -> prefer the
+ *                                            arcforge CLI in BOTH directions:
+ *                                            `arcforge expand` for epic worktrees,
+ *                                            `arcforge worktree add` for non-epic ones
  *   ship a skill  `git commit`/`push` after editing a SKILL.md (once/session)
  *                                         -> freshness-aware eval nudge: compares
  *                                            evals/benchmarks/latest.json (`generated`,
@@ -149,9 +151,12 @@ function buildReminder(command, testSeen) {
 
 function worktreeAddNudge() {
   return (
-    '\n🌳 Manual `git worktree add` in an arcforge project. For EPIC worktrees, ' +
-    '`arcforge expand` (see arc-using-worktrees) creates the `.arcforge-epic` marker and ' +
-    'keeps the DAG in sync — prefer it for epic work. (Fine for a non-epic worktree.)\n'
+    '\n🌳 Manual `git worktree add` in an arcforge project. Prefer the arcforge CLI so ' +
+    'the path is derived and hooks stay quiet (see arc-using-worktrees):\n' +
+    '  • EPIC work → `arcforge expand --epic <id>` — writes the `.arcforge-epic` marker ' +
+    'and keeps the DAG in sync.\n' +
+    '  • Non-epic work (a branch, experiment, or review checkout) → `arcforge worktree add ' +
+    '<name>` — a managed worktree with no marker.\n'
   );
 }
 

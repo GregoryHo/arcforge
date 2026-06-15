@@ -10,7 +10,7 @@ Dispatches by tool; emits a user-facing `systemMessage` for these triggers:
 | Trigger | Tool | Nudge |
 |---------|------|-------|
 | `gh pr create` / `gh pr merge` | Bash | verify (`arc-verifying`) + review (`arc-requesting-review`); notes whether a test ran this session |
-| `git worktree add` in an arcforge project (`specs/`) | Bash | prefer `arcforge expand` for epic worktrees (`arc-using-worktrees`) |
+| raw `git worktree add` in an arcforge project (`specs/`) | Bash | prefer the arcforge CLI in BOTH directions — `arcforge expand` for epic worktrees, `arcforge worktree add` for non-epic ones (`arc-using-worktrees`). A CLI-routed worktree add never contains the raw `git worktree add` literal, so it never trips this nudge. |
 | `git commit` / `push` after a SKILL.md edit (once/session) | Bash + Edit/Write | freshness-aware eval-before-ship: compares `evals/benchmarks/latest.json` against the session's SKILL.md edits (`arc-writing-skills` Iron Law) |
 | first code (non-doc) edit on `main`/`master` (once/session) | Edit/Write | prefer a branch / epic worktree for feature work (`arc-executing-tasks`) |
 

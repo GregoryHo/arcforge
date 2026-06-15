@@ -50,6 +50,24 @@ describe('arc-guard evaluate', () => {
     assert.strictEqual(reason, null);
   });
 
+  // WT-7 seam regression: a GENERIC (non-epic) worktree created by `arcforge
+  // worktree add` is a managed path with NO `.arcforge-epic` marker. arc-guard
+  // self-gates on the marker, so the generic worktree must hit the no-op
+  // invariant — raw `git merge` and a loop launch there are the user's own
+  // business, not coordinator territory. Zero code change in arc-guard; this
+  // pins that the new worktree kind stays untouched.
+  it('no-op invariant: generic (markerless) worktree → never denies', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const generic = base(); // managed dir shape, but no `.arcforge-epic` marker
+    for (const cmd of ['git merge main', 'git merge --no-ff feature', 'node scripts/loop.js']) {
+      assert.strictEqual(
+        evaluate({ tool_name: 'Bash', tool_input: { command: cmd }, cwd: generic }),
+        null,
+        `generic worktree must not deny: ${cmd}`,
+      );
+    }
+  });
+
   it('ignores non-Bash tools entirely', () => {
     const { evaluate } = require('../arc-guard/main');
     assert.strictEqual(
