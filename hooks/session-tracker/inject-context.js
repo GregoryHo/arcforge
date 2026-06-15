@@ -33,6 +33,7 @@ const {
   getInstinctsDir,
   getGlobalInstinctsDir,
   getInstinctsGlobalIndex,
+  migrateInstinctsToNameKey,
 } = require('../../scripts/lib/session-utils');
 
 const { parseConfidenceFrontmatter, shouldAutoLoad } = require('../../scripts/lib/confidence');
@@ -43,7 +44,19 @@ const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-
  * Load instincts with confidence >= AUTO_LOAD_THRESHOLD
  */
 function loadAutoInstincts(project) {
-  const projectInstincts = loadInstinctFiles(getInstinctsDir(project));
+  let projectInstincts = loadInstinctFiles(getInstinctsDir(project));
+  // First-session window (ICL-3, S5-6): start.js runs async and is skipped on
+  // source=compact, so the name-keyed dir may still be empty while stale
+  // hash-keyed instinct files exist. On a basename miss, run the idempotent,
+  // collision-safe migration once and re-resolve. No-op when already migrated.
+  if (projectInstincts.length === 0) {
+    try {
+      migrateInstinctsToNameKey(project);
+      projectInstincts = loadInstinctFiles(getInstinctsDir(project));
+    } catch {
+      // silent — never block SessionStart
+    }
+  }
   const globalInstincts = loadInstinctFiles(getGlobalInstinctsDir());
   const autoLoaded = [...projectInstincts, ...globalInstincts].filter((i) =>
     shouldAutoLoad(i.confidence),

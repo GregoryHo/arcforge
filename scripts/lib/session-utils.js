@@ -8,6 +8,7 @@ const {
   getDateDiariesDir,
   getProjectSessionsDir,
   sanitizeSessionId,
+  sanitizeProjectName,
 } = require('./utils');
 
 function getDiaryPath(project, date, sessionId) {
@@ -491,6 +492,127 @@ function getEvolvedLogPath() {
   return path.join(getArcforgeHome(), 'evolved', 'evolved.jsonl');
 }
 
+// ─────────────────────────────────────────────
+// Instinct keyspace migration (ICL-3)
+// ─────────────────────────────────────────────
+//
+// Active instinct files were historically written under a hash-keyed
+// directory (`instincts/<project_id>/`) by Layer 8 activation, while the
+// injection/decay side resolves them under a name-keyed directory
+// (`instincts/<project>/`). The two never matched, so dashboard-activated
+// instincts could never be loaded. The keyspace is now unified to the
+// name-keyed dir. This one-time, idempotent migration relocates any
+// previously-activated instinct files from a stale (hash-keyed) project dir
+// into the canonical name-keyed dir for the current project.
+//
+// Each active instinct file embeds its source candidate scope in a fenced
+// JSON metadata block, so the correct destination is read from the file
+// itself — no hash→name mapping table is required.
+
+// Reserved entries directly under the instincts root that are NOT
+// project-scoped instinct directories (must never be migrated).
+const RESERVED_INSTINCT_ROOT_ENTRIES = new Set([
+  'global',
+  'global-index.jsonl',
+  '.last_signal',
+  '.observer.lock',
+]);
+
+/**
+ * Extract the embedded `scope.project` slug from an active instinct file.
+ * Active files written by Layer 8 carry the source candidate metadata in a
+ * fenced ```json block. Returns the sanitized project slug, or null when the
+ * file has no parseable project scope (e.g. global-scoped or malformed).
+ */
+function readInstinctProjectScope(filePath) {
+  let content;
+  try {
+    content = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+  const match = content.match(/```json\s*\n([\s\S]*?)\n```/);
+  if (!match) return null;
+  try {
+    const meta = JSON.parse(match[1]);
+    const project = meta.scope?.project;
+    if (typeof project !== 'string' || !project.trim()) return null;
+    return sanitizeProjectName(project);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Migrate active instinct files belonging to `project` from any stale
+ * (hash-keyed) directory under the instincts root into the canonical
+ * name-keyed directory `instincts/<project>/`.
+ *
+ * Idempotent: files already in the name-keyed dir are left untouched, and a
+ * second invocation is a no-op. Collision-safe: if a file with the same
+ * basename already exists at the destination, the source is left in place
+ * (never overwrites an active artifact).
+ *
+ * @param {string} project — name-keyed project slug (e.g. getProjectName()).
+ * @returns {{ moved: string[], skipped: string[] }} basenames moved / skipped.
+ */
+function migrateInstinctsToNameKey(project) {
+  const result = { moved: [], skipped: [] };
+  if (typeof project !== 'string' || !project.trim()) return result;
+
+  const targetProject = sanitizeProjectName(project);
+  const root = getInstinctsRoot();
+  const destDir = getInstinctsDir(targetProject);
+
+  let entries;
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return result; // instincts root absent — nothing to migrate
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (RESERVED_INSTINCT_ROOT_ENTRIES.has(entry.name)) continue;
+    // Already the canonical name-keyed dir for this project — nothing to move.
+    if (entry.name === targetProject) continue;
+
+    const sourceDir = path.join(root, entry.name);
+    let files;
+    try {
+      files = fs.readdirSync(sourceDir);
+    } catch {
+      continue;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.md')) continue;
+      const sourcePath = path.join(sourceDir, file);
+      try {
+        if (!fs.statSync(sourcePath).isFile()) continue;
+      } catch {
+        continue;
+      }
+      if (readInstinctProjectScope(sourcePath) !== targetProject) continue;
+
+      const destPath = path.join(destDir, file);
+      if (fs.existsSync(destPath)) {
+        result.skipped.push(file); // collision — never overwrite
+        continue;
+      }
+      try {
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.renameSync(sourcePath, destPath);
+        result.moved.push(file);
+      } catch {
+        result.skipped.push(file);
+      }
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   getDiaryPath,
   saveDiary,
@@ -516,4 +638,6 @@ module.exports = {
   getObserverSignalFile,
   getObserverPidFile,
   getEvolvedLogPath,
+  migrateInstinctsToNameKey,
+  readInstinctProjectScope,
 };
