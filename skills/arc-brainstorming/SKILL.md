@@ -85,6 +85,7 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 - Only one question per message — if a topic needs exploration, break it into multiple questions
 - Prefer multiple choice when possible, but open-ended is fine
 - Focus on: purpose, constraints, success criteria
+- **Begin buffering the decision-log from your first question here** — these Phase 1 answers are authorization-bearing Q&A the refiner traces against. Assign stable q_ids and hold the rows in session memory; the spec-id is not yet known, so you cannot write to disk yet (see [Decision-Log Output (fr-bs-009)](#decision-log-output-fr-bs-009) for the spec-id-not-yet-determined ordering).
 
 ### Phase 2: Exploring
 
@@ -105,6 +106,8 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 - Propose a kebab-case spec-id based on the topic
 - Ask user to confirm or modify: `"Proposed spec-id: <suggestion>. OK?"`
 - The spec-id MUST NOT be finalized before Phase 2 completes
+
+**Flush the buffered decision-log once the spec-id is confirmed.** Keep buffering Phase 2 Q&A into the same in-memory rows you started in Phase 1 (stable q_ids continue sequentially). The moment the user confirms the spec-id above, write the buffered rows to `decision-log.yml`, then append incrementally for any later exchanges — see [Decision-Log Output (fr-bs-009)](#decision-log-output-fr-bs-009) for the full ordering. The decision-log is required on this branch too — the refiner's mechanical authorization check runs on new-spec Q&A, not just iterations.
 
 ### Phase 2 Decision-Ledger Output (D6)
 
@@ -164,25 +167,7 @@ Use 2-Action Rule: Save research findings to `docs/research/<topic>.md` after ev
 
 Apply YAGNI ruthlessly: only capture what the user explicitly states is changing.
 
-#### Phase 2 Decision-Log Output (fr-bs-009)
-
-Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The refiner parses this decision-log mechanically via `parseDecisionLog`, so brainstorming MUST NOT emit free-form prose.
-
-**Output path:** `<brainstorming-output-dir>/decision-log.yml`
-
-That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
-
-**Schema source of truth:** Before writing or validating `decision-log.yml`, direct-read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` and follow the `DECISION_LOG_RULES` contract exported via `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. Do not copy a structural template into this skill; the generated schema is authoritative for required fields (`q_id`, `question`, `user_answer_verbatim`, `deferral_signal`), valid/invalid examples, canonical path, and deferral-signal phrases.
-
-**q_id stability rule (fr-bs-009-ac3):**
-
-`q_id` values MUST be stable across the brainstorming session. Assign q_ids sequentially (`q1`, `q2`, `q3`, ...) and persist them across iteration revisions. Once a question receives `q1`, that q_id MUST NOT be reassigned to a different question within the same session. If a row is added or a question is revised, new rows get the next sequential q_id; existing q_ids stay fixed.
-
-**Deferral-signal detection rule (fr-bs-009-ac4):**
-
-Brainstorming MUST set `deferral_signal: true` according to `DECISION_LOG_RULES.deferral_signal_canonical_phrases` from the generated schema/source constants (currently including `use defaults`, `covered.`, `skip`, and `you decide`). Implementations MAY extend this list with additional deferral phrases, but any extension MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is authoritative — when the list changes there, the detection rule changes automatically.
-
-**Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
+**Emit the structured decision-log for every Q&A exchange** — see [Decision-Log Output (fr-bs-009)](#decision-log-output-fr-bs-009) below. The spec-id is already known on this branch (confirmed in Phase 0), so the output path resolves immediately; write the decision-log incrementally from the first exchange.
 
 #### Phase 2 Decision-Ledger Output (D6)
 
@@ -229,6 +214,38 @@ Either form yields the canonical design-doc schema — required sections, forbid
 **If the `docs/plans/<spec-id>/<YYYY-MM-DD>/` folder already exists**, offer the user a suffix to disambiguate (see Same-Day Iteration UX below).
 
 Write to: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md`
+
+---
+
+## Decision-Log Output (fr-bs-009)
+
+This contract applies to **both branches**. Every brainstorming session that elicits Q&A — whether a new spec or an iteration on an existing one — MUST emit the Q&A history as a structured decision-log. The refiner's mechanical authorization check (Phase 6) iterates over these rows by `q_id`, so the decision-log is required regardless of which branch produced it.
+
+Brainstorming MUST emit the Q&A history as a structured decision-log in YAML format. The refiner parses this decision-log mechanically via `parseDecisionLog`, so brainstorming MUST NOT emit free-form prose.
+
+**Output path:** `<brainstorming-output-dir>/decision-log.yml`
+
+That is: `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`
+
+**Schema source of truth:** Before writing or validating `decision-log.yml`, direct-read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` and follow the `DECISION_LOG_RULES` contract exported via `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. Do not copy a structural template into this skill; the generated schema is authoritative for required fields (`q_id`, `question`, `user_answer_verbatim`, `deferral_signal`), valid/invalid examples, canonical path, and deferral-signal phrases.
+
+**q_id stability rule (fr-bs-009-ac3):**
+
+`q_id` values MUST be stable across the brainstorming session. Assign q_ids sequentially (`q1`, `q2`, `q3`, ...) and persist them across session revisions. Once a question receives `q1`, that q_id MUST NOT be reassigned to a different question within the same session. If a row is added or a question is revised, new rows get the next sequential q_id; existing q_ids stay fixed.
+
+**Deferral-signal detection rule (fr-bs-009-ac4):**
+
+Brainstorming MUST set `deferral_signal: true` according to `DECISION_LOG_RULES.deferral_signal_canonical_phrases` from the generated schema/source constants (currently including `use defaults`, `covered.`, `skip`, and `you decide`). Implementations MAY extend this list with additional deferral phrases, but any extension MUST be documented alongside the decision-log output. The canonical list in `DECISION_LOG_RULES` is authoritative — when the list changes there, the detection rule changes automatically.
+
+**Write the decision-log after each elicitation exchange.** Do not defer writing to the end of Phase 2 — write incrementally so a session interruption does not lose Q&A history.
+
+**When the spec-id is not yet determined (new-spec branch):** the output path depends on `<spec-id>`, which the new-spec branch only confirms at the end of Phase 2. Do not let that ordering drop Q&A rows. Apply this sequence:
+
+1. **Buffer with stable q_ids from the first exchange.** Assign `q1`, `q2`, ... as you elicit and hold the rows in session memory. The q_ids are stable per the rule above, so buffering does not break addressability.
+2. **Write on spec-id confirmation.** The moment the user confirms the spec-id, flush the buffered rows to `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml`.
+3. **Append incrementally afterward.** Any later exchanges append to the now-existing file, exactly as the iterate branch does from the start.
+
+Buffering is in-memory session state — it introduces no new on-disk artifact. The iterate branch already knows the spec-id in Phase 0, so it skips straight to step 3's incremental writes from the first exchange.
 
 ---
 
