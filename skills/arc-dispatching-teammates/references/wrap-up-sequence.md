@@ -23,39 +23,63 @@ things:
 
 ## 8a — Emit the Final Report
 
-Use the format in SKILL.md's "Final Report" completion block.
-
-**Required evidence per accepted epic:**
-
-```
-  ✅ epic-<id>  — accepted on attempt <N>
-       spec-reviewer: PASS (<X>/<Y> ACs verified)
-       verifier:      PASS (<X>/<Y> tests, exit 0)
-```
-
-**Missing evidence = you skipped Step 6.** The evidence lines are not
-optional decoration — they are the self-audit that catches inline
-rationalization. If you cannot fill them in with concrete numbers
-from a subagent report, you did not dispatch the subagent.
-
-**For failed epics:**
+This is the user-facing hand-off, emitted after every dispatched epic
+reaches a terminal state (accepted or permanently failed). Use this full
+format:
 
 ```
-  ❌ epic-<id>  — permanently failed after <N> attempts
-       Final rejection: <specific reason>
-       Last spec-reviewer: FAIL (<criterion>)
-       Worktree retained for debugging: <absolute path>
+🏁 Dispatch session complete
+
+Dev branch: <branch-name> (current HEAD is the deliverable)
+
+Epics:
+  ✅ epic-yaml-output  — accepted on attempt 1
+       spec-reviewer: PASS (10/10 ACs verified)
+       verifier:      PASS (42/42 tests, exit 0)
+  ✅ epic-stats        — accepted on attempt 2 (retry 1)
+       Attempt 1 rejected: getStats() missing perCollection breakdown
+       (fr-stats-001 AC #5). Retry fixed it.
+       spec-reviewer: PASS (5/5 ACs)
+       verifier:      PASS (38/38 tests, exit 0)
+  ❌ epic-history      — permanently failed after 4 attempts (3 retries)
+       Final rejection: query_history migration fails on existing DBs.
+       Last spec-reviewer: FAIL (fr-hist-002 AC #3)
+       Worktree: <absolute-path> (retained for debugging)
+
+Spec defects recorded for follow-up:
+  - epic-history, epic-bookmark: spec references src/db.ts but codebase
+    convention is src/store.ts — override-accepted, spec needs revision
+  - (or: none observed)
+
+Cleanup performed:
+  - Accepted worktrees removed: epic-yaml-output, epic-stats
+  - Team torn down (TeamDelete)
+  - Failed worktrees retained: epic-history
+
+Next actions you may consider:
+  - Inspect dev branch HEAD: git log --oneline <branch-name>
+  - Promote successful work: merge/cherry-pick to main
+  - Debug the failed epic: /arc-debugging on epic-history
+  - Discard the session: git branch -D <branch-name>
 ```
 
-Include the worktree path for failed epics so the user can cd into it
-without needing to derive the canonical path themselves.
+**Required evidence per accepted epic** — `spec-reviewer: PASS (<X>/<Y>
+ACs verified)` and `verifier: PASS (<X>/<Y> tests, exit 0)`. The evidence
+lines are not optional decoration — they are the self-audit that catches
+inline rationalization. **Missing evidence = you skipped Step 6.** If you
+cannot fill them in with concrete numbers from a subagent report, you did
+not dispatch the subagent.
+
+**For failed epics**, include the worktree path so the user can cd into it
+without needing to derive the canonical path themselves. "Next actions"
+lists user options — you don't execute them.
 
 ## 8b — Clean up accepted worktrees
 
 From the project root (NOT from inside a teammate's worktree):
 
 ```bash
-node scripts/cli.js cleanup <epic-id-1> <epic-id-2> ...
+node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <epic-id-1> <epic-id-2> ...
 ```
 
 Pass only epic IDs whose acceptance check passed. The CLI's
@@ -92,7 +116,7 @@ branch. The final report already tells them which worktrees were
 retained and where.
 
 If the user later decides to discard a failed epic, they can run
-cleanup manually — `node scripts/cli.js cleanup <failed-epic-id>`
+cleanup manually — `node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <failed-epic-id>`
 from the project root.
 
 ## 8c — Shut down teammates, then `TeamDelete`

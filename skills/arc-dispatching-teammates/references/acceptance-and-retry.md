@@ -169,7 +169,7 @@ defect (not an implementation defect):
    spec defect wastes a teammate cycle on something they can't fix
    without a spec revision.
 3. **Record the spec defect.** Add it to the Final Report's "Spec
-   defects" section (see SKILL.md Final Report template) so the user
+   defects" section (see `references/wrap-up-sequence.md` §8a) so the user
    can fix the spec post-dispatch.
 4. **Retry counter does NOT increment.** Same as merge-conflict
    arbitration: spec defects are arbitration flows, not acceptance
@@ -339,7 +339,7 @@ as no feedback.
 
 ### Fresh worktree via `cli.js expand`
 
-On rejection, call `node scripts/cli.js expand --epic <epic-id>`. The
+On rejection, call `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>`. The
 CLI creates a new worktree at the canonical path. The new worktree's
 starting commit is the current dev-branch HEAD — which already
 contains the rejected attempt's merge commits.

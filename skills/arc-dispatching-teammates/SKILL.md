@@ -7,9 +7,9 @@ description: Use when specs/<spec-id>/dag.yaml has 2+ ready epics and the lead i
 
 ## Overview
 
-Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, messages teammates via SendMessage, intervenes on blockers. Teammates implement inside isolated worktrees and merge back to a short-lived dev branch — intermediate noise (retries, fix-forward commits) is fine; the deliverable is stability at HEAD, not clean history. The user decides promotion afterward.
+Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, messages teammates via SendMessage, intervenes on blockers. Teammates implement inside isolated worktrees and merge back to a short-lived dev branch — intermediate noise (retries, fix-forward commits) is fine.
 
-**Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't over-protect the dev branch, don't pre-identify conflicts — let runtime handle runtime.
+**Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't pre-identify conflicts — let runtime handle runtime.
 
 ## When to Use
 
@@ -32,6 +32,7 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 2. **Single spec.** Cross-spec ready epics → report blocked, user picks with `--spec-id <id>`.
 3. **Agent tool supports `team_name` and `name`.** If dispatch errors with "unknown parameter team_name", report blocked.
 4. **Lead is in project root**, not a worktree. Move to base worktree if `.arcforge-epic` is in cwd.
+5. **On a dev branch, not `main`/`master`.** Teammates merge back to the lead's branch. If on `main`/`master`, create one first: `git switch -c dispatch/<spec-id>-$(date +%Y-%m-%d)`. If the user named a branch, or the lead is already off the default, use that — never override an explicit choice.
 
 Precondition failure = hard fail. Do not silently fall back to arc-looping or manual juggling.
 
@@ -39,12 +40,12 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 1. **Identify ready epics.** From `arcforge status --json`, collect every epic with `status: pending` and `worktree: null`. Call this set R.
 
-2. **Cap team size at 5.** If `|R| > 5`, take the first 5 as the initial team and queue the rest. ≤5 teammates is Anthropic's documented best practice; beyond 5 coordination overhead exceeds benefit.
+2. **Cap team size at 5 (default).** If `|R| > 5`, take the first 5 as the initial team and queue the rest. ≤5 teammates is Anthropic's documented best practice; beyond 5 coordination overhead exceeds benefit. Honor a higher cap only when the user explicitly asks for one.
 
 3. **`TeamCreate` BEFORE any Agent dispatch.** Use a descriptive name like `dispatch-<project>-<timestamp>`. Per [Agent Teams docs](https://code.claude.com/docs/en/agent-teams), passing `team_name` to Agent does NOT auto-create — it triggers a state-sync bug.
 
 4. **Expand worktrees and dispatch teammates in parallel.** For each epic in the initial 5:
-   - `node scripts/cli.js expand --epic <epic-id>` from the project root — creates the canonical worktree and stamps `.arcforge-epic`. Per-epic, not batch.
+   - `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` from the project root — creates the canonical worktree and stamps `.arcforge-epic`. Per-epic, not batch.
    - Read the absolute worktree path from `arcforge status --json`; do not reconstruct it.
    - Dispatch via Agent with `team_name=<team>`, `name=worker-<epic-id>`, spawn prompt from `references/spawn-prompt-template.md`.
 
@@ -66,7 +67,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
    - Shut down the rejected teammate's session (reclaim the pane).
    - Formulate feedback naming the failed criterion, quoting spec text verbatim, stating current-vs-required behavior.
-   - `node scripts/cli.js expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
+   - `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
    - Dispatch `worker-<epic-id>-retry<N>` using `references/spawn-prompt-template.md` with a prepended `## Previous Attempt Feedback` section (cumulative).
    - Track retry count in session memory. Retry 3 also fails → mark **permanently failed**, record reason for Step 8.
 
@@ -74,8 +75,8 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 8. **Wrap up (three actions, in order).** When every epic reaches a terminal state:
 
-   - **8a.** Emit the Final Report (format below). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
-   - **8b.** Clean up **accepted** worktrees from the project root: `node scripts/cli.js cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
+   - **8a.** Emit the Final Report (format in `references/wrap-up-sequence.md` §8a). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
+   - **8b.** Clean up **accepted** worktrees from the project root: `node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
    - **8c.** Shut down any remaining teammates (most already down from Steps 6/7), then call `TeamDelete`. See `references/wrap-up-sequence.md` for ordering and failure handling.
 
 ## Spawn Prompt Template
@@ -92,9 +93,10 @@ Rationalizations observed in baseline testing. If you catch yourself saying any 
 - **"`arc-dispatching-parallel` already covers this."** No — that skill is feature-level inside one worktree. This is epic-level across worktrees.
 - **"Let me spawn 8 teammates since there are 8 ready epics."** Cap at 5. Queue the rest. Continuous dispatch.
 - **"Worktrees already exist, so I'll just dispatch."** Fine — skip the expand step for epics whose worktree is non-null. Do not re-expand.
+- **"I'm on `main`, dispatching from here is fine."** No — teammates merge back to the lead's branch. Create a dev branch first (Precondition 5).
 - **"Parallel burst hit `Failed to create teammate pane` — downscale the team."** No. You hit GH #40168. Retry the failed spawns sequentially. See `references/tmux-timing-race.md`.
 - **"I need to tell teammates which shared files to avoid."** No. Let conflicts happen; arc-finishing-epic escalates them via the Merge Conflict (Multi-Teammate) path. Static prediction is over-engineering.
-- **"Pin arcforge version: `ARCFORGE_ROOT=... node "${ARCFORGE_ROOT}/scripts/cli.js"`."** POSIX footgun — `"${VAR}"` expands before the inline assignment. Use plain `node scripts/cli.js ...`.
+- **"Pin arcforge version inline: `ARCFORGE_ROOT=... node "${ARCFORGE_ROOT}/scripts/cli.js"`."** POSIX footgun — `"${VAR}"` expands before the inline assignment, resolving to the *old* value. `export ARCFORGE_ROOT=...` on its own line first, then the blessed form.
 - **"I already know what this epic does — I'll skip the spec-reviewer and just map test names to ACs."** This is the qmd baseline failure verbatim. The lead's prior context is precisely what makes inline acceptance unreliable. Always dispatch `arcforge:spec-reviewer` per Step 6; it has fresh context and cannot rationalize.
 - **"The teammate already ran tests green — running verifier is redundant."** Same mistake. The verifier runs from an empty context; "redundant" is the rationalization that skips the gate. Dispatch `arcforge:verifier` per Step 6.
 - **"I'll close tmux panes manually later, skip `TeamDelete`."** Without TeamDelete, panes orphan and the team's runtime state lingers across sessions. Step 8c is not optional.
@@ -117,41 +119,7 @@ Use this after every dispatched epic has reached a terminal state (accepted
 or permanently failed). This is the user-facing hand-off — they read this
 and decide what to do with the dev branch.
 
-```
-🏁 Dispatch session complete
-
-Dev branch: <branch-name> (current HEAD is the deliverable)
-
-Epics:
-  ✅ epic-yaml-output  — accepted on attempt 1
-       spec-reviewer: PASS (10/10 ACs verified)
-       verifier:      PASS (42/42 tests, exit 0)
-  ✅ epic-stats        — accepted on attempt 2 (retry 1)
-       Attempt 1 rejected: getStats() missing perCollection breakdown
-       (fr-stats-001 AC #5). Retry fixed it.
-       spec-reviewer: PASS (5/5 ACs)
-       verifier:      PASS (38/38 tests, exit 0)
-  ❌ epic-history      — permanently failed after 4 attempts (3 retries)
-       Final rejection: query_history migration fails on existing DBs.
-       Last spec-reviewer: FAIL (fr-hist-002 AC #3)
-       Worktree: <absolute-path> (retained for debugging)
-
-Spec defects recorded for follow-up:
-  - epic-history, epic-bookmark: spec references src/db.ts but codebase
-    convention is src/store.ts — override-accepted, spec needs revision
-  - (or: none observed)
-
-Cleanup performed:
-  - Accepted worktrees removed: epic-yaml-output, epic-stats
-  - Team torn down (TeamDelete)
-  - Failed worktrees retained: epic-history
-
-Next actions you may consider:
-  - Inspect dev branch HEAD: git log --oneline <branch-name>
-  - Promote successful work: merge/cherry-pick to main
-  - Debug the failed epic: /arc-debugging on epic-history
-  - Discard the session: git branch -D <branch-name>
-```
+See `references/wrap-up-sequence.md` (§8a) for the full Final Report example.
 
 Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). Missing = Step 6 was skipped. Failed epics show the last subagent FAIL and are NOT auto-cleaned. "Next actions" lists user options — you don't execute them.
 

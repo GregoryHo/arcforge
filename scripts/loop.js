@@ -20,7 +20,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Coordinator } = require('./lib/coordinator');
 const { spawnSession, spawnSessionAsync } = require('./lib/loop-session');
-const { loadLoopState, saveLoopState, recordError, finalizeLoop } = require('./lib/loop-state');
+const {
+  loadLoopState,
+  saveLoopState,
+  beginRun,
+  recordError,
+  finalizeLoop,
+} = require('./lib/loop-state');
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
 const { Feature } = require('./lib/models');
 const {
@@ -397,7 +403,7 @@ function tryCreateCoordinator(projectRoot, state, specId = null) {
 function runSequential(options) {
   const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
-  state.pattern = 'sequential';
+  beginRun(state, { pattern: 'sequential', maxRuns, maxCost });
   const epicScope = resolveEpicScope(epic, projectRoot);
 
   console.log(`[loop] Starting sequential loop (max ${maxRuns} runs)`);
@@ -443,7 +449,7 @@ function runSequential(options) {
 async function runDag(options) {
   const { projectRoot, maxRuns, maxCost, epic } = options;
   const state = loadLoopState(projectRoot);
-  state.pattern = 'dag';
+  beginRun(state, { pattern: 'dag', maxRuns, maxCost });
   const epicScope = resolveEpicScope(epic, projectRoot);
 
   console.log(`[loop] Starting DAG loop (max ${maxRuns} runs)`);

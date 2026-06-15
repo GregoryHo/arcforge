@@ -104,7 +104,7 @@ The contract author decides at lock time, not the loop at runtime. If Trials is 
 3. If the baseline crashes or produces no metric, STOP. Tell the human to fix the evaluation environment. Do not debug infrastructure — it is outside scope.
 4. Extract the baseline metric value
 5. Log baseline to `results.tsv` with status `baseline` — do NOT commit results.tsv (keep it untracked so experiment history survives resets)
-6. Start the dashboard: `node scripts/cli.js research dashboard --results results.tsv --config research-config.md`
+6. Start the dashboard: `node "${ARCFORGE_ROOT}/scripts/cli.js" research dashboard --results results.tsv --config research-config.md`
 7. Tell the human: "Dashboard running at http://localhost:3000 — monitor progress there."
 8. Commit the baseline state (but NOT results.tsv)
 
