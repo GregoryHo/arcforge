@@ -24,6 +24,7 @@ const os = require('node:os');
 
 const { sanitizeObservationPayload, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated } = require('../utils');
+const { draftIsStale } = require('../diary-capture');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -151,6 +152,10 @@ const EVIDENCE_KIND_CONFIG = {
     idField: 'diary_id',
     store: 'diary',
     buildExtra: (sanitized) => ({ summary: sanitized }),
+    // Drafts whose enricher never ran still carry the TO BE ENRICHED stub.
+    // Skip them so a failed enrichment degrades to MISSING evidence rather
+    // than feeding template placeholders into the curator (S5-5).
+    skipStale: true,
   },
   reflect: {
     getDir: getReflectionsDir,
@@ -183,7 +188,10 @@ function readRecentEvidence(kind, homeDir, project) {
 
   const allFiles = walkFilesByMtime(dir, cfg.pattern);
   const scanned = allFiles.length;
-  const selected = allFiles.slice(0, cfg.maxN());
+  // Filter unenriched diary stubs before selecting so the maxN budget is spent
+  // on real evidence, not template placeholders (S5-5).
+  const eligible = cfg.skipStale ? allFiles.filter((f) => !draftIsStale(f.path)) : allFiles;
+  const selected = eligible.slice(0, cfg.maxN());
 
   const items = [];
   for (const { path: filePath } of selected) {

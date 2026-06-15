@@ -99,22 +99,16 @@ describe('E2E: diary enricher full spawn cycle', { skip: !RUN_E2E }, () => {
       const draftPath = path.join(diariesDateDir, `diary-${sessionId}-draft.md`);
       fs.writeFileSync(draftPath, STUB_DRAFT);
 
-      const { spawnDiaryEnricher } = require('../session-tracker/end');
+      const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
 
-      const session = {
-        project,
-        sessionId,
-        date,
-        started: '2026-04-15T10:00:00Z',
-        lastUpdated: '2026-04-15T10:05:00Z',
-        userMessages: 3,
-        toolCalls: 42,
-        filesModified: ['/tmp/example.js'],
-        userMessageContent: ['fix the auth bug', 'rerun tests', 'ship it'],
+      const transcriptData = {
+        userMessages: ['fix the auth bug', 'rerun tests', 'ship it'],
         toolsUsed: ['Read', 'Edit', 'Bash'],
+        filesModified: ['/tmp/example.js'],
+        stats: '~5 min, 3 messages, 42 tool calls, 1 files modified',
       };
 
-      spawnDiaryEnricher(draftPath, session);
+      spawnDiaryEnricher(draftPath, transcriptData, project);
 
       const enriched = await waitForEnrichment(draftPath, TIMEOUT_MS);
       const logPath = path.join(sessionsProjectDir, 'enricher.log');

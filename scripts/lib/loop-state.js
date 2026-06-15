@@ -150,6 +150,114 @@ function currentRunErrors(state) {
 }
 
 /**
+ * Count proposed decisions across specs/<id>/decisions.yml under projectRoot.
+ * Canonical single-level glob (specs then per-spec decisions.yml) — no recursion.
+ * Best-effort: any read/parse failure for a spec contributes zero, never throws.
+ * @param {string} projectRoot - Project root directory
+ * @returns {{ count: number, specs: Array<{ spec_id: string, decision_ids: string[] }> }}
+ */
+function scanProposedDecisions(projectRoot) {
+  const { parseDecisionLedger } = require('./sdd-utils');
+  const specsDir = path.join(projectRoot, 'specs');
+  const result = { count: 0, specs: [] };
+  let entries;
+  try {
+    entries = fs.readdirSync(specsDir, { withFileTypes: true });
+  } catch {
+    return result;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const ledgerPath = path.join(specsDir, entry.name, 'decisions.yml');
+    let parsed;
+    try {
+      parsed = parseDecisionLedger(ledgerPath);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(parsed)) continue;
+    const decisionIds = parsed
+      .filter((d) => d && d.status === 'proposed')
+      .map((d) => d.id)
+      .filter(Boolean);
+    if (decisionIds.length > 0) {
+      result.count += decisionIds.length;
+      result.specs.push({ spec_id: entry.name, decision_ids: decisionIds });
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolve the current branch of projectRoot. Best-effort → null on failure.
+ * @param {string} projectRoot - Project root directory
+ * @returns {string|null}
+ */
+function resolveBaseBranch(projectRoot) {
+  try {
+    const { execFileSync } = require('node:child_process');
+    return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Map failed_tasks → [{ id, reason }]. Reason is the latest recorded error for
+ * the task (errors are capped/run-scoped, so fall back to a generic reason when
+ * the entry has been evicted).
+ * @param {Object} state - Loop state
+ * @returns {Array<{ id: string, reason: string }>}
+ */
+function buildBlockedList(state) {
+  const failed = Array.isArray(state.failed_tasks) ? state.failed_tasks : [];
+  const errors = Array.isArray(state.errors) ? state.errors : [];
+  return failed.map((id) => {
+    const match = errors.filter((e) => e.task_id === id).pop();
+    return { id, reason: match ? match.error : 'failed after retries' };
+  });
+}
+
+/**
+ * Queue the morning review-queue actions: a deduped ratify-pending (when any
+ * proposed decisions exist) and a loop-finished outcome summary. Best-effort —
+ * never throws into finalize (a notification failure must not leave the loop
+ * sentinel non-terminal).
+ * @param {Object} state - Loop state
+ * @param {string} projectRoot - Project root directory
+ */
+function queueLoopNotifications(state, projectRoot) {
+  const { addPendingAction, getPendingActions } = require('./pending-actions');
+  const { sanitizeProjectName } = require('./utils');
+  const project = sanitizeProjectName(path.basename(projectRoot));
+
+  const proposed = scanProposedDecisions(projectRoot);
+  if (proposed.count > 0) {
+    // Dedup: addPendingAction always pushes a fresh entry, so skip if an
+    // unconsumed ratify-pending is already queued (a second finalize must not
+    // double-notify).
+    const existing = getPendingActions(project, 'ratify-pending');
+    if (existing.length === 0) {
+      addPendingAction(project, 'ratify-pending', {
+        count: proposed.count,
+        specs: proposed.specs,
+      });
+    }
+  }
+
+  addPendingAction(project, 'loop-finished', {
+    status: state.status,
+    completed_count: Array.isArray(state.completed_tasks) ? state.completed_tasks.length : 0,
+    blocked: buildBlockedList(state),
+    base_branch: resolveBaseBranch(projectRoot),
+    total_cost: state.total_cost || 0,
+  });
+}
+
+/**
  * Finalize loop state: stamp terminal status and persist.
  * @param {Object} state - Loop state
  * @param {number} maxRuns - Maximum iterations configured for the run
@@ -160,7 +268,17 @@ function finalizeLoop(state, maxRuns, projectRoot) {
     state.status = 'max_runs';
   }
   state.finished_at = getTimestamp();
+  // Persist terminal state FIRST — the loop sentinel must read terminal/finished
+  // before any notification work runs, or the SDD-5 ratify command the morning
+  // notification names would be denied by the (still-running) sentinel gate.
   saveLoopState(state, projectRoot);
+
+  // Morning review-queue notifications (SDD-5) — best-effort, never breaks finalize.
+  try {
+    queueLoopNotifications(state, projectRoot);
+  } catch {
+    /* notification enrichment is best-effort; terminal state is already saved */
+  }
 }
 
 /**

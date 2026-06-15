@@ -103,6 +103,35 @@ describe('loop-state', () => {
   });
 
   describe('finalizeLoop', () => {
+    // finalizeLoop now queues morning review-queue pending actions under
+    // ~/.arcforge/sessions/{project} (SDD-5). Redirect homedir so those writes
+    // are isolated to the temp dir and never touch the real ~/.arcforge.
+    let homeDir;
+    beforeEach(() => {
+      homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loop-state-home-'));
+      jest.spyOn(os, 'homedir').mockReturnValue(homeDir);
+      jest.resetModules();
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+      fs.rmSync(homeDir, { recursive: true, force: true });
+    });
+
+    // pending-actions reads via getProjectName-equivalent key: basename(projectRoot)
+    const projectKey = (root) => path.basename(root);
+    const getActions = (root, type) => {
+      const file = path.join(
+        homeDir,
+        '.arcforge',
+        'sessions',
+        projectKey(root),
+        'pending-actions.json',
+      );
+      if (!fs.existsSync(file)) return [];
+      const all = JSON.parse(fs.readFileSync(file, 'utf-8')).actions;
+      return type ? all.filter((a) => a.type === type) : all;
+    };
+
     it('stamps finished_at and persists state', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';
@@ -118,6 +147,92 @@ describe('loop-state', () => {
       finalizeLoop(state, 50, tmpDir);
       expect(state.status).toBe('max_runs');
       expect(loadLoopState(tmpDir).status).toBe('max_runs');
+    });
+
+    it('queues a loop-finished action with status/completed_count/blocked/cost', () => {
+      const state = loadLoopState(tmpDir);
+      state.status = 'complete';
+      state.completed_tasks = ['T-1', 'T-2'];
+      state.failed_tasks = ['T-3'];
+      state.errors = [{ task_id: 'T-3', error: 'boom', iteration: 1, timestamp: 'x', attempt: 2 }];
+      state.total_cost = 1.5;
+      finalizeLoop(state, 50, tmpDir);
+
+      const finished = getActions(tmpDir, 'loop-finished');
+      expect(finished).toHaveLength(1);
+      const p = finished[0].payload;
+      expect(p.status).toBe('complete');
+      expect(p.completed_count).toBe(2);
+      expect(p.blocked).toEqual([{ id: 'T-3', reason: 'boom' }]);
+      expect(p.total_cost).toBe(1.5);
+      // base_branch resolves to the temp repo's branch or null — must not throw.
+      expect('base_branch' in p).toBe(true);
+    });
+
+    it('falls back to a generic blocked reason when the error was evicted', () => {
+      const state = loadLoopState(tmpDir);
+      state.failed_tasks = ['T-9'];
+      state.errors = [];
+      finalizeLoop(state, 50, tmpDir);
+      const p = getActions(tmpDir, 'loop-finished')[0].payload;
+      expect(p.blocked).toEqual([{ id: 'T-9', reason: 'failed after retries' }]);
+    });
+
+    it('queues ratify-pending counting proposed decisions across specs', () => {
+      const mkLedger = (specId, body) => {
+        const dir = path.join(tmpDir, 'specs', specId);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'decisions.yml'), body);
+      };
+      mkLedger(
+        'spec-a',
+        '- id: D-001\n  status: proposed\n  decision: x\n- id: D-002\n  status: proposed\n  decision: y\n',
+      );
+      mkLedger('spec-b', '- id: D-003\n  status: accepted\n  decision: z\n');
+
+      const state = loadLoopState(tmpDir);
+      state.status = 'complete';
+      finalizeLoop(state, 50, tmpDir);
+
+      const ratify = getActions(tmpDir, 'ratify-pending');
+      expect(ratify).toHaveLength(1);
+      expect(ratify[0].payload.count).toBe(2);
+      expect(ratify[0].payload.specs).toEqual([
+        { spec_id: 'spec-a', decision_ids: ['D-001', 'D-002'] },
+      ]);
+    });
+
+    it('does not double-queue ratify-pending across two finalize calls', () => {
+      const dir = path.join(tmpDir, 'specs', 'spec-a');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- id: D-001\n  status: proposed\n');
+
+      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
+      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
+
+      expect(getActions(tmpDir, 'ratify-pending')).toHaveLength(1);
+    });
+
+    it('does not queue ratify-pending when no decisions are proposed', () => {
+      const dir = path.join(tmpDir, 'specs', 'spec-a');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- id: D-001\n  status: accepted\n');
+
+      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
+      expect(getActions(tmpDir, 'ratify-pending')).toHaveLength(0);
+    });
+
+    it('writes a terminal sentinel that passes the AF-2 loop-sentinel gate (S3-4)', () => {
+      // After finalize, the on-disk sentinel is terminal, so the ratify command
+      // named in the morning notification is NOT denied by the sentinel gate.
+      const { loopSentinelPresent } = require('../../scripts/lib/sdd-utils');
+      const state = loadLoopState(tmpDir);
+      state.status = 'complete';
+      finalizeLoop(state, 50, tmpDir);
+
+      // Sentinel exists (resume depends on it) but reads as terminal.
+      expect(fs.existsSync(path.join(tmpDir, '.arcforge-loop.json'))).toBe(true);
+      expect(loopSentinelPresent(tmpDir)).toBe(false);
     });
   });
 

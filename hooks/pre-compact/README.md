@@ -1,21 +1,30 @@
 # PreCompact Hook
 
-Records context compaction events for session tracking and triggers diary prompts when threshold is met.
+Records context compaction events for session tracking and captures the session
+diary when the threshold is met.
 
 ## What It Does
 
-1. **Updates current session file** with compaction markers
+1. **Resolves the session id from stdin** (`parseStdinJson` + `setSessionIdFromInput`)
+   before touching any counter, so the counts read belong to the live session.
+
+2. **Updates the current session file** with compaction markers
    - Adds timestamp to `compactions` array
    - Sets `lastCompaction` field
 
-2. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
-   - Updates session with current user/tool counts
-   - Prompts user to run the `arc-journaling` skill
-   - Resets both counters (user messages and tool calls)
+3. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
+   Delegates to the shared diary-capture core (`scripts/lib/diary-capture.js`),
+   the same path the Stop hook runs:
+   - Generates the auto-diary draft
+   - Spawns the background diary enricher (dual path — Stop AND PreCompact)
+   - Resets both counters (the sole reset path)
 
-3. **Below threshold**:
+   Then it queues a `diary-ready` pending action for the next `SessionStart`.
+   PreCompact stdout is reserved for the transcript channel and cannot render a
+   `systemMessage`, so the notification is deferred to inject-context.
+
+4. **Below threshold**:
    - Preserves counters for future accumulation
-   - Shows current count status
 
 ## Threshold Logic
 
@@ -25,22 +34,13 @@ Uses shared threshold from `scripts/lib/thresholds.js`:
 userCount >= 10 || toolCount >= 50
 ```
 
-This ensures diary prompts only appear for meaningful sessions.
+This ensures diary capture only happens for meaningful sessions.
 
-## Output Examples
+## Notification (pending action, not systemMessage)
 
-**Threshold met:**
-```
-📝 Context compaction detected. (15 messages, 47 tool calls)
-
-Please use the arc-journaling skill immediately to capture session reflections before context is compacted.
-```
-
-**Below threshold:**
-```
-📝 Context compaction. (3 messages, 12 tool calls)
-   Below threshold - counters preserved.
-```
+When the threshold is met, the hook calls `addPendingAction(project, 'diary-ready', …)`.
+The next `SessionStart(source: "compact")` surfaces it via inject-context.js as
+"📝 Diary draft ready — use /arcforge:arc-journaling …".
 
 ## Session File Format
 

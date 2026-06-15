@@ -8,9 +8,8 @@
  * 3. Queue pending actions (reflect-ready)
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync, spawn } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -18,21 +17,14 @@ const {
   writeFileSafe,
   loadSession,
   getSessionDir,
-  getProjectSessionsDir,
   getProjectName,
   getDateString,
   getSessionId,
   getTimestamp,
-  createSessionCounter,
-  ensureDir,
   output,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const {
-  readCount: readUserCount,
-  resetCounter: resetUserCounter,
-} = require('../user-message-counter/main');
-const { shouldTrigger } = require('../../scripts/lib/thresholds');
+const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
 const { parseTranscript } = require('../../scripts/lib/transcript');
 
 /**
@@ -75,24 +67,6 @@ function saveSessionJson(session) {
 }
 
 /**
- * Try to generate auto-diary draft.
- * Returns draft path on success, null on failure.
- */
-function tryGenerateAutoDiary(project, date, sessionId) {
-  try {
-    const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
-    const result = execFileSync(
-      'node',
-      [autoDiaryPath, 'generate', '--project', project, '--date', date, '--session', sessionId],
-      { encoding: 'utf-8', timeout: 5000 },
-    ).trim();
-    return result || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Check if reflection is ready.
  * Returns { ready, strategy, count } or null on failure.
  */
@@ -128,72 +102,6 @@ function formatStats(session) {
 }
 
 /**
- * Spawn a background Claude instance to enrich the diary draft.
- * Fire-and-forget: detached process, hook exits immediately.
- */
-function spawnDiaryEnricher(draftPath, session) {
-  try {
-    const transcriptData = {
-      userMessages: session.userMessageContent || [],
-      toolsUsed: session.toolsUsed || [],
-      filesModified: session.filesModified || [],
-      stats: formatStats(session),
-    };
-
-    const prompt = [
-      'Read the diary draft and fill all <!-- TO BE ENRICHED --> sections.',
-      `Draft path: ${draftPath}`,
-      '',
-      'Session context (parsed summary):',
-      JSON.stringify(transcriptData, null, 2),
-      '',
-      'Write the enriched diary back to the same path.',
-      'Keep auto-generated metrics sections unchanged.',
-      'Fill Completed, In Progress, Decisions, Challenges from the session context.',
-    ].join('\n');
-
-    const systemPrompt =
-      'You are a diary enrichment agent. ' +
-      'Read the draft, fill placeholder sections using provided session data, ' +
-      'write the result back. Be concise and factual.';
-
-    // Capture stderr to a log file so silent failures leave a trail.
-    const sessionsDir = getProjectSessionsDir(session.project);
-    ensureDir(sessionsDir);
-    const stderrFd = fs.openSync(path.join(sessionsDir, 'enricher.log'), 'a');
-
-    const child = spawn(
-      'claude',
-      [
-        '--model',
-        'haiku',
-        // Haiku needs Read + Write + thinking; 10 leaves headroom (2 hits max-turns).
-        '--max-turns',
-        '10',
-        '--print',
-        '--dangerously-skip-permissions',
-        '--system-prompt',
-        systemPrompt,
-        '--tools',
-        'Read,Write',
-        '--disable-slash-commands',
-        '--strict-mcp-config',
-        '--mcp-config',
-        '{"mcpServers":{}}',
-      ],
-      { detached: true, stdio: ['pipe', 'ignore', stderrFd] },
-    );
-
-    child.stdin.write(prompt);
-    child.stdin.end();
-    child.unref();
-    fs.closeSync(stderrFd);
-  } catch {
-    // Fire-and-forget — spawn failure is non-fatal
-  }
-}
-
-/**
  * Format short message for stderr output (when threshold is not met)
  */
 function formatShortMessage(userCount, toolCount) {
@@ -210,8 +118,7 @@ function main() {
   setSessionIdFromInput(input);
 
   const session = getOrCreateSession();
-  const userCount = readUserCount();
-  const toolCount = createSessionCounter('tool-count').read();
+  const { userCount, toolCount } = readCounts();
 
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
@@ -231,13 +138,22 @@ function main() {
 
   saveSessionJson(session);
 
-  if (shouldTrigger(userCount, toolCount)) {
-    const draftPath = tryGenerateAutoDiary(session.project, session.date, session.sessionId);
+  // Shared diary-capture core: threshold gate → draft → background enricher
+  // → counter reset (the sole reset path). The parsed-session summary is
+  // handed to the enricher.
+  const { triggered } = runDiaryCapture({
+    project: session.project,
+    date: session.date,
+    sessionId: session.sessionId,
+    transcriptData: {
+      userMessages: session.userMessageContent || [],
+      toolsUsed: session.toolsUsed || [],
+      filesModified: session.filesModified || [],
+      stats: formatStats(session),
+    },
+  });
 
-    if (draftPath) {
-      spawnDiaryEnricher(draftPath, session);
-    }
-
+  if (triggered) {
     const reflectStatus = checkReflectReady(session.project);
     if (reflectStatus?.ready) {
       addPendingAction(session.project, 'reflect-ready', {
@@ -245,13 +161,9 @@ function main() {
         count: reflectStatus.count,
       });
     }
-
-    output({ systemMessage: formatShortMessage(userCount, toolCount) });
-    resetUserCounter();
-    createSessionCounter('tool-count').reset();
-  } else {
-    output({ systemMessage: formatShortMessage(userCount, toolCount) });
   }
+
+  output({ systemMessage: formatShortMessage(userCount, toolCount) });
 
   process.exit(0);
 }
@@ -263,8 +175,6 @@ module.exports = {
   saveSessionJson,
   formatStats,
   formatShortMessage,
-  spawnDiaryEnricher,
-  tryGenerateAutoDiary,
   checkReflectReady,
 };
 

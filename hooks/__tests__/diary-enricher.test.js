@@ -2,9 +2,12 @@
  * Diary Enricher Regression Tests
  *
  * Guards the fixes for the silent enrichment failure discovered 2026-04-15:
- * - end.js spawnDiaryEnricher used --max-turns 2 (insufficient → "Reached max turns").
- * - end.js piped enricher stderr to 'ignore' (silent failure invisible for ~30 days).
+ * - spawnDiaryEnricher used --max-turns 2 (insufficient → "Reached max turns").
+ * - it piped enricher stderr to 'ignore' (silent failure invisible for ~30 days).
  * - inject-context.js never warned about stale unenriched drafts.
+ *
+ * spawnDiaryEnricher moved to scripts/lib/diary-capture.js (ICL-8) so the Stop
+ * and PreCompact paths share one implementation.
  */
 
 const { describe, it } = require('node:test');
@@ -13,14 +16,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const END_JS = path.join(__dirname, '..', 'session-tracker', 'end.js');
+const DIARY_CAPTURE_JS = path.join(__dirname, '..', '..', 'scripts', 'lib', 'diary-capture.js');
 
 // ─────────────────────────────────────────────
-// end.js: spawnDiaryEnricher invocation hardening
+// diary-capture.js: spawnDiaryEnricher invocation hardening
 // ─────────────────────────────────────────────
 
 describe('spawnDiaryEnricher invocation', () => {
-  const source = fs.readFileSync(END_JS, 'utf-8');
+  const source = fs.readFileSync(DIARY_CAPTURE_JS, 'utf-8');
 
   it('uses --max-turns >= 5 (haiku needs room to read AND write)', () => {
     const match = source.match(/'--max-turns',\s*'(\d+)'/);

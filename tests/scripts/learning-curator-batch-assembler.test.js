@@ -215,6 +215,24 @@ describe('assembleBatch — diary context', () => {
     }
   });
 
+  test('skips unenriched stub diaries, ingesting only enriched ones (S5-5)', () => {
+    const { assembleBatch } = getAssembler();
+    const project = 'stale-diary-project';
+    seedObservations(project, [makeObservation({ project })]);
+    seedDiaries(project, [
+      '# Session Summary\n\nShipped the enriched retry-budget fix.',
+      '# Session Summary\n\n## Decisions\n<!-- TO BE ENRICHED -->\nplaceholder-token-XYZ',
+    ]);
+
+    const result = assembleBatch({ project });
+    const promptContent = fs.readFileSync(result.prompt_path, 'utf8');
+
+    expect(promptContent).toContain('retry-budget fix');
+    // The unenriched stub must NOT contribute template placeholders.
+    expect(promptContent).not.toContain('TO BE ENRICHED');
+    expect(promptContent).not.toContain('placeholder-token-XYZ');
+  });
+
   test('limits diary context to at most 5 entries', () => {
     const { assembleBatch } = getAssembler();
     const project = 'many-diaries-project';
