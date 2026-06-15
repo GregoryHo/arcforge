@@ -79,7 +79,10 @@ const CLI_MANIFEST = {
   },
 
   parallel: {
-    flags: ['--json', '--spec-id'],
+    // --features switches the JSON shape to feature-level readiness
+    // ({ count, features: [...] }); without it, the default epic-level shape
+    // below is what the contract test live-probes.
+    flags: ['--features', '--json', '--spec-id'],
     output: { count: null, epics: [{ id: null, name: null }] },
   },
 

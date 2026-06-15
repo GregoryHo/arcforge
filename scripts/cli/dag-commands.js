@@ -75,9 +75,23 @@ function runBlock(args, { projectRoot, asJson, specFlag }) {
   output({ success: true, task_id: args.positional[0] }, asJson);
 }
 
-function runParallel(_args, { projectRoot, asJson, specFlag }) {
+function runParallel(args, { projectRoot, asJson, specFlag }) {
   const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'parallel');
   const coord = new Coordinator(projectRoot, resolved);
+  // --features: feature-level readiness within in-progress epics. Distinct
+  // JSON shape ({ count, features: [...] }) from the default epic-level
+  // ({ count, epics: [...] }) — the pinned manifest contract probes default.
+  if (args.flags.features) {
+    const features = coord.parallelFeatures();
+    output(
+      {
+        count: features.length,
+        features: features.map((f) => ({ id: f.id, name: f.name, epic: f.epic })),
+      },
+      asJson,
+    );
+    return;
+  }
   const tasks = coord.parallelTasks();
   output(
     {
