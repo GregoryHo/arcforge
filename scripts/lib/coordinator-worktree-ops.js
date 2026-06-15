@@ -257,6 +257,43 @@ module.exports = {
   },
 
   /**
+   * Abort an in-progress merge in the BASE checkout.
+   *
+   * A merge conflict during epic finishing leaves the BASE checkout (not the
+   * worktree) in a half-merged state — `mergeEpics` checks out the base branch
+   * in the base worktree before merging, so the unmerged index lives there. The
+   * agent that hit the conflict is in the epic worktree, so this method finds the
+   * base worktree (same delegation as mergeEpics) and runs `git merge --abort`
+   * there, returning the base to a clean state on its current branch.
+   *
+   * Idempotent-friendly: if there is no merge to abort, git's `MERGE_HEAD`
+   * check yields exit 128; we surface that as a no-op result rather than a
+   * throw, so calling --abort when already clean is safe.
+   *
+   * @returns {{ aborted: boolean, base: string }} aborted=false when there was
+   *   no merge in progress
+   */
+  abortMerge() {
+    const basePath = this._findBaseWorktree();
+    if (!basePath) {
+      throw new Error('Base worktree not found via git worktree list');
+    }
+
+    const result = this._runGit(['merge', '--abort'], basePath);
+    if (result.exitCode === 0) {
+      return { aborted: true, base: basePath };
+    }
+
+    // `git merge --abort` exits non-zero (128) when there is no merge to abort
+    // ("fatal: There is no merge to abort"). That is the no-op case, not an
+    // error — report it as such. Any other failure is a real git error.
+    if (/no merge to abort/i.test(result.stderr)) {
+      return { aborted: false, base: basePath };
+    }
+    throw new Error(`Failed to abort merge in ${basePath}: ${result.stderr.trim()}`);
+  },
+
+  /**
    * Clean up worktrees for completed epics
    * @param {Object} options - Cleanup options
    * @param {string[]} [options.epicIds] - Specific epic IDs to clean

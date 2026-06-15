@@ -114,6 +114,15 @@ function runExpand(args, { projectRoot, asJson, specFlag }) {
 function runMerge(args, { projectRoot, asJson, specFlag }) {
   const resolved = resolveMergeOrCleanupSpec(projectRoot, specFlag, args.positional, 'merge');
   const coord = new Coordinator(projectRoot, resolved);
+  // --abort: recover from a conflicted epic merge. The half-merged state lives
+  // in the BASE checkout (mergeEpics checks the base branch out there before
+  // merging), so abortMerge delegates to the base worktree and runs
+  // `git merge --abort` there — even when invoked from the epic worktree cwd.
+  if (args.flags.abort) {
+    const result = coord.abortMerge();
+    output(result, asJson);
+    return;
+  }
   const merged = coord.mergeEpics({
     baseBranch: args.options.base,
     epicIds: args.positional.length > 0 ? args.positional : undefined,

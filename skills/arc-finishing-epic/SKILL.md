@@ -93,25 +93,49 @@ Which option?
 
 #### Option 1: Merge Locally
 
+**Migrate before you destroy.** Capture the epic branch and base path while you
+are still inside the worktree, merge the epic out, then move to the base
+checkout *before* cleaning up — running cleanup or `git branch -d` from the
+worktree is a silent no-op (the worktree's local dag carries `worktree: null`),
+and you cannot delete a worktree you are standing inside.
+
 **Use coordinator merge (NOT git merge directly):**
 
 ```bash
-# Merge via coordinator (auto-detects epic + base)
+# Capture the live epic branch (the engine names it <spec-id>/<epic-id>) and the
+# base worktree path from the marker — BEFORE anything is removed.
+EPIC_BRANCH="$(git branch --show-current)"
+BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
+
+# Merge via coordinator (auto-detects epic + base). Safe to run from the worktree.
 node "${SKILL_ROOT}/scripts/finish-epic.js" merge
 
-# Clean up merged worktrees
+# Move to the base checkout so cleanup, status, and branch -d all act on the
+# base dag and you are not standing in the directory about to be removed.
+cd "$BASE_WORKTREE"
+
+# Clean up merged worktrees (delegates to base; removes the epic worktree).
 node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup
+
+# Look up the (now null) path for the completion format, then delete the merged
+# branch. `-d` is the honest, safe delete — it refuses if the branch was not
+# fully merged, which is exactly the guard you want.
+node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
+git branch -d "$EPIC_BRANCH"
 ```
 
 **If the merge produces a conflict** (coordinator returns non-zero, or `git status` shows unmerged paths), STOP before resolving. Go to **Step 4.1: Merge Conflict Handling** below. Do NOT auto-resolve, hand-edit conflict markers, or retry blindly.
 
-Report completion format when done.
+**If `git branch -d` refuses** ("not fully merged"), STOP — do NOT force with `-D`. A refusal means the merge did not actually land; investigate before destroying the branch.
+
+Report completion format when done — and only claim the branch is deleted after `git branch -d` actually succeeded.
 
 #### Option 2: Push and Create PR
 
 ```bash
-# Push branch
-git push -u origin <epic-name>
+# Push the current epic branch (engine names it <spec-id>/<epic-id>)
+EPIC_BRANCH="$(git branch --show-current)"
+git push -u origin "$EPIC_BRANCH"
 
 # Create PR
 gh pr create --title "feat: <Epic Title>" --body "$(cat <<'EOF'
@@ -129,12 +153,15 @@ Keep worktree until PR merged.
 #### Option 3: Keep As-Is
 
 ```bash
+# Resolve the current epic branch (engine names it <spec-id>/<epic-id>)
+EPIC_BRANCH="$(git branch --show-current)"
+
 # Push for backup
-git push -u origin <epic-name>
+git push -u origin "$EPIC_BRANCH"
 
 # Tag completion state
-git tag -a epic/<epic-name>-complete -m "Epic complete, all tests pass"
-git push origin epic/<epic-name>-complete
+git tag -a "epic/${EPIC_BRANCH}-complete" -m "Epic complete, all tests pass"
+git push origin "epic/${EPIC_BRANCH}-complete"
 ```
 
 Report: "Keeping epic <name>. Worktree preserved."
@@ -155,32 +182,57 @@ Wait for exact confirmation.
 
 If confirmed:
 ```bash
+# Capture identifiers from the marker BEFORE destroying anything. `block` and
+# `cleanup` take the epic *id*; `git branch -D` takes the live branch name
+# (engine: <spec-id>/<epic-id>); cleanup + branch -D must run from the base.
+EPIC_ID="$(grep '^epic:' .arcforge-epic | sed 's/^epic:[[:space:]]*//')"
+EPIC_BRANCH="$(git branch --show-current)"
+BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
+
 # Update DAG and sync BEFORE destroying the worktree.
 # The per-spec dag.yaml lives in the base worktree (specs/<spec-id>/dag.yaml);
 # the current worktree carries only the .arcforge-epic marker, which the
 # coordinator uses to reconnect to that dag and push local status back.
 if [ -f .arcforge-epic ]; then
-  node "${SKILL_ROOT}/scripts/finish-epic.js" block <epic-name> "Cancelled by user"
+  node "${SKILL_ROOT}/scripts/finish-epic.js" block "$EPIC_ID" "Cancelled by user"
   node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 fi
+
+# Move to the base checkout before removing the worktree — you cannot delete a
+# worktree (or its branch) while standing inside it, and cleanup only acts on
+# the base dag.
+cd "$BASE_WORKTREE"
 
 # Delegate worktree removal to the coordinator — it derives the canonical
 # path via ${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js and handles
 # force-remove of the .arcforge-epic marker. Never call `git worktree remove` by hand.
-node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup <epic-name>
-git branch -D <epic-name>
+node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup "$EPIC_ID"
+git branch -D "$EPIC_BRANCH"
 ```
 
 ### Step 4.1: Merge Conflict Handling (Option 1 only)
 
 A merge conflict during epic finishing means another change has landed on the base branch since your epic started. In a multi-teammate dispatch (epics dispatched via `arc-dispatching-teammates`), the conflict typically comes from another teammate's already-merged epic touching a shared file.
 
-**First, always abort to a clean state.** Do not leave a half-merged worktree:
+**First, always abort to a clean state.** The half-merged state lives in the
+**base checkout**, not your worktree — the coordinator checks the base branch
+out in the base worktree before merging. So abort through the coordinator, which
+finds the base worktree and runs the abort there even though you are in the
+epic worktree:
 
 ```bash
-git merge --abort
-git status  # expect: clean working tree on epic branch
+node "${SKILL_ROOT}/scripts/finish-epic.js" merge --abort
+
+# Verify the BASE working tree is clean again — the abort happened there, so
+# check git's working-tree state in the base, not the DAG. `git -C` keeps you in
+# the worktree while inspecting the base; expect no unmerged paths.
+BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
+git -C "$BASE_WORKTREE" status   # expect: no "Unmerged paths", base on its branch
 ```
+
+Do NOT run a bare `git merge --abort` from the worktree — your worktree is on
+the epic branch and has no merge in progress, so it would be a silent no-op
+while the base stays half-merged.
 
 **Then decide based on context:**
 
@@ -215,10 +267,27 @@ node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 
 Before emitting the completion format, query the coordinator for the epic's
 absolute worktree path — don't reconstruct it from pattern knowledge, because
-the derivation rule can change and the cached value is authoritative:
+the derivation rule can change and the cached value is authoritative.
+
+**Always query `status --json` against the BASE dag, never the worktree's local
+copy.** A worktree's own dag copy carries `worktree: null` for every epic, so
+`status --json` run from a worktree cwd reports `path: null` even when the
+worktree is alive — which would wrongly print a null path for the kept-worktree
+options. Only the base dag holds the real `worktree`/`path` value.
 
 ```bash
+# Options 1 and 4: you already ran `cd "$BASE_WORKTREE"`, so the base dag is the
+# current cwd — query it directly.
 node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
+
+# Options 2 and 3: the worktree is kept, so you are still inside it. Resolve the
+# base AND the spec id from the marker, then query the base dag in a subshell
+# (keeps you in the worktree for later steps). Pass --spec-id: the base has no
+# marker to pin the spec, so without it a multi-spec base returns the nested
+# `{ specs: { <id>: ... } }` shape instead of a flat `{ epics: [...] }`.
+SPEC_ID="$(grep '^spec_id:' .arcforge-epic | sed 's/^spec_id:[[:space:]]*//')"
+BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
+( cd "$BASE_WORKTREE" && node "${SKILL_ROOT}/scripts/finish-epic.js" status --json --spec-id "$SPEC_ID" )
 ```
 
 Extract the epic's `worktree` / `path` field from the JSON. Use that literal

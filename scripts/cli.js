@@ -9,7 +9,7 @@
  *   block <task_id> <reason>        Mark task as blocked
  *   parallel                        Get parallelizable epics
  *   expand [--epic <id>] [--project-setup] [--verify] [--verify-cmd "..."]  Create worktrees
- *   merge [epic_ids...] [--base branch]     Merge epics to base
+ *   merge [epic_ids...] [--base branch] [--abort]  Merge epics to base (--abort recovers a conflict)
  *   cleanup [epic_ids...]           Remove worktrees for completed epics
  *   sync [--direction from-base|to-base|both|scan]  Sync state
  *   reboot                          Get context for new session
