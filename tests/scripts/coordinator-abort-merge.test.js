@@ -22,10 +22,7 @@ const {
   DEFAULT_SPEC_ID,
 } = require('./coordinator-test-helpers');
 
-const FINISH_EPIC = path.resolve(
-  __dirname,
-  '../../skills/arc-finishing-epic/scripts/finish-epic.js',
-);
+const FINISH_EPIC = path.resolve(__dirname, '../../skills/arc-finishing/scripts/finish-epic.js');
 
 function runCli(args, cwd, home) {
   try {

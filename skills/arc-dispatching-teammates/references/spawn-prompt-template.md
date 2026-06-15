@@ -57,7 +57,7 @@ Report to the lead via SendMessage ONLY for:
   progress that is outside the epic's scope or outside your authority.
   Design preferences, test-write ordering, and implementation detail
   choices are NOT blockers; resolve them yourself.
-- **Merge conflicts at finishing time** — follow arc-finishing-epic's
+- **Merge conflicts at finishing time** — follow arc-finishing's
   Merge Conflict (Multi-Teammate) blocked format.
 - **Epic completion** — success (ready for lead review) or give-up (you
   tried and cannot proceed). Include a short summary of what was done.
@@ -145,7 +145,7 @@ The dev-branch mental model intentionally excludes static conflict
 prediction. If the lead starts adding "here are the files you should
 not touch" sections, they are drifting into over-engineering territory
 that the skill deliberately avoids. Cross-epic file conflicts, when
-they occur, are handled at finishing time via the arc-finishing-epic
+they occur, are handled at finishing time via the arc-finishing
 Merge Conflict (Multi-Teammate) escalation path — not via pre-dispatch
 constraint lists.
 

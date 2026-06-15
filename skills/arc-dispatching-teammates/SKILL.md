@@ -95,7 +95,7 @@ Rationalizations observed in baseline testing. If you catch yourself saying any 
 - **"Worktrees already exist, so I'll just dispatch."** Fine — skip the expand step for epics whose worktree is non-null. Do not re-expand.
 - **"I'm on `main`, dispatching from here is fine."** No — teammates merge back to the lead's branch. Create a dev branch first (Precondition 5).
 - **"Parallel burst hit `Failed to create teammate pane` — downscale the team."** No. You hit GH #40168. Retry the failed spawns sequentially. See `references/tmux-timing-race.md`.
-- **"I need to tell teammates which shared files to avoid."** No. Let conflicts happen; arc-finishing-epic escalates them via the Merge Conflict (Multi-Teammate) path. Static prediction is over-engineering.
+- **"I need to tell teammates which shared files to avoid."** No. Let conflicts happen; arc-finishing escalates them via the Merge Conflict (Multi-Teammate) path. Static prediction is over-engineering.
 - **"Pin arcforge version inline: `ARCFORGE_ROOT=... node "${ARCFORGE_ROOT}/scripts/cli.js"`."** POSIX footgun — `"${VAR}"` expands before the inline assignment, resolving to the *old* value. `export ARCFORGE_ROOT=...` on its own line first, then the blessed form.
 - **"I already know what this epic does — I'll skip the spec-reviewer and just map test names to ACs."** This is the qmd baseline failure verbatim. The lead's prior context is precisely what makes inline acceptance unreliable. Always dispatch `arcforge:spec-reviewer` per Step 6; it has fresh context and cannot rationalize.
 - **"The teammate already ran tests green — running verifier is redundant."** Same mistake. The verifier runs from an empty context; "redundant" is the rationalization that skips the gate. Dispatch `arcforge:verifier` per Step 6.
@@ -134,6 +134,6 @@ Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). 
 
 ## After This Skill
 
-- **Each teammate** hands off to `arc-finishing-epic` as part of `/arc-implementing`.
+- **Each teammate** hands off to `arc-finishing` (Step 0 selects the epic path) as part of `/arc-implementing`.
 - **Lead session** dispatches `arcforge:spec-reviewer` + `arcforge:verifier` per Step 6 on each completion; does NOT run `arc-verifying` inline.
 - **Blocked teammates** → route to `arc-debugging` on the specific epics. Do not auto-retry.

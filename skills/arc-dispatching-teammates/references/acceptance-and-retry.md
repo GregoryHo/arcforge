@@ -379,7 +379,7 @@ Three events look like "teammate failed" but are NOT retry-triggering:
    with guidance, teammate continues the same attempt. Retry counter
    does not increment.
 2. **Merge conflict at finishing time.** Teammate SendMessages using
-   the Merge Conflict (Multi-Teammate) format from arc-finishing-epic.
+   the Merge Conflict (Multi-Teammate) format from arc-finishing.
    Lead arbitrates the conflict, teammate continues the same attempt.
    Counter does not increment.
 3. **Teammate gives up voluntarily.** Teammate SendMessages "I can't

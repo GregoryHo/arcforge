@@ -87,7 +87,7 @@ which delegates to `git worktree remove <absolute-path>`.
 - If git's own worktree registry still holds a stale entry after removal,
   the coordinator force-removes the directory.
 - Cleanup does **not** delete the epic branch — that is the agent's choice
-  via `arc-finishing-epic`.
+  via `arc-finishing` (its epic path).
 - After cleanup the epic's `worktree` field in `specs/<spec-id>/dag.yaml`
   is cleared to `null`.
 
@@ -181,7 +181,7 @@ arcforge sync --direction from-base
 
 ```bash
 # 1. 在 worktree 內，所有 feature 完成
-#    → 使用 arc-finishing-epic skill
+#    → 使用 arc-finishing skill（Step 0 依 .arcforge-epic 選 epic 路徑）
 
 # 2. 選擇 Merge
 arcforge merge         # 自動偵測 epic，merge 回 base

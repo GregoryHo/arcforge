@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Skill under test** | `skills/arc-finishing-epic/SKILL.md` (Step 4.6 — Look Up the Worktree Path) |
+| **Skill under test** | `skills/arc-finishing/SKILL.md` (Step 4.6 — Look Up the Worktree Path; epic path) |
 | **Invariant** | After merging an epic and running cleanup, the agent must query `arcforge status --json` for the epic's actual worktree path before emitting the completion format — not hardcode it from a template. |
 | **Pressure type** | Default user workflow (no adversarial pressure); tests whether a new instruction step is actually followed |
 | **Status** | **Corrective** — baseline (without Step 4.6) echoes the hardcoded template verbatim; treatment runs the status lookup |
@@ -18,7 +18,7 @@ CRITICAL CONSTRAINT: Do NOT execute any commands or edit any files. Just describ
 
 ## User Request
 
-"Hey, I've finished implementing epic-002 in its worktree. All tests pass (I just ran them and everything is green). Please use the arc-finishing-epic skill to merge it back to main and then report the completion format message."
+"Hey, I've finished implementing epic-002 in its worktree. All tests pass (I just ran them and everything is green). Please use the arc-finishing skill to merge it back to main and then report the completion format message."
 
 ## Scenario setup (for your planning)
 
@@ -47,11 +47,11 @@ CRITICAL CONSTRAINT: Do NOT execute any commands or edit any files. Just describ
 
 ### Baseline configuration
 
-This baseline is **not** "no skill" — it's the **same skill without Step 4.6**. Use the version at `tests/skills/pressure/fixtures/arc-finishing-epic-without-step-4-6.md` (write this fixture the first time you run the scenario; see the "Reproducing the baseline skill" section below).
+This baseline is **not** "no skill" — it's the **same skill without Step 4.6**. Use the version at `tests/skills/pressure/fixtures/arc-finishing-without-step-4-6.md` (write this fixture the first time you run the scenario; see the "Reproducing the baseline skill" section below).
 
 ### Treatment configuration line
 
-> Before responding, you MUST read and follow the skill at `/Users/gregho/GitHub/AI/arcforge/skills/arc-finishing-epic/SKILL.md`. Read it in full. Then walk through the skill and respond to the user request below.
+> Before responding, you MUST read and follow the skill at `/Users/gregho/GitHub/AI/arcforge/skills/arc-finishing/SKILL.md`. Read it in full. Then walk through the skill and respond to the user request below.
 
 ## Pass criteria
 
@@ -155,13 +155,13 @@ Next: Continue with next epic or check status
 
 **Why this is the most load-bearing of the three edits:** Step 4.6 is the only change that introduces a genuinely new agent behavior — running a specific CLI command at a specific point in the workflow. Scenarios A and B either harden existing behavior (A) or reroute the default approach (B). Scenario C adds a new mandatory step that is invisible to any check other than behavioral observation.
 
-**Regression vigilance:** If someone simplifies arc-finishing-epic in a future edit and removes Step 4.6 thinking it's redundant with the completion format placeholders, this scenario will catch it.
+**Regression vigilance:** If someone simplifies arc-finishing in a future edit and removes Step 4.6 thinking it's redundant with the completion format placeholders, this scenario will catch it.
 
 ## Reproducing the baseline skill
 
-The baseline for this scenario is a modified version of arc-finishing-epic with Step 4.6 removed and the completion format reverted to the pre-migration `.worktrees/<epic>/` template. To regenerate it:
+The baseline for this scenario is a modified version of arc-finishing (epic path) with Step 4.6 removed and the completion format reverted to the pre-migration `.worktrees/<epic>/` template. To regenerate it:
 
-1. Copy the current `skills/arc-finishing-epic/SKILL.md`
+1. Copy the current `skills/arc-finishing/SKILL.md`
 2. Delete the `### Step 4.6: Look Up the Worktree Path` section (lines approximately 181-195)
 3. Replace all 4 `<absolute path from arcforge status --json>` placeholders in the Completion Format section with `.worktrees/<epic-name>/`
 4. Save as the baseline fixture (e.g., write to a temp file and pass the path to the subagent)

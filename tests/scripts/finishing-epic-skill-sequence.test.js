@@ -1,6 +1,6 @@
 /**
- * WT-4 / WT-5 — arc-finishing-epic skill command sequence, executed VERBATIM
- * with cwd=worktree (not by calling Coordinator methods from base).
+ * WT-4 / WT-5 — arc-finishing skill command sequence (epic path), executed
+ * VERBATIM with cwd=worktree (not by calling Coordinator methods from base).
  *
  * Why a CLI-subprocess fixture instead of in-process Coordinator calls: the
  * skill instructs the agent to run `finish-epic.js merge` / `cleanup` /
@@ -29,10 +29,7 @@ const {
 
 // The skill invokes `node .../scripts/finish-epic.js <cmd>`; finish-epic.js is a
 // thin shim that requires cli.js. Run the shim to exercise the exact entry point.
-const FINISH_EPIC = path.resolve(
-  __dirname,
-  '../../skills/arc-finishing-epic/scripts/finish-epic.js',
-);
+const FINISH_EPIC = path.resolve(__dirname, '../../skills/arc-finishing/scripts/finish-epic.js');
 
 function run(bin, args, cwd, env = {}) {
   try {
@@ -52,7 +49,7 @@ function run(bin, args, cwd, env = {}) {
   }
 }
 
-describe('arc-finishing-epic Option 1 — verbatim skill sequence (cwd=worktree)', () => {
+describe('arc-finishing epic-path Option 1 — verbatim skill sequence (cwd=worktree)', () => {
   const originalHome = process.env.HOME;
   let testHome;
   let root;

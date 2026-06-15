@@ -34,7 +34,7 @@ tests/skills/pressure/
 ├── README.md                                  # This file
 ├── arc-using-worktrees-cli-failure.md         # Scenario A
 ├── arc-using-path-reconstruction.md           # Scenario B
-└── arc-finishing-epic-completion-format.md    # Scenario C
+└── arc-finishing-completion-format.md         # Scenario C
 ```
 
 Each scenario file contains:
@@ -107,4 +107,4 @@ Name the file `<skill-name>-<short-description>.md`.
 |---------|-----------------|-----------|--------|
 | [A: CLI failure](arc-using-worktrees-cli-failure.md) | `arc-using-worktrees` | Refuse manual `git worktree add` bypass under CLI failure + deadline pressure | Confirmatory |
 | [B: Path reconstruction](arc-using-path-reconstruction.md) | `arc-using` (Worktree Rule) | Query `arcforge status --json` instead of confirming or hand-deriving a guessed path | Corrective |
-| [C: Completion format](arc-finishing-epic-completion-format.md) | `arc-finishing-epic` (Step 4.6) | Query `status --json` for the actual worktree path before emitting the completion format | Corrective |
+| [C: Completion format](arc-finishing-completion-format.md) | `arc-finishing` (Step 4.6, epic path) | Query `status --json` for the actual worktree path before emitting the completion format | Corrective |

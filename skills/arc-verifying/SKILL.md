@@ -165,7 +165,7 @@ digraph cannot_verify {
 **Discoverable from:** `arc-using` when a task is approaching a completion claim and verification guidance would help.
 
 **Also embedded in:**
-- **arc-finishing** / **arc-finishing-epic** — verify tests before offering merge options
+- **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — verify tests before offering merge options
 - **arc-tdd** — Verify RED / Verify GREEN steps
 - **Spec reviewer** / **Quality reviewer** — read actual code, run tests
 

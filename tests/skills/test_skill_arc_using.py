@@ -96,3 +96,52 @@ def test_arc_using_file_artifacts_are_per_spec():
     for line in block_lines:
         # The legacy form was `` `dag.yaml` + `epics/` → Implementation plans ``
         assert "`dag.yaml` + `epics/`" not in line
+
+
+def test_arc_using_finish_row_points_at_arc_finishing():
+    """WT-6 (absorbs SRH-6): the finishing chooser collapses to one skill.
+
+    The twin finishing skills merged into a single `arc-finishing` whose Step 0
+    discriminates on `.arcforge-epic`. The router must point at the survivor name
+    and must NOT mention the deleted `arc-finishing-epic`.
+    """
+    skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
+    content = skill_path.read_text()
+
+    assert "arc-finishing-epic" not in content
+    # The finish row names arc-finishing and the marker-based discrimination.
+    assert "Finish work" in content
+    assert "arc-finishing" in content
+    assert ".arcforge-epic" in content
+
+
+def test_arc_using_has_generic_worktree_row():
+    """WT-6 (absorbs SRH-6): the chooser table gains a generic-worktree row.
+
+    Generic worktrees (experiment/hotfix/review checkout) route to
+    `arc-using-worktrees`; epic work routes to `arc-coordinating expand`.
+    """
+    skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
+    content = skill_path.read_text()
+
+    assert "isolated workspace" in content.lower()
+    assert "arc-using-worktrees" in content
+    assert "arc-coordinating expand" in content
+
+
+def test_arc_using_worktree_rule_marker_scoped():
+    """WT-6 (absorbs SRH-6): the Worktree Rule scopes path lookup by tier.
+
+    Epic worktrees resolve via `status --json` (.path); generic worktrees resolve
+    via `worktree list --json` and NEVER via `status --json` (which only knows
+    epic worktrees).
+    """
+    skill_path = PROJECT_ROOT / "skills" / "arc-using" / "SKILL.md"
+    content = skill_path.read_text()
+
+    # Epic re-entry uses the epic-tier surface.
+    assert "status --json" in content
+    # Generic worktree lookup uses the generic surface, never status --json.
+    assert "worktree list --json" in content
+    # The marker is named as the discriminator.
+    assert ".arcforge-epic" in content

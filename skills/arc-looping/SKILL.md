@@ -185,4 +185,4 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" loop --epic epic-001 --pattern sequential
 
 **After loop completes (in order):**
 1. **arc-verifying** — verify all requirements met and tests pass
-2. **arc-finishing** or **arc-finishing-epic** — wrap up and decide merge/PR
+2. **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — wrap up and decide merge/PR

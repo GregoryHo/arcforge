@@ -61,7 +61,7 @@ digraph process {
     "Multiple independent issues?" [shape=diamond];
     "Use arc-dispatching-parallel for fixes" [shape=box];
     "Dispatch final code reviewer" [shape=box];
-    "Use arc-finishing or arc-finishing-epic" [shape=box style=filled fillcolor=lightgreen];
+    "Use arc-finishing" [shape=box style=filled fillcolor=lightgreen];
 
     "Read tasks, create TodoWrite" -> "Dispatch implementer subagent";
     "Dispatch implementer subagent" -> "Implementer asks questions?";
@@ -83,7 +83,7 @@ digraph process {
     "Mark task complete" -> "More tasks?";
     "More tasks?" -> "Dispatch implementer subagent" [label="yes"];
     "More tasks?" -> "Dispatch final code reviewer" [label="no"];
-    "Dispatch final code reviewer" -> "Use arc-finishing or arc-finishing-epic";
+    "Dispatch final code reviewer" -> "Use arc-finishing";
 }
 ```
 
@@ -142,7 +142,7 @@ Final reviewer: All requirements met, architecture solid
 
 Done! Completion pipeline:
 1. Run arc-verifying — confirm all requirements met and tests pass
-2. Use arc-finishing (regular branch) or arc-finishing-epic (worktree) to decide merge/PR/keep/discard
+2. Use arc-finishing (Step 0 discriminates on .arcforge-epic) to decide merge/PR/keep/discard
 ```
 
 ## Available Agents
@@ -215,7 +215,7 @@ The full agent roster for arc-agent-driven workflows:
 - **arc-using-worktrees** — REQUIRED: Set up isolated workspace before starting
 - **arc-writing-tasks** - Creates the task list this skill executes
 - **arc-requesting-review** - Code review template for reviewer subagents
-- **arc-finishing** or **arc-finishing-epic** - Complete development after all tasks
+- **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) - Complete development after all tasks
 
 **Subagents should use:**
 

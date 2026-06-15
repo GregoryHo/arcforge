@@ -61,7 +61,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 | 2a | arc-writing-tasks | `specs/<spec-id>/epics/<epic-id>/features/<feature>.md` | tasks file |
 | 2b | arc-agent-driven | tasks file | completed code |
 | 2b | arc-dispatching-parallel | (via arc-agent-driven, if review finds multiple issues) | parallel fixes |
-| End | arc-finishing-epic | completed epic | merge decision |
+| End | arc-finishing | completed epic | merge decision |
 
 ## What Implementer Does NOT Do
 
@@ -84,7 +84,7 @@ Features implemented:
 Total: 13 tasks, 0 failures
 Commits: 13
 
-Next: Use arc-finishing-epic to decide merge/PR/keep/discard
+Next: Use arc-finishing to decide merge/PR/keep/discard
 ─────────────────────────────────────────────────
 ```
 
@@ -130,4 +130,4 @@ Then resume implementer
 
 - **Before:** arc-coordinating (creates worktrees), arc-planning (creates DAG)
 - **Uses:** arc-writing-tasks, arc-agent-driven, arc-dispatching-parallel
-- **After:** arc-finishing-epic
+- **After:** arc-finishing (Step 0 selects the epic path)
