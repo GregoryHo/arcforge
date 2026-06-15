@@ -4,6 +4,8 @@
 > 本文件是唯一執行依據。所有先前查證事實（`/tmp/arcforge-audit-items.json`、`/tmp/arcforge-goal-analyses.json`、`/tmp/arcforge-capability-first-blueprint.md`）已吸收；七大情境走查發現的每一條 seam 均已併入對應任務（以【S*-*】標註）。實作者依波次執行，遇停止條件即上報，不得自行繞道。
 
 > **執行狀態（2026-06-12）**：Wave 0 全數完成並合併 — CORE-1 (#64)、CORE-2 (#69)、AF-1 (#65)、AF-2 (#66)、RV-1 (#67)、WT-1 (#68)。RV-1 spike 結論：`decision:block` 與 `additionalContext` 均達模型（v2.1.172，含 Task-subagent 輪）；helper 採 additionalContext 形態，RV-3/RV-5/ICL-10 解凍。CORE-2 的 ≤450 門檻經停止條件上報後由 owner 修訂為 (b)+(c) 方案、≤467（見該任務的修訂註記）。
+>
+> **MATCHER TRIAGE hotfix（2026-06-12，branch `fix/hooks-matcher-triage`）**：RV-2 的 6-cell A/B 證實 expression matcher（`tool == "..."` / `&& tool_input... matches ...`）在 Claude Code v2.1.173 上從未觸發 — matcher 是對 tool name 的 regex，無 expression 語法。guard 層（arc-guard G2/G3、sdd-ledger-guard、sdd-ratify-guard、arc-remind）的 hooks.json matcher 已全數換成 plain tool-name（`Bash`/`Edit`/`Write`）；四個 hook 的 main.js 原本即在 tool_name 上自我把關，無需改動。quality-check 的 matcher 由 RV-2 分支自行修（hunk 保持互斥）。Wave 2.1（guard package）必須以本分支為基底。
 
 ---
 

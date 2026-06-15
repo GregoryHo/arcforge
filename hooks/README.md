@@ -133,7 +133,7 @@ main();
 {
   "PostToolUse": [
     {
-      "matcher": "tool == \"Edit\"",
+      "matcher": "Edit",
       "hooks": [
         {
           "type": "command",
