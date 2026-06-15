@@ -129,6 +129,8 @@ const CLI_MANIFEST = {
       '--max-runs',
       '--max-cost',
       '--epic',
+      '--max-parallel',
+      '--no-project-setup',
       '--spec-id',
       '--task-timeout',
       '--permission-mode',

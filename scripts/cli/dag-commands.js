@@ -208,6 +208,12 @@ function runLoop(args, { projectRoot, specFlag }) {
     process.exit(1);
   }
 
+  const maxParallel = args.options['max-parallel'] ? parseInt(args.options['max-parallel'], 10) : 5;
+  if (args.options['max-parallel'] && (Number.isNaN(maxParallel) || maxParallel < 1)) {
+    console.error('Error: --max-parallel must be a positive integer');
+    process.exit(1);
+  }
+
   // --reset archives any existing state file before this run starts, so the
   // loop begins from a clean state. Deliberate pre-run action — never mid-run.
   if (args.flags.reset) {
@@ -221,6 +227,11 @@ function runLoop(args, { projectRoot, specFlag }) {
     maxRuns,
     maxCost,
     epic,
+    maxParallel,
+    // dag-mode worktrees start empty (no node_modules) — run the per-worktree
+    // installer by default so a downstream --verify-cmd has a usable tree.
+    // --no-project-setup opts out.
+    projectSetup: !args.flags['no-project-setup'],
     projectRoot,
     specId: resolved,
     taskTimeoutMs: taskTimeout ? taskTimeout * 1000 : null,

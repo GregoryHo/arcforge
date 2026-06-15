@@ -28,6 +28,7 @@ const {
   finalizeLoop,
 } = require('./lib/loop-state');
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
+const { warnIfBaseBranch, selectRoundEpics, runDagRound } = require('./lib/loop-dag');
 const { Feature } = require('./lib/models');
 const {
   detectPackageManager,
@@ -38,6 +39,9 @@ const {
 const { getTimestamp, readFileSafe } = require('./lib/utils');
 
 const MAX_RETRIES = 1;
+
+/** Default concurrency cap for the DAG pattern's per-round worktree batch. */
+const DEFAULT_MAX_PARALLEL = 5;
 
 /**
  * Parse loop CLI arguments
@@ -50,6 +54,8 @@ function parseLoopArgs(args) {
     maxRuns: 50,
     maxCost: null,
     epic: null,
+    maxParallel: DEFAULT_MAX_PARALLEL,
+    projectSetup: true,
     taskTimeoutMs: null,
     permissionMode: null,
     allowedTools: null,
@@ -71,6 +77,16 @@ function parseLoopArgs(args) {
           console.error('Error: --max-runs must be a positive integer');
           process.exit(1);
         }
+        break;
+      case '--max-parallel':
+        options.maxParallel = parseInt(args[++i], 10);
+        if (Number.isNaN(options.maxParallel) || options.maxParallel < 1) {
+          console.error('Error: --max-parallel must be a positive integer');
+          process.exit(1);
+        }
+        break;
+      case '--no-project-setup':
+        options.projectSetup = false;
         break;
       case '--max-cost':
         options.maxCost = parseFloat(args[++i]);
@@ -127,6 +143,8 @@ OPTIONS:
   --max-runs N               Maximum iterations (default: 50)
   --max-cost N               Maximum cost in dollars (default: unlimited)
   --epic <id>                Scope loop to a single epic (safe for parallel loops)
+  --max-parallel N           Max concurrent epics per round in dag mode (default: 5)
+  --no-project-setup         Skip per-worktree installer in dag mode (default: on)
   --task-timeout N           Per-session timeout in seconds (default: 600)
   --permission-mode <mode>   Pass --permission-mode through to spawned claude sessions
   --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
@@ -261,10 +279,15 @@ function buildVerificationLines(projectRoot) {
  * Uses coordinator.taskContext() for enriched task data.
  * @param {Object} task - Task from coordinator
  * @param {Coordinator} coord - Coordinator instance
- * @param {string} projectRoot - Project root directory
+ * @param {string} projectRoot - Project root directory (verification + spec
+ *   resolution are keyed here; the relative paths emitted resolve identically
+ *   from a worktree checkout of the same repo).
+ * @param {string} [workspaceRoot] - Actual session workspace for the
+ *   `## Project Root:` line. In dag mode this is the epic worktree so the
+ *   headless session works there (not the base). Defaults to projectRoot.
  * @returns {string} Prompt for the spawned session
  */
-function buildTaskPrompt(task, coord, projectRoot) {
+function buildTaskPrompt(task, coord, projectRoot, workspaceRoot) {
   const taskType = task instanceof Feature ? 'feature' : 'epic';
   const parts = [`# Task: ${task.name}`, ``, `## Task ID: ${task.id}`, `## Type: ${taskType}`];
 
@@ -300,7 +323,7 @@ function buildTaskPrompt(task, coord, projectRoot) {
     `Use TDD: write failing test first, then implement, then refactor.`,
     `Commit your changes with a conventional commit message.`,
     ``,
-    `## Project Root: ${projectRoot}`,
+    `## Project Root: ${workspaceRoot || projectRoot}`,
   );
 
   const verification = buildVerificationLines(projectRoot);
@@ -443,11 +466,12 @@ function runSequential(options) {
 
 /**
  * Run DAG-parallel loop pattern.
- * Independent tasks are spawned concurrently via spawnSessionAsync.
+ * Each round runs every ready (and resumable in-progress) epic as an
+ * isolated worktree session, then merges the successful ones back to base.
  * @param {Object} options - Loop options
  */
 async function runDag(options) {
-  const { projectRoot, maxRuns, maxCost, epic } = options;
+  const { projectRoot, maxRuns, maxCost, epic, maxParallel } = options;
   const state = loadLoopState(projectRoot);
   beginRun(state, { pattern: 'dag', maxRuns, maxCost });
   const epicScope = resolveEpicScope(epic, projectRoot);
@@ -465,60 +489,24 @@ async function runDag(options) {
 
     const coord = tryCreateCoordinator(projectRoot, state, options.specId);
     if (!coord) break;
+    if (state.iteration === 1) warnIfBaseBranch(coord);
 
-    // Try parallel tasks first
-    const parallelEpics = coord.parallelTasks(epicScope);
-    if (parallelEpics.length > 1) {
-      console.log(`[loop] Found ${parallelEpics.length} parallel epics — running concurrently`);
-
-      // Spawn all sessions concurrently
-      const taskEntries = parallelEpics.map((epicItem) => ({
-        epic: epicItem,
-        prompt: buildTaskPrompt(epicItem, coord, projectRoot),
-      }));
-      const spawnResults = await Promise.all(
-        taskEntries.map((entry) => spawnSessionAsync(entry.prompt, projectRoot, options)),
-      );
-
-      // Process results sequentially (state + DAG updates are not concurrent-safe)
-      let anySuccess = false;
-      for (let i = 0; i < parallelEpics.length; i++) {
-        const epicItem = parallelEpics[i];
-        const result = spawnResults[i];
-        state.total_cost += result.costUsd;
-
-        if (result.exitCode !== 0) {
-          console.log(`[loop] Task ${epicItem.id} failed`);
-          recordError(state, epicItem.id, result.stderr, 1);
-          state.failed_tasks.push(epicItem.id);
-          try {
-            coord.blockTask(epicItem.id, 'Loop: failed in parallel batch');
-          } catch (err) {
-            console.error(`[loop] Warning: could not block task ${epicItem.id}: ${err.message}`);
-          }
-        } else {
-          try {
-            coord.completeTask(epicItem.id);
-            state.completed_tasks.push(epicItem.id);
-            state.last_progress_at = getTimestamp();
-            console.log(`[loop] Task ${epicItem.id} completed successfully`);
-            anySuccess = true;
-          } catch (err) {
-            console.error(`[loop] Warning: DAG update failed for ${epicItem.id}: ${err.message}`);
-          }
-        }
-      }
-      saveLoopState(state, projectRoot);
-
+    // Every round with ≥1 ready/resumable epic takes the isolated worktree
+    // path — chain and diamond-join rounds with a single ready epic included.
+    const batch = selectRoundEpics(coord, epicScope, maxParallel);
+    if (batch.length > 0) {
+      console.log(`[loop] Running ${batch.length} epic(s) in isolated worktrees this round`);
+      const anySuccess = await runDagRound(coord, batch, state, options, buildTaskPrompt);
       if (!anySuccess) {
-        console.log('[loop] No parallel tasks succeeded');
+        console.log('[loop] No epics made progress this round');
         state.status = 'failed';
         break;
       }
       continue;
     }
 
-    // Fall back to next task
+    // No isolated epic work — fall back to feature-level next task (legacy
+    // non-isolated path for in-progress epics worked feature by feature).
     const task = coord.nextTask(epicScope);
     if (!task) {
       console.log('[loop] All tasks complete!');
