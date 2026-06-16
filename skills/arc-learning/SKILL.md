@@ -43,7 +43,7 @@ Use `--json` on any command when another tool or test needs machine-readable out
 5. **Approve or dismiss.** Use the dashboard `[Approve]` or `[Dismiss]` action. Approval is required before any artifact is written.
 6. **Materialize as inactive drafts.** Use the dashboard `[Materialize]` action. Draft artifacts are written to `~/.arcforge/learning/drafts/<candidate-id>/<materialization-id>/instincts/<name>.md` — these are inactive review files; they are not loaded into Claude context.
 7. **Inspect before activation.** Open the candidate card on the dashboard; preview the draft body before activating.
-8. **Explicit activation.** Use the dashboard `[Activate]` action only after reviewing the draft. Activation copies the draft to `~/.arcforge/instincts/<project>/<candidate-id>.md` (project scope) or `~/.arcforge/instincts/global/<candidate-id>.md` (global scope), with `supersede_with_backup` if an active artifact already exists at that path. SessionStart never auto-loads activated instinct bodies — surfacing is via dashboard / `arc-recalling` only.
+8. **Explicit activation.** Use the dashboard `[Activate]` action only after reviewing the draft. Activation copies the draft to `~/.arcforge/instincts/<project>/<candidate-id>.md` (project scope) or `~/.arcforge/instincts/global/<candidate-id>.md` (global scope), with `supersede_with_backup` if an active artifact already exists at that path. Once activated, the instinct is injected at SessionStart through that activation gate only — the top 5 by confidence (sort/cap, not a threshold), with an `inject_activated_instincts` kill-switch (default ON). Non-activated candidates are never injected.
 
 ## Candidate Lifecycle Statuses
 

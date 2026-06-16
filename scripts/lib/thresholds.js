@@ -4,7 +4,7 @@
  * Shared module for determining when to trigger diary/evaluation actions.
  * Counters accumulate across resume/exit cycles until threshold is reached.
  *
- * NOTE: This is the canonical location. hooks/lib/thresholds.js should import from here.
+ * Canonical source — hooks import this directly (there is no hooks/lib/ layer).
  */
 
 const MIN_USER_MESSAGES = 10;

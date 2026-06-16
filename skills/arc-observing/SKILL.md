@@ -45,7 +45,7 @@ The observer daemon is a four-layer orchestrator:
 3. **LLM curation** (Layer 4): Daemon invokes `claude --model haiku --max-turns 15 --print --output-format json --json-schema` with the batch. The LLM curator produces structured candidate proposals rather than direct instinct file writes
 4. **Ingestion** (Layer 5): Daemon calls `node $CURATOR_CLI ingest-proposal --batch-id --response-file` to parse the LLM response and append candidates to the review queue at `~/.arcforge/learning/candidates/queue.jsonl`
 
-The daemon never writes instinct `.md` files directly, and SessionStart never auto-loads instinct bodies into Claude context. All candidate proposals flow through the LLM curator into the review queue; human review via `arcforge learn dashboard` is the only path that produces active instinct files (Layer 8 activation), and activated instincts are surfaced through dashboard / history / evolve flows rather than runtime auto-injection.
+The daemon never writes instinct `.md` files directly, and SessionStart never auto-loads instinct bodies by confidence. All candidate proposals flow through the LLM curator into the review queue; human review via `arcforge learn dashboard` is the only path that produces active instinct files (Layer 8 activation). Dashboard-activated instincts are injected at SessionStart, but only through that explicit activation gate — the top 5 by confidence, with confidence used to sort and cap rather than as a threshold, and an `inject_activated_instincts` kill-switch (default ON).
 
 ## Instinct Format
 
