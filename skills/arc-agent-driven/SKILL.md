@@ -91,17 +91,29 @@ digraph process {
 
 ## Agents & Templates
 
-Dispatch these agents via the Agent tool (preferred) or use templates for custom prompts:
+Two ways to dispatch each role, depending on what your platform supports:
 
-**Agents (recommended — includes tool isolation and methodology):**
+**Pre-built agents (when your platform supports named subagents — e.g. Claude
+Code's `agents/`):** they bundle tool isolation and methodology.
 - `implementer` — TDD implementation with full write access
 - `spec-reviewer` — Spec compliance verification (read-only)
 - `quality-reviewer` — Code quality assessment (read-only + test runner)
 
-**Templates (for custom prompts or when agents aren't available):**
+**Templates (cross-platform fallback — for custom prompts or when named agents
+aren't available):**
 - `./implementer-prompt.md` - Implementer prompt with placeholders
 - `./spec-reviewer-prompt.md` - Spec compliance review prompt
 - `./code-quality-reviewer-prompt.md` - Code quality review prompt (references arc-requesting-review)
+
+## Cross-Platform Dispatch
+
+This skill is platform-agnostic: it needs only the ability to run a fresh
+subagent per task. The named agents above are a Claude Code convenience; on any
+platform (Codex, Gemini CLI, OpenCode, or Claude Code) you can dispatch each
+role from the templates instead, using whatever subagent mechanism your harness
+provides. The templates carry the full role prompt, so the workflow — fresh
+implementer per task, then spec review, then quality review — is identical
+regardless of how the subagent is launched.
 
 ## Example Workflow
 

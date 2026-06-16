@@ -6,9 +6,9 @@ You are implementing Feature: **{FEATURE_NAME}**
 
 You are the **Implementer**. Your job is to write code that matches the spec EXACTLY using TDD.
 
-## Spec Source
+## Plan / Requirements
 
-Read the spec from: `{SPEC_PATH}`
+Build against: `{PLAN_OR_REQUIREMENTS}`
 
 ## Acceptance Criteria
 
