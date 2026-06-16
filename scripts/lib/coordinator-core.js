@@ -187,6 +187,32 @@ class Coordinator {
   }
 
   /**
+   * Get all features that can be worked on in parallel within in-progress
+   * epics. Feature-level analog of parallelTasks (epic-level): a feature is
+   * ready when its epic is in progress, the feature is pending, and every one
+   * of its intra-epic dependencies is completed.
+   * @param {string|null} [epicId=null] - If set, only consider this epic
+   * @returns {Array<{id: string, name: string, epic: string}>} Ready features
+   *   tagged with their parent epic id.
+   */
+  parallelFeatures(epicId = null) {
+    const epics = epicId
+      ? this.dag.epics.filter((e) => e.id === epicId)
+      : this.dag.epics.filter((e) => e.status === TaskStatus.IN_PROGRESS);
+    const ready = [];
+    for (const epic of epics) {
+      if (epic.status !== TaskStatus.IN_PROGRESS) continue;
+      const completedFeatures = epic.getCompletedFeatures();
+      for (const feature of epic.features) {
+        if (feature.status === TaskStatus.PENDING && feature.isReady(completedFeatures)) {
+          ready.push({ id: feature.id, name: feature.name, epic: epic.id });
+        }
+      }
+    }
+    return ready;
+  }
+
+  /**
    * Mark a task as completed
    * @param {string} taskId - Task ID to complete
    */

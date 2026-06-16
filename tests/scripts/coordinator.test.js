@@ -321,6 +321,76 @@ describe('Coordinator', () => {
     });
   });
 
+  describe('parallelFeatures', () => {
+    it('should return ready features in an in-progress epic, tagged with epic id', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Features: [
+            { id: 'feat-1a', name: 'Setup', status: TaskStatus.PENDING },
+            { id: 'feat-1b', name: 'Docs', status: TaskStatus.PENDING },
+          ],
+        }),
+      );
+      const ready = coord.parallelFeatures();
+      // Both features have no deps → both parallelizable.
+      expect(ready).toHaveLength(2);
+      expect(ready.map((f) => f.id).sort()).toEqual(['feat-1a', 'feat-1b']);
+      expect(ready[0].epic).toBe('epic-1');
+    });
+
+    it('should exclude a feature whose dependency is not yet completed', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          // feat-1b depends on feat-1a (still pending) → not ready.
+          epic1Features: [
+            { id: 'feat-1a', name: 'Setup', status: TaskStatus.PENDING },
+            { id: 'feat-1b', name: 'Core', status: TaskStatus.PENDING, depends_on: ['feat-1a'] },
+          ],
+        }),
+      );
+      const ready = coord.parallelFeatures();
+      expect(ready).toHaveLength(1);
+      expect(ready[0].id).toBe('feat-1a');
+    });
+
+    it('should include a dependent feature once its dependency completes', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic1Features: [
+            { id: 'feat-1a', name: 'Setup', status: TaskStatus.COMPLETED },
+            { id: 'feat-1b', name: 'Core', status: TaskStatus.PENDING, depends_on: ['feat-1a'] },
+          ],
+        }),
+      );
+      const ready = coord.parallelFeatures();
+      expect(ready).toHaveLength(1);
+      expect(ready[0].id).toBe('feat-1b');
+    });
+
+    it('should ignore features in epics that are not in progress', () => {
+      // Default twoEpicDag: both epics pending → no in-progress epic.
+      const coord = createCoordinator(twoEpicDag());
+      expect(coord.parallelFeatures()).toHaveLength(0);
+    });
+
+    it('should scope to a single epic when epicId is given', () => {
+      const coord = createCoordinator(
+        twoEpicDag({
+          epic1Status: TaskStatus.IN_PROGRESS,
+          epic2Status: TaskStatus.IN_PROGRESS,
+          epic2Features: [{ id: 'feat-2a', name: 'Plugin', status: TaskStatus.PENDING }],
+        }),
+      );
+      const result = coord.parallelFeatures('epic-2');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('feat-2a');
+      expect(result[0].epic).toBe('epic-2');
+    });
+  });
+
   describe('rebootContext', () => {
     it('should return task counts', () => {
       const coord = createCoordinator(twoEpicDag({ epic1Status: TaskStatus.IN_PROGRESS }));

@@ -89,20 +89,26 @@ Return:
 
 ### 3. Dispatch in Parallel
 
+Dispatch one subagent per task in a single message so they run concurrently:
+
 ```
-Task tool (general-purpose): "Fix issue A in file X"
-Task tool (general-purpose): "Fix issue B in file Y"
-Task tool (general-purpose): "Fix issue C in file Z"
-# All three dispatch simultaneously
+Agent(subagent_type='general-purpose'): "Fix issue A in file X"
+Agent(subagent_type='general-purpose'): "Fix issue B in file Y"
+Agent(subagent_type='general-purpose'): "Fix issue C in file Z"
 ```
 
 ### 4. Review and Integrate
 
 - Read each summary
-- Verify no conflicts
-- If conflicts found: tasks were not truly independent — resolve manually and re-check grouping
-- Run full test suite
-- Integrate all changes
+- Verify no conflicts. If conflicts found: tasks were not truly independent — resolve manually and re-check grouping
+- Verify the merged result with a fresh-context subagent rather than trusting
+  the implementers' own reports:
+  - `Agent(subagent_type='arcforge:verifier')` with the project test command —
+    runs the suite from an empty context and returns raw output.
+  - When a spec exists, also `Agent(subagent_type='arcforge:spec-reviewer')`
+    with the relevant `specs/<spec-id>/.../*.md` attached — it confirms every
+    acceptance criterion in the integrated branch.
+- Integrate all changes only after the verifier (and spec-reviewer, if run) PASS
 
 ## DAG-Based Workflow
 
@@ -125,20 +131,21 @@ Parse the structure to understand:
 
 ### Step 2: Identify Ready Features
 
-A feature is "ready" when:
+A feature is ready when it is `pending` and every feature it `depends_on` is
+`completed`. Don't hand-parse the dag for this — the engine computes it:
 
-- Status is "ready" OR
-- All dependencies are "complete"
-
-```python
-# Pseudocode
-ready_features = []
-for feature in all_features:
-    if feature.status == "ready":
-        ready_features.append(feature)
-    elif all(dep.status == "complete" for dep in feature.dependencies):
-        ready_features.append(feature)
+```bash
+node "${ARCFORGE_ROOT}/scripts/cli.js" parallel --features --json
 ```
+
+Output is the set of parallelizable features in the in-progress epic(s):
+
+```json
+{ "count": 2, "features": [{ "id": "feat-001", "name": "...", "epic": "epic-001" }] }
+```
+
+`count: 0` means nothing is ready right now — complete a blocking feature
+first, or fall back to `arcforge next` for the single next task.
 
 ### Step 3: Group by Independence
 
@@ -192,29 +199,29 @@ Use `arc-implementing` to implement features one at a time in dependency order.
 
 #### Option 2: Parallel
 
-For each feature in the parallel group, dispatch a separate subagent:
+For each feature in the parallel group, dispatch a separate subagent — all in
+one message so they run concurrently:
 
 ```
-For each feature in Group 1:
-    Use Task tool with subagent_type=general-purpose
-    Prompt: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
-    Run in parallel (all at once)
-
-Wait for all to complete
-Review each implementation
-Then proceed to next group
+Agent(subagent_type='general-purpose'): "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
+Agent(subagent_type='general-purpose'): "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
 ```
+
+Wait for all to complete, then run the Step 4 verification gate
+(`arcforge:verifier`, plus `arcforge:spec-reviewer` when a spec exists) before
+proceeding to the next group.
 
 ### Step 6: Integrate with Coordinator
 
-Use `arc-coordinating` to fetch next work:
+Fetch the next work from the engine (the `arc-coordinating` skill owns the full
+lifecycle; these are the underlying CLI calls):
 
 ```bash
-# Get next parallelizable tasks
-arc-coordinating parallel
+# Get the next parallelizable features
+node "${ARCFORGE_ROOT}/scripts/cli.js" parallel --features --json
 
-# Or get next single task
-arc-coordinating next
+# Or get the next single task
+node "${ARCFORGE_ROOT}/scripts/cli.js" next --json
 ```
 
 ## Without DAG: Independent Failures
@@ -300,17 +307,17 @@ Then retry: `/arc-dispatching-parallel`
 - **Before:** `/arc-planning` creates dag.yaml
 - **During:** Use this skill to plan feature execution order
 - **After:** `/arc-implementing` executes features
-- **Related:** `/arc-coordinating parallel` (CLI command)
+- **Related:** `/arc-coordinating` owns the DAG lifecycle (wraps `parallel`, `next`)
 
 ## Key Distinction
 
-| Type              | Scope                         | Tool                               |
-| ----------------- | ----------------------------- | ---------------------------------- |
-| **Epic-level**    | Multiple epics at once        | Git worktrees (`arc-using-worktrees`) |
-| **Feature-level** | Multiple features within epic | This skill (`arc-dispatching-parallel`)    |
+| Type              | Scope                         | Skill                                  |
+| ----------------- | ----------------------------- | -------------------------------------- |
+| **Epic-level**    | Multiple epics at once        | `arc-dispatching-teammates` (multi-epic via DAG) / `arc-coordinating` (lifecycle) |
+| **Feature-level** | Multiple features within epic | This skill (`arc-dispatching-parallel`) |
 
 **Example:**
 
-- Epic 1 (worktree 1): Features A, B, C in parallel
-- Epic 2 (worktree 2): Features D, E in parallel
-- Both epics run simultaneously via separate worktrees
+- Epic 1: Features A, B, C in parallel (this skill, within one epic worktree)
+- Epic 2: Features D, E in parallel (this skill, within its own epic worktree)
+- The two epics run simultaneously as separate teammates via `arc-dispatching-teammates` / `arc-coordinating`
