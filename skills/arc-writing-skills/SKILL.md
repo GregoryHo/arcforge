@@ -264,9 +264,9 @@ Use words Claude would search for:
 | `arc-<acronym>` | Well-known abbreviation | `arc-tdd` |
 
 **Avoid:**
-- Agent-nouns: `arc-coordinator` → `arc-coordinating`
-- Bare verbs: `arc-debug` → `arc-debugging`
-- Noun-first: `arc-task-writer` → `arc-writing-tasks`
+- Agent-nouns: `arc-coordinator` → `arc-coordinating` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
+- Bare verbs: `arc-debug` → `arc-debugging` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
+- Noun-first: `arc-task-writer` → `arc-writing-tasks` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
 
 ### 4. Token Efficiency
 

@@ -23,13 +23,13 @@ Transform design documents into structured XML specifications. The spec becomes 
 
 ## Boundary
 
-`arc-refining` owns formalizing design docs into authoritative `specs/<spec-id>/spec.xml` and `details/*.xml`. It does not own completion-claim verification (that is `arc-verifying`) and it does not own post-implementation spec sync or spec/code drift reconciliation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router).
+`arc-refining` owns formalizing design docs into authoritative `specs/<spec-id>/spec.xml` and `details/*.xml`. It does not own completion-claim verification (that is `arc-verifying`) and it does not own post-implementation spec sync or spec/code drift reconciliation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router). <!-- doc-ref-lint: ignore R4 arc-syncing-spec is an intentional test-pinned boundary reference to a future opt-in skill that does not ship today (plan §1.11) -->
 
 ## When NOT to Use
 
 - No design doc exists yet (run `/arc-brainstorming` first)
 - Task is small enough that a structured spec is overhead
-- Spec is already authoritative and the work is reconciling it with post-implementation reality — that is the `arc-syncing-spec` job (separate, opt-in workflow), not refiner
+- Spec is already authoritative and the work is reconciling it with post-implementation reality — that is the `arc-syncing-spec` job (separate, opt-in workflow), not refiner <!-- doc-ref-lint: ignore R4 arc-syncing-spec is an intentional test-pinned boundary reference to a future opt-in skill that does not ship today (plan §1.11) -->
 
 ## Core Rules
 

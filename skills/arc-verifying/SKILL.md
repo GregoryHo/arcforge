@@ -11,7 +11,7 @@ description: Use when you need to verify work is complete before making completi
 
 ## Boundary
 
-`arc-verifying` owns producing fresh evidence for completion claims. It does not own authoring spec artifacts (that is `arc-refining`) and it does not own reconciling spec/code drift after implementation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router). Spec/code drift checks may quote verification evidence as input, but verification itself is not a spec-sync skill.
+`arc-verifying` owns producing fresh evidence for completion claims. It does not own authoring spec artifacts (that is `arc-refining`) and it does not own reconciling spec/code drift after implementation (that is the optional, separate, future `arc-syncing-spec` workflow — never folded into the SessionStart bootstrap or the `arc-using` router). Spec/code drift checks may quote verification evidence as input, but verification itself is not a spec-sync skill. <!-- doc-ref-lint: ignore R4 arc-syncing-spec is an intentional test-pinned boundary reference to a future opt-in skill that does not ship today (plan §1.11) -->
 
 ## The Iron Law
 
