@@ -140,7 +140,7 @@ describe('rolling-window phase detection', () => {
     assert.strictEqual(mod.phaseFromWindow(win), 'read-heavy');
     const msg = mod.buildMessage(50, win);
     assert.ok(msg.includes('mostly reads'));
-    assert.ok(msg.includes('exploration') || msg.includes('research'));
+    assert.ok(msg.includes('arc-compacting'));
   });
 
   it('detects write-heavy phase from window', () => {
@@ -148,19 +148,19 @@ describe('rolling-window phase detection', () => {
     assert.strictEqual(mod.phaseFromWindow(win), 'write-heavy');
     const msg = mod.buildMessage(50, win);
     assert.ok(msg.includes('active implementation'));
-    assert.ok(msg.includes('Mid-implementation'));
+    assert.ok(msg.includes('arc-compacting'));
   });
 
   it('neutral when no phase dominates', () => {
     const win = windowOf(6, 6);
     assert.strictEqual(mod.phaseFromWindow(win), 'neutral');
-    assert.ok(mod.buildMessage(50, win).includes('workflow phases'));
+    assert.ok(mod.buildMessage(50, win).includes('arc-compacting'));
   });
 
   it('neutral when too few samples', () => {
     const win = windowOf(5, 0);
     assert.strictEqual(mod.phaseFromWindow(win), 'neutral');
-    assert.ok(mod.buildMessage(50, win).includes('workflow phases'));
+    assert.ok(mod.buildMessage(50, win).includes('arc-compacting'));
   });
 
   it('window is bounded to 20 most-recent entries', () => {
@@ -298,6 +298,33 @@ describe('compact-suggester e2e (ICL-9 acceptance)', () => {
 
     // Shared diary tool-count incremented in lockstep (binding preserved).
     assert.strictEqual(fs.readFileSync(toolCountPath(), 'utf-8'), '50');
+  });
+
+  it('S6-3: threshold output is a SINGLE JSON object carrying BOTH channels', () => {
+    // Drive to the threshold; capture the one event that produces output.
+    let thresholdOut = null;
+    for (let i = 0; i < 50; i++) {
+      const res = runSuggester('Read');
+      assert.strictEqual(res.status, 0, res.stderr);
+      if (res.stdout.trim()) thresholdOut = res.stdout.trim();
+    }
+    assert.ok(thresholdOut, 'threshold produced stdout');
+
+    // Exactly one JSON object (single-output pattern), not two lines.
+    assert.strictEqual(thresholdOut.split('\n').length, 1, 'exactly one stdout line');
+    const parsed = JSON.parse(thresholdOut);
+
+    // Both channels present in the SAME object: user-visible systemMessage
+    // AND model-visible additionalContext (the arc-compacting indicator).
+    assert.ok(parsed.systemMessage, 'user-visible systemMessage present');
+    assert.ok(
+      parsed.systemMessage.includes('arc-compacting'),
+      'user line points at arc-compacting',
+    );
+    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
+    const modelLine = parsed.hookSpecificOutput.additionalContext;
+    assert.ok(modelLine, 'model-visible additionalContext present');
+    assert.ok(modelLine.includes('arc-compacting'), 'model line is the arc-compacting indicator');
   });
 
   it('records suggestions[] into the live session JSON', () => {
