@@ -227,3 +227,191 @@ describe('quality-check: hooks.json registration', () => {
     );
   });
 });
+
+describe('quality-check: tsc incremental cost bound (RV-4)', () => {
+  beforeEach(() => {
+    delete require.cache[require.resolve('../quality-check/typescript')];
+  });
+
+  describe('buildTscArgs (arg construction)', () => {
+    it('adds --incremental + --tsBuildInfoFile when a build-info path is given', () => {
+      const { buildTscArgs } = require('../quality-check/typescript');
+      const args = buildTscArgs(['tsc'], {
+        tsconfigPath: '/proj/tsconfig.json',
+        buildInfoPath: '/tmp/cache/abc.tsbuildinfo',
+      });
+      assert.deepStrictEqual(args, [
+        'tsc',
+        '--noEmit',
+        '--pretty',
+        'false',
+        '--incremental',
+        '--tsBuildInfoFile',
+        '/tmp/cache/abc.tsbuildinfo',
+        '--project',
+        '/proj/tsconfig.json',
+      ]);
+      // --tsBuildInfoFile must immediately follow --incremental (required pairing).
+      const inc = args.indexOf('--incremental');
+      assert.strictEqual(
+        args[inc + 1],
+        '--tsBuildInfoFile',
+        '--incremental needs the buildinfo flag',
+      );
+    });
+
+    it('omits --incremental entirely when no build-info path is given (fallback shape)', () => {
+      const { buildTscArgs } = require('../quality-check/typescript');
+      const args = buildTscArgs(['tsc'], {
+        tsconfigPath: '/proj/tsconfig.json',
+        buildInfoPath: null,
+      });
+      assert.ok(!args.includes('--incremental'), 'no incremental flag in fallback');
+      assert.ok(!args.includes('--tsBuildInfoFile'), 'no buildinfo flag in fallback');
+      assert.ok(args.includes('--noEmit'), 'still a noEmit type-check');
+      assert.ok(args.includes('--project'), 'still scoped to the tsconfig');
+    });
+
+    it('passes the executable args through and keeps --noEmit --pretty false', () => {
+      const { buildTscArgs } = require('../quality-check/typescript');
+      const args = buildTscArgs(['exec', 'tsc'], {});
+      assert.deepStrictEqual(args.slice(0, 5), ['exec', 'tsc', '--noEmit', '--pretty', 'false']);
+    });
+  });
+
+  describe('buildInfoPathFor (stable per-project cache)', () => {
+    it('lives inside the OS tmpdir and is stable for a given project key', () => {
+      const { buildInfoPathFor } = require('../quality-check/typescript');
+      const a = buildInfoPathFor('/proj/tsconfig.json');
+      const b = buildInfoPathFor('/proj/tsconfig.json');
+      assert.strictEqual(a, b, 'same project → same cache file (so the 2nd run is warm)');
+      assert.ok(a.startsWith(os.tmpdir()), 'cache lives in the OS tmpdir');
+      assert.ok(a.endsWith('.tsbuildinfo'), 'ends with .tsbuildinfo');
+    });
+
+    it('gives different projects different cache files', () => {
+      const { buildInfoPathFor } = require('../quality-check/typescript');
+      assert.notStrictEqual(
+        buildInfoPathFor('/proj-a/tsconfig.json'),
+        buildInfoPathFor('/proj-b/tsconfig.json'),
+      );
+    });
+  });
+
+  describe('isIncrementalFlagRejected (back-off detector)', () => {
+    it('detects TS5023 "Unknown compiler option" for --incremental (old tsc)', () => {
+      const { isIncrementalFlagRejected } = require('../quality-check/typescript');
+      assert.ok(
+        isIncrementalFlagRejected("error TS5023: Unknown compiler option '--incremental'."),
+      );
+    });
+
+    it('detects TS5074 (incremental requires tsBuildInfoFile)', () => {
+      const { isIncrementalFlagRejected } = require('../quality-check/typescript');
+      assert.ok(
+        isIncrementalFlagRejected(
+          "error TS5074: Option '--incremental' can only be specified using tsconfig, emitting to single file or when option '--tsBuildInfoFile' is specified.",
+        ),
+      );
+    });
+
+    it('does NOT treat a genuine source type error as a flag rejection', () => {
+      const { isIncrementalFlagRejected } = require('../quality-check/typescript');
+      assert.ok(
+        !isIncrementalFlagRejected(
+          "src/a.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+        ),
+        'a real type error must not trigger the back-off (would mask the error)',
+      );
+    });
+
+    it('does not back off on empty output', () => {
+      const { isIncrementalFlagRejected } = require('../quality-check/typescript');
+      assert.ok(!isIncrementalFlagRejected(''));
+    });
+  });
+
+  describe('runTypeCheck fallback (stub tsc rejecting --incremental)', () => {
+    let testDir;
+    beforeEach(() => {
+      testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-tsc-fallback-'));
+    });
+    afterEach(() => {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    });
+
+    it('retries WITHOUT --incremental and still type-checks (never silently dropped)', () => {
+      const { runTypeCheck } = require('../quality-check/typescript');
+      const file = path.join(testDir, 'a.ts');
+      fs.writeFileSync(file, 'const x: number = "bad";\n');
+
+      const calls = [];
+      // Stub: a tsc that does not understand --incremental. First call (with the
+      // flag) is rejected like an old compiler; second call (without it) does the
+      // real type-check and surfaces the source error.
+      const run = (_cmd, args) => {
+        calls.push(args);
+        if (args.includes('--incremental')) {
+          return {
+            stdout: '',
+            stderr: "error TS5023: Unknown compiler option '--incremental'.",
+            exitCode: 1,
+          };
+        }
+        return {
+          stdout: `${file}(1,7): error TS2322: Type 'string' is not assignable to type 'number'.`,
+          stderr: '',
+          exitCode: 2,
+        };
+      };
+
+      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+
+      assert.strictEqual(calls.length, 2, 'first call backs off → exactly one retry');
+      assert.ok(calls[0].includes('--incremental'), 'first attempt uses the fast path');
+      assert.ok(!calls[1].includes('--incremental'), 'retry drops only the speedup flag');
+      assert.strictEqual(result.errors.length, 1, 'the real type error still surfaces');
+      assert.ok(
+        result.errors[0].includes('TS2322'),
+        'type-checking was NOT silently dropped on flag rejection',
+      );
+    });
+
+    it('does not retry when the incremental run succeeds (fast path stays single-call)', () => {
+      const { runTypeCheck } = require('../quality-check/typescript');
+      const file = path.join(testDir, 'ok.ts');
+      fs.writeFileSync(file, 'const x: number = 1;\n');
+
+      const calls = [];
+      const run = (_cmd, args) => {
+        calls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      };
+      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+
+      assert.strictEqual(calls.length, 1, 'success on the incremental path → no retry');
+      assert.ok(calls[0].includes('--incremental'), 'used the incremental fast path');
+      assert.deepStrictEqual(result, { errors: [], warnings: [] });
+    });
+
+    it('does not retry on a genuine type error (real errors are not flag rejections)', () => {
+      const { runTypeCheck } = require('../quality-check/typescript');
+      const file = path.join(testDir, 'bad.ts');
+      fs.writeFileSync(file, 'const x: number = "bad";\n');
+
+      const calls = [];
+      const run = (_cmd, args) => {
+        calls.push(args);
+        return {
+          stdout: `${file}(1,7): error TS2322: Type 'string' is not assignable to type 'number'.`,
+          stderr: '',
+          exitCode: 2,
+        };
+      };
+      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+
+      assert.strictEqual(calls.length, 1, 'a real type error must not trigger a (futile) retry');
+      assert.strictEqual(result.errors.length, 1);
+    });
+  });
+});

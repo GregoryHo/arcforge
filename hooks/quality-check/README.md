@@ -19,6 +19,16 @@ Runs on `PostToolUse` when:
 - **Prettier**: Must be in `devDependencies` to auto-format
 - **TypeScript**: Must be in `devDependencies` for type checking
 
+## Performance
+
+Type-checking runs `tsc --noEmit` with `--incremental` and a per-project
+`.tsbuildinfo` cache in the OS temp directory, so repeated edits to the same
+project reuse prior results and the second and later runs are faster. The cache
+invalidates correctly across edits — a newly introduced type error is always
+reported, never masked by a stale cache. If the installed `tsc` rejects
+`--incremental` (an older compiler), the run backs off and retries without the
+flag, so type-checking is never silently dropped — only the speedup.
+
 ## Output
 
 Findings are split by audience over a single stdout JSON object:
