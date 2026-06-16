@@ -6,6 +6,8 @@
 > **執行狀態（2026-06-12）**：Wave 0 全數完成並合併 — CORE-1 (#64)、CORE-2 (#69)、AF-1 (#65)、AF-2 (#66)、RV-1 (#67)、WT-1 (#68)。RV-1 spike 結論：`decision:block` 與 `additionalContext` 均達模型（v2.1.172，含 Task-subagent 輪）；helper 採 additionalContext 形態，RV-3/RV-5/ICL-10 解凍。CORE-2 的 ≤450 門檻經停止條件上報後由 owner 修訂為 (b)+(c) 方案、≤467（見該任務的修訂註記）。
 >
 > **MATCHER TRIAGE hotfix（2026-06-12，branch `fix/hooks-matcher-triage`）**：RV-2 的 6-cell A/B 證實 expression matcher（`tool == "..."` / `&& tool_input... matches ...`）在 Claude Code v2.1.173 上從未觸發 — matcher 是對 tool name 的 regex，無 expression 語法。guard 層（arc-guard G2/G3、sdd-ledger-guard、sdd-ratify-guard、arc-remind）的 hooks.json matcher 已全數換成 plain tool-name（`Bash`/`Edit`/`Write`）；四個 hook 的 main.js 原本即在 tool_name 上自我把關，無需改動。quality-check 的 matcher 由 RV-2 分支自行修（hunk 保持互斥）。Wave 2.1（guard package）必須以本分支為基底。
+>
+> **Wave 1–4 全數完成並合併（2026-06-15/16）**：Wave 1（引擎與獨立修復，13 任務 + matcher triage）、Wave 2（技能層與通道，12 任務，#87 起；SRH-2 manifest 落地）、Wave 3（組合層 8 PR #88–95；ICL-4 loadAutoInstincts 注入、AF-7 runDag worktree 隔離、SDD-5 晨間 review queue、WT-6 finishing 合併、SRH-3/4 結構防線）、Wave 4（進階能力 6 PR #96–101：SDD-4 sdd-pipeline 指南 + attended opt-in、AF-8 --verify-cmd 確定性驗收地板、AF-11 parallelFeatures、ICL-5/9/11 學習通道、RV-4 tsc 成本上界、SRH-5 check:docs 進 CI 並 R1/R2/R3 gating）。**SRH-5 R4-flip 延後**：翻 gating 會冒 ~38 條誤報（hooks/ 名、eval 情境名、教學範例名、test-pinned 的 arc-syncing-spec），需另開 task 精修 R4 啟發法/白名單，非機械式翻轉。剩 Wave 5（收尾能力）、Wave 6（各包 eval 批次）。發版前需 plugin 版本 bump 使 matcher/guard 修復觸及已安裝使用者。
 
 ---
 
