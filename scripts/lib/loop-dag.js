@@ -14,6 +14,7 @@
 
 const { spawnSessionAsync } = require('./loop-session');
 const { saveLoopState, recordError } = require('./loop-state');
+const { runVerify, recordVerifyResult } = require('./loop-verify');
 const { getTimestamp } = require('./utils');
 
 /**
@@ -131,6 +132,41 @@ function integrateEpic(coord, epic, state) {
 }
 
 /**
+ * Run the deterministic acceptance floor for a dag epic whose session exited 0,
+ * BEFORE integrating it. Runs the configured --verify-cmd as an argv array (no
+ * shell) in the epic's OWN worktree cwd — AF-7's projectSetup makes that tree
+ * real (installed deps), so `npm test` etc. actually run. On a non-zero verify
+ * the epic is blocked (not merged/completed) and its worktree retained, mirroring
+ * a failed session. The result is persisted for AF-9. Returns whether verify
+ * passed; with no --verify-cmd configured it is a no-op returning true.
+ * @param {Coordinator} coord - Coordinator instance
+ * @param {Object} epic - Epic whose session succeeded
+ * @param {string} worktreePath - The epic's worktree cwd to verify in
+ * @param {Object} state - Loop state (verify result + error persisted here)
+ * @param {Object} options - Loop options (verifyCommand, taskTimeoutMs)
+ * @returns {boolean} Whether verification passed (or was not configured)
+ */
+function verifyEpic(coord, epic, worktreePath, state, options) {
+  if (!options.verifyCommand) return true;
+  console.log(`[loop] Verifying ${epic.id}: ${options.verifyCommand.join(' ')}`);
+  const result = runVerify(options.verifyCommand, worktreePath, {
+    timeoutMs: options.taskTimeoutMs,
+  });
+  recordVerifyResult(state, epic.id, result);
+  if (result.exitCode === 0) return true;
+
+  console.log(`[loop] Verify failed for ${epic.id} (exit ${result.exitCode}) — blocking`);
+  recordError(state, epic.id, `verify-cmd failed: ${result.stderr || result.stdout}`, 1);
+  state.failed_tasks.push(epic.id);
+  try {
+    coord.blockTask(epic.id, `Loop: verify-cmd failed (exit ${result.exitCode})`);
+  } catch (err) {
+    console.error(`[loop] Warning: could not block task ${epic.id}: ${err.message}`);
+  }
+  return false;
+}
+
+/**
  * Run one isolated-worktree round: expand each batch epic, spawn a session
  * in its worktree, and integrate the successful ones. Returns whether any
  * epic made progress.
@@ -172,7 +208,7 @@ async function runDagRound(coord, batch, state, options, buildTaskPrompt) {
   // Phase 3: integrate sequentially (DAG + git updates are not concurrent-safe).
   let anySuccess = false;
   for (let i = 0; i < live.length; i++) {
-    const { epic } = live[i];
+    const { epic, worktreePath } = live[i];
     const result = spawnResults[i];
     state.total_cost += result.costUsd;
 
@@ -187,6 +223,9 @@ async function runDagRound(coord, batch, state, options, buildTaskPrompt) {
       }
       continue;
     }
+    // Deterministic acceptance floor: a clean session exit alone is not enough
+    // to merge — the verify command must pass in the epic's worktree first.
+    if (!verifyEpic(coord, epic, worktreePath, state, options)) continue;
     if (integrateEpic(coord, epic, state)) anySuccess = true;
   }
 
@@ -198,6 +237,7 @@ module.exports = {
   warnIfBaseBranch,
   selectRoundEpics,
   prepareEpicWorktree,
+  verifyEpic,
   integrateEpic,
   runDagRound,
 };

@@ -350,4 +350,103 @@ describe('runDag worktree isolation (AF-7)', () => {
     expect(byId['epic-b']).toBe(TaskStatus.COMPLETED);
     expect(status.blocked.some((b) => /setup failed/.test(b.reason))).toBe(true);
   });
+
+  // --- AF-8: deterministic acceptance floor (--verify-cmd) -------------------
+
+  function loopState() {
+    const p = path.join(root, '.arcforge-loop.json');
+    return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
+  }
+
+  test('flag absent → behavior byte-identical (no verify_results, epic merges)', async () => {
+    root = setupRepo([epic('epic-a')]);
+    await runDag(baseOptions());
+    const status = new Coordinator(root, SPEC_ID).status();
+    expect(status.epics[0].status).toBe(TaskStatus.COMPLETED);
+    // No verify floor ran: no verify_results key persisted.
+    expect(loopState().verify_results).toBeUndefined();
+  });
+
+  test('exit-0 session + passing verify → merges and completes', async () => {
+    root = setupRepo([epic('epic-a')]);
+    await runDag(baseOptions({ verifyCommand: ['node', '-e', 'process.exit(0)'] }));
+
+    const status = new Coordinator(root, SPEC_ID).status();
+    expect(status.epics[0].status).toBe(TaskStatus.COMPLETED);
+    expect(runGit(['log', '--oneline'], root)).toContain('integrate epic-a');
+    const results = loopState().verify_results;
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ task_id: 'epic-a', exit_code: 0, passed: true });
+  });
+
+  test('exit-0 session + failing verify → blocked, NOT merged, worktree retained', async () => {
+    root = setupRepo([epic('epic-a')]);
+    await runDag(baseOptions({ verifyCommand: ['node', '-e', 'process.exit(1)'] }));
+
+    const status = new Coordinator(root, SPEC_ID).status({ blockedOnly: false });
+    expect(status.epics[0].status).toBe(TaskStatus.BLOCKED);
+    // Floor gate: the epic branch was NOT merged into base.
+    expect(runGit(['log', '--oneline'], root)).not.toContain('integrate epic-a');
+    // Worktree retained for inspection (a failed verify mirrors a failed session).
+    expect(fs.existsSync(getWorktreePath(root, SPEC_ID, 'epic-a'))).toBe(true);
+    // Failure persisted for AF-9, and the block reason names the verify floor.
+    const results = loopState().verify_results;
+    expect(results[0]).toMatchObject({ task_id: 'epic-a', passed: false });
+    expect(status.blocked.some((b) => /verify-cmd failed/.test(b.reason))).toBe(true);
+  });
+
+  test('verify runs in the epic worktree cwd, never the base', async () => {
+    root = setupRepo([epic('epic-a')]);
+    const cwdFile = path.join(binDir, 'verify-cwd.txt');
+    // The verify command records its own cwd; it must be the epic worktree.
+    await runDag(
+      baseOptions({
+        verifyCommand: [
+          'node',
+          '-e',
+          `require('fs').writeFileSync(${JSON.stringify(cwdFile)}, process.cwd())`,
+        ],
+      }),
+    );
+
+    // The recorded cwd is canonical (testHome is realpath'd, getWorktreeRoot
+    // uses the mocked homedir) and comparable as-is — do NOT realpathSync it,
+    // because a passing verify merges then CLEANS UP the worktree.
+    const recordedCwd = fs.readFileSync(cwdFile, 'utf8').trim();
+    expect(recordedCwd).toBe(getWorktreePath(root, SPEC_ID, 'epic-a'));
+    expect(recordedCwd).not.toBe(root);
+  });
+
+  test('one epic fails verify, another passes → independent outcomes', async () => {
+    root = setupRepo([epic('epic-a'), epic('epic-b')]);
+    // Fail verify only inside epic-a's worktree by keying on the basename of cwd.
+    await runDag(
+      baseOptions({
+        verifyCommand: [
+          'node',
+          '-e',
+          "process.exit(require('path').basename(process.cwd()).endsWith('epic-a') ? 1 : 0)",
+        ],
+      }),
+    );
+
+    const status = new Coordinator(root, SPEC_ID).status({ blockedOnly: false });
+    const byId = Object.fromEntries(status.epics.map((e) => [e.id, e.status]));
+    expect(byId['epic-a']).toBe(TaskStatus.BLOCKED);
+    expect(byId['epic-b']).toBe(TaskStatus.COMPLETED);
+    expect(runGit(['log', '--oneline'], root)).not.toContain('integrate epic-a');
+    expect(runGit(['log', '--oneline'], root)).toContain('integrate epic-b');
+  });
+
+  test('failed session is blocked before verify even runs (no verify_results)', async () => {
+    root = setupRepo([epic('epic-a')]);
+    process.env.CLAUDE_EXIT = '1';
+    await runDag(baseOptions({ verifyCommand: ['node', '-e', 'process.exit(0)'] }));
+
+    const status = new Coordinator(root, SPEC_ID).status();
+    expect(status.epics[0].status).toBe(TaskStatus.BLOCKED);
+    // The floor only runs AFTER a clean session exit, so a failed session
+    // never reaches verify — no verify result recorded for it.
+    expect(loopState().verify_results).toBeUndefined();
+  });
 });

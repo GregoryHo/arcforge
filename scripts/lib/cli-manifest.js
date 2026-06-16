@@ -135,6 +135,7 @@ const CLI_MANIFEST = {
       '--task-timeout',
       '--permission-mode',
       '--allowed-tools',
+      '--verify-cmd',
     ],
     output: null,
   },
