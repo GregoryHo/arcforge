@@ -38,6 +38,7 @@
     "test:diary": "node skills/arc-journaling/scripts/diary.js",
     "test:reflect": "node skills/arc-reflecting/scripts/reflect.js",
     "check:versions": "node scripts/check-version-sync.js",
+    "check:docs": "node scripts/check-doc-refs.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",

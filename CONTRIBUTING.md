@@ -369,6 +369,33 @@ You must document Iron Law compliance in the PR description:
 
 A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out completely.
 
+### Doc-reference gate (`npm run check:docs`)
+
+CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the shipped markdown surface (`skills/`, `docs/guide/`, `agents/`, `templates/`, `hooks/`, and `README.md`). It fails the build when a doc makes a promise the engine does not keep:
+
+| Rule | Catches |
+|------|---------|
+| R1 | A repo-relative path in a code span (under `scripts/`, `skills/`, `hooks/`, `templates/`, `agents/`, `.claude-plugin/`) that does not resolve to a real file or directory. |
+| R2 | A CLI invocation naming a command, or a `--flag`, that the CLI manifest (`scripts/lib/cli-manifest.js`) does not declare. |
+| R3 | A `--json` output field promise that is not in that command's pinned manifest output shape. |
+| R4 | A backticked `arc-<name>` skill reference that does not resolve to `skills/<name>/`. **Warn-only** today (see note below). |
+
+Run it locally before opening a PR:
+
+```bash
+npm run check:docs
+```
+
+When a finding is a genuine false positive — an illustrative or placeholder path that is not a real reference — suppress it on that line with an escape-hatch comment whose **reason is mandatory** (a reason-less directive is itself a finding):
+
+```
+<!-- doc-ref-lint: ignore R1 illustrative path example, not a real repo file -->
+```
+
+Use the escape hatch sparingly. If you find yourself adding many suppressions, the rule is probably mis-firing — fix the linter (its data comes from the manifest, never a second hardcoded copy) rather than papering over it.
+
+> **R4 is warn-only.** It currently over-matches: `arc-<name>` tokens that are agents (`agents/`), hooks (`hooks/`), eval-scenario identifiers (`eval-arc-…`), or deliberate bad-name examples are reported but do not fail the build. Promoting R4 to gating requires narrowing its resolver first; until then its warnings are advisory.
+
 ---
 
 ## Guidelines
@@ -378,6 +405,7 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 - Read existing skills, hooks, and tests before writing new ones
 - Follow existing patterns and conventions
 - Run `npm test` before submitting (all 5 runners must pass)
+- Run `npm run check:docs` so doc promises (paths, CLI commands/flags, `--json` fields) match the engine
 - Include tests for new functionality
 - Skill word count tiers (soft guidance): Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w — use `references/` for overflow
 - Use `execFileSync` over `exec` in hooks (prevents shell injection)

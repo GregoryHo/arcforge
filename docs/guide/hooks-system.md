@@ -190,6 +190,7 @@ Counter files are stored at `{TMPDIR}/arcforge-{name}-session-{sessionId}`.
 
 In `hooks.json`:
 
+<!-- doc-ref-lint: ignore R1 placeholder hook path in an illustrative config example -->
 ```json
 {
   "type": "command",
