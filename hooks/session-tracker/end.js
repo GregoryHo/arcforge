@@ -22,6 +22,7 @@ const {
   getSessionId,
   getTimestamp,
   output,
+  log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
@@ -102,11 +103,22 @@ function formatStats(session) {
 }
 
 /**
- * Format short message for stderr output (when threshold is not met)
+ * Format the below-threshold session-paused message. Logged to stderr only —
+ * counters are genuinely preserved because the diary threshold did not fire.
  */
 function formatShortMessage(userCount, toolCount) {
   return `📝 Session paused. (${userCount} messages, ${toolCount} tool calls)
    Counters preserved for next resume.`;
+}
+
+/**
+ * Format the triggered session-paused message. Surfaced to the user
+ * (systemMessage) when the diary threshold fired — a diary draft was captured
+ * and the counters were reset for the next session.
+ */
+function formatTriggeredMessage(userCount, toolCount) {
+  return `📝 Session paused. (${userCount} messages, ${toolCount} tool calls)
+   Diary captured; counters reset for next session.`;
 }
 
 /**
@@ -161,9 +173,13 @@ function main() {
         count: reflectStatus.count,
       });
     }
+    // Only surface the 'Session paused' notification when the diary threshold
+    // actually fired — a Stop worth telling the user about. Below threshold a
+    // per-Stop user message is noise, so it is downgraded to a stderr log.
+    output({ systemMessage: formatTriggeredMessage(userCount, toolCount) });
+  } else {
+    log(formatShortMessage(userCount, toolCount));
   }
-
-  output({ systemMessage: formatShortMessage(userCount, toolCount) });
 
   process.exit(0);
 }
@@ -175,6 +191,7 @@ module.exports = {
   saveSessionJson,
   formatStats,
   formatShortMessage,
+  formatTriggeredMessage,
   checkReflectReady,
 };
 

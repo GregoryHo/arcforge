@@ -16,6 +16,7 @@ Save patterns and insights from the current session as instincts. This skill bri
 |------|---------|
 | **Save instinct** | `node "${SKILL_ROOT}/scripts/recall.js" save --id {id} --trigger "..." --action "..." --domain {d} --project {p}` |
 | **Check duplicate** | `node "${SKILL_ROOT}/scripts/recall.js" check-duplicate --id {id} --project {p}` |
+| **Save record** | `node "${SKILL_ROOT}/scripts/recall.js" save-record --project {p} --recall-id recall-{id} [--query "..."] [--instinct-ids "a,b,c"] [--summary "..."]` |
 
 ## Infrastructure Commands
 
@@ -43,6 +44,18 @@ fi
    - `source: 'manual'`
    - `confidence: 0.50` (starting confidence for manual instincts)
    - `maxConfidence: 0.90` (manual instincts use full MAX_CONFIDENCE)
+6. **Save record** of the recall operation so the learning curator has evidence
+   that this recall happened:
+   ```bash
+   node "${SKILL_ROOT}/scripts/recall.js" save-record \
+     --project {project} \
+     --recall-id recall-{id} \
+     --query "{what the user wanted to remember}" \
+     --instinct-ids "{saved-instinct-id}" \
+     --summary "{one-line summary}"
+   ```
+   The `--recall-id` MUST start with `recall-` (the curator batch-assembler only
+   matches `recall-*.md` records).
 
 ## When to Use
 

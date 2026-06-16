@@ -6,7 +6,13 @@ Tracks tool call count and suggests `/compact` at strategic intervals.
 
 - **Threshold**: First suggestion at 50 tool calls
 - **Interval**: Reminders every 25 calls after threshold (75, 100, 125, ...)
-- **Reset**: Counter resets on session start/clear/compact
+- **Phase-aware**: messaging reflects the current phase using a rolling window of
+  the most recent 20 tool types (read-heavy / write-heavy / neutral), not the
+  lifetime average — so a long research phase early in the session no longer
+  masks a later implementation phase.
+- **Reset**: State is reset on every compaction by the PreCompact hook (via the
+  shared `getSuggesterStatePath()` helper), so suggestions never survive a
+  context boundary.
 
 ## Trigger
 
@@ -14,25 +20,48 @@ Runs on `PostToolUse` for ALL tools (matcher: `.*`)
 
 ## Storage
 
-Single JSON state file in temp directory:
+A single session-scoped JSON state file in the temp directory:
 ```
-$TMPDIR/arcforge-compact-state-<sessionId>
+$TMPDIR/arcforge-suggester-state-<sessionId>.json
 ```
 
-Format: `{ "tools": number, "reads": number, "writes": number }`
+Shape:
+```json
+{
+  "tools": 0,
+  "reads": 0,
+  "writes": 0,
+  "window": ["r", "w", "..."],
+  "suggestions": [{ "count": 50, "phase": "neutral", "at": "<iso>" }]
+}
+```
 
-All three counters (tool calls, read-tool count, write-tool count) are stored in one file to minimize I/O (1 read + 1 write per hook invocation).
+All counters, the rolling phase window, and the suggestion snapshots live in
+this one file (1 read + 1 write per hook invocation). The canonical path is
+owned by `getSuggesterStatePath()` in `scripts/lib/diary-capture.js` so the
+writer and the PreCompact resetter always agree on one filename.
+
+The separate `arcforge-tool-count-<sessionId>` file is the **diary threshold's**
+source of truth — incremented here via `incrementSharedToolCount()` (owned by
+diary-capture). It is intentionally distinct from the suggester's own counter so
+the diary trigger and the compaction suggestion share no fragile coupling.
+
+## Session record
+
+Each time a suggestion fires, a snapshot `{ count, phase, at }` is appended to
+the live session JSON (`suggestions[]`) so the timing of suggestions can later be
+correlated against compaction events.
 
 ## Output Examples
 
-At 50 calls:
+At 50 calls (neutral phase):
 ```
-📊 You've made 50 tool calls this session. Consider using /compact at your next phase boundary to preserve context quality.
+📊 50 tool calls this session. If you're between workflow phases, consider /compact to preserve context quality. Use arc-compacting for timing guidance.
 ```
 
 At 75, 100, 125... calls:
 ```
-📊 Now at 75 tool calls. Reminder: /compact helps maintain context quality for longer sessions.
+📊 75 tool calls. Between phases? /compact helps maintain context quality for longer sessions.
 ```
 
 ## Why This Matters

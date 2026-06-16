@@ -8,6 +8,7 @@
  * Non-blocking: Always exits 0 to avoid disrupting compaction flow.
  */
 
+const fs = require('node:fs');
 const path = require('node:path');
 const {
   getSessionDir,
@@ -25,7 +26,24 @@ const {
   saveSession,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+const { runDiaryCapture, getSuggesterStatePath } = require('../../scripts/lib/diary-capture');
+
+/**
+ * Reset the compact-suggester state on every compaction.
+ *
+ * Uses the shared getSuggesterStatePath() helper so the resetter and the
+ * suggester writer always agree on one filename (S5-4) — and so it inherits the
+ * stdin-derived session id resolved above. Without this, suggestion snapshots
+ * from before a compaction would survive into the freshly compacted context and
+ * "zero after compaction" would never land.
+ */
+function resetSuggesterState() {
+  try {
+    fs.rmSync(getSuggesterStatePath(), { force: true });
+  } catch {
+    // Best-effort; never block compaction.
+  }
+}
 
 /**
  * Update session file with compaction marker
@@ -73,6 +91,11 @@ function main() {
     // Update session file with compaction marker
     updateSessionFile(project, date, timestamp, sessionId);
 
+    // Reset the compact-suggester state on EVERY compaction (unconditional,
+    // independent of the diary threshold) so suggestions don't survive the
+    // context boundary.
+    resetSuggesterState();
+
     // Shared diary-capture core: threshold gate → draft → background enricher
     // → counter reset. Enricher fires on PreCompact too (dual-path ON).
     const { triggered, userCount, toolCount } = runDiaryCapture({ project, date, sessionId });
@@ -108,7 +131,7 @@ function main() {
 }
 
 // Export for testing
-module.exports = { updateSessionFile };
+module.exports = { updateSessionFile, resetSuggesterState };
 
 // Run if executed directly
 if (require.main === module) {

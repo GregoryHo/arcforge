@@ -431,9 +431,13 @@ describe('E2E: compact-suggester/main.js', () => {
     const sessionId = 'test-threshold';
     const env = { TMPDIR: testDir };
 
-    // Pre-create counter at 49 (compact-suggester uses its own "compact-count" counter)
-    const counterFile = path.join(testDir, `arcforge-compact-count-session-${sessionId}`);
-    fs.writeFileSync(counterFile, '49');
+    // Pre-create the suggester JSON state at 49 tools (its own counter, distinct
+    // from the shared diary tool-count). The 50th call triggers the suggestion.
+    const stateFile = path.join(testDir, `arcforge-suggester-state-session-${sessionId}.json`);
+    fs.writeFileSync(
+      stateFile,
+      JSON.stringify({ tools: 49, reads: 0, writes: 0, window: [], suggestions: [] }),
+    );
 
     // The 50th call should trigger suggestion
     const input = makeToolUseInput(

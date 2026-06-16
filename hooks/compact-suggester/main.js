@@ -10,8 +10,18 @@
  *
  * Triggered on PostToolUse for ALL tools.
  *
- * Performance: read/write tracking uses session-scoped file counters (same as tool-count)
- * since hooks run as fresh processes per event — in-memory state doesn't persist.
+ * State: a SINGLE session-scoped JSON file (getSuggesterStatePath) holds the
+ * tool counter, the rolling phase window, and the suggestion snapshots — 1 read
+ * + 1 write per event instead of three separate counter files. PreCompact resets
+ * this file on every compaction so suggestions never survive a context boundary.
+ *
+ * Phase detection uses a ROLLING WINDOW of the most recent tool types, so the
+ * suggested message reflects the current phase (read vs write heavy) rather than
+ * the lifetime average that early reads would otherwise dominate.
+ *
+ * The shared diary-trigger tool-count is incremented separately via
+ * incrementSharedToolCount() — that counter is owned by diary-capture and is the
+ * single source of truth for the diary threshold (binding coupling, do not drop).
  */
 
 const {
@@ -19,41 +29,51 @@ const {
   parseStdinJson,
   setSessionIdFromInput,
   output,
-  createSessionCounter,
+  readJsonFile,
+  writeJsonFile,
+  getTimestamp,
+  loadSession,
+  saveSession,
+  log,
 } = require('../../scripts/lib/utils');
-const { incrementSharedToolCount } = require('../../scripts/lib/diary-capture');
+const {
+  incrementSharedToolCount,
+  getSuggesterStatePath,
+} = require('../../scripts/lib/diary-capture');
 
 const THRESHOLD = 50; // First suggestion
 const INTERVAL = 25; // Subsequent reminders
 const MIN_PHASE_SAMPLES = 10;
+const WINDOW_SIZE = 20; // Rolling phase window: most recent tool types
 
 const WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit'];
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 
-// All counters persist to disk — hooks run as fresh processes per event
-let toolCounter = null;
-let readCounter = null;
-let writeCounter = null;
-
-function getCounter() {
-  if (!toolCounter) {
-    toolCounter = createSessionCounter('compact-count');
-  }
-  return toolCounter;
+// Empty state shape — one JSON file per session holds everything.
+function emptyState() {
+  return { tools: 0, reads: 0, writes: 0, window: [], suggestions: [] };
 }
 
-function getReadCounter() {
-  if (!readCounter) {
-    readCounter = createSessionCounter('read-count');
-  }
-  return readCounter;
+/**
+ * Load the single suggester state file (1 read). Missing/corrupt → empty state.
+ */
+function readState() {
+  const state = readJsonFile(getSuggesterStatePath(), null);
+  if (!state || typeof state !== 'object') return emptyState();
+  return {
+    tools: Number(state.tools) || 0,
+    reads: Number(state.reads) || 0,
+    writes: Number(state.writes) || 0,
+    window: Array.isArray(state.window) ? state.window : [],
+    suggestions: Array.isArray(state.suggestions) ? state.suggestions : [],
+  };
 }
 
-function getWriteCounter() {
-  if (!writeCounter) {
-    writeCounter = createSessionCounter('write-count');
-  }
-  return writeCounter;
+/**
+ * Persist the single suggester state file (1 write).
+ */
+function writeState(state) {
+  writeJsonFile(getSuggesterStatePath(), state);
 }
 
 /**
@@ -64,33 +84,48 @@ function shouldSuggest(count) {
 }
 
 /**
- * Get read/write ratio from persisted counters
+ * Compute read/write counts from the rolling window (most recent tool types).
+ * @param {string[]} window - Array of 'r'/'w' entries, oldest first.
  * @returns {{ reads: number, writes: number, total: number }}
  */
-function getReadWriteRatio() {
-  const reads = getReadCounter().read();
-  const writes = getWriteCounter().read();
+function windowRatio(window) {
+  let reads = 0;
+  let writes = 0;
+  for (const t of window) {
+    if (t === 'r') reads++;
+    else if (t === 'w') writes++;
+  }
   return { reads, writes, total: reads + writes };
+}
+
+/**
+ * Classify a phase from a rolling window.
+ * @returns {'read-heavy'|'write-heavy'|'neutral'}
+ */
+function phaseFromWindow(window) {
+  const { reads, writes, total } = windowRatio(window);
+  if (total < MIN_PHASE_SAMPLES) return 'neutral';
+  if (reads / total > 0.7) return 'read-heavy';
+  if (writes / total > 0.6) return 'write-heavy';
+  return 'neutral';
 }
 
 /**
  * Check if a write-heavy phase should suppress non-critical reminders.
  * Suppresses at non-threshold counts below 100 during active implementation.
  */
-function shouldSuppressReminder(count) {
-  const { writes, total } = getReadWriteRatio();
-  const writeHeavy = total >= MIN_PHASE_SAMPLES && writes / total > 0.6;
+function shouldSuppressReminder(count, window) {
+  const writeHeavy = phaseFromWindow(window) === 'write-heavy';
   return writeHeavy && count !== THRESHOLD && count < 100;
 }
 
 /**
- * Build phase-aware suggestion message
+ * Build phase-aware suggestion message from the rolling window.
  */
-function buildMessage(count) {
-  const { reads, writes, total } = getReadWriteRatio();
-  const hasEnoughData = total >= MIN_PHASE_SAMPLES;
-  const readHeavy = hasEnoughData && reads / total > 0.7;
-  const writeHeavy = hasEnoughData && writes / total > 0.6;
+function buildMessage(count, window) {
+  const phase = phaseFromWindow(window);
+  const readHeavy = phase === 'read-heavy';
+  const writeHeavy = phase === 'write-heavy';
 
   if (count === THRESHOLD) {
     if (readHeavy) {
@@ -110,60 +145,97 @@ function buildMessage(count) {
 }
 
 /**
- * Track read/write tool usage via persisted counters
+ * Record a read/write classification into the rolling window + cumulative tallies.
+ * Mutates `state` in place. Returns the classification ('r'|'w'|null).
  */
-function trackToolType(input) {
+function trackToolType(state, input) {
   const toolName = input?.tool_name || '';
+  let kind = null;
   if (READ_TOOLS.some((t) => toolName.includes(t))) {
-    const c = getReadCounter();
-    c.write(c.read() + 1);
+    kind = 'r';
+    state.reads++;
   } else if (WRITE_TOOLS.some((t) => toolName.includes(t))) {
-    const c = getWriteCounter();
-    c.write(c.read() + 1);
+    kind = 'w';
+    state.writes++;
   }
+  if (kind) {
+    state.window.push(kind);
+    if (state.window.length > WINDOW_SIZE) {
+      state.window.splice(0, state.window.length - WINDOW_SIZE);
+    }
+  }
+  return kind;
+}
+
+/**
+ * Append a suggestion snapshot to the live session JSON (best-effort).
+ * Records the phase at suggestion time so ICL-12 can correlate suggestions
+ * against compactions. Silently skipped when no session file exists yet.
+ */
+function recordSessionSuggestion(snapshot) {
+  const session = loadSession();
+  if (!session) return;
+  session.suggestions = session.suggestions || [];
+  session.suggestions.push(snapshot);
+  saveSession(session);
 }
 
 /**
  * Main entry point
  */
 function main() {
-  const stdin = readStdinSync();
-  const input = parseStdinJson(stdin);
-  setSessionIdFromInput(input);
+  try {
+    const stdin = readStdinSync();
+    const input = parseStdinJson(stdin);
+    setSessionIdFromInput(input);
 
-  // Track read/write ratio via persisted counters (2 file I/O ops: read + write)
-  trackToolType(input);
+    // Single read of the consolidated state file.
+    const state = readState();
 
-  // NOTE: read-increment-write is not atomic, but hooks are serialized per event
-  // by Claude Code, so no race condition in practice. See scripts/lib/locking.js
-  // if atomic counters become necessary.
-  const counter = getCounter();
-  const currentCount = counter.read();
-  const newCount = currentCount + 1;
-  counter.write(newCount);
+    // Track read/write classification into the rolling window.
+    trackToolType(state, input);
 
-  // Also increment shared tool-count (used by diary threshold in session-tracker/end).
-  // SOLE increment path — owned by diary-capture so the diary and suggester
-  // thresholds share one source of truth (counter-ownership contract).
-  incrementSharedToolCount();
+    // Increment the suggester's own tool counter.
+    state.tools += 1;
 
-  // Check if suggestion is needed (suppress during write-heavy phases at non-threshold counts)
-  if (shouldSuggest(newCount)) {
-    if (shouldSuppressReminder(newCount)) {
+    // Increment the shared diary tool-count (owned by diary-capture). This is the
+    // diary threshold's source of truth — keep this call to preserve the binding.
+    incrementSharedToolCount();
+
+    // Decide whether to suggest; record the snapshot before persisting state.
+    if (shouldSuggest(state.tools) && !shouldSuppressReminder(state.tools, state.window)) {
+      const snapshot = {
+        count: state.tools,
+        phase: phaseFromWindow(state.window),
+        at: getTimestamp(),
+      };
+      state.suggestions.push(snapshot);
+      recordSessionSuggestion(snapshot);
+      writeState(state);
+      output({ systemMessage: buildMessage(state.tools, state.window) });
       return;
     }
-    output({ systemMessage: buildMessage(newCount) });
+
+    // Single write of the consolidated state file.
+    writeState(state);
+  } catch (e) {
+    // Hooks must never crash the session.
+    log(`[compact-suggester] Warning: ${e.message}`);
   }
 }
 
 module.exports = {
-  readCount: () => getCounter().read(),
-  getCounterFilePath: () => getCounter().getFilePath(),
+  emptyState,
+  readState,
+  writeState,
+  readCount: () => readState().tools,
+  getStateFilePath: getSuggesterStatePath,
   shouldSuggest,
   shouldSuppressReminder,
   buildMessage,
   trackToolType,
-  getReadWriteRatio,
+  windowRatio,
+  phaseFromWindow,
 };
 
 // Run if executed directly

@@ -20,6 +20,12 @@ const { atomicWriteFile } = require('./utils');
 // reflect → reflections (not "reflects") matches the spec storage path.
 const KIND_DIRS = { reflect: 'reflections', recall: 'recalls' };
 
+// Filename prefix the curator batch-assembler matches on
+// (^reflect-.*\.md$ / ^recall-.*\.md$ in learning-curator/batch-assembler.js).
+// The id becomes `<id>.md`, so the id MUST carry this prefix or the assembler
+// silently skips the record. Fail fast at the writer instead.
+const KIND_ID_PREFIX = { reflect: 'reflect-', recall: 'recall-' };
+
 /**
  * Serialize a YAML frontmatter list field, or emit `[]` when empty.
  * Note: relies on existing project convention (hand-rolled YAML, not js-yaml).
@@ -68,6 +74,18 @@ function writeOperationRecord({
   const homeDir = homeOverride || os.homedir();
   const dirName = KIND_DIRS[kind];
   if (!dirName) throw new Error(`writeOperationRecord: unknown kind "${kind}"`);
+
+  // Fail fast when the id lacks the prefix the curator batch-assembler matches
+  // on — otherwise the record writes successfully but is invisible to the
+  // assembler, a silent provenance gap (ICL-5).
+  const prefix = KIND_ID_PREFIX[kind];
+  if (!id.startsWith(prefix)) {
+    throw new Error(
+      `writeOperationRecord: ${kind} id must start with "${prefix}" so the curator ` +
+        `batch-assembler can match it (got "${id}")`,
+    );
+  }
+
   const dir = path.join(homeDir, '.arcforge', dirName, project);
   const filePath = path.join(dir, `${id}.md`);
 

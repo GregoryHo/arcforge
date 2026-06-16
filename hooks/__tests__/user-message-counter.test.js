@@ -78,13 +78,15 @@ describe('counter independence', () => {
       readCount: readUserCount,
       writeCount: writeUserCount,
     } = require('../user-message-counter/main');
-    const { readCount: readCompactCount } = require('../compact-suggester/main');
-    const { createSessionCounter } = require('../../scripts/lib/utils');
-    const compactCounter = createSessionCounter('compact-count');
+    const {
+      readCount: readCompactCount,
+      writeState,
+      emptyState,
+    } = require('../compact-suggester/main');
 
-    // Set different values
+    // Set different values — suggester now uses a single JSON state file.
     writeUserCount(42);
-    compactCounter.write(100);
+    writeState({ ...emptyState(), tools: 100 });
 
     // Verify independence
     assert.strictEqual(readUserCount(), 42);

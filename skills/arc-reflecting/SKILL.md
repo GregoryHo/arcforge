@@ -19,6 +19,7 @@ Analyze multiple diary entries to identify recurring patterns. Save insights to 
 | **Pattern threshold** | 3+ occurrences = Pattern, 1-2 = Observation |
 | **Rule violations** | Check CLAUDE.md first, report violations with evidence |
 | **Save instinct** | `node "${SKILL_ROOT}/scripts/reflect.js" save-instinct --project {p} --id {id} --trigger "..." --action "..." [--domain D] [--evidence "..."] [--evidence-count N]` |
+| **Save record** | `node "${SKILL_ROOT}/scripts/reflect.js" save-record --project {p} --reflect-id reflect-{id} [--diaries "a,b,c"] [--summary "..."]` |
 | **Strategy modes** | unprocessed (5+ new) \| project_focused (5+ total) \| recent_window (fallback) |
 
 ## Infrastructure Commands
@@ -258,7 +259,18 @@ For rule violations, additionally inform:
      --evidence "{source diary references}" \
      --evidence-count {N}
    ```
-5. Confirm save location, processed.log update, and instincts saved
+5. **Save a reflection record** so the learning curator has evidence that this
+   reflection happened:
+   ```bash
+   node "${SKILL_ROOT}/scripts/reflect.js" save-record \
+     --project {project} \
+     --reflect-id reflect-{id} \
+     --diaries "{analyzed diary filenames}" \
+     --summary "{one-line summary of the reflection}"
+   ```
+   The `--reflect-id` MUST start with `reflect-` (the curator batch-assembler
+   only matches `reflect-*.md` records).
+6. Confirm save location, processed.log update, and instincts saved
 
 ## Key Principles
 
