@@ -30,6 +30,7 @@ const {
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
 const { warnIfBaseBranch, selectRoundEpics, runDagRound } = require('./lib/loop-dag');
 const { parseVerifyCommand, runVerify, recordVerifyResult } = require('./lib/loop-verify');
+const { runVerifierGate, blockOnVerdict, DEFAULT_MAX_RETRIES } = require('./lib/loop-verifier');
 const { Feature } = require('./lib/models');
 const {
   detectPackageManager,
@@ -61,6 +62,8 @@ function parseLoopArgs(args) {
     permissionMode: null,
     allowedTools: null,
     verifyCommand: null,
+    verifier: false,
+    maxRetries: DEFAULT_MAX_RETRIES,
     projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
   };
 
@@ -123,6 +126,16 @@ function parseLoopArgs(args) {
           process.exit(1);
         }
         break;
+      case '--verifier':
+        options.verifier = true;
+        break;
+      case '--max-retries':
+        options.maxRetries = parseInt(args[++i], 10);
+        if (Number.isNaN(options.maxRetries) || options.maxRetries < 0) {
+          console.error('Error: --max-retries must be a non-negative integer');
+          process.exit(1);
+        }
+        break;
       case '--help':
       case '-h':
         printLoopHelp();
@@ -160,6 +173,10 @@ OPTIONS:
   --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
   --verify-cmd "<cmd>"       Run this command after each session exits 0; a
                              non-zero exit fails the task (retry/block, no complete)
+  --verifier                 After the --verify-cmd floor passes, spawn an
+                             independent verifier agent; FAIL → retry with verbatim
+                             feedback, exhausted → block (opt-in; off by default)
+  --max-retries N            Verifier feedback retries before blocking (default: 2)
   --help, -h                 Show this help
 
 PATTERNS:
@@ -380,6 +397,39 @@ function runVerifyFloor(task, state, options, cwd, attempt) {
 }
 
 /**
+ * Run the AF-9 verifier gate for a task whose session exited 0 and passed the
+ * AF-8 floor, in `cwd`. Layered ON TOP of the floor: when `--verifier` is off
+ * this is a no-op returning true (no extra session — sequential behavior stays
+ * byte-identical). The verbatim-feedback retry loop and verdict parsing live in
+ * loop-verifier.js; this only wires the loop's spawn/floor/prompt callbacks and
+ * blocks the task on FAIL-exhausted or an unparseable verdict (never inferring
+ * PASS). `buildPrompt` re-builds the implementer prompt with prepended feedback.
+ * @param {Object} task - Task whose session succeeded
+ * @param {Coordinator} coord - Coordinator instance
+ * @param {Object} state - Loop state
+ * @param {Object} options - Loop options
+ * @param {string} cwd - Work cwd (epic worktree in dag mode)
+ * @param {Function} buildPrompt - (feedback) => implementer prompt string
+ * @returns {boolean} Whether the verifier passed (or was skipped/off)
+ */
+function runVerifierGateFor(task, coord, state, options, cwd, buildPrompt) {
+  const outcome = runVerifierGate({
+    coord,
+    task,
+    state,
+    options,
+    cwd,
+    projectRoot: options.projectRoot,
+    spawnImplementer: (prompt, c) => spawnSession(prompt, c, options),
+    spawnVerifier: (prompt, c) => spawnSession(prompt, c, options),
+    buildImplementerPrompt: buildPrompt,
+    runFloor: (c) => runVerifyFloor(task, state, options, c, 1),
+  });
+  if (outcome.passed) return true;
+  return blockOnVerdict(coord, task, state, outcome);
+}
+
+/**
  * Run a single task iteration
  * @param {Object} task - Task from coordinator
  * @param {Coordinator} coord - Coordinator instance
@@ -419,6 +469,16 @@ function runTask(task, coord, state, options) {
       }
       return false;
     }
+  }
+
+  // AF-9 verifier gate (opt-in): the floor passed, but with --verifier on an
+  // independent verdict must also PASS before completing. A no-op when off.
+  if (
+    !runVerifierGateFor(task, coord, state, options, projectRoot, (feedback) =>
+      feedback ? `${feedback}\n\n---\n\n${prompt}` : prompt,
+    )
+  ) {
+    return false;
   }
 
   // Success — update DAG before recording in state

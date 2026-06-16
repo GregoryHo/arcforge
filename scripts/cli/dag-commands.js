@@ -10,6 +10,7 @@
 const { Coordinator, syncAllSpecs, rebootAllSpecs } = require('../lib/coordinator');
 const { getWorktreePath } = require('../lib/worktree-paths');
 const { parseVerifyCommand } = require('../lib/loop-verify');
+const { DEFAULT_MAX_RETRIES } = require('../lib/loop-verifier');
 const { output } = require('./shared');
 const {
   resolveSpecId,
@@ -244,6 +245,19 @@ function runLoop(args, { projectRoot, specFlag }) {
     }
   }
 
+  // --verifier (opt-in) + --max-retries: the AF-9 verifier-agent gate layered
+  // ON TOP of the --verify-cmd floor. --verifier is a boolean flag; --max-retries
+  // bounds the verbatim-feedback retry loop before the task is blocked.
+  const verifier = Boolean(args.flags.verifier);
+  let maxRetries = DEFAULT_MAX_RETRIES;
+  if (args.options['max-retries'] !== undefined) {
+    maxRetries = parseInt(args.options['max-retries'], 10);
+    if (Number.isNaN(maxRetries) || maxRetries < 0) {
+      console.error('Error: --max-retries must be a non-negative integer');
+      process.exit(1);
+    }
+  }
+
   // --reset archives any existing state file before this run starts, so the
   // loop begins from a clean state. Deliberate pre-run action — never mid-run.
   if (args.flags.reset) {
@@ -268,6 +282,8 @@ function runLoop(args, { projectRoot, specFlag }) {
     permissionMode: args.options['permission-mode'] || null,
     allowedTools: args.options['allowed-tools'] || null,
     verifyCommand,
+    verifier,
+    maxRetries,
   };
   if (pattern === 'dag') {
     runDag(loopOptions);

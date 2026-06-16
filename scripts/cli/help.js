@@ -84,7 +84,8 @@ COMMANDS:
       --example    Show complete example
 
   loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>] [--spec-id <id>]
-       [--task-timeout N] [--permission-mode <mode>] [--allowed-tools <tools>] [--verify-cmd "..."] [--reset]
+       [--task-timeout N] [--permission-mode <mode>] [--allowed-tools <tools>] [--verify-cmd "..."]
+       [--verifier] [--max-retries N] [--reset]
       Run autonomous cross-session execution loop.
       --pattern          Execution pattern: sequential (default) or dag
       --epic             Scope loop to a single epic (auto-detected in worktrees)
@@ -94,6 +95,9 @@ COMMANDS:
       --permission-mode  Pass --permission-mode through to spawned claude sessions
       --allowed-tools    Pass --allowed-tools through to spawned claude sessions
       --verify-cmd       Acceptance floor run after each session exits 0; non-zero fails the task
+      --verifier         After the floor passes, spawn an independent verifier agent;
+                         FAIL → retry with feedback, exhausted/unparseable → block (opt-in)
+      --max-retries      Verifier feedback retries before blocking (default: 2)
       --reset            Archive prior state to .arcforge-loop.archive/ and start fresh
 
   eval list                          List eval scenarios
