@@ -112,6 +112,20 @@ function evidenceQualityChip(quality) {
 }
 
 /**
+ * Build the integer-only feedback counts block for a card (ICL-6).
+ * confirm/contradict on a curator-activated instinct mirror running counts back
+ * to the candidate record as `record.feedback`. Only the integer counts are
+ * surfaced — never raw payloads — keeping the card allowlist intact. Returns
+ * undefined when the candidate carries no feedback (omits the field entirely).
+ */
+function buildCardFeedback(feedback) {
+  if (!feedback || typeof feedback !== 'object') return undefined;
+  const confirmations = Number.isFinite(feedback.confirmations) ? feedback.confirmations : 0;
+  const contradictions = Number.isFinite(feedback.contradictions) ? feedback.contradictions : 0;
+  return { confirmations, contradictions };
+}
+
+/**
  * Build a DashboardCandidateCard from a CandidateQueueRecord per Layer 6 spec.
  * Returns only allowlisted fields. project_id intentionally excluded.
  *
@@ -123,6 +137,7 @@ function sanitizeDashboardCard(record) {
   const llmAssessment = record.llm_assessment || {};
   const chip = evidenceQualityChip(record.evidence_quality);
   const hasRelationships = record.relationships !== undefined && record.relationships !== null;
+  const feedback = buildCardFeedback(record.feedback);
 
   return {
     schema_version: 1,
@@ -144,6 +159,7 @@ function sanitizeDashboardCard(record) {
     available_actions: legalActionsFor(status),
     ...(chip !== undefined && { evidence_quality_chip: chip }),
     ...(hasRelationships && { relationships: record.relationships }),
+    ...(feedback !== undefined && { feedback }),
   };
 }
 

@@ -14,9 +14,7 @@ const {
   updateConfidenceFrontmatter,
   applyConfirmation,
   applyContradiction,
-  shouldAutoLoad,
   shouldArchive,
-  AUTO_LOAD_THRESHOLD,
   ARCHIVE_THRESHOLD
 } = require('../../../scripts/lib/confidence');
 
@@ -27,6 +25,17 @@ const {
 } = require('../../../scripts/lib/session-utils');
 
 const { sanitizeFilename } = require('../../../scripts/lib/utils');
+
+const { readCurrentCandidates } = require('../../../scripts/lib/learning-curator/queue-writer');
+const {
+  appendTransitionEvent,
+  appendUpdateEvent
+} = require('../../../scripts/lib/learning-curator/dashboard-events');
+const {
+  isLegalAction,
+  LIFECYCLE_STATUS,
+  LIFECYCLE_ACTION
+} = require('../../../scripts/lib/learning-curator/lifecycle');
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -83,6 +92,67 @@ function pct(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
+/**
+ * Align confirm/contradict feedback on a curator-activated candidate (ICL-6).
+ *
+ * Curator-activated instincts carry `id == candidate_id` (set by activate.js).
+ * When such an instinct is confirmed or contradicted, mirror the running
+ * feedback counts back to the Layer 5 candidate store as a `candidate.updated`
+ * patch so the dashboard card stays consistent with the instinct frontmatter.
+ *
+ * When a contradiction archives the instinct AND the matched candidate is
+ * currently `activated`, also append a `deactivate` lifecycle transition —
+ * gated through `lifecycle.isLegalAction`. This stays inside the curator event
+ * log (the file remains in the instinct's own `archived/` dir); it does NOT run
+ * activate.js's physical move-to-`.disabled/` or its reviewer_ack consent model.
+ *
+ * Candidate lookup uses `readCurrentCandidates()` — the HOME-global event log
+ * replayed under the store lock — NOT the project-local legacy queue. A
+ * non-curator instinct simply has no matching candidate: no event, no crash.
+ *
+ * @param {string} instinctId
+ * @param {{confirmations: number, contradictions: number}} feedback
+ * @param {boolean} archived — true when the contradiction archived the instinct
+ */
+function syncCuratorCandidate(instinctId, feedback, archived) {
+  try {
+    const candidates = readCurrentCandidates();
+    const candidate = candidates[instinctId];
+    if (!candidate) return;
+
+    const actor = { layer: 6, actor_type: 'instinct_cli' };
+
+    appendUpdateEvent(
+      instinctId,
+      {
+        feedback: {
+          confirmations: feedback.confirmations,
+          contradictions: feedback.contradictions
+        }
+      },
+      actor
+    );
+
+    if (!archived) return;
+
+    const status = candidate.lifecycle ? candidate.lifecycle.status : undefined;
+    if (
+      status === LIFECYCLE_STATUS.ACTIVATED &&
+      isLegalAction(status, LIFECYCLE_ACTION.DEACTIVATE)
+    ) {
+      appendTransitionEvent(
+        instinctId,
+        LIFECYCLE_ACTION.DEACTIVATE,
+        LIFECYCLE_STATUS.DEACTIVATED,
+        actor
+      );
+    }
+  } catch {
+    // Curator store unavailable or locked — instinct file write already
+    // succeeded; do not crash the CLI over best-effort lifecycle alignment.
+  }
+}
+
 // ─────────────────────────────────────────────
 // Commands
 // ─────────────────────────────────────────────
@@ -123,10 +193,9 @@ function cmdStatus(project) {
       for (const inst of items) {
         const conf = inst.frontmatter.confidence || 0;
         const bar = confidenceBar(conf);
-        const autoLoad = shouldAutoLoad(conf) ? ' [auto-loaded]' : '';
         const trigger = inst.frontmatter.trigger || '';
 
-        console.log(`  ${bar}  ${pct(conf)}  ${inst.id}${autoLoad}`);
+        console.log(`  ${bar}  ${pct(conf)}  ${inst.id}`);
         if (trigger) {
           console.log(`            trigger: ${trigger}`);
         }
@@ -157,14 +226,16 @@ function cmdStatus(project) {
   }
 
   // Summary
-  const autoLoaded = instincts.filter(i => shouldAutoLoad(i.frontmatter.confidence || 0));
   const atRisk = instincts.filter(i => {
     const c = i.frontmatter.confidence || 0;
     return c < 0.3 && c >= ARCHIVE_THRESHOLD;
   });
 
   console.log('---');
-  console.log(`Auto-loaded (>= ${AUTO_LOAD_THRESHOLD}): ${autoLoaded.length}`);
+  console.log(
+    'Injection is activation-gated: activate instincts via `arcforge learn dashboard`. ' +
+      'Activated instincts are injected at SessionStart (top 5 by confidence; confidence sorts/caps, it is not a threshold).'
+  );
   if (atRisk.length > 0) {
     console.log(`At risk (< 0.3): ${atRisk.map(i => i.id).join(', ')}`);
   }
@@ -198,13 +269,15 @@ function cmdConfirm(instinctId, project) {
 
   fs.writeFileSync(filePath, updated, 'utf-8');
 
+  syncCuratorCandidate(
+    instinctId,
+    { confirmations, contradictions: frontmatter.contradictions || 0 },
+    false
+  );
+
   console.log(`Confirmed: ${instinctId}`);
   console.log(`  ${confidenceBar(oldConfidence)} ${pct(oldConfidence)} → ${confidenceBar(newConfidence)} ${pct(newConfidence)}`);
   console.log(`  Confirmations: ${confirmations}`);
-
-  if (shouldAutoLoad(newConfidence) && !shouldAutoLoad(oldConfidence)) {
-    console.log(`  Now auto-loaded into sessions (>= ${AUTO_LOAD_THRESHOLD})`);
-  }
 }
 
 /**
@@ -245,11 +318,23 @@ function cmdContradict(instinctId, project) {
     fs.writeFileSync(path.join(archivedDir, `${instinctId}.md`), archivedContent, 'utf-8');
     fs.unlinkSync(filePath);
 
+    syncCuratorCandidate(
+      instinctId,
+      { confirmations: frontmatter.confirmations || 0, contradictions },
+      true
+    );
+
     console.log(`Contradicted & archived: ${instinctId}`);
     console.log(`  ${confidenceBar(oldConfidence)} ${pct(oldConfidence)} → ${confidenceBar(newConfidence)} ${pct(newConfidence)}`);
     console.log(`  Confidence below ${ARCHIVE_THRESHOLD} — moved to archived/`);
   } else {
     fs.writeFileSync(filePath, updated, 'utf-8');
+
+    syncCuratorCandidate(
+      instinctId,
+      { confirmations: frontmatter.confirmations || 0, contradictions },
+      false
+    );
 
     console.log(`Contradicted: ${instinctId}`);
     console.log(`  ${confidenceBar(oldConfidence)} ${pct(oldConfidence)} → ${confidenceBar(newConfidence)} ${pct(newConfidence)}`);
@@ -373,6 +458,7 @@ module.exports = {
   loadInstincts,
   confidenceBar,
   pct,
+  syncCuratorCandidate,
   cmdStatus,
   cmdConfirm,
   cmdContradict,

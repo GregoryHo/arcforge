@@ -5,15 +5,12 @@
  * Runs SYNCHRONOUSLY on SessionStart with dual output:
  *
  * systemMessage (user-visible):
- * - Brief summary: instinct count, pending actions
+ * - Brief summary: instinct count, pending actions, session aliases,
+ *   recent global promotions
  *
  * additionalContext (Claude-visible):
  * - Full instinct details with confidence scores
  * - Pending action notifications
- *
- * stderr (internal diagnostics):
- * - Available session aliases
- * - Global instinct promotions
  */
 
 const fs = require('node:fs');
@@ -26,7 +23,6 @@ const {
   getProjectDiariesDir,
   getProjectSessionsDir,
   outputCombined,
-  log,
 } = require('../../scripts/lib/utils');
 
 const {
@@ -295,28 +291,30 @@ function loadPendingActions(project) {
 }
 
 /**
- * Load session aliases and log to stderr for discoverability.
+ * Build a user-summary line for available session aliases (discoverability).
+ * @returns {string|null} summary line, or null when there are no aliases
  */
-function logAvailableAliases(project) {
+function loadAvailableAliases(project) {
   try {
     const { listAliases } = require('../../scripts/lib/session-aliases');
     const aliases = listAliases(project);
     if (aliases.length > 0) {
-      const names = aliases.map((a) => a.name).join(', ');
-      log(`${aliases.length} session aliases available: ${names}`);
+      return `${aliases.length} session alias${aliases.length === 1 ? '' : 'es'}`;
     }
   } catch {
     // session-aliases not available yet — skip
   }
+  return null;
 }
 
 /**
- * Check global index for newly promoted patterns (stderr only)
+ * Build a user-summary line for patterns promoted to global in the last week.
+ * @returns {string|null} summary line, or null when there are none
  */
-function checkNewGlobalPromotions() {
+function loadNewGlobalPromotions() {
   try {
     const indexPath = getInstinctsGlobalIndex();
-    if (!fs.existsSync(indexPath)) return;
+    if (!fs.existsSync(indexPath)) return null;
 
     const content = fs.readFileSync(indexPath, 'utf-8');
     const lines = content.trim().split('\n').filter(Boolean);
@@ -336,12 +334,12 @@ function checkNewGlobalPromotions() {
       .filter((entry) => new Date(entry.promoted) > weekAgo);
 
     if (recent.length > 0) {
-      const ids = recent.map((e) => e.id).join(', ');
-      log(`New global instincts (found in multiple projects): ${ids}`);
+      return `${recent.length} new global promotion${recent.length === 1 ? '' : 's'}`;
     }
   } catch {
     // silent
   }
+  return null;
 }
 
 /**
@@ -384,9 +382,15 @@ function main() {
     userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);
   }
 
-  // Stderr-only (internal diagnostics)
-  logAvailableAliases(project);
-  checkNewGlobalPromotions();
+  // Session aliases + recent global promotions — surfaced to the USER summary
+  // (the stderr versions were invisible: Claude Code condenses stderr to
+  // "N hooks ran"). These are discoverability hints for the user, not Claude
+  // context, so they go to userParts only.
+  const aliasSummary = loadAvailableAliases(project);
+  if (aliasSummary) userParts.push(aliasSummary);
+
+  const promotionSummary = loadNewGlobalPromotions();
+  if (promotionSummary) userParts.push(promotionSummary);
 
   const claudeContext = contextParts.length > 0 ? contextParts.join('\n\n') : null;
   const userMessage = userParts.length > 0 ? userParts.join(' | ') : null;
@@ -406,8 +410,8 @@ module.exports = {
   loadStaleDraftWarning,
   renderLoopFinished,
   renderRatifyPending,
-  logAvailableAliases,
-  checkNewGlobalPromotions,
+  loadAvailableAliases,
+  loadNewGlobalPromotions,
 };
 
 // Run if executed directly

@@ -174,4 +174,29 @@ function appendRelatedEvent(sourceCandidateId, patch, actor) {
   });
 }
 
-module.exports = { appendTransitionEvent, appendRelatedEvent };
+/**
+ * Append a candidate.updated event for an existing candidate.
+ *
+ * readCurrentCandidates() merges the patch onto the candidate record wholesale,
+ * so callers should pass a top-level field patch (e.g. { feedback: {...} }).
+ *
+ * @param {string} candidateId
+ * @param {object} patch — top-level field patch merged onto the candidate record
+ * @param {object} [actor]
+ */
+function appendUpdateEvent(candidateId, patch, actor) {
+  withStoreLock(() => {
+    const event = {
+      schema_version: 1,
+      event_id: generateEventId(),
+      ts: new Date().toISOString(),
+      candidate_id: candidateId,
+      event_type: 'candidate.updated',
+      actor: actor || { layer: 6, actor_type: 'dashboard' },
+      patch,
+    };
+    appendJsonlLine(getQueuePath(), event);
+  });
+}
+
+module.exports = { appendTransitionEvent, appendRelatedEvent, appendUpdateEvent };
