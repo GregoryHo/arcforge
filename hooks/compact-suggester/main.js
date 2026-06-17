@@ -10,6 +10,13 @@
  *
  * Triggered on PostToolUse for ALL tools.
  *
+ * Dual-channel delivery (ICL-10): on a threshold hit the hook emits EXACTLY ONE
+ * JSON object carrying BOTH a user-visible systemMessage (the phase-aware
+ * suggestion) AND a model-visible additionalContext one-liner (the arc-compacting
+ * indicator) via the RV-1 merged helper outputPostToolUseFeedback. The user line
+ * is a notification; the model line is a routing indicator pointing at the
+ * arc-compacting skill — never a silent model directive.
+ *
  * State: a SINGLE session-scoped JSON file (getSuggesterStatePath) holds the
  * tool counter, the rolling phase window, and the suggestion snapshots — 1 read
  * + 1 write per event instead of three separate counter files. PreCompact resets
@@ -28,7 +35,7 @@ const {
   readStdinSync,
   parseStdinJson,
   setSessionIdFromInput,
-  output,
+  outputPostToolUseFeedback,
   readJsonFile,
   writeJsonFile,
   getTimestamp,
@@ -120,28 +127,34 @@ function shouldSuppressReminder(count, window) {
 }
 
 /**
- * Build phase-aware suggestion message from the rolling window.
+ * Build the user-visible suggestion message (systemMessage channel).
+ *
+ * Slimmed to a phase indicator (ICL-10): it names the current phase and the tool
+ * count, then defers the actual compact/no-compact timing call to the
+ * arc-compacting skill rather than inlining the decision guide. The model-visible
+ * companion line (buildModelIndicator) carries the same arc-compacting pointer.
  */
 function buildMessage(count, window) {
   const phase = phaseFromWindow(window);
-  const readHeavy = phase === 'read-heavy';
-  const writeHeavy = phase === 'write-heavy';
+  const label =
+    phase === 'read-heavy'
+      ? 'mostly reads'
+      : phase === 'write-heavy'
+        ? 'active implementation'
+        : 'mixed work';
+  return `\n📊 ${count} tool calls (${label}) — possible compaction boundary. See arc-compacting for whether to /compact now.\n`;
+}
 
-  if (count === THRESHOLD) {
-    if (readHeavy) {
-      return `\n📊 ${count} tool calls (mostly reads) — looks like a research/exploration phase. If you're transitioning to implementation, /compact now to free context for code.\n`;
-    }
-    if (writeHeavy) {
-      return `\n📊 ${count} tool calls (active implementation). If you're between tasks or about to switch features, /compact at the boundary. Mid-implementation compaction loses valuable context.\n`;
-    }
-    return `\n📊 ${count} tool calls this session. If you're between workflow phases, consider /compact to preserve context quality. Use arc-compacting for timing guidance.\n`;
-  }
-
-  if (count >= 75 && readHeavy) {
-    return `\n📊 ${count} tool calls — heavy read phase. Context is filling with research. If findings are saved to files, /compact now for a fresh start.\n`;
-  }
-
-  return `\n📊 ${count} tool calls. Between phases? /compact helps maintain context quality for longer sessions.\n`;
+/**
+ * Build the model-visible compaction-prep indicator (additionalContext channel).
+ *
+ * This is the ICL-10 capability: a one-line routing indicator that reaches the
+ * MODEL (not just the user), pointing at the arc-compacting skill so the model
+ * can make the phase-boundary timing call. It states the phase as evidence; it
+ * never issues a compaction directive — the decision stays with arc-compacting.
+ */
+function buildModelIndicator(count, window) {
+  return `arc-compacting indicator: ${count} tool calls (${phaseFromWindow(window)} phase) — at a possible compaction boundary. Consult arc-compacting to decide whether to /compact at this phase boundary.`;
 }
 
 /**
@@ -212,7 +225,12 @@ function main() {
       state.suggestions.push(snapshot);
       recordSessionSuggestion(snapshot);
       writeState(state);
-      output({ systemMessage: buildMessage(state.tools, state.window) });
+      // Dual channel (ICL-10): ONE merged JSON object carrying the model-visible
+      // additionalContext (arc-compacting indicator) AND the user-visible
+      // systemMessage suggestion. The model line is never a silent directive.
+      outputPostToolUseFeedback(buildModelIndicator(state.tools, state.window), {
+        systemMessage: buildMessage(state.tools, state.window),
+      });
       return;
     }
 
@@ -233,6 +251,7 @@ module.exports = {
   shouldSuggest,
   shouldSuppressReminder,
   buildMessage,
+  buildModelIndicator,
   trackToolType,
   windowRatio,
   phaseFromWindow,
