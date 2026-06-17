@@ -139,6 +139,8 @@ const CLI_MANIFEST = {
       '--permission-mode',
       '--allowed-tools',
       '--verify-cmd',
+      '--verifier',
+      '--max-retries',
     ],
     output: null,
   },

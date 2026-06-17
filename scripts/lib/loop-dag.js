@@ -12,9 +12,10 @@
  * keeps the loop.js → loop-dag.js dependency one-directional.
  */
 
-const { spawnSessionAsync } = require('./loop-session');
+const { spawnSession, spawnSessionAsync } = require('./loop-session');
 const { saveLoopState, recordError } = require('./loop-state');
 const { runVerify, recordVerifyResult } = require('./loop-verify');
+const { runVerifierGate, blockOnVerdict } = require('./loop-verifier');
 const { getTimestamp } = require('./utils');
 
 /**
@@ -167,6 +168,61 @@ function verifyEpic(coord, epic, worktreePath, state, options) {
 }
 
 /**
+ * Run the AF-9 verifier gate for a dag epic whose session exited 0 AND passed
+ * the verify-cmd floor, in the epic's OWN worktree cwd. Layered ON TOP of the
+ * floor: a no-op returning true when `--verifier` is off (no extra session).
+ * Verifier + verbatim-feedback retries run synchronously here in the sequential
+ * integration phase (the initial concurrent batch already ran); both reuse the
+ * sync spawnSession. On FAIL-exhausted or an unparseable verdict the epic is
+ * blocked (never merged/completed) and its worktree retained — PASS is never
+ * inferred from an exit code.
+ * @param {Coordinator} coord - Coordinator instance
+ * @param {Object} epic - Epic whose session + floor passed
+ * @param {string} worktreePath - The epic's worktree cwd to verify in
+ * @param {Object} state - Loop state
+ * @param {Object} options - Loop options
+ * @param {Function} buildTaskPrompt - (task, coord, projectRoot, workspaceRoot)=>string
+ * @returns {boolean} Whether the verifier passed (or was skipped/off)
+ */
+function verifyEpicAgent(coord, epic, worktreePath, state, options, buildTaskPrompt) {
+  const { projectRoot } = options;
+  const outcome = runVerifierGate({
+    coord,
+    task: epic,
+    state,
+    options,
+    cwd: worktreePath,
+    projectRoot,
+    spawnImplementer: (prompt, cwd) => spawnSession(prompt, cwd, options),
+    spawnVerifier: (prompt, cwd) => spawnSession(prompt, cwd, options),
+    buildImplementerPrompt: (feedback) => {
+      const base = buildTaskPrompt(epic, coord, projectRoot, worktreePath);
+      return feedback ? `${feedback}\n\n---\n\n${base}` : base;
+    },
+    runFloor: (cwd) => verifyEpicFloorOnly(epic, cwd, state, options),
+  });
+  if (outcome.passed) return true;
+  return blockOnVerdict(coord, epic, state, outcome);
+}
+
+/**
+ * Re-run the deterministic --verify-cmd floor on retried work (no blocking side
+ * effects — the verifier gate owns the block decision). Returns whether it
+ * passed; a no-op returning true when no --verify-cmd is configured.
+ * @param {Object} epic - Epic being re-verified
+ * @param {string} cwd - Worktree cwd
+ * @param {Object} state - Loop state (verify result persisted)
+ * @param {Object} options - Loop options
+ * @returns {boolean} Whether the floor passed (or was not configured)
+ */
+function verifyEpicFloorOnly(epic, cwd, state, options) {
+  if (!options.verifyCommand) return true;
+  const result = runVerify(options.verifyCommand, cwd, { timeoutMs: options.taskTimeoutMs });
+  recordVerifyResult(state, epic.id, result);
+  return result.exitCode === 0;
+}
+
+/**
  * Run one isolated-worktree round: expand each batch epic, spawn a session
  * in its worktree, and integrate the successful ones. Returns whether any
  * epic made progress.
@@ -226,6 +282,9 @@ async function runDagRound(coord, batch, state, options, buildTaskPrompt) {
     // Deterministic acceptance floor: a clean session exit alone is not enough
     // to merge — the verify command must pass in the epic's worktree first.
     if (!verifyEpic(coord, epic, worktreePath, state, options)) continue;
+    // AF-9 verifier gate (opt-in, layered on the floor): an independent verdict
+    // must also PASS before merge; FAIL → retry, exhausted/unparseable → block.
+    if (!verifyEpicAgent(coord, epic, worktreePath, state, options, buildTaskPrompt)) continue;
     if (integrateEpic(coord, epic, state)) anySuccess = true;
   }
 
@@ -238,6 +297,8 @@ module.exports = {
   selectRoundEpics,
   prepareEpicWorktree,
   verifyEpic,
+  verifyEpicAgent,
+  verifyEpicFloorOnly,
   integrateEpic,
   runDagRound,
 };
