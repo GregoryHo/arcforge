@@ -89,12 +89,13 @@ Return:
 
 ### 3. Dispatch in Parallel
 
-Dispatch one subagent per task in a single message so they run concurrently:
+Dispatch one general-purpose subagent per task — all in a single batch so they
+run concurrently — using whatever subagent mechanism your platform provides:
 
 ```
-Agent(subagent_type='general-purpose'): "Fix issue A in file X"
-Agent(subagent_type='general-purpose'): "Fix issue B in file Y"
-Agent(subagent_type='general-purpose'): "Fix issue C in file Z"
+subagent: "Fix issue A in file X"
+subagent: "Fix issue B in file Y"
+subagent: "Fix issue C in file Z"
 ```
 
 ### 4. Review and Integrate
@@ -103,11 +104,11 @@ Agent(subagent_type='general-purpose'): "Fix issue C in file Z"
 - Verify no conflicts. If conflicts found: tasks were not truly independent — resolve manually and re-check grouping
 - Verify the merged result with a fresh-context subagent rather than trusting
   the implementers' own reports:
-  - `Agent(subagent_type='arcforge:verifier')` with the project test command —
-    runs the suite from an empty context and returns raw output.
-  - When a spec exists, also `Agent(subagent_type='arcforge:spec-reviewer')`
-    with the relevant `specs/<spec-id>/.../*.md` attached — it confirms every
-    acceptance criterion in the integrated branch.
+  - the `verifier` agent with the project test command — runs the suite from an
+    empty context and returns raw output.
+  - When a spec exists, also the `spec-reviewer` agent with the relevant
+    `specs/<spec-id>/.../*.md` attached — it confirms every acceptance criterion
+    in the integrated branch.
 - Integrate all changes only after the verifier (and spec-reviewer, if run) PASS
 
 ## DAG-Based Workflow
@@ -203,13 +204,13 @@ For each feature in the parallel group, dispatch a separate subagent — all in
 one message so they run concurrently:
 
 ```
-Agent(subagent_type='general-purpose'): "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
-Agent(subagent_type='general-purpose'): "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
+subagent: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
+subagent: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
 ```
 
-Wait for all to complete, then run the Step 4 verification gate
-(`arcforge:verifier`, plus `arcforge:spec-reviewer` when a spec exists) before
-proceeding to the next group.
+Wait for all to complete, then run the Step 4 verification gate (the `verifier`
+agent, plus the `spec-reviewer` agent when a spec exists) before proceeding to
+the next group.
 
 ### Step 6: Integrate with Coordinator
 
@@ -301,6 +302,17 @@ To resolve:
 Then retry: `/arc-dispatching-parallel`
 ─────────────────────────────────────────────────
 ```
+
+## Cross-Platform Dispatch
+
+The `subagent:` lines above are notation, not a specific tool — this skill works
+on any platform that can run a fresh subagent (Claude Code, Codex, Gemini CLI,
+OpenCode). Dispatch each parallel task with whatever subagent mechanism your
+harness provides; the only requirement is that independent tasks run in their
+own fresh contexts and report back. The `verifier` and `spec-reviewer` agents in
+the verification gate are pre-built where your platform supplies them; otherwise
+dispatch a general-purpose subagent with the equivalent verify command and
+spec-check instructions.
 
 ## Related Skills
 

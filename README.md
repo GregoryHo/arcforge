@@ -214,6 +214,9 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 
 ### Review Templates
 
+Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from any
+harness that can dispatch a subagent (Claude Code, Codex, Gemini CLI, OpenCode):
+
 - `templates/implementer-prompt.md` - TDD implementer subagent prompt
 - `templates/spec-reviewer-prompt.md` - Spec compliance reviewer prompt
 - `templates/quality-reviewer-prompt.md` - Code quality reviewer prompt
