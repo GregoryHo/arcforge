@@ -16,14 +16,14 @@
  *                 promise tied to a command) must exist in that command's
  *                 manifest `output` shape (only checked for commands whose
  *                 shape is pinned — `output !== null`).
- *   R4  skills  — a backticked `arc-<name>` skill reference must resolve to an
- *                 existing `skills/<name>/` directory. SHIPPED WARN-ONLY in this
- *                 PR: WT-6 (the finishing-twin merge that deletes
- *                 skills/arc-finishing-epic/) has not landed yet, so gating R4
- *                 now would false-positive on the live tree and on sibling
- *                 Wave-3 branches that still reference the old name. R4 flips to
- *                 gating (severity 'error') in the SRH-5 CI follow-up once WT-6
- *                 has merged. See R4_SEVERITY below.
+ *   R4  skills  — a backticked `arc-<name>` reference must resolve to an
+ *                 existing `skills/<name>/` directory, `hooks/<name>/` directory,
+ *                 or `agents/<name>.md` file (the caller-supplied skillExists
+ *                 probe resolves against all three component trees, since a
+ *                 backticked arc-<name> token equally names a skill, a hook, or
+ *                 a dispatched agent). GATING (severity 'error') as of the
+ *                 SRH-5 R4-flip follow-up — WT-6 has merged, so the finishing
+ *                 twin no longer dangles. See R4_SEVERITY below.
  *
  * The manifest (scripts/lib/cli-manifest.js) is the SINGLE source of truth for
  * R2 flags and R3 field promises — this engine reads it and is FORBIDDEN a
@@ -41,8 +41,8 @@
 
 const { CLI_MANIFEST } = require('./cli-manifest');
 
-// R4 ships warn-only this PR; flips to 'error' (gating) after WT-6 lands.
-const R4_SEVERITY = 'warn';
+// R4 is gating (WT-6 has merged; the finishing twin no longer dangles).
+const R4_SEVERITY = 'error';
 
 // Top-level dirs whose paths we are willing to assert exist. Restricted to the
 // engine/agent/skill/hook/template CODE surface — the layers whose paths are a
@@ -414,6 +414,15 @@ function scanR4Skills(file, spans, skillExists) {
   for (const { text, line } of spans) {
     for (const m of text.matchAll(re)) {
       const name = m[0];
+      const before = m.index > 0 ? text[m.index - 1] : '';
+      const after = text[m.index + name.length] || '';
+      // Skip arc-<name> embedded in a path (`skills/arc-releasing/SKILL.md`):
+      // that is a path component, owned by R1, not a standalone skill reference.
+      if (before === '/' || after === '/') continue;
+      // Skip eval-scenario identifiers (`eval-arc-using-harness-isolation`):
+      // these are eval labels, not a claim that a component named arc-<name>
+      // ships. R4 polices handoff/reference promises, not the eval catalog.
+      if (text.slice(Math.max(0, m.index - 5), m.index) === 'eval-') continue;
       if (!skillExists(name)) {
         findings.push(
           makeFinding(
@@ -421,7 +430,7 @@ function scanR4Skills(file, spans, skillExists) {
             R4_SEVERITY,
             file,
             line,
-            `skill reference does not resolve to skills/${name}/ (warn-only until WT-6; flips to gating in SRH-5)`,
+            `reference does not resolve to skills/${name}/, hooks/${name}/, or agents/${name}.md`,
           ),
         );
       }

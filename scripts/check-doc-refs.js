@@ -9,11 +9,10 @@
  * skill names (R4) match what the engine actually ships.
  *
  * Exit code reflects GATING findings only: any finding whose severity is
- * 'error' fails the check (exit 1). 'warn'-severity findings (R4 today — see
- * doc-refs.js R4_SEVERITY) are printed but do NOT affect the exit code, so the
- * pre-WT-6 tree (which still carries skills/arc-finishing-epic/ and live
- * references to it) stays green. R4 flips to gating in the SRH-5 CI follow-up
- * once WT-6 has merged.
+ * 'error' fails the check (exit 1). All four rules now gate — R4 flipped to
+ * 'error' in the SRH-5 R4-flip follow-up (WT-6 has merged, so the finishing
+ * twin no longer dangles). 'warn'-severity findings, if any are ever added,
+ * are printed but do NOT affect the exit code.
  *
  * CLI tier: prints a human-readable report and exits 0/1.
  */
@@ -56,9 +55,18 @@ function pathExists(relPath, docDir) {
   return false;
 }
 
-/** Existence probe for a skill directory. */
-function skillExists(skillName) {
-  return fs.existsSync(path.join(repoRoot, 'skills', skillName));
+/**
+ * Existence probe for a backticked arc-<name> reference. Resolves against all
+ * three component trees a doc may legitimately name: a skill dir, a hook dir,
+ * or an agent file. (arc-guard / arc-remind are hooks; arc-auditing-spec-*
+ * are dispatched agents — neither lives under skills/.)
+ */
+function skillExists(name) {
+  return (
+    fs.existsSync(path.join(repoRoot, 'skills', name)) ||
+    fs.existsSync(path.join(repoRoot, 'hooks', name)) ||
+    fs.existsSync(path.join(repoRoot, 'agents', `${name}.md`))
+  );
 }
 
 function gatherFiles() {

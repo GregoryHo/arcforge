@@ -59,7 +59,7 @@ PostToolUse cannot block; this hook only ever reminds.
 
 ## State
 
-Tracks a per-session `arc-remind-test-seen` counter (incremented when a test
+Tracks a per-session `arc-remind-test-seen` counter (incremented when a test <!-- doc-ref-lint: ignore R4 arc-remind-test-seen is a per-session state counter name, not a skill/hook/agent reference -->
 runner command is seen) so the reminder can note when no verification ran, and
 a hook-local per-session JSON list of the SKILL.md paths edited this session
 (feeding the freshness comparison above).

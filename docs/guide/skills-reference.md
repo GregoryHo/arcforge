@@ -865,8 +865,8 @@ arc-brainstorming --> arc-refining --> arc-planning --> arc-using-worktrees
                               arc-coordinating --> arc-implementing
                                    |                    |
                                    v                    v
-                              arc-dispatching      arc-agent-driven
-                              -parallel                 |
+                          arc-dispatching-parallel  arc-agent-driven
+                                                        |
                                                         v
                                                   arc-finishing
 ```
@@ -951,6 +951,6 @@ ArcForge's Living SDD pipeline assigns each spec-related job to exactly one owne
 |-------|------|--------------|
 | `arc-refining` | Formalizing design docs into authoritative `specs/<spec-id>/spec.xml` + `details/*.xml` | Completion-claim verification; post-implementation spec sync |
 | `arc-verifying` | Producing fresh evidence before completion claims | Authoring spec artifacts; reconciling spec/code drift |
-| `arc-syncing-spec` (future, optional) | Post-implementation / drift sync of spec artifacts from code, tests, and decisions | Initial formalization; gating completion claims |
+| `arc-syncing-spec` (future, optional) | Post-implementation / drift sync of spec artifacts from code, tests, and decisions | Initial formalization; gating completion claims | <!-- doc-ref-lint: ignore R4 arc-syncing-spec is an intentional test-pinned boundary reference to a future opt-in skill that does not ship today (plan §1.11) -->
 
-`arc-syncing-spec` is not a shipped skill today. If and when it is added, it MUST ship as a separate opt-in workflow skill — never as language injected by the SessionStart bootstrap, the `arc-using` router, or any always-on instruction surface. The minimal-toolkit posture and harness/eval isolation depend on this boundary holding.
+`arc-syncing-spec` is not a shipped skill today. If and when it is added, it MUST ship as a separate opt-in workflow skill — never as language injected by the SessionStart bootstrap, the `arc-using` router, or any always-on instruction surface. The minimal-toolkit posture and harness/eval isolation depend on this boundary holding. <!-- doc-ref-lint: ignore R4 arc-syncing-spec is an intentional test-pinned boundary reference to a future opt-in skill that does not ship today (plan §1.11) -->

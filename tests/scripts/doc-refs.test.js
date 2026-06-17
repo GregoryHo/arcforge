@@ -9,9 +9,13 @@
  *     real cli-manifest.js (no second copy of flag data).
  *   - R3 (field): a `--json` field promise absent from the command's pinned
  *     output shape; plus a NEGATIVE case proving piped-jq selectors validate.
- *   - R4 (skill): a backticked `arc-<name>` that does not resolve to a skill
- *     dir — asserted as WARN severity (warn-only this PR; flips after WT-6),
- *     plus a good skill name that produces nothing.
+ *   - R4 (skill): a backticked `arc-<name>` that does not resolve to a skill,
+ *     hook, or agent — asserted as ERROR severity (GATING as of the SRH-5
+ *     R4-flip), plus a good name that produces nothing. The R4-flip regression
+ *     proves a genuinely-dangling reference still trips gating after the
+ *     false-positive-reducing heuristics were added (hook/agent resolution,
+ *     eval-scenario skip, path-component skip) — the analog of the deliberate
+ *     broken-commit proof: a hollow gate that exempted everything would fail it.
  *   - ignore: a directive suppresses the matching rule on its line; a
  *     reason-less directive is itself a finding.
  */
@@ -140,7 +144,7 @@ describe('doc-refs engine (SRH-4)', () => {
     });
   });
 
-  describe('R4 — skill references (WARN-ONLY this PR)', () => {
+  describe('R4 — skill/hook/agent references (GATING since the SRH-5 R4-flip)', () => {
     test('a good skill name (resolves to a skill dir) produces nothing', () => {
       const doc = 'Hand off to `arc-finishing` when done.\n';
       const { findings } = lintDoc('skills/x/SKILL.md', doc, {
@@ -150,7 +154,9 @@ describe('doc-refs engine (SRH-4)', () => {
       expect(findings.filter((f) => f.rule === 'R4')).toHaveLength(0);
     });
 
-    test('a bad skill name is a WARN finding (dangling-skill-name defect class)', () => {
+    test('R4-flip: a genuinely-dangling reference is a GATING (error) finding', () => {
+      // The deliberate-break proof — the analog of SRH-5's broken-commit gate
+      // proof. The false-positive heuristics below must NOT swallow a real one.
       const doc = 'Hand off to `arc-finishing-epic` when done.\n';
       const { findings } = lintDoc('skills/x/SKILL.md', doc, {
         pathExists: () => true,
@@ -158,9 +164,43 @@ describe('doc-refs engine (SRH-4)', () => {
       });
       const r4 = findings.filter((f) => f.rule === 'R4');
       expect(r4).toHaveLength(1);
-      expect(r4[0].severity).toBe('warn');
+      expect(r4[0].severity).toBe('error');
       expect(r4[0].severity).toBe(R4_SEVERITY);
       expect(r4[0].message).toContain('arc-finishing-epic');
+    });
+
+    test('a name that resolves only as a hook or agent (not a skill) produces nothing', () => {
+      // arc-guard/arc-remind are hooks; arc-auditing-spec-* are agents — the
+      // caller-supplied probe resolves arc-<name> against all three trees.
+      const doc = 'See `arc-guard` and `arc-auditing-spec-internal-consistency`.\n';
+      const { findings } = lintDoc('hooks/README.md', doc, {
+        pathExists: () => true,
+        skillExists: (name) =>
+          name === 'arc-guard' || name === 'arc-auditing-spec-internal-consistency',
+      });
+      expect(findings.filter((f) => f.rule === 'R4')).toHaveLength(0);
+    });
+
+    test('an eval-scenario identifier (eval-arc-<name>) is not an R4 finding', () => {
+      // `eval-arc-using-harness-isolation` is an eval label, not a claim that a
+      // component named arc-using-harness-isolation ships.
+      const doc = 'Scenario `eval-arc-using-harness-isolation` covers isolation.\n';
+      const { findings } = lintDoc('docs/guide/composable-skill-eval-coverage.md', doc, {
+        pathExists: () => true,
+        skillExists: () => false,
+      });
+      expect(findings.filter((f) => f.rule === 'R4')).toHaveLength(0);
+    });
+
+    test('arc-<name> embedded in a path is a path component (R1 owns it), not R4', () => {
+      // `skills/arc-releasing/SKILL.md` — the arc-releasing segment is a path,
+      // not a standalone skill reference, so R4 must not fire on it.
+      const doc = 'Target `skills/arc-releasing/SKILL.md`.\n';
+      const { findings } = lintDoc('docs/guide/x.md', doc, {
+        pathExists: () => true, // path resolves → no R1 either; isolate R4
+        skillExists: () => false,
+      });
+      expect(findings.filter((f) => f.rule === 'R4')).toHaveLength(0);
     });
   });
 
@@ -228,10 +268,10 @@ describe('doc-refs engine (SRH-4)', () => {
       expect(rulesOf(findings)).toEqual(['R3']);
     });
 
-    test('R4 mutation: residual arc-finishing-epic reference (warn-only)', () => {
+    test('R4 mutation: residual arc-finishing-epic reference (gating)', () => {
       const { findings } = lintDoc('skills/x/SKILL.md', 'Then run `arc-finishing-epic`.', probes);
       expect(rulesOf(findings)).toEqual(['R4']);
-      expect(findings[0].severity).toBe('warn');
+      expect(findings[0].severity).toBe('error');
     });
   });
 
