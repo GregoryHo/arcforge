@@ -94,7 +94,7 @@ const CLI_MANIFEST = {
 
   // Needs populated worktrees to merge → SRH-3 charter.
   merge: {
-    flags: ['--base', '--json', '--spec-id'],
+    flags: ['--base', '--abort', '--json', '--spec-id'],
     output: null,
   },
 
@@ -141,6 +141,7 @@ const CLI_MANIFEST = {
       '--verify-cmd',
       '--verifier',
       '--max-retries',
+      '--reset',
     ],
     output: null,
   },
