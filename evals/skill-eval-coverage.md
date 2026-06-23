@@ -39,9 +39,10 @@ discriminates; then remove the `status: draft-unvalidated` marker from the file.
 
 ## Current coverage (as of 2026-06-03)
 
-**Validated coverage: 14 / 33 shippable skills** (12 carry a non-`draft` marker;
+**Validated coverage: 14 / 32 shippable skills** (12 carry a non-`draft` marker;
 see the discrimination-vs-non-regression tiers below — 2 of the 14 are
-non-regression passes with Δ≈0, weaker than the discrimination passes).
+non-regression passes with Δ≈0, weaker than the discrimination passes). The
+denominator matches the recompute snippet's live count (`validated: 14/32`).
 
 Shippable skills = directories under `skills/` containing a `SKILL.md`. Eval scratch
 lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`).
@@ -98,16 +99,32 @@ existing behavior"). Verdict policy is `non-regression`, matching arc-verifying.
 > has `sdd-v2-arc-implementing-delegation` (prose `## Target`, so not counted by the
 > strict-Target metric); the new scenario targets a different facet to avoid duplication.
 
-### Skills with NO scenario (19)
+### Skills with a DRAFT (unvalidated) scenario (3)
 
-The remaining 19 shippable skills (e.g. arc-agent-driven, arc-auditing-spec,
+Authored under AF-14 (2026-06-23) for the autonomy package. Each has a
+`## Target → skills/<skill>/SKILL.md` scenario that is structurally lint-clean
+(`eval lint` ok, registered in `eval list`) but carries `status: draft-unvalidated`.
+Per the tiers above, a draft is a *candidate* for coverage, not coverage — these
+do NOT count toward the validated metric until a recorded passing live run
+(`arc eval preflight`/`ab`) removes the marker.
+
+| Skill | Draft scenario | Discriminative trap |
+|-------|----------------|---------------------|
+| arc-dispatching-teammates | eval-arc-dispatching-teammates-lead-present-routing | lead-present multi-epic → teammates, not manual window-juggling, not arc-looping (boundary = attendance) |
+| arc-dispatching-parallel | eval-arc-dispatching-parallel-feature-level-readiness | engine-computed readiness (`parallel --features`) + parallelize independent features, not eyeball + sequential-for-safety |
+| arc-looping | eval-arc-looping-bounded-unattended-loop-gate | verified DAG + green baseline + bounded `--max-runs` before an unattended overnight loop, not an unbounded blind launch |
+
+### Skills with NO scenario (16)
+
+The remaining 16 shippable skills (e.g. arc-agent-driven, arc-auditing-spec,
 arc-compacting, arc-executing-tasks, arc-finishing, arc-finishing-epic,
-arc-journaling, arc-looping, arc-maintaining-obsidian, arc-observing,
+arc-journaling, arc-maintaining-obsidian, arc-observing,
 arc-recalling, arc-receiving-review, arc-requesting-review, arc-researching,
-arc-using-worktrees, arc-writing-tasks, arc-dispatching-parallel,
-arc-dispatching-teammates, arc-diagramming-obsidian) have no direct-target
-scenario at all. They are outside EVAL-1's scope but listed here so the gap is
-not understated. Use the recompute snippet for the authoritative live list.
+arc-using-worktrees, arc-writing-tasks, arc-diagramming-obsidian) have no
+direct-target scenario at all. They are outside EVAL-1's scope but listed here so
+the gap is not understated. Use the recompute snippet for the authoritative live
+list. (arc-looping, arc-dispatching-parallel, and arc-dispatching-teammates moved
+to the DRAFT section above under AF-14.)
 
 ## Recompute (so this doc cannot silently go stale)
 
@@ -140,10 +157,12 @@ console.log("draft-only skills:", [...draft].sort().join(", "));
 '
 ```
 
-Expected today: `validated: 14/33`, with NO draft-only skills (all five EVAL-1
-scenarios validated — three by discrimination, two as non-regression; see the tiers
-above). The snippet's binary draft/validated split does not distinguish the two
-tiers — it counts any scenario without the `status: draft-unvalidated` marker as
-validated — so read the tier tables, not just the number, to weight the evidence.
-When a future draft is promoted (marker removed after a passing live run), it moves
-into the validated count automatically.
+Expected today: `validated: 14/32`, with three draft-only skills
+(`arc-dispatching-parallel`, `arc-dispatching-teammates`, `arc-looping` — the
+AF-14 autonomy-package drafts). The five EVAL-1 scenarios remain validated —
+three by discrimination, two as non-regression; see the tiers above. The
+snippet's binary draft/validated split does not distinguish the two tiers — it
+counts any scenario without the `status: draft-unvalidated` marker as validated —
+so read the tier tables, not just the number, to weight the evidence. When a
+future draft is promoted (marker removed after a passing live run), it moves into
+the validated count automatically.
