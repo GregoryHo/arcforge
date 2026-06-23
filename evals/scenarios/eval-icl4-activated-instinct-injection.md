@@ -1,6 +1,6 @@
 # Eval: eval-icl4-activated-instinct-injection
 
-**Status**: Active — Layer 8 activated-instinct SessionStart injection gate (ICL-4 positive boundary).
+**Status**: validated-DISCRIMINATION 2026-06-23 — Layer 8 activated-instinct SessionStart injection gate (ICL-4 positive boundary). Preflight PASS (baseline pass 0% < 0.8 — genuinely discriminative); `arc eval run` k=5 → 5/5 SHIP (baseline 0% → treatment 100%, Δ+1.0). Proves ICL-4's activation-gated injection actually surfaces an activated instinct at SessionStart. REQUIRES `ARCFORGE_HOME` trial isolation at runtime (the eval-home-isolation fix); without it the trial reads the real `~/.arcforge` and the fixture never reaches the hook.
 
 ## Scope
 learning
