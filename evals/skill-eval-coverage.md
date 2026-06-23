@@ -99,9 +99,9 @@ existing behavior"). Verdict policy is `non-regression`, matching arc-verifying.
 > has `sdd-v2-arc-implementing-delegation` (prose `## Target`, so not counted by the
 > strict-Target metric); the new scenario targets a different facet to avoid duplication.
 
-### Skills with a DRAFT (unvalidated) scenario (3)
+### Skills with a DRAFT (unvalidated) scenario (4)
 
-Authored under AF-14 (2026-06-23) for the autonomy package. Each has a
+Authored 2026-06-23 for Wave 6 (AF-14 autonomy package + RV-9 review-gates). Each has a
 `## Target → skills/<skill>/SKILL.md` scenario that is structurally lint-clean
 (`eval lint` ok, registered in `eval list`) but carries `status: draft-unvalidated`.
 Per the tiers above, a draft is a *candidate* for coverage, not coverage — these
@@ -113,18 +113,42 @@ do NOT count toward the validated metric until a recorded passing live run
 | arc-dispatching-teammates | eval-arc-dispatching-teammates-lead-present-routing | lead-present multi-epic → teammates, not manual window-juggling, not arc-looping (boundary = attendance) |
 | arc-dispatching-parallel | eval-arc-dispatching-parallel-feature-level-readiness | engine-computed readiness (`parallel --features`) + parallelize independent features, not eyeball + sequential-for-safety |
 | arc-looping | eval-arc-looping-bounded-unattended-loop-gate | verified DAG + green baseline + bounded `--max-runs` before an unattended overnight loop, not an unbounded blind launch |
+| arc-requesting-review | eval-arc-requesting-review-dispatch-fidelity | faithful PR/branch context — resolve real `BASE_SHA`/`HEAD_SHA` via `git rev-parse` + fill the five code-reviewer placeholders, not blank SHAs + a hand-waved "look at my recent changes" (verdict policy `non-regression`: the 0.8 preflight ceiling may BLOCK since modern Claude often captures the range unaided) |
 
-### Skills with NO scenario (16)
+### Skills with NO scenario (14)
 
-The remaining 16 shippable skills (e.g. arc-agent-driven, arc-auditing-spec,
-arc-compacting, arc-executing-tasks, arc-finishing, arc-finishing-epic,
-arc-journaling, arc-maintaining-obsidian, arc-observing,
-arc-recalling, arc-receiving-review, arc-requesting-review, arc-researching,
-arc-using-worktrees, arc-writing-tasks, arc-diagramming-obsidian) have no
-direct-target scenario at all. They are outside EVAL-1's scope but listed here so
-the gap is not understated. Use the recompute snippet for the authoritative live
-list. (arc-looping, arc-dispatching-parallel, and arc-dispatching-teammates moved
-to the DRAFT section above under AF-14.)
+The remaining 14 shippable skills (arc-agent-driven, arc-auditing-spec,
+arc-compacting, arc-executing-tasks, arc-finishing, arc-journaling,
+arc-maintaining-obsidian, arc-observing, arc-recalling, arc-receiving-review,
+arc-researching, arc-using-worktrees, arc-writing-tasks, arc-diagramming-obsidian)
+have no direct-target scenario at all. They are outside EVAL-1's scope but listed
+here so the gap is not understated. Use the recompute snippet for the authoritative
+live list. (arc-looping, arc-dispatching-parallel, arc-dispatching-teammates moved
+to the DRAFT section under AF-14; arc-requesting-review under RV-9;
+arc-finishing-epic was merged into arc-finishing in WT-6.)
+
+## RV-9 adjudications (behavioral vs exempt)
+
+Recorded rulings on whether a skill edit needs its own eval, per
+`skills/arc-evaluating/SKILL.md` ("the line is behavioral footprint, not edit size").
+
+### arc-agent-driven — AF-12 edit (commit 5444e6d) — 2026-06-23
+
+**Ruling: EXEMPT from a dedicated RV-9 eval; behavioral coverage owned by AF-14.**
+
+AF-12's change to `skills/arc-agent-driven/SKILL.md` reframed the existing
+"agents (preferred) **or** templates" dispatch options as platform-dependent and
+added a `## Cross-Platform Dispatch` section. It changed no decision or action in
+the workflow: the steps (fresh implementer per task → spec review → quality review),
+the dispatch options, and the review gates are unchanged — it only documents that
+the same options apply across platforms. That is presentational, not behavioral,
+so it requires no dedicated RV-9 eval.
+
+This ruling is scoped to AF-12's specific edit. Direct behavioral eval coverage for
+arc-agent-driven (a new scenario) remains owned by the **AF-14** batch (plan §6,
+row AF-14) — the AF-12 commit body flagged the same boundary ("arc-agent-driven
+boundary ruling also RV-9"). Either reading of AF-12 reconciles with that: AF-14
+covers the skill's behavior regardless, so this is not an escalation case.
 
 ## Recompute (so this doc cannot silently go stale)
 
@@ -157,12 +181,12 @@ console.log("draft-only skills:", [...draft].sort().join(", "));
 '
 ```
 
-Expected today: `validated: 14/32`, with three draft-only skills
+Expected today: `validated: 14/32`, with four draft-only skills
 (`arc-dispatching-parallel`, `arc-dispatching-teammates`, `arc-looping` — the
-AF-14 autonomy-package drafts). The five EVAL-1 scenarios remain validated —
-three by discrimination, two as non-regression; see the tiers above. The
-snippet's binary draft/validated split does not distinguish the two tiers — it
-counts any scenario without the `status: draft-unvalidated` marker as validated —
-so read the tier tables, not just the number, to weight the evidence. When a
-future draft is promoted (marker removed after a passing live run), it moves into
-the validated count automatically.
+AF-14 autonomy-package drafts — and `arc-requesting-review`, the RV-9 draft). The
+five EVAL-1 scenarios remain validated — three by discrimination, two as
+non-regression; see the tiers above. The snippet's binary draft/validated split
+does not distinguish the two tiers — it counts any scenario without the
+`status: draft-unvalidated` marker as validated — so read the tier tables, not just
+the number, to weight the evidence. When a future draft is promoted (marker removed
+after a passing live run), it moves into the validated count automatically.
