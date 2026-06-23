@@ -19,7 +19,7 @@ Two tiers, and they are NOT interchangeable:
 
 | Tier | Definition | Counts toward the metric? |
 |------|------------|---------------------------|
-| **Validated** | A non-draft scenario whose `## Target` is `skills/<skill>/SKILL.md`: the audit's inherited 9, plus 3 promoted on 2026-06-03 by a recorded passing `arc eval ab` run. | **Yes** |
+| **Validated** | A non-draft scenario whose `## Target` is `skills/<skill>/SKILL.md`: the audit's inherited 9, plus 3 promoted on 2026-06-03 by a recorded passing `arc eval ab` run, plus 4 promoted on 2026-06-23 at the non-regression bar — a measured `arc eval preflight` baseline at ceiling (BLOCK) PLUS a treatment `arc eval run` SHIP. | **Yes** |
 | **Draft (unvalidated)** | Has a `## Target → skills/<skill>/SKILL.md` scenario marked `status: draft-unvalidated`. Structurally lint-clean, but discrimination NOT yet proven by a live run. | **No** |
 
 **Operational proxy vs. recorded runs.** The recompute snippet classifies a
@@ -31,34 +31,55 @@ a recency-bounded snapshot and does not list a passing entry for every one, so i
 isn't proof either way). The **3 promoted on 2026-06-03** (arc-tdd, arc-planning,
 arc-coordinating) are different: each carries a recorded live `arc eval ab` result
 in its scenario marker (baseline→treatment delta, verdict PASS), so for those the
-marker is backed by an actual discriminative run, not just an audit assertion.
+marker is backed by an actual discriminative run, not just an audit assertion. The
+**4 promoted on 2026-06-23** (arc-dispatching-teammates, arc-dispatching-parallel,
+arc-looping, arc-requesting-review) are backed by both arms recorded in each
+scenario marker: a **measured `arc eval preflight` baseline at ceiling** (k=5
+baseline pass 100% ≥ 0.8 → BLOCK, with its hash) PLUS a treatment `arc eval run`
+SHIP (k=5: 5/5 PASS). The measured ceiling baseline is what classifies these as
+non-regression: the behavior is baseline-competent, so the skill **formalizes**
+it — the marker does NOT claim the skill adds it. That is the non-regression bar
+(see the tiers below), weaker than the discrimination promotions, and it is exactly
+the EVAL-1 twin pattern (baseline-at-ceiling).
 
-A draft is a *candidate* for coverage, not coverage. Do not promote a draft to
-validated until `arc eval preflight <name>` (or an `arc eval ab` run) confirms it
-discriminates; then remove the `status: draft-unvalidated` marker from the file.
+A draft is a *candidate* for coverage, not coverage. Promote a draft to validated
+only on a recorded passing live run that removes the `status: draft-unvalidated`
+marker. Two sanctioned routes: (a) `arc eval preflight <name>` / `arc eval ab`
+confirming **discrimination** (baseline fails, treatment passes); or (b) the
+**non-regression** bar — a **measured** `arc eval preflight <name>` (k=5) baseline
+**at ceiling** (BLOCK, baseline pass ≥ 0.8) PLUS a treatment `arc eval run <name>`
+(k=5) reaching **SHIP**, for a scenario whose verdict policy is `non-regression`.
+A treatment SHIP alone is NOT sufficient — the measured ceiling baseline is what
+licenses the "skill formalizes a behavior modern Claude already exhibits" claim
+and rules out an undetected baseline-fails (discrimination) case. Record both arms
+(and which route) in the scenario marker.
 
-## Current coverage (as of 2026-06-03)
+## Current coverage (as of 2026-06-23)
 
-**Validated coverage: 14 / 32 shippable skills** (12 carry a non-`draft` marker;
-see the discrimination-vs-non-regression tiers below — 2 of the 14 are
+**Validated coverage: 18 / 32 shippable skills** (16 carry a non-`draft` marker;
+see the discrimination-vs-non-regression tiers below — 6 of the 18 are
 non-regression passes with Δ≈0, weaker than the discrimination passes). The
-denominator matches the recompute snippet's live count (`validated: 14/32`).
+denominator matches the recompute snippet's live count (`validated: 18/32`).
 
 Shippable skills = directories under `skills/` containing a `SKILL.md`. Eval scratch
 lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`).
 
-### Skills with a VALIDATED scenario (14)
+### Skills with a VALIDATED scenario (18)
 
 - arc-brainstorming
 - arc-coordinating  *(discrimination — arc eval ab: 40%→100%, Δ+0.15)*
 - arc-debugging  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
+- arc-dispatching-parallel  *(non-regression — preflight baseline 100% ≥ 0.8 → BLOCK + arc eval run k=5: 5/5 SHIP; promoted 2026-06-23 after A4 regrade)*
+- arc-dispatching-teammates  *(non-regression — preflight baseline 100% ≥ 0.8 → BLOCK + arc eval run k=5: 5/5 SHIP; promoted 2026-06-23 after A4 regrade)*
 - arc-evaluating
 - arc-implementing  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
 - arc-learning
+- arc-looping  *(non-regression — preflight baseline 100% ≥ 0.8 → BLOCK + arc eval run k=5: 5/5 SHIP; promoted 2026-06-23 after A4 regrade)*
 - arc-managing-sessions
 - arc-planning  *(discrimination — arc eval ab: 0%→100%, Δ+0.25)*
 - arc-reflecting
 - arc-refining
+- arc-requesting-review  *(non-regression — preflight baseline 100% ≥ 0.8 → BLOCK + arc eval run k=5: 5/5 SHIP; promoted 2026-06-23 after A4 regrade)*
 - arc-tdd  *(discrimination — arc eval ab: 0%→100%, Δ+0.25)*
 - arc-using
 - arc-verifying
@@ -66,8 +87,8 @@ lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`)
 
 ### Validation tiers — discrimination vs non-regression
 
-The five EVAL-1 scenarios all validated, but in two different (both legitimate)
-ways. Counting them identically would overstate the weaker two, so they are
+The validated scenarios passed in two different (both legitimate) ways. Counting
+them identically would overstate the non-regression ones, so they are
 distinguished here.
 
 **Discrimination (3)** — the no-skill baseline genuinely fails the trap and the
@@ -79,41 +100,53 @@ skill flips it to pass. Strong evidence the skill *adds* the behavior:
 | arc-planning | baseline 0% → treatment 100%, Δ+0.25 |
 | arc-coordinating | baseline 40% → treatment 100%, Δ+0.15 |
 
-**Non-regression (2)** — the baseline *also* passes (modern Claude states the
-behavior unaided in a single-turn "describe your approach" prompt), so the A/B
-delta is ≈0. The scenario guards against the skill *regressing* the behavior; it
-does NOT prove the skill adds it (cf. `.claude/rules/eval.md`: "skill formalizes
-existing behavior"). Verdict policy is `non-regression`, matching arc-verifying.
+**Non-regression (6)** — all six are **baseline-at-ceiling**: the no-skill baseline
+*also* passes (modern Claude already states the behavior unaided in a single-turn
+"describe your approach" prompt), so the skill *formalizes* a behavior it already
+exhibits rather than *adding* it (cf. `.claude/rules/eval.md`: "skill formalizes
+existing behavior"). Passing does NOT prove the skill adds the behavior. Verdict
+policy is `non-regression`, matching arc-verifying. All six have a **measured**
+baseline backing the classification — the EVAL-1 pair via `arc eval ab` v2
+(baseline 100% = treatment 100%, Δ0.00), and the four promoted 2026-06-23 via
+`arc eval preflight` (k=5 baseline pass 100% ≥ 0.8 ceiling → BLOCK) plus a
+treatment `arc eval run` SHIP. The table records each.
 
-| Skill | A/B v2 (k=5) |
-|-------|--------------|
-| arc-debugging | baseline 100% = treatment 100%, Δ0.00 |
-| arc-implementing | baseline 100% = treatment 100%, Δ0.00 |
+| Skill | Baseline (measured) | Treatment |
+|-------|--------------|-----------|
+| arc-debugging | A/B v2: baseline 100%, Δ0.00 | treatment 100% |
+| arc-implementing | A/B v2: baseline 100%, Δ0.00 | treatment 100% |
+| arc-dispatching-teammates | preflight: 100% ≥ 0.8 → BLOCK (0def1773) | arc eval run: 5/5 SHIP |
+| arc-dispatching-parallel | preflight: 100% ≥ 0.8 → BLOCK (695c6f5e) | arc eval run: 5/5 SHIP |
+| arc-looping | preflight: 100% ≥ 0.8 → BLOCK (2e6fc32c) | arc eval run: 5/5 SHIP |
+| arc-requesting-review | preflight: 100% ≥ 0.8 → BLOCK (db3fe84f) | arc eval run: 5/5 SHIP |
 
-> Both non-regression scenarios first showed a **false** `REGRESSED` verdict because
-> their A4 assertion flagged *any* read-only `[Tool: Bash]` (the agent reading the
-> fixture via `ls`/`cat`), conflicting with the scenarios' own "you may read files"
-> — and the skills, which encourage investigation, tripped it more. A4 was fixed to
-> guard the real regression (production code written / fixture mutated); see each
-> scenario's status marker (`validated-nonregression`, v2). `arc-implementing` also
-> has `sdd-v2-arc-implementing-delegation` (prose `## Target`, so not counted by the
+> **A4 regrade (the recurring over-strict grader).** Six non-regression scenarios
+> first showed a **false** failing verdict because their A4 assertion flagged *any*
+> read-only `[Tool: Bash]` (the agent reading the fixture via `ls`/`cat`/`git status`),
+> conflicting with the scenarios' own "you may read files" — and the skills, which
+> encourage investigation, tripped it more. The EVAL-1 pair (arc-debugging,
+> arc-implementing) was fixed first; the four Wave 6 drafts
+> (arc-dispatching-teammates, arc-dispatching-parallel, arc-looping,
+> arc-requesting-review) carried the same copied A4 and were regraded identically
+> on 2026-06-23. The fix guards the real regression — production code written /
+> fixture mutated / artifacts created (detected by effect: fixture sha + new-file
+> scan), not Bash presence — so read-only investigation no longer trips A4. A1/A2/A3,
+> the real discriminators, were left untouched. See each scenario's
+> `validated-nonregression` status marker. `arc-implementing` also has
+> `sdd-v2-arc-implementing-delegation` (prose `## Target`, so not counted by the
 > strict-Target metric); the new scenario targets a different facet to avoid duplication.
 
-### Skills with a DRAFT (unvalidated) scenario (4)
+### Skills with a DRAFT (unvalidated) scenario (0)
 
-Authored 2026-06-23 for Wave 6 (AF-14 autonomy package + RV-9 review-gates). Each has a
-`## Target → skills/<skill>/SKILL.md` scenario that is structurally lint-clean
-(`eval lint` ok, registered in `eval list`) but carries `status: draft-unvalidated`.
-Per the tiers above, a draft is a *candidate* for coverage, not coverage — these
-do NOT count toward the validated metric until a recorded passing live run
-(`arc eval preflight`/`ab`) removes the marker.
-
-| Skill | Draft scenario | Discriminative trap |
-|-------|----------------|---------------------|
-| arc-dispatching-teammates | eval-arc-dispatching-teammates-lead-present-routing | lead-present multi-epic → teammates, not manual window-juggling, not arc-looping (boundary = attendance) |
-| arc-dispatching-parallel | eval-arc-dispatching-parallel-feature-level-readiness | engine-computed readiness (`parallel --features`) + parallelize independent features, not eyeball + sequential-for-safety |
-| arc-looping | eval-arc-looping-bounded-unattended-loop-gate | verified DAG + green baseline + bounded `--max-runs` before an unattended overnight loop, not an unbounded blind launch |
-| arc-requesting-review | eval-arc-requesting-review-dispatch-fidelity | faithful PR/branch context — resolve real `BASE_SHA`/`HEAD_SHA` via `git rev-parse` + fill the five code-reviewer placeholders, not blank SHAs + a hand-waved "look at my recent changes" (verdict policy `non-regression`: the 0.8 preflight ceiling may BLOCK since modern Claude often captures the range unaided) |
+None. The four Wave 6 drafts (AF-14 autonomy package + RV-9 review-gates) authored
+2026-06-23 — arc-dispatching-teammates, arc-dispatching-parallel, arc-looping, and
+arc-requesting-review — were promoted to validated on 2026-06-23 after the A4
+regrade (see the non-regression tier and the A4-regrade note above). Each recorded
+a measured `arc eval preflight` baseline at ceiling (k=5: 100% ≥ 0.8 → BLOCK) plus
+a treatment `arc eval run` SHIP (k=5: 5/5 PASS) once A4 stopped flagging read-only
+Bash — the baseline-at-ceiling non-regression bar, like the EVAL-1 twins. Their
+discriminative traps are summarized in the non-regression tier table; the trap
+detail lives in each scenario's `## Context`.
 
 ### Skills with NO scenario (14)
 
@@ -123,9 +156,10 @@ arc-maintaining-obsidian, arc-observing, arc-recalling, arc-receiving-review,
 arc-researching, arc-using-worktrees, arc-writing-tasks, arc-diagramming-obsidian)
 have no direct-target scenario at all. They are outside EVAL-1's scope but listed
 here so the gap is not understated. Use the recompute snippet for the authoritative
-live list. (arc-looping, arc-dispatching-parallel, arc-dispatching-teammates moved
-to the DRAFT section under AF-14; arc-requesting-review under RV-9;
-arc-finishing-epic was merged into arc-finishing in WT-6.)
+live list. (arc-looping, arc-dispatching-parallel, arc-dispatching-teammates were
+added under AF-14 and arc-requesting-review under RV-9; all four were promoted from
+DRAFT to VALIDATED on 2026-06-23 after the A4 regrade. arc-finishing-epic was merged
+into arc-finishing in WT-6.)
 
 ## RV-9 adjudications (behavioral vs exempt)
 
@@ -181,11 +215,12 @@ console.log("draft-only skills:", [...draft].sort().join(", "));
 '
 ```
 
-Expected today: `validated: 14/32`, with four draft-only skills
-(`arc-dispatching-parallel`, `arc-dispatching-teammates`, `arc-looping` — the
-AF-14 autonomy-package drafts — and `arc-requesting-review`, the RV-9 draft). The
-five EVAL-1 scenarios remain validated — three by discrimination, two as
-non-regression; see the tiers above. The snippet's binary draft/validated split
+Expected today: `validated: 18/32`, with zero draft-only skills — the four Wave 6
+drafts (`arc-dispatching-parallel`, `arc-dispatching-teammates`, `arc-looping` — the
+AF-14 autonomy-package drafts — and `arc-requesting-review`, the RV-9 draft) were
+promoted on 2026-06-23 after the A4 regrade. Of the 18, three validate by
+discrimination and six as non-regression (the two EVAL-1 pair plus the four Wave 6
+promotions); see the tiers above. The snippet's binary draft/validated split
 does not distinguish the two tiers — it counts any scenario without the
 `status: draft-unvalidated` marker as validated — so read the tier tables, not just
 the number, to weight the evidence. When a future draft is promoted (marker removed
