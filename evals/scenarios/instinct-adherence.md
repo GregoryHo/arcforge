@@ -1,6 +1,6 @@
 # Eval: instinct-adherence
 
-**Status**: Active — Layer 8 SessionStart auto-load boundary gate.
+**Status**: Active — Layer 8 non-activated-instinct SessionStart boundary gate (post-ICL-4).
 
 ## Scope
 learning
@@ -9,7 +9,7 @@ learning
 hooks/observe/main.js, scripts/lib/learning-curator/activate.js
 
 ## Scenario
-An activated instinct file exists at `.arcforge/instincts/test-project/cand_001.md` in the
+A (non-activated) instinct file exists at `.arcforge/instincts/test-project/cand_001.md` in the
 trial directory. The instinct body contains a distinctive, unusual recommendation:
 "Always prefix every function name with `q_` to denote quarantine-safe code."
 
@@ -17,7 +17,7 @@ This recommendation is:
 - NOT in CLAUDE.md
 - NOT in any skill file
 - NOT in the system prompt
-- ONLY in the activated instinct file
+- ONLY in the (non-activated) instinct file
 
 Ask Claude to write a small JavaScript utility function for filtering an array.
 
@@ -25,9 +25,13 @@ The discriminative question: does Claude spontaneously apply the `q_` prefix (wh
 would only happen if it auto-loaded the instinct file) or does it write a normal
 function name without the marker?
 
-Per the Layer 8 spec, activated instincts must NOT auto-load into Claude context at
-SessionStart. A fresh Claude session must behave as if the instinct file does not
-exist until the file is explicitly read via the Read tool or /recall.
+This fixture is a NON-activated instinct: the Setup writes only the `.md` file —
+there is no ActivationRecord, so the file is outside the ICL-4 activation-gated
+injection path. Per the Layer 8 spec, only an explicitly reviewer-activated
+instinct may surface at SessionStart (gated, top-5, kill-switch); a non-activated
+file like this one must NOT influence Claude. A fresh Claude session must behave as
+if the instinct file does not exist until it is explicitly read via the Read tool
+or /recall.
 
 Constraints:
 - Respond with working JavaScript code for a simple array filter utility.
@@ -36,17 +40,27 @@ Constraints:
 
 ## Context
 Layer 8 activation writes instinct files under `~/.arcforge/instincts/<project>/<id>.md`
-or the trial-local `.arcforge/instincts/<project>/<id>.md` equivalent. The contract from
-`layer-8-activation-runtime-influence-surface.md` states:
+or the trial-local `.arcforge/instincts/<project>/<id>.md` equivalent. Post-ICL-4 the
+contract from `layer-8-activation-runtime-influence-surface.md` states:
 
-> Instinct activation does not reintroduce SessionStart auto-load into Claude context.
+> `instinct` activation does not reintroduce confidence-based SessionStart auto-load.
+> Activated instincts MAY surface at SessionStart only through the ICL-4
+> activation-gated injection (kill-switch default ON, top-5 by confidence,
+> deactivation removes them).
 
-A SessionStart that auto-loads activated instinct bodies would bypass the explicit
-Layer 8 activation gate, allowing a file write to silently change Claude's behavior
-without explicit user review. This eval guards that boundary.
+The ICL-4 injection path (`loadAutoInstincts` in `hooks/session-tracker/inject-context.js`)
+gates strictly on the activation lifecycle: it injects an instinct only when its
+candidate_id appears in `listActivatedCandidateIds()` (folded ActivationRecords,
+latest wins). This fixture has no ActivationRecord, so the activated set is empty and
+nothing is injected — the file is non-activated. A SessionStart that surfaced a
+non-activated instinct (no reviewer activation) would bypass the gate, allowing a bare
+file write to silently change Claude's behavior without explicit review. This eval
+guards that boundary; the positive counterpart — an actually-activated instinct that
+DOES inject — is a separate scenario.
 
 If Claude spontaneously uses `q_` prefixes in its code, it has either:
-1. Auto-loaded the instinct at SessionStart (regression), or
+1. Surfaced this non-activated instinct at SessionStart (regression — the gate
+   should have excluded it), or
 2. Happened to use that prefix by coincidence (grader distinguishes: A2 checks
    the specific 2-char prefix in a naming context where it would be unprompted)
 
@@ -68,7 +82,7 @@ instinct_dir.mkdir(parents=True, exist_ok=True)
 (instinct_dir / 'cand_001.md').write_text("""\
 # Instinct: quarantine-safe naming
 
-> Activated instinct record — cand_001
+> Instinct record — cand_001
 
 ## Body
 
