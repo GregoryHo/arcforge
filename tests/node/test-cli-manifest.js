@@ -327,4 +327,163 @@ for (const probe of liveProbes) {
 // Cleanup
 fs.rmSync(testDir, { recursive: true, force: true });
 
+// ---------------------------------------------------------------------------
+// Layer 3: flag COMPLETENESS (live ⊆ manifest, per command).
+//
+// Layers 1–2 pin the command set and the --json shapes but NOT the flag list,
+// so a live flag absent from a command's manifest `flags` (e.g. `loop --reset`,
+// `merge --abort`) went undetected. This layer derives each command's live flag
+// set STATICALLY from the handlers' actual `args.flags.X` / `args.options['X']`
+// reads (the parser turns any `--x` into flags.x/options.x, so there is no
+// declarative flag list to read — what a handler READS is what it accepts) and
+// asserts every live command-specific flag appears in that command's manifest
+// `flags`. One-directional (live ⊆ manifest): extra manifest entries are not the
+// concern here; a live flag missing from the manifest is.
+//
+// Two ambient reads are handled explicitly so they do not produce false
+// positives or escape enforcement:
+//   - META flags `--json` (cli.js:104), `--help`/`-h` (cli.js:93) are global and
+//     listed selectively (never `--help`/`-h`); excluded from the live set.
+//   - `--spec-id` (runDagCommand, dag-commands.js:311) is read once for every
+//     DAG command, so it is injected into each DAG command's live set (it IS
+//     listed in every DAG manifest entry, so this keeps it enforced).
+// ---------------------------------------------------------------------------
+
+console.log('  Layer 3: flag completeness (live reads ⊆ manifest flags)...');
+
+const CLI_DIR = path.join(SCRIPT_DIR, 'cli');
+const LIB_DIR = path.join(SCRIPT_DIR, 'lib');
+
+// Global meta flags — read in cli.js (lines 93, 104), apply to every command,
+// and are listed selectively (or never, for --help/-h). Excluded from the
+// derived live set so they never force a manifest entry.
+const META_FLAGS = new Set(['--json', '--help', '-h']);
+
+// Scan a source string for every flag a handler READS and return them as a Set
+// of `--flag` strings, minus the meta flags. Matches both boolean reads
+// (args.flags.X / args.flags['X']) and value reads (args.options.X /
+// args.options['X']). Aliased reads (e.g. `const o = args.options; o['x']`) are
+// NOT resolved — a file that only reads via an alias yields an empty set, which
+// is trivially ⊆ manifest (sound, just under-covered); sdd-gate is such a file
+// and is reported as scoped-out below.
+function liveFlagsFromSource(source) {
+  const flags = new Set();
+  const re = /args\.(?:flags|options)(?:\.([a-zA-Z_$][\w$]*)|\['([^']+)'\])/g;
+  for (const m of source.matchAll(re)) {
+    const name = m[1] || m[2];
+    const flag = `--${name}`;
+    if (!META_FLAGS.has(flag)) flags.add(flag);
+  }
+  return flags;
+}
+
+// Slice dag-commands.js into per-function bodies on top-level `function run`
+// boundaries (sequential top-level declarations — robust, unlike brace-matching
+// past the template literals in runSync). Map each chunk to its command via the
+// DAG_COMMANDS dispatch table so flags are attributed per command, not per file.
+function sliceTopLevelFunctions(source) {
+  const bodies = {};
+  const re = /\nfunction (\w+)\(/g;
+  const marks = [...source.matchAll(re)].map((m) => ({ name: m[1], at: m.index }));
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].at : source.length;
+    bodies[marks[i].name] = source.slice(marks[i].at, end);
+  }
+  return bodies;
+}
+
+// command → handler function name in dag-commands.js (mirrors DAG_COMMANDS).
+const DAG_HANDLERS = {
+  status: 'runStatus',
+  next: 'runNext',
+  complete: 'runComplete',
+  block: 'runBlock',
+  parallel: 'runParallel',
+  expand: 'runExpand',
+  merge: 'runMerge',
+  cleanup: 'runCleanup',
+  sync: 'runSync',
+  reboot: 'runReboot',
+  loop: 'runLoop',
+};
+
+// Slice a single `case 'cmd': { ... }` block out of cli.js (for the handlers
+// inlined there — schema, research). Brace-matched from the case's opening `{`.
+function sliceCaseBlock(source, command) {
+  const start = source.indexOf(`case '${command}': {`);
+  if (start === -1) throw new Error(`could not locate case '${command}' block in cli.js`);
+  let depth = 0;
+  let i = source.indexOf('{', start);
+  for (; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) break;
+  }
+  return source.slice(start, i + 1);
+}
+
+const dagBodies = sliceTopLevelFunctions(
+  fs.readFileSync(path.join(CLI_DIR, 'dag-commands.js'), 'utf8'),
+);
+const evalSource = fs.readFileSync(path.join(CLI_DIR, 'eval-command.js'), 'utf8');
+const learnSource = fs.readFileSync(path.join(CLI_DIR, 'learn-command.js'), 'utf8');
+const obsidianSource = fs.readFileSync(path.join(CLI_DIR, 'obsidian-command.js'), 'utf8');
+const worktreeSource = fs.readFileSync(path.join(LIB_DIR, 'worktree-generic.js'), 'utf8');
+
+// Derive the live flag set per command. Commands whose flags cannot be derived
+// from a literal scan (sdd-gate reads only via an `args.options` alias; ratify
+// reads no flags) are scoped OUT and asserted explicitly below.
+const SCOPED_OUT = new Set(['sdd-gate', 'ratify']);
+
+const liveFlagSets = {};
+for (const [cmd, fn] of Object.entries(DAG_HANDLERS)) {
+  const flags = liveFlagsFromSource(dagBodies[fn]);
+  flags.add('--spec-id'); // ambient: runDagCommand reads it for every dag command
+  liveFlagSets[cmd] = flags;
+}
+liveFlagSets.eval = liveFlagsFromSource(evalSource);
+liveFlagSets.learn = liveFlagsFromSource(learnSource);
+liveFlagSets.obsidian = liveFlagsFromSource(obsidianSource);
+liveFlagSets.worktree = liveFlagsFromSource(worktreeSource);
+liveFlagSets.schema = liveFlagsFromSource(sliceCaseBlock(CLI_SOURCE, 'schema'));
+liveFlagSets.research = liveFlagsFromSource(sliceCaseBlock(CLI_SOURCE, 'research'));
+
+// Manifest allowed set per command. For commands with pinned subcommands
+// (worktree), a live flag may legitimately live on a subcommand's flags, so the
+// allowed set is the union of top-level flags + every subcommand's flags.
+function manifestAllowedFlags(entry) {
+  const allowed = new Set(entry.flags || []);
+  if (entry.subcommands) {
+    for (const sub of Object.values(entry.subcommands)) {
+      for (const f of sub.flags || []) allowed.add(f);
+    }
+  }
+  return allowed;
+}
+
+// Every command must be either derived (in liveFlagSets) or explicitly scoped
+// out — no command may silently escape this layer.
+const uncovered = manifestKeys.filter((c) => !(c in liveFlagSets) && !SCOPED_OUT.has(c));
+assert.deepStrictEqual(
+  uncovered,
+  [],
+  `command(s) neither flag-derived nor scoped-out of the completeness check: ${uncovered.join(', ')}`,
+);
+
+const gaps = [];
+for (const [cmd, live] of Object.entries(liveFlagSets)) {
+  const allowed = manifestAllowedFlags(CLI_MANIFEST[cmd]);
+  for (const flag of live) {
+    if (!allowed.has(flag)) gaps.push(`${cmd} ${flag}`);
+  }
+}
+assert.deepStrictEqual(
+  gaps.sort(),
+  [],
+  `live CLI flag(s) missing from CLI_MANIFEST: ${gaps.join(', ')}`,
+);
+console.log(
+  `    ✓ ${Object.keys(liveFlagSets).length} commands: every live flag is in the manifest`,
+);
+console.log(`      (scoped out — alias/positional-only reads: ${[...SCOPED_OUT].join(', ')})`);
+
 console.log('\n✅ All cli-manifest contract tests passed!\n');
