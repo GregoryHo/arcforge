@@ -10,6 +10,7 @@ const {
   loadSession,
   saveSession,
   getProjectName,
+  getArcforgeHome,
   getSessionsDir,
   getProjectSessionsDir,
   getDiaryedDir,
@@ -179,5 +180,20 @@ describe('path helpers', () => {
     const base = path.join(os.homedir(), '.arcforge', 'diaryed');
     expect(getDiaryedDir('proj')).toBe(path.join(base, 'proj'));
     expect(getDiaryedDir()).toBe(path.join(base, 'global'));
+  });
+
+  it('getArcforgeHome should be byte-identical to ~/.arcforge when ARCFORGE_HOME is unset', () => {
+    delete process.env.ARCFORGE_HOME;
+    expect(getArcforgeHome()).toBe(path.join(os.homedir(), '.arcforge'));
+  });
+
+  it('getArcforgeHome should honor a non-empty ARCFORGE_HOME override', () => {
+    process.env.ARCFORGE_HOME = '/tmp/trial-xyz/.arcforge';
+    expect(getArcforgeHome()).toBe('/tmp/trial-xyz/.arcforge');
+  });
+
+  it('getArcforgeHome should ignore a blank ARCFORGE_HOME and fall back to ~/.arcforge', () => {
+    process.env.ARCFORGE_HOME = '   ';
+    expect(getArcforgeHome()).toBe(path.join(os.homedir(), '.arcforge'));
   });
 });

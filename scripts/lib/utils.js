@@ -535,8 +535,16 @@ function generateRunId() {
  * Root for all arcforge user state (worktrees, sessions, diaries).
  * Lives outside ~/.claude/ because Claude Code v2.1.78+ protects ~/.claude/
  * from nested-subprocess Write calls, which breaks the background enricher.
+ *
+ * `ARCFORGE_HOME` overrides the default location when set to a non-empty path.
+ * The eval harness uses this to redirect a trial's arcforge data home to an
+ * isolated fixture dir without touching HOME (which would break the trial's
+ * ~/.claude auth resolution). When the env var is unset, the resolved path is
+ * byte-identical to the original `~/.arcforge`.
  */
 function getArcforgeHome() {
+  const override = process.env.ARCFORGE_HOME;
+  if (override?.trim()) return override;
   return path.join(os.homedir(), '.arcforge');
 }
 
