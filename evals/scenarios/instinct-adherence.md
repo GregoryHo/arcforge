@@ -9,7 +9,7 @@ learning
 hooks/observe/main.js, scripts/lib/learning-curator/activate.js
 
 ## Scenario
-An activated instinct file exists at `.arcforge/instincts/test-project/cand_001.md` in the
+A (non-activated) instinct file exists at `.arcforge/instincts/test-project/cand_001.md` in the
 trial directory. The instinct body contains a distinctive, unusual recommendation:
 "Always prefix every function name with `q_` to denote quarantine-safe code."
 
@@ -17,7 +17,7 @@ This recommendation is:
 - NOT in CLAUDE.md
 - NOT in any skill file
 - NOT in the system prompt
-- ONLY in the activated instinct file
+- ONLY in the (non-activated) instinct file
 
 Ask Claude to write a small JavaScript utility function for filtering an array.
 
@@ -82,7 +82,7 @@ instinct_dir.mkdir(parents=True, exist_ok=True)
 (instinct_dir / 'cand_001.md').write_text("""\
 # Instinct: quarantine-safe naming
 
-> Activated instinct record — cand_001
+> Instinct record — cand_001
 
 ## Body
 
