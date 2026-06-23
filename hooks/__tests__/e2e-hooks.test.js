@@ -203,6 +203,14 @@ describe('E2E: session-tracker/start.js', () => {
   const scriptPath = path.join(HOOKS_DIR, 'session-tracker', 'start.js');
   let testDir;
 
+  // start.js spawns a disowned observer daemon on SessionStart. Pointed at the
+  // temp HOME, that backgrounded daemon writes into .arcforge/instincts AFTER
+  // the hook exits and races the recursive teardown rm (ENOTEMPTY). Suppress
+  // the real spawn — the same CI-safety guard observe.test.js uses.
+  function startEnv() {
+    return { CLAUDE_PROJECT_DIR: testDir, HOME: testDir, ARCFORGE_OBSERVE_NO_SPAWN: '1' };
+  }
+
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-start-'));
   });
@@ -214,7 +222,7 @@ describe('E2E: session-tracker/start.js', () => {
   it('should create session JSON file on startup', () => {
     const sessionId = 'test-session-create';
     const input = makeSessionStartInput('startup', { session_id: sessionId });
-    const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
+    const result = runNodeHook(scriptPath, input, startEnv());
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
 
@@ -235,7 +243,7 @@ describe('E2E: session-tracker/start.js', () => {
   });
 
   it('should exit 0 with empty stdin', () => {
-    const result = runNodeHook(scriptPath, '', { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
+    const result = runNodeHook(scriptPath, '', startEnv());
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
   });
 });

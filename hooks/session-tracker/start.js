@@ -74,6 +74,10 @@ function initializeSession() {
  */
 function checkDaemon() {
   try {
+    // Parity with observe/main.js: both spawn the same observer daemon, so
+    // both must honor ARCFORGE_OBSERVE_NO_SPAWN. Without this, setting the
+    // env still spawned a daemon here on every SessionStart.
+    if (process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1') return;
     const daemonPath = path.join(
       __dirname,
       '../../skills/arc-observing/scripts/observer-daemon.sh',
