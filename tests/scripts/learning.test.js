@@ -119,6 +119,44 @@ describe('learning subsystem MVP-1', () => {
       writeGlobalConfig({ scope: 'global', inject_activated_instincts: false });
       expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
     });
+
+    it('global config path honors ARCFORGE_HOME when no homeDir is passed (eval-trial isolation)', () => {
+      const prev = process.env.ARCFORGE_HOME;
+      try {
+        process.env.ARCFORGE_HOME = path.join(homeDir, 'isolated-arcforge');
+        expect(getLearningConfigPath({ scope: 'global' })).toBe(
+          path.join(homeDir, 'isolated-arcforge', 'learning', 'config.json'),
+        );
+      } finally {
+        if (prev === undefined) delete process.env.ARCFORGE_HOME;
+        else process.env.ARCFORGE_HOME = prev;
+      }
+    });
+
+    it('global config path is byte-identical to ~/.arcforge when ARCFORGE_HOME is unset', () => {
+      const prev = process.env.ARCFORGE_HOME;
+      try {
+        delete process.env.ARCFORGE_HOME;
+        expect(getLearningConfigPath({ scope: 'global' })).toBe(
+          path.join(os.homedir(), '.arcforge', 'learning', 'config.json'),
+        );
+      } finally {
+        if (prev !== undefined) process.env.ARCFORGE_HOME = prev;
+      }
+    });
+
+    it('explicit homeDir takes precedence over ARCFORGE_HOME (tests stay byte-identical)', () => {
+      const prev = process.env.ARCFORGE_HOME;
+      try {
+        process.env.ARCFORGE_HOME = path.join(homeDir, 'should-be-ignored');
+        expect(getLearningConfigPath({ scope: 'global', homeDir })).toBe(
+          path.join(homeDir, '.arcforge', 'learning', 'config.json'),
+        );
+      } finally {
+        if (prev === undefined) delete process.env.ARCFORGE_HOME;
+        else process.env.ARCFORGE_HOME = prev;
+      }
+    });
   });
 
   it('validates required candidate queue schema fields', () => {

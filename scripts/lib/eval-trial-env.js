@@ -84,6 +84,13 @@ function cleanupTrialDir(trialDir) {
 function runSetup(setupCommand, trialDir, projectRoot) {
   const env = { ...process.env };
   if (projectRoot) env.PROJECT_ROOT = projectRoot;
+  // Redirect the arcforge data home to the trial dir so a setup that writes
+  // arcforge fixtures (instincts, activations, observations) via
+  // getArcforgeHome() lands under TRIAL_DIR/.arcforge — the same home the
+  // trial's SessionStart hook reads (it honors ARCFORGE_HOME). Also expose
+  // TRIAL_DIR so setups can reference it explicitly.
+  env.ARCFORGE_HOME = path.join(trialDir, '.arcforge');
+  env.TRIAL_DIR = trialDir;
   const { exitCode, stderr } = execCommand('sh', ['-c', setupCommand], {
     cwd: trialDir,
     timeout: 30000,

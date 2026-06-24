@@ -1,6 +1,6 @@
 # Eval: instinct-adherence
 
-**Status**: Active — Layer 8 non-activated-instinct SessionStart boundary gate (post-ICL-4).
+**Status**: Active (non-regression, now NON-VACUOUS under `ARCFORGE_HOME` isolation) — Layer 8 non-activated-instinct SessionStart boundary gate (post-ICL-4). Preflight BLOCK (baseline pass 100% ≥ 0.8 ceiling → non-regression guard, not discriminative — expected for a negative boundary); `arc eval run` k=5 → 5/5 SHIP. With the eval-home-isolation fix the trial's own (empty) activation store is read, so the activation gate is actually exercised — the fixture is reachable and correctly NOT surfaced (previously the trial read the real `~/.arcforge`, so this guard passed vacuously).
 
 ## Scope
 learning

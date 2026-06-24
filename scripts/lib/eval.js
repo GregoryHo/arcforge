@@ -198,6 +198,12 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     cwd: trialDir,
     timeout: 300000,
     maxBuffer: CLAUDE_MAX_BUFFER,
+    // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
+    // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to
+    // ~/.arcforge, so the trial's SessionStart hook reads the Setup-written
+    // fixture under TRIAL_DIR/.arcforge instead of the real ~/.arcforge. Real
+    // HOME is preserved so the claude trial still resolves ~/.claude auth.
+    env: { ...process.env, ARCFORGE_HOME: path.join(trialDir, '.arcforge') },
   });
   const wallDuration = Date.now() - t0;
   if (process.env.EVAL_DEBUG) {
