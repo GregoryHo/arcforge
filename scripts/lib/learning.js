@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { readJsonFile, writeJsonFile } = require('./utils');
+const { readJsonFile, writeJsonFile, getArcforgeHome } = require('./utils');
 const { renderDraft } = require('./learning-drafts');
 
 const VALID_SCOPES = new Set(['project', 'global']);
@@ -50,7 +50,12 @@ function assertScope(scope) {
 function getLearningConfigPath({ scope, projectRoot = process.cwd(), homeDir } = {}) {
   assertScope(scope);
   if (scope === 'global')
-    return path.join(homePath(homeDir), '.arcforge', 'learning', 'config.json');
+    // No explicit homeDir → honor ARCFORGE_HOME (eval-trial isolation) via the
+    // shared resolver; byte-identical to ~/.arcforge when ARCFORGE_HOME is unset.
+    // An explicit homeDir (tests) keeps the original path exactly.
+    return homeDir
+      ? path.join(homePath(homeDir), '.arcforge', 'learning', 'config.json')
+      : path.join(getArcforgeHome(), 'learning', 'config.json');
   return path.join(projectRoot, '.arcforge', 'learning', 'config.json');
 }
 
