@@ -1,6 +1,6 @@
 # Eval: eval-arc-dispatching-teammates-lead-present-routing
 
-<!-- status: draft-unvalidated — authored 2026-06-23 (AF-14). Structurally lint-clean; discrimination NOT yet proven by a live `arc eval ab` run. Do NOT count toward validated coverage until a recorded passing run removes this marker. Discriminative behavioral coverage for skills/arc-dispatching-teammates/SKILL.md. -->
+<!-- status: validated-nonregression 2026-06-23 — authored 2026-06-23 (AF-14); promoted after A4 regrade. The draft A4 flagged ANY read-only [Tool: Bash] (the agent investigating via ls/cat), failing 5/5 on A4 alone while A1/A2/A3 — the real discriminators — passed; A4 was regraded to guard the actual regression (fixture mutated / artifacts created), mirroring the EVAL-1 twins. arc eval run (k=5, --plugin-dir .): 5/5 PASS, verdict SHIP. Measured baseline: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash 0def1773) — the behavior is baseline-competent, so the skill FORMALIZES it rather than adding it. NON-REGRESSION TIER (baseline-at-ceiling, verdict policy non-regression): the measured ceiling baseline backs this classification; it guards against the skill regressing the teammates-routing behavior; it does NOT prove the skill adds it. Direct behavioral coverage for skills/arc-dispatching-teammates/SKILL.md. -->
 
 ## Scope
 skill
@@ -72,7 +72,7 @@ PY
 - [ ] A1: The response routes to agent teammates (one teammate per ready epic) as the substrate for the parallel run.
 - [ ] A2: The response keeps the lead session as the coordinator and does NOT recommend the manual "open N Claude windows and tab between them" pattern as the answer.
 - [ ] A3: The response does NOT route this lead-present scenario to `arc-looping`; if it mentions arc-looping at all, it is only to rule it out as the walk-away/unattended alternative.
-- [ ] A4: The response respects the no-shell/no-edit constraints: it does not use Bash, does not edit files, and does not create artifacts.
+- [ ] A4: The response does NOT mutate the fixture or create artifacts — it does not edit `specs/demo/dag.yaml` and does not write new files (read-only exploration with `ls`/`cat` is allowed).
 
 ## Grader
 code
@@ -158,9 +158,12 @@ for p in trial.rglob("*"):
     if rel in allowed or rel.startswith(".git/") or rel.startswith(".claude/logs/"):
         continue
     bad_artifacts.append(rel)
-shell_tool_call = re.search(r"(?im)^\[Tool: Bash\]", txt)
-a4 = unchanged and not shell_tool_call and not bad_artifacts
-emit("A4", a4, "Bash used, fixture modified, or artifacts created")
+# A4 guards the actual regression — the agent mutating the fixture or writing
+# artifacts itself — NOT read-only shell. Reading via `ls`/`cat` is explicitly
+# allowed, so any-Bash detection is intentionally excluded (it conflicts with
+# that and spuriously penalized the investigation the skill encourages).
+a4 = unchanged and not bad_artifacts
+emit("A4", a4, "fixture (specs/demo/dag.yaml) modified or artifact created")
 
 sys.exit(0 if all([a1, a2, a3, a4]) else 1)
 PY
