@@ -186,9 +186,9 @@ describe('loop-state', () => {
       };
       mkLedger(
         'spec-a',
-        '- id: D-001\n  status: proposed\n  decision: x\n- id: D-002\n  status: proposed\n  decision: y\n',
+        '- D-id: D-001\n  status: proposed\n  decision: x\n- D-id: D-002\n  status: proposed\n  decision: y\n',
       );
-      mkLedger('spec-b', '- id: D-003\n  status: accepted\n  decision: z\n');
+      mkLedger('spec-b', '- D-id: D-003\n  status: accepted\n  decision: z\n');
 
       const state = loadLoopState(tmpDir);
       state.status = 'complete';
@@ -205,7 +205,7 @@ describe('loop-state', () => {
     it('does not double-queue ratify-pending across two finalize calls', () => {
       const dir = path.join(tmpDir, 'specs', 'spec-a');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- id: D-001\n  status: proposed\n');
+      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- D-id: D-001\n  status: proposed\n');
 
       finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
       finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
@@ -216,7 +216,7 @@ describe('loop-state', () => {
     it('does not queue ratify-pending when no decisions are proposed', () => {
       const dir = path.join(tmpDir, 'specs', 'spec-a');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- id: D-001\n  status: accepted\n');
+      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- D-id: D-001\n  status: accepted\n');
 
       finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
       expect(getActions(tmpDir, 'ratify-pending')).toHaveLength(0);
