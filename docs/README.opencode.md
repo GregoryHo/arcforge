@@ -51,7 +51,7 @@ OpenCode uses two mechanisms to integrate arcforge:
 
 2. **Plugin** — The `arcforge.js` plugin uses OpenCode's `experimental.chat.system.transform` hook to inject agentic context (routing tables, skill metadata) into the system prompt at runtime. This enables features like automatic skill routing that go beyond basic skill discovery.
 
-> **Note:** Unlike Codex and Gemini (which share `~/.agents/skills/`), OpenCode requires its own skills symlink at `~/.config/opencode/skills/` plus the plugin symlink.
+> **Note:** OpenCode requires its own skills symlink at `~/.config/opencode/skills/` plus the plugin symlink. Each platform points its own distinct skills location at the shared `~/.agents/arcforge` clone (Codex: `~/.agents/skills/`, Gemini: `~/.gemini/skills/`).
 
 ## Tool Mapping
 
