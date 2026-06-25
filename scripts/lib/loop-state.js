@@ -178,7 +178,7 @@ function scanProposedDecisions(projectRoot) {
     if (!Array.isArray(parsed)) continue;
     const decisionIds = parsed
       .filter((d) => d && d.status === 'proposed')
-      .map((d) => d.id)
+      .map((d) => d['D-id'])
       .filter(Boolean);
     if (decisionIds.length > 0) {
       result.count += decisionIds.length;
