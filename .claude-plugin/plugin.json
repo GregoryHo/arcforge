@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "description": "Minimal, composable skill toolkit for AI coding agents: intent-first routing, SDD, TDD, worktree coordination, opt-in session learning",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "author": {
     "name": "Gregory Ho"
   },
