@@ -127,7 +127,8 @@ Run these READ-ONLY checks from the repo root and report structured results. Do 
 2. Eval surface: \`git diff --name-only ${prevTag} HEAD | grep -E '^(skills/|evals/scenarios/|evals/fixtures/)'\` — evalSurfaceChanged = true if any output.
 3. Benchmark freshness: \`node scripts/check-benchmark-freshness.js\` — benchmarkFresh = (exit code 0). Include its stdout in the matching check detail.
 4. Version sync: \`npm run check:versions\` — versionSynced = (exit code 0). Capture the location→version table into the check detail.
-5. currentVersion: the top-level "version" in package.json.
+5. CLI consumers: \`npm run check:cli-consumers\` — read-only. Capture its stdout into the check detail. The linter is warn-mode today (always exits 0): record status 'warn' if it lists any zero-consumer command, else 'pass'. Do NOT treat a nonzero list as a hard fail while warn-mode is in effect.
+6. currentVersion: the top-level "version" in package.json.
 
 Return JSON per schema. 'checks' must contain one row per check above (name, status pass/fail/warn, detail).`,
   { schema: SETUP_SCHEMA, label: 'preflight-gates', phase: 'Preflight' },
