@@ -42,34 +42,33 @@ Once you have the spec-id, all inputs come from `specs/<spec-id>/spec.xml` and t
 
 ## Phase 1 — Input Validation and Scope Extraction
 
-Validate the spec programmatically using sdd-utils, and extract the current sprint's scope from the latest `<delta>`:
+Validate the spec and read the current sprint's scope from the `header` gate's
+stable JSON. The gate parses `specs/<spec-id>/spec.xml` and emits both the
+validation result and the parsed header — the planner reads scope from that
+JSON, not from a separate inline parse:
 
 ```bash
-node -e "
-  const fs = require('fs');
-  const { parseSpecHeader, validateSpecHeader } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const xml = fs.readFileSync('specs/<spec-id>/spec.xml', 'utf-8');
-  const parsed = parseSpecHeader(xml);
-  const result = validateSpecHeader(parsed);
-  console.log(JSON.stringify(result, null, 2));
-  if (parsed && parsed.latest_delta) {
-    const d = parsed.latest_delta;
-    console.log('Sprint version:', d.version, 'iteration:', d.iteration);
-    console.log('Added (implement epics):', d.added.map(x => x.ref));
-    console.log('Modified (update epics):', d.modified.map(x => x.ref));
-    console.log('Removed (teardown epics):', d.removed.map(x => x.ref));
-    console.log('Renamed (mechanical refactor epics):', d.renamed.map(x => x.ref_old + '→' + x.ref_new));
-  } else if (parsed) {
-    console.log('No delta — v1 spec. Plan all requirements in detail files.');
-  }
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate header --spec-id <spec-id> \
+  --draft specs/<spec-id>/spec.xml
 ```
 
-- If `valid` is `false` and any issue has `level: 'ERROR'` — **BLOCK**. Remediation: "Run refiner to produce a spec first." Do not proceed.
-- If `valid` is `false` with only WARNINGs (e.g., broken `design_path`) — proceed but surface the warnings.
-- If `valid` is `true` — proceed.
+- If `status` is `"block"` (exit 1) — any issue has `level: "ERROR"` — **BLOCK**. Remediation: "Run refiner to produce a spec first." Do not proceed.
+- If `status` is `"pass"` (exit 0) with WARNING issues (e.g., broken `design_path`) — proceed but surface the warnings.
+- If `status` is `"pass"` (exit 0) with no issues — proceed.
 
-The scope-extraction snippet uses `parsed.latest_delta` (the highest-version delta — equivalent to the last child of `<overview>`). Earlier `<delta>` elements are historical record of prior sprints; the planner ignores them.
+Read sprint scope from `header.latest_delta`:
+
+| JSON field | Planner reads it as |
+|---|---|
+| `header.latest_delta.version` / `.iteration` | Current sprint identity |
+| `header.latest_delta.added[].ref` | Implement epics |
+| `header.latest_delta.modified[].ref` | Update epics |
+| `header.latest_delta.removed[].ref` | Teardown epics |
+| `header.latest_delta.renamed[]` (`ref_old` → `ref_new`) | Mechanical refactor epics |
+
+`header.latest_delta` is the highest-version delta (the last child of `<overview>`).
+When it is `null`, the spec is v1 — plan all requirements in the detail files.
+Earlier `<delta>` elements are historical record of prior sprints; the planner ignores them.
 
 ## Phase 2 — Determine Planning Scope
 

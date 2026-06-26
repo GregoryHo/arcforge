@@ -72,8 +72,8 @@ def test_arc_refining_sdd_utils_input_validation():
     # Must mention parseDesignDoc and/or sdd-utils for input validation
     assert "parseDesignDoc" in text or "sdd-utils" in text
 
-    # Must mention validateDesignDoc for input validation
-    assert "validateDesignDoc" in text
+    # Must invoke the design-validation gate stage for input validation (SDD-6: was validateDesignDoc)
+    assert "sdd-gate design" in text
 
 
 def test_arc_refining_sdd_utils_output_validation():
@@ -396,9 +396,9 @@ def test_fr_rf_015_ac1_r3_block_paths_invoke_write_conflict_marker():
     """
     text = _read_skill()
 
-    # Must mention writeConflictMarker (the writer function name)
-    assert "writeConflictMarker" in text, (
-        "fr-rf-015-ac1: SKILL.md must direct refiner to call writeConflictMarker on R3 axis block"
+    # Must invoke the conflict gate stage (the conflict-marker writer; SDD-6: was writeConflictMarker)
+    assert "sdd-gate conflict" in text, (
+        "fr-rf-015-ac1: SKILL.md must direct refiner to run sdd-gate conflict on R3 axis block"
     )
 
     # Phase 4 (axis 1/2 block) must invoke the writer
@@ -407,8 +407,8 @@ def test_fr_rf_015_ac1_r3_block_paths_invoke_write_conflict_marker():
     assert phase4_start != -1, "Phase 4 heading must exist"
     assert phase5_start != -1, "Phase 5 heading must exist"
     phase4_section = text[phase4_start:phase5_start]
-    assert "writeConflictMarker" in phase4_section, (
-        "fr-rf-015-ac1: Phase 4 BLOCK path must invoke writeConflictMarker (axis 1/2)"
+    assert "sdd-gate conflict" in phase4_section, (
+        "fr-rf-015-ac1: Phase 4 BLOCK path must invoke sdd-gate conflict (axis 1/2)"
     )
 
     # Phase 5.5 or Phase 6 must invoke the writer for axis-3 blocks
@@ -417,8 +417,8 @@ def test_fr_rf_015_ac1_r3_block_paths_invoke_write_conflict_marker():
     assert phase55_start != -1, "Phase 5.5 heading must exist"
     assert phase6_start != -1, "Phase 6 heading must exist"
     post_draft_section = text[phase55_start:]
-    assert "writeConflictMarker" in post_draft_section, (
-        "fr-rf-015-ac1: Phase 5.5 or Phase 6 axis-3 BLOCK path must invoke writeConflictMarker"
+    assert "sdd-gate conflict" in post_draft_section, (
+        "fr-rf-015-ac1: Phase 5.5 or Phase 6 axis-3 BLOCK path must invoke sdd-gate conflict"
     )
 
 
@@ -732,8 +732,8 @@ def test_fr_rf_010_ac5_mechanical_auth_check_trace_types():
     if next_section != -1:
         phase6_section = phase6_section[:next_section]
 
-    assert "mechanicalAuthorizationCheck" in phase6_section, (
-        "fr-rf-010-ac5: Phase 6 must invoke mechanicalAuthorizationCheck"
+    assert "sdd-gate authorize" in phase6_section, (
+        "fr-rf-010-ac5: Phase 6 must invoke sdd-gate authorize (mechanical auth check runs behind the gate)"
     )
 
     # Must distinguish design line-range traces
@@ -962,9 +962,9 @@ def test_fr_rf_014_ac5_phase55a_writes_conflict_marker():
     text = _read_skill()
     section_a = _get_phase55a_section(text)
 
-    # Phase 5.5a MUST invoke writeConflictMarker
-    assert "writeConflictMarker" in section_a, (
-        "fr-rf-014-ac5: Phase 5.5a must invoke writeConflictMarker "
+    # Phase 5.5a MUST route to the conflict gate stage
+    assert "sdd-gate conflict" in section_a, (
+        "fr-rf-014-ac5: Phase 5.5a must invoke sdd-gate conflict "
         "(audit-patched: self-contradiction is NOT exempt from the handoff)"
     )
 
@@ -1001,9 +1001,9 @@ def test_fr_rf_014_ac5_phase55b_writes_conflict_marker():
     text = _read_skill()
     section_b = _get_phase55b_section(text)
 
-    # Phase 5.5b MUST invoke writeConflictMarker
-    assert "writeConflictMarker" in section_b, (
-        "fr-rf-014-ac5: Phase 5.5b must invoke writeConflictMarker for axis-3 LLM findings"
+    # Phase 5.5b MUST route to the conflict gate stage
+    assert "sdd-gate conflict" in section_b, (
+        "fr-rf-014-ac5: Phase 5.5b must invoke sdd-gate conflict for axis-3 LLM findings"
     )
 
     # axis_fired must be '3' for 5.5b

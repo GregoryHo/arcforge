@@ -68,17 +68,19 @@ def test_arc_planning_contains_required_sections():
 
 
 def test_arc_planning_input_validation_sdd_utils():
-    """Skill must invoke sdd-utils validateSpecHeader before decomposition (fr-pl-005, fr-cc-if-005-ac4)."""
+    """Skill must invoke the sdd-gate header stage to validate the spec header and
+    extract delta scope before decomposition (fr-pl-005, fr-cc-if-005-ac4).
+    SDD-6: migrated from direct sdd-utils validateSpecHeader/parseSpecHeader calls."""
     text = _read_skill()
 
-    # Must mention validateSpecHeader for input validation
-    assert "validateSpecHeader" in text
+    # Must invoke the header gate stage for input validation (runs validateSpecHeader behind it)
+    assert "sdd-gate header" in text
 
-    # Must mention parseSpecHeader to extract delta scope
-    assert "parseSpecHeader" in text
+    # Must read the delta scope from the header stage's latest_delta output
+    assert "latest_delta" in text or "parsed.deltas" in text
 
-    # Must mention sdd-utils or scripts/lib/sdd-utils
-    assert "sdd-utils" in text
+    # Must delegate validation to the sdd-gate CLI (replaces direct sdd-utils calls)
+    assert "sdd-gate" in text
 
 
 def test_arc_planning_sprint_model():

@@ -54,21 +54,13 @@ Before producing a new spec version, verify that the prior sprint is complete. T
 **Prior spec exists → run the gate check:**
 
 ```bash
-node -e "
-  const { checkDagStatus } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const status = checkDagStatus('specs/<spec-id>/dag.yaml');
-  if (status === null) {
-    console.log('No dag.yaml — proceed (legal: refined but not yet planned).');
-  } else if (status.incomplete === 0) {
-    console.log('All', status.total, 'epics complete — proceed with new iteration.');
-  } else {
-    console.log('BLOCKED:', status.incomplete, 'of', status.total, 'epics still incomplete:');
-    for (const e of status.incompleteEpics) console.log('  -', e.id, '(' + e.status + ')');
-    console.log('Complete current sprint before iterating.');
-    process.exit(1);
-  }
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate dag --spec-id <spec-id>
 ```
+
+Reads the stable JSON: `status: "pass"` (exit 0) → proceed; `status: "block"`
+(exit 1) → the JSON's `dag.incompleteEpics` lists the unfinished epics and
+`message` is the user-facing block reason. `dag: null` means no `dag.yaml` (legal:
+refined but not yet planned).
 
 Three outcomes:
 
@@ -90,12 +82,7 @@ There is no `--force` flag, no `abandoned` epic status, no environment-variable 
 Validate the design doc programmatically:
 
 ```bash
-node -e "
-  const { parseDesignDoc, validateDesignDoc } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const parsed = parseDesignDoc('docs/plans/<spec-id>/<date>/design.md');
-  const result = validateDesignDoc(parsed);
-  console.log(JSON.stringify(result, null, 2));
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate design --design docs/plans/<spec-id>/<date>/design.md
 ```
 
 - If `valid` is `false` and any issue has `level: 'ERROR'` — **BLOCK**. Print the issues to terminal, exit non-zero, write no files. Do not write any report file.
@@ -112,58 +99,16 @@ If `specs/<spec-id>/vision.md` exists, read it as context — it describes the p
 
 Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do NOT edit existing ledger entries; the B2 immutability hook will deny any such write.
 
-### 2.5b — Validate Vision and Ledger (node -e gate)
+### 2.5b — Validate Vision and Ledger (sdd-gate context)
 
 ```bash
-node -e "
-  const { parseVision, validateVision, parseDecisionLedger, validateDecisionLedger,
-          getHeadLedgerContent, parseDecisionLedgerContent,
-          checkSpecDecisionGraph } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const fs = require('fs');
-
-  // Vision gate — no-op when spec vision absent.
-  const productVisionPath = 'product/vision.md';
-  const specVisionPath = 'specs/<spec-id>/vision.md';
-  const productParsed = fs.existsSync(productVisionPath) ? parseVision(productVisionPath) : null;
-  const specParsed = fs.existsSync(specVisionPath) ? parseVision(specVisionPath) : null;
-  const visionResult = validateVision(productParsed, specParsed);
-  if (!visionResult.valid) {
-    console.log(JSON.stringify(visionResult, null, 2));
-    process.exit(1);
-  }
-
-  // Ledger gate — no-op when absent.
-  const ledgerPath = 'specs/<spec-id>/decisions.yml';
-  const current = parseDecisionLedger(ledgerPath);
-  if (current !== null) {
-    const headContent = getHeadLedgerContent(ledgerPath, process.cwd());
-    const previous = parseDecisionLedgerContent(headContent);
-    const result = validateDecisionLedger(current, previous);
-    if (!result.valid) {
-      console.log(JSON.stringify(result, null, 2));
-      process.exit(1);
-    }
-  }
-
-  // Graph gate — spec↔decision↔anchor consistency (D6 P2, S10). No-op when absent.
-  const specXmlPath = 'specs/<spec-id>/spec.xml';
-  const specXmlContent = fs.existsSync(specXmlPath) ? fs.readFileSync(specXmlPath, 'utf8') : null;
-  const graphResult = checkSpecDecisionGraph({
-    specXmlContent,
-    ledger: current,
-    productVision: productParsed,
-    specVision: specParsed,
-  });
-  if (!graphResult.valid) {
-    console.log(JSON.stringify(graphResult, null, 2));
-    process.exit(1);
-  }
-
-  console.log('vision+ledger+graph gate: OK');
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate context --spec-id <spec-id>
 ```
 
-No-op rule: when `specs/<spec-id>/decisions.yml`, `specs/<spec-id>/vision.md`, and `specs/<spec-id>/spec.xml` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
+The gate chains three sub-checks in order — vision, ledger (append-only against
+HEAD), then spec↔decision↔anchor graph. `status: "pass"` (exit 0) → proceed;
+`status: "block"` (exit 1) names the failing sub-gate in `gate` and lists the
+errors. No-op rule: when `specs/<spec-id>/decisions.yml`, `specs/<spec-id>/vision.md`, and `specs/<spec-id>/spec.xml` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
 
 ## Phase 3 — Detect Behavior Context
 
@@ -211,24 +156,29 @@ The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any re
    - Axis 2: `(a) keep design wording, edit Q&A row; (b) accept Q&A answer, edit design; (c) make the axis configurable so both stances coexist`.
    - Axis 3: `(a) downgrade the criterion to SHOULD/MAY citing design's qualitative phrase; (b) leave the axis unbound; (c) ask user to specify a concrete value in a new design iteration`.
 
-**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-015-ac1):**
+**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-015-ac1)** by piping the conflict payload as JSON to the `conflict` gate stage. The heredoc keeps the payload off disk until the CLI writes the canonical file:
 
 ```bash
-node -e "
-  const { writeConflictMarker } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  writeConflictMarker('<spec-id>', {
-    axis_fired: '<1|2|3>',
-    conflict_description: '<specific design line ranges and Q&A row q_ids involved>',
-    candidate_resolutions: [
-      '(a) <first candidate>',
-      '(b) <second candidate>'
-    ],
-    user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
-  });
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate conflict --spec-id <spec-id> <<'JSON'
+{
+  "axis_fired": "<1|2|3>",
+  "conflict_description": "<specific design line ranges and Q&A row q_ids involved>",
+  "candidate_resolutions": [
+    "(a) <first candidate>",
+    "(b) <second candidate>"
+  ],
+  "user_action_prompt": "Run /arc-brainstorming iterate <spec-id> to resolve this conflict."
+}
+JSON
 ```
 
-The schema source of truth is `PENDING_CONFLICT_RULES` (from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md`. It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up.
+**Required payload fields (per `PENDING_CONFLICT_RULES`) — all four are mandatory; a missing or empty field exits non-zero. Reproduce these keys exactly (no synonyms):**
+- `axis_fired` — the string `"1"`, `"2"`, or `"3"` (the axis that fired). Axis-3 blocks (invention, Phase 5.5a self-contradiction, Phase 5.5b unauthorized criterion) use `"3"`.
+- `conflict_description` — the specific design line ranges and Q&A `q_id`s in conflict.
+- `candidate_resolutions` — a list of **1–3** concrete, user-pickable resolutions (never zero, never more than three).
+- `user_action_prompt` — the recovery route, always `Run /arc-brainstorming iterate <spec-id> to resolve this conflict.`
+
+The schema source of truth is `PENDING_CONFLICT_RULES` (from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md` (the path is echoed back as `conflict_marker` in the gate JSON). It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up. A malformed payload (missing required field, zero resolutions) exits non-zero with a descriptive error and writes nothing.
 
 **MUST NOT write `_pending-conflict.md` for non-R3-axis blocks (fr-rf-015-ac2):**
 - DAG completion gate failure (fr-rf-012) → terminal output only, exit non-zero, no file written.
@@ -346,7 +296,7 @@ Before Phase 6 output validation, re-read each requirement's `<description>` aga
 
 If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions.
 
-**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):** call `writeConflictMarker` (recipe above in Phase 4) with these values:
+**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):** run the `sdd-gate conflict` recipe from Phase 4 (the `<<'JSON'` heredoc), supplying these payload values:
 - `axis_fired: '3'`
 - `conflict_description`: `'<requirement ID>: <specific scope or verb mismatch> — <remediation hint from ac1/ac2>'` (ac1: widen/narrow scope; ac2: align verbs)
 - `candidate_resolutions`: 1–3 concrete user-pickable resolutions
@@ -360,7 +310,7 @@ Re-read each criterion in the in-memory draft and verify it traces to a (design 
 
 If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1, R3 enforcement severity).** Phase 5.5 findings MUST NOT be downgraded to WARNING. Before exiting non-zero:
 
-1. Call `writeConflictMarker` (same pattern as Phase 4 block shown above), setting `axis_fired: '3'`.
+1. Run the `sdd-gate conflict` recipe from Phase 4 (same `<<'JSON'` heredoc shown above), setting `axis_fired: '3'` in the payload.
 2. Print to terminal: which criterion has no source, and the 1–3 candidate resolutions.
 3. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`.
 
@@ -368,18 +318,20 @@ This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts 
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 
-Before writing any file to disk, validate the in-memory spec:
+Before writing any file to disk, validate the in-memory spec. Pipe the in-memory
+draft `spec.xml` to the `header` gate stage over stdin (heredoc) — the draft never
+touches disk, preserving zero-filesystem-state-on-block:
 
 ```bash
-node -e "
-  const fs = require('fs');
-  const { parseSpecHeader, validateSpecHeader } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const xml = fs.readFileSync('_draft_spec.xml', 'utf-8');
-  const parsed = parseSpecHeader(xml);
-  const result = validateSpecHeader(parsed);
-  console.log(JSON.stringify(result, null, 2));
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate header --spec-id <spec-id> <<'SPECXML'
+<the in-memory spec.xml content>
+SPECXML
 ```
+
+The `header` stage reads only the `<overview>` block, so the single `spec.xml`
+suffices — the in-memory `details/*.xml` are not inputs to this gate. `status:
+"pass"` (exit 0) → continue to 6b; `status: "block"` (exit 1) → the `issues`
+array carries the ERROR findings.
 
 Phase 6 runs two checks:
 
@@ -392,35 +344,30 @@ Phase 6 runs two checks:
 
 **6b — Axis-3 mechanical authorization check (R3-axis block, writes conflict file):**
 
+Pipe the **combined in-memory draft** to the `authorize` gate stage. The
+mechanical check reads `<requirement>/<criterion>/<trace>` elements — and those
+live in the `details/*.xml` content, NOT in the `<overview>` of `spec.xml`. So
+the input here is the full in-memory draft you built in Phase 5 (the overview
+plus every requirement and every `<trace>`), as a single concatenated XML stream
+— before the two-pass write splits it into `spec.xml` + `details/`. On a failed
+check the CLI deterministically writes `specs/<spec-id>/_pending-conflict.md`
+with `axis_fired: '3'` and the unauthorized-trace summary — the agent does NOT
+hand-build the marker for this stage:
+
 ```bash
-node -e "
-  const fs = require('fs');
-  const { mechanicalAuthorizationCheck, writeConflictMarker, parseDecisionLedger } = require('${ARCFORGE_ROOT}/scripts/lib/sdd-utils');
-  const result = mechanicalAuthorizationCheck(
-    fs.readFileSync('_draft_spec.xml', 'utf-8'),
-    'docs/plans/<spec-id>/<date>/design.md',
-    'docs/plans/<spec-id>/<date>/decision-log.yml',
-    parseDecisionLedger('specs/<spec-id>/decisions.yml')
-  );
-  if (!result.valid) {
-    console.log(JSON.stringify(result.unauthorized_traces, null, 2));
-    writeConflictMarker('<spec-id>', {
-      axis_fired: '3',
-      conflict_description: 'Mechanical authorization check failed: ' +
-        result.unauthorized_traces.map(t => t.trace_value + ' (' + t.reason + ')').join('; '),
-      candidate_resolutions: [
-        '(a) Add authorizing source to design.md for the flagged criterion.',
-        '(b) Downgrade the criterion to SHOULD/MAY citing design qualitative phrase.',
-        '(c) Remove the criterion — the axis is unbound without an authorizing source.'
-      ],
-      user_action_prompt: 'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'
-    });
-    process.exit(1);
-  }
-"
+node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate authorize --spec-id <spec-id> \
+  --design docs/plans/<spec-id>/<date>/design.md \
+  --decision-log docs/plans/<spec-id>/<date>/decision-log.yml <<'DRAFT'
+<the combined in-memory draft: overview + all requirements + all traces>
+DRAFT
 ```
 
-If `mechanicalAuthorizationCheck` returns `valid: false` — **BLOCK (write conflict file, per fr-rf-015-ac1)**. Call `writeConflictMarker` with `axis_fired: '3'`, then exit non-zero. Write no authoritative files.
+The stage loads the ledger from `specs/<spec-id>/decisions.yml` automatically.
+`status: "pass"` (exit 0) → both checks passed. `status: "block"` (exit 1) →
+`unauthorized_traces` lists the flagged criteria and `conflict_marker` echoes the
+path of the written file.
+
+If the `authorize` stage returns `status: "block"` — **BLOCK (conflict file written by the CLI, per fr-rf-015-ac1)**, exit non-zero. Write no authoritative files (no `spec.xml`, no `details/`) — only the `_pending-conflict.md` the CLI produced.
 
 **If both checks pass:** write all files atomically: `spec.xml` and all `details/*.xml` in a single operation. Partial writes (spec.xml written but details/ incomplete) MUST NOT occur.
 
