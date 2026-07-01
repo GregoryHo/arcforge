@@ -59,6 +59,7 @@ jobs:
       - run: pip install pytest pyyaml
       - run: npm run check:versions
       - run: npm run check:docs
+      - run: npm run check:cli-consumers
       - run: npm run test:scripts
       - run: npm run test:hooks
       - run: npm run test:node

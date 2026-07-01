@@ -17,6 +17,7 @@ Never start the release workflow on a broken branch.
 2. `npm test` — all 4 runners green
 3. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
 4. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
+5. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
 
 If any pre-flight fails, stop and tell the user. A broken release is worse than a delayed one, because it ships to users through the marketplace cache and is painful to recall.
 
