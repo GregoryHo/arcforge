@@ -76,16 +76,25 @@ process.cwd()` = `TRIAL_DIR`, and `writeConflictMarker` writes to
 design/decision-log are therefore all created under `TRIAL_DIR` so the marker and
 the inputs share the same project root.
 
-This eval is RED-on-regression and discriminative:
+This eval is a **regression tripwire** (RED-on-regression), NOT a discrimination eval:
 - If `writeConflictMarker` is reverted to a 2-arg signature (no `projectRoot`),
   its `projectRoot is required` guard throws, the `conflict` stage emits
   `status: error` / exit 2, and NO marker file is written → the grader's file-exists
   check FAILs.
 - If a required `PENDING_CONFLICT_RULES` field is dropped from the payload,
   `writeConflictMarker` throws before touching disk → no file → FAIL.
-- A baseline trial with no `arc-refining` skill loaded does not know the
-  `sdd-gate conflict` recipe and would not produce the structured marker (it would
-  invent the `24 hours` MUST or print an unstructured warning) → no marker → FAIL.
+- It is **NOT discriminative**, by design and by necessity. An A/B run scores
+  baseline and treatment equally (both pass — empirically 3/3 vs 3/3): the trial
+  necessarily has `ARCFORGE_ROOT` / repo access so the agent can invoke `node
+  "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate conflict`, but that same access lets a
+  no-skill baseline read `skills/arc-refining/SKILL.md` (and the trial dir path
+  itself embeds the repo) and reproduce the recipe. The repo access the recipe
+  requires is the access that defeats baseline isolation, so a behavioral
+  discrimination arm is not feasible for this scenario class. Skill-teaching
+  discrimination is owned by the DESCRIBE sibling
+  (`sdd-refining-r3-pending-conflict-producer.md`, model-graded, filesystem
+  forbidden). This scenario's job is to catch execution regressions in the migrated
+  `sdd-gate` path — which the two bullets above verify.
 
 ## Preflight
 skip
