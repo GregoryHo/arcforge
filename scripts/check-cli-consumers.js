@@ -15,12 +15,11 @@
  * bidirectionally contract-tested against the live `cli.js` switch, so it can
  * never silently drift from the real command set — unlike scraping help.js.
  *
- * WARN MODE (current). `GATING` is false: the linter prints any zero-consumer
- * command but ALWAYS exits 0. This is deliberate — at v4.0.0 `sdd-gate` has no
- * consumers, so gating now would redden unrelated PRs. The SDD-6 migration
- * (release v4.0.1) wires sdd-gate's consumers; once it lands, flip `GATING` to
- * true so the check fails on any future stranded command. This mirrors the
- * repo's doc-reference linter, which shipped warn-first then flipped to gating.
+ * GATING (since v4.0.1). The linter exits 1 on any zero-consumer command. It
+ * shipped warn-only at v4.0.0 (when `sdd-gate` itself had no consumers — gating
+ * then would have reddened unrelated PRs) and flipped to gating once the SDD-6
+ * migration wired sdd-gate's consumers. This mirrors the repo's doc-reference
+ * linter, which shipped warn-first then flipped to gating.
  *
  * LIMITATION — common-English-word command names. The match is a lenient
  * word-boundary presence test (zero vs nonzero), so a command whose name is an
@@ -51,9 +50,9 @@ const SCAN_DIRS = ['skills', 'docs/guide', 'templates', 'agents'];
 // documented reason (a command that legitimately has no prose consumer).
 const ALLOWLIST = new Set([]);
 
-// Flip to true once v4.0.1 wires sdd-gate's consumers (see header). Until then,
-// the linter reports but never fails.
-const GATING = false;
+// Flipped to true at v4.0.1: the SDD-6 migration wired sdd-gate's consumers
+// (arc-refining + arc-planning), so a zero-consumer command now fails the check.
+const GATING = true;
 
 /** Recursively collect *.md files under a directory (skips node_modules + dotdirs). */
 function collectMarkdown(dir, acc) {
@@ -122,7 +121,7 @@ function main() {
     log(`  - ${cmd}  (no word-boundary match in ${SCAN_DIRS.join(', ')})`);
   }
   if (!GATING) {
-    log('\nWarn-only until v4.0.1 wires sdd-gate; flip GATING to true after it lands.');
+    log('\nWarn-only (GATING=false): reporting without failing the check.');
   }
   process.exit(GATING ? 1 : 0);
 }

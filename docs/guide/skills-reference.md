@@ -137,10 +137,10 @@ The complete catalog still uses functional categories for lookup:
 **When to use:** When converting design documents to structured specs, when spec quality is below threshold, or when requirements need formal acceptance criteria.
 
 **Key workflow:**
-1. Validate design doc via `parseDesignDoc` + `validateDesignDoc` from `scripts/lib/sdd-utils.js`
-2. DAG completion gate (when prior spec exists): block if any epic in `specs/<spec-id>/dag.yaml` is not `completed`
+1. Validate design doc via the `sdd-gate design` CLI stage (`arcforge sdd-gate design --design <path>`)
+2. DAG completion gate via `sdd-gate dag` (when prior spec exists): block if any epic in `specs/<spec-id>/dag.yaml` is not `completed`
 3. Detect context from filesystem: `specs/<spec-id>/spec.xml` exists → iteration (expect Context + Change Intent sections); missing → v1 formalization (expect prose)
-4. Two-pass write: build spec in memory, validate via `parseSpecHeader` + `validateSpecHeader`, atomic write only if zero ERRORs
+4. Two-pass write: build spec in memory, validate via the `sdd-gate header` and `sdd-gate authorize` stages, atomic write only if zero ERRORs
 5. Append new `<delta>` as last child of `<overview>`; preserve every prior `<delta>` verbatim
 6. Commit specs to git
 
