@@ -65,7 +65,7 @@ one merged JSON object carrying both channels at once — the `systemMessage`
 above (user-visible) and a companion `additionalContext` arc-compacting
 indicator (model-visible):
 ```
-arc-compacting indicator: 50 tool calls (mixed work phase) — at a possible compaction boundary. Consult arc-compacting to decide whether to /compact at this phase boundary.
+arc-compacting indicator: 50 tool calls (neutral phase) — at a possible compaction boundary. Consult arc-compacting to decide whether to /compact at this phase boundary.
 ```
 Neither line issues a compaction directive — the actual /compact-or-not
 timing call is deferred to the `arc-compacting` skill.
