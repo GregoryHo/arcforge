@@ -39,72 +39,79 @@ across sessions until the threshold is met; reset is owned exclusively by
 
 ### On Session End (Stop) — `end.js`
 - Saves session metrics (duration, tool calls)
-- Records modified files from git status
+- Records modified files from transcript parsing (parseTranscript)
 - Runs diary-capture (threshold-gated draft + counter reset)
 - Outputs session summary
 
 ## Triggers
 
-- **SessionStart**: `startup|resume` (but not clear/compact - those are handled by inject-skills)
-- **Stop**: All stop events
+- **SessionStart** (`inject-context.js`): `startup|resume|clear|compact` — runs on every SessionStart source, including compact.
+- **SessionStart** (`start.js`): `startup|resume|clear` — does not run on `compact` (background init should not re-run mid-compaction).
+- **Stop** (`end.js`): all Stop events.
 
 ## Storage
 
-Sessions stored in `~/.arcforge/sessions/` as JSON:
+Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
 ```
 ~/.arcforge/sessions/
-├── my-project-2025-01-24.json    # Machine-readable
-├── my-project-2025-01-23.json
-└── other-project-2025-01-24.json
+├── my-project/
+│   ├── 2025-01-24/
+│   │   └── {sessionId}.json    # Machine-readable
+│   └── 2025-01-23/
+│       └── {sessionId}.json
+└── other-project/
+    └── 2025-01-24/
+        └── {sessionId}.json
 ```
 
 ## Session File Format
 
 ```json
 {
+  "sessionId": "abc123",
   "project": "my-project",
+  "date": "2025-01-24",
   "started": "2025-01-24T10:00:00.000Z",
   "lastUpdated": "2025-01-24T12:30:00.000Z",
   "toolCalls": 47,
   "filesModified": [
     "src/foo.ts",
     "tests/foo.test.ts"
-  ],
-  "notes": "Working on hooks implementation"
+  ]
 }
 ```
 
 ## Output Examples
 
 ### Session Start
-If previous session exists:
+`inject-context.js` builds a brief `systemMessage` summary from whichever of
+these are present — active instincts, pending action notifications, and a
+stale-draft warning (full detail goes to Claude via `additionalContext`):
+
 ```
-## Previous Session Context
-
-**Notes from last session:** Working on hooks implementation
-**Tool calls in last session:** 47
-
-**Files modified:**
-- src/foo.ts
-- tests/foo.test.ts
-
-**Session duration:** ~150 minutes
+2 active instincts | 1 pending action | 3 unenriched drafts
 ```
 
 ### Session End
-```
-📝 Session Summary:
-  Duration: ~45 minutes
-  Tool calls: 32
-  Files modified: 5
-  Session saved to: ~/.arcforge/sessions/my-project-2025-01-24.json
-```
+`end.js` only surfaces a user-visible `systemMessage` when the diary
+threshold fired on this Stop; otherwise the same summary is logged to
+stderr only (invisible to the user):
 
-## Editing Notes
-
-You can manually edit the session JSON to add notes:
-```bash
-vim ~/.arcforge/sessions/my-project-2025-01-24.json
+```
+📝 Session paused. (12 messages, 47 tool calls)
+   Diary captured; counters reset for next session.
 ```
 
-Change the `notes` field to leave yourself reminders for next session.
+Below threshold (stderr only, not shown to the user):
+```
+📝 Session paused. (12 messages, 47 tool calls)
+   Counters preserved for next resume.
+```
+
+## Leaving Notes for Next Session
+
+The session JSON is not read back by any hook — editing it does not
+communicate anything to a future session. To leave yourself a message for
+next time, use `arc-managing-sessions`'s `save`/`handover --save`
+(`session-{alias}.md` / `handover-{slug}.md`) instead of editing the
+session JSON directly.

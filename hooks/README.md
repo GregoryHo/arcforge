@@ -9,7 +9,7 @@ hooks/
 ├── hooks.json              # Hook configuration
 ├── run-hook.cmd            # Bash dispatcher
 ├── README.md
-├── inject-skills/          # Injects arc-using skill at session start
+├── inject-skills/          # Injects a minimal ArcForge bootstrap at session start
 │   ├── main.sh
 │   └── README.md
 ├── arc-guard/              # Blocks unsafe ops (raw git merge / arcforge loop in epic worktrees, research scope violations)
@@ -53,7 +53,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| inject-skills | startup, resume, clear, compact | Injects arc-using skill content |
+| inject-skills | startup, resume, clear, compact | Injects a minimal ArcForge bootstrap (not arc-using's full content) |
 | session-tracker/inject-context | startup, resume, clear | Loads previous session context |
 | session-tracker/start | startup, resume, clear | Resets counters, initializes session |
 

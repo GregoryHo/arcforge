@@ -210,7 +210,7 @@ In `hooks.json`:
 
 | Event | Hook | Sync/Async | Purpose |
 |-------|------|-----------|---------|
-| SessionStart | inject-skills | sync | Inject arc-using skill content into Claude |
+| SessionStart | inject-skills | sync | Inject minimal ArcForge bootstrap context into Claude |
 | SessionStart | inject-context | sync | Inject active instincts + pending actions |
 | SessionStart | session-tracker/start | async | Initialize session file, run decay |
 | UserPromptSubmit | user-message-counter | sync | Count user prompts |
