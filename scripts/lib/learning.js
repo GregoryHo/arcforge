@@ -242,6 +242,11 @@ function transitionCandidate(
   if (!VALID_STATUSES.has(status) || status === 'pending' || status === 'activated') {
     throw new Error('status transition must be approved, rejected, or materialized');
   }
+  if (scope !== 'project') {
+    throw new Error(
+      "only project candidate transitions are supported — approve/reject --global would rewrite the curator's canonical queue.jsonl without its store.lock; use the dashboard instead",
+    );
+  }
   const candidates = loadCandidates({ scope, projectRoot, homeDir });
   const index = candidates.findIndex((candidate) => candidate.id === id);
   if (index === -1) throw new Error(`candidate not found: ${id}`);

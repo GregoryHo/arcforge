@@ -325,6 +325,12 @@ describe('learning subsystem MVP-1', () => {
     expect(updated.updated_at).toBe('2026-05-01T00:02:00Z');
   });
 
+  it('refuses to transition a candidate under --global scope (store.lock safety)', () => {
+    expect(() =>
+      transitionCandidate('some-id', 'approved', { scope: 'global', projectRoot, homeDir }),
+    ).toThrow(/only project candidate transitions/);
+  });
+
   it('materialization is rejected for non-approved candidates', () => {
     expect(() => assertCanMaterialize(candidate({ status: 'pending' }))).toThrow(
       'candidate must be approved before materialization',
