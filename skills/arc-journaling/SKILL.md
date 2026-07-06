@@ -15,7 +15,8 @@ Capture session reflections as structured diary entries for the **learning cycle
 |------|---------|
 | **Get diary path** | `node "${SKILL_ROOT}/scripts/diary.js" path --project {p} --date {d} --session {s}` |
 | **Save diary** | `node "${SKILL_ROOT}/scripts/diary.js" save --project {p} --date {d} --session {s} --content "{content}"` |
-| **Key principle** | Reflect from memory, NOT by reading files |
+| **Finalize draft** | `node "${SKILL_ROOT}/scripts/diary.js" finalize --project {p} --date {d} --session {s}` |
+| **Key principle** | Reflect from memory, NOT by reading files — **except** an existing draft (see "Draft Finalization Workflow"): read it first, never rewrite it from memory |
 | **Permission** | NEVER auto-save - always ask first |
 | **Template location** | See "Template" section below |
 
@@ -89,9 +90,35 @@ This is a **soft gate**: Claude judges based on conversation memory. User can al
 - Pattern extraction needed (use arc-recalling instead)
 - **Fails Pre-Diary Check** — unless user explicitly requests
 
+## Draft Finalization Workflow
+
+When SessionStart shows **"📝 Diary draft ready — use /arcforge:arc-journaling to review and finalize."**, a background pipeline (PreCompact or Stop hook → `auto-diary.js generate` → detached Haiku enricher) has already written a draft to:
+
+```
+~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}-draft.md
+```
+
+Do this instead of writing a new entry from scratch:
+
+1. **Read the draft file.** Its `## Session Metrics` section (duration, tool calls, user messages, compactions, files modified) is always deterministically filled — preserve it, never regenerate or discard it. It may also have a `## Tool Usage Summary` section. Its `<!-- TO BE ENRICHED -->` placeholder sections (Decisions Made, Challenges & Solutions, etc.) *may* already be filled by a background enricher — check, don't assume either way.
+2. **If placeholders remain and you have conversation memory of that session**, edit the draft file in place to replace the `<!-- TO BE ENRICHED -->` blocks with real content — do not create a separate entry via `save`. If you do NOT have memory of the flagged session (e.g. the nudge surfaced in a later, unrelated session), leave the placeholders as-is rather than fabricating content.
+3. **Promote the draft to the final diary:**
+   ```bash
+   node "${SKILL_ROOT}/scripts/diary.js" finalize \
+     --project {project} \
+     --date {YYYY-MM-DD} \
+     --session {sessionId}
+   ```
+   `finalize` renames the draft to the final path — it does **not** merge content, so any edits from step 2 must already be written to the draft file before calling it.
+4. **If `finalize` reports `No draft found at: ...`**, there is no pending draft — fall back to the normal "## Process" workflow below (reflect from memory, then `save`).
+
+Never respond to the draft-ready nudge by reflecting from memory and calling `save` directly — that creates a duplicate final diary and leaves the auto-generated draft as an orphaned file.
+
 ## Process
 
 ### 1. Reflect on Conversation (Context-First)
+
+(This flow is for a fresh entry with no pending draft. If a draft exists, use "Draft Finalization Workflow" above instead.)
 
 Review the conversation from memory. **DO NOT read files to gather context.**
 
@@ -201,6 +228,11 @@ Keep entries focused. Don't over-document routine work.
 **Wrong:** Leaving Generalizable? empty or omitting it
 **Right:** Always mark solutions as Yes/No - helps arc-reflecting identify patterns
 
+### Rewriting an Existing Draft From Scratch
+
+**Wrong:** Seeing "Diary draft ready" and reflecting from memory into a brand-new `save` call
+**Right:** Read the draft first, fill only remaining placeholders in place, then `finalize` it (see "Draft Finalization Workflow")
+
 ## Template Variables
 
 | Variable       | Source                                                 |
@@ -214,7 +246,8 @@ Keep entries focused. Don't over-document routine work.
 
 ```
 ~/.arcforge/diaries/{project}/{YYYY-MM-DD}/
-└── diary-{sessionId}.md      # Diary entry (from arc-journaling)
+├── diary-{sessionId}.md      # Diary entry (from arc-journaling)
+└── diary-{sessionId}-draft.md    # Auto-generated draft (PreCompact/Stop hook); promote with `finalize`, do not overwrite with `save`
 
 ~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
 └── {sessionId}.json          # Session data (auto-generated)
