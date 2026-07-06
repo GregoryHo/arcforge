@@ -192,16 +192,14 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 ### Agents
 
-Skills delegate focused work to 11 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
+Skills delegate focused work to 9 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
 
 | Agent | Role |
 |-------|------|
-| `planner` | Architectural analysis and implementation planning (arc-planning, arc-brainstorming) |
 | `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
 | `spec-reviewer` | Stage 1 review: implementation matches spec exactly (arc-agent-driven) |
 | `quality-reviewer` | Stage 2 review: architecture, testing, error handling (arc-agent-driven) |
 | `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
-| `debugger` | 4-phase root-cause investigation (arc-debugging) |
 | `verifier` | Independent acceptance-criteria verification (arc-verifying) |
 | `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
 | `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |

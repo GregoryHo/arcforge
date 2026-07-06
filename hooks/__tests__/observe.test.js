@@ -175,7 +175,7 @@ describe('observe: privacy boundaries', () => {
 
   it('caps sanitized payload length at the configured maximum', () => {
     const { sanitizeObservationPayload } = require('../../scripts/lib/sanitize-observation');
-    const { MAX_OUTPUT_LENGTH } = require('../observe/main');
+    const MAX_OUTPUT_LENGTH = 5000; // sanitizeObservationPayload's cap is generic (not observe-specific); matches main.js's MAX_INPUT_LENGTH value
     const huge = 'A'.repeat(MAX_OUTPUT_LENGTH * 4);
     const out = sanitizeObservationPayload(huge, MAX_OUTPUT_LENGTH);
     assert.ok(

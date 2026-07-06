@@ -43,14 +43,6 @@ function main() {
   process.exit(0);
 }
 
-// Export for use by session-tracker
-module.exports = {
-  readCount: () => getCounter().read(),
-  writeCount: (count) => getCounter().write(count),
-  resetCounter: () => getCounter().reset(),
-  getCounterFilePath: () => getCounter().getFilePath(),
-};
-
 // Run if executed directly
 if (require.main === module) {
   main();
