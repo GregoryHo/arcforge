@@ -57,7 +57,7 @@ Check that commands appear:
 ```
 # Should see:
 # /arcforge:arc-brainstorming - Design exploration
-# /arcforge:arc-writing-tasks - Break epics or features into executable tasks
+# /arcforge:arc-writing-tasks - Break features into executable tasks
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
@@ -147,7 +147,7 @@ All 33 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-brainstorming** - Design exploration
 - **arc-refining** - Convert design documents to structured specs
 - **arc-planning** - Break a spec into an executable DAG of epics
-- **arc-writing-tasks** - Break epics or features into executable tasks
+- **arc-writing-tasks** - Break features into executable tasks
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-implementing** - Orchestrate large project implementation in a worktree

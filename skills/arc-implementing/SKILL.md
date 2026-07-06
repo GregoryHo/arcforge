@@ -35,10 +35,11 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
    - Run `arc-coordinating` to sync from base and check `blocked_by`.
    - If `blocked_by` is not empty: STOP and use the blocked format.
    - If ready: continue to Phase 1.
-3. Phase 1: Epic → Features.
-   - Call `arc-writing-tasks`
-   - Input: `specs/<spec-id>/epics/<epic-id>/epic.md`
-   - Output: features list (may already exist in `specs/<spec-id>/epics/<epic-id>/features/*.md`)
+3. Phase 1: Confirm features exist.
+   - `specs/<spec-id>/epics/<epic-id>/features/*.md` is produced by `arc-planning`
+     Phase 3 (co-created with `epic.md` in the same two-pass write) — it already
+     exists by the time this skill triggers. No skill call here; read the feature
+     files directly and proceed to Phase 2.
 4. Phase 2: Per Feature.
    - 2a: Feature → Tasks.
      - Call `arc-writing-tasks`
@@ -57,7 +58,6 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 | Phase | Skill | Input | Output |
 |-------|-------|-------|--------|
 | 0 | arc-coordinating | worktree | sync + blocked status |
-| 1 | arc-writing-tasks | `specs/<spec-id>/epics/<epic-id>/epic.md` | features breakdown |
 | 2a | arc-writing-tasks | `specs/<spec-id>/epics/<epic-id>/features/<feature>.md` | tasks file |
 | 2b | arc-agent-driven | tasks file | completed code |
 | 2b | arc-dispatching-parallel | (via arc-agent-driven, if review finds multiple issues) | parallel fixes |

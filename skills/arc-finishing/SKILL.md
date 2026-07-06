@@ -333,8 +333,7 @@ while the base stays half-merged.
 | Context | Resolution Path |
 |---|---|
 | **Solo epic** — you (or a human user) invoked this skill directly, no team-lead in the loop | Present the conflict to the user. Show the unmerged files, the conflicting hunks verbatim, and ask for resolution guidance. Wait for explicit direction before editing. |
-| **Multi-teammate dispatch** — you are a teammate spawned via `arc-dispatching-teammates`, a lead is present, conflict is on a file listed in your spawn prompt's Shared Files section | **SendMessage to `team-lead`** using the Merge Conflict (Multi-Teammate) blocked format below. Do NOT auto-resolve. The lead has the global view of which teammates landed in what order and is the correct arbiter. |
-| **Multi-teammate dispatch, conflict on a file NOT listed in your Shared Files section** | Same as above (SendMessage lead) — AND flag that the shared-file scan missed this file. The lead needs to update the other teammates' ownership if they're still running. |
+| **Multi-teammate dispatch** — you are a teammate spawned via `arc-dispatching-teammates`, a lead is present | **SendMessage to `team-lead`** using the Merge Conflict (Multi-Teammate) blocked format below. Do NOT auto-resolve. The lead has the global view of which teammates landed in what order and is the correct arbiter. |
 
 **Never:**
 - Auto-resolve conflicts by taking "ours" / "theirs" / a guessed union
@@ -517,8 +516,8 @@ State: merge aborted, worktree clean on epic branch
 Commits ready: <N commits>
 
 Conflict files:
-- <path1>  [listed in my Shared Files: yes | no]
-- <path2>  [listed in my Shared Files: yes | no]
+- <path1>
+- <path2>
 
 Conflict hunks (verbatim from `git diff`):
 <paste each hunk, keeping conflict markers intact>
@@ -530,14 +529,6 @@ My read:
 
 I am waiting for arbitration. Not pushing, not creating PR, not
 re-attempting merge until you respond.
-```
-
-If the conflict is on a file NOT listed in your spawn prompt's Shared Files section, add this line above the conflict files block:
-
-```
-ALERT: this file was NOT in my Shared Files section — the lead's
-scan in arc-dispatching-teammates step 4 may have missed it. Other
-running teammates should be notified.
 ```
 
 Wait for the lead's response before taking further git action. Hold `epic` branch state, do not modify or push.
