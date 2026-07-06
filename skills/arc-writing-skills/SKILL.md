@@ -100,9 +100,11 @@ Discovered through eval — don't repeat:
 | Platform | Skills Directory |
 |----------|------------------|
 | Claude Code | `~/.claude/skills/` |
-| Codex | `~/.codex/skills/` |
-| Cursor | `~/.cursor/skills/` |
-| Gemini | `~/.gemini/skills/` |
+| Codex | `~/.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` |
+| OpenCode | `~/.config/opencode/skills/` |
+
+> arcforge installs into these directories via symlink: Codex uses `~/.agents/skills/arcforge` → `~/.agents/arcforge/skills` (see `.codex/INSTALL.md`); OpenCode uses `~/.config/opencode/skills/arcforge` → `~/.agents/arcforge/skills` (see `.opencode/INSTALL.md`); Gemini CLI symlinks each skill individually into `~/.gemini/skills/` (see `.gemini/INSTALL.md`).
 
 ### Skill Folder Structure
 
