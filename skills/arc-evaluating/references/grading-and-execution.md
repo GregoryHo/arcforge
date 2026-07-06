@@ -109,7 +109,7 @@ Behaviors observed during grading that the grader identified as noteworthy — p
 - `process` — The claim is about how the agent went about the task (methodology, sequencing, decision-making steps).
 - `quality` — The claim is about the caliber of the output (clarity, completeness, correctness of reasoning, depth of analysis).
 
-Promotion candidates for `arc eval audit` come from `discovered_claims` entries where `passed: true` appears consistently across multiple trials. An agent cannot self-promote a discovered claim — human arbitration is required (see references/audit-workflow.md).
+Promotion candidates for `arc eval audit` are `discovered_claims` entries ranked by `frequency × failure_rate` — claims that recur often AND fail often, not claims that consistently pass. An agent cannot self-promote a discovered claim — human arbitration is required (see references/audit-workflow.md).
 
 ### weak_assertions[]
 

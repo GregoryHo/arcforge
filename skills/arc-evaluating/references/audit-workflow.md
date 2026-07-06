@@ -6,15 +6,15 @@ The audit workflow governs what happens to eval results after a verdict is reach
 
 The `arc eval audit` command processes the eval result corpus and surfaces two categories for human review:
 
-1. **Promotion candidates** — `discovered_claims` from grading.json entries where `passed: true` across multiple trials. These are behaviors the eval harness has observed consistently. A promotion candidate has passed the empirical bar but not yet been validated by a human and canonicalized into the skill.
+1. **Promotion candidates** — `discovered_claims` from grading entries, ranked by `score = frequency × failure_rate` (see `buildPromotionCandidates` in `${ARCFORGE_ROOT}/scripts/lib/eval-audit.js`). These are NOT the claims that passed most consistently — they are claims that occurred often AND failed often. A promotion candidate is a frequent, failing behavior pattern: one the agent exhibits regularly but does not reliably get right, and therefore a candidate to formalize as an explicit assertion so future evals grade it directly instead of relying on the grader noticing it incidentally.
 
 2. **Retirement candidates** — Claims currently in the skill body that the eval corpus contradicts, or `weak_assertions` patterns that indicate the assertion no longer tests meaningful behavior. These require a human to decide whether to remove, revise, or escalate the claim.
 
 ## How Promotion Works
 
-Promotion is the process of moving a discovered claim from eval evidence into the skill's canonical instruction set. The steps:
+Promotion is the process of moving a discovered claim — one that recurs often and fails often — from incidental grader observation into a formal, explicit assertion. Where the human arbitrator judges the pattern reflects a systemic skill gap rather than a scenario-specific gap, they may instead (or additionally) canonicalize it into the skill body — see Step 3. The steps:
 
-1. **Candidate surfaces** — The audit command identifies a discovered claim with sufficient evidence (passed in 3+ trials, across 2+ distinct scenarios, with no contradicting trials).
+1. **Candidate surfaces** — `arc eval audit` buckets all `discovered_claims` by normalized claim text, computes `frequency` and `failure_rate` per bucket, scores each bucket `frequency × failure_rate`, and sorts descending. The CLI prints the top N (default 10, override with `--top`) under `Promotion Candidates (frequent + failing claims)`. There is no minimum-trial or minimum-scenario-count filter — all-pass claims are still included but sort to the bottom (score 0).
 2. **Human review** — A human reads the claim text, the supporting evidence, and the scenarios where it appeared. They assess: is this claim generalizable? Is it distinct from existing skill content? Is the evidence reliable?
 3. **Arbitration** — If the claim is worth promoting, the human decides where it belongs in the skill body (trigger conditions, routing table, Red Flags, or a reference file). If the claim is narrow or scenario-specific, it may stay as eval evidence rather than being promoted.
 4. **Canonicalization** — The human or their agent writes the claim into the skill body and updates the skill version. The promoted claim is marked in the audit log with the commit hash and promotion date.
@@ -47,7 +47,7 @@ The audit workflow is human-arbitrated rather than automated for three reasons:
 ## Operational Notes
 
 - Run `arc eval audit` to generate the current promotion and retirement candidate lists.
-- Audit reads from `evals/benchmarks/latest.json` and the grading.json entries in `evals/results/`.
+- Audit reads grading entries from `evals/results/<scenarioName>/<runId>/grading/trial-*.json` (see `collectGradingData` in `${ARCFORGE_ROOT}/scripts/lib/eval-audit.js`). It does not read `evals/benchmarks/latest.json` — that file is written by `arc eval report` and consumed separately by `scripts/check-benchmark-freshness.js`.
 - Promotion candidates appear with their evidence count, scenario list, and claim text.
 - Retirement candidates appear with the `weak_assertions` pattern summary and the contradicting trial count.
 - The audit output is a review document, not an action — a human must take action based on it.
@@ -57,7 +57,7 @@ The audit workflow is human-arbitrated rather than automated for three reasons:
 
 The audit workflow consumes two grader output fields (see **REQUIRED BACKGROUND:** references/grading-and-execution.md for their schemas):
 
-- `discovered_claims[]` — behaviors observed during grading, categorized as factual, process, or quality. Promotion candidates come from `discovered_claims` where `passed: true`.
+- `discovered_claims[]` — behaviors observed during grading, categorized as factual, process, or quality. Promotion candidates are `discovered_claims` ranked by `frequency × failure_rate` — claims that recur often AND fail often, not claims that consistently pass.
 - `weak_assertions[]` — assertions flagged during grading as poorly designed, ambiguous, or non-discriminative. Retirement candidates come from patterns across `weak_assertions`.
 
 Both fields are populated by the eval-grader agent during the grading phase. They accumulate across trials and scenarios into the audit-visible corpus.

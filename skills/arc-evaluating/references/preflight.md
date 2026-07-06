@@ -39,7 +39,18 @@ The eval proceeds to the trial run phase.
 | No assertions | Nothing to grade | Define at least one specific, verifiable assertion |
 | Invalid grader type | Harness cannot select a grader | Change Grader to `code`, `model`, or `human` |
 
-When preflight blocks, respect the block. Do not bypass it by deleting history, lowering the threshold manually, or running trials with `--skip-preflight`. Each of those actions defeats the purpose of the gate and corrupts the benchmark signal.
+When preflight blocks, respect the block. Do not bypass it by deleting history, lowering the threshold manually, or hand-editing a cached preflight file's `verdict` field to `PASS`. Each of those actions defeats the purpose of the gate and corrupts the benchmark signal. The only legitimate way to skip the gate is the scenario-level `## Preflight\nskip` directive (see next section) — reserved for non-regression/non-interference scenarios, not a general escape hatch.
+
+## Scenario-Level Opt-Out: `## Preflight\nskip`
+
+A scenario file may include a `## Preflight` section whose body is `skip` to explicitly opt out of the `arc eval ab` gate:
+
+```
+## Preflight
+skip
+```
+
+`shouldSkipPreflightGate()` (`${ARCFORGE_ROOT}/scripts/lib/eval-preflight.js`) checks for this exact directive, case-insensitive. When present, `arc eval ab` prints `Preflight: skipped by scenario policy (<name>)` and proceeds without checking for a cached PASS record. This exists for non-regression / non-interference scenarios where a ceiling-effect check does not apply. Because it lives in the version-controlled scenario file, bypassing the gate for an existing scenario requires editing and committing that file — visible in code review, unlike a CLI flag.
 
 ## Preflight is Exempt from INSUFFICIENT_DATA (fr-vr-001)
 
@@ -54,6 +65,6 @@ Do not conflate these two mechanisms. Preflight asks "is the scenario still disc
 ## Operational Notes
 
 - Run `arc eval preflight <name>` to check a scenario without executing trials.
-- Preflight also runs automatically at the start of `arc eval run` and `arc eval ab`.
+- Preflight does NOT run automatically. `arc eval run` has no preflight logic at all — it never checks the ceiling. `arc eval ab` only *checks* for an existing cached preflight record for the current (scenario, model) pair via `checkPreflightGate()`; if none exists, it errors out with the exact remediation command (`arc eval preflight <name>`) rather than running preflight itself. You must run `arc eval preflight <name>` explicitly before your first `arc eval ab` on a given scenario+model pair.
 - If you are iterating on scenario design, run preflight between redesigns to verify the ceiling check clears.
 - The `arc eval lint <name>` subcommand checks structural validity only (sections, assertions, grader type) without checking the ceiling — use it for early structural validation before you have baseline history.
