@@ -31,9 +31,14 @@ function buildInfoPathFor(key) {
  * @param {object} opts
  * @param {string|null} opts.tsconfigPath - resolved tsconfig.json path, or null
  * @param {string|null} opts.buildInfoPath - incremental cache path, or null to disable incremental
+ * @param {string|null} opts.filePath - edited file path, used as a fallback input
+ *   when no ancestor tsconfig.json was found (mutually exclusive with --project)
  * @returns {string[]} the full argv (excluding the executable itself)
  */
-function buildTscArgs(baseArgs, { tsconfigPath = null, buildInfoPath = null } = {}) {
+function buildTscArgs(
+  baseArgs,
+  { tsconfigPath = null, buildInfoPath = null, filePath = null } = {},
+) {
   // --noEmit: type-check only. --pretty false: parseable output.
   const args = [...baseArgs, '--noEmit', '--pretty', 'false'];
 
@@ -46,6 +51,10 @@ function buildTscArgs(baseArgs, { tsconfigPath = null, buildInfoPath = null } = 
 
   if (tsconfigPath) {
     args.push('--project', tsconfigPath);
+  } else if (filePath) {
+    // No ancestor tsconfig.json: fall back to a single-file standalone check,
+    // so tsc never runs with zero input files and silently "passes".
+    args.push(filePath);
   }
 
   return args;
@@ -105,17 +114,24 @@ function runTypeCheck(filePath, pmName, inject = {}) {
   const fileDir = path.dirname(filePath);
   const tsconfigPath = findUpwards('tsconfig.json', fileDir);
   const buildInfoPath = buildInfoPathFor(tsconfigPath || fileDir);
+  const absolutePath = path.resolve(filePath);
 
   // injectable runner for tests; defaults to the safe execCommand wrapper.
   const run = inject.run || ((c, a) => execCommand(c, a, { timeout: 30000 }));
 
   // First attempt: incremental (the fast path).
-  let result = run(cmd, buildTscArgs(baseArgs, { tsconfigPath, buildInfoPath }));
+  let result = run(
+    cmd,
+    buildTscArgs(baseArgs, { tsconfigPath, buildInfoPath, filePath: absolutePath }),
+  );
 
   // BACK OFF: if tsc rejected --incremental, retry without it so we never
   // silently lose type-checking on a compiler that lacks the flag.
   if (result.exitCode !== 0 && isIncrementalFlagRejected(result.stdout + result.stderr)) {
-    result = run(cmd, buildTscArgs(baseArgs, { tsconfigPath, buildInfoPath: null }));
+    result = run(
+      cmd,
+      buildTscArgs(baseArgs, { tsconfigPath, buildInfoPath: null, filePath: absolutePath }),
+    );
   }
 
   if (result.exitCode === 0) {
@@ -129,7 +145,6 @@ function runTypeCheck(filePath, pmName, inject = {}) {
 
   // TypeScript error format: filename(line,col): error TSxxxx: message
   const errorRegex = /^(.+?)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/gm;
-  const absolutePath = path.resolve(filePath);
   const basename = path.basename(filePath);
 
   let match;

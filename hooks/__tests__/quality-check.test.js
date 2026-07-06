@@ -277,6 +277,17 @@ describe('quality-check: tsc incremental cost bound (RV-4)', () => {
       const args = buildTscArgs(['exec', 'tsc'], {});
       assert.deepStrictEqual(args.slice(0, 5), ['exec', 'tsc', '--noEmit', '--pretty', 'false']);
     });
+
+    it('falls back to the file path as a positional arg when there is no tsconfig (TS-1)', () => {
+      const { buildTscArgs } = require('../quality-check/typescript');
+      const args = buildTscArgs(['tsc'], {
+        tsconfigPath: null,
+        buildInfoPath: null,
+        filePath: '/x/a.ts',
+      });
+      assert.ok(args.includes('/x/a.ts'), 'file path must be passed as an input to tsc');
+      assert.ok(!args.includes('--project'), 'no tsconfig means no --project flag');
+    });
   });
 
   describe('buildInfoPathFor (stable per-project cache)', () => {
@@ -412,6 +423,32 @@ describe('quality-check: tsc incremental cost bound (RV-4)', () => {
 
       assert.strictEqual(calls.length, 1, 'a real type error must not trigger a (futile) retry');
       assert.strictEqual(result.errors.length, 1);
+    });
+
+    it('passes the file path to tsc when no ancestor tsconfig.json exists (TS-1)', () => {
+      const { runTypeCheck } = require('../quality-check/typescript');
+      const file = path.join(testDir, 'a.ts');
+      fs.writeFileSync(file, 'const x: number = "bad";\n');
+      const absoluteFile = path.resolve(file);
+
+      const calls = [];
+      const run = (_cmd, args) => {
+        calls.push(args);
+        return {
+          stdout: `${absoluteFile}(1,7): error TS2322: Type 'string' is not assignable to type 'number'.`,
+          stderr: '',
+          exitCode: 2,
+        };
+      };
+      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+
+      assert.ok(
+        calls[0].includes(absoluteFile),
+        'no tsconfig found → tsc must receive the file path as an input',
+      );
+      assert.ok(!calls[0].includes('--project'), 'no tsconfig found → no --project flag');
+      assert.strictEqual(result.errors.length, 1, 'the real type error must surface');
+      assert.ok(result.errors[0].includes('TS2322'));
     });
   });
 });
