@@ -80,7 +80,7 @@ Plan all requirements from all detail files in `specs/<spec-id>/details/`. Every
 
 ### v2+ spec (one or more `<delta>` elements)
 
-Read `parsed.latest_delta` — the delta whose `version` equals the current `spec_version`. Every child of that delta generates exactly one epic:
+Read `header.latest_delta` — the delta whose `version` equals the current `spec_version`. Every child of that delta generates exactly one epic:
 
 | Delta child | Epic semantics | source_requirement |
 |---|---|---|

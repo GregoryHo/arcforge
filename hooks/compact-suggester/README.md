@@ -54,15 +54,21 @@ correlated against compaction events.
 
 ## Output Examples
 
-At 50 calls (neutral phase):
+Every threshold hit (50, 75, 100, 125...) uses the same single format,
+naming the current phase:
 ```
-📊 50 tool calls this session. If you're between workflow phases, consider /compact to preserve context quality. Use arc-compacting for timing guidance.
+📊 50 tool calls (mixed work) — possible compaction boundary. See arc-compacting for whether to /compact now.
 ```
 
-At 75, 100, 125... calls:
+**Dual-channel delivery (ICL-10):** on a threshold hit the hook emits exactly
+one merged JSON object carrying both channels at once — the `systemMessage`
+above (user-visible) and a companion `additionalContext` arc-compacting
+indicator (model-visible):
 ```
-📊 75 tool calls. Between phases? /compact helps maintain context quality for longer sessions.
+arc-compacting indicator: 50 tool calls (mixed work phase) — at a possible compaction boundary. Consult arc-compacting to decide whether to /compact at this phase boundary.
 ```
+Neither line issues a compaction directive — the actual /compact-or-not
+timing call is deferred to the `arc-compacting` skill.
 
 ## Why This Matters
 

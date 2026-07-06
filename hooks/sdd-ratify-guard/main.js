@@ -26,9 +26,6 @@ const { LOOP_SENTINEL, loopSentinelPresent } = require('../../scripts/lib/sdd-ut
 // Matches "arcforge ratify" and "node <anything>/cli.js ratify".
 const RATIFY_PATTERN = /(?:^|\s)(?:arcforge\s+ratify|node\s+\S*cli\.js\s+ratify)(?:\s|$)/;
 
-/** Alias kept for backwards-compat with unit-test exports. */
-const sentinelPresent = loopSentinelPresent;
-
 /**
  * Pure decision core for a PreToolUse Bash event.
  * Returns a deny reason string, or null to allow.
@@ -51,7 +48,7 @@ function evaluate(input) {
   const cwd = input.cwd || process.cwd();
 
   // Lifecycle-aware live-loop check (worktree cwds resolve to their base).
-  if (!sentinelPresent(cwd)) return null;
+  if (!loopSentinelPresent(cwd)) return null;
 
   return (
     `"arcforge ratify" denied — a live autonomous loop was detected for ${cwd}\n` +
@@ -87,7 +84,7 @@ function main() {
   }
 }
 
-module.exports = { evaluate, sentinelPresent };
+module.exports = { evaluate };
 
 if (require.main === module) {
   main();

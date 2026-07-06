@@ -14,7 +14,7 @@ Save patterns and insights from the current session as instincts. This skill bri
 
 | Task | Command |
 |------|---------|
-| **Save instinct** | `node "${SKILL_ROOT}/scripts/recall.js" save --id {id} --trigger "..." --action "..." --domain {d} --project {p}` |
+| **Save instinct** | `node "${SKILL_ROOT}/scripts/recall.js" save --id {id} --trigger "..." --action "..." --domain {d} --project {p} [--evidence "..."] [--evidence-count N]` |
 | **Check duplicate** | `node "${SKILL_ROOT}/scripts/recall.js" check-duplicate --id {id} --project {p}` |
 | **Save record** | `node "${SKILL_ROOT}/scripts/recall.js" save-record --project {p} --recall-id recall-{id} [--query "..."] [--instinct-ids "a,b,c"] [--summary "..."]` |
 
@@ -42,7 +42,7 @@ fi
 4. **Check duplicate** before saving
 5. **Save** via instinct-writer with:
    - `source: 'manual'`
-   - `confidence: 0.50` (starting confidence for manual instincts)
+   - `confidence: min(0.9, 0.5 + 0.05 * evidence_count)` (default evidence-count is 1, giving 0.55)
    - `maxConfidence: 0.90` (manual instincts use full MAX_CONFIDENCE)
 6. **Save record** of the recall operation so the learning curator has evidence
    that this recall happened:

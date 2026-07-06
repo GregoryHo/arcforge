@@ -3,8 +3,9 @@
  * User Message Counter
  *
  * Tracks user prompt submissions via UserPromptSubmit hook.
- * Count is stored in temp file and used by session-tracker
- * to determine if session is long enough for pattern extraction.
+ * Count is stored in temp file and used by diary-capture.js
+ * (via createSessionCounter) to determine if session is long enough
+ * for pattern extraction.
  */
 
 const {
@@ -28,7 +29,8 @@ function getCounter() {
  * Main entry point - UserPromptSubmit hook
  */
 function main() {
-  // Read and pass through stdin (for hook chaining)
+  // Read and pass through stdin. Note: this is NOT hook chaining — Claude
+  // Code does not pipe one hook's stdout into the next hook's stdin.
   const stdin = readStdinSync();
   process.stdout.write(stdin);
 

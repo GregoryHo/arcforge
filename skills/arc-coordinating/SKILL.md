@@ -18,7 +18,7 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 
 **Single-epic projects:** Use arc-implementing directly (except `merge` in a worktree).
 
-**If already in a worktree:** Use arc-implementing, except for `merge` (allowed).
+**If already in a worktree:** Use arc-implementing, except for `merge` and `sync` (both allowed).
 
 **DAG requirement:** `specs/<spec-id>/dag.yaml` must exist and be committed before running coordinator commands. In base-side sessions with multiple specs, commands that cannot aggregate (`next`, `parallel`, `expand`, `loop`) require `--spec-id <id>`; `merge` / `cleanup` accept positional epic ids as disambiguator.
 
@@ -38,7 +38,7 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 
 ## CLI Usage
 
-**IMPORTANT**: Set `SKILL_ROOT` to the absolute path from the skill loader header (`# SKILL_ROOT: ...`).
+**IMPORTANT**: Set `SKILL_ROOT` from the `ARCFORGE_ROOT` environment variable, using the fallback below when unset.
 
 ```bash
 : "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-coordinating}"
@@ -64,7 +64,7 @@ node "${SKILL_ROOT}/scripts/coordinator.js" status --json
 
 Workflow:
 
-1. **Set SKILL_ROOT**: From the skill loader header
+1. **Set SKILL_ROOT**: From `ARCFORGE_ROOT` (see CLI Usage fallback above)
 2. **Check Exit Code**: If exit 1, report blocked format and stop
 3. **Execute Command**: Use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>`
 4. **Never Fallback**: Do NOT attempt manual operations if CLI fails

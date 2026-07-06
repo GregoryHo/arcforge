@@ -353,8 +353,8 @@ See `graphviz-conventions.dot` for graphviz style rules.
 
 **Visualizing for your human partner:** Use `render-graphs.js` to render a skill's flowcharts to SVG:
 ```bash
-./render-graphs.js ../some-skill           # Each diagram separately
-./render-graphs.js ../some-skill --combine # All diagrams in one SVG
+"${SKILL_ROOT}/render-graphs.js" ../some-skill           # Each diagram separately
+"${SKILL_ROOT}/render-graphs.js" ../some-skill --combine # All diagrams in one SVG
 ```
 
 ## Examples

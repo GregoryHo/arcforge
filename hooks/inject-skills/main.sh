@@ -9,7 +9,7 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Inject ARCFORGE_ROOT into Bash tool environment (for SKILL_ROOT fallback)
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "export ARCFORGE_ROOT=\"${PLUGIN_ROOT}\"" >> "$CLAUDE_ENV_FILE"
+  echo "export ARCFORGE_ROOT=\"${PLUGIN_ROOT}\"" >> "$CLAUDE_ENV_FILE" || true
 fi
 
 # Attended-mode opt-in: when the project carries an .arcforge-attended marker,
@@ -21,7 +21,7 @@ fi
 # every hook; if it is unset we simply do not opt in (we never parse stdin here).
 if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -n "${CLAUDE_PROJECT_DIR:-}" ] &&
   [ -f "${CLAUDE_PROJECT_DIR}/.arcforge-attended" ]; then
-  echo "export ARCFORGE_MODE=attended" >> "$CLAUDE_ENV_FILE"
+  echo "export ARCFORGE_MODE=attended" >> "$CLAUDE_ENV_FILE" || true
 fi
 
 # Escape outputs for JSON using pure bash

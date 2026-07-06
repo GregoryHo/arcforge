@@ -362,11 +362,11 @@ function main() {
     const command = input.tool_input?.command || '';
     const cwd = input.cwd || process.cwd();
 
-    // Record that a test ran (used by the PR-boundary note); a test command is
-    // never also one of the trigger commands below, so stop here.
+    // Record that a test ran (used by the PR-boundary note). A compound command
+    // (e.g. `npm test && gh pr create`) can match both isTestCommand and
+    // isPrBoundary, so don't return here — fall through to the PR-boundary check.
     if (isTestCommand(command)) {
       bump('arc-remind-test-seen');
-      return;
     }
 
     if (isPrBoundary(command)) {

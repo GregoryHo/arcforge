@@ -3,7 +3,7 @@
 # dispatcher. It is invoked by hooks.json for inject-skills/main.sh.
 set -euo pipefail
 
-HOOK_SCRIPT="$1"
+HOOK_SCRIPT="${1:-}"
 if [ -z "${HOOK_SCRIPT}" ]; then
     echo "Usage: run-hook.cmd <hook-script>"
     exit 1

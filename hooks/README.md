@@ -24,7 +24,7 @@ hooks/
 ├── sdd-ratify-guard/       # Blocks `arcforge ratify` in unattended loop context
 │   ├── main.js
 │   └── README.md
-├── quality-check/          # Auto-format & type-check on Edit
+├── quality-check/          # Auto-format & type-check on Edit or Write
 │   ├── main.js
 │   ├── prettier.js
 │   ├── typescript.js
@@ -44,7 +44,8 @@ hooks/
 │   ├── main.js
 │   └── README.md
 └── observe/                # Tool call observation
-    └── main.js
+    ├── main.js
+    └── README.md
 ```
 
 ## Active Hooks
@@ -81,7 +82,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| quality-check | Edit on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
+| quality-check | Edit\|Write on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
 | observe | All | Captures tool call results for behavioral pattern observation |
 | compact-suggester | All | Counts tool calls, suggests /compact at 50, then every 25 |
 | arc-remind | Bash, Edit, Write | Contextual nudges: PR boundary after green tests, eval-before-ship on skill edits, spec planning, main-branch warning |
@@ -96,7 +97,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| pre-compact | All | Logs compaction event, marks session file with compaction timestamp |
+| pre-compact | All | Resets compact-suggester state, runs threshold-gated diary capture, queues a `diary-ready` pending action |
 
 ## Adding New Hooks
 

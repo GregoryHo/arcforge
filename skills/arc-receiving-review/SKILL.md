@@ -80,5 +80,5 @@ When all feedback items are implemented and tested:
 
 ## Integration
 
-- **Called by:** arc-agent-driven, arc-requesting-review
+- **Called by:** arc-requesting-review
 - **Related:** arc-verifying (verification mindset)

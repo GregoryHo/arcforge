@@ -111,7 +111,7 @@ This branch fires when the user confirms a new topic and no `specs/<spec-id>/spe
 
 ### Phase 2 Decision-Ledger Output (D6)
 
-After the proposed approaches and trade-offs are clear, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant design decision. Follow the `DECISION_LEDGER_RULES` field shape (same as the "When Prior Spec Exists" branch above). If `specs/<spec-id>/decisions.yml` does not yet exist, create it as a YAML sequence. The B2 immutability hook enforces append-only on all writes to `decisions.yml`.
+After the proposed approaches and trade-offs are clear, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant design decision. Follow the `DECISION_LEDGER_RULES` field shape (same as the "When Prior Spec Exists" branch below). If `specs/<spec-id>/decisions.yml` does not yet exist, create it as a YAML sequence. The B2 immutability hook enforces append-only on all writes to `decisions.yml`.
 
 ### Phase 3: Presenting
 

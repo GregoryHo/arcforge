@@ -25,6 +25,11 @@ otherwise; it denies via `permissionDecision: 'deny'`.
 - **`git merge`** excludes `git merge-base` and conflict-recovery
   (`--abort/--continue/--quit`) — those run legitimately during the epic merge
   flow. **Loop** matches invocations, not `cat`/`diff` of a file named `loop.js`.
+- **Known limitation:** `GIT_MERGE_RE` requires `git` and `merge` separated only
+  by whitespace, so any `-C <path>` operand between them (e.g. `git -C <dir>
+  merge`) is never matched — such invocations are not intercepted by G2,
+  regardless of `--abort/--continue/--quit`. See
+  `hooks/__tests__/arc-guard.test.js` (WT-5 cases) for the pinned behavior.
 - **R-scope blocks only CANNOT entries that resolve to an existing file/dir.**
   `research-config.md`'s CANNOT list is free-form prose, so prose words and globs
   are skipped. A missed fence is recoverable (the research loop runs on a branch

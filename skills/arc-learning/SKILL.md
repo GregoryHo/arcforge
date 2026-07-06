@@ -64,9 +64,9 @@ The full set of statuses a candidate moves through:
 
 - **No active behavior change without explicit activation.** Pending candidates and inactive drafts do not affect runtime behavior.
 - **Project scope first.** Project learning writes project-local config, queues, and drafts. Promotion to global scope is an explicit dashboard action; silent auto-promotion to global remains unsupported.
-- **Human authorization at gates.** The LLM curator proposes; users approve/reject, materialize, and activate via dashboard or CLI.
+- **Human authorization at gates.** The LLM curator proposes; users approve/reject, materialize, and activate via dashboard.
 - **Redacted durable evidence.** Observations are sanitized before persistence; candidate evidence stores review-safe summaries, not raw tool payloads.
-- **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and refuses to overwrite existing active artifacts.
+- **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and defaults to `supersede_with_backup`; only refuses when the policy is not `supersede_with_backup`.
 - **Duplicate suppression.** The curator should not append semantic duplicate candidates for the same learned behavior.
 
 ## When to Use

@@ -58,12 +58,14 @@ Ship gate (fr-sc-003-ac2): all three axis evals MUST exist and at least one scen
 | File | Covers | ACs | Shape |
 |---|---|---|---|
 | `oi-001-emphasis-single-high.md` | fr-oi-001-ac5 | Single-HIGH ⚠️ emphasis in Phase 2 Overview; N_HIGH == 0 and N_HIGH >= 2 baseline non-emphasis | Harness-executable (⚠️ prefix check) + Behavioral (detail-block no-bleed, Phase 3 firing) |
+| `oi-002-threshold-n-high-0.md` | fr-oi-002-ac5 | N_HIGH == 0 exit path — Phase 3/4/5 all skipped | Behavioral |
+| `oi-003-low-resolutions-skip.md` | fr-oi-003-ac6 | Phase 4 auto-skip for Stage-2 entries with < 2 resolutions | Behavioral |
+| `oi-004-decisions-table-suppressed.md` | fr-oi-004-ac4 | Phase 5 Decisions table suppressed on N_HIGH == 0 | Behavioral |
+| `threshold-change1-coverage.md` | fr-sc-003-ac3 | Coverage index confirming a scenario exists for each Change-1 threshold branch (a)/(b)/(c) | Documentation (not itself an eval scenario) |
+| `threshold-change1-n-high-1-full.md` | fr-oi-001-ac5, fr-oi-002-ac6, fr-oi-004 | N_HIGH == 1 end-to-end full path (emphasis + no multi-select + Phase 4 entry + Phase 5 rendered) | Behavioral |
 
 ## To be added in future `output-and-interaction` epics
 
 | File | Covers | Shape |
 |---|---|---|
 | `report-rendering.md` | fr-oi-001 (full layout conformance) | Harness-executable (table layout conformance) |
-| `triage-ux.md` | fr-oi-002 | Behavioral — AskUserQuestion multi-select + Other pull-in |
-| `resolution-ux.md` | fr-oi-003 | Behavioral — AskUserQuestion per-finding + preview diffs |
-| `decisions-and-save.md` | fr-oi-004, fr-oi-005 | Harness-executable (Decisions table format) + Behavioral (--save path) |

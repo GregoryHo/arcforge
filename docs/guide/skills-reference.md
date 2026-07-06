@@ -324,7 +324,7 @@ The complete catalog still uses functional categories for lookup:
 1. Verify DAG exists (from arc-planning) and baseline tests pass
 2. Choose loop pattern: sequential (safest, one task at a time) or DAG (parallel-aware)
 3. Set bounds: `--max-runs` and optional `--max-cost`
-4. Start loop: `node scripts/cli.js loop --pattern sequential --max-runs 20`
+4. Start loop: `node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20`
 5. Each iteration: read dag.yaml, spawn fresh Claude session, execute task, update DAG
 6. Stop on: all complete, max-runs hit, cost limit, stall detected, or retry storm
 

@@ -167,7 +167,7 @@ Key build rules (these restate the mechanical invariants above in context):
 - **`addText` with box returns the BOX id** — use this for `connectObjects`, not the text id
 - **Stagger anchors** when multiple arrows leave one shape (left/bottom/right, not all bottom)
 - **Diamond text ≤ 12 chars** — diamonds have ~50% less usable area than rectangles
-- **`viewBackgroundColor`** — `#1e1e1e` (dark) or `#ffffff` (light), per Step 4
+- **`viewBackgroundColor`** — `#1e1e1e` (dark) or `#ffffff` (light), per Process Invariants
 
 Read `references/element-templates.md` for the full EA API reference, raw JSON templates for Phase 2 fixes, and the binding checklist.
 

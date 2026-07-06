@@ -1,7 +1,7 @@
 ---
 name: arc-managing-sessions
 description: Use when ending a session and handing off to a future session, summarizing recent context, continuing from where the last turn left off, archiving a session for durable reference, or resuming/listing/aliasing saved sessions
-argument-hint: "save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <session-path> <name> | aliases"
+argument-hint: "handover [--mode quick|full|tail] | save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <session-path> <name> | aliases"
 ---
 
 # Managing Sessions

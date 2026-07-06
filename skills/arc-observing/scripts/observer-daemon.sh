@@ -13,7 +13,6 @@ INSTINCTS_DIR="${ARCFORGE_DIR}/instincts"
 OBS_DIR="${ARCFORGE_DIR}/observations"
 LOCK_DIR="${INSTINCTS_DIR}/.observer.lock"
 LOG_FILE="${INSTINCTS_DIR}/observer.log"
-GLOBAL_INDEX="${INSTINCTS_DIR}/global-index.jsonl"
 
 # ARCFORGE_ROOT: path to the arcforge repo containing scripts/lib/learning-curator/cli.js
 # Prefer env var (set by plugin sessions + tests); fall back to grandparent of SCRIPT_DIR.
@@ -33,9 +32,6 @@ MAX_AGE=7200           # 2 hours maximum lifetime
 ANALYSIS_COOLDOWN=60   # Minimum 60 seconds between analyses
 # Watchdog timeout for claude CLI invocation (override via env var for tests)
 OBSERVER_DAEMON_WATCHDOG_SECS="${OBSERVER_DAEMON_WATCHDOG_SECS:-120}"
-
-# Path to observer prompt (relative to this script's directory)
-OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
 
 # ─────────────────────────────────────────────
 # Logging
