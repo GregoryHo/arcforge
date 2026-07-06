@@ -15,16 +15,6 @@ const {
   createSessionCounter,
 } = require('../../scripts/lib/utils');
 
-// Counter is created lazily on first access
-let userCounter = null;
-
-function getCounter() {
-  if (!userCounter) {
-    userCounter = createSessionCounter('user-count');
-  }
-  return userCounter;
-}
-
 /**
  * Main entry point - UserPromptSubmit hook
  */
@@ -39,7 +29,7 @@ function main() {
   setSessionIdFromInput(input);
 
   // Increment counter
-  const counter = getCounter();
+  const counter = createSessionCounter('user-count');
   const currentCount = counter.read();
   counter.write(currentCount + 1);
   process.exit(0);
