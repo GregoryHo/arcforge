@@ -1,6 +1,6 @@
 # arcforge Skills Reference
 
-This is the offline reference for all 33 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
+This is the offline reference for all 32 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
 
 ## Table of Contents
 
@@ -59,7 +59,7 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 33 skills are organized into a three-layer model:
+arcforge's 32 skills are organized into a three-layer model:
 
 1. **Core toolkit** — the small promoted surface most users should learn first.
 2. **Optional workflows** — recipes and advanced orchestration used only when the task justifies them.
@@ -251,7 +251,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Key workflow:**
 1. Phase 0: Sync and check dependencies via arc-coordinating
-2. Phase 1: Epic to features via arc-writing-tasks
+2. Phase 1: Confirm features exist — already produced by `arc-planning` Phase 3; no skill call, read the feature files directly and proceed to Phase 2
 3. Phase 2a: Feature to tasks via arc-writing-tasks (max 2 refinement cycles)
 4. Phase 2b: Execute tasks via arc-agent-driven
 5. Phase 3: Move to next feature or finish epic
@@ -463,19 +463,17 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.arcforge/sessions/` directory layout.
 
-**Purpose:** User-controlled session saves for continuity across conversations — save what matters, resume when needed.
+**Purpose:** Lightweight, user-controlled session continuity. Default = handover, not archive — most handoffs need only a short handover (quick bullet list, full context summary, or a tail marker); reach for a durable archive snapshot only when the session holds decisions or patterns worth preserving weeks or months later.
 
-**When to use:** When saving session state for cross-conversation handoff, resuming a previous session, listing session history, or managing session aliases.
+**When to use:** When ending a session and handing off to a future session — default is a lightweight handover (quick bullets, full context summary, or a tail "you are here" marker, no file written unless asked). Escalate to an archive snapshot (save) only when the archive-recommendation heuristics fire (explicit ask, high decision density, lasting value); use resume/list/alias to work with archived sessions.
 
 **Key workflow:**
-1. **Save:** Reflect on conversation, write enrichment (summary, what worked/failed, blockers, next step), save to session file
-2. **Resume:** Resolve alias, read session file, present structured briefing, WAIT for user confirmation
-3. **List:** Browse sessions with filters (`--limit`, `--date`, `--query`)
-4. **Alias:** Create friendly names for easy session reference
+1. **Handover (default):** Pick the lightest mode that unblocks the next session — Quick Handover (5–10 line bullets, no file by default), Full Context Summary (longer, for cross-agent/cross-person handoff), or Tail Handover (last exchanges + immediate next step only).
+2. **Archive (advanced, opt-in):** Only when the archive-recommendation heuristics say the work is worth preserving — `save [alias]` reflects on the conversation and writes an enriched durable file; `resume [alias]` resolves the alias, reads the file, presents a structured briefing, and WAITs for user confirmation; `list` browses history (`--limit`, `--date`, `--query`); `alias` creates friendly names.
 
 **Artifacts:**
 - Input: current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
-- Output: `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
+- Output: handovers print inline by default (optional `handover-{slug}.md` if asked); archive snapshots write `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
 
 **Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
 
@@ -756,18 +754,19 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Platform:** All platforms. Requires an Obsidian vault; `obsidian-cli` is preferred for vault operations but the skill falls back to direct file writes when the CLI is unavailable.
 
-**Purpose:** Unified Obsidian vault lifecycle skill — one agent, three modes (ingest, query, audit) — implementing Karpathy's LLM Wiki pattern for a persistent, compounding knowledge base. Eliminates wiki maintenance burden by handling classification, schema compliance, propagation, and gap analysis as a single shared-context operation.
+**Purpose:** Vault interface — resolves which registered Obsidian vault to operate on (via `--vault=<name>`, cwd match, or the single-vault default), then dispatches one of three universal actions (ingest, query, audit) against that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema). Vaults are domain-agnostic; `init-vault` bootstraps a new vault from a preset (minimal, llm-wiki, news, project-tracker).
 
-**When to use:** When creating, querying, or maintaining an Obsidian vault. Triggers on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about X"), auditing vault health (missing links, orphan notes, stale content), or ingesting raw files (Excalidraw, PDFs, screenshots, papers).
+**When to use:** When creating, querying, or maintaining an Obsidian vault. Triggers on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about X"), auditing vault health (missing links, orphan notes, stale content), or ingesting raw files (Excalidraw, PDFs, screenshots, papers); also when initializing a new vault (`init-vault`), registering an existing vault (`register`), or managing the multi-vault registry (`list-vaults`, `unregister`, `set-default`).
 
 **Key workflow:**
-- **Ingest** pipeline: `Classify → Confirm → Create → Visuals → Index → Propagate → Log` — 6 page types (Source, Entity, Synthesis, MOC, Decision, Log) + Paper variant for academic papers. Raw-first-then-wiki rule preserves re-extraction ability.
+- **Registry-level** (vault-agnostic): `init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>]` runs an 11-step bootstrap that authors `AGENTS.md` + `SCHEMA.md` from the chosen preset and registers the vault; `register` / `unregister` / `set-default` / `list-vaults` manage `~/.arcforge/obsidian-vaults.json`.
+- **Ingest** pipeline: `Classify → Confirm → Create → Visuals → Index → Propagate → Log` — page types are declared per-vault in that vault's `SCHEMA.md` (the llm-wiki preset ships Source, Entity, Synthesis, MOC, Decision, Log + a Paper variant; news/project-tracker declare their own domain-specific types). Raw-first-then-wiki rule preserves re-extraction ability.
 - **Query** pipeline: `Orient → Search → Read → Synthesize → (File Back)` — vault-only answers (no general-knowledge backfill), inline citations, optional file-back as a new synthesis note.
 - **Audit** pipeline: `LINK → LINT → GROW` — resolve plain-text mentions into wikilinks, schema/orphan/stale checks with `index.md` rebuild, gap analysis with internal and external suggestions.
 
 **Artifacts:**
 - Input: URLs, files, text descriptions, natural-language queries
-- Output: typed wiki notes with bilingual `[!multi-lang-{code}]` callout format, audit reports under `audit-YYYY-MM-DD-<subcommand>.md`, rolling `index.md` and `log.md`
+- Output: typed notes per the vault's `SCHEMA.md`; language format (e.g. bilingual `[!multi-lang-{code}]` callouts under the llm-wiki/minimal presets, vs single-language body text under news/project-tracker) is declared in that vault's `AGENTS.md` Language Policy; audit reports under `_audits/audit-YYYY-MM-DD-<scope>.md`, rolling `index.md` and `log.md`
 
 **Related:** user input --> **arc-maintaining-obsidian** (three modes) --> vault state updated. Delegates Excalidraw creation to **arc-diagramming-obsidian** via the Visuals decision tree.
 
