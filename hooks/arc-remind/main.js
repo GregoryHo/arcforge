@@ -363,15 +363,22 @@ function main() {
     const cwd = input.cwd || process.cwd();
 
     // Record that a test ran (used by the PR-boundary note). A compound command
-    // (e.g. `npm test && gh pr create`) can match both isTestCommand and
-    // isPrBoundary, so don't return here — fall through to the PR-boundary check.
+    // (e.g. `npm test && gh pr create`) can match multiple predicates at once —
+    // isTestCommand alongside isPrBoundary, isWorktreeAdd, or isShipCommand — so
+    // don't return here; every check below still runs for the same event.
     if (isTestCommand(command)) {
       bump('arc-remind-test-seen');
     }
 
+    // PR-boundary and ship-a-skill both reach the model over the same
+    // PostToolUse channel in autopilot mode (RV-5), and a compound command like
+    // `git commit && git push && gh pr create` can independently satisfy both —
+    // collect whichever nudge(s) apply here and emit them together as ONE
+    // merged message, rather than letting isPrBoundary's early return silently
+    // drop the ship nudge.
+    const nudgeTexts = [];
     if (isPrBoundary(command)) {
-      emitNudge(cwd, buildReminder(command, counter('arc-remind-test-seen').read() > 0));
-      return;
+      nudgeTexts.push(buildReminder(command, counter('arc-remind-test-seen').read() > 0));
     }
 
     if (isWorktreeAdd(command) && isArcforgeProject(cwd)) {
@@ -386,7 +393,11 @@ function main() {
       counter('arc-remind-skill-ship-warned').read() === 0
     ) {
       bump('arc-remind-skill-ship-warned');
-      emitNudge(cwd, buildEvalShipNudge(cwd));
+      nudgeTexts.push(buildEvalShipNudge(cwd));
+    }
+
+    if (nudgeTexts.length > 0) {
+      emitNudge(cwd, nudgeTexts.join(''));
     }
   } catch {
     // Non-blocking — never crash the session.
