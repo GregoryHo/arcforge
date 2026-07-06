@@ -398,11 +398,15 @@ describe('quality-check: tsc incremental cost bound (RV-4)', () => {
         calls.push(args);
         return { stdout: '', stderr: '', exitCode: 0 };
       };
-      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+      const result = runTypeCheck(file, 'npm', {
+        execCommand: 'stub-tsc',
+        run,
+        findUpwards: () => null,
+      });
 
       assert.strictEqual(calls.length, 1, 'success on the incremental path → no retry');
       assert.ok(calls[0].includes('--incremental'), 'used the incremental fast path');
-      assert.deepStrictEqual(result, { errors: [], warnings: [] });
+      assert.deepStrictEqual(result, { errors: [], warnings: [], standalone: true });
     });
 
     it('does not retry on a genuine type error (real errors are not flag rejections)', () => {
@@ -440,7 +444,11 @@ describe('quality-check: tsc incremental cost bound (RV-4)', () => {
           exitCode: 2,
         };
       };
-      const result = runTypeCheck(file, 'npm', { execCommand: 'stub-tsc', run });
+      const result = runTypeCheck(file, 'npm', {
+        execCommand: 'stub-tsc',
+        run,
+        findUpwards: () => null,
+      });
 
       assert.ok(
         calls[0].includes(absoluteFile),
@@ -449,6 +457,19 @@ describe('quality-check: tsc incremental cost bound (RV-4)', () => {
       assert.ok(!calls[0].includes('--project'), 'no tsconfig found → no --project flag');
       assert.strictEqual(result.errors.length, 1, 'the real type error must surface');
       assert.ok(result.errors[0].includes('TS2322'));
+    });
+
+    it('flags the result as standalone when no ancestor tsconfig.json exists (TS-1 follow-up)', () => {
+      const { runTypeCheck } = require('../quality-check/typescript');
+      const file = path.join(testDir, 'b.ts');
+      fs.writeFileSync(file, 'const x: number = 1;\n');
+      const run = (_cmd, _args) => ({ stdout: '', stderr: '', exitCode: 0 });
+      const result = runTypeCheck(file, 'npm', {
+        execCommand: 'stub-tsc',
+        run,
+        findUpwards: () => null,
+      });
+      assert.strictEqual(result.standalone, true, 'no tsconfig found → standalone must be true');
     });
   });
 });

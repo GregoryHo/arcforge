@@ -87,7 +87,10 @@ function isIncrementalFlagRejected(output) {
 /**
  * Run TypeScript compiler on project (noEmit mode)
  * Filters errors to only show those from the edited file
- * Returns { errors: string[], warnings: string[] }
+ * Returns { errors: string[], warnings: string[], standalone: boolean } —
+ * standalone is true when no ancestor tsconfig.json was found, so the check
+ * ran with tsc's bare default options rather than the project's real
+ * configuration
  *
  * Cost bound: uses --incremental with a stable per-project .tsbuildinfo so the
  * second and later runs reuse cached results. If the installed tsc rejects the
@@ -112,9 +115,10 @@ function runTypeCheck(filePath, pmName, inject = {}) {
 
   // Find tsconfig.json by walking up from file directory
   const fileDir = path.dirname(filePath);
-  const tsconfigPath = findUpwards('tsconfig.json', fileDir);
-  const buildInfoPath = buildInfoPathFor(tsconfigPath || fileDir);
+  const findTsconfig = inject.findUpwards || findUpwards;
+  const tsconfigPath = findTsconfig('tsconfig.json', fileDir);
   const absolutePath = path.resolve(filePath);
+  const buildInfoPath = buildInfoPathFor(tsconfigPath || absolutePath);
 
   // injectable runner for tests; defaults to the safe execCommand wrapper.
   const run = inject.run || ((c, a) => execCommand(c, a, { timeout: 30000 }));
@@ -134,8 +138,10 @@ function runTypeCheck(filePath, pmName, inject = {}) {
     );
   }
 
+  const standalone = !tsconfigPath;
+
   if (result.exitCode === 0) {
-    return { errors: [], warnings: [] };
+    return { errors: [], warnings: [], standalone };
   }
 
   // Parse TypeScript output and filter to edited file only
@@ -154,7 +160,7 @@ function runTypeCheck(filePath, pmName, inject = {}) {
 
     // Check if error is from our edited file
     const errorFilePath = path.resolve(errorFile);
-    if (errorFilePath === absolutePath || errorFile.endsWith(basename)) {
+    if (errorFilePath === absolutePath || path.basename(errorFile) === basename) {
       const formattedError = `Line ${line}: ${message} (${code})`;
       if (severity === 'warning') {
         warnings.push(formattedError);
@@ -168,6 +174,7 @@ function runTypeCheck(filePath, pmName, inject = {}) {
   return {
     errors: errors.slice(0, 15),
     warnings: warnings.slice(0, 15),
+    standalone,
   };
 }
 

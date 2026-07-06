@@ -39,7 +39,10 @@ check does not apply the project's own `tsconfig.json` settings (lib, types,
 paths, strict, etc.), so it can surface noise unrelated to real project
 errors — e.g. `TS2591: Cannot find name 'node:fs'` on an otherwise-valid
 `import { readFileSync } from 'node:fs'`. This is accepted: a noisy but real
-check is preferable to a silent false-clean result.
+check is preferable to a silent false-clean result. Standalone-mode results
+are labeled distinctly in the model-facing heading (`no tsconfig.json
+found — checked with default compiler options...`) so the model can weigh
+them accordingly instead of mistaking them for real project-aware errors.
 
 ## Output
 
