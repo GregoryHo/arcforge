@@ -30,7 +30,7 @@ Once the daemon is running and learning is enabled, the **dashboard** is where a
 
 ### Retired / Deprecated CLI commands
 
-Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI but do not read or write the candidate queue — use the dashboard instead.
+Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI. Under `--project` scope they read/write a project-local queue that the dashboard and curator never touch — informational only, safe to ignore. Under `--global` scope, `review|inbox|inspect|drafts` read the *same* canonical `~/.arcforge/learning/candidates/queue.jsonl` file the curator populates (verify: `getCandidateQueuePath({scope:'global'})` in `${ARCFORGE_ROOT}/scripts/lib/learning.js` resolves to the identical path as the curator's `${ARCFORGE_ROOT}/scripts/lib/learning-curator/queue-writer.js`); `approve|reject|materialize|activate --global` additionally rewrite that file wholesale without acquiring the curator's `store.lock` — do not run these against a queue the daemon/dashboard may be actively writing — use the dashboard instead of any legacy subcommand, in either scope.
 
 Use `--json` on any command when another tool or test needs machine-readable output.
 
