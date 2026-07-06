@@ -85,11 +85,12 @@ Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
 
 ### Session Start
 `inject-context.js` builds a brief `systemMessage` summary from whichever of
-these are present — active instincts, pending action notifications, and a
-stale-draft warning (full detail goes to Claude via `additionalContext`):
+these are present — active instincts, pending action notifications, a
+stale-draft warning, available session aliases, and recent global promotions
+(full detail goes to Claude via `additionalContext`):
 
 ```
-2 active instincts | 1 pending action | 3 unenriched drafts
+2 active instincts | 1 pending action | 3 unenriched drafts | 2 session aliases | 1 new global promotion
 ```
 
 ### Session End
