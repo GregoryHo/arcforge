@@ -26,7 +26,10 @@ description: Use when completing tasks or features to request code review
 
 1. Get git SHAs:
    ```bash
-   BASE_SHA=$(git rev-parse HEAD~1)
+   # BASE_SHA = the commit the task started from (record it BEFORE the work).
+   # Never use HEAD~1: a task with more than one commit would drop all but its
+   # final commit from review.
+   BASE_SHA="${TASK_BASE_SHA:-$(git merge-base HEAD "${BASE_BRANCH:-main}")}"
    HEAD_SHA=$(git rev-parse HEAD)
    ```
 
@@ -50,7 +53,7 @@ Required placeholders:
 ```
 [Just completed Task 2: Add verification function]
 
-BASE_SHA=$(git rev-parse HEAD~1)
+BASE_SHA=$TASK_BASE_SHA   # recorded before Task 2's first commit (not HEAD~1)
 HEAD_SHA=$(git rev-parse HEAD)
 
 [Dispatch code-reviewer]
