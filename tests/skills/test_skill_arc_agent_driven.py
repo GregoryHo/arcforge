@@ -67,3 +67,19 @@ def test_arc_agent_driven_review_package_handoff():
 
     # Must warn against HEAD~1 truncating a multi-commit task
     assert "HEAD~1" in text
+
+
+def test_arc_agent_driven_durable_progress_ledger():
+    text = _read_skill()
+
+    # Ledger file lives in the same self-ignoring workspace
+    assert ".arcforge/sdd/progress.md" in text
+
+    # Exact ledger line format is the recovery contract
+    assert "Task N: complete (commits <base7>..<head7>, review clean)" in text
+
+    # Resume uses git-verifiable state, not recollection
+    assert "git log" in text.lower()
+
+    # Red Flag: never re-dispatch a ledger-complete task; reconcile first
+    assert "reconcile the ledger against `git log`" in text

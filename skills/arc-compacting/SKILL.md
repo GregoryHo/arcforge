@@ -65,6 +65,12 @@ The summary text becomes the seed for the compressed context. Make it actionable
 ### After Compact
 
 - Run `arcforge reboot` to recover DAG context quickly
+- For per-task recovery inside an `arc-agent-driven` run, read the
+  `.arcforge/sdd/progress.md` ledger — it is the per-task recovery map.
+  `arcforge reboot` recovers only epic/feature granularity; TodoWrite, though it
+  persists through compaction, carries no git-verifiable commit range, is lost
+  across a fresh session, and doesn't exist on non-Claude platforms — so the
+  ledger, paired with `git log`, is what tells you which task to resume after.
 - Re-read any files you'll need for the next phase
 - The agent will have CLAUDE.md, rules, and memory — but not conversation history
 
@@ -73,7 +79,7 @@ The summary text becomes the seed for the compressed context. Make it actionable
 **Works with:**
 - **compact-suggester hook** — triggers threshold notifications that reference this skill
 - **pre-compact hook** — auto-triggers diary capture before compaction
-- **arc-agent-driven** — compact between task batches, not mid-task
+- **arc-agent-driven** — compact between task batches, not mid-task; its `.arcforge/sdd/progress.md` ledger is your per-task recovery map after any compact or fresh session
 - **arc-planning** — compact after DAG is written to disk
 
 **Red Flags:**

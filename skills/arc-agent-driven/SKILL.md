@@ -109,6 +109,27 @@ package live in the self-ignoring `.arcforge/sdd/` workspace:
 Record BASE from *before* the implementer ran so a multi-commit task stays whole.
 `HEAD~1` as the base would truncate the package to the final commit.
 
+### Durable Progress Ledger
+
+TodoWrite and terminal narration hold per-task progress only in context — a
+mid-run auto-compaction or a fresh session can lose your place and re-dispatch
+an already-completed task (the single most expensive failure). Persist per-task
+completion to a ledger file, not only to todos.
+
+- **Ledger file:** `.arcforge/sdd/progress.md` — the same self-ignoring
+  `.arcforge/sdd/` workspace the brief and review packages use. It is a runtime
+  recovery artifact, not a tracked file. (Alternative for those who want it
+  tracked: also tick the task's checkbox in `docs/tasks/<feature>-tasks.md`.)
+- **At skill start**, check the ledger (`cat .arcforge/sdd/progress.md`). If it
+  exists, trust it plus `git log` and resume AFTER the last task marked complete
+  — do not re-dispatch tasks it already lists.
+- **After each clean review** (both stages passed), append one line in the same
+  message as your other bookkeeping:
+  `Task N: complete (commits <base7>..<head7>, review clean)`. The commits it
+  names exist in git even when your context no longer remembers creating them.
+- `git clean -fdx` destroys the ledger (git-ignored scratch); if that happens,
+  reconstruct progress from `git log`.
+
 ## Agents & Templates
 
 Two ways to dispatch each role, depending on what your platform supports:
@@ -229,6 +250,7 @@ The full agent roster for arc-agent-driven workflows:
 - Move to next task while either review has open issues
 - Hand a reviewer a bare diff and let it re-run git or crawl the codebase — build the review package and give it the file path instead
 - Use `HEAD~1` as the review base — it truncates a multi-commit task to its last commit; record the pre-implementer BASE and package `BASE..HEAD`
+- **Re-dispatch a task the ledger marks complete** — a ledger-complete task is DONE; on resume, reconcile the ledger against `git log` before dispatching anything
 
 **If subagent asks questions:**
 

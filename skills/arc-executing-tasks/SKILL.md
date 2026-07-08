@@ -82,6 +82,18 @@ After all tasks: use arc-finishing (Step 0 discriminates on `.arcforge-epic`)
 4. **Stop on failure** - Don't continue if test fails
 5. **Don't break working code** - Changes must not break existing functionality
 
+### Durable Progress Ledger
+
+Per-task progress in TodoWrite and checkpoint reports lives only in context — a
+compaction or fresh session can lose it and re-execute a completed task. Persist
+completion to a ledger file using the same format `arc-agent-driven` writes:
+after each task's verification passes, append one line to
+`.arcforge/sdd/progress.md` (a self-ignoring runtime recovery artifact; or tick
+the checkbox in `docs/tasks/<name>-tasks.md` if you want it tracked):
+`Task N: complete (commits <base7>..<head7>, review clean)`. At skill start,
+check the ledger and resume AFTER the last task it marks complete — never
+re-execute a ledger-complete task; reconcile it against `git log` first.
+
 ## Execution Flow
 
 ```dot

@@ -71,3 +71,21 @@ def test_arc_compacting_references_related_skills():
 
     # Must reference at least one other skill
     assert "arc-agent-driven" in text or "arc-planning" in text
+
+
+def test_arc_compacting_points_at_progress_ledger():
+    """Recovery guidance points per-task recovery at the durable ledger."""
+    text = _read_skill()
+
+    # Points recovery at the shared per-task ledger / recovery map
+    assert ".arcforge/sdd/progress.md" in text
+    assert "per-task recovery map" in text
+
+    # Rationale AFFIRMS the survives/lost table (TodoWrite persists through
+    # compaction) instead of contradicting it — the ledger's edge is a
+    # git-verifiable commit range, fresh-session durability, and non-Claude
+    # platforms, NOT that TodoWrite is lost to compaction.
+    assert "persists through compaction" in text.lower()
+    assert "commit range" in text.lower()
+    assert "fresh session" in text.lower()
+    assert "non-Claude" in text
