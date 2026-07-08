@@ -89,6 +89,26 @@ digraph process {
 
 **Max review cycles: 3 per reviewer.** If not converging, escalate to human with summary of unresolved issues.
 
+### Per-Task File Handoff
+
+Hand each subagent a file, not a wall of pasted text. The brief and the review
+package live in the self-ignoring `.arcforge/sdd/` workspace:
+
+1. **Before dispatching the implementer**, record the current commit as the task
+   BASE: `git rev-parse HEAD`. Optionally assemble the brief with
+   `node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/task-brief.js" --task "<text>" --acceptance "<criteria>" --base <BASE>`
+   (it prints the brief path).
+2. **After the implementer commits**, build the review package for the whole task
+   range — never just the last commit — with
+   `node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
+   It writes the commit list plus `git diff --stat` and `git diff -U10` for
+   `<BASE>..HEAD` into one file and prints that file's path.
+3. **Hand each reviewer that path** as `{DIFF_FILE}`. The reviewer reads the
+   package once; it does not re-run git or crawl the codebase.
+
+Record BASE from *before* the implementer ran so a multi-commit task stays whole.
+`HEAD~1` as the base would truncate the package to the final commit.
+
 ## Agents & Templates
 
 Two ways to dispatch each role, depending on what your platform supports:
@@ -207,6 +227,8 @@ The full agent roster for arc-agent-driven workflows:
 - Let implementer self-review replace actual review
 - **Start code quality review before spec compliance**
 - Move to next task while either review has open issues
+- Hand a reviewer a bare diff and let it re-run git or crawl the codebase — build the review package and give it the file path instead
+- Use `HEAD~1` as the review base — it truncates a multi-commit task to its last commit; record the pre-implementer BASE and package `BASE..HEAD`
 
 **If subagent asks questions:**
 

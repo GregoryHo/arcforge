@@ -55,3 +55,15 @@ def test_arc_agent_driven_contains_required_sections():
 
     # Must reference subagent dispatch
     assert "subagent" in text.lower()
+
+
+def test_arc_agent_driven_review_package_handoff():
+    text = _read_skill()
+
+    # Must wire in the pre-built review package handoff
+    assert "scripts/review-package.js" in text
+    assert ".arcforge/sdd/" in text
+    assert "{DIFF_FILE}" in text
+
+    # Must warn against HEAD~1 truncating a multi-commit task
+    assert "HEAD~1" in text
