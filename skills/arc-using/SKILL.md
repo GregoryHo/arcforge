@@ -146,6 +146,15 @@ Do not force an ArcForge workflow when the task is:
 
 In those cases, proceed directly, and only mention ArcForge skills if they materially help.
 
+## Platform Adaptation
+
+Skills describe actions in vendor-neutral terms ("dispatch a subagent", "track
+task progress", "search the web"). If your harness is not Claude Code, read its
+reference for the real tool names:
+
+- Codex: `references/codex-tools.md`
+- OpenCode: `references/opencode-tools.md`
+
 ## User Instructions
 
 User instructions say what outcome matters. ArcForge skills can help decide how to get there, but they do not override user intent, harness constraints, or higher-priority system instructions.

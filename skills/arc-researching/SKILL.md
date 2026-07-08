@@ -151,7 +151,7 @@ If **3 or more consecutive experiments** fail in the same direction (e.g., all t
 2. Read all results so far and identify untried approaches
 3. Research — search for domain knowledge you don't have yet:
    - Read documentation for tools/libraries in the target files
-   - WebSearch for optimization techniques in this domain
+   - Search the web for optimization techniques in this domain
    - Check the Strategy section's research sources for unexplored leads
    - Look at similar projects or reference implementations for patterns
 4. Choose a fundamentally different direction informed by your research

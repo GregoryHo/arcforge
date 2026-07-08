@@ -56,14 +56,14 @@ digraph process {
         "Mark task complete" [shape=box];
     }
 
-    "Read tasks, create TodoWrite" [shape=box];
+    "Read tasks, create task list" [shape=box];
     "More tasks?" [shape=diamond];
     "Multiple independent issues?" [shape=diamond];
     "Use arc-dispatching-parallel for fixes" [shape=box];
     "Dispatch final code reviewer" [shape=box];
     "Use arc-finishing" [shape=box style=filled fillcolor=lightgreen];
 
-    "Read tasks, create TodoWrite" -> "Dispatch implementer subagent";
+    "Read tasks, create task list" -> "Dispatch implementer subagent";
     "Dispatch implementer subagent" -> "Implementer asks questions?";
     "Implementer asks questions?" -> "Answer questions" [label="yes"];
     "Answer questions" -> "Dispatch implementer subagent";
@@ -189,7 +189,7 @@ regardless of how the subagent is launched.
 You: I'm using arc-agent-driven to execute these tasks.
 
 [Read task file: docs/tasks/sync-command-tasks.md]
-[Create TodoWrite with all 5 tasks]
+[Create a task list with all 5 tasks]
 
 Task 1: Add SyncResult dataclass
 

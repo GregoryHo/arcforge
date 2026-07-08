@@ -601,7 +601,7 @@ below for each skill.
 
 ## Skill Creation Checklist
 
-Track these as you go (TodoWrite helps when you're working through a multi-skill batch).
+Track these as you go (a task list helps when you're working through a multi-skill batch).
 
 **RED Phase - Write Failing Test:**
 - [ ] Create pressure scenarios (3+ combined pressures for discipline skills)

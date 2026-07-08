@@ -11,6 +11,8 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 
 **Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't pre-identify conflicts — let runtime handle runtime.
 
+**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `arc-looping` (walk-away) or `arc-executing-tasks` (attended) for multi-epic work instead.
+
 ## When to Use
 
 | Condition | Route to |

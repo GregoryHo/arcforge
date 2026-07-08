@@ -38,6 +38,12 @@ Enable agentic skills in OpenCode via native skill discovery and system transfor
 
 4. **Restart OpenCode** to discover skills and load the plugin.
 
+## Tool mapping
+
+Skills describe actions in vendor-neutral terms. For how they map to OpenCode's
+real tools (subagent dispatch, task tracking, web search), see
+`skills/arc-using/references/opencode-tools.md`.
+
 ## Verify
 
 ```bash

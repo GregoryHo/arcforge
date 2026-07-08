@@ -58,7 +58,7 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 | Phase | What | Contract |
 |---|---|---|
 | 0 | Precondition check above | fr-sc-001-ac1, fr-sc-001-ac2 |
-| 1 | Parallel fan-out to three read-only sub-agents via Task tool | `agents/arc-auditing-spec-*.md`; fr-aa-001 |
+| 1 | Parallel fan-out to three read-only sub-agents via subagent dispatch | `agents/arc-auditing-spec-*.md`; fr-aa-001 |
 | 2 | Print Summary + Findings Overview + per-finding Detail markdown | `specs/arc-auditing-spec/details/output-and-interaction.xml` fr-oi-001 |
 | 3 | Triage UX — AskUserQuestion multi-select over HIGH findings | fr-oi-002 |
 | 4 | Resolution UX — batched per-finding AskUserQuestion with diff previews | fr-oi-003 |
@@ -67,9 +67,11 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 ### Phase 1 — Parallel Fan-Out to Three Audit Axes
 
 **You MUST dispatch all three audit agents in a SINGLE message using three
-parallel Task tool uses.** Do NOT dispatch them one at a time. Sequential
+parallel subagent dispatches.** Do NOT dispatch them one at a time. Sequential
 dispatch is the baseline failure mode this rule exists to prevent — a stock
-agent defaults to serial execution; this skill forbids it.
+agent defaults to serial execution; this skill forbids it. (For your harness's
+subagent-dispatch tool, see `arc-using/references/codex-tools.md` or
+`arc-using/references/opencode-tools.md`.)
 
 Dispatch these three agents concurrently, in a single message:
 - `arc-auditing-spec-cross-artifact-alignment`

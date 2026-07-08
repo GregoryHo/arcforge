@@ -35,6 +35,12 @@ Enable agentic skills in Codex via native skill discovery. One clone, one symlin
 
 4. **Restart Codex** to discover the skills.
 
+## Tool mapping
+
+Skills describe actions in vendor-neutral terms. For how they map to Codex's
+real tools (subagent dispatch, task tracking, web search), see
+`skills/arc-using/references/codex-tools.md`.
+
 ## Verify
 
 ```bash
