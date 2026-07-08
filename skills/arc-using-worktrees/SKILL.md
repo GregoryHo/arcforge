@@ -152,6 +152,6 @@ Report the exact CLI error and stop.
 
 ## Related Skills
 
-- **Called by:** `arc-coordinating` (single-epic expansion), `arc-agent-driven`, `arc-executing-tasks`
+- **Called by:** `arc-agent-driven`, `arc-executing-tasks`
 - **Composition tier:** `arc-coordinating` (full epic lifecycle)
 - **After this skill:** Work in the created worktree, then `/arc-finishing` (Step 0 discriminates on `.arcforge-epic`) to integrate

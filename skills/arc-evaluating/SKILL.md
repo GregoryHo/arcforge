@@ -81,7 +81,7 @@ Do NOT proceed to scenario design until you can answer question 2 in one sentenc
 
 **REQUIRED BACKGROUND:** references/preflight.md — ceiling threshold (0.8), PASS/BLOCK semantics, scenario hash mechanics.
 
-**REQUIRED BACKGROUND:** references/verdict-policy.md — full verdict enum (SHIP, NEEDS WORK, BLOCKED, IMPROVED, REGRESSED, NO_CHANGE, INSUFFICIENT_DATA), why k<5 triggers INSUFFICIENT_DATA, asymmetric delta thresholds.
+**REQUIRED BACKGROUND:** references/verdict-policy.md — full verdict enum (SHIP, NEEDS WORK, BLOCKED, IMPROVED, REGRESSED, INCONCLUSIVE, INSUFFICIENT_DATA), why k<5 triggers INSUFFICIENT_DATA, asymmetric delta thresholds.
 
 ### Scenario Design Rules
 
@@ -182,4 +182,5 @@ Top mistakes that waste the most eval runs. Full catalog in references/common-mi
 - references/audit-workflow.md — promotion and retirement arbitration
 - references/grading-and-execution.md — environment setup, graders, discovered_claims/weak_assertions schemas
 - references/cli-and-metrics.md — CLI commands, metrics, storage, scenario template
+- references/eval-schemas.md — JSON schema quick reference for evals.json, grading/trial-N.json, comparison.json
 - references/common-mistakes-catalog.md — full 23-entry mistake catalog

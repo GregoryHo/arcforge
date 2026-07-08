@@ -86,10 +86,10 @@ Always use Grep to find the exact location before using Edit.
 │   │   └── archived/               # Decayed instincts
 │   ├── global/                     # Cross-project (promoted via dashboard)
 │   ├── global-index.jsonl          # Bubble-up tracking
-│   ├── config.json                 # Observer configuration
-│   └── .observer.pid               # Daemon PID file
+│   └── .observer.lock/pid          # Daemon PID file
 │
 └── learning/
+    ├── config.json                 # Observer configuration
     ├── candidates/
     │   └── queue.jsonl             # LLM curator output (pending review)
     └── dashboard/

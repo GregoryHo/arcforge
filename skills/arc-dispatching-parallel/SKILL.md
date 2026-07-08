@@ -208,9 +208,9 @@ subagent: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/feat
 subagent: "Implement feature <feature-id> from specs/<spec-id>/epics/<epic>/features/<feature>.md"
 ```
 
-Wait for all to complete, then run the Step 4 verification gate (the `verifier`
-agent, plus the `spec-reviewer` agent when a spec exists) before proceeding to
-the next group.
+Wait for all to complete, then run the "Review and Integrate" gate (§4 of The
+Pattern) (the `verifier` agent, plus the `spec-reviewer` agent when a spec
+exists) before proceeding to the next group.
 
 ### Step 6: Integrate with Coordinator
 

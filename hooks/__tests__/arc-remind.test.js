@@ -478,3 +478,81 @@ describe('arc-remind autopilot model channel (RV-5)', () => {
     }
   });
 });
+
+describe('arc-remind compound Bash commands (merged nudges)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+  const script = path.join(__dirname, '..', 'arc-remind', 'main.js');
+
+  let root;
+  let sessionId;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../arc-remind/main')];
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-remind-compound-'));
+    sessionId = `compound-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  });
+
+  const { afterEach } = require('node:test');
+  afterEach(() => {
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (f.includes(sessionId)) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  function run(toolName, toolInput) {
+    const input = {
+      session_id: sessionId,
+      cwd: root,
+      hook_event_name: 'PostToolUse',
+      tool_name: toolName,
+      tool_input: toolInput,
+    };
+    const r = spawnSync('node', [script], {
+      input: JSON.stringify(input),
+      encoding: 'utf-8',
+      timeout: 15000,
+    });
+    return r.stdout || '';
+  }
+
+  function systemMessageOf(raw) {
+    if (!raw) return '';
+    return JSON.parse(raw.trim()).systemMessage || '';
+  }
+
+  it('PR-boundary + ship-a-skill compound command merges both nudges into one message', () => {
+    fs.mkdirSync(path.join(root, 'skills', 'arc-x'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'skills', 'arc-x', 'SKILL.md'), '# skill\n');
+    const editOut = run('Edit', { file_path: 'skills/arc-x/SKILL.md' });
+    assert.strictEqual(editOut, '', 'skill edit alone should not nudge');
+
+    const raw = run('Bash', {
+      command: 'git add -A && git commit -m "x" && git push && gh pr create --fill',
+    });
+    const text = systemMessageOf(raw);
+    assert.ok(text.includes('PR boundary'), 'should include the PR-boundary nudge text');
+    assert.ok(text.includes('arc-writing-skills'), 'should include the ship-a-skill nudge text');
+  });
+
+  it('test + worktree-add compound command still fires the worktree-add nudge', () => {
+    fs.mkdirSync(path.join(root, 'specs'));
+    const raw = run('Bash', { command: 'npm test && git worktree add ../foo' });
+    const text = systemMessageOf(raw);
+    assert.ok(text.includes('arcforge expand'), 'worktree-add nudge should fire');
+  });
+
+  it('test + ship compound command fires the ship-a-skill nudge', () => {
+    fs.mkdirSync(path.join(root, 'skills', 'arc-x'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'skills', 'arc-x', 'SKILL.md'), '# skill\n');
+    const editOut = run('Edit', { file_path: 'skills/arc-x/SKILL.md' });
+    assert.strictEqual(editOut, '', 'skill edit alone should not nudge');
+
+    const raw = run('Bash', { command: 'npm test && git commit -m x' });
+    const text = systemMessageOf(raw);
+    assert.ok(text.includes('arc-writing-skills'), 'should include the ship-a-skill nudge text');
+  });
+});

@@ -124,8 +124,11 @@ describe('arc-guard evaluate', () => {
   // `git -C <base> merge --abort` (execFileSync, not the Bash tool — so it never
   // reaches this hook in production). These two cases pin the regex so that even
   // if such a command were typed into the Bash tool from a worktree, the `-C
-  // <path>` form of conflict-recovery is NOT matched (the --abort/--continue
-  // lookahead still applies through the `-C` operand).
+  // <path>` form is NOT matched — GIT_MERGE_RE requires `git` and `merge`
+  // separated only by whitespace, so any `-C <path>` operand between them
+  // defeats the match unconditionally. This is unrelated to the
+  // --abort/--continue lookahead: `-C`-initiated merges (of any kind, not just
+  // conflict recovery) are simply never intercepted by G2.
   it('does NOT block `git -C <base> merge --abort` (WT-5 conflict recovery)', () => {
     const { GIT_MERGE_RE } = require('../arc-guard/main');
     assert.strictEqual(

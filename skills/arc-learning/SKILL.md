@@ -30,7 +30,7 @@ Once the daemon is running and learning is enabled, the **dashboard** is where a
 
 ### Retired / Deprecated CLI commands
 
-Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI but do not read or write the candidate queue — use the dashboard instead.
+Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI. Under `--project` scope they read/write a project-local queue that the dashboard and curator never touch — informational only, safe to ignore. Under `--global` scope, `review|inbox|inspect|drafts` read the *same* canonical `~/.arcforge/learning/candidates/queue.jsonl` file the curator populates (verify: `getCandidateQueuePath({scope:'global'})` in `${ARCFORGE_ROOT}/scripts/lib/learning.js` resolves to the identical path as the curator's `${ARCFORGE_ROOT}/scripts/lib/learning-curator/queue-writer.js`) and remain read-only informational in that scope; `approve|reject|materialize|activate --global` now throw and refuse to run outright, since they would otherwise rewrite that file wholesale without acquiring the curator's `store.lock` — use the dashboard instead of any legacy subcommand, in either scope.
 
 Use `--json` on any command when another tool or test needs machine-readable output.
 
@@ -64,9 +64,9 @@ The full set of statuses a candidate moves through:
 
 - **No active behavior change without explicit activation.** Pending candidates and inactive drafts do not affect runtime behavior.
 - **Project scope first.** Project learning writes project-local config, queues, and drafts. Promotion to global scope is an explicit dashboard action; silent auto-promotion to global remains unsupported.
-- **Human authorization at gates.** The LLM curator proposes; users approve/reject, materialize, and activate via dashboard or CLI.
+- **Human authorization at gates.** The LLM curator proposes; users approve/reject, materialize, and activate via dashboard.
 - **Redacted durable evidence.** Observations are sanitized before persistence; candidate evidence stores review-safe summaries, not raw tool payloads.
-- **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and refuses to overwrite existing active artifacts.
+- **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and defaults to `supersede_with_backup`; only refuses when the policy is not `supersede_with_backup`.
 - **Duplicate suppression.** The curator should not append semantic duplicate candidates for the same learned behavior.
 
 ## When to Use

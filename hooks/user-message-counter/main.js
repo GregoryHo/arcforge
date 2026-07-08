@@ -3,8 +3,9 @@
  * User Message Counter
  *
  * Tracks user prompt submissions via UserPromptSubmit hook.
- * Count is stored in temp file and used by session-tracker
- * to determine if session is long enough for pattern extraction.
+ * Count is stored in temp file and used by diary-capture.js
+ * (via createSessionCounter) to determine if session is long enough
+ * for pattern extraction.
  */
 
 const {
@@ -14,21 +15,12 @@ const {
   createSessionCounter,
 } = require('../../scripts/lib/utils');
 
-// Counter is created lazily on first access
-let userCounter = null;
-
-function getCounter() {
-  if (!userCounter) {
-    userCounter = createSessionCounter('user-count');
-  }
-  return userCounter;
-}
-
 /**
  * Main entry point - UserPromptSubmit hook
  */
 function main() {
-  // Read and pass through stdin (for hook chaining)
+  // Read and pass through stdin. Note: this is NOT hook chaining — Claude
+  // Code does not pipe one hook's stdout into the next hook's stdin.
   const stdin = readStdinSync();
   process.stdout.write(stdin);
 
@@ -37,19 +29,11 @@ function main() {
   setSessionIdFromInput(input);
 
   // Increment counter
-  const counter = getCounter();
+  const counter = createSessionCounter('user-count');
   const currentCount = counter.read();
   counter.write(currentCount + 1);
   process.exit(0);
 }
-
-// Export for use by session-tracker
-module.exports = {
-  readCount: () => getCounter().read(),
-  writeCount: (count) => getCounter().write(count),
-  resetCounter: () => getCounter().reset(),
-  getCounterFilePath: () => getCounter().getFilePath(),
-};
 
 // Run if executed directly
 if (require.main === module) {

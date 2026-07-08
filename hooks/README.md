@@ -9,7 +9,7 @@ hooks/
 ├── hooks.json              # Hook configuration
 ├── run-hook.cmd            # Bash dispatcher
 ├── README.md
-├── inject-skills/          # Injects arc-using skill at session start
+├── inject-skills/          # Injects a minimal ArcForge bootstrap at session start
 │   ├── main.sh
 │   └── README.md
 ├── arc-guard/              # Blocks unsafe ops (raw git merge / arcforge loop in epic worktrees, research scope violations)
@@ -24,7 +24,7 @@ hooks/
 ├── sdd-ratify-guard/       # Blocks `arcforge ratify` in unattended loop context
 │   ├── main.js
 │   └── README.md
-├── quality-check/          # Auto-format & type-check on Edit
+├── quality-check/          # Auto-format & type-check on Edit or Write
 │   ├── main.js
 │   ├── prettier.js
 │   ├── typescript.js
@@ -39,13 +39,13 @@ hooks/
 │   ├── inject-context.js   # Context injection at session start
 │   ├── start.js
 │   ├── end.js
-│   ├── session.json.template
 │   └── README.md
 ├── user-message-counter/   # Counts user prompts
 │   ├── main.js
 │   └── README.md
 └── observe/                # Tool call observation
-    └── main.js
+    ├── main.js
+    └── README.md
 ```
 
 ## Active Hooks
@@ -54,7 +54,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| inject-skills | startup, resume, clear, compact | Injects arc-using skill content |
+| inject-skills | startup, resume, clear, compact | Injects a minimal ArcForge bootstrap (not arc-using's full content) |
 | session-tracker/inject-context | startup, resume, clear | Loads previous session context |
 | session-tracker/start | startup, resume, clear | Resets counters, initializes session |
 
@@ -82,7 +82,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| quality-check | Edit on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
+| quality-check | Edit\|Write on .ts/.tsx/.js/.jsx | Auto-format (Prettier), type-check (TSC), console.log warnings |
 | observe | All | Captures tool call results for behavioral pattern observation |
 | compact-suggester | All | Counts tool calls, suggests /compact at 50, then every 25 |
 | arc-remind | Bash, Edit, Write | Contextual nudges: PR boundary after green tests, eval-before-ship on skill edits, spec planning, main-branch warning |
@@ -97,7 +97,7 @@ hooks/
 
 | Hook | Trigger | Description |
 |------|---------|-------------|
-| pre-compact | All | Logs compaction event, marks session file with compaction timestamp |
+| pre-compact | All | Resets compact-suggester state, runs threshold-gated diary capture, queues a `diary-ready` pending action |
 
 ## Adding New Hooks
 

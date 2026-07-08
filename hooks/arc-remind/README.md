@@ -13,10 +13,14 @@ Dispatches by tool; emits a user-facing `systemMessage` for these triggers:
 | raw `git worktree add` in an arcforge project (`specs/`) | Bash | prefer the arcforge CLI in BOTH directions — `arcforge expand` for epic worktrees, `arcforge worktree add` for non-epic ones (`arc-using-worktrees`). A CLI-routed worktree add never contains the raw `git worktree add` literal, so it never trips this nudge. |
 | `git commit` / `push` after a SKILL.md edit (once/session) | Bash + Edit/Write | freshness-aware eval-before-ship: compares `evals/benchmarks/latest.json` against the session's SKILL.md edits (`arc-writing-skills` Iron Law) |
 | first code (non-doc) edit on `main`/`master` (once/session) | Edit/Write | prefer a branch / epic worktree for feature work (`arc-executing-tasks`) |
+| `specs/<id>/spec.xml` written but its `dag.yaml` is missing (once per spec-id) | Edit/Write | SDD stage nudge: prompts `arc-planning` to plan next (`main.js:338-348`) |
 
-The last one is the shippable, user-facing half of eval-before-ship; the
-`ci.yml` annotation is the arcforge-repo half (the plugin is disabled here).
-Edit/Write events are observed only to track which `SKILL.md` files were edited.
+The eval-before-ship nudge (`git commit`/`push` after a SKILL.md edit) is the
+shippable, user-facing half of eval-before-ship; the `ci.yml` annotation is the
+arcforge-repo half.
+Edit/Write events are also used to track which `SKILL.md` files were edited
+(feeding the eval-before-ship freshness check below), and directly emit the
+spec→dag and main-branch nudges (`main.js:330-358`).
 
 ## Eval-before-ship freshness
 

@@ -8,6 +8,7 @@ evals/preflight/
 !.claude/skills/arc-releasing/
 .claude/settings.local.json
 .claude/logs/
+skills/**/.claude/logs/
 # Teammate worktrees spawned by Claude Desktop (EnterWorktree default path).
 # These are local-session artifacts; each worktree is its own git checkout
 # and should never be tracked by the parent repo.

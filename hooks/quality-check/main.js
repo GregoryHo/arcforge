@@ -88,7 +88,10 @@ function collectFindings(absolutePath, filePath, projectDir) {
   if (/\.(ts|tsx)$/.test(filePath) && pm && hasDevDependency('typescript', projectDir)) {
     const tsResult = runTypeCheck(absolutePath, pm);
     if (tsResult.errors && tsResult.errors.length > 0) {
-      modelLines.push(`TypeScript errors in ${fileName}:`);
+      const heading = tsResult.standalone
+        ? `TypeScript errors in ${fileName} (no tsconfig.json found — checked with default compiler options, may not reflect this project's real settings):`
+        : `TypeScript errors in ${fileName}:`;
+      modelLines.push(heading);
       for (const err of tsResult.errors) modelLines.push(`  ${err}`);
     }
   }

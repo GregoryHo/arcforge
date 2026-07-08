@@ -67,7 +67,7 @@ When you detect failures in a parallel batch:
    - Reason: GH #40168 timing race — retry did not recover
    - Action: use arc-looping `--pattern dag` for the failed epics, or
      wait for all running teammates to finish and dispatch failed ones
-     into freed slots per Core Workflow step 6 continuous dispatch
+     into freed slots per Core Workflow Step 5 continuous dispatch
    ```
 
 ## Why not dispatch sequentially by default

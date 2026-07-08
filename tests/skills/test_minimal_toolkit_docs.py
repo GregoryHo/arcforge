@@ -51,7 +51,7 @@ def test_skills_reference_has_bounded_arc_using_and_meta_only_writing_skills():
     assert "bounded router" in lower
     assert "project-level meta" in lower
     assert "arc-writing-skills" in content
-    assert "33 skills" in content
+    assert "32 skills" in content
     assert "three-layer model" in lower
     assert "core toolkit" in lower
     assert "optional workflows" in lower
@@ -133,6 +133,22 @@ def test_sessionstart_bootstrap_does_not_smuggle_spec_sync_or_routing_pressure()
     assert "1%" not in content
     assert "before any" not in lower
     assert "you must" not in lower
+
+
+def test_hook_docs_describe_inject_skills_as_minimal_bootstrap():
+    """hooks/README.md and docs/guide/hooks-system.md must not claim inject-skills
+    injects the full arc-using skill content — it injects a minimal bootstrap only
+    (see hooks/inject-skills/main.sh and hooks/inject-skills/README.md)."""
+    hooks_readme = _read("hooks/README.md")
+    hooks_system_guide = _read("docs/guide/hooks-system.md")
+    inject_skills_readme = _read("hooks/inject-skills/README.md")
+
+    assert "arc-using skill" not in hooks_readme
+    assert "arc-using skill" not in hooks_system_guide
+
+    assert "minimal ArcForge bootstrap" in hooks_readme
+    assert "minimal ArcForge bootstrap" in hooks_system_guide
+    assert "minimal ArcForge bootstrap" in inject_skills_readme
 
 
 def test_arc_using_router_does_not_route_to_unshipped_syncing_spec():

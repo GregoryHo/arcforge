@@ -1,7 +1,7 @@
 ---
 name: arc-managing-sessions
 description: Use when ending a session and handing off to a future session, summarizing recent context, continuing from where the last turn left off, archiving a session for durable reference, or resuming/listing/aliasing saved sessions
-argument-hint: "save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <id> <name> | aliases"
+argument-hint: "handover [--mode quick|full|tail] | save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <session-path> <name> | aliases"
 ---
 
 # Managing Sessions
@@ -105,7 +105,7 @@ In all "do not archive" cases, produce a handover instead.
 | **Archive (save) session**   | `/arc-managing-sessions save [alias]`                                      |
 | **Resume archived session**  | `/arc-managing-sessions resume [alias]`                                    |
 | **List sessions**            | `/arc-managing-sessions list [--limit N] [--date YYYY-MM-DD] [--query id]` |
-| **Create alias**             | `/arc-managing-sessions alias <id> <name>`                                 |
+| **Create alias**             | `/arc-managing-sessions alias <session-path> <name>`                       |
 | **List aliases**             | `/arc-managing-sessions aliases`                                           |
 
 ## Handover Workflow
@@ -186,7 +186,7 @@ Options:
 node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [--query id]
 ```
 
-### `alias <id> <name>` / `aliases`
+### `alias <session-path> <name>` / `aliases`
 
 Create an alias for easy reference, or list all aliases.
 
@@ -204,8 +204,10 @@ node "${SKILL_ROOT}/scripts/sessions.js" aliases
 │   ├── {sessionId}.json                  # Auto-saved session metrics
 │   ├── session-{alias}.md                # User-archived session (from save)
 │   ├── handover-{slug}.md                # Optional handover file (from handover --save)
-│   ├── diary-{sessionId}.md              # Diary entry (from arc-journaling)
 ```
+
+Diary entries (from `arc-journaling`) live under a separate tree, not here:
+`~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
 ## Common Mistakes
 

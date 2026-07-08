@@ -29,6 +29,21 @@ reported, never masked by a stale cache. If the installed `tsc` rejects
 `--incremental` (an older compiler), the run backs off and retries without the
 flag, so type-checking is never silently dropped — only the speedup.
 
+If no `tsconfig.json` is found in any ancestor directory of the edited file
+(e.g. a monorepo where `tsconfig.json` only lives in a sub-package directory
+below the edited file), the check falls back to a standalone single-file
+`tsc` run scoped to just that file, using `tsc`'s default compiler options.
+This avoids the alternative failure mode — `tsc` running with zero input
+files and silently reporting a "clean" result. Known tradeoff: the standalone
+check does not apply the project's own `tsconfig.json` settings (lib, types,
+paths, strict, etc.), so it can surface noise unrelated to real project
+errors — e.g. `TS2591: Cannot find name 'node:fs'` on an otherwise-valid
+`import { readFileSync } from 'node:fs'`. This is accepted: a noisy but real
+check is preferable to a silent false-clean result. Standalone-mode results
+are labeled distinctly in the model-facing heading (`no tsconfig.json
+found — checked with default compiler options...`) so the model can weigh
+them accordingly instead of mistaking them for real project-aware errors.
+
 ## Output
 
 Findings are split by audience over a single stdout JSON object:

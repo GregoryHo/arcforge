@@ -48,17 +48,6 @@ $TMPDIR/arcforge-user-count-<session-id>
 
 Contains a single integer representing the count.
 
-## Exported Functions
-
-```javascript
-const { readCount, writeCount, resetCounter, getCounterFilePath } =
-  require('../user-message-counter/main');
-```
-
-These thin wrappers over the shared `createSessionCounter('user-count')` exist
-for tests; production read/reset go through `diary-capture.js` per the
-counter-ownership contract above.
-
 ## Design Notes
 
 **Why a temp file instead of reading the transcript?**

@@ -37,33 +37,6 @@ function runPrettier(filePath, pmName) {
   };
 }
 
-/**
- * Check if file would be formatted (without writing)
- * Returns { needsFormatting: boolean, error?: string }
- */
-function checkPrettier(filePath, pmName) {
-  if (!fileExists(filePath)) {
-    return { needsFormatting: false, error: 'File not found' };
-  }
-
-  const execCmd = getPmExecCommand('prettier', pmName);
-  if (!execCmd) {
-    return { needsFormatting: false, error: 'Could not determine package manager command' };
-  }
-
-  const [cmd, ...baseArgs] = execCmd;
-  const args = [...baseArgs, '--check', filePath];
-
-  const result = execCommand(cmd, args, { timeout: 15000 });
-
-  // Exit code 0 = already formatted, 1 = needs formatting
-  return {
-    needsFormatting: result.exitCode !== 0,
-    error: result.exitCode > 1 ? result.stderr : undefined,
-  };
-}
-
 module.exports = {
   runPrettier,
-  checkPrettier,
 };

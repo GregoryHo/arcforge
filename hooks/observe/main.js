@@ -37,7 +37,6 @@ const {
 // ─────────────────────────────────────────────
 
 const MAX_INPUT_LENGTH = 5000;
-const MAX_OUTPUT_LENGTH = 5000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SIGNAL_COOLDOWN_MS = 30000; // 30 seconds between SIGUSR1 signals
 const SIGNAL_TIMESTAMP_FILE = getObserverSignalFile();
@@ -488,6 +487,5 @@ module.exports = {
   shouldObserve,
   spawnDaemonIfNeeded,
   MAX_INPUT_LENGTH,
-  MAX_OUTPUT_LENGTH,
   LAZY_START_THRESHOLD,
 };

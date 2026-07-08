@@ -57,7 +57,7 @@ Check that commands appear:
 ```
 # Should see:
 # /arcforge:arc-brainstorming - Design exploration
-# /arcforge:arc-writing-tasks - Break epics or features into executable tasks
+# /arcforge:arc-writing-tasks - Break features into executable tasks
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
@@ -136,7 +136,7 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-All 33 skills, each listed once. Workflow skills hand off sequentially, discipline skills fire as quality gates when their condition is present, and meta skills are invoked directly (see `arc-using` for routing).
+All 32 skills, each listed once. Workflow skills hand off sequentially, discipline skills fire as quality gates when their condition is present, and meta skills are invoked directly (see `arc-using` for routing).
 
 ### Routing
 
@@ -147,7 +147,7 @@ All 33 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-brainstorming** - Design exploration
 - **arc-refining** - Convert design documents to structured specs
 - **arc-planning** - Break a spec into an executable DAG of epics
-- **arc-writing-tasks** - Break epics or features into executable tasks
+- **arc-writing-tasks** - Break features into executable tasks
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
 - **arc-agent-driven** - Automated execution with subagent per task and two-stage review
 - **arc-implementing** - Orchestrate large project implementation in a worktree
@@ -192,17 +192,15 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 ### Agents
 
-Skills delegate focused work to 11 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
+Skills delegate focused work to 9 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
 
 | Agent | Role |
 |-------|------|
-| `planner` | Architectural analysis and implementation planning (arc-planning, arc-brainstorming) |
 | `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
 | `spec-reviewer` | Stage 1 review: implementation matches spec exactly (arc-agent-driven) |
 | `quality-reviewer` | Stage 2 review: architecture, testing, error handling (arc-agent-driven) |
 | `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
-| `debugger` | 4-phase root-cause investigation (arc-debugging) |
-| `verifier` | Independent acceptance-criteria verification (arc-verifying) |
+| `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
 | `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
 | `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
 | `arc-auditing-spec-cross-artifact-alignment` | Spec audit axis 2 (arc-auditing-spec) |

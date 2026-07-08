@@ -9,7 +9,7 @@
  *
  * Context injection to Claude lives in inject-context.js (sync); this file
  * handles async background tasks. If you need context-related functions
- * (findRecentSessions, formatSessionContext, etc.), import them from
+ * (loadAutoInstincts, loadPendingActions, etc.), import them from
  * inject-context.js.
  *
  * Note: Counters accumulate until threshold is met in end.js or pre-compact/main.js.

@@ -26,7 +26,7 @@ The subtle rationalizations happen when:
 
 ## Classic Rationalizations to Block
 
-From review-model-spec.md Section 3:
+(rationalizations observed during RED baseline)
 
 1. **"Should work now"** - Confidence ≠ evidence
 2. **"I'm confident"** - Must still verify
