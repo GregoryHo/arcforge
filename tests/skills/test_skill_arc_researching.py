@@ -120,3 +120,37 @@ def test_arc_researching_has_completion_format():
 
     # Must have completion format
     assert "RESEARCH COMPLETE" in text or "Completion Format" in text
+
+
+def test_arc_researching_has_predict_step():
+    """Test the loop pre-registers a prediction before running."""
+    text = _read_skill()
+
+    # PREDICT must be a loop step and land before RUN
+    assert "PREDICT" in text
+    assert text.index("PREDICT") < text.index("RUN")
+
+    # Pre-registration must be a hard gate, not a suggestion
+    assert "pre-registration" in text.lower() or "Pre-Registration" in text
+    assert "before running" in text.lower()
+
+
+def test_arc_researching_has_measurement_audit():
+    """Test surprising wins require a raw-log vs extraction-pattern audit."""
+    text = _read_skill()
+
+    assert "Measurement Audit" in text
+    # Required check for surprising wins, tightening the passive hint
+    assert "surprising" in text.lower()
+    assert "run-N.log" in text or "run-N" in text
+    assert "extraction" in text.lower() and "pattern" in text.lower()
+
+
+def test_arc_researching_has_retracted_and_remeasured_statuses():
+    """Test the results.tsv status vocabulary includes audit outcomes."""
+    text = _read_skill()
+
+    assert "retracted" in text
+    assert "remeasured" in text
+    # Documented in the status vocabulary line
+    assert "`retracted`" in text and "`remeasured`" in text

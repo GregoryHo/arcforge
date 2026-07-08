@@ -231,6 +231,18 @@ describe('computeSummary', () => {
     expect(summary.best).toBeNull();
     expect(summary.crashed).toBe(2);
   });
+
+  it('should exclude retracted from best and count remeasured as kept', () => {
+    const experiments = [
+      { status: 'baseline', metric_value: 1.0 },
+      { status: 'retracted', metric_value: 0.26 }, // withdrawn artifact — must not become best
+      { status: 'remeasured', metric_value: 0.59 }, // honest re-run
+    ];
+    const summary = computeSummary(experiments, { direction: 'lower-is-better' });
+    expect(summary.best).toBe(0.59);
+    expect(summary.kept).toBe(1);
+    expect(summary.improvement).toBe(41);
+  });
 });
 
 // ── SSE Manager ─────────────────────────────────────────────

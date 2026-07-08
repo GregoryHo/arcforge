@@ -80,13 +80,17 @@ function parseConfig(content) {
 
 function computeSummary(experiments, config) {
   const baseline = experiments.find((e) => e.status === 'baseline');
-  const kept = experiments.filter((e) => e.status === 'keep');
+  const kept = experiments.filter((e) => e.status === 'keep' || e.status === 'remeasured');
   const discarded = experiments.filter((e) => e.status === 'discard');
   const crashed = experiments.filter((e) => e.status === 'crash');
   const lowerIsBetter = (config.direction || '').includes('lower');
 
+  // Retracted rows stay in the log as an audit trail but their metric is a known
+  // artifact — exclude it from best so a withdrawn win can't remain the record.
   const validMetrics = experiments
-    .filter((e) => e.metric_value !== null && e.metric_value !== undefined)
+    .filter(
+      (e) => e.status !== 'retracted' && e.metric_value !== null && e.metric_value !== undefined,
+    )
     .map((e) => e.metric_value);
 
   let best = null;
