@@ -35,19 +35,13 @@ escape_for_json() {
     printf '%s' "$s"
 }
 
-bootstrap_context=$(cat <<EOF_CONTEXT
-ArcForge skills are available for this project.
-
-ARCFORGE_ROOT=${PLUGIN_ROOT}
-
-Use ArcForge as a minimal, composable toolkit:
-- Respect higher-priority instructions, explicit user constraints, and harness/eval isolation.
-- Prefer the smallest useful workflow; skills are tools, not laws.
-- For ArcForge workflow tasks, read or invoke the relevant skill on demand.
-- For routing help or a full skill index, invoke the arcforge:arc-using skill.
-- For simple answers, read-only inspection, grading, or isolated evals, proceed directly when no workflow is needed.
-EOF_CONTEXT
-)
+# Read the shared minimal bootstrap and substitute the ${ARCFORGE_ROOT}
+# placeholder with the resolved plugin root. The OpenCode plugin reads this same
+# file, so both platforms emit an identical bootstrap. $(cat ...) strips the
+# file's trailing newline, matching the previous heredoc value byte-for-byte.
+bootstrap_template=$(cat "${SCRIPT_DIR}/bootstrap.txt")
+placeholder='${ARCFORGE_ROOT}'
+bootstrap_context="${bootstrap_template//"$placeholder"/"$PLUGIN_ROOT"}"
 
 bootstrap_escaped=$(escape_for_json "$bootstrap_context")
 

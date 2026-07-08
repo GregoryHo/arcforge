@@ -11,70 +11,42 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Extract YAML frontmatter from a skill file.
- * Only needs to parse arc-using for bootstrap injection.
- */
-function extractFrontmatter(content) {
-  const lines = content.split('\n');
-  let inFrontmatter = false;
-  let name = '';
-  let description = '';
-
-  for (const line of lines) {
-    if (line.trim() === '---') {
-      if (inFrontmatter) break;
-      inFrontmatter = true;
-      continue;
-    }
-    if (inFrontmatter) {
-      const match = line.match(/^(\w+):\s*(.*)$/);
-      if (match) {
-        const [, key, value] = match;
-        if (key === 'name') name = value.trim();
-        if (key === 'description') description = value.trim();
-      }
-    }
-  }
-
-  return { name, description };
-}
+// Module-level cache for the built bootstrap string. The system.transform hook
+// fires on every request; the bootstrap text does not change during a process,
+// so read + substitute once instead of re-reading the file each time.
+// undefined = not yet loaded, null = source file missing.
+let _bootstrapCache = undefined;
 
 /**
- * Strip YAML frontmatter, returning just the content.
+ * Build the minimal arcforge bootstrap from the shared bootstrap.txt file.
+ *
+ * hooks/inject-skills/main.sh reads the SAME file for the Claude Code side, so
+ * both platforms emit an identical minimal bootstrap. Here we substitute the
+ * literal ${ARCFORGE_ROOT} placeholder with the resolved plugin root and wrap
+ * it in the injection markers. Cached after the first call.
  */
-function stripFrontmatter(content) {
-  const lines = content.split('\n');
-  let inFrontmatter = false;
-  let frontmatterEnded = false;
-  const contentLines = [];
-
-  for (const line of lines) {
-    if (line.trim() === '---') {
-      if (inFrontmatter) { frontmatterEnded = true; continue; }
-      inFrontmatter = true;
-      continue;
-    }
-    if (frontmatterEnded || !inFrontmatter) {
-      contentLines.push(line);
-    }
-  }
-
-  return contentLines.join('\n').trim();
-}
-
 function getBootstrapContent() {
-  const usingPath = path.resolve(__dirname, '../../skills/arc-using/SKILL.md');
-  if (!fs.existsSync(usingPath)) return null;
+  if (_bootstrapCache !== undefined) return _bootstrapCache;
 
-  const fullContent = fs.readFileSync(usingPath, 'utf8');
-  const content = stripFrontmatter(fullContent);
+  const bootstrapPath = path.resolve(__dirname, '../../hooks/inject-skills/bootstrap.txt');
+  if (!fs.existsSync(bootstrapPath)) {
+    _bootstrapCache = null;
+    return null;
+  }
 
-  return `<EXTREMELY_IMPORTANT>
+  const arcforgeRoot = path.resolve(__dirname, '../..');
+  const template = fs.readFileSync(bootstrapPath, 'utf8').trim();
+  // split/join instead of String.replace so a path containing $&, $1, $$ etc.
+  // is inserted literally (replace treats those as special in the replacement).
+  const bootstrap = template.split('${ARCFORGE_ROOT}').join(arcforgeRoot);
+
+  _bootstrapCache = `<EXTREMELY_IMPORTANT>
 You have arcforge skills.
 
-${content}
+${bootstrap}
 </EXTREMELY_IMPORTANT>`;
+
+  return _bootstrapCache;
 }
 
 export default {
