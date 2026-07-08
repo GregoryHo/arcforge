@@ -130,6 +130,33 @@ completion to a ledger file, not only to todos.
 - `git clean -fdx` destroys the ledger (git-ignored scratch); if that happens,
   reconstruct progress from `git log`.
 
+### Model Selection
+
+**Name a model on every dispatch — never rely on inherit.** An omitted model
+inherits your session's model, often the most expensive tier — one real run let
+26 reviewers silently inherit the top tier that way. The Task/subagent `model`
+parameter overrides an agent's frontmatter default, so you request the tier per
+dispatch; the `sonnet` values in the Available Agents table below are the
+mid-tier floor, not a ceiling.
+
+Match each role to the cheapest tier that fits:
+
+- **Transcription implementer → `haiku`.** arc-writing-tasks requires each task
+  to carry "Exact code — Complete code", so a well-formed task is transcription
+  plus testing — the cheapest tier handles it, as do single-file mechanical fixes.
+- **Prose-plan implementer and both reviewers → `sonnet` floor.** Turn count
+  beats token price: cheaper models routinely take 2-3× the turns on multi-step
+  judgment work, costing more overall. Scale a reviewer above the floor only for
+  a large or subtle diff.
+- **Final whole-branch review → `opus`** — the strongest recognized tier, pinned
+  in `agents/code-reviewer.md`. It is the one architecture-level judgment here;
+  do not let it ride the session default.
+
+**Headless caveat (arc-looping):** the loop path spawns agents through headless
+`claude -p`, which strips agent frontmatter and does NOT honor a `model:` pin
+(`${ARCFORGE_ROOT}/scripts/lib/loop-verifier.js`) — under arc-looping, pass `--model` explicitly
+on the dispatch, or the intended tier is ignored.
+
 ## Agents & Templates
 
 Two ways to dispatch each role, depending on what your platform supports:

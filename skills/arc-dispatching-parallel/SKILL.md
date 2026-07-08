@@ -67,6 +67,7 @@ Each agent gets:
 - **Clear goal:** What to achieve
 - **Constraints:** Don't change other code
 - **Expected output:** Summary of changes
+- **Model:** Named explicitly (never inherit) — see arc-agent-driven's Model Selection ladder for the tier map
 
 **Prompt template:**
 

@@ -83,3 +83,31 @@ def test_arc_agent_driven_durable_progress_ledger():
 
     # Red Flag: never re-dispatch a ledger-complete task; reconcile first
     assert "reconcile the ledger against `git log`" in text
+
+
+def test_arc_agent_driven_model_selection_ladder():
+    text = _read_skill()
+
+    # New Model Selection section carrying the load-bearing dispatch rule
+    assert "### Model Selection" in text
+    assert "never rely on inherit" in text.lower()
+
+    # arcforge's real tiers, mapped cheapest → strongest
+    assert "haiku" in text
+    assert "sonnet" in text
+    assert "opus" in text
+
+    # Cheapest-tier condition is directly checkable against arc-writing-tasks
+    assert "Exact code — Complete code" in text
+
+    # Headless caveat: arc-looping must pass --model explicitly to honor a pin
+    assert "--model" in text
+    assert "loop-verifier.js" in text
+
+
+def test_code_reviewer_agent_pinned_to_strongest_tier():
+    # The final whole-branch review must not silently inherit the session's
+    # (often most expensive) model — it is pinned to arcforge's strongest tier.
+    text = Path("agents/code-reviewer.md").read_text(encoding="utf-8")
+    front = _parse_frontmatter(text)
+    assert front.get("model") == "opus"

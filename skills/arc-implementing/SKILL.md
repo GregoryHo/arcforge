@@ -50,6 +50,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
      - Call `arc-agent-driven`
      - Input: tasks file
      - Output: completed code + commits
+     - Model tiers: arc-agent-driven's Model Selection ladder governs per-dispatch model choice (never inherit).
 5. Phase 3: Feature complete.
    - Move to next feature, or finish the epic.
 
