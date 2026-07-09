@@ -111,10 +111,11 @@ Record BASE from *before* the implementer ran so a multi-commit task stays whole
 
 ### Durable Progress Ledger
 
-TodoWrite and terminal narration hold per-task progress only in context — a
-mid-run auto-compaction or a fresh session can lose your place and re-dispatch
-an already-completed task (the single most expensive failure). Persist per-task
-completion to a ledger file, not only to todos.
+TodoWrite and terminal narration track per-task progress only in your session —
+a fresh session loses them, a mid-run auto-compaction drops the narration, and
+neither carries a git-verifiable commit range to recover from. Either way you can
+lose your place and re-dispatch an already-completed task (the single most
+expensive failure). Persist per-task completion to a ledger file, not only to todos.
 
 - **Ledger file:** `.arcforge/sdd/progress.md` — the same self-ignoring
   `.arcforge/sdd/` workspace the brief and review packages use. It is a runtime
