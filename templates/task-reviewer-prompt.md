@@ -108,7 +108,7 @@ You are checking HOW the code was built (Part 1 already covered WHAT).
 
 ### Code Quality
 - **Separation of concerns** — one responsibility per function/class
-- **Error handling** — correct tier (throw in `scripts/lib/`, silent catch in `hooks/`, exit in CLI), descriptive messages
+- **Error handling** — correct tier (library code throws, hooks silently catch, CLI exits), descriptive messages
 - **DRY without premature abstraction** — no verbatim duplication; no speculative flexibility
 - **Edge cases** — nulls, empty arrays, invalid input
 - **Naming** — clear, consistent with project conventions

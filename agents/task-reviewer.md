@@ -57,7 +57,7 @@ check, but do not broaden your own search or hand the resolution back.
 ## Part 2: Task Quality
 
 Assess how the code was built: separation of concerns, error handling at the correct
-tier (throw in `scripts/lib/`, silent in `hooks/`, exit in CLI), DRY without premature
+tier (library code throws, hooks silently catch, CLI exits), DRY without premature
 abstraction, edge cases, security, module patterns, test quality, and file/function
 size. The implementer already ran the tests with TDD evidence — do NOT re-run the
 suite; run a focused test only for a specific doubt. Categorize issues by **actual**
