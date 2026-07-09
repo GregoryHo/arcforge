@@ -17,7 +17,7 @@ Human-in-the-loop execution with checkpoints. For when you want control over eac
 | Aspect | execute-tasks | agent-driven |
 |------|---------------|--------------|
 | Executor | main session | fresh subagent |
-| Review | human checkpoints | automated two-stage |
+| Review | human checkpoints | automated task-reviewer (both verdicts) |
 | Control | high | low |
 | Best for | needs human judgment | automated execution |
 

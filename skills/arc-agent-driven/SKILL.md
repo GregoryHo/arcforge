@@ -5,9 +5,9 @@ description: Use when executing task lists where each task requires isolated exe
 
 # arc-agent-driven
 
-Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
+Execute plan by dispatching fresh subagent per task, with one task-reviewer after each that returns both verdicts in a single pass: spec compliance and task quality.
 
-**Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration
+**Core principle:** Fresh subagent per task + one task-reviewer returning both verdicts (spec compliance + task quality) = high quality, fast iteration
 
 ## When to Use
 
@@ -32,7 +32,7 @@ digraph when_to_use {
 **vs. arc-executing-tasks:**
 
 - Fresh subagent per task (no context pollution)
-- Two-stage review after each task
+- One task-reviewer (both verdicts) after each task
 - Faster iteration (no human-in-loop between tasks)
 
 ## The Process
@@ -47,19 +47,16 @@ digraph process {
         "Implementer asks questions?" [shape=diamond];
         "Answer questions" [shape=box];
         "Implementer implements, tests, commits, self-reviews" [shape=box];
-        "Dispatch spec reviewer subagent" [shape=box];
-        "Spec compliant?" [shape=diamond];
-        "Implementer fixes spec gaps" [shape=box];
-        "Dispatch code quality reviewer subagent" [shape=box];
-        "Quality approved?" [shape=diamond];
-        "Implementer fixes quality issues" [shape=box];
+        "Dispatch task-reviewer subagent" [shape=box];
+        "Review clean? (both verdicts)" [shape=diamond];
+        "Multiple independent issues?" [shape=diamond];
+        "Use arc-dispatching-parallel for fixes" [shape=box];
+        "Implementer fixes issues (single batch)" [shape=box];
         "Mark task complete" [shape=box];
     }
 
     "Read tasks, create task list" [shape=box];
     "More tasks?" [shape=diamond];
-    "Multiple independent issues?" [shape=diamond];
-    "Use arc-dispatching-parallel for fixes" [shape=box];
     "Dispatch final code reviewer" [shape=box];
     "Use arc-finishing" [shape=box style=filled fillcolor=lightgreen];
 
@@ -68,18 +65,14 @@ digraph process {
     "Implementer asks questions?" -> "Answer questions" [label="yes"];
     "Answer questions" -> "Dispatch implementer subagent";
     "Implementer asks questions?" -> "Implementer implements, tests, commits, self-reviews" [label="no"];
-    "Implementer implements, tests, commits, self-reviews" -> "Dispatch spec reviewer subagent";
-    "Dispatch spec reviewer subagent" -> "Spec compliant?";
-    "Spec compliant?" -> "Implementer fixes spec gaps" [label="no"];
-    "Implementer fixes spec gaps" -> "Dispatch spec reviewer subagent";
-    "Spec compliant?" -> "Dispatch code quality reviewer subagent" [label="yes"];
-    "Dispatch code quality reviewer subagent" -> "Quality approved?";
-    "Quality approved?" -> "Multiple independent issues?" [label="no"];
-    "Multiple independent issues?" -> "Use arc-dispatching-parallel for fixes" [label="yes"];
-    "Multiple independent issues?" -> "Implementer fixes quality issues" [label="no"];
-    "Use arc-dispatching-parallel for fixes" -> "Dispatch code quality reviewer subagent";
-    "Implementer fixes quality issues" -> "Dispatch code quality reviewer subagent";
-    "Quality approved?" -> "Mark task complete" [label="yes"];
+    "Implementer implements, tests, commits, self-reviews" -> "Dispatch task-reviewer subagent";
+    "Dispatch task-reviewer subagent" -> "Review clean? (both verdicts)";
+    "Review clean? (both verdicts)" -> "Multiple independent issues?" [label="no"];
+    "Multiple independent issues?" -> "Use arc-dispatching-parallel for fixes" [label="yes - fan out"];
+    "Multiple independent issues?" -> "Implementer fixes issues (single batch)" [label="no - one fix pass"];
+    "Use arc-dispatching-parallel for fixes" -> "Dispatch task-reviewer subagent";
+    "Implementer fixes issues (single batch)" -> "Dispatch task-reviewer subagent";
+    "Review clean? (both verdicts)" -> "Mark task complete" [label="yes"];
     "Mark task complete" -> "More tasks?";
     "More tasks?" -> "Dispatch implementer subagent" [label="yes"];
     "More tasks?" -> "Dispatch final code reviewer" [label="no"];
@@ -87,7 +80,13 @@ digraph process {
 }
 ```
 
-**Max review cycles: 3 per reviewer.** If not converging, escalate to human with summary of unresolved issues.
+**Max review cycles: 3 per task.** If not converging, escalate to human with summary of unresolved issues.
+
+The single task-reviewer returns both verdicts (spec compliance + task quality) from
+one read of the change. When it finds issues, one fix pass addresses spec gaps and
+quality findings together, then re-review covers both verdicts. Fan out to
+`arc-dispatching-parallel` only when the findings are genuinely independent; otherwise
+a single batch-fix dispatch is the default.
 
 ### Per-Task File Handoff
 
@@ -103,7 +102,7 @@ package live in the self-ignoring `.arcforge/sdd/` workspace:
    `node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
    It writes the commit list plus `git diff --stat` and `git diff -U10` for
    `<BASE>..HEAD` into one file and prints that file's path.
-3. **Hand each reviewer that path** as `{DIFF_FILE}`. The reviewer reads the
+3. **Hand the task-reviewer that path** as `{DIFF_FILE}`. The reviewer reads the
    package once; it does not re-run git or crawl the codebase.
 
 Record BASE from *before* the implementer ran so a multi-commit task stays whole.
@@ -124,7 +123,7 @@ expensive failure). Persist per-task completion to a ledger file, not only to to
 - **At skill start**, check the ledger (`cat .arcforge/sdd/progress.md`). If it
   exists, trust it plus `git log` and resume AFTER the last task marked complete
   — do not re-dispatch tasks it already lists.
-- **After each clean review** (both stages passed), append one line in the same
+- **After each clean review** (both verdicts clean), append one line in the same
   message as your other bookkeeping:
   `Task N: complete (commits <base7>..<head7>, review clean)`. The commits it
   names exist in git even when your context no longer remembers creating them.
@@ -145,9 +144,9 @@ Match each role to the cheapest tier that fits:
 - **Transcription implementer → `haiku`.** arc-writing-tasks requires each task
   to carry "Exact code — Complete code", so a well-formed task is transcription
   plus testing — the cheapest tier handles it, as do single-file mechanical fixes.
-- **Prose-plan implementer and both reviewers → `sonnet` floor.** Turn count
+- **Prose-plan implementer and the task-reviewer → `sonnet` floor.** Turn count
   beats token price: cheaper models routinely take 2-3× the turns on multi-step
-  judgment work, costing more overall. Scale a reviewer above the floor only for
+  judgment work, costing more overall. Scale the reviewer above the floor only for
   a large or subtle diff.
 - **Final whole-branch review → `opus`** — the strongest recognized tier, pinned
   in `agents/code-reviewer.md`. It is the one architecture-level judgment here;
@@ -165,14 +164,12 @@ Two ways to dispatch each role, depending on what your platform supports:
 **Pre-built agents (when your platform supports named subagents — e.g. Claude
 Code's `agents/`):** they bundle tool isolation and methodology.
 - `implementer` — TDD implementation with full write access
-- `spec-reviewer` — Spec compliance verification (read-only)
-- `quality-reviewer` — Code quality assessment (read-only + test runner)
+- `task-reviewer` — Single per-task gate: spec compliance + task quality in one pass (read-only + focused test)
 
 **Templates (cross-platform fallback — for custom prompts or when named agents
 aren't available):**
 - `./implementer-prompt.md` - Implementer prompt with placeholders
-- `./spec-reviewer-prompt.md` - Spec compliance review prompt
-- `./code-quality-reviewer-prompt.md` - Code quality review prompt (references arc-requesting-review)
+- `./task-reviewer-prompt.md` - Per-task review prompt returning both verdicts (spec compliance + task quality)
 
 ## Cross-Platform Dispatch
 
@@ -181,8 +178,8 @@ subagent per task. The named agents above are a Claude Code convenience; on any
 platform (Codex, Gemini CLI, OpenCode, or Claude Code) you can dispatch each
 role from the templates instead, using whatever subagent mechanism your harness
 provides. The templates carry the full role prompt, so the workflow — fresh
-implementer per task, then spec review, then quality review — is identical
-regardless of how the subagent is launched.
+implementer per task, then a single task-review returning both verdicts (spec
+compliance + task quality) — is identical regardless of how the subagent is launched.
 
 ## Example Workflow
 
@@ -206,11 +203,10 @@ Implementer:
   - Self-review: All good
   - Committed: abc1234 "feat(models): add SyncResult dataclass"
 
-[Dispatch spec compliance reviewer]
-Spec reviewer: ✅ Spec compliant - all fields present, nothing extra
-
-[Dispatch code quality reviewer]
-Code reviewer: Strengths: Clean, typed. Issues: None. Approved.
+[Dispatch task-reviewer — returns both verdicts in one pass]
+Task reviewer:
+  Spec Compliance: ✅ Spec compliant - all fields present, nothing extra
+  Task Quality: Strengths: Clean, typed. Issues: None. Approved.
 
 [Mark Task 1 complete]
 
@@ -233,8 +229,7 @@ The full agent roster for arc-agent-driven workflows:
 | Agent | Role | Model | Access |
 |-------|------|-------|--------|
 | **implementer** | TDD implementation | sonnet | Read, Write, Edit, Bash, Grep |
-| **spec-reviewer** | Spec compliance check | sonnet | Read, Grep, Glob |
-| **quality-reviewer** | Code quality review | sonnet | Read, Grep, Glob, Bash |
+| **task-reviewer** | Per-task review: spec compliance + task quality | sonnet | Read, Grep, Glob, Bash |
 
 ## Subagents Should Use
 
@@ -257,14 +252,14 @@ The full agent roster for arc-agent-driven workflows:
 **Quality gates:**
 
 - Self-review catches issues before handoff
-- Two-stage review: spec compliance, then code quality
+- Single task-reviewer returns both verdicts: spec compliance and task quality
 - Review loops ensure fixes actually work
 
 ## Red Flags
 
 **Never:**
 
-- Skip reviews (spec compliance OR code quality)
+- Skip the task-reviewer gate — mark a task complete before both verdicts (spec compliance AND task quality) are clean
 - Proceed with unfixed issues
 - Start implementation on main/master branch without explicit user consent
 - Dispatch multiple implementation subagents in parallel (conflicts)
@@ -274,8 +269,9 @@ The full agent roster for arc-agent-driven workflows:
 - Accept "close enough" on spec compliance
 - Skip review loops
 - Let implementer self-review replace actual review
-- **Start code quality review before spec compliance**
-- Move to next task while either review has open issues
+- **Coach the reviewer** — never tell the task-reviewer to ignore specific issues, and never pre-assign a severity; it categorizes findings by their actual severity, independently
+- **Let the plan grade its own work** — a defect the plan explicitly mandated (a test that asserts nothing, verbatim duplication) is still a finding: reported Important and labeled **plan-mandated** for the human to decide, never silently accepted
+- Move to next task while the task-reviewer has open issues on either verdict
 - Hand a reviewer a bare diff and let it re-run git or crawl the codebase — build the review package and give it the file path instead
 - Use `HEAD~1` as the review base — it truncates a multi-commit task to its last commit; record the pre-implementer BASE and package `BASE..HEAD`
 - **Re-dispatch a task the ledger marks complete** — a ledger-complete task is DONE; on resume, reconcile the ledger against `git log` before dispatching anything

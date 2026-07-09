@@ -24,7 +24,7 @@ ArcForge is split into three layers:
 
 When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, `ARCFORGE_ROOT` is set, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
 
-Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a two-stage review (spec compliance, then code quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
+Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a single per-task reviewer that returns both verdicts in one pass (spec compliance and task quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
 Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
 
@@ -121,7 +121,7 @@ These are the most frequently used commands:
 | Bug or regression | debugging, tdd, verifying | `arc-debugging` |
 | End of session | journaling | `arc-journaling` |
 
-**Within each path:** TDD (RED-GREEN-REFACTOR) with two-stage review (spec compliance, then code quality).
+**Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
 
 **Finishing:** `arc-finishing` for both — its Step 0 discriminates on `.arcforge-epic` (epic worktree vs normal branch).
 
@@ -149,7 +149,7 @@ All 32 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-planning** - Break a spec into an executable DAG of epics
 - **arc-writing-tasks** - Break features into executable tasks
 - **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
-- **arc-agent-driven** - Automated execution with subagent per task and two-stage review
+- **arc-agent-driven** - Automated execution with subagent per task and a single task-reviewer (both verdicts)
 - **arc-implementing** - Orchestrate large project implementation in a worktree
 - **arc-coordinating** - Worktree management for multi-epic projects
 - **arc-using-worktrees** - Isolated git worktree for any repo: a branch, experiment, or review checkout via the generic CLI; epic work auto-escalates to the coordinator
@@ -197,8 +197,8 @@ Skills delegate focused work to 9 specialized subagents (Claude Code only). You 
 | Agent | Role |
 |-------|------|
 | `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
-| `spec-reviewer` | Stage 1 review: implementation matches spec exactly (arc-agent-driven) |
-| `quality-reviewer` | Stage 2 review: architecture, testing, error handling (arc-agent-driven) |
+| `task-reviewer` | Per-task review: spec compliance + task quality in one pass (arc-agent-driven) |
+| `spec-reviewer` | Epic-acceptance spec compliance, whole merged branch (arc-dispatching-teammates / arc-dispatching-parallel) |
 | `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
 | `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
 | `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
@@ -216,8 +216,8 @@ Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from a
 harness that can dispatch a subagent (Claude Code, Codex, Gemini CLI, OpenCode):
 
 - `templates/implementer-prompt.md` - TDD implementer subagent prompt
-- `templates/spec-reviewer-prompt.md` - Spec compliance reviewer prompt
-- `templates/quality-reviewer-prompt.md` - Code quality reviewer prompt
+- `templates/task-reviewer-prompt.md` - Per-task reviewer prompt (spec compliance + task quality)
+- `templates/spec-reviewer-prompt.md` - Epic-acceptance spec compliance reviewer prompt
 
 ## CLI Usage
 

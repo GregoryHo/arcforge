@@ -36,7 +36,7 @@ no prior conversation history has no way to rationalize — it reads
 the spec, locates the code, runs the test, and reports. The lead's
 job is to READ the reports and decide, not execute the checks. This
 matches arcforge's existing pattern in `arc-agent-driven`, which
-delegates every task to spec-reviewer + quality-reviewer subagents
+delegates every task to spec-reviewer subagents
 precisely because inline review produces rationalizations.
 
 Per-completion acceptance catches defects early, while the retry

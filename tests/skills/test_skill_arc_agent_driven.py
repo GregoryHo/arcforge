@@ -43,15 +43,14 @@ def test_arc_agent_driven_contains_required_sections():
 
     # Must have prompt template references
     assert "implementer-prompt.md" in text
-    assert "spec-reviewer-prompt.md" in text
-    assert "code-quality-reviewer-prompt.md" in text
+    assert "task-reviewer-prompt.md" in text
 
     # Must have max review cycles guidance
     assert "Max review cycles" in text
 
-    # Must reference two-stage review
+    # Must reference the single task-reviewer's dual-verdict contract
     assert "spec compliance" in text.lower()
-    assert "code quality" in text.lower()
+    assert "task quality" in text.lower()
 
     # Must reference subagent dispatch
     assert "subagent" in text.lower()

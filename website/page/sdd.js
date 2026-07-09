@@ -272,7 +272,7 @@ function SDDPipeline({
     y: 200,
     name: "arc-agent-driven",
     axis: "task \xB7 present",
-    note: "fresh subagent per task, two-stage review",
+    note: "fresh subagent per task, task-reviewer (spec + quality)",
     color: t.ember,
     t: t
   }), /*#__PURE__*/React.createElement(ModeCard, {
@@ -318,7 +318,7 @@ function SDDPipeline({
     fontSize: "10",
     letterSpacing: "2",
     fontFamily: "JetBrains Mono,monospace"
-  }, "TWO-STAGE REVIEW \u2014 spec-reviewer \u2192 quality-reviewer"), /*#__PURE__*/React.createElement("text", {
+  }, "PER-TASK REVIEW \u2014 task-reviewer (spec + quality)"), /*#__PURE__*/React.createElement("text", {
     x: "16",
     y: "36",
     fill: t.mute,
@@ -668,7 +668,7 @@ function SDDPipeline({
     kicker: "DOWNSTREAM",
     title: "pick the mode \u2014 not a pipeline",
     color: t.ember,
-    bullets: [['arc-agent-driven', 'In-session executor. Fresh subagent per task, two-stage review (spec → quality). Lead stays available to answer questions. Default for task lists.'], ['arc-implementing', 'Orchestrator for large projects with a dag.yaml in a worktree. Expands epic → features → tasks and delegates to the skills below — it does not write code itself.'], ['arc-dispatching-teammates', 'Epic-level parallel with the lead present. One Claude Code teammate per ready epic in its own worktree; lead monitors via SendMessage, intervenes on blockers.'], ['arc-looping', 'Cross-session unattended execution. Fresh Claude session per task, DAG+git persist state — built for walk-away overnight runs, not human-in-the-loop work.']],
+    bullets: [['arc-agent-driven', 'In-session executor. Fresh subagent per task, single task-reviewer returning both verdicts (spec + quality). Lead stays available to answer questions. Default for task lists.'], ['arc-implementing', 'Orchestrator for large projects with a dag.yaml in a worktree. Expands epic → features → tasks and delegates to the skills below — it does not write code itself.'], ['arc-dispatching-teammates', 'Epic-level parallel with the lead present. One Claude Code teammate per ready epic in its own worktree; lead monitors via SendMessage, intervenes on blockers.'], ['arc-looping', 'Cross-session unattended execution. Fresh Claude session per task, DAG+git persist state — built for walk-away overnight runs, not human-in-the-loop work.']],
     t: t
   })));
 }

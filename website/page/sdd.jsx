@@ -86,7 +86,7 @@ function SDDPipeline({theme:t}) {
             </g>
 
             {/* 4 mode cards */}
-            <ModeCard x={20}  y={200} name="arc-agent-driven"          axis="task · present"       note="fresh subagent per task, two-stage review" color={t.ember} t={t}/>
+            <ModeCard x={20}  y={200} name="arc-agent-driven"          axis="task · present"       note="fresh subagent per task, task-reviewer (spec + quality)" color={t.ember} t={t}/>
             <ModeCard x={300} y={200} name="arc-implementing"          axis="epic · orchestrator"  note="expands epic → features → tasks; calls skills" color={t.ember} t={t}/>
             <ModeCard x={580} y={200} name="arc-dispatching-teammates" axis="multi-epic · present" note="one teammate per ready epic; lead monitors"    color={t.ember} t={t}/>
             <ModeCard x={860} y={200} name="arc-looping"               axis="dag · walk-away"      note="fresh session per task, overnight"            color={t.ember} t={t}/>
@@ -96,7 +96,7 @@ function SDDPipeline({theme:t}) {
               <g filter="url(#sk-sdd)">
                 <rect width="500" height="46" fill={t.card} stroke={t.brass} strokeWidth="1.2" strokeDasharray="3 3" rx="4"/>
               </g>
-              <text x="16" y="20" fill={t.brass} fontSize="10" letterSpacing="2" fontFamily="JetBrains Mono,monospace">TWO-STAGE REVIEW — spec-reviewer → quality-reviewer</text>
+              <text x="16" y="20" fill={t.brass} fontSize="10" letterSpacing="2" fontFamily="JetBrains Mono,monospace">PER-TASK REVIEW — task-reviewer (spec + quality)</text>
               <text x="16" y="36" fill={t.mute} fontSize="11" fontFamily="Fraunces,serif" fontStyle="italic">fires inside agent-driven and on every teammate completion · walk-away loops defer to verifier</text>
             </g>
           </g>
@@ -241,7 +241,7 @@ function SDDPipeline({theme:t}) {
           title="pick the mode — not a pipeline"
           color={t.ember}
           bullets={[
-            ['arc-agent-driven','In-session executor. Fresh subagent per task, two-stage review (spec → quality). Lead stays available to answer questions. Default for task lists.'],
+            ['arc-agent-driven','In-session executor. Fresh subagent per task, single task-reviewer returning both verdicts (spec + quality). Lead stays available to answer questions. Default for task lists.'],
             ['arc-implementing','Orchestrator for large projects with a dag.yaml in a worktree. Expands epic → features → tasks and delegates to the skills below — it does not write code itself.'],
             ['arc-dispatching-teammates','Epic-level parallel with the lead present. One Claude Code teammate per ready epic in its own worktree; lead monitors via SendMessage, intervenes on blockers.'],
             ['arc-looping','Cross-session unattended execution. Fresh Claude session per task, DAG+git persist state — built for walk-away overnight runs, not human-in-the-loop work.'],

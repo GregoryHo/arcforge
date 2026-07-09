@@ -43,7 +43,7 @@ def test_arc_implementing_contains_required_sections():
     # Must be an orchestrator that delegates
     assert "orchestrator" in text.lower() or "呼叫" in text.lower()
     
-    # Must delegate to agent-driven (which handles TDD + two-stage review)
+    # Must delegate to agent-driven (which handles TDD + task-reviewer, both verdicts)
     assert "arc-agent-driven" in text.lower() or "agent-driven" in text.lower()
     
     # Must delegate to writing-tasks (for task breakdown)
