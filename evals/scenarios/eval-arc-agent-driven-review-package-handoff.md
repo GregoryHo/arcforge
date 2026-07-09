@@ -1,5 +1,7 @@
 # Eval: eval-arc-agent-driven-review-package-handoff
 
+> **Preflight (2026-07-09): PASS** — discriminative (baseline 67% < 80%). Ready for a real `eval ab`.
+
 **Status**: Active — direct behavioral coverage of arc-agent-driven's Per-Task
 File Handoff (review-package file handoff, pre-implementer BASE, no HEAD~1).
 

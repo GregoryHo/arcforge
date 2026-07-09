@@ -1,5 +1,7 @@
 # Eval: eval-arc-agent-driven-model-selection
 
+> **Preflight (2026-07-09): BLOCK** — baseline ~100%, non-discriminative _as authored_. Kept as a **regression tripwire**, not a lift gate. `eval run` "SHIP" here is single-condition pass-rate, NOT discriminative evidence.
+
 <!--
 status: draft-unvalidated 2026-07-09 — direct behavioral coverage of
 skills/arc-agent-driven "Model Selection". Ported ground truth: name an EXPLICIT

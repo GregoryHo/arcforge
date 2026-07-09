@@ -1,5 +1,7 @@
 # Eval: eval-arc-writing-skills-micro-test-control
 
+> **Preflight (2026-07-09): BLOCK** — baseline ~100%, non-discriminative _as authored_. Kept as a **regression tripwire**, not a lift gate. `eval run` "SHIP" here is single-condition pass-rate, NOT discriminative evidence.
+
 ## Scope
 
 skill

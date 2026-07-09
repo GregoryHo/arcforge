@@ -1,5 +1,7 @@
 # Eval: eval-arc-writing-skills-match-form-to-failure
 
+> **Preflight (2026-07-09): no verdict returned** (model-graded path) — treat as UNVALIDATED / preflight-pending, not a passing gate.
+
 ## Scope
 
 skill

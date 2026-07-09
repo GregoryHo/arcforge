@@ -1,5 +1,7 @@
 # Eval: eval-arc-agent-driven-ledger-resume
 
+> **Preflight (2026-07-09): BLOCK** — baseline ~100%, non-discriminative _as authored_ (not iterated to discriminative). Kept as a **regression tripwire**, not a lift gate. `eval run` prints "SHIP" on single-condition pass-rate here — that is NOT discriminative evidence.
+
 <!--
 Ported from skills/arc-agent-driven "Durable Progress Ledger". Behavior under
 test: on resume of an interrupted arc-agent-driven run, the controller

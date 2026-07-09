@@ -1,5 +1,7 @@
 # Eval: eval-arc-researching-predict-audit
 
+> **Preflight: PENDING** — authored after the preflight batch; not yet run. Treat as unvalidated until preflight passes.
+
 <!--
 Ported from skills/arc-researching "PREDICT" loop step + "Measurement Audit"
 section. Two facets under test in one loop iteration:
