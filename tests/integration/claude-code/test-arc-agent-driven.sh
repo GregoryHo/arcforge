@@ -23,12 +23,12 @@ else
 fi
 echo ""
 
-# Test 2: Verify skill describes correct workflow order
-echo "Test 2: Workflow ordering..."
-output=$(run_claude "In the arc-agent-driven skill, which review comes first: spec compliance or code quality? Answer with the order.") || true
+# Test 2: Verify skill describes the single task-reviewer returning both verdicts
+echo "Test 2: Single task-reviewer dual verdict..."
+output=$(run_claude "In the arc-agent-driven skill, how many reviewers run per task, and what verdicts does the reviewer return?") || true
 
-if require_output "$output" "Workflow ordering"; then
-    assert_contains "$output" "spec.*first\|spec.*before.*code\|first.*spec\|compliance.*then.*quality\|compliance.*followed.*quality" "Spec compliance comes first" || FAILED=$((FAILED + 1))
+if require_output "$output" "Single task-reviewer dual verdict"; then
+    assert_contains "$output" "one\|single\|task.\?reviewer\|both\|dual\|spec.*quality" "One task-reviewer returns both verdicts" || FAILED=$((FAILED + 1))
 else
     FAILED=$((FAILED + 1))
 fi
