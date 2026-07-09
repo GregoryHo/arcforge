@@ -20,6 +20,8 @@
     "templates/",
     "agents/",
     ".claude-plugin/",
+    ".codex-plugin/",
+    ".agents/",
     ".codex/",
     ".gemini/",
     ".opencode/",

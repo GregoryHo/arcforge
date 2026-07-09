@@ -1,6 +1,24 @@
 # Installing arcforge for Codex
 
-Enable agentic skills in Codex via native skill discovery. One clone, one symlink.
+Enable agentic skills in Codex via native skill discovery.
+
+## Marketplace install (recommended)
+
+arcforge ships a native Codex plugin manifest (`.codex-plugin/plugin.json`,
+declaring `"hooks": {}` so Codex does not adopt the Claude Code hooks) and a
+marketplace entry (`.agents/plugins/marketplace.json`). Install through Codex's
+marketplace and skills are discovered automatically — no manual symlink.
+
+If the marketplace lands the plugin somewhere other than `~/.agents/arcforge`,
+export `ARCFORGE_ROOT` so the CLI resolves (see the note in step 1 below):
+
+```bash
+export ARCFORGE_ROOT=/path/to/installed/arcforge
+```
+
+## Manual install (fallback)
+
+If you prefer a manual checkout — one clone, one symlink.
 
 ## Prerequisites
 

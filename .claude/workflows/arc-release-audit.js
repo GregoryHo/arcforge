@@ -190,9 +190,9 @@ Specifically: (1) the OLD version string "${prevVersion}" hardcoded anywhere out
   },
   {
     key: 'version-locations',
-    prompt: `Verify the 9 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
-package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), .opencode/plugins/arcforge.js (version:), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
-For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ .opencode/plugins/arcforge.js README.md website/page/\` and note the hit count. Return JSON per schema.`,
+    prompt: `Verify the 10 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
+package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), .codex-plugin/plugin.json (version), .opencode/plugins/arcforge.js (version:), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
+For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ .codex-plugin/ .opencode/plugins/arcforge.js README.md website/page/\` and note the hit count. Return JSON per schema.`,
   },
 ];
 
