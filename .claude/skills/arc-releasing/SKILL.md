@@ -225,7 +225,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Version bump without CHANGELOG entry** — the marketplace release cache is version-keyed. A bump with no CHANGELOG entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG *before* version bump) enforces pairing them.
 - **Editing past CHANGELOG entries** — downstream users and vault Decision notes depend on past entries being stable. Add corrections to the current entry; never stealth-edit the past.
 - **Partial bump shipped** — bumping a subset of the 10 locations produces a release where Claude Code, Codex, OpenCode, the marketplace JSON, or the website disagree about the current version. Always use the 10-location grep as a post-bump gate.
-- **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 6 release files. Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
+- **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 11 release files. Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
 - **Skipping the post-merge tag** — without the tag, the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. Missing tags cause the *next* release to either drop entries or include already-shipped ones.
 
 ## After the Release
