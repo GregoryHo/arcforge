@@ -106,9 +106,17 @@ everything you could verify.
 
 You are checking HOW the code was built (Part 1 already covered WHAT).
 
+**Review EVERY changed function for the checks below, independently of Part 1's
+acceptance criteria.** Code that no acceptance criterion requires is still reviewed
+for quality defects here — a resource leak, swallowed error, or vacuous test in an
+unrequested helper is a real Part 2 finding. Do NOT dismiss non-AC code as merely
+"extra scope" and skip its quality review (if it is genuinely unrequested, note that
+as a Part 1 *Extra* — but still review its quality here).
+
 ### Code Quality
 - **Separation of concerns** — one responsibility per function/class
-- **Error handling** — correct tier (library code throws, hooks silently catch, CLI exits), descriptive messages
+- **Error handling** — correct tier (library code throws, hooks silently catch, CLI exits), descriptive messages; no swallowed errors (an empty/blanket catch that hides failures)
+- **Resource management** — every opened file/handle/connection/lock is released on all paths, including error paths; no leaks (e.g. `openSync` with no matching `closeSync`)
 - **DRY without premature abstraction** — no verbatim duplication; no speculative flexibility
 - **Edge cases** — nulls, empty arrays, invalid input
 - **Naming** — clear, consistent with project conventions

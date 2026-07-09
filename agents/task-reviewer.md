@@ -56,8 +56,10 @@ check, but do not broaden your own search or hand the resolution back.
 
 ## Part 2: Task Quality
 
-Assess how the code was built: separation of concerns, error handling at the correct
-tier (library code throws, hooks silently catch, CLI exits), DRY without premature
+Assess how the code was built — for EVERY changed function, not just AC-covered code:
+separation of concerns, error handling at the correct tier (library code throws, hooks
+silently catch, CLI exits) with no swallowed errors, resource cleanup (close what you
+open, on all paths), DRY without premature
 abstraction, edge cases, security, module patterns, test quality, and file/function
 size. The implementer already ran the tests with TDD evidence — do NOT re-run the
 suite; run a focused test only for a specific doubt. Categorize issues by **actual**
