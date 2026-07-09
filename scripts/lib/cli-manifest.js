@@ -136,6 +136,7 @@ const CLI_MANIFEST = {
       '--no-project-setup',
       '--spec-id',
       '--task-timeout',
+      '--model',
       '--permission-mode',
       '--allowed-tools',
       '--verify-cmd',

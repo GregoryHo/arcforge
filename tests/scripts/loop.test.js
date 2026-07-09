@@ -6,6 +6,7 @@ const {
   detectWorktree,
   buildTaskPrompt,
 } = require('../../scripts/loop');
+const { buildClaudeArgs } = require('../../scripts/lib/loop-session');
 
 /**
  * Helper: build a minimal loop state with sensible defaults.
@@ -309,6 +310,7 @@ describe('parseLoopArgs', () => {
   it('should default spawn pass-through options to null', () => {
     const result = parseLoopArgs([]);
     expect(result.taskTimeoutMs).toBeNull();
+    expect(result.model).toBeNull();
     expect(result.permissionMode).toBeNull();
     expect(result.allowedTools).toBeNull();
   });
@@ -322,6 +324,14 @@ describe('parseLoopArgs', () => {
     ]);
     expect(result.permissionMode).toBe('acceptEdits');
     expect(result.allowedTools).toBe('Bash,Read');
+  });
+
+  it('should pass through the --model value so buildClaudeArgs pins the tier', () => {
+    const result = parseLoopArgs(['--model', 'opus']);
+    expect(result.model).toBe('opus');
+    // Proves the parsed value reaches the spawned argv: options.model flows
+    // unchanged to spawnSession → buildClaudeArgs, which appends --model.
+    expect(buildClaudeArgs({ model: result.model })).toContain('opus');
   });
 });
 

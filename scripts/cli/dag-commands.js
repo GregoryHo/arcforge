@@ -279,6 +279,7 @@ function runLoop(args, { projectRoot, specFlag }) {
     projectRoot,
     specId: resolved,
     taskTimeoutMs: taskTimeout ? taskTimeout * 1000 : null,
+    model: args.options.model || null,
     permissionMode: args.options['permission-mode'] || null,
     allowedTools: args.options['allowed-tools'] || null,
     verifyCommand,
