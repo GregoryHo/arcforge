@@ -335,6 +335,8 @@ At minimum, test your contribution on Claude Code (the primary platform). For pl
 - [`docs/README.opencode.md`](docs/README.opencode.md)
 - [`docs/README.gemini.md`](docs/README.gemini.md)
 
+Adding a **fifth** platform (a new IDE, CLI, or agent runner)? See [`docs/guide/porting-to-a-new-platform.md`](docs/guide/porting-to-a-new-platform.md) for the invariants a platform must satisfy, the integration-shape routing, and the end-to-end porting procedure.
+
 ---
 
 ## PR Process
