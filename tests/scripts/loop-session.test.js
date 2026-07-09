@@ -21,6 +21,18 @@ describe('buildClaudeArgs', () => {
     ]);
   });
 
+  it('passes --model through with its value when provided', () => {
+    const args = buildClaudeArgs({ model: 'opus' });
+    const idx = args.indexOf('--model');
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe('opus');
+  });
+
+  it('omits --model when no model is provided', () => {
+    expect(buildClaudeArgs()).not.toContain('--model');
+    expect(buildClaudeArgs({ permissionMode: 'acceptEdits' })).not.toContain('--model');
+  });
+
   it('passes --permission-mode through with its value', () => {
     const args = buildClaudeArgs({ permissionMode: 'acceptEdits' });
     const idx = args.indexOf('--permission-mode');
