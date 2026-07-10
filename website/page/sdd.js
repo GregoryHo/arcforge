@@ -325,7 +325,7 @@ function SDDPipeline({
     fontSize: "11",
     fontFamily: "Fraunces,serif",
     fontStyle: "italic"
-  }, "fires inside agent-driven and on every teammate completion \xB7 walk-away loops defer to verifier"))), /*#__PURE__*/React.createElement("g", {
+  }, "fires per-task in agent-driven \xB7 teammate completion uses spec-reviewer \xB7 walk-away loops defer to verifier"))), /*#__PURE__*/React.createElement("g", {
     fontFamily: "'Caveat',cursive",
     fontSize: "18",
     fill: t.brass

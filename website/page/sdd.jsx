@@ -97,7 +97,7 @@ function SDDPipeline({theme:t}) {
                 <rect width="500" height="46" fill={t.card} stroke={t.brass} strokeWidth="1.2" strokeDasharray="3 3" rx="4"/>
               </g>
               <text x="16" y="20" fill={t.brass} fontSize="10" letterSpacing="2" fontFamily="JetBrains Mono,monospace">PER-TASK REVIEW — task-reviewer (spec + quality)</text>
-              <text x="16" y="36" fill={t.mute} fontSize="11" fontFamily="Fraunces,serif" fontStyle="italic">fires inside agent-driven and on every teammate completion · walk-away loops defer to verifier</text>
+              <text x="16" y="36" fill={t.mute} fontSize="11" fontFamily="Fraunces,serif" fontStyle="italic">fires per-task in agent-driven · teammate completion uses spec-reviewer · walk-away loops defer to verifier</text>
             </g>
           </g>
 
