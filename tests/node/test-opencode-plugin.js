@@ -42,7 +42,7 @@ async function main() {
     'bootstrap should contain the minimal-bootstrap posture line',
   );
   assert.ok(
-    bootstrap.includes('invoke the arcforge:arc-using skill'),
+    bootstrap.includes('invoke the arc-using skill'),
     'bootstrap should point at the arc-using router',
   );
   assert.ok(
