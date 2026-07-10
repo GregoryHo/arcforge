@@ -13,8 +13,8 @@
 // Prints the written brief path to stdout.
 
 const fs = require('node:fs');
-const path = require('node:path');
-const { ensureWorkspace } = require('./sdd-workspace');
+const { resolveOutPath } = require('./sdd-workspace');
+const { sanitizeFilename } = require('../../../scripts/lib/utils');
 
 /**
  * Parse `--key value` flags into an object.
@@ -51,16 +51,15 @@ function buildTaskBrief({ task, base, acceptance, number, out, cwd = process.cwd
     throw new Error('--base is required (the pre-implementer BASE SHA).');
   }
 
-  let outPath = out;
-  if (outPath) {
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  } else {
-    const dir = ensureWorkspace(cwd);
-    outPath = path.join(dir, number ? `task-${number}-brief.md` : 'task-brief.md');
-  }
+  // Sanitize the task number before it lands in a filename — an unsanitized
+  // `--number` (e.g. `x/../../../etc/evil`) would escape the .arcforge/sdd/
+  // workspace via path traversal.
+  const safeNumber = number ? sanitizeFilename(number) : '';
+  const defaultName = safeNumber ? `task-${safeNumber}-brief.md` : 'task-brief.md';
+  const { outPath } = resolveOutPath({ out, cwd, defaultName });
 
   const body = [
-    number ? `# Task Brief: Task ${number}` : '# Task Brief',
+    safeNumber ? `# Task Brief: Task ${safeNumber}` : '# Task Brief',
     '',
     '## Base SHA',
     '',

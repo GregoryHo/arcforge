@@ -72,4 +72,31 @@ function ensureWorkspace(cwd) {
   return dir;
 }
 
-module.exports = { runGit, repoRoot, resolveCommit, ensureWorkspace, GIT_MAX_BUFFER };
+/**
+ * Resolve the output path for a handoff artifact. An explicit `out` wins (its
+ * parent directory is created); otherwise the artifact lands in the
+ * .arcforge/sdd/ workspace under `defaultName`.
+ * @param {object} opts
+ * @param {string} [opts.out] - explicit output file path.
+ * @param {string} opts.cwd - working directory.
+ * @param {string} opts.defaultName - filename used inside the workspace when out is absent.
+ * @returns {{ outPath: string, workspaceDir: string }}
+ */
+function resolveOutPath({ out, cwd, defaultName }) {
+  if (out) {
+    const workspaceDir = path.dirname(out);
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    return { outPath: out, workspaceDir };
+  }
+  const workspaceDir = ensureWorkspace(cwd);
+  return { outPath: path.join(workspaceDir, defaultName), workspaceDir };
+}
+
+module.exports = {
+  runGit,
+  repoRoot,
+  resolveCommit,
+  ensureWorkspace,
+  resolveOutPath,
+  GIT_MAX_BUFFER,
+};

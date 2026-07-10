@@ -16,8 +16,7 @@
 // {DIFF_FILE} to the reviewer).
 
 const fs = require('node:fs');
-const path = require('node:path');
-const { runGit, resolveCommit, ensureWorkspace } = require('./sdd-workspace');
+const { runGit, resolveCommit, resolveOutPath } = require('./sdd-workspace');
 
 /**
  * Build the review package and write it to disk.
@@ -50,15 +49,11 @@ function buildReviewPackage({ base, head, out, cwd = process.cwd() }) {
 
   // Filename is built from the RESOLVED hex SHAs (not the raw refs), so a ref
   // like `feature/x` can never inject a path separator, and the name is stable.
-  let outPath = out;
-  let workspaceDir;
-  if (outPath) {
-    workspaceDir = path.dirname(outPath);
-    fs.mkdirSync(workspaceDir, { recursive: true });
-  } else {
-    workspaceDir = ensureWorkspace(cwd);
-    outPath = path.join(workspaceDir, `review-${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}.md`);
-  }
+  const { outPath, workspaceDir } = resolveOutPath({
+    out,
+    cwd,
+    defaultName: `review-${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}.md`,
+  });
 
   const body = [
     `# Review package: ${base}..${head}`,
