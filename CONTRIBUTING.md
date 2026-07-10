@@ -269,7 +269,7 @@ Templates use `{VARIABLE}` placeholders and follow a consistent structure:
 - Rules and constraints
 - Anti-patterns
 
-Follow the structure of existing templates (`implementer-prompt.md`, `quality-reviewer-prompt.md`, `spec-reviewer-prompt.md`).
+Follow the structure of existing templates (`implementer-prompt.md`, `task-reviewer-prompt.md`, `spec-reviewer-prompt.md`).
 
 ---
 
