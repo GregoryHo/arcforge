@@ -54,6 +54,7 @@ Before producing a new spec version, verify that the prior sprint is complete. T
 **Prior spec exists → run the gate check:**
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate dag --spec-id <spec-id>
 ```
 
@@ -82,6 +83,7 @@ There is no `--force` flag, no `abandoned` epic status, no environment-variable 
 Validate the design doc programmatically:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate design --design docs/plans/<spec-id>/<date>/design.md
 ```
 
@@ -102,6 +104,7 @@ Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do 
 ### 2.5b — Validate Vision and Ledger (sdd-gate context)
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate context --spec-id <spec-id>
 ```
 
@@ -159,6 +162,7 @@ The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any re
 **Before exiting non-zero, MUST write the conflict handoff file (fr-rf-015-ac1)** by piping the conflict payload as JSON to the `conflict` gate stage. The heredoc keeps the payload off disk until the CLI writes the canonical file:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate conflict --spec-id <spec-id> <<'JSON'
 {
   "axis_fired": "<1|2|3>",
@@ -323,6 +327,7 @@ draft `spec.xml` to the `header` gate stage over stdin (heredoc) — the draft n
 touches disk, preserving zero-filesystem-state-on-block:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate header --spec-id <spec-id> <<'SPECXML'
 <the in-memory spec.xml content>
 SPECXML
@@ -355,6 +360,7 @@ with `axis_fired: '3'` and the unauthorized-trace summary — the agent does NOT
 hand-build the marker for this stage:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate authorize --spec-id <spec-id> \
   --design docs/plans/<spec-id>/<date>/design.md \
   --decision-log docs/plans/<spec-id>/<date>/decision-log.yml <<'DRAFT'

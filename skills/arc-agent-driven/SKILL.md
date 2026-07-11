@@ -95,11 +95,11 @@ package live in the self-ignoring `.arcforge/sdd/` workspace:
 
 1. **Before dispatching the implementer**, record the current commit as the task
    BASE: `git rev-parse HEAD`. Optionally assemble the brief with
-   `node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/task-brief.js" --task "<text>" --acceptance "<criteria>" --base <BASE>`
+   `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/task-brief.js" --task "<text>" --acceptance "<criteria>" --base <BASE>`
    (it prints the brief path).
 2. **After the implementer commits**, build the review package for the whole task
    range — never just the last commit — with
-   `node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
+   `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
    It writes the commit list plus `git diff --stat` and `git diff -U10` for
    `<BASE>..HEAD` into one file and prints that file's path.
 3. **Hand the task-reviewer that path** as `{DIFF_FILE}`. The reviewer reads the

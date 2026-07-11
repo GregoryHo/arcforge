@@ -41,7 +41,8 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 **IMPORTANT**: Set `SKILL_ROOT` from the `ARCFORGE_ROOT` environment variable, using the fallback below when unset.
 
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-coordinating}"
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-coordinating}"
 if [ ! -d "$SKILL_ROOT" ]; then
   echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
   exit 1
@@ -50,6 +51,8 @@ fi
 
 Then use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>` for all commands:
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-coordinating}"
 node "${SKILL_ROOT}/scripts/coordinator.js" status
 node "${SKILL_ROOT}/scripts/coordinator.js" expand
 node "${SKILL_ROOT}/scripts/coordinator.js" merge
@@ -57,6 +60,8 @@ node "${SKILL_ROOT}/scripts/coordinator.js" merge
 
 **JSON output:** Add `--json` flag for machine-readable output:
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-coordinating}"
 node "${SKILL_ROOT}/scripts/coordinator.js" status --json
 ```
 

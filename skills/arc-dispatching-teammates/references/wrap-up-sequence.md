@@ -79,6 +79,7 @@ lists user options — you don't execute them.
 From the project root (NOT from inside a teammate's worktree):
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <epic-id-1> <epic-id-2> ...
 ```
 
@@ -116,7 +117,7 @@ branch. The final report already tells them which worktrees were
 retained and where.
 
 If the user later decides to discard a failed epic, they can run
-cleanup manually — `node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <failed-epic-id>`
+cleanup manually — `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <failed-epic-id>`
 from the project root.
 
 ## 8c — Shut down teammates, then `TeamDelete`

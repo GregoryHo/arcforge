@@ -43,8 +43,9 @@ differ.
 ### Step 0.5: Sync Before Finish (Epic Path only)
 
 ```bash
-# Set SKILL_ROOT from skill loader header, then sync
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-finishing}"
+# Derive SKILL_ROOT from ARCFORGE_ROOT (hook-set under Claude; fallback default elsewhere), then sync
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 if [ ! -d "$SKILL_ROOT" ]; then
   echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
   exit 1
@@ -121,6 +122,8 @@ exits 128); always merge into the base from the base checkout (`cd` there, or
 **Epic Path — use coordinator merge (NOT git merge directly):**
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 # Capture the live epic branch (the engine names it <spec-id>/<epic-id>) and the
 # base worktree path from the marker — BEFORE anything is removed.
 EPIC_BRANCH="$(git branch --show-current)"
@@ -256,6 +259,8 @@ Wait for exact confirmation.
 **Epic Path — if confirmed:**
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 # Capture identifiers from the marker BEFORE destroying anything. `block` and
 # `cleanup` take the epic *id*; `git branch -D` takes the live branch name
 # (engine: <spec-id>/<epic-id>); cleanup + branch -D must run from the base.
@@ -315,6 +320,8 @@ finds the base worktree and runs the abort there even though you are in the
 epic worktree:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 node "${SKILL_ROOT}/scripts/finish-epic.js" merge --abort
 
 # Verify the BASE working tree is clean again — the abort happened there, so
@@ -350,6 +357,8 @@ After the user or lead provides resolution guidance and you edit/commit, re-run 
 **After Option 2 (PR) — merge delegates to base internally, keep has no DAG change, discard syncs inline above:**
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 # Sync to base to ensure DAG reflects new status
 node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
 ```
@@ -369,6 +378,8 @@ worktree is alive — which would wrongly print a null path for the kept-worktre
 options. Only the base dag holds the real `worktree`/`path` value.
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
 # Options 1 and 4: you already ran `cd "$BASE_WORKTREE"`, so the base dag is the
 # current cwd — query it directly.
 node "${SKILL_ROOT}/scripts/finish-epic.js" status --json

@@ -39,6 +39,7 @@ digraph when_to_use {
 ### Sequential (Default — Safest)
 
 ```
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
 ```
 
@@ -49,6 +50,7 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
 ### DAG (Parallel-aware)
 
 ```
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 20
 ```
 
@@ -76,6 +78,7 @@ If you are in a worktree (`.arcforge-epic` exists), the loop auto-detects both t
 
 For scoped single-epic execution, use `--epic`:
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --epic epic-001 --pattern sequential --max-runs 20
 ```
 
@@ -141,6 +144,7 @@ Spawned sessions run as headless `claude -p` — they **cannot** answer interact
 Pre-authorize so unattended sessions never block:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50 \
   --permission-mode acceptEdits \
   --allowed-tools "Bash,Edit,Write,Read"
@@ -156,6 +160,7 @@ A dag loop is many sessions back-to-back — each capped at `--task-timeout` (de
 Launch detached so the loop outlives the launching shell:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 # Background, survives the launching session (preferred when a runner supports it)
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50 \
   --permission-mode acceptEdits > loop.log 2>&1 &
@@ -250,6 +255,7 @@ When the loop ends, hand off in order:
 ## CLI Usage
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 # Sequential — safest
 node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
 
