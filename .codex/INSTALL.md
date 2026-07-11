@@ -33,10 +33,12 @@ If you prefer a manual checkout — one clone, one symlink.
    git clone https://github.com/GregoryHo/arcforge ~/.agents/arcforge
    ```
 
-   This is the **standard clone location**, and skills resolve the CLI
-   through `ARCFORGE_ROOT`. Codex has no SessionStart hook to export it, so
-   skills fall back to `~/.agents/arcforge` automatically. If you clone
-   somewhere else, export it in your shell profile so the CLI resolves:
+   This is the **standard clone location**. Skills invoke the CLI through
+   `ARCFORGE_ROOT`, and Codex has no SessionStart hook to export it — so
+   every skill's bash block defaults it to `~/.agents/arcforge` when unset
+   (`: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"`). A standard clone runs
+   with no extra configuration. If you clone somewhere else, export
+   `ARCFORGE_ROOT` in your shell profile so the CLI resolves:
    ```bash
    export ARCFORGE_ROOT=/your/arcforge/checkout
    ```
