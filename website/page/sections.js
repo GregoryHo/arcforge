@@ -735,16 +735,6 @@ function Platforms({
     tag: 'SUPPORTED',
     cmd: 'Fetch .codex/INSTALL.md',
     note: 'Manual install. Core skills + SDD pipeline.'
-  }, {
-    name: 'Gemini CLI',
-    tag: 'SUPPORTED',
-    cmd: 'Fetch .gemini/INSTALL.md',
-    note: 'Manual install. Core skills + SDD pipeline.'
-  }, {
-    name: 'OpenCode',
-    tag: 'SUPPORTED',
-    cmd: 'Clone + symlink plugin',
-    note: 'Plugin-shaped. Lives in ~/.config/opencode/plugins.'
   }];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
@@ -757,8 +747,8 @@ function Platforms({
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "four harnesses.")),
-    sub: "Claude Code gets the deepest integration via the plugin marketplace. Codex, Gemini CLI, and OpenCode ship manually but share the same skill library.",
+    }, "two harnesses.")),
+    sub: "Claude Code gets the deepest integration via the plugin marketplace. Codex ships manually but shares the same skill library.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -1154,11 +1144,7 @@ function Install({
       fontSize: 13,
       lineHeight: 1.7
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("b", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
     style: {
       color: t.ink,
       fontFamily: 'monospace'
@@ -1168,26 +1154,7 @@ function Install({
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, ".codex/INSTALL.md")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("b", {
-    style: {
-      color: t.ink,
-      fontFamily: 'monospace'
-    }
-  }, "Gemini:"), " Fetch ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: t.brass,
-      fontFamily: 'monospace'
-    }
-  }, ".gemini/INSTALL.md")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
-    style: {
-      color: t.ink,
-      fontFamily: 'monospace'
-    }
-  }, "OpenCode:"), " Clone + symlink plugin")))));
+  }, ".codex/INSTALL.md"))))));
 }
 
 // ─── Footer ───

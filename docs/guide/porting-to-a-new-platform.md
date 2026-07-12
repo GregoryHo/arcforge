@@ -1,7 +1,7 @@
 # Porting arcforge to a New Platform
 
-> How to add a fifth platform — an IDE, CLI, or agent runner beyond Claude
-> Code, Codex, Gemini CLI, and OpenCode — so arcforge skills are discoverable
+> How to add a third platform — an IDE, CLI, or agent runner beyond Claude
+> Code and Codex — so arcforge skills are discoverable
 > and runnable there.
 >
 > This is a **contributor** guide. It lives in `docs/guide/` alongside the
@@ -32,15 +32,14 @@ What changes per platform is a thin delivery layer with three components:
 2. **Tool mapping (per-platform).** Each platform needs the action vocabulary
    translated into its real tool names. That lives in
    `skills/arc-using/references/<platform>-tools.md` — see the existing
-   `skills/arc-using/references/codex-tools.md` and
-   `skills/arc-using/references/opencode-tools.md`.
+   `skills/arc-using/references/codex-tools.md`.
 
 3. **Bootstrap (per-platform, degradable).** At session start, a minimal
    bootstrap tells the model that arcforge skills exist and where the install
    root is. The shared text is `hooks/inject-skills/bootstrap.txt`; how it
    reaches the model is platform-specific (Part 3). Unlike some toolkits,
-   arcforge does **not** require auto-injection — two shipped platforms (Codex,
-   Gemini) run without it and degrade to native skill discovery (Part 2).
+   arcforge does **not** require auto-injection — the shipped Codex platform
+   runs without it and degrades to native skill discovery (Part 2).
 
 ### Two rules that make this work
 
@@ -67,7 +66,7 @@ before writing code.
 ### (a) Skill discovery
 
 The model must be able to load a skill's full content on demand — either through
-a **native skill mechanism** (Claude Code's `Skill` tool, Codex/Gemini native
+a **native skill mechanism** (Claude Code's `Skill` tool, Codex native
 skill discovery) or, absent one, a **file-read fallback** so that
 `skills/*/SKILL.md` are reachable with the platform's read tool. A platform with
 neither a skill tool nor file-read cannot work.
@@ -88,28 +87,28 @@ it differently, and a port must pick one:
 - **Injected at session start** — Claude Code's `hooks/inject-skills/main.sh`
   writes `export ARCFORGE_ROOT="${PLUGIN_ROOT}"` into `$CLAUDE_ENV_FILE`, so
   every Bash tool call sees it.
-- **Resolved at runtime by the plugin** — `.opencode/plugins/arcforge.js`
-  computes the root from its own module path (`path.resolve(__dirname, '../..')`)
-  and the Codex manifest `.codex-plugin/plugin.json` declares `"skills": "./skills/"`
-  relative to the manifest.
-- **Standard-clone fallback** — platforms with no hook (Codex, Gemini) rely on
+- **Resolved at runtime by the plugin manifest** — the Codex manifest
+  `.codex-plugin/plugin.json` declares `"skills": "./skills/"` relative to the
+  manifest. An in-process plugin can instead compute the root from its own
+  module path (`path.resolve(__dirname, '../..')`).
+- **Standard-clone fallback** — Codex (no hook) relies on
   skills falling back to the standard clone location `~/.agents/arcforge`, which
   the user overrides by exporting `ARCFORGE_ROOT` in their shell profile if they
-  cloned elsewhere. See `.codex/INSTALL.md` and `.gemini/INSTALL.md`.
+  cloned elsewhere. See `.codex/INSTALL.md`.
 
 ### (d) Context injection at session start (preferred, not required)
 
 Injecting the bootstrap at session start — the arcforge analog of a "you have
 skills" preamble — is **strongly preferred** but degradable. The shared source
 is `hooks/inject-skills/` (`main.sh` reads `bootstrap.txt`, substitutes
-`${ARCFORGE_ROOT}`, and emits it). OpenCode re-reads the same `bootstrap.txt`
-from its plugin.
+`${ARCFORGE_ROOT}`, and emits it). An in-process plugin can re-read the same
+`bootstrap.txt` to inject it in code.
 
 **Degraded mode (no auto-injection).** If the platform cannot inject at session
 start, it must instead rely on **native skill discovery** surfacing
 `arc-using`'s description so the model loads it on demand, with `ARCFORGE_ROOT`
-resolved via the `~/.agents/arcforge` fallback. This is exactly how Codex and
-Gemini ship today — no bootstrap, discovery does the triggering. The floor below
+resolved via the `~/.agents/arcforge` fallback. This is exactly how Codex
+ships today — no bootstrap, discovery does the triggering. The floor below
 that (a platform lacking even native discovery) is a documented manual
 `SKILL.md` read, but prefer native discovery whenever the platform offers it.
 
@@ -151,17 +150,18 @@ the platform's JSON shape.
 ### Shape B — In-process plugin (injects)
 
 The platform loads a JS/TS module with a message/system lifecycle callback.
-Skills are discovered separately (OpenCode uses a symlink — see its
-`INSTALL.md`); the module's job is to inject the bootstrap in code.
+Skills are discovered separately (e.g. via a symlink); the module's job is to
+inject the bootstrap in code.
 
-- Reference: `.opencode/plugins/arcforge.js` — its `experimental.chat.system.transform`
-  callback reads the **same** `bootstrap.txt`, wraps it in `<EXTREMELY_IMPORTANT>`
-  tags, and pushes it onto the system array. It caches the built string at module
-  level (the callback fires on every request).
+- Reference: arcforge shipped an in-process plugin through v4.x (removed in v5,
+  recoverable from git history) as a worked example. Its lifecycle callback read
+  the **same** `bootstrap.txt`, wrapped it in `<EXTREMELY_IMPORTANT>` tags, and
+  pushed it onto the system array, caching the built string at module level (the
+  callback fires on every request).
 - This shape carries a version field in the module, so it is version-bearing
   (Part 4, Step 6).
 
-### Shape C — Native discovery + symlink (degraded, no injection)
+### Shape C — Native discovery (degraded, no injection)
 
 The platform discovers skills natively but has no session-start injection point.
 There is no bootstrap; the platform surfaces skill descriptions and the model
@@ -171,21 +171,20 @@ loads `arc-using` on demand. `ARCFORGE_ROOT` resolves via `~/.agents/arcforge`.
   `"skills": "./skills/"` and `"hooks": {}` so Codex does not adopt the Claude
   Code hooks) plus the marketplace entry `.agents/plugins/marketplace.json`.
   Install docs: `.codex/INSTALL.md`.
-- Reference (per-skill symlink): Gemini expects each skill folder directly under
-  `~/.gemini/skills/`, so the install symlinks each one. Install docs:
-  `.gemini/INSTALL.md`.
+- A per-skill-symlink variant (each skill folder symlinked directly under the
+  platform's skills dir) is equally valid where the platform expects that layout.
 
 ### Routing table
 
 | If the platform… | Use shape | Copy from |
 |---|---|---|
 | runs a shell command at session start and reads its stdout | A (shell-hook) | `hooks/inject-skills/main.sh` + `.claude-plugin/plugin.json` |
-| loads a JS/TS plugin module with a message/system lifecycle callback | B (in-process) | `.opencode/plugins/arcforge.js` |
-| only discovers skills natively (marketplace manifest or symlinked dir), no injection point | C (degraded) | `.codex-plugin/` (marketplace) or `.gemini/` (per-skill symlink) |
+| loads a JS/TS plugin module with a message/system lifecycle callback | B (in-process) | in-tree example removed in v5 — see git history |
+| only discovers skills natively (marketplace manifest or symlinked dir), no injection point | C (degraded) | `.codex-plugin/` (marketplace) |
 
 Shapes compose: the *skill-discovery* mechanism and the *bootstrap* mechanism
-need not be the same shape (OpenCode discovers via symlink but injects in code).
-Decide the two questions separately.
+need not be the same shape (a platform can discover via symlink but inject in
+code). Decide the two questions separately.
 
 ---
 
@@ -204,17 +203,17 @@ config (Part 1, rule 2).
 
 - **Shape A:** a `*-plugin/plugin.json` (see `.claude-plugin/plugin.json`) plus a
   session-start hook registration.
-- **Shape B:** the module the platform loads (see `.opencode/plugins/arcforge.js`)
-  plus the package metadata it needs to be discovered.
+- **Shape B:** the module the platform loads (an in-process plugin; the removed
+  v5 example is in git history) plus the package metadata it needs to be discovered.
 - **Shape C:** a marketplace manifest declaring `"skills": "./skills/"` (see
-  `.codex-plugin/plugin.json`) **or** the per-skill symlink recipe (Gemini).
+  `.codex-plugin/plugin.json`) **or** the per-skill symlink recipe.
 
 ### Step 3 — Wire the bootstrap (or accept the degrade)
 
 - **Shape A / B:** get `bootstrap.txt` in front of the model at session start.
-  **Reuse the shared file — do not fork the bootstrap text.** Both `main.sh` and
-  `arcforge.js` read `hooks/inject-skills/bootstrap.txt` so every platform emits
-  an identical bootstrap; a second copy will drift.
+  **Reuse the shared file — do not fork the bootstrap text.** `main.sh` reads
+  `hooks/inject-skills/bootstrap.txt`; any in-process injector must read the same
+  file so every platform emits an identical bootstrap — a second copy will drift.
 - **Shape C:** there is no injector. Confirm native discovery surfaces
   `arc-using` and that `ARCFORGE_ROOT` resolves via `~/.agents/arcforge`. Document
   the degrade in the platform's `INSTALL.md` the way `.codex/INSTALL.md` does.
@@ -235,20 +234,20 @@ it's bypassing the mechanism.
 
 ### Step 5 — Add an install doc
 
-Write `<platform>/INSTALL.md` following `.opencode/INSTALL.md` (in-process) or
-`.codex/INSTALL.md` (native discovery): prerequisites (Git, Node), the clone to
+Write `<platform>/INSTALL.md` following `.codex/INSTALL.md` (native discovery):
+prerequisites (Git, Node), the clone to
 `~/.agents/arcforge`, the install command or symlink, a verify step, updating,
 and uninstalling. The only supported install action is a command the user runs.
 
 ### Step 6 — Register the version (only if the platform has a version-bearing manifest)
 
-If your shim carries its own version string (like `.opencode/plugins/arcforge.js`
-or `.codex-plugin/plugin.json`), it must move in lockstep with every release:
+If your shim carries its own version string (like `.codex-plugin/plugin.json`),
+it must move in lockstep with every release:
 
 1. Add an entry (file path + a version extractor) to the `LOCATIONS` array in
    `scripts/check-version-sync.js`.
 2. Add a row to the canonical version table in
-   `.claude/skills/arc-releasing/SKILL.md` (the "all 10 canonical locations"
+   `.claude/skills/arc-releasing/SKILL.md` (the "all 9 canonical locations"
    list) and bump the count language accordingly.
 
 If instead your platform rides an already-tracked file (e.g. the repo-root
@@ -285,6 +284,4 @@ Use the files as the live index; when in doubt, read them, not this table.
 | Platform | Integration style | Entry point | Bootstrap | Tool mapping | Install |
 |---|---|---|---|---|---|
 | Claude Code | Shell-hook (A) | `.claude-plugin/plugin.json` + `hooks/inject-skills/` | `main.sh` → `hookSpecificOutput.additionalContext` (reads `bootstrap.txt`) | native `Skill` tool | marketplace (`.claude-plugin/marketplace.json`) |
-| OpenCode | In-process plugin (B) | `.opencode/plugins/arcforge.js` | `experimental.chat.system.transform` (same `bootstrap.txt`) | `skills/arc-using/references/opencode-tools.md` | symlink (`.opencode/INSTALL.md`) |
 | Codex | Native discovery + marketplace (C) | `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` | none — degraded to native discovery | `skills/arc-using/references/codex-tools.md` | marketplace or symlink (`.codex/INSTALL.md`) |
-| Gemini CLI | Native discovery + per-skill symlink (C) | per-skill symlinks into `~/.gemini/skills/` | none — degraded to native discovery | none shipped (actions are vendor-neutral) | symlink (`.gemini/INSTALL.md`) |

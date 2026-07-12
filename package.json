@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "version": "4.0.1",
-  "description": "Skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode",
+  "description": "Skill-based autonomous agent toolkit for Claude Code and Codex",
   "license": "MIT",
   "author": {
     "name": "Gregory Ho"
@@ -23,8 +23,6 @@
     ".codex-plugin/",
     ".agents/",
     ".codex/",
-    ".gemini/",
-    ".opencode/",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"

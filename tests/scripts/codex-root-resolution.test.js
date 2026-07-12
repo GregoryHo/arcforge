@@ -8,8 +8,8 @@ const { spawnSync } = require('node:child_process');
 // Codex-unset ARCFORGE_ROOT resolution — the canonical fallback header.
 // ---------------------------------------------------------------------------
 //
-// Claude Code exports ARCFORGE_ROOT from its SessionStart hook. Codex, Gemini
-// CLI and OpenCode have no such hook, so a skill's bash block runs with
+// Claude Code exports ARCFORGE_ROOT from its SessionStart hook. Codex has no
+// such hook, so a skill's bash block runs with
 // ARCFORGE_ROOT unset. Option (a) puts this exact line at the top of every
 // bash block that touches the CLI:
 //

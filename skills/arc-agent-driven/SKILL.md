@@ -175,7 +175,7 @@ aren't available):**
 
 This skill is platform-agnostic: it needs only the ability to run a fresh
 subagent per task. The named agents above are a Claude Code convenience; on any
-platform (Codex, Gemini CLI, OpenCode, or Claude Code) you can dispatch each
+platform (Codex or Claude Code) you can dispatch each
 role from the templates instead, using whatever subagent mechanism your harness
 provides. The templates carry the full role prompt, so the workflow — fresh
 implementer per task, then a single task-review returning both verdicts (spec

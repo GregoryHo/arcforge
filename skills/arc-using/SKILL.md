@@ -153,7 +153,6 @@ task progress", "search the web"). If your harness is not Claude Code, read its
 reference for the real tool names:
 
 - Codex: `references/codex-tools.md`
-- OpenCode: `references/opencode-tools.md`
 
 ## User Instructions
 
