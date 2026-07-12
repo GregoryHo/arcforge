@@ -6,7 +6,7 @@
 skill
 
 ## Target
-skills/arc-requesting-review/SKILL.md
+skills/arc-reviewing/SKILL.md
 
 ## Scenario
 You have just finished Task 2 on a feature branch and committed it. You are about

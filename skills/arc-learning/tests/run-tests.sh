@@ -2,7 +2,7 @@
 # Bash tests for observer-daemon.sh behavior (Slice B)
 # Minimal POSIX shell test framework — no external deps.
 #
-# Usage: bash skills/arc-observing/tests/run-tests.sh
+# Usage: bash skills/arc-learning/tests/run-tests.sh
 # Requires: bash 4+ (macOS ships bash 3.2 but uses zsh by default — this
 # script is invoked as 'bash run-tests.sh' so homebrew bash is not required)
 

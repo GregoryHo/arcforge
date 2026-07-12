@@ -19,7 +19,7 @@
  *
  * Reminders (all rare / high-signal by construction):
  *   PR boundary   `gh pr create`/`merge`  -> verify (arc-verifying) + review
- *                                            (arc-requesting-review); notes whether
+ *                                            (arc-reviewing); notes whether
  *                                            a test ran this session
  *   worktree add  raw `git worktree add` in an arcforge project -> prefer the
  *                                            arcforge CLI in BOTH directions:
@@ -144,7 +144,7 @@ function buildReminder(command, testSeen) {
   return (
     '\n🔍 PR boundary reached. Before treating this as complete:\n' +
     '  • Fresh verification evidence — see arc-verifying (run the actual checks now).\n' +
-    '  • Review before merge — see arc-requesting-review.\n' +
+    '  • Review before merge — see arc-reviewing.\n' +
     `  ${verifyNote}\n`
   );
 }

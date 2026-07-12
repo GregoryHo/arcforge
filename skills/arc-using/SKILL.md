@@ -116,22 +116,20 @@ These skills activate during a workflow when the condition is present. They are 
 | About to write implementation code | `arc-tdd` | Failing test before production code |
 | Test fails or unexpected behavior appears | `arc-debugging` | Root cause before fixes |
 | About to claim work is complete | `arc-verifying` | Fresh verification evidence before completion claims |
-| Task or feature complete | `arc-requesting-review` | Review before proceeding to next task |
-| Received code review feedback | `arc-receiving-review` | Technical rigor, not performative agreement |
+| Task or feature complete, or review feedback received | `arc-reviewing` | Request review, then process feedback with technical rigor |
 | User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` audit mode | Propose changes, never auto-modify without approval |
 | About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | Eval evidence that does not return `INSUFFICIENT_DATA` |
 
 ## Instinct & Learning Routes
 
-Five skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
+Four skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
 
 | User intent | Skill |
 |-------------|-------|
 | Capture THIS session's reflections as a diary entry | `arc-journaling` |
 | Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` |
 | Manually save ONE insight as an instinct right now | `arc-recalling` |
-| Review / confirm / contradict auto-detected instincts | `arc-observing` |
-| Review the learning-candidate queue (when optional learning is enabled) | `arc-learning` |
+| Review the learning-candidate queue, or confirm/contradict auto-detected instincts (when optional learning is enabled) | `arc-learning` |
 
 ## When Not to Route
 

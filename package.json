@@ -34,7 +34,7 @@
     "test:hooks": "cd hooks && npm test",
     "test:node": "node tests/node/run-tests.js",
     "test:skills": "python3 -m pytest tests/skills/ -v",
-    "test:observer-daemon": "bash skills/arc-observing/tests/run-tests.sh",
+    "test:observer-daemon": "bash skills/arc-learning/tests/run-tests.sh",
     "test:diary": "node skills/arc-journaling/scripts/diary.js",
     "test:reflect": "node skills/arc-reflecting/scripts/reflect.js",
     "check:versions": "node scripts/check-version-sync.js",

@@ -259,7 +259,7 @@ Use words Claude would search for:
 | Pattern | When | Example |
 |---------|------|---------|
 | `arc-<gerund>` | Single action | `arc-brainstorming`, `arc-debugging` |
-| `arc-<gerund>-<object>` | Action + target | `arc-writing-tasks`, `arc-requesting-review` |
+| `arc-<gerund>-<object>` | Action + target | `arc-writing-tasks`, `arc-managing-sessions` |
 | `arc-using-<tool>` | Tool usage | `arc-using-worktrees` |
 | `arc-<acronym>` | Well-known abbreviation | `arc-tdd` |
 

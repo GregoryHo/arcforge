@@ -9,7 +9,7 @@ const {
   confidenceBar,
   pct,
   parseArgs,
-} = require('../../skills/arc-observing/scripts/instinct');
+} = require('../../skills/arc-learning/scripts/instinct');
 
 const {
   parseConfidenceFrontmatter,

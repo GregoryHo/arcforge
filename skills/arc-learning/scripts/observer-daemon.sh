@@ -20,7 +20,7 @@ LOG_FILE="${INSTINCTS_DIR}/observer.log"
 if [ -z "${SCRIPT_DIR:-}" ]; then
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 fi
-# Derive ARCFORGE_ROOT from SCRIPT_DIR (skills/arc-observing/scripts → repo root = ../../../)
+# Derive ARCFORGE_ROOT from SCRIPT_DIR (skills/arc-learning/scripts → repo root = ../../../)
 ARCFORGE_ROOT="${ARCFORGE_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
 CURATOR_CLI="${ARCFORGE_ROOT}/scripts/lib/learning-curator/cli.js"
 
