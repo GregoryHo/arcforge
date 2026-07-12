@@ -38,7 +38,10 @@ Use the Node.js CLI (`scripts/coordinator.js`) for worktree lifecycle and cross-
 
 ## CLI Usage
 
-**IMPORTANT**: Set `SKILL_ROOT` from the `ARCFORGE_ROOT` environment variable, using the fallback below when unset.
+Set `SKILL_ROOT` from `ARCFORGE_ROOT` (fallback when unset), then run every
+command as `node "${SKILL_ROOT}/scripts/coordinator.js" <command>`; add `--json`
+for machine-readable output. If the CLI exits 1, report the blocked format and
+stop — never fall back to manual git operations.
 
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
@@ -47,32 +50,10 @@ if [ ! -d "$SKILL_ROOT" ]; then
   echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
   exit 1
 fi
-```
-
-Then use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>` for all commands:
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-coordinating}"
-node "${SKILL_ROOT}/scripts/coordinator.js" status
+node "${SKILL_ROOT}/scripts/coordinator.js" status        # add --json for machine-readable output
 node "${SKILL_ROOT}/scripts/coordinator.js" expand
 node "${SKILL_ROOT}/scripts/coordinator.js" merge
 ```
-
-**JSON output:** Add `--json` flag for machine-readable output:
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-coordinating}"
-node "${SKILL_ROOT}/scripts/coordinator.js" status --json
-```
-
-## Standard Workflow
-
-Workflow:
-
-1. **Set SKILL_ROOT**: From `ARCFORGE_ROOT` (see CLI Usage fallback above)
-2. **Check Exit Code**: If exit 1, report blocked format and stop
-3. **Execute Command**: Use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>`
-4. **Never Fallback**: Do NOT attempt manual operations if CLI fails
 
 ## Merge From Worktree (Auto-Detect)
 
@@ -110,9 +91,3 @@ If base worktree cannot be found or base branch cannot be inferred → report bl
 - Issue: Base worktree not found or base branch not inferred
 - Checked: `git worktree list --porcelain`, base worktree HEAD
 - Action: Ensure a main worktree exists and has a valid branch checked out, then retry
-
-## When NOT to Use
-
-- Single feature implementation → arc-implementing
-- No dag.yaml → arc-planning first
-- Already in worktree → stay in arc-implementing
