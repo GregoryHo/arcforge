@@ -10,6 +10,41 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+
+// ─────────────────────────────────────────────
+// D4 fast-path: exit BEFORE loading the heavy learning/session-utils/sanitize
+// requires when learning is definitively disabled. This runs on every tool call
+// via the async observe registration, so the common case (learning off, no
+// config file) must not pay the module-load cost. Conservative by design — it
+// skips ONLY when certain; anything uncertain falls through to the authoritative
+// shouldObserve() check below. The config-path derivation mirrors
+// learning.js/getLearningConfigPath (project + global scope, ARCFORGE_HOME
+// honored) so it can never skip when a config that could enable learning exists.
+// ─────────────────────────────────────────────
+function learningDefinitelyDisabled() {
+  if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return true;
+  if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return true;
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const override = process.env.ARCFORGE_HOME;
+  const arcforgeHome = override?.trim() ? override : path.join(os.homedir(), '.arcforge');
+  const projectConfig = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
+  const globalConfig = path.join(arcforgeHome, 'learning', 'config.json');
+  // No config file anywhere → learning cannot be enabled → skip.
+  return !fs.existsSync(projectConfig) && !fs.existsSync(globalConfig);
+}
+
+if (require.main === module && learningDefinitelyDisabled()) {
+  // Drain stdin so the parent's write completes (avoids EPIPE), then exit
+  // without loading the heavy requires or writing any observation.
+  try {
+    fs.readFileSync(0);
+  } catch {
+    // No stdin / already closed — nothing to drain.
+  }
+  process.exit(0);
+}
+
 const { spawn } = require('node:child_process');
 
 const {

@@ -147,15 +147,22 @@ describe('quality-check: collectFindings buckets by audience (RV-3)', () => {
   });
 });
 
-describe('quality-check: main() channel routing (RV-3 e2e)', () => {
+describe('quality-check: PostToolUse is accumulate-only, findings batch at Stop (v5)', () => {
   const { spawnSync } = require('node:child_process');
   const script = path.join(__dirname, '..', 'quality-check', 'main.js');
+  const originalTmpdir = process.env.TMPDIR;
   let testDir;
 
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-quality-e2e-'));
+    delete require.cache[require.resolve('../quality-check/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
   });
   afterEach(() => {
+    // Restore TMPDIR before removing testDir — the accumulate test points TMPDIR
+    // at testDir, and a leaked value breaks sibling describes' mkdtemp calls.
+    if (originalTmpdir === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = originalTmpdir;
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -173,58 +180,102 @@ describe('quality-check: main() channel routing (RV-3 e2e)', () => {
     });
   }
 
-  it('emits exactly one JSON object carrying findings in the model channel', () => {
+  it('emits NOTHING on PostToolUse even when the file has a console.log finding', () => {
     const file = path.join(testDir, 'app.js');
     fs.writeFileSync(file, 'const x = 1;\nconsole.log("oops");\n');
     const r = run(file);
-    const out = (r.stdout || '').trim();
-    assert.ok(out, 'should produce stdout for a console.log finding');
-    // Exactly one JSON object — a parse of the whole trimmed stdout must succeed.
-    const parsed = JSON.parse(out);
-    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
-    assert.ok(
-      parsed.hookSpecificOutput.additionalContext.includes('console.* found'),
-      'finding must reach the model via additionalContext',
-    );
-    assert.ok(
-      !('systemMessage' in parsed),
-      'no Formatted notice (no prettier devDep) → no systemMessage key',
-    );
+    // Findings are deferred to the Stop batch — the PostToolUse entry is silent.
+    assert.strictEqual((r.stdout || '').trim(), '', 'accumulate-only → no PostToolUse output');
+    assert.strictEqual(r.status, 0, 'exit 0');
   });
 
-  it('stays silent for a clean file (no output, exit 0)', () => {
-    const file = path.join(testDir, 'clean.js');
-    fs.writeFileSync(file, 'const x = 1;\n');
-    const r = run(file);
+  it('accumulates the edited path and surfaces findings via the Stop batch, then clears', () => {
+    const { setSessionIdFromInput, clearCachedSessionId } = require('../../scripts/lib/utils');
+    const { accumulate, runStopBatch, readAccumulated } = require('../quality-check/main');
+
+    process.env.TMPDIR = testDir;
+    clearCachedSessionId();
+    setSessionIdFromInput({ session_id: 'qc-accum' });
+
+    const file = path.join(testDir, 'app.js');
+    fs.writeFileSync(file, 'const x = 1;\nconsole.log("oops");\n');
+
+    // Accumulate-only: no return value, path recorded, deduped across two edits.
+    assert.strictEqual(
+      accumulate({ tool_name: 'Write', tool_input: { file_path: file }, cwd: testDir }),
+      null,
+    );
+    accumulate({ tool_name: 'Edit', tool_input: { file_path: file }, cwd: testDir });
+    assert.deepStrictEqual(readAccumulated(), [file], 'path accumulated once (deduped)');
+
+    // Stop batch runs the console.* scan once and folds it into a systemMessage.
+    const message = runStopBatch(testDir);
+    assert.ok(message?.includes('console.* found'), 'Stop batch surfaces the console finding');
+
+    // The accumulator is cleared — a second Stop over the same session says nothing.
+    assert.deepStrictEqual(readAccumulated(), [], 'accumulator cleared after the batch');
+    assert.strictEqual(runStopBatch(testDir), null, 'nothing left to report');
+  });
+
+  it('non-code files and clean files stay silent (no output, exit 0)', () => {
+    const clean = path.join(testDir, 'clean.js');
+    fs.writeFileSync(clean, 'const x = 1;\n');
+    const r = run(clean);
     assert.strictEqual((r.stdout || '').trim(), '', 'clean file → no output');
     assert.strictEqual(r.status, 0, 'exit 0');
   });
 });
 
-describe('quality-check: hooks.json registration', () => {
+describe('quality-check: hooks.json registration contract (v5 dispatcher)', () => {
   const hooksJsonPath = path.join(__dirname, '..', 'hooks.json');
+  const config = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
 
-  it('should parse hooks.json and register quality-check once with plain "Edit|Write" matcher', () => {
-    const config = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
-    const postToolUse = config.hooks.PostToolUse;
-    assert.ok(Array.isArray(postToolUse), 'PostToolUse should be an array');
+  function syncGroups(event) {
+    return (config.hooks[event] || []).filter((g) => g.hooks.every((h) => h.async !== true));
+  }
 
-    const qualityCheckEntries = postToolUse.filter((entry) =>
-      entry.hooks.some((h) => h.command.includes('quality-check/main.js')),
+  it('PostToolUse exposes exactly one sync dispatcher entry (dispatch-post.js)', () => {
+    const sync = syncGroups('PostToolUse');
+    assert.strictEqual(sync.length, 1, 'exactly one sync PostToolUse matcher-group');
+    assert.ok(
+      sync[0].hooks.some((h) => h.command.includes('dispatch-post.js')),
+      'the sync PostToolUse entry is the post dispatcher',
     );
-    assert.strictEqual(
-      qualityCheckEntries.length,
-      1,
-      `Expected exactly 1 quality-check entry, got ${qualityCheckEntries.length}`,
-    );
+  });
 
-    // Plain tool-name regex — the only matcher syntax verified to fire on
-    // PostToolUse (v2.1.173). The ts/tsx/js/jsx gate lives in main.js.
-    assert.strictEqual(
-      qualityCheckEntries[0].matcher,
-      'Edit|Write',
-      `Matcher must be the plain tool-name regex "Edit|Write". Got: ${qualityCheckEntries[0].matcher}`,
+  it('PreToolUse exposes exactly one sync dispatcher entry (dispatch-pre.js)', () => {
+    const sync = syncGroups('PreToolUse');
+    assert.strictEqual(sync.length, 1, 'exactly one sync PreToolUse matcher-group');
+    assert.ok(
+      sync[0].hooks.some((h) => h.command.includes('dispatch-pre.js')),
+      'the sync PreToolUse entry is the guard dispatcher',
     );
+  });
+
+  it('quality-check is folded into the dispatcher, not registered directly', () => {
+    assert.ok(
+      !JSON.stringify(config.hooks).includes('quality-check/main.js'),
+      'quality-check runs via the post dispatcher, not its own registration',
+    );
+  });
+
+  it('every matcher-group carries a stable, unique id', () => {
+    const ids = [];
+    for (const groups of Object.values(config.hooks)) {
+      for (const g of groups) {
+        assert.ok(
+          typeof g.id === 'string' && g.id.trim(),
+          `group has a string id (matcher ${g.matcher})`,
+        );
+        ids.push(g.id);
+      }
+    }
+    assert.strictEqual(new Set(ids).size, ids.length, 'ids are unique across the file');
+  });
+
+  it('passes the hooks-schema validator with zero violations', () => {
+    const { validateHooksJson } = require('../../scripts/check-hooks-schema');
+    assert.deepStrictEqual(validateHooksJson(config), []);
   });
 });
 

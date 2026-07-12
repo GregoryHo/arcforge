@@ -194,6 +194,57 @@ function recordSessionSuggestion(snapshot) {
 }
 
 /**
+ * Pure decision core for a PostToolUse event. Always performs the per-event
+ * side effects — tracks the read/write window, bumps the suggester's own tool
+ * counter, and increments the shared diary tool-count — then returns the
+ * suggestion to emit as `{ modelReason, systemMessage }`, or null when below the
+ * threshold. Session id must already be set by the caller.
+ *
+ * incrementSharedToolCount() fires on EVERY event (the diary threshold's single
+ * source of truth) — it must run whether or not a suggestion is emitted.
+ *
+ * @param {Object|null} input - Parsed hook stdin.
+ * @returns {{ modelReason: string, systemMessage: string }|null}
+ */
+function evaluate(input) {
+  // Single read of the consolidated state file.
+  const state = readState();
+
+  // Track read/write classification into the rolling window.
+  trackToolType(state, input);
+
+  // Increment the suggester's own tool counter.
+  state.tools += 1;
+
+  // Increment the shared diary tool-count (owned by diary-capture). This is the
+  // diary threshold's source of truth — keep this call to preserve the binding.
+  incrementSharedToolCount();
+
+  // Decide whether to suggest; record the snapshot before persisting state.
+  if (shouldSuggest(state.tools) && !shouldSuppressReminder(state.tools, state.window)) {
+    const snapshot = {
+      count: state.tools,
+      phase: phaseFromWindow(state.window),
+      at: getTimestamp(),
+    };
+    state.suggestions.push(snapshot);
+    recordSessionSuggestion(snapshot);
+    writeState(state);
+    // Dual channel (ICL-10): the model-visible additionalContext (arc-compacting
+    // indicator) AND the user-visible systemMessage suggestion. The model line is
+    // never a silent directive.
+    return {
+      modelReason: buildModelIndicator(state.tools, state.window),
+      systemMessage: buildMessage(state.tools, state.window),
+    };
+  }
+
+  // Single write of the consolidated state file.
+  writeState(state);
+  return null;
+}
+
+/**
  * Main entry point
  */
 function main() {
@@ -202,40 +253,11 @@ function main() {
     const input = parseStdinJson(stdin);
     setSessionIdFromInput(input);
 
-    // Single read of the consolidated state file.
-    const state = readState();
-
-    // Track read/write classification into the rolling window.
-    trackToolType(state, input);
-
-    // Increment the suggester's own tool counter.
-    state.tools += 1;
-
-    // Increment the shared diary tool-count (owned by diary-capture). This is the
-    // diary threshold's source of truth — keep this call to preserve the binding.
-    incrementSharedToolCount();
-
-    // Decide whether to suggest; record the snapshot before persisting state.
-    if (shouldSuggest(state.tools) && !shouldSuppressReminder(state.tools, state.window)) {
-      const snapshot = {
-        count: state.tools,
-        phase: phaseFromWindow(state.window),
-        at: getTimestamp(),
-      };
-      state.suggestions.push(snapshot);
-      recordSessionSuggestion(snapshot);
-      writeState(state);
-      // Dual channel (ICL-10): ONE merged JSON object carrying the model-visible
-      // additionalContext (arc-compacting indicator) AND the user-visible
-      // systemMessage suggestion. The model line is never a silent directive.
-      outputPostToolUseFeedback(buildModelIndicator(state.tools, state.window), {
-        systemMessage: buildMessage(state.tools, state.window),
-      });
-      return;
+    const result = evaluate(input);
+    if (result) {
+      // ONE merged JSON object carrying both channels.
+      outputPostToolUseFeedback(result.modelReason, { systemMessage: result.systemMessage });
     }
-
-    // Single write of the consolidated state file.
-    writeState(state);
   } catch (e) {
     // Hooks must never crash the session.
     log(`[compact-suggester] Warning: ${e.message}`);
@@ -243,6 +265,7 @@ function main() {
 }
 
 module.exports = {
+  evaluate,
   emptyState,
   readState,
   writeState,

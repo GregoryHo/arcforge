@@ -2,6 +2,8 @@
   "hooks": {
     "SessionStart": [
       {
+        "id": "inject-skills",
+        "description": "Inject the minimal arcforge bootstrap context + ARCFORGE_ROOT (bash, writes CLAUDE_ENV_FILE).",
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
@@ -11,6 +13,8 @@
         ]
       },
       {
+        "id": "inject-context",
+        "description": "Inject resume context (session summary, activated instincts).",
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
@@ -20,6 +24,8 @@
         ]
       },
       {
+        "id": "session-start",
+        "description": "Create the session file and lazily start the observer daemon (async).",
         "matcher": "startup|resume|clear",
         "hooks": [
           {
@@ -32,6 +38,8 @@
     ],
     "UserPromptSubmit": [
       {
+        "id": "user-message-counter",
+        "description": "Increment the diary user-message counter (stdin-passthrough; stays standalone).",
         "matcher": ".*",
         "hooks": [
           {
@@ -43,60 +51,19 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "id": "guard-dispatcher",
+        "description": "Sync BLOCK guard dispatcher: arc-guard + sdd-ledger-guard + sdd-ratify-guard.",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-guard/main.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch-pre.js\""
           }
         ]
       },
       {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-guard/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-guard/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-ledger-guard/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-ledger-guard/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-ratify-guard/main.js\""
-          }
-        ]
-      },
-      {
+        "id": "observe-pre",
+        "description": "Append the pre-tool observation (async — daemon I/O stays off the blocking path).",
         "matcher": ".*",
         "hooks": [
           {
@@ -109,15 +76,19 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
+        "id": "post-dispatcher",
+        "description": "Sync PostToolUse dispatcher: quality-check accumulator + arc-remind + compact-suggester.",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/quality-check/main.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch-post.js\""
           }
         ]
       },
       {
+        "id": "observe-post",
+        "description": "Append the post-tool observation (async).",
         "matcher": ".*",
         "hooks": [
           {
@@ -126,46 +97,12 @@
             "async": true
           }
         ]
-      },
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/compact-suggester/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-remind/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-remind/main.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/arc-remind/main.js\""
-          }
-        ]
       }
     ],
     "Stop": [
       {
+        "id": "session-end",
+        "description": "Finalize the session, run the diary-capture threshold, and batch the quality checks.",
         "matcher": ".*",
         "hooks": [
           {
@@ -177,6 +114,8 @@
     ],
     "PreCompact": [
       {
+        "id": "pre-compact",
+        "description": "Reset the suggester state and run diary-capture before compaction.",
         "matcher": ".*",
         "hooks": [
           {
