@@ -181,9 +181,11 @@ After building, render to PNG, view it, fix defects. Up to 3 iterations — then
 
 ```
 ITERATION (repeat up to 3×):
-  1. CHECK  — cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+  1. CHECK  — : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+              cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
                 uv run python check_overlaps.py /tmp/diagram.excalidraw
-  2. RENDER — cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
+  2. RENDER — : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+              cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
                 uv run python render_excalidraw.py /tmp/diagram.excalidraw \
                 --output /tmp/diagram.png --scale 2
               View /tmp/diagram.png with the Read tool — HARD, every iteration.
@@ -202,6 +204,7 @@ Read `references/layout-heuristics.md` Part 2 for fix strategies.
 
 **First-time setup** (if renderer fails with missing deps):
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
   uv sync && uv run playwright install chromium
 ```
@@ -240,6 +243,7 @@ Only use when `obsidian eval code="typeof window.ExcalidrawAutomate"` returns em
 ### Post-Save Verification (Mandatory)
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 cd ${ARCFORGE_ROOT}/skills/arc-diagramming-obsidian/references && \
   uv run python verify_saved_diagram.py <vault-path>/<name>.excalidraw.md
 ```

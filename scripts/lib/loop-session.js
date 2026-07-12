@@ -27,12 +27,19 @@ const PERMISSION_STALL_GUIDANCE =
  * Permission posture is strictly caller-controlled via pass-through flags:
  * no code path may append --dangerously-skip-permissions automatically.
  * @param {Object} [options] - Spawn options
+ * @param {string} [options.model] - Value for --model. Headless `claude -p`
+ *   does NOT honor a spawned agent's frontmatter `model:` field (the loop
+ *   assembles the agent body itself, stripping frontmatter), so an intended
+ *   tier must be passed explicitly here. Omit to preserve the CLI default.
  * @param {string} [options.permissionMode] - Value for --permission-mode
  * @param {string} [options.allowedTools] - Value for --allowed-tools
  * @returns {string[]} Argument array for the claude CLI
  */
 function buildClaudeArgs(options = {}) {
   const args = ['-p', '--output-format', 'json', '--no-session-persistence'];
+  if (options.model) {
+    args.push('--model', options.model);
+  }
   if (options.permissionMode) {
     args.push('--permission-mode', options.permissionMode);
   }
@@ -102,6 +109,7 @@ function extractCost(result) {
  * @param {string} projectRoot - Project root directory
  * @param {Object} [options] - Spawn options
  * @param {number} [options.taskTimeoutMs] - Per-session timeout in ms
+ * @param {string} [options.model] - Value for --model (explicit tier pin)
  * @param {string} [options.permissionMode] - Value for --permission-mode
  * @param {string} [options.allowedTools] - Value for --allowed-tools
  * @returns {{ exitCode: number, stdout: string, stderr: string, costUsd: number }}

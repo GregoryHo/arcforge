@@ -100,7 +100,7 @@ When two skills cover the same step, pick by the concrete condition:
 
 | Decision | Pick |
 |----------|------|
-| Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + two-stage review) |
+| Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + single task-reviewer, both verdicts) |
 | Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-epic via DAG, lead present) |
 | Set up an isolated workspace | `arc-coordinating expand` for epic work (DAG-tracked, marker'd); `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo, no DAG) |
 | Finish work | `arc-finishing` (Step 0 discriminates on `.arcforge-epic`: epic path = coordinator merge; non-epic path = 4-option gate) |
@@ -145,6 +145,15 @@ Do not force an ArcForge workflow when the task is:
 - Outside ArcForge's domain.
 
 In those cases, proceed directly, and only mention ArcForge skills if they materially help.
+
+## Platform Adaptation
+
+Skills describe actions in vendor-neutral terms ("dispatch a subagent", "track
+task progress", "search the web"). If your harness is not Claude Code, read its
+reference for the real tool names:
+
+- Codex: `references/codex-tools.md`
+- OpenCode: `references/opencode-tools.md`
 
 ## User Instructions
 

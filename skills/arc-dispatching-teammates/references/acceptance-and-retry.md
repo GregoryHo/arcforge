@@ -36,7 +36,7 @@ no prior conversation history has no way to rationalize — it reads
 the spec, locates the code, runs the test, and reports. The lead's
 job is to READ the reports and decide, not execute the checks. This
 matches arcforge's existing pattern in `arc-agent-driven`, which
-delegates every task to spec-reviewer + quality-reviewer subagents
+delegates every task's review to a fresh task-reviewer subagent
 precisely because inline review produces rationalizations.
 
 Per-completion acceptance catches defects early, while the retry
@@ -339,7 +339,7 @@ as no feedback.
 
 ### Fresh worktree via `cli.js expand`
 
-On rejection, call `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>`. The
+On rejection, call `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>`. The
 CLI creates a new worktree at the canonical path. The new worktree's
 starting commit is the current dev-branch HEAD — which already
 contains the rejected attempt's merge commits.

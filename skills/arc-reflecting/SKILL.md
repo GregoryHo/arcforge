@@ -26,9 +26,10 @@ Analyze multiple diary entries to identify recurring patterns. Save insights to 
 
 Node.js utilities handle diary scanning and processed.log management.
 
-**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
+**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-reflecting}"
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
 if [ ! -d "$SKILL_ROOT" ]; then
   echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
   exit 1
@@ -37,12 +38,16 @@ fi
 
 **Determine strategy (auto-detect):**
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
 node "${SKILL_ROOT}/scripts/reflect.js" strategy --project {project}
 # Returns: unprocessed | project_focused | recent_window
 ```
 
 **Scan for diaries:**
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
 node "${SKILL_ROOT}/scripts/reflect.js" scan \
   --project {project} \
   --strategy unprocessed
@@ -51,6 +56,8 @@ node "${SKILL_ROOT}/scripts/reflect.js" scan \
 
 **Update processed.log after reflection:**
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
 node "${SKILL_ROOT}/scripts/reflect.js" update-log \
   --project {project} \
   --diaries "diary-1.md,diary-2.md,diary-3.md" \
@@ -250,6 +257,8 @@ For rule violations, additionally inform:
    ```
 4. For each Pattern, save an instinct:
    ```bash
+   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
    node "${SKILL_ROOT}/scripts/reflect.js" save-instinct \
      --project {project} \
      --id {pattern-name} \
@@ -262,6 +271,8 @@ For rule violations, additionally inform:
 5. **Save a reflection record** so the learning curator has evidence that this
    reflection happened:
    ```bash
+   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
    node "${SKILL_ROOT}/scripts/reflect.js" save-record \
      --project {project} \
      --reflect-id reflect-{id} \

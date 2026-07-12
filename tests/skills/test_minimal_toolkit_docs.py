@@ -118,7 +118,10 @@ def test_arc_verifying_disclaims_spec_authoring_and_drift_sync():
 
 def test_sessionstart_bootstrap_does_not_smuggle_spec_sync_or_routing_pressure():
     """SessionStart hook must inject only minimal bootstrap — no spec-sync, no global routing."""
-    content = _read("hooks/inject-skills/main.sh")
+    # The bootstrap body lives in the shared bootstrap.txt (read by main.sh and the
+    # OpenCode plugin); scan both so the positive posture and the no-smuggling guards
+    # cover the effective injected content wherever it is authored.
+    content = _read("hooks/inject-skills/main.sh") + "\n" + _read("hooks/inject-skills/bootstrap.txt")
     lower = content.lower()
 
     # Minimal-toolkit posture preserved.

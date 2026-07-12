@@ -197,3 +197,104 @@ describe('cc-005 plugin path discipline lint (fr-cc-pl-001)', () => {
     throw new Error(report.join('\n'));
   });
 });
+
+// ---------------------------------------------------------------------------
+// cc-006 Codex-unset ARCFORGE_ROOT header discipline — CI lint.
+// ---------------------------------------------------------------------------
+//
+// Claude Code exports ARCFORGE_ROOT from its SessionStart hook; Codex, Gemini
+// and OpenCode do not. So every skill ```bash block that invokes the arcforge
+// CLI must set a working fallback default before first use:
+//
+//   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+//
+// Family-2 (SKILL_ROOT) skills chain off the same line:
+//   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+//   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/<name>}"
+// so requiring the single canonical line covers both families.
+//
+// Detection is conservative (executable blocks only): a file is header-required
+// iff a ```bash / ```sh / ```shell fence contains a CLI invocation —
+//   - node "${ARCFORGE_ROOT}/scripts/cli.js"   (family-1)  OR
+//   - "${SKILL_ROOT}/scripts/...               (family-2, node or bash)
+// Inline cheat-sheet references (markdown tables, numbered lists) and non-bash
+// fences (json/yaml) are NOT runnable blocks and are intentionally not flagged;
+// the SKILL_ROOT default-assignment line (${SKILL_ROOT:=...}) is not an
+// invocation and never triggers the requirement. arc-writing-skills is the
+// teaching skill (documents these patterns as examples) and is excluded.
+
+// biome-ignore lint/suspicious/noTemplateCurlyInString: literal shell ${VAR} default, not a JS template
+const CANONICAL_HEADER = ': "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"';
+const CLI_INVOCATION = /node\s+"\$\{ARCFORGE_ROOT\}\/scripts\/cli\.js"/;
+const SKILL_ROOT_INVOCATION = /"\$\{SKILL_ROOT\}\/scripts\//;
+const BASH_FENCE_LANGS = new Set(['bash', 'sh', 'shell']);
+const HEADER_LINT_EXCLUDED_SKILLS = new Set(['arc-writing-skills']);
+
+function collectSkillDocs() {
+  const skillsDir = path.join(REPO_ROOT, 'skills');
+  const out = [];
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.includes('-workspace')) continue;
+    if (HEADER_LINT_EXCLUDED_SKILLS.has(entry.name)) continue;
+    const skillDir = path.join(skillsDir, entry.name);
+    const skillMd = path.join(skillDir, 'SKILL.md');
+    if (fs.existsSync(skillMd)) out.push(skillMd);
+    const referencesDir = path.join(skillDir, 'references');
+    if (fs.existsSync(referencesDir)) out.push(...collectMarkdown(referencesDir));
+  }
+  return out;
+}
+
+// Return the invoking lines that live inside a bash fence (executable), if any.
+function bashFenceInvocations(content) {
+  const lines = content.split('\n');
+  let fenceLang = null; // null = outside any fenced block
+  const hits = [];
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('```')) {
+      fenceLang = fenceLang === null ? trimmed.slice(3).trim().toLowerCase() : null;
+      continue;
+    }
+    if (fenceLang === null || !BASH_FENCE_LANGS.has(fenceLang)) continue;
+    if (CLI_INVOCATION.test(lines[i]) || SKILL_ROOT_INVOCATION.test(lines[i])) {
+      hits.push({ line: i + 1, content: truncate(trimmed, 120) });
+    }
+  }
+  return hits;
+}
+
+describe('cc-006 codex-unset ARCFORGE_ROOT header discipline', () => {
+  const skillDocs = collectSkillDocs();
+
+  it('skill doc scope is non-empty (sanity check)', () => {
+    expect(skillDocs.length).toBeGreaterThan(0);
+  });
+
+  it('every skill bash block that invokes the CLI carries the canonical fallback header', () => {
+    const missing = [];
+    for (const f of skillDocs) {
+      const content = fs.readFileSync(f, 'utf8');
+      const hits = bashFenceInvocations(content);
+      if (hits.length === 0) continue;
+      if (content.includes(CANONICAL_HEADER)) continue;
+      missing.push({ file: relativizeToRepo(f), hits });
+    }
+
+    if (missing.length === 0) return;
+
+    const report = ['', `Found ${missing.length} skill file(s) missing the fallback header:`, ''];
+    for (const m of missing) {
+      report.push(`  ${m.file}`);
+      for (const h of m.hits) report.push(`    L${h.line}: ${h.content}`);
+      report.push('    fix:  add this exact line at the top of the bash block(s) above:');
+      report.push(`          ${CANONICAL_HEADER}`);
+      report.push('');
+    }
+    report.push('Every ```bash block invoking the arcforge CLI must default ARCFORGE_ROOT so it');
+    report.push('resolves when the SessionStart hook did not set it (Codex / Gemini / OpenCode).');
+    report.push('Reference: arc-writing-skills SKILL.md "Path Resolution" section.');
+    throw new Error(report.join('\n'));
+  });
+});

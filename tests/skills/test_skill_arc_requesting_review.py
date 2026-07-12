@@ -51,6 +51,11 @@ def test_arc_requesting_review_contains_required_sections():
     assert "{BASE_SHA}" in text
     assert "{HEAD_SHA}" in text
 
+    # Regression: the review base must not be hardcoded to `git rev-parse HEAD~1`
+    # — a task with more than one commit would drop all but its final commit from
+    # review. (A cautionary mention of HEAD~1 in a comment is allowed.)
+    assert "rev-parse HEAD~1" not in text
+
     # Must reference arc-receiving-review
     assert "arc-receiving-review" in text
 

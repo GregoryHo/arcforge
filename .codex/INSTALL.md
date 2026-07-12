@@ -1,6 +1,24 @@
 # Installing arcforge for Codex
 
-Enable agentic skills in Codex via native skill discovery. One clone, one symlink.
+Enable agentic skills in Codex via native skill discovery.
+
+## Marketplace install (recommended)
+
+arcforge ships a native Codex plugin manifest (`.codex-plugin/plugin.json`,
+declaring `"hooks": {}` so Codex does not adopt the Claude Code hooks) and a
+marketplace entry (`.agents/plugins/marketplace.json`). Install through Codex's
+marketplace and skills are discovered automatically — no manual symlink.
+
+If the marketplace lands the plugin somewhere other than `~/.agents/arcforge`,
+export `ARCFORGE_ROOT` so the CLI resolves (see the note in step 1 below):
+
+```bash
+export ARCFORGE_ROOT=/path/to/installed/arcforge
+```
+
+## Manual install (fallback)
+
+If you prefer a manual checkout — one clone, one symlink.
 
 ## Prerequisites
 
@@ -15,10 +33,12 @@ Enable agentic skills in Codex via native skill discovery. One clone, one symlin
    git clone https://github.com/GregoryHo/arcforge ~/.agents/arcforge
    ```
 
-   This is the **standard clone location**, and skills resolve the CLI
-   through `ARCFORGE_ROOT`. Codex has no SessionStart hook to export it, so
-   skills fall back to `~/.agents/arcforge` automatically. If you clone
-   somewhere else, export it in your shell profile so the CLI resolves:
+   This is the **standard clone location**. Skills invoke the CLI through
+   `ARCFORGE_ROOT`, and Codex has no SessionStart hook to export it — so
+   every skill's bash block defaults it to `~/.agents/arcforge` when unset
+   (`: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"`). A standard clone runs
+   with no extra configuration. If you clone somewhere else, export
+   `ARCFORGE_ROOT` in your shell profile so the CLI resolves:
    ```bash
    export ARCFORGE_ROOT=/your/arcforge/checkout
    ```
@@ -34,6 +54,12 @@ Enable agentic skills in Codex via native skill discovery. One clone, one symlin
    ```
 
 4. **Restart Codex** to discover the skills.
+
+## Tool mapping
+
+Skills describe actions in vendor-neutral terms. For how they map to Codex's
+real tools (subagent dispatch, task tracking, web search), see
+`skills/arc-using/references/codex-tools.md`.
 
 ## Verify
 

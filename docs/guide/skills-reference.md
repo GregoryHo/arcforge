@@ -223,17 +223,16 @@ The complete catalog still uses functional categories for lookup:
 
 ### arc-agent-driven
 
-**Purpose:** Fully autonomous task execution with fresh subagent per task and two-stage review.
+**Purpose:** Fully autonomous task execution with fresh subagent per task and a single task-reviewer returning both verdicts (spec compliance + task quality).
 
 **When to use:** When executing task lists where each task requires isolated execution.
 
 **Key workflow:**
 1. Read task list, create TodoWrite tracking
 2. Per task: dispatch implementer subagent with full task text
-3. Spec compliance review (dispatch reviewer subagent)
-4. Code quality review (dispatch reviewer subagent)
-5. Max 3 review cycles per reviewer — escalate to human if not converging
-6. After all tasks: dispatch final code reviewer, then arc-finishing
+3. Dispatch task-reviewer — returns both verdicts (spec compliance + task quality) in one pass
+4. Max 3 review cycles per task — escalate to human if not converging
+5. After all tasks: dispatch final code reviewer, then arc-finishing
 
 **Artifacts:**
 - Input: `docs/tasks/<name>-tasks.md`
@@ -904,7 +903,7 @@ Capture session insights in diaries, extract patterns after 5+ entries, and clus
 | | arc-executing-tasks | arc-agent-driven |
 |---|---|---|
 | **Model** | Human-in-the-loop batches | Fully autonomous subagents |
-| **Review** | Human reviews each batch | Two-stage automated review |
+| **Review** | Human reviews each batch | Single task-reviewer (spec + quality) |
 | **Best for** | Tasks needing judgment | Mechanical tasks with clear specs |
 | **Risk** | Slower (human bottleneck) | May diverge without oversight |
 

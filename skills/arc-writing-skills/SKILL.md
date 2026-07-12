@@ -441,12 +441,38 @@ These come up when deciding whether to run the baseline. Each has a measured ans
 | "I'm confident it's good" | The baseline is cheap — it either confirms the confidence or corrects it. |
 | "No time to test" | A skill that doesn't land costs more downstream than the baseline does now. |
 
+## Match the Form to the Failure
+
+Before writing guidance, classify the baseline failure. The form that bulletproofs one failure
+type backfires on another — this is a correctness choice, not a style one.
+
+| Baseline failure | Right form | Wrong form |
+|---|---|---|
+| Knows the rule, skips it under pressure | Prohibition + rationalization table + red flags (Bulletproofing, below) | Soft guidance ("prefer...", "consider...") |
+| Right action, wrong shape (bloated prompt, buried verdict, restated spec) | Positive recipe/contract: state what the output IS — its parts, in order | Prohibition list ("don't restate", "never narrate") |
+| Omits a required element it already produces | Structural REQUIRED slot in the template it fills in | Prose reminder near the template |
+| Behavior should vary by condition | Conditional keyed to an observable predicate ("if the brief exists, reference it") | Unconditional rule + exemption clauses |
+
+**Empirical warning:** a prohibition aimed at a *shaping* failure produces MORE of the unwanted
+output than giving no guidance at all — the agent negotiates with each "don't". A recipe leaves
+nothing to negotiate.
+
+**Two form rules:**
+- **No nuance clauses.** "Don't X unless it matters" reopens the negotiation. Express a real
+  exception as its own conditional on an observable predicate.
+- **An exemption clause can't narrow scope.** "This limit doesn't apply to code blocks" still
+  suppresses code blocks. If part of the output must be exempt, restructure so the rule can't
+  reach it.
+
+See `guidance-form-and-wording-tests.md` for worked examples and the wording-test evidence.
+
 ## Bulletproofing a Discipline Skill Against Rationalization
 
-This section is about writing a *discipline* skill — one the agent must hold under pressure.
-The examples below are intentionally firm because that firmness belongs in the discipline
-skill you're authoring (this is how `arc-tdd`, say, talks); it's the subject being taught,
-not the tone of this guide. Technique, pattern, and reference skills don't need it.
+This toolbox is for exactly one row of the table above: the agent *knows* the rule and skips it
+under pressure. For wrong-shaped output or a missing element, a prohibition backfires — use the
+matching form instead. The examples below are intentionally firm because that firmness belongs
+in the discipline skill you're authoring (this is how `arc-tdd`, say, talks); it's the subject
+being taught, not the tone of this guide. Technique, pattern, and reference skills don't need it.
 
 ### Close Every Loophole Explicitly
 
@@ -509,10 +535,30 @@ Run same scenarios WITH skill. Agent should now comply.
 
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
+### Micro-Test Wording Before Full Scenarios
+
+For behavior-shaping guidance, iterate on the *wording* with cheap micro-tests before you spend
+a full pressure-scenario run. This is an authoring-time loop, not the ship gate:
+
+- **One fresh-context sample per run** — a raw API call (or a single-shot subagent). System
+  prompt = the realistic context the guidance lives in (the full skill/template, not the line in
+  isolation); user message = a task that tempts the failure.
+- **Mandatory no-guidance control.** If the control doesn't exhibit the failure, stop — don't
+  write the guidance.
+- **5+ reps per variant.** Single samples lie.
+- **Read every flagged match by hand** — template echo masquerades as a hit; automated counts
+  overstate both failure and success.
+- **Treat rep-to-rep variance as a signal** the wording didn't bind — tighten the form before
+  adding words.
+
+Micro-testing verifies wording; it does not replace the pressure scenarios or the ship gate.
+See `guidance-form-and-wording-tests.md` for the full protocol.
+
 **Testing methodology:** See `testing-skills-with-subagents.md` for the pressure-scenario method.
 
-**Structured grading and measurement belong to arc-evaluating.** When you need to grade
-compliance, mine rationalizations from a transcript, compare two versions blind, or prove a
+**Structured grading and measurement belong to arc-evaluating.** Micro-tests are the fast
+authoring-time loop; arc-evaluating's A/B comparison (k ≥ 5) is the ship gate. When you need to
+grade compliance, mine rationalizations from a transcript, compare two versions blind, or prove a
 behavior change before shipping, use **arc-evaluating** — it owns the graders (including the
 discipline-skill `skill-grader` with its `rationalizations[]` output), the A/B loop
 (`arc eval ab`), and the SHIP verdict. Keep this skill focused on writing the skill well, and
@@ -555,7 +601,7 @@ below for each skill.
 
 ## Skill Creation Checklist
 
-Track these as you go (TodoWrite helps when you're working through a multi-skill batch).
+Track these as you go (a task list helps when you're working through a multi-skill batch).
 
 **RED Phase - Write Failing Test:**
 - [ ] Create pressure scenarios (3+ combined pressures for discipline skills)
@@ -569,6 +615,8 @@ Track these as you go (TodoWrite helps when you're working through a multi-skill
 - [ ] Description written in third person
 - [ ] Keywords throughout for search (errors, symptoms, tools)
 - [ ] Address specific baseline failures identified in RED
+- [ ] Guidance form matches the failure type (see Match the Form to the Failure)
+- [ ] Behavior-shaping wording micro-tested against a no-guidance control before the full eval (see Micro-Test Wording) — N/A for pure reference skills
 - [ ] Run scenarios WITH skill - verify agents now comply
 
 **REFACTOR Phase - Close Loopholes:**
@@ -588,6 +636,7 @@ This skill includes supporting files for comprehensive skill development:
 
 **Methodology:**
 - `testing-skills-with-subagents.md` - Complete testing methodology with pressure scenarios
+- `guidance-form-and-wording-tests.md` - Failure-to-form taxonomy and the wording micro-test protocol (rationale, examples, evidence)
 - `anthropic-best-practices.md` - Official skill authoring guidance (conciseness, structure, evaluation)
 
 **Psychology:**

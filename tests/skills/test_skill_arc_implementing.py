@@ -43,7 +43,7 @@ def test_arc_implementing_contains_required_sections():
     # Must be an orchestrator that delegates
     assert "orchestrator" in text.lower() or "呼叫" in text.lower()
     
-    # Must delegate to agent-driven (which handles TDD + two-stage review)
+    # Must delegate to agent-driven (which handles TDD + task-reviewer, both verdicts)
     assert "arc-agent-driven" in text.lower() or "agent-driven" in text.lower()
     
     # Must delegate to writing-tasks (for task breakdown)
@@ -65,3 +65,14 @@ def test_arc_implementing_uses_per_spec_paths():
 
     # Phase inputs reference specs/<spec-id>/epics/...
     assert "specs/<spec-id>/epics" in text
+
+
+def test_arc_implementing_durable_progress_ledger():
+    text = _read_skill()
+
+    # Orchestrator mirror: points recovery at the shared per-task ledger
+    assert ".arcforge/sdd/progress.md" in text
+
+    # Resume mid-epic uses the ledger + git log, never re-dispatch complete work
+    assert "git log" in text.lower()
+    assert "reconcile" in text.lower()

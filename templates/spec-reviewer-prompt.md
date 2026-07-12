@@ -21,6 +21,14 @@ Implementer 完成得太快了。他們的報告可能不完整、不準確、�
 - 逐行比對 acceptance criteria
 ```
 
+## Review Package
+
+A pre-built review package is at `{DIFF_FILE}`. Read it first — it holds the
+commit list, `git diff --stat`, and the full `git diff -U10` for this task's
+`BASE..HEAD` range. Do NOT re-run git or crawl the codebase to reconstruct the
+diff; the package is the diff. Open the actual source files only to verify the
+changes it shows.
+
 ## Plan / Requirements
 
 Read the plan or requirements from: `{PLAN_OR_REQUIREMENTS}`

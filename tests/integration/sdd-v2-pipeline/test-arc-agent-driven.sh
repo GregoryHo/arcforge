@@ -68,7 +68,7 @@ echo ""
 echo ">>> Spawning claude -p inside worktree to run arc-agent-driven..."
 cd "$WORKTREE_PATH"
 
-PROMPT="You are inside an arcforge worktree for the epic-formatter epic. A task list has been pre-created at docs/tasks/fr-formatter-001-tasks.md. Use arc-agent-driven to execute this task list: dispatch a fresh subagent per task, then run spec-reviewer and quality-reviewer after each task completes. Do not re-generate the task list — it already exists."
+PROMPT="You are inside an arcforge worktree for the epic-formatter epic. A task list has been pre-created at docs/tasks/fr-formatter-001-tasks.md. Use arc-agent-driven to execute this task list: dispatch a fresh subagent per task, then run task-reviewer after each task completes. Do not re-generate the task list — it already exists."
 
 # 15-minute ceiling for arc-agent-driven with a single 2-task list.
 TIMEOUT_SECONDS="${SDD_V2_AGENT_DRIVEN_TIMEOUT:-900}"

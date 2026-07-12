@@ -99,6 +99,7 @@ Registry mutation goes through `${ARCFORGE_ROOT}/scripts/cli.js`, not
 hand-written JSON. Run:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" obsidian register \
   --name <name> \
   --path <absolute-path> \

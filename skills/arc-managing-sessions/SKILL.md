@@ -124,7 +124,8 @@ These remain available for the durable archive path. Set `SKILL_ROOT`
 before running scripts:
 
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-managing-sessions}"
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
 ```
 
 ### `save [alias]`
@@ -145,6 +146,8 @@ Archive the current session with enrichment.
 5. Create alias if name provided.
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" save <alias> [summary] [whatWorked] [whatFailed] [blockers] [nextStep]
 ```
 
@@ -165,6 +168,8 @@ Load an archived session and present a structured briefing.
 4. **Wait for user confirmation before doing any work.**
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" resume [alias]
 ```
 
@@ -183,6 +188,8 @@ Options:
 - `--query id` — filter by session ID substring
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [--query id]
 ```
 
@@ -191,6 +198,8 @@ node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [-
 Create an alias for easy reference, or list all aliases.
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" alias <session-path> <name>
 node "${SKILL_ROOT}/scripts/sessions.js" aliases
 ```

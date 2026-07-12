@@ -59,6 +59,7 @@ function parseLoopArgs(args) {
     maxParallel: DEFAULT_MAX_PARALLEL,
     projectSetup: true,
     taskTimeoutMs: null,
+    model: null,
     permissionMode: null,
     allowedTools: null,
     verifyCommand: null,
@@ -112,6 +113,9 @@ function parseLoopArgs(args) {
         options.taskTimeoutMs = seconds * 1000;
         break;
       }
+      case '--model':
+        options.model = args[++i];
+        break;
       case '--permission-mode':
         options.permissionMode = args[++i];
         break;
@@ -169,6 +173,8 @@ OPTIONS:
   --max-parallel N           Max concurrent epics per round in dag mode (default: 5)
   --no-project-setup         Skip per-worktree installer in dag mode (default: on)
   --task-timeout N           Per-session timeout in seconds (default: 600)
+  --model <tier>             Pass --model through to every spawned claude session
+                             (implementer + verifier); default: CLI default tier
   --permission-mode <mode>   Pass --permission-mode through to spawned claude sessions
   --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
   --verify-cmd "<cmd>"       Run this command after each session exits 0; a

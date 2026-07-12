@@ -41,6 +41,7 @@ fi
 ### add
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
 ```
 
@@ -55,6 +56,7 @@ Conventions:
 ### list
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
 ```
 
@@ -70,6 +72,7 @@ field from the `add` or `list` JSON.
 ### remove
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove <name> [--force]
 ```
 
@@ -83,6 +86,7 @@ When the work matches an epic id in `specs/<spec-id>/dag.yaml`, do **not** use
 the generic tier. Escalate to the coordinator with one command:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <id> --project-setup
 ```
 

@@ -104,7 +104,12 @@ The contract author decides at lock time, not the loop at runtime. If Trials is 
 3. If the baseline crashes or produces no metric, STOP. Tell the human to fix the evaluation environment. Do not debug infrastructure — it is outside scope.
 4. Extract the baseline metric value
 5. Log baseline to `results.tsv` with status `baseline` — do NOT commit results.tsv (keep it untracked so experiment history survives resets)
-6. Start the dashboard: `node "${ARCFORGE_ROOT}/scripts/cli.js" research dashboard --results results.tsv --config research-config.md` — run in the background; do not block on this step
+6. Start the dashboard (run in the background; do not block on this step):
+
+   ```bash
+   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+   node "${ARCFORGE_ROOT}/scripts/cli.js" research dashboard --results results.tsv --config research-config.md
+   ```
 7. Tell the human: "Dashboard running at http://localhost:3000 — monitor progress there."
 8. Commit the baseline state (but NOT results.tsv)
 
@@ -116,14 +121,19 @@ This is the heart of the skill. **NEVER STOP** — run until interrupted or the 
 LOOP (until stop condition):
   1. READ STATE    — git log, results.tsv, research-config.md
   2. HYPOTHESIZE   — pick a direction based on results so far
-  3. IMPLEMENT     — modify files within declared scope only
-  4. COMMIT        — git commit with descriptive message
-  5. RUN           — execute command `trials` times → run-1.log, run-2.log, ... (never tee or raw stdout)
-  6. EXTRACT       — grep metric from each log, compute aggregation (median/mean)
-  7. DECIDE        — aggregated value improved? keep. Same/worse? revert. Crash? log + revert.
-  8. LOG           — append row to results.tsv (every experiment, no exceptions)
-  9. ANALYZE       — 3+ failures in same direction? change direction entirely
+  3. PREDICT       — record predicted direction + rough magnitude in the run log BEFORE running (pre-registration)
+  4. IMPLEMENT     — modify files within declared scope only
+  5. COMMIT        — git commit with descriptive message
+  6. RUN           — execute command `trials` times → run-1.log, run-2.log, ... (never tee or raw stdout)
+  7. EXTRACT       — grep metric from each log, compute aggregation (median/mean)
+  8. DECIDE        — aggregated value improved? keep. Same/worse? revert. Crash? log + revert.
+  9. LOG           — append row to results.tsv (every experiment, no exceptions)
+  10. ANALYZE      — 3+ failures in same direction? change direction entirely
 ```
+
+#### Pre-Registration (PREDICT)
+
+Before running, commit to a prediction — direction (improve/regress) and rough magnitude (e.g., "−5% build time") — in the run log, or as the results.tsv `description` you complete at LOG. **No run until the prediction is recorded.** A result that contradicts your prediction is a signal to audit the measurement (below), not just a number to log.
 
 #### Decision Rules
 
@@ -133,6 +143,12 @@ LOOP (until stop condition):
 | Metric same or worse | Discard the change | `git reset --hard HEAD~1` | `discard` |
 | Command crashed/timed out | Log and discard | `git reset --hard HEAD~1` | `crash` |
 
+#### Measurement Audit (required for surprising wins)
+
+Before recording a *surprising* win as `keep` — one that beats your prediction or looks too good — manually compare a sample of raw `run-N.log` lines against the extraction/grep pattern. Confirm it matches real metric output (not an echoed template line counted as a hit) and is not over- or under-counting. For a surprising win this is mandatory, not the passive "check later if suspicious."
+
+If the audit shows the number was a measurement artifact, don't silently fix it: mark the original row `retracted` (kept as the audit trail) and log the corrected re-run as `remeasured`.
+
 #### Stuck Protocol
 
 If **3 or more consecutive experiments** fail in the same direction (e.g., all trying to reduce allocations):
@@ -140,7 +156,7 @@ If **3 or more consecutive experiments** fail in the same direction (e.g., all t
 2. Read all results so far and identify untried approaches
 3. Research — search for domain knowledge you don't have yet:
    - Read documentation for tools/libraries in the target files
-   - WebSearch for optimization techniques in this domain
+   - Search the web for optimization techniques in this domain
    - Check the Strategy section's research sources for unexplored leads
    - Look at similar projects or reference implementations for patterns
 4. Choose a fundamentally different direction informed by your research
@@ -199,12 +215,15 @@ a1b2c3d	0.997	baseline	Initial baseline measurement
 b2c3d4e	0.891	keep	Reduced learning rate by 50%
 c3d4e5f	0.912	discard	Added dropout layer 0.3 — regression from 0.891
 d4e5f6g	NaN	crash	Segfault in custom allocator — timeout after 300s
+e5f6g7h	0.260	retracted	Suspicious -74% win — audit found grep counted template echo, not hits
+f6g7h8i	0.590	remeasured	Honest re-run of e5f6g7h — real result -41%
 ```
 
 - **commit**: Short git hash (7 chars)
 - **metric_value**: Numeric value, or `NaN` for crashes
-- **status**: One of `baseline`, `keep`, `discard`, `crash`
+- **status**: One of `baseline`, `keep`, `discard`, `crash`, `retracted`, `remeasured`
 - **description**: What was tried and why it was kept/discarded
+- **retracted / remeasured**: a `keep` that a Measurement Audit found was a measurement artifact — the original row stays as `retracted`, the honest re-run is logged as `remeasured`
 
 **Git status:** Keep results.tsv untracked. If committed, `git reset` after failed experiments will erase the log. The TSV is your persistent memory — it must survive resets.
 
@@ -228,7 +247,7 @@ If the agent is interrupted and resumes in a new session:
 - Ask the human questions during the experiment loop
 
 **If results are suspicious:**
-1. Check if the metric extraction pattern matches correctly
+1. Run the Measurement Audit (above) — compare raw `run-N.log` lines against the extraction pattern
 2. Check if external factors (network, disk, other processes) affect the metric
 3. If variance is higher than expected, increase Trials in the contract (requires human approval to unlock and re-lock)
 

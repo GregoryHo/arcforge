@@ -9,7 +9,7 @@
   --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
   --border: #30363d; --text: #e6edf3; --text2: #8b949e;
   --accent: #58a6ff; --keep: #3fb950; --discard: #8b949e;
-  --crash: #f85149; --baseline: #58a6ff;
+  --crash: #f85149; --baseline: #58a6ff; --retracted: #d29922;
   --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -53,6 +53,8 @@ tr:hover td { background: var(--surface); }
 .status-discard { background: rgba(139,148,158,0.15); color: var(--discard); }
 .status-crash { background: rgba(248,81,73,0.15); color: var(--crash); }
 .status-baseline { background: rgba(88,166,255,0.15); color: var(--baseline); }
+.status-remeasured { background: rgba(63,185,80,0.15); color: var(--keep); }
+.status-retracted { background: rgba(210,153,34,0.15); color: var(--retracted); }
 
 /* Config panel */
 .config-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
@@ -149,7 +151,7 @@ function buildChart(experiments) {
   const xScale = (i) => PAD.left + (i / (valid.length - 1)) * plotW;
   const yScale = (v) => PAD.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
-  const statusColor = { baseline: '#58a6ff', keep: '#3fb950', discard: '#8b949e', crash: '#f85149' };
+  const statusColor = { baseline: '#58a6ff', keep: '#3fb950', discard: '#8b949e', crash: '#f85149', remeasured: '#3fb950', retracted: '#d29922' };
 
   const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, style: 'width:100%;height:auto' });
 
@@ -173,8 +175,8 @@ function buildChart(experiments) {
     svg.appendChild(label);
   }
 
-  // Line path (kept + baseline only)
-  const keptPoints = valid.filter((e) => e.status === 'keep' || e.status === 'baseline');
+  // Line path (kept + remeasured + baseline only)
+  const keptPoints = valid.filter((e) => e.status === 'keep' || e.status === 'remeasured' || e.status === 'baseline');
   if (keptPoints.length > 1) {
     const keptSet = new Set(keptPoints.map((e) => e.idx));
     const lineValid = valid.filter((e) => keptSet.has(e.idx));

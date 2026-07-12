@@ -50,6 +50,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
      - Call `arc-agent-driven`
      - Input: tasks file
      - Output: completed code + commits
+     - Model tiers: arc-agent-driven's Model Selection ladder governs per-dispatch model choice (never inherit).
 5. Phase 3: Feature complete.
    - Move to next feature, or finish the epic.
 
@@ -69,6 +70,16 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 - ❌ Split tasks manually (delegate to writing-tasks)
 - ❌ Perform reviews (handled inside agent-driven)
 - ❌ Run TDD cycle (handled inside agent-driven)
+
+## Durable Progress
+
+Phase 2b runs through `arc-agent-driven`, which records each completed task to
+the `.arcforge/sdd/progress.md` ledger (a self-ignoring runtime recovery
+artifact) as `Task N: complete (commits <base7>..<head7>, review clean)`. If a
+compaction or fresh session drops your place mid-epic, read that ledger plus
+`git log` and resume AFTER the last task marked complete — never re-dispatch a
+feature or task the ledger already records as done; reconcile against `git log`
+before dispatching anything.
 
 ## Completion Format
 

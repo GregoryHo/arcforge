@@ -21,7 +21,7 @@ Location: `templates/<name>-prompt.md`
   4. Anti-patterns
   5. Report format (if applicable)
 
-Reference existing templates: `implementer-prompt.md`, `quality-reviewer-prompt.md`, `spec-reviewer-prompt.md`.
+Reference existing templates: `implementer-prompt.md`, `task-reviewer-prompt.md`, `spec-reviewer-prompt.md`.
 
 ## Commands
 

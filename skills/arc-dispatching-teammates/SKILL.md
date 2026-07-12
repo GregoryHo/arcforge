@@ -11,6 +11,8 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 
 **Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't pre-identify conflicts — let runtime handle runtime.
 
+**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `arc-looping` (walk-away) or `arc-executing-tasks` (attended) for multi-epic work instead.
+
 ## When to Use
 
 | Condition | Route to |
@@ -45,7 +47,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 3. **`TeamCreate` BEFORE any Agent dispatch.** Use a descriptive name like `dispatch-<project>-<timestamp>`. Per [Agent Teams docs](https://code.claude.com/docs/en/agent-teams), passing `team_name` to Agent does NOT auto-create — it triggers a state-sync bug.
 
 4. **Expand worktrees and dispatch teammates in parallel.** For each epic in the initial 5:
-   - `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` from the project root — creates the canonical worktree and stamps `.arcforge-epic`. Per-epic, not batch.
+   - `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` from the project root — creates the canonical worktree and stamps `.arcforge-epic`. Per-epic, not batch.
    - Read the absolute worktree path from `arcforge status --json`; do not reconstruct it.
    - Dispatch via Agent with `team_name=<team>`, `name=worker-<epic-id>`, spawn prompt from `references/spawn-prompt-template.md`.
 
@@ -67,7 +69,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
    - Shut down the rejected teammate's session (reclaim the pane).
    - Formulate feedback naming the failed criterion, quoting spec text verbatim, stating current-vs-required behavior.
-   - `node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
+   - `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
    - Dispatch `worker-<epic-id>-retry<N>` using `references/spawn-prompt-template.md` with a prepended `## Previous Attempt Feedback` section (cumulative).
    - Track retry count in session memory. Retry 3 also fails → mark **permanently failed**, record reason for Step 8.
 
@@ -76,7 +78,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 8. **Wrap up (three actions, in order).** When every epic reaches a terminal state:
 
    - **8a.** Emit the Final Report (format in `references/wrap-up-sequence.md` §8a). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
-   - **8b.** Clean up **accepted** worktrees from the project root: `node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
+   - **8b.** Clean up **accepted** worktrees from the project root: `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
    - **8c.** Shut down any remaining teammates (most already down from Steps 6/7), then call `TeamDelete`. See `references/wrap-up-sequence.md` for ordering and failure handling.
 
 ## Spawn Prompt Template

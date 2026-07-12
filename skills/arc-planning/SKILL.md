@@ -48,6 +48,7 @@ validation result and the parsed header — the planner reads scope from that
 JSON, not from a separate inline parse:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate header --spec-id <spec-id> \
   --draft specs/<spec-id>/spec.xml
 ```
@@ -146,9 +147,10 @@ If `specs/<spec-id>/dag.yaml` already exists, planner MUST overwrite it. Planner
 
 ## Infrastructure Commands
 
-**Set SKILL_ROOT** from skill loader header (`# SKILL_ROOT: ...`):
+**Set SKILL_ROOT** (derives from ARCFORGE_ROOT — set by the Claude Code hook, or the fallback default below on other platforms):
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/arc-planning}"
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-planning}"
 if [ ! -d "$SKILL_ROOT" ]; then
   echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
   exit 1
@@ -157,6 +159,8 @@ fi
 
 To view the full schema and example, run:
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-planning}"
 # View schema with field descriptions
 node "${SKILL_ROOT}/scripts/planner.js" schema
 

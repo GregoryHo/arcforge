@@ -67,6 +67,7 @@ Each agent gets:
 - **Clear goal:** What to achieve
 - **Constraints:** Don't change other code
 - **Expected output:** Summary of changes
+- **Model:** Named explicitly (never inherit) — see arc-agent-driven's Model Selection ladder for the tier map
 
 **Prompt template:**
 
@@ -136,6 +137,7 @@ A feature is ready when it is `pending` and every feature it `depends_on` is
 `completed`. Don't hand-parse the dag for this — the engine computes it:
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 node "${ARCFORGE_ROOT}/scripts/cli.js" parallel --features --json
 ```
 
@@ -218,6 +220,7 @@ Fetch the next work from the engine (the `arc-coordinating` skill owns the full
 lifecycle; these are the underlying CLI calls):
 
 ```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
 # Get the next parallelizable features
 node "${ARCFORGE_ROOT}/scripts/cli.js" parallel --features --json
 

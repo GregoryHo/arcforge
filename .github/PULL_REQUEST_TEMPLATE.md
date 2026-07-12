@@ -26,9 +26,15 @@
 **REFACTOR (Loopholes Closed):**
 <!-- What new rationalizations did you find and counter? -->
 
+**Baseline provenance:**
+<!-- Where was the RED baseline observed? A baseline can go stale when the model or harness changes, so record it. -->
+- Model + version:
+- Harness + version:
+- arc-evaluating scenario ID + k (if an A/B eval was run):
+
 ## Testing
 
-- [ ] `npm test` passes (all 4 runners)
+- [ ] `npm test` passes (all 5 runners)
 - [ ] New tests added for new functionality
 - [ ] Tested on Claude Code (primary platform)
 

@@ -48,3 +48,14 @@ def test_arc_executing_tasks_contains_required_sections():
 
     # Must have commit pattern
     assert "commit" in text.lower()
+
+
+def test_arc_executing_tasks_durable_progress_ledger():
+    text = _read_skill()
+
+    # Mirrors the durable ledger, same file + same line format as agent-driven
+    assert ".arcforge/sdd/progress.md" in text
+    assert "Task N: complete (commits <base7>..<head7>, review clean)" in text
+
+    # Resume-after-last-complete + reconcile against git log
+    assert "git log" in text.lower()

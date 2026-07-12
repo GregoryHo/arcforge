@@ -16,10 +16,12 @@ Enable agentic skills in OpenCode via native skill discovery and system transfor
    git clone https://github.com/GregoryHo/arcforge ~/.agents/arcforge
    ```
 
-   This is the **standard clone location**, and skills resolve the CLI
-   through `ARCFORGE_ROOT`. OpenCode has no SessionStart hook to export it,
-   so skills fall back to `~/.agents/arcforge` automatically. If you clone
-   somewhere else, export it in your shell profile so the CLI resolves:
+   This is the **standard clone location**. Skills invoke the CLI through
+   `ARCFORGE_ROOT`, and OpenCode has no SessionStart hook to export it — so
+   every skill's bash block defaults it to `~/.agents/arcforge` when unset
+   (`: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"`). A standard clone runs
+   with no extra configuration. If you clone somewhere else, export
+   `ARCFORGE_ROOT` in your shell profile so the CLI resolves:
    ```bash
    export ARCFORGE_ROOT=/your/arcforge/checkout
    ```
@@ -37,6 +39,12 @@ Enable agentic skills in OpenCode via native skill discovery and system transfor
    ```
 
 4. **Restart OpenCode** to discover skills and load the plugin.
+
+## Tool mapping
+
+Skills describe actions in vendor-neutral terms. For how they map to OpenCode's
+real tools (subagent dispatch, task tracking, web search), see
+`skills/arc-using/references/opencode-tools.md`.
 
 ## Verify
 
