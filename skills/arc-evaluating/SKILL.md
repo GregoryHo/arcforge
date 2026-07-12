@@ -135,6 +135,17 @@ When pressure builds to skip or shortcut eval, these rationalizations surface. E
 
 **REQUIRED BACKGROUND:** references/audit-workflow.md — how promotion and retirement arbitration works for discovered_claims and weak_assertions.
 
+## Red Flags
+
+Every listed thought means stop, re-read the skill, do not proceed.
+
+- "I already manually tested, eval is redundant" — Manual testing measures your confidence, not the agent's behavioral reliability. Eval measures whether the skill systematically changes agent behavior across trials.
+- "This is docs-only, no eval needed" — Docs changes that alter skill instructions change agent behavior by definition. If you changed what the agent reads, you changed what the agent does.
+- "The INSUFFICIENT_DATA banner is just a warning" — INSUFFICIENT_DATA is a hard gate, not a warning. It means you have no statistical verdict. Shipping under INSUFFICIENT_DATA is shipping without evidence.
+- "I can promote the discovered claim on my own without audit" — Promotion requires human arbitration to ensure the claim is generalizable and non-redundant. Bypassing audit corrupts the canonical skill body.
+- "The blind comparator disagreed but assertions passed so it's fine" — The blind comparator is an independent signal. Disagreement between the comparator and assertion scores indicates one of them is poorly calibrated. Investigate before shipping.
+- "Preflight is new, I'll skip it this time and backfill later" — Preflight is a gate, not a recommendation. Running trials on a scenario that fails preflight produces results you cannot trust. There is no backfill — run preflight first.
+
 ## Common Mistakes
 
 Top mistakes that waste the most eval runs. Full catalog in references/common-mistakes-catalog.md.
