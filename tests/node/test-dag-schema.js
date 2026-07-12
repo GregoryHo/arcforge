@@ -137,4 +137,52 @@ assert.throws(() => normalizeStatus('banana'), /Invalid status/);
 assert.throws(() => normalizeStatus(''), /Invalid status/);
 console.log('    ✓ Unknown values throw');
 
+// Test validateDagTransition (dag-guard / engine-twin invariants)
+console.log('  validateDagTransition...');
+const { validateDagTransition } = require('../../scripts/lib/dag-schema');
+
+const baseTransitionDag = {
+  epics: [
+    {
+      id: 'epic-1',
+      status: 'in_progress',
+      depends_on: [],
+      features: [
+        { id: 'feat-1', status: 'completed', depends_on: [] },
+        { id: 'feat-2', status: 'pending', depends_on: ['feat-1'] },
+      ],
+    },
+  ],
+};
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// Identical + legal-forward transitions are valid.
+assert.strictEqual(validateDagTransition(baseTransitionDag, baseTransitionDag).valid, true);
+const advanced = clone(baseTransitionDag);
+advanced.epics[0].features[1].status = 'in_progress';
+assert.strictEqual(validateDagTransition(baseTransitionDag, advanced).valid, true);
+console.log('    ✓ identical and legal-forward transitions are valid');
+
+// Leaving completed is rejected (monotonic).
+const unCompleted = clone(baseTransitionDag);
+unCompleted.epics[0].features[0].status = 'pending';
+const monoResult = validateDagTransition(baseTransitionDag, unCompleted);
+assert.strictEqual(monoResult.valid, false);
+assert.ok(monoResult.errors.some((e) => e.includes('feat-1')));
+console.log('    ✓ leaving completed is rejected');
+
+// Dropping a dependency is rejected.
+const droppedDep = clone(baseTransitionDag);
+droppedDep.epics[0].features[1].depends_on = [];
+const depResult = validateDagTransition(baseTransitionDag, droppedDep);
+assert.strictEqual(depResult.valid, false);
+assert.ok(depResult.errors.some((e) => e.includes('feat-1')));
+console.log('    ✓ dropping a dependency is rejected');
+
+// Adding a new task / removing a task is out of scope (allowed).
+const added = clone(baseTransitionDag);
+added.epics[0].features.push({ id: 'feat-3', status: 'pending', depends_on: [] });
+assert.strictEqual(validateDagTransition(baseTransitionDag, added).valid, true);
+console.log('    ✓ additions are allowed');
+
 console.log('\n✅ All dag-schema tests passed!\n');

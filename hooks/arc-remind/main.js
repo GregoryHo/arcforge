@@ -170,8 +170,8 @@ function mainBranchNudge() {
 
 function evalBeforeShipNudge() {
   return (
-    '\n🧪 You edited a skill this session and are committing. arc-writing-skills’ Iron Law: ' +
-    're-run the skill’s eval (RED → GREEN → REFACTOR) before shipping a behavioral change — ' +
+    '\n🧪 You edited a skill this session and are committing. Iron Law: re-run the skill’s ' +
+    'eval (RED → GREEN → REFACTOR) before shipping a behavioral change — run the eval now; ' +
     'an untested skill edit should not ship.\n'
   );
 }
@@ -255,8 +255,8 @@ function staleEvalNudge(skillNames, benchTime) {
   return (
     `\n🧪 You edited ${skillNames} this session and are committing. No eval result newer ` +
     `than your skill edit exists — evals/benchmarks/latest.json was generated ` +
-    `${new Date(benchTime).toISOString()}, before the edit. arc-writing-skills’ Iron Law: ` +
-    're-run the skill’s eval (RED → GREEN → REFACTOR) before shipping a behavioral change.\n'
+    `${new Date(benchTime).toISOString()}, before the edit. Iron Law: re-run the skill’s ` +
+    'eval (RED → GREEN → REFACTOR) now before shipping a behavioral change.\n'
   );
 }
 
