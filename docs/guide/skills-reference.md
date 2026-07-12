@@ -21,9 +21,9 @@ This is the offline reference for all 32 arcforge skills. In a live session, **`
 
 ## Quick Start
 
-arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
+arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on all four platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, `arc-observing`, and `arc-managing-sessions`.
 
 **Core skills every user should learn first:**
 

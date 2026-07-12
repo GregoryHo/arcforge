@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
+arcforge is a minimal, composable skill toolkit for Claude Code and Codex. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
 
 ## Why arcforge
 
@@ -30,7 +30,7 @@ Skills are tools, not laws. You can enter through `arc-using` for routing help o
 
 ## Installation
 
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex and OpenCode require manual setup.
+**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex requires manual setup.
 
 ### Claude Code (Plugin Marketplace)
 
@@ -72,26 +72,6 @@ Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/ma
 ```
 
 **Detailed docs:** `docs/README.codex.md`
-
-### Gemini CLI
-
-Tell Gemini CLI:
-
-```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.gemini/INSTALL.md
-```
-
-**Detailed docs:** `docs/README.gemini.md`
-
-### OpenCode
-
-Tell OpenCode:
-
-```
-Clone https://github.com/GregoryHo/arcforge to ~/.agents/arcforge, then create directory ~/.config/opencode/skills, then symlink ~/.agents/arcforge/skills to ~/.config/opencode/skills/arcforge, then create directory ~/.config/opencode/plugins, then symlink ~/.agents/arcforge/.opencode/plugins/arcforge.js to ~/.config/opencode/plugins/arcforge.js, then restart opencode.
-```
-
-**Detailed docs:** `docs/README.opencode.md`
 
 ## Quick Start: Common Commands
 
@@ -213,7 +193,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 ### Review Templates
 
 Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from any
-harness that can dispatch a subagent (Claude Code, Codex, Gemini CLI, OpenCode):
+harness that can dispatch a subagent (Claude Code, Codex):
 
 - `templates/implementer-prompt.md` - TDD implementer subagent prompt
 - `templates/task-reviewer-prompt.md` - Per-task reviewer prompt (spec compliance + task quality)

@@ -70,8 +70,7 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 parallel subagent dispatches.** Do NOT dispatch them one at a time. Sequential
 dispatch is the baseline failure mode this rule exists to prevent — a stock
 agent defaults to serial execution; this skill forbids it. (For your harness's
-subagent-dispatch tool, see `arc-using/references/codex-tools.md` or
-`arc-using/references/opencode-tools.md`.)
+subagent-dispatch tool, see `arc-using/references/codex-tools.md`.)
 
 Dispatch these three agents concurrently, in a single message:
 - `arc-auditing-spec-cross-artifact-alignment`

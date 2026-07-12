@@ -309,8 +309,8 @@ Then retry: `/arc-dispatching-parallel`
 ## Cross-Platform Dispatch
 
 The `subagent:` lines above are notation, not a specific tool — this skill works
-on any platform that can run a fresh subagent (Claude Code, Codex, Gemini CLI,
-OpenCode). Dispatch each parallel task with whatever subagent mechanism your
+on any platform that can run a fresh subagent (Claude Code, Codex). Dispatch
+each parallel task with whatever subagent mechanism your
 harness provides; the only requirement is that independent tasks run in their
 own fresh contexts and report back. The `verifier` and `spec-reviewer` agents in
 the verification gate are pre-built where your platform supplies them; otherwise

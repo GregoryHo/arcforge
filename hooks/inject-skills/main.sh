@@ -36,8 +36,7 @@ escape_for_json() {
 }
 
 # Read the shared minimal bootstrap and substitute the ${ARCFORGE_ROOT}
-# placeholder with the resolved plugin root. The OpenCode plugin reads this same
-# file, so both platforms emit an identical bootstrap. $(cat ...) strips the
+# placeholder with the resolved plugin root. $(cat ...) strips the
 # file's trailing newline, matching the previous heredoc value byte-for-byte.
 bootstrap_template=$(cat "${SCRIPT_DIR}/bootstrap.txt" 2>/dev/null || true)
 placeholder='${ARCFORGE_ROOT}'

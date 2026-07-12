@@ -202,8 +202,8 @@ describe('cc-005 plugin path discipline lint (fr-cc-pl-001)', () => {
 // cc-006 Codex-unset ARCFORGE_ROOT header discipline — CI lint.
 // ---------------------------------------------------------------------------
 //
-// Claude Code exports ARCFORGE_ROOT from its SessionStart hook; Codex, Gemini
-// and OpenCode do not. So every skill ```bash block that invokes the arcforge
+// Claude Code exports ARCFORGE_ROOT from its SessionStart hook; Codex does
+// not. So every skill ```bash block that invokes the arcforge
 // CLI must set a working fallback default before first use:
 //
 //   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
@@ -293,7 +293,7 @@ describe('cc-006 codex-unset ARCFORGE_ROOT header discipline', () => {
       report.push('');
     }
     report.push('Every ```bash block invoking the arcforge CLI must default ARCFORGE_ROOT so it');
-    report.push('resolves when the SessionStart hook did not set it (Codex / Gemini / OpenCode).');
+    report.push('resolves when the SessionStart hook did not set it (Codex).');
     report.push('Reference: arc-writing-skills SKILL.md "Path Resolution" section.');
     throw new Error(report.join('\n'));
   });
