@@ -1,6 +1,8 @@
 ---
 name: arc-using
-description: Use when an ArcForge task needs routing help or the user asks which ArcForge skill/workflow applies
+description: Route an ArcForge task to the smallest useful skill or workflow. Use when unsure which skill applies or the user asks where to start — a bounded router and skill index, not an always-on policy engine.
+category: meta
+status: promoted
 ---
 
 # arc-using

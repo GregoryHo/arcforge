@@ -1,6 +1,8 @@
 ---
 name: arc-dispatching-parallel
-description: Use when dispatching multiple independent features within a worktree session
+description: Dispatch multiple independent features to parallel subagents within one worktree session. Use when fanning out feature-level work you drive yourself; for epic-level teammates you monitor as a present lead use arc-dispatching-teammates.
+category: orchestration
+status: promoted
 ---
 
 # arc-dispatching-parallel

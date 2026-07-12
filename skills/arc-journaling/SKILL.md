@@ -1,6 +1,8 @@
 ---
 name: arc-journaling
-description: Use when the user asks to journal session reflections (/arcforge:arc-journaling), when the PreCompact hook triggers, or at end of a significant work session
+description: Capture session reflections into a durable diary. Use when a significant work session ends, the user asks to journal, or the PreCompact hook fires before context is compacted and insight would be lost.
+category: memory
+status: promoted
 ---
 
 # Session Diary Capture

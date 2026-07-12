@@ -116,57 +116,57 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-All 32 skills, each listed once. Workflow skills hand off sequentially, discipline skills fire as quality gates when their condition is present, and meta skills are invoked directly (see `arc-using` for routing).
+All 30 skills, grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
 
-### Routing
+### SDD (idea → spec → tasks → integration)
 
-- **arc-using** - Canonical router: maps task conditions to the smallest useful skill or workflow
+- **arc-brainstorming** - Explore and shape a design before implementation
+- **arc-refining** - Formalize an approved design into a structured `spec.xml`
+- **arc-planning** - Break a refined spec into an executable DAG of epics
+- **arc-writing-tasks** - Break a feature into small executable tasks with exact code
+- **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
+- **arc-implementing** - Orchestrate a large multi-feature project inside a worktree
+- **arc-finishing** - Integrate finished work; Step 0 discriminates epic worktree vs branch on `.arcforge-epic`
+- **arc-auditing-spec** _(user-invoked)_ - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
 
-### Workflow Skills (idea → spec → tasks → integration)
+### Orchestration (subagents, worktrees, loops)
 
-- **arc-brainstorming** - Design exploration
-- **arc-refining** - Convert design documents to structured specs
-- **arc-planning** - Break a spec into an executable DAG of epics
-- **arc-writing-tasks** - Break features into executable tasks
-- **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
-- **arc-agent-driven** - Automated execution with subagent per task and a single task-reviewer (both verdicts)
-- **arc-implementing** - Orchestrate large project implementation in a worktree
-- **arc-coordinating** - Worktree management for multi-epic projects
-- **arc-using-worktrees** - Isolated git worktree for any repo: a branch, experiment, or review checkout via the generic CLI; epic work auto-escalates to the coordinator
-- **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
-- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via agent teammates
-- **arc-looping** - Autonomous cross-session loop execution
-- **arc-finishing** - Completion with merge decision; Step 0 discriminates epic worktree vs normal branch on `.arcforge-epic`
+- **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
+- **arc-coordinating** - Coordinate multi-epic worktrees and cross-epic DAG state
+- **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
+- **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
+- **arc-looping** - Autonomous unattended cross-session DAG execution
+- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout); epic work auto-escalates to the coordinator
 
-### Discipline Skills (quality gates)
+### Discipline (quality gates)
 
-- **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
-- **arc-debugging** - Systematic debugging with four phases
-- **arc-verifying** - Verification evidence before completion claims
-- **arc-reviewing** - Request code review, then process the feedback with technical rigor
-- **arc-evaluating** - Measure whether skills and workflows change agent behavior
+- **arc-tdd** - Test-first implementation (RED → GREEN → REFACTOR)
+- **arc-debugging** - Systematic root-cause investigation before any fix
+- **arc-verifying** - Fresh evidence before completion claims
+- **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
+- **arc-researching** - Autonomous hypothesis-driven metric optimization
 
-### Session & Learning Skills
+### Memory (session continuity + learning; default-off module)
 
-- **arc-journaling** - Session journaling for capturing reflections before compaction
-- **arc-reflecting** - Analyze diary entries for insights and patterns
-- **arc-learning** - Opt-in observe→curate→review→activate lifecycle for behavioral instincts
-- **arc-recalling** - Manual instinct creation from session insights
-- **arc-managing-sessions** - Session save/resume with alias support
+- **arc-journaling** - Capture session reflections into a durable diary before compaction
+- **arc-reflecting** - Analyze accumulated diaries for patterns and preferences
+- **arc-learning** - Opt-in observe → curate → review → activate instinct lifecycle
+- **arc-recalling** _(user-invoked)_ - Manually save a session pattern as a reusable instinct
+- **arc-managing-sessions** - Hand off, save, or resume session state across turns
 - **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
-- **arc-researching** - Autonomous hypothesis-driven experimentation
 
 The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
 
-### Knowledge Base Skills
+### Knowledge (Obsidian vault)
 
-- **arc-maintaining-obsidian** - Unified Obsidian vault lifecycle: ingest, query, audit (Karpathy LLM Wiki pattern)
+- **arc-maintaining-obsidian** - Ingest, query, audit, or initialize an Obsidian vault (Karpathy LLM Wiki pattern)
 - **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
 
-### Meta & Audit Skills
+### Meta (operates on the catalog itself)
 
-- **arc-writing-skills** - Maintain ArcForge's own skills and skill tests (project-level meta)
-- **arc-auditing-spec** - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
+- **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
+- **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
+- **arc-writing-skills** _(user-invoked)_ - Create, edit, or verify ArcForge's own skills and skill tests
 
 ### Agents
 

@@ -51,7 +51,7 @@ def test_skills_reference_has_bounded_arc_using_and_meta_only_writing_skills():
     assert "bounded router" in lower
     assert "project-level meta" in lower
     assert "arc-writing-skills" in content
-    assert "32 skills" in content
+    assert "30 skills" in content
     assert "three-layer model" in lower
     assert "core toolkit" in lower
     assert "optional workflows" in lower

@@ -1,6 +1,8 @@
 ---
 name: arc-learning
-description: Use when optional learning is enabled and observations should become reviewable candidates, inactive drafts, and explicitly activated artifacts.
+description: "Run the opt-in learning lifecycle: turn observations into reviewable candidates, inactive drafts, then explicitly activated instincts. Use when the default-off learning module is enabled and observations should become artifacts."
+category: memory
+status: promoted
 ---
 
 # Optional Learning Candidate Lifecycle

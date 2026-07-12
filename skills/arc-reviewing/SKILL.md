@@ -1,6 +1,8 @@
 ---
 name: arc-reviewing
-description: Use when completing a task or feature to request code review, and when processing the reviewer feedback that comes back — one request→receive loop.
+description: Request code review then process the returning feedback with technical rigor. Use when a task or feature is complete and needs review — runs the full request-to-receive loop, dispatching the code-reviewer agent and handling its verdict.
+category: discipline
+status: promoted
 ---
 
 # arc-reviewing

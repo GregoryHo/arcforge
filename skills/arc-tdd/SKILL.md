@@ -1,6 +1,8 @@
 ---
 name: arc-tdd
-description: Use when implementing any feature or bugfix, before writing implementation code
+description: Drive implementation test-first through RED, GREEN, REFACTOR. Use when about to write any feature or bugfix code — write the failing test first, then the minimum code to pass, then refactor. Enforces the Iron Law for implementation.
+category: discipline
+status: promoted
 ---
 
 # Test-Driven Development (TDD)

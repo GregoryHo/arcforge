@@ -1,6 +1,8 @@
 ---
 name: arc-executing-tasks
-description: Use when executing a prepared task list, when running batch implementation, or when tasks are already broken down
+description: Run a prepared task list yourself with human-in-the-loop checkpoints. Use when tasks are already broken down and you implement them in-session; for isolated subagent-per-task execution use arc-agent-driven instead.
+category: sdd
+status: promoted
 argument-hint: "<task-list-name>"
 ---
 

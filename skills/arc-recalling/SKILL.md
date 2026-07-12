@@ -1,6 +1,9 @@
 ---
 name: arc-recalling
-description: Use when the user wants to manually save a pattern or insight as an instinct from the current session context, invokes /arcforge:arc-recalling with a description, or identifies a reusable technique worth preserving
+description: Manually save a pattern or insight from the current session as a reusable instinct.
+category: memory
+status: promoted
+disable-model-invocation: true
 argument-hint: "<description of the pattern to remember>"
 ---
 

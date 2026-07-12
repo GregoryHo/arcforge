@@ -1,6 +1,8 @@
 ---
 name: arc-researching
-description: Use when optimizing any measurable metric through autonomous hypothesis-driven experimentation — build times, algorithm efficiency, prompt quality, model performance, or any target with a numeric signal
+description: Optimize a measurable metric through autonomous hypothesis-driven experimentation. Use when a target has a numeric signal — build times, algorithm efficiency, prompt quality, model performance — and you want iterative measured gains.
+category: discipline
+status: promoted
 ---
 
 # arc-researching

@@ -1,6 +1,8 @@
 ---
 name: arc-compacting
-description: Guide for strategic manual compaction timing at workflow phase boundaries
+description: Guide manual context compaction to workflow phase boundaries. Use when deciding whether to compact now — compact at clean seams between phases rather than mid-task; the compact-suggester hook may route here as context grows.
+category: memory
+status: promoted
 ---
 
 # arc-compacting

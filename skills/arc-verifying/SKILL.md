@@ -1,6 +1,8 @@
 ---
 name: arc-verifying
-description: Use when you need to verify work is complete before making completion claims
+description: Gather fresh evidence that work is actually complete before a completion claim. Use when about to say 'done', 'fixed', or 'passing' — rerun the checks and read real output rather than trusting prior state.
+category: discipline
+status: promoted
 ---
 
 # arc-verifying

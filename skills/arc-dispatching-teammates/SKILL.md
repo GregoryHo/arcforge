@@ -1,6 +1,8 @@
 ---
 name: arc-dispatching-teammates
-description: Use when specs/<spec-id>/dag.yaml has 2+ ready epics and the lead is staying present to monitor epic-level parallel work via agent teammates. Trigger on mentions of agent teams/teammates for multi-epic work, or after arc-planning yields multiple ready epics. For walk-away unattended execution, use arc-looping.
+description: Run epic-level parallel work via agent teammates while staying present to monitor. Use when dag.yaml has 2+ ready epics and you want a live team; for walk-away loops use arc-looping, for feature fan-out use arc-dispatching-parallel.
+category: orchestration
+status: promoted
 ---
 
 # arc-dispatching-teammates

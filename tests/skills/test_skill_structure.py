@@ -22,18 +22,31 @@ SKILLS_DIR = PROJECT_ROOT / "skills"
 SOFT_LINE_CAP = 150
 HARD_LINE_CAP = 250
 
+# Description grammar (D8): two registers.
+#   model-invoked (default): "<identity>. Use when <triggers>" — hard max 280 chars.
+#   user-invoked (disable-model-invocation: true): plain one-liner, hard max 120 chars,
+#   no "Use when" trigger list.
+MODEL_DESC_MAX = 280
+USER_DESC_MAX = 120
+
+# Frontmatter category (D8 taxonomy) + lifecycle status.
+ALLOWED_CATEGORIES = {"sdd", "orchestration", "discipline", "memory", "knowledge", "meta"}
+ALLOWED_STATUSES = {"promoted", "incubating", "deprecated"}
+
 # Permanent exceptions — skills floored above the hard cap by untouchable content.
-# NOTE (v5.0): these two land above their D7 targets (arc-refining 300, arc-finishing
-# 430) because the untouchable content alone exceeds the target — arc-refining's six
-# CLI heredoc sdd-gate recipes + three-legal-moves + delta accumulation + attended/
-# unattended split + pytest-pinned Boundary, and arc-finishing's ~440 lines of
-# worktree-safety git mechanics. Kept verbatim per the maintainer line-budget ruling
-# ("break the cap only where an untouchable block cannot be preserved otherwise").
-# FLAGGED FOR MAINTAINER REVIEW. arc-finishing is tracked to fall below 430 in 5.x
-# once option mechanics move into scripts/finish-epic.js (decision record D7).
+# Values are BODY lines (frontmatter excluded): the budget governs SKILL.md prose depth
+# per D7, and WS8's mandated metadata (category/status/disable-model-invocation) is not
+# prose subject to the no-op test. NOTE (v5.0): these two land above their D7 targets
+# (arc-refining 300, arc-finishing 430) because the untouchable content alone exceeds the
+# target — arc-refining's six CLI heredoc sdd-gate recipes + three-legal-moves + delta
+# accumulation + attended/unattended split + pytest-pinned Boundary, and arc-finishing's
+# ~440 lines of worktree-safety git mechanics. Kept verbatim per the maintainer
+# line-budget ruling ("break the cap only where an untouchable block cannot be preserved
+# otherwise"). FLAGGED FOR MAINTAINER REVIEW. arc-finishing is tracked to fall below its
+# floor in 5.x once option mechanics move into scripts/finish-epic.js (decision record D7).
 PERMANENT_LINE_BUDGET = {
-    "arc-refining": 390,
-    "arc-finishing": 529,
+    "arc-refining": 386,
+    "arc-finishing": 525,
 }
 
 # v5-transition allowlist — emptied at Wave 4 burn-down. Every other skill is now
@@ -113,6 +126,55 @@ def test_frontmatter_valid(skill_dir):
     assert combined < 1024, f"name+description is {combined} chars (>= 1024)"
 
 
+def _is_dmi(data: dict) -> bool:
+    """True when the skill is flagged user-invoked-only (disable-model-invocation)."""
+    value = data.get("disable-model-invocation")
+    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
+def test_description_register(skill_dir):
+    """Description obeys its D8 register: user-invoked (DMI) plain <=120 with no trigger
+    list; model-invoked <=280 and a non-trivial 'Use when' trigger."""
+    data = _load_frontmatter(_read(skill_dir))
+    description = data["description"]
+
+    if _is_dmi(data):
+        assert len(description) <= USER_DESC_MAX, (
+            f"{skill_dir.name} is user-invoked (disable-model-invocation) but its "
+            f"description is {len(description)} chars (> {USER_DESC_MAX}); drop trigger prose"
+        )
+        assert "use when" not in description.lower(), (
+            f"{skill_dir.name} is user-invoked but its description carries a 'Use when' "
+            f"trigger list — user-invoked descriptions are plain human-facing one-liners"
+        )
+    else:
+        assert len(description) <= MODEL_DESC_MAX, (
+            f"{skill_dir.name} model-invoked description is {len(description)} chars "
+            f"(> {MODEL_DESC_MAX})"
+        )
+        assert len(description) >= 60 and "use when" in description.lower(), (
+            f"{skill_dir.name} model-invoked description must be a non-trivial "
+            f"'<identity>. Use when <triggers>' clause"
+        )
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
+def test_category_and_status(skill_dir):
+    """Every skill declares a valid D8 category and lifecycle status (all v5.0 = promoted)."""
+    data = _load_frontmatter(_read(skill_dir))
+
+    category = data.get("category")
+    assert category in ALLOWED_CATEGORIES, (
+        f"{skill_dir.name} category {category!r} not in {sorted(ALLOWED_CATEGORIES)}"
+    )
+    status = data.get("status")
+    assert status == "promoted", (
+        f"{skill_dir.name} status {status!r} — all v5.0 skills ship promoted "
+        f"(allowed lifecycle set: {sorted(ALLOWED_STATUSES)})"
+    )
+
+
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_has_section_and_body(skill_dir):
     """Every skill has at least one '## ' section heading and a non-empty body."""
@@ -136,8 +198,13 @@ def test_referenced_supporting_files_exist(skill_dir):
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_line_budget(skill_dir):
-    """SKILL.md stays within its hard cap; over the soft cap emits a warning."""
-    lines = _read(skill_dir).count("\n")
+    """SKILL.md body stays within its hard cap; over the soft cap emits a warning.
+
+    Counts body lines only — frontmatter is declarative metadata, not the prose the
+    D7 budget governs (WS8 adds mandated category/status/disable-model-invocation fields).
+    """
+    _, body = _split_frontmatter(_read(skill_dir))
+    lines = body.count("\n")
     limit = _line_budget(skill_dir.name)
     assert lines <= limit, f"{skill_dir.name} SKILL.md is {lines} lines (hard cap {limit})"
     if lines > SOFT_LINE_CAP:

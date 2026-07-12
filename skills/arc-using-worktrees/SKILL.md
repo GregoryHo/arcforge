@@ -1,6 +1,8 @@
 ---
 name: arc-using-worktrees
-description: Use when work needs an isolated workspace — a parallel branch, an experiment, a review checkout, or scoping to one epic — in ANY git repo, even if the user never says "worktree". Epic context auto-escalates to the coordinator; everything else uses the generic worktree CLI.
+description: Create an isolated git worktree in ANY repo — a parallel branch, experiment, or review checkout. Use when work needs isolation even if the user never says 'worktree'; epic context auto-escalates to arc-coordinating, else the generic CLI.
+category: orchestration
+status: promoted
 ---
 
 # arc-using-worktrees

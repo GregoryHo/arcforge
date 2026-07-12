@@ -1,6 +1,8 @@
 ---
 name: arc-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
+description: Investigate root cause systematically before proposing any fix. Use when hitting a bug, test failure, or unexpected behavior — reproduce, isolate, and confirm the cause with evidence rather than guessing at patches.
+category: discipline
+status: promoted
 ---
 
 # Systematic Debugging
