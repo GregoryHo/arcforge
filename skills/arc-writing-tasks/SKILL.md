@@ -16,33 +16,7 @@ Break features into bite-sized tasks (2-5 minutes each) with exact code and comm
 2. **Exact code** - Complete code, not "add validation"
 3. **Exact commands** - Full test command with expected output
 4. **TDD order** - Test first, then implementation
-5. **Persist to file** - Tasks saved to docs/tasks/<name>-tasks.md
-
-## Task Format
-
-```yaml
-tasks:
-  - id: 1
-    description: "Write failing test for login validation"
-    file: "tests/auth/test_login.py"
-    action: "create"
-    code: |
-      def test_login_valid_credentials():
-          result = login("user", "valid123")
-          assert result.success is True
-    test_command: "pytest tests/auth/test_login.py -v"
-    expected: "FAILED - login not defined"
-
-  - id: 2
-    description: "Implement login function"
-    file: "src/auth/login.py"
-    depends_on: [1]
-    code: |
-      def login(username: str, password: str) -> LoginResult:
-          # exact implementation
-    test_command: "pytest tests/auth/test_login.py -v"
-    expected: "PASSED"
-```
+5. **Persist to file** - Tasks saved to `docs/tasks/<name>-tasks.md`
 
 ## Granularity Check
 
@@ -52,24 +26,10 @@ tasks:
 | "Add tests" | "Write test_login_invalid_password in tests/auth/" |
 | "Implement login" | "Add password hash check in login()" |
 
-## Workflow
-
-```dot
-digraph writing_tasks {
-    "Read feature spec" -> "Identify files needed";
-    "Identify files needed" -> "Break into 2-5 min tasks";
-    "Break into 2-5 min tasks" -> "Each has exact code?";
-    "Each has exact code?" -> "Break into 2-5 min tasks" [label="no"];
-    "Each has exact code?" -> "Add test commands" [label="yes"];
-    "Add test commands" -> "Output task list";
-}
-```
-
 ## Output Structure
 
-Output to `docs/tasks/<feature-name>-tasks.md`
+Output to `docs/tasks/<feature-name>-tasks.md`. Each task is TDD-ordered: write failing test → run (expect FAIL) → implement → run (expect PASS) → commit.
 
-Format:
 ```markdown
 # <Feature Name> Tasks
 
@@ -141,11 +101,7 @@ Expected: PASS
 
 Hand off to one of:
 
-- **`arc-agent-driven`** — automated execution, fresh subagent per task.
-  Best for walk-away batch runs where each task is well-scoped.
-- **`arc-executing-tasks`** — human-in-the-loop mode with checkpoint
-  prompts between tasks. Best when the task list carries judgment
-  calls or when you want to review each step.
+- **`arc-agent-driven`** — automated execution, fresh subagent per task. Best for walk-away batch runs where each task is well-scoped.
+- **`arc-executing-tasks`** — human-in-the-loop mode with checkpoint prompts between tasks. Best when the task list carries judgment calls or when you want to review each step.
 
-Both read `docs/tasks/<name>-tasks.md` as input. The task file itself
-says which one to use; default to `arc-agent-driven`.
+Both read `docs/tasks/<name>-tasks.md` as input. Default to `arc-agent-driven`.

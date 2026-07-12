@@ -25,9 +25,9 @@ Human-in-the-loop execution with checkpoints. For when you want control over eac
 
 ### Step 1: Load and Review Tasks
 
-1. Read task file from docs/tasks/<name>-tasks.md
+1. Read task file from `docs/tasks/<name>-tasks.md`
 2. Review critically for gaps or ambiguity
-3. If concerns: raise them with user before starting
+3. If concerns: raise them with the user before starting
 4. If no concerns: confirm the plan is approved, then proceed
 
 ### Step 2: Choose Execution Context
@@ -36,13 +36,7 @@ This skill is designed for **parallel session execution** (separate from plannin
 
 ### Step 3: Execute Batch
 
-**Default: 3 tasks per batch**
-
-For each task:
-1. Mark as in_progress
-2. Follow TDD steps exactly
-3. Run verifications
-4. Mark as completed
+**Default: 3 tasks per batch.** For each task: mark in_progress → follow TDD steps exactly → run verifications → mark completed.
 
 ### Step 4: Checkpoint Report (Required)
 
@@ -65,14 +59,11 @@ Ready for feedback. Continue to next batch? (y/n)
 
 ### Step 5: Continue or Adjust
 
-Based on feedback:
-- Apply changes if needed
-- Execute next batch
-- Repeat until complete
+Based on feedback: apply changes if needed, execute next batch, repeat until complete.
 
 ### Step 6: Finish
 
-After all tasks: use arc-finishing (Step 0 discriminates on `.arcforge-epic`)
+After all tasks: use arc-finishing (Step 0 discriminates on `.arcforge-epic`).
 
 ## Core Rules
 
@@ -94,37 +85,6 @@ the checkbox in `docs/tasks/<name>-tasks.md` if you want it tracked):
 check the ledger and resume AFTER the last task it marks complete — never
 re-execute a ledger-complete task; reconcile it against `git log` first.
 
-## Execution Flow
-
-```dot
-digraph executing {
-    "Get next task" -> "Write code to file";
-    "Write code to file" -> "Run test command";
-    "Run test command" -> "Matches expected?";
-    "Matches expected?" -> "Mark complete" [label="yes"];
-    "Matches expected?" -> "Debug and retry" [label="no"];
-    "Mark complete" -> "More tasks?";
-    "More tasks?" -> "Get next task" [label="yes"];
-    "More tasks?" -> "Commit all" [label="no"];
-}
-```
-
-## Per-Task Execution
-
-```
-Task 3/8: Write login function
-─────────────────────────────
-File: src/auth/login.py
-Action: create
-
-Writing code...
-Running: pytest tests/auth/test_login.py -v
-Expected: PASSED
-Actual: PASSED ✓
-
-[x] Task 3 complete
-```
-
 ## Commit Strategy
 
 | Scope | Message |
@@ -133,25 +93,7 @@ Actual: PASSED ✓
 | Single task | `feat(auth): add password validation` |
 | Small step (WIP) | `wip: add basic validation` |
 
-### Commit Frequently
-
-**Principle: Commit at small steps**
-
-| Why | Benefit |
-|-----|---------|
-| Track changes | Know which change caused issues |
-| Easy rollback | Return to known working state |
-| Reduce risk | Avoid changing too much at once |
-
-## Don't Break Working Code
-
-**Core principle:** After changes, previously working functionality must still work.
-
-| When | Action |
-|------|--------|
-| Before change | Describe impact scope |
-| After change | List items to verify |
-| If broken | Rollback immediately, rethink approach |
+Commit at small steps: easy rollback to a known working state, and you can tell which change caused an issue. Uncertain whether a change affects other code? Commit first.
 
 ### Rationalizations
 
@@ -185,12 +127,9 @@ Actual: PASSED ✓
 ## Red Flags - STOP
 
 - "Start implementation on main/master branch without explicit user consent"
-- "Skip failing test and continue"
-- "Test failed but code looks right"
+- "Skip failing test and continue" / "Test failed but code looks right"
 - "Commit now, fix test later"
 - "Broke existing code but keep going"
 - "Too many changes to track, just commit all"
-- "Unsure of impact but don't commit first"
 
-**Failing test = stop and fix before continuing.**
-**Broke working code = rollback and rethink.**
+**Failing test = stop and fix before continuing. Broke working code = rollback and rethink.**
