@@ -7,9 +7,7 @@ description: Use when measuring whether skills, agents, or workflows actually ch
 
 Measure whether skills, agents, and workflows actually change AI agent behavior. Define scenarios, prepare environments, run trials, grade results, track regressions.
 
-**Core principle:** "Unit tests for AI agent behavior" — if you can't measure improvement, you can't ship with confidence.
-
-**Key distinction:** You are evaluating **AI agents** (LLM + tools), not just LLM text output. Agents use tools, read files, search codebases. Your eval environment must account for this.
+**Key distinction:** You are evaluating **AI agents** (LLM + tools), not just LLM text output. Agents use tools, read files, and search codebases — your eval environment must account for this.
 
 ## When to Use
 
@@ -45,10 +43,8 @@ Does the full toolkit system improve agent outcomes?
 
 - **Baseline**: Bare agent — no plugins, no MCP, no skills/hooks
 - **Treatment**: Agent with full toolkit active (plugins, MCP, skills, hooks)
-- Same prompt, only the **environment** varies
+- Same prompt, only the **environment** varies (skill evals vary the prompt instead)
 - Measure: `delta`, `pass^k` for critical paths
-
-Unlike skill evals (which vary the prompt), workflow evals vary the environment while keeping the identical prompt for both conditions.
 
 ## Scope Alignment (MANDATORY)
 
@@ -139,17 +135,6 @@ When pressure builds to skip or shortcut eval, these rationalizations surface. E
 
 **REQUIRED BACKGROUND:** references/audit-workflow.md — how promotion and retirement arbitration works for discovered_claims and weak_assertions.
 
-## Red Flags
-
-Every listed thought means stop, re-read the skill, do not proceed.
-
-- "I already manually tested, eval is redundant" — Manual testing measures your confidence, not the agent's behavioral reliability. Eval measures whether the skill systematically changes agent behavior across trials.
-- "This is docs-only, no eval needed" — Docs changes that alter skill instructions change agent behavior by definition. If you changed what the agent reads, you changed what the agent does.
-- "The INSUFFICIENT_DATA banner is just a warning" — INSUFFICIENT_DATA is a hard gate, not a warning. It means you have no statistical verdict. Shipping under INSUFFICIENT_DATA is shipping without evidence.
-- "I can promote the discovered claim on my own without audit" — Promotion requires human arbitration to ensure the claim is generalizable and non-redundant. Bypassing audit corrupts the canonical skill body.
-- "The blind comparator disagreed but assertions passed so it's fine" — The blind comparator is an independent signal. Disagreement between the comparator and assertion scores indicates one of them is poorly calibrated. Investigate before shipping.
-- "Preflight is new, I'll skip it this time and backfill later" — Preflight is a gate, not a recommendation. Running trials on a scenario that fails preflight produces results you cannot trust. There is no backfill — run preflight first.
-
 ## Common Mistakes
 
 Top mistakes that waste the most eval runs. Full catalog in references/common-mistakes-catalog.md.
@@ -158,29 +143,14 @@ Top mistakes that waste the most eval runs. Full catalog in references/common-mi
 |---------|-------------|-----|
 | Scenario before question | Mixing adherence, correctness, and toolkit effects in one noisy test | State the question first: behavior change, task outcome, or toolkit effect |
 | Baseline already near ceiling | Both conditions pass, delta stays tiny | Run 2-3 pilot trials first; if baseline exceeds ~0.8, redesign |
-| Skill formalizes behavior agent already exhibits | A/B delta is zero — behavior is generic competence, not skill-specific | Ask "would baseline behave differently without this skill?" If no, use workflow or agent eval |
 | Prompt leaks the repair pattern | Baseline follows the template and scores high without the skill | Remove explicit grader split or named repair structure from the prompt |
-| Code-grading skill adherence via competence proxy | Both conditions pass, delta is zero | Mentally run the code grader against a bare agent — if it still passes, the artifact isn't discriminative |
 | Using `--skill-file` for workflow eval | Varies the prompt instead of the environment | Workflow A/B varies the environment — use `eval ab <name>` without `--skill-file` |
 | Workflow eval with no plugins installed | Baseline and treatment are identical, delta is always 0 | Ensure toolkit plugin is installed: `claude plugin list` should show active plugins |
 
 ## Integration
 
-**Before:**
-- **arc-brainstorming** → design the skill/agent being evaluated
-- **arc-planning** → define what success looks like
-
-**After:**
-- arc-evaluating results inform whether to SHIP or iterate
-- Track benchmarks over time in `evals/benchmarks/latest.json`
+Design the target with **arc-brainstorming**; define success with **arc-planning**. Results inform whether to SHIP or iterate; track benchmarks over time in `evals/benchmarks/latest.json`.
 
 **Numeric vs qualitative analysis:** Numeric comparison (delta, CI, verdict) is programmatic — the harness computes it. The `eval-analyzer` agent adds qualitative analysis for model/human-graded A/B results; it does not replace the programmatic verdict.
 
-**Reference files:**
-- references/preflight.md — ceiling threshold, PASS/BLOCK semantics, scenario hash mechanics
-- references/verdict-policy.md — full verdict enum, INSUFFICIENT_DATA, delta thresholds
-- references/audit-workflow.md — promotion and retirement arbitration
-- references/grading-and-execution.md — environment setup, graders, discovered_claims/weak_assertions schemas
-- references/cli-and-metrics.md — CLI commands, metrics, storage, scenario template
-- references/eval-schemas.md — JSON schema quick reference for evals.json, grading/trial-N.json, comparison.json
-- references/common-mistakes-catalog.md — full 23-entry mistake catalog
+Additional depth loads on demand: references/eval-schemas.md (JSON schemas for evals.json, grading/trial-N.json, comparison.json) and references/common-mistakes-catalog.md (full 23-entry catalog).
