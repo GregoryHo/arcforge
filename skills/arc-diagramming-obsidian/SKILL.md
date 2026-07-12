@@ -1,6 +1,8 @@
 ---
 name: arc-diagramming-obsidian
-description: Use when the user wants an Excalidraw diagram or any visual representation — architecture, flowchart, mind map — including casual "draw this" / "show me how this works visually". Also use when arc-maintaining-obsidian delegates Synthesis visuals beyond embedded Mermaid.
+description: Create an Excalidraw diagram or visual — architecture, flowchart, mind map — including casual 'draw this' / 'show me visually'. Also use when arc-maintaining-obsidian delegates Synthesis visuals beyond embedded Mermaid.
+category: knowledge
+status: promoted
 ---
 
 # arc-diagramming-obsidian

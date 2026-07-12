@@ -1,6 +1,9 @@
 ---
 name: arc-writing-skills
-description: Use when maintaining ArcForge itself by creating, editing, or verifying ArcForge skills before deployment
+description: Create, edit, or verify ArcForge's own skills and skill tests before deployment.
+category: meta
+status: promoted
+disable-model-invocation: true
 ---
 
 # Writing ArcForge Skills

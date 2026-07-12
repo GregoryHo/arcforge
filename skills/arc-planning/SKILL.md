@@ -1,6 +1,8 @@
 ---
 name: arc-planning
-description: Use when breaking down a structured spec into an executable DAG, when a spec has been refined and epics need to be defined, or when planning feature and epic structure for implementation
+description: Break a refined spec into an executable DAG of epics. Use when specs/<id>/spec.xml exists and needs decomposition into dependency-ordered epics and features before implementation — produces dag.yaml for arc-coordinating.
+category: sdd
+status: promoted
 ---
 
 # Planner

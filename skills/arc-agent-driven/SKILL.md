@@ -1,6 +1,8 @@
 ---
 name: arc-agent-driven
-description: Use when executing task lists where each task requires isolated execution
+description: Execute a task list with one fresh subagent per task plus a single task-reviewer each. Use when tasks need isolated contexts to avoid cross-task pollution; for in-session human-checkpoint execution use arc-executing-tasks.
+category: orchestration
+status: promoted
 ---
 
 # arc-agent-driven

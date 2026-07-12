@@ -1,6 +1,8 @@
 ---
 name: arc-implementing
-description: Use when orchestrating large project implementation in a worktree
+description: Orchestrate implementation of a large multi-feature project inside a worktree. Use when driving one epic's build end-to-end; for cross-epic worktree and DAG-state management use arc-coordinating instead.
+category: sdd
+status: promoted
 ---
 
 # arc-implementing

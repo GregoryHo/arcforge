@@ -1,6 +1,9 @@
 ---
 name: arc-auditing-spec
-description: Use when the user explicitly invokes `/arcforge:arc-auditing-spec <spec-id>` for a read-only advisory audit of an SDD spec family (design, spec, dag, decision anchors). Only triggered by direct user invocation; never auto-invoked from any pipeline skill.
+description: Read-only advisory audit of an SDD spec family — design, spec, dag, and decision anchors.
+category: sdd
+status: promoted
+disable-model-invocation: true
 argument-hint: "<spec-id> [--save]"
 ---
 

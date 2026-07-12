@@ -1,6 +1,8 @@
 ---
 name: arc-writing-tasks
-description: Use when breaking down features into executable tasks, when preparing for implementation, or when tasks need exact code and commands
+description: Break a feature into small executable tasks with exact code and commands. Use when a spec or feature is ready and you need concrete implementation steps before coding — produces the task list arc-executing-tasks runs.
+category: sdd
+status: promoted
 argument-hint: "<feature-name>"
 ---
 

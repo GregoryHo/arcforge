@@ -1,6 +1,8 @@
 ---
 name: arc-brainstorming
-description: Use when exploring ideas before implementation or when user wants to design a new feature or iterate on an existing spec
+description: Explore and shape a design before implementation. Use when intent is vague, a new feature needs design, or an existing spec needs another iteration — the front door to the SDD pipeline that writes design.md.
+category: sdd
+status: promoted
 argument-hint: "[topic or feature to explore]"
 ---
 

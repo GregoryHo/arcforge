@@ -1,6 +1,8 @@
 ---
 name: arc-reflecting
-description: Use when the user asks to reflect on accumulated diaries (/arcforge:arc-reflecting), after 5+ diary entries accumulate, or when asked to summarize preferences from past sessions
+description: Analyze accumulated diary entries for recurring patterns and preferences. Use when 5+ diaries have accumulated, the user asks to summarize learnings from past sessions, or inject-context flags that reflection is due.
+category: memory
+status: promoted
 ---
 
 # Diary Reflection & Pattern Extraction

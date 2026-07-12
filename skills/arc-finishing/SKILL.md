@@ -1,6 +1,8 @@
 ---
 name: arc-finishing
-description: Use when implementation is complete and all tests pass, and you need to decide how to integrate — works for both epic worktrees (.arcforge-epic present) and regular branches. Step 0 discriminates on the marker.
+description: Integrate finished work once implementation is complete and tests pass. Use when deciding how to merge — Step 0 discriminates epic worktrees (.arcforge-epic present) from regular branches and runs the matching path.
+category: sdd
+status: promoted
 ---
 
 # arc-finishing

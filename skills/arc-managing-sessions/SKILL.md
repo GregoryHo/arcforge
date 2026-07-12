@@ -1,6 +1,8 @@
 ---
 name: arc-managing-sessions
-description: Use when ending a session and handing off to a future session, summarizing recent context, continuing from where the last turn left off, archiving a session for durable reference, or resuming/listing/aliasing saved sessions
+description: Hand off, save, or resume session state across turns. Use when ending a session and handing to a future one, summarizing recent context to continue, or archiving, resuming, or aliasing a saved session for durable reference.
+category: memory
+status: promoted
 argument-hint: "handover [--mode quick|full|tail] | save [alias] | resume [alias] | list [--limit N] [--date YYYY-MM-DD] [--query id] | alias <session-path> <name> | aliases"
 ---
 

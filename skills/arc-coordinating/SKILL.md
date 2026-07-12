@@ -1,6 +1,8 @@
 ---
 name: arc-coordinating
-description: Use when managing worktrees for multi-epic projects, when specs/<spec-id>/dag.yaml exists, or when coordinating parallel development
+description: Coordinate multi-epic worktrees and cross-epic DAG state. Use when specs/<id>/dag.yaml exists and epics run in parallel worktrees needing sync and merge orchestration; to build a single epic's features use arc-implementing.
+category: orchestration
+status: promoted
 ---
 
 # Coordinator

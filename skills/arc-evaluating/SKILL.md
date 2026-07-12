@@ -1,6 +1,8 @@
 ---
 name: arc-evaluating
-description: Use when measuring whether skills, agents, or workflows actually change AI agent behavior — before shipping a new skill, after modifying an existing one, or when comparing alternative approaches
+description: Measure whether a skill, agent, or workflow actually changes AI agent behavior. Use when shipping a new skill, after modifying one, or comparing alternative approaches — the eval gate behind the Iron Law.
+category: meta
+status: promoted
 ---
 
 # arc-evaluating

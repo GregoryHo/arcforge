@@ -1,6 +1,8 @@
 ---
 name: arc-looping
-description: Use when running autonomous unattended loops — cross-session execution of DAG tasks without human intervention
+description: Run an autonomous unattended loop that executes DAG tasks across sessions without human intervention. Use when walk-away execution is needed; for a present lead monitoring epic teammates use arc-dispatching-teammates instead.
+category: orchestration
+status: promoted
 ---
 
 # arc-looping

@@ -1,6 +1,8 @@
 ---
 name: arc-refining
-description: Use when converting design documents to structured specs, when spec quality is below threshold, or when requirements need formal acceptance criteria
+description: Formalize an approved design into a structured spec.xml with acceptance criteria. Use when a design.md is ready to become the authoritative spec, or spec quality is below threshold — the delta authority, hands to arc-planning.
+category: sdd
+status: promoted
 ---
 
 # Refiner
