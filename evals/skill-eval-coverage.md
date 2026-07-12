@@ -1,5 +1,10 @@
 # Skill Eval Coverage
 
+> **v5 rename mapping (historical entries below are unchanged):**
+> `arc-requesting-review` + `arc-receiving-review` → `arc-reviewing`;
+> `arc-observing` → `arc-learning`. The `arc-requesting-review-dispatch-fidelity`
+> scenario is now `eval-arc-reviewing-dispatch-fidelity`.
+
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
 

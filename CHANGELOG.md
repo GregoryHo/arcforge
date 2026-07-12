@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.0.0] - Unreleased
+
+**Skill merges (BREAKING — hard break, no shims per D1).** Three review/learning skills consolidate into two. The retired invocation names (`/arcforge:arc-requesting-review`, `/arcforge:arc-receiving-review`, `/arcforge:arc-observing`) no longer resolve — use the merged names below.
+
+| Retired skill | Merged into |
+|---------------|-------------|
+| `arc-requesting-review` | `arc-reviewing` |
+| `arc-receiving-review` | `arc-reviewing` |
+| `arc-observing` | `arc-learning` |
+
+> This entry seeds the v5 rename mapping only; the full v5.0.0 changelog is authored at release.
+
 ## [4.0.1] - 2026-07-02
 
 **Completes the SDD-6 migration that v4.0.0 shipped only half of — and corrects that entry's claim.** v4.0.0's Added section stated that `arcforge sdd-gate <stage>` "replaces the inline `node -e` recipes in arc-refining/arc-planning." At release time that was not true: the engine (#87) landed with **zero skill consumers** — both skills still carried the old inline recipes, and the skill half of SDD-6 had been deferred into an eval-only tranche tracked only in prose, so it was never built. Worse, the stranded recipes were not merely stale but **broken at runtime**: the inline `writeConflictMarker` call passed 2 arguments where the engine requires a 3rd (`projectRoot`), so a real refining session hitting an R3 conflict block would throw instead of writing the `_pending-conflict.md` handoff. This release lands the migration, so the v4.0.0 claim is now true. (Past entries are never rewritten; this correction is additive, per policy.)

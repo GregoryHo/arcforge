@@ -315,7 +315,7 @@ arcforge uses five separate test runners. **All must pass before submitting a PR
 | Jest | `npm run test:scripts` | `tests/scripts/` | CLI engine (diary, reflect, session-utils) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
-| Bash | `npm run test:observer-daemon` | `skills/arc-observing/tests/` | Observer daemon behavior |
+| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
 | **All** | **`npm test`** | All above | **Run this before every PR** |
 
 ---

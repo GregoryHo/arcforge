@@ -10,8 +10,8 @@ This is the offline reference for all 32 arcforge skills. In a live session, **`
   - Planning: [arc-brainstorming](#arc-brainstorming) · [arc-refining](#arc-refining) · [arc-writing-tasks](#arc-writing-tasks) · [arc-planning](#arc-planning)
   - Execution: [arc-executing-tasks](#arc-executing-tasks) · [arc-agent-driven](#arc-agent-driven) · [arc-implementing](#arc-implementing) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping)
   - Coordination: [arc-using](#arc-using) · [arc-using-worktrees](#arc-using-worktrees) · [arc-compacting](#arc-compacting) · [arc-coordinating](#arc-coordinating) · [arc-finishing](#arc-finishing) · [arc-managing-sessions](#arc-managing-sessions)
-  - Quality: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-evaluating](#arc-evaluating) · [arc-requesting-review](#arc-requesting-review) · [arc-receiving-review](#arc-receiving-review)
-  - Learning: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-observing](#arc-observing) · [arc-recalling](#arc-recalling) · [arc-researching](#arc-researching)
+  - Quality: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-evaluating](#arc-evaluating) · [arc-reviewing](#arc-reviewing)
+  - Learning: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-researching](#arc-researching)
   - Knowledge Base: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
   - Meta: [arc-writing-skills](#arc-writing-skills) · [arc-auditing-spec](#arc-auditing-spec)
 - [Workflow Patterns](#workflow-patterns)
@@ -72,8 +72,8 @@ The complete catalog still uses functional categories for lookup:
 | **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
 | **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping | Build and ship |
 | **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
-| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating | Test, debug, verify, review |
-| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-observing, arc-recalling, arc-researching | Capture, extract, evolve |
+| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-reviewing, arc-evaluating | Test, debug, verify, review |
+| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-recalling, arc-researching | Capture, extract, evolve |
 | **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
 | **Meta** | arc-writing-skills, arc-auditing-spec | Maintain ArcForge's own skills; audit SDD spec families |
 
@@ -570,44 +570,24 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-requesting-review
+### arc-reviewing
 
-**Purpose:** Structured code review requests with proper context for reviewer subagents.
+**Purpose:** Request code review with faithful context, then process the feedback with technical rigor — one request→receive loop.
 
-**When to use:** When completing tasks or features to request code review.
+**When to use:** When completing a task or feature to request code review, and when handling the reviewer feedback that comes back.
 
 **Key workflow:**
 1. Get git SHAs (base and head)
 2. Dispatch code-reviewer subagent with filled template placeholders
-3. Act on feedback: fix Critical immediately, Important before proceeding, note Minor
+3. Read feedback completely, restate each item, verify against codebase reality
+4. Respond with technical acknowledgment or reasoned pushback — not performative agreement
+5. Act on feedback: fix Critical immediately, Important before proceeding, note Minor
 
 **Artifacts:**
-- Input: completed task with commits
-- Output: review feedback, fixes applied
-
-**Related:** arc-agent-driven --> **arc-requesting-review** --> arc-receiving-review
-
----
-
-### arc-receiving-review
-
-**Purpose:** Handle code review feedback with technical rigor, not performative agreement.
-
-**When to use:** When receiving code review feedback, requires technical rigor not performative agreement.
-
-**Key workflow:**
-1. READ — complete feedback without reacting
-2. UNDERSTAND — restate requirement in own words
-3. VERIFY — check against codebase reality
-4. EVALUATE — technically sound for THIS codebase?
-5. RESPOND — technical acknowledgment or reasoned pushback
-6. IMPLEMENT — one item at a time, test each
-
-**Artifacts:**
-- Input: review feedback
+- Input: completed task with commits, review feedback
 - Output: verified fixes or reasoned pushback
 
-**Related:** arc-requesting-review --> **arc-receiving-review** --> continue or arc-verifying
+**Related:** arc-agent-driven --> **arc-reviewing** --> continue or arc-verifying
 
 ---
 
@@ -658,47 +638,27 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ### arc-learning
 
-**Purpose:** Review observer-curated learning candidates and turn them into activated artifacts through the dashboard.
+**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/`, populated by Claude Code PostToolUse hooks.
 
-**When to use:** When optional learning is enabled and you want to review the candidate instincts the observer daemon's LLM curator has proposed.
+**Purpose:** Turn repeated project observations into reviewable learning candidates and activated artifacts through the dashboard — the full observe → curate → review → activate lifecycle.
+
+**When to use:** When optional learning is enabled and observations should become reviewable candidates, inactive drafts, and explicitly activated artifacts.
 
 **Key workflow:**
 1. Enable learning: `arcforge learn enable --project`
-2. Open the dashboard: `arcforge learn dashboard` (port 3334)
-3. Review queued candidates (`pending_review` → `approved` → `materialized` → `activated`)
-4. Authorize through three gates: Approve → Materialize → Activate (no candidate changes behavior without explicit action)
-5. Promote / Evolve / Deactivate as needed (Promote and Evolve mint new candidates; silent auto-promotion is not supported)
+2. Capture: hooks record every tool call to observations.jsonl (skip filter honored); the background daemon assembles sanitized batches and an LLM curator proposes candidates
+3. Open the dashboard: `arcforge learn dashboard` (port 3334)
+4. Review queued candidates (`pending_review` → `approved` → `materialized` → `activated`)
+5. Authorize through three gates: Approve → Materialize → Activate (no candidate changes behavior without explicit action)
+6. Promote / Evolve / Deactivate as needed (Promote and Evolve mint new candidates; silent auto-promotion is not supported)
 
 **Artifacts:**
-- Input: `~/.arcforge/learning/candidates/queue.jsonl` (Layer 5 candidate queue)
+- Input: `~/.arcforge/observations/{project}/observations.jsonl` → `~/.arcforge/learning/candidates/queue.jsonl` (Layer 5 candidate queue)
 - Output: `~/.arcforge/learning/drafts/` (Layer 7 inactive drafts) → `~/.arcforge/instincts/<scope>/` (Layer 8 activation)
 
-**Related:** arc-observing (curates candidates) --> **arc-learning** (dashboard review)
+**Related:** background daemon --> **arc-learning** (capture → dashboard review → activation)
 
 > The pre-pivot `arcforge learn analyze` statistical clustering (Jaccard, confidence thresholds) was retired in v3.1 — see [learning-dashboard.md](learning-dashboard.md).
-
----
-
-### arc-observing
-
-**Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/` which is populated by Claude Code PostToolUse hooks.
-
-**Purpose:** Capture tool-usage observations and feed them into the post-pivot four-layer curation pipeline.
-
-**When to use:** When user asks about behavioral patterns, requests learning status, or wants to manage the observer daemon.
-
-**Key workflow:**
-1. Capture: hooks record every tool call to observations.jsonl (skip filter honored)
-2. Batch assembly (Layer 3): daemon calls `assemble-batch` on a batch of sanitized observations
-3. LLM curation (Layer 4): Haiku curator with `--json-schema` produces candidate proposals (failure → `transport_error` / `timeout` manifest)
-4. Ingestion (Layer 5): `ingest-proposal` validates proposals into the candidate queue
-5. Review: candidates are acted on in the dashboard; SessionStart never auto-loads instinct bodies
-
-**Artifacts:**
-- Input: `~/.arcforge/observations/{project}/observations.jsonl`
-- Output: `~/.arcforge/learning/candidates/queue.jsonl` (candidate proposals — the daemon no longer writes instinct `.md` files directly)
-
-**Related:** background daemon --> **arc-observing** --> arc-learning (dashboard review)
 
 ---
 
@@ -719,7 +679,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: user-described pattern or insight
 - Output: `~/.arcforge/instincts/{project}/<id>.md`
 
-**Related:** user insight --> **arc-recalling** --> instinct saved for arc-observing lifecycle
+**Related:** user insight --> **arc-recalling** --> instinct saved for arc-learning lifecycle
 
 ---
 
@@ -938,7 +898,7 @@ These principles keep ArcForge disciplined without making every task follow the 
 3. **No ArcForge Skill Without Failing Test** — arc-writing-skills: project-level TDD for ArcForge skill documentation
 4. **No Fix Without Hypothesis** — arc-debugging: Observe, Hypothesize, Test, Fix cycle
 5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
-6. **Verify Before Implementing Review Feedback** — arc-receiving-review: technical rigor, not performative agreement
+6. **Verify Before Implementing Review Feedback** — arc-reviewing: technical rigor, not performative agreement
 7. **File Artifacts = Truth** — Don't rely on session memory; resume from file artifacts
 
 ## Living SDD Responsibility Boundary
