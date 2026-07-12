@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 function getInstinct() {
-  return require('../../skills/arc-observing/scripts/instinct');
+  return require('../../skills/arc-learning/scripts/instinct');
 }
 
 function getWriter() {

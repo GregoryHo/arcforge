@@ -122,15 +122,14 @@ These skills activate during a workflow when the condition is present. They are 
 
 ## Instinct & Learning Routes
 
-Five skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
+Four skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
 
 | User intent | Skill |
 |-------------|-------|
 | Capture THIS session's reflections as a diary entry | `arc-journaling` |
 | Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` |
 | Manually save ONE insight as an instinct right now | `arc-recalling` |
-| Review / confirm / contradict auto-detected instincts | `arc-observing` |
-| Review the learning-candidate queue (when optional learning is enabled) | `arc-learning` |
+| Review the learning-candidate queue, or confirm/contradict auto-detected instincts (when optional learning is enabled) | `arc-learning` |
 
 ## When Not to Route
 

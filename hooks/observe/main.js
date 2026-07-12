@@ -396,7 +396,7 @@ function spawnDaemonIfNeeded(obsPath) {
 
     const daemonScript = path.resolve(
       __dirname,
-      '../../skills/arc-observing/scripts/observer-daemon.sh',
+      '../../skills/arc-learning/scripts/observer-daemon.sh',
     );
     const child = spawn('bash', [daemonScript, 'start'], {
       detached: true,
