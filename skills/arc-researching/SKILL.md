@@ -7,7 +7,7 @@ description: Use when optimizing any measurable metric through autonomous hypoth
 
 Autonomous iterative research: define a measurable optimization target, establish a baseline, then run a hypothesis-driven experiment loop until interrupted.
 
-**Core principle:** "Fixed judge + free player" — the evaluation method is immutable (the judge), while the implementation is free to change (the player). By locking what you measure, you prevent moving goalposts during optimization.
+**Core principle:** "Fixed judge + free player" — the evaluation method is immutable (the judge), while the implementation is free to change (the player). Locking what you measure prevents moving goalposts during optimization.
 
 ## When to Use
 
@@ -31,61 +31,12 @@ Autonomous iterative research: define a measurable optimization target, establis
 
 Agent proposes, human reacts, refine iteratively, then lock.
 
-**Step 1: Analyze Target**
-- Read files, understand the project structure
-- Identify what's measurable and what the human likely wants to optimize
-- Note existing tests, build scripts, benchmarks
+1. **Analyze target** — read files, understand structure, identify what's measurable, note existing tests/build scripts/benchmarks.
+2. **Propose draft contract** — present a complete draft `research-config.md` covering all six sections in one AskUserQuestion, with sensible defaults based on what you found.
+3. **Refine with human** — adjust section by section; clarify scope boundaries (CAN/CANNOT), metric direction, timeout budget.
+4. **Lock the contract** — write `research-config.md` to disk, get final confirmation. After lock the contract is **immutable**.
 
-**Step 2: Propose Draft Contract**
-- Present a complete draft `research-config.md` covering all 6 sections (below)
-- Use one AskUserQuestion with the full proposal
-- Include sensible defaults based on what you found
-
-**Step 3: Refine with Human**
-- Based on human feedback, adjust section by section
-- Clarify scope boundaries (CAN/CANNOT), metric direction, timeout budget
-- Ask follow-up questions only if critical information is missing
-
-**Step 4: Lock the Contract**
-- Write `research-config.md` to disk
-- Get final confirmation from the human
-- After lock: the contract is **immutable**. Do not modify it during experiments.
-
-#### research-config.md Template
-
-```markdown
-# Research Config: {target}
-
-## Scope
-CAN modify: {files/dirs the agent may change}
-CANNOT modify: {files/dirs that are off-limits}
-
-## Goal
-Metric: {name, e.g., "build_time_seconds", "val_bpb"}
-Direction: {lower-is-better | higher-is-better}
-Target: {optional, e.g., "< 30s" or "none"}
-
-## Strategy
-Hypothesis playbook: {domain-specific approaches, ordered by likelihood}
-Research sources: {docs URLs, reference implementations, config files}
-First moves: {2-3 concrete experiments after baseline}
-
-## Evaluation
-Run command: {exact shell command, e.g., "npm run build 2>&1"}
-Extract metric: {grep pattern, e.g., "grep -oP 'Time: \K[\d.]+' build.log"}
-Timeout: {seconds per experiment}
-Trials: {1 | 3 | 5 — runs per experiment; default 1 if omitted}
-Aggregation: {median | mean — default median}
-
-## Constraints
-{secondary considerations, e.g., "keep memory under 4GB"}
-
-## Autonomy
-Mode: {run-until-interrupted | run-N-times | run-until-target}
-
-## Simplicity Criterion
-{Prefer simpler code when results are similar. Removing code for equal results is a win. "0.1% + 20 hacky lines? No." "0.1% from deleting code? Yes." "No improvement but simpler? Keep."}
-```
+Write the config using the six-section template in `references/research-config-template.md` (keep the `## Goal` field names — the dashboard parses them).
 
 #### Choosing Trial Count
 
@@ -115,7 +66,7 @@ The contract author decides at lock time, not the loop at runtime. If Trials is 
 
 ### Phase 3: Experiment Loop (Autonomous)
 
-This is the heart of the skill. **NEVER STOP** — run until interrupted or the stop condition from the contract is met.
+The heart of the skill. **NEVER STOP** — run until interrupted or the contract's stop condition is met.
 
 ```
 LOOP (until stop condition):
@@ -133,7 +84,7 @@ LOOP (until stop condition):
 
 #### Pre-Registration (PREDICT)
 
-Before running, commit to a prediction — direction (improve/regress) and rough magnitude (e.g., "−5% build time") — in the run log, or as the results.tsv `description` you complete at LOG. **No run until the prediction is recorded.** A result that contradicts your prediction is a signal to audit the measurement (below), not just a number to log.
+Before running, commit to a prediction — direction (improve/regress) and rough magnitude (e.g., "−5% build time") — in the run log or as the results.tsv `description` you complete at LOG. **No run until the prediction is recorded.** A result that contradicts your prediction is a signal to audit the measurement, not just a number to log.
 
 #### Decision Rules
 
@@ -145,48 +96,27 @@ Before running, commit to a prediction — direction (improve/regress) and rough
 
 #### Measurement Audit (required for surprising wins)
 
-Before recording a *surprising* win as `keep` — one that beats your prediction or looks too good — manually compare a sample of raw `run-N.log` lines against the extraction/grep pattern. Confirm it matches real metric output (not an echoed template line counted as a hit) and is not over- or under-counting. For a surprising win this is mandatory, not the passive "check later if suspicious."
+Before recording a *surprising* win as `keep` — one that beats your prediction or looks too good — manually compare a sample of raw `run-N.log` lines against the extraction/grep pattern. Confirm it matches real metric output (not an echoed template line counted as a hit) and is not over- or under-counting.
 
 If the audit shows the number was a measurement artifact, don't silently fix it: mark the original row `retracted` (kept as the audit trail) and log the corrected re-run as `remeasured`.
 
 #### Stuck Protocol
 
-If **3 or more consecutive experiments** fail in the same direction (e.g., all trying to reduce allocations):
+If **3+ consecutive experiments** fail in the same direction (e.g., all trying to reduce allocations):
 1. Stop that line of investigation entirely
-2. Read all results so far and identify untried approaches
-3. Research — search for domain knowledge you don't have yet:
-   - Read documentation for tools/libraries in the target files
-   - Search the web for optimization techniques in this domain
-   - Check the Strategy section's research sources for unexplored leads
-   - Look at similar projects or reference implementations for patterns
-4. Choose a fundamentally different direction informed by your research
-5. If all major directions exhausted, try combinations of previously successful changes
-
-**Idea generation when stuck:**
-- Re-read the target files for angles you missed on first read
-- Search docs/web for domain-specific techniques you haven't tried
-- Read the Strategy section's research sources for unexplored leads
-- Try combining two previously successful changes
-- Try the opposite of your last 3 failed approaches
-- Try removing code instead of adding it — simplification often unlocks performance
+2. Read all results and identify untried approaches
+3. Research the domain knowledge you're missing — read docs for the target's tools/libraries, search the web for optimization techniques, check the Strategy section's research sources and similar reference implementations
+4. Choose a fundamentally different direction informed by that research
+5. If all major directions are exhausted, try combining previously successful changes — or try removing code instead of adding it; simplification often unlocks performance
 
 #### Crash/Timeout Handling
 
 Two types of crashes — handle differently:
 
-**Dumb bug** (typo, missing import, syntax error, off-by-one):
-- Fix the bug in-place without reverting
-- Re-run the same experiment
-- The hypothesis is fine; the implementation had a bug
+- **Dumb bug** (typo, missing import, syntax error, off-by-one): fix in-place without reverting and re-run the same experiment. The hypothesis is fine; the implementation had a bug.
+- **Fundamentally broken idea** (OOM, doesn't converge, wrong approach): log as `crash` with the error in description, `git reset --hard HEAD~1`, move to the next hypothesis.
 
-**Fundamentally broken idea** (OOM, algorithm doesn't converge, approach is wrong):
-- Log as `crash` with the error in description
-- Reset the commit: `git reset --hard HEAD~1`
-- Move on to the next hypothesis
-
-**Timeout:** If the run exceeds the timeout, kill it and treat as a fundamentally broken idea.
-
-Never count crashes toward the "3 failures → change direction" rule — crashes indicate broken code, not a bad hypothesis.
+**Timeout:** if the run exceeds the timeout, kill it and treat as a fundamentally broken idea. Never count crashes toward the "3 failures → change direction" rule — crashes indicate broken code, not a bad hypothesis.
 
 #### Context Discipline
 
@@ -198,12 +128,7 @@ Long-running research burns context. Protect it:
 
 ### Phase 4: Report
 
-When the loop ends (interrupted, target reached, or max iterations):
-1. Read all results from `results.tsv`
-2. Summarize: baseline value, best value, improvement %, total experiments, keep/discard/crash counts
-3. List the top 3 most impactful kept experiments
-4. If target was set: report whether it was achieved
-5. Provide the final commit hash and branch name
+When the loop ends (interrupted, target reached, or max iterations): read all results, summarize (baseline value, best value, improvement %, total experiments, keep/discard/crash counts), list the top 3 most impactful kept experiments, report whether any target was achieved, and give the final commit hash and branch name.
 
 ## results.tsv Format
 
@@ -223,33 +148,23 @@ f6g7h8i	0.590	remeasured	Honest re-run of e5f6g7h — real result -41%
 - **metric_value**: Numeric value, or `NaN` for crashes
 - **status**: One of `baseline`, `keep`, `discard`, `crash`, `retracted`, `remeasured`
 - **description**: What was tried and why it was kept/discarded
-- **retracted / remeasured**: a `keep` that a Measurement Audit found was a measurement artifact — the original row stays as `retracted`, the honest re-run is logged as `remeasured`
 
 **Git status:** Keep results.tsv untracked. If committed, `git reset` after failed experiments will erase the log. The TSV is your persistent memory — it must survive resets.
 
 ## Resume Protocol
 
-If the agent is interrupted and resumes in a new session:
-
-1. Check for existing `research-config.md` → if exists, contract is already locked (skip Phase 1)
+If interrupted and resuming in a new session:
+1. `research-config.md` exists → contract is already locked (skip Phase 1)
 2. Read `results.tsv` → understand all prior experiments
 3. Read `git log` → understand current code state
-4. Check current branch starts with `research/` → confirm research context
+4. Confirm the current branch starts with `research/`
 5. Continue Phase 3 from current state (do not redo Phase 1 or 2)
 
 ## Red Flags
 
-**Never:**
-- Modify the evaluation command or metric extraction during the loop
-- Skip logging an experiment (even crashes)
-- Continue after 5+ consecutive crashes (something is fundamentally broken — stop and report)
-- Modify files outside the declared scope
-- Ask the human questions during the experiment loop
+**Never:** modify the evaluation command or metric extraction during the loop; skip logging an experiment; continue after 5+ consecutive crashes (something is fundamentally broken — stop and report); modify files outside declared scope; ask the human questions during the loop.
 
-**If results are suspicious:**
-1. Run the Measurement Audit (above) — compare raw `run-N.log` lines against the extraction pattern
-2. Check if external factors (network, disk, other processes) affect the metric
-3. If variance is higher than expected, increase Trials in the contract (requires human approval to unlock and re-lock)
+**If results are suspicious:** run the Measurement Audit (above), check whether external factors (network, disk, other processes) affect the metric, and if variance is higher than expected, increase Trials (requires human approval to unlock and re-lock).
 
 ## Common Rationalizations
 
@@ -282,6 +197,4 @@ If the agent is interrupted and resumes in a new session:
 
 ## Integration
 
-**Before:** arc-brainstorming → explore what to optimize and identify measurable targets
-**During:** `arc research dashboard` for live monitoring
-**After:** Review `research/{tag}` branch, cherry-pick or merge to main, run project tests
+**Before:** arc-brainstorming → identify measurable targets. **During:** `arc research dashboard` for live monitoring. **After:** review the `research/{tag}` branch, cherry-pick or merge to main, run project tests.
