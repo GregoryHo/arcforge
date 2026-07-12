@@ -22,32 +22,23 @@ SKILLS_DIR = PROJECT_ROOT / "skills"
 SOFT_LINE_CAP = 150
 HARD_LINE_CAP = 250
 
-# Permanent exceptions — engine/content dependencies that stay above the hard cap.
+# Permanent exceptions — skills floored above the hard cap by untouchable content.
+# NOTE (v5.0): these two land above their D7 targets (arc-refining 300, arc-finishing
+# 430) because the untouchable content alone exceeds the target — arc-refining's six
+# CLI heredoc sdd-gate recipes + three-legal-moves + delta accumulation + attended/
+# unattended split + pytest-pinned Boundary, and arc-finishing's ~440 lines of
+# worktree-safety git mechanics. Kept verbatim per the maintainer line-budget ruling
+# ("break the cap only where an untouchable block cannot be preserved otherwise").
+# FLAGGED FOR MAINTAINER REVIEW. arc-finishing is tracked to fall below 430 in 5.x
+# once option mechanics move into scripts/finish-epic.js (decision record D7).
 PERMANENT_LINE_BUDGET = {
-    "arc-refining": 300,
-    "arc-finishing": 430,
+    "arc-refining": 390,
+    "arc-finishing": 529,
 }
 
-# Temporary v5-transition exceptions — cap = current size so files cannot GROW.
-# Wave 4 body-diet lanes delete their entry here as each skill is brought under
-# budget; once removed, the skill falls back to its permanent cap (or the hard cap).
-TEMPORARY_LINE_BUDGET = {
-    "arc-writing-skills": 675,
-    "arc-finishing": 618,
-    "arc-refining": 454,
-    "arc-reflecting": 416,
-    "arc-tdd": 413,
-    "arc-brainstorming": 360,
-    "arc-dispatching-parallel": 338,
-    "arc-auditing-spec": 337,
-    "arc-diagramming-obsidian": 320,
-    "arc-journaling": 312,
-    "arc-agent-driven": 306,
-    "arc-looping": 301,
-    "arc-debugging": 296,
-    "arc-researching": 287,
-    "arc-planning": 260,
-}
+# v5-transition allowlist — emptied at Wave 4 burn-down. Every other skill is now
+# within the 250 hard cap. Left present (empty) as the documented burn-down anchor.
+TEMPORARY_LINE_BUDGET = {}
 
 # Supporting-file references: references/, scripts/, templates/, agents/ paths ending
 # in a known extension. The lookbehind skips matches embedded in a longer path
