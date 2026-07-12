@@ -15,21 +15,13 @@ Use it when:
 - The task is an ArcForge workflow task: brainstorming, refining specs, planning, implementing epics, verifying, evaluating, or maintaining ArcForge skills.
 - You are unsure which ArcForge skill should handle the next step.
 
-Respect higher-priority instructions, explicit user constraints, and the host harness. If a workflow would add more friction than value, do not force it.
+Respect higher-priority instructions, explicit user constraints, and the host harness. Skills are tools, not laws — prefer the smallest useful workflow, and if one would add more friction than value, do not force it. Strong workflows are opt-in by task fit, not always-on behavior.
 
 ## How to Access Skills
 
 **In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you — follow it directly. Never use the Read tool on skill files.
 
 **In other environments:** Use the platform's skill-loading mechanism, or read the relevant skill documentation when no tool exists.
-
-## Core Philosophy
-
-- Skills are tools, not laws.
-- Prefer the smallest useful workflow.
-- File artifacts are the source of truth when the workflow creates them.
-- Session context is current workflow state only; resume from files, not memory.
-- Strong workflows are opt-in by task fit, not always-on behavior.
 
 ## File Artifacts = Truth
 
@@ -54,29 +46,6 @@ When touching worktrees:
 
 For derivation rules, marker schema, and cleanup semantics, see `docs/guide/worktree-workflow.md`.
 
-## Routing Flow
-
-```dot
-digraph skill_flow {
-    "User message received" [shape=doublecircle];
-    "ArcForge workflow task?" [shape=diamond];
-    "Simple/read-only/eval/grading?" [shape=diamond];
-    "Choose smallest useful skill" [shape=box];
-    "Invoke/read skill" [shape=box];
-    "Proceed directly" [shape=box];
-    "Act with evidence" [shape=doublecircle];
-
-    "User message received" -> "ArcForge workflow task?";
-    "ArcForge workflow task?" -> "Proceed directly" [label="no"];
-    "ArcForge workflow task?" -> "Simple/read-only/eval/grading?" [label="yes"];
-    "Simple/read-only/eval/grading?" -> "Proceed directly" [label="yes"];
-    "Simple/read-only/eval/grading?" -> "Choose smallest useful skill" [label="no"];
-    "Choose smallest useful skill" -> "Invoke/read skill";
-    "Invoke/read skill" -> "Act with evidence";
-    "Proceed directly" -> "Act with evidence";
-}
-```
-
 ## Skill Priority
 
 When multiple skills could apply, choose the smallest useful one:
@@ -92,7 +61,6 @@ Examples:
 - "Let's build X" → `arc-brainstorming` if design is unclear; `arc-planning` if a refined spec already exists.
 - "Fix this bug" → `arc-debugging` if cause is unknown; `arc-tdd` if cause and expected behavior are clear.
 - "Implement epic" → `arc-planning` if no `specs/<spec-id>/dag.yaml`; coordination/implementation skills if the DAG exists.
-- "Audit this skill/workflow" → `arc-evaluating` when shipping/merge/completion evidence matters.
 
 ## Execution & Finishing Choosers
 
@@ -133,24 +101,11 @@ Four skills touch the diary/instinct system. Route by the concrete trigger, not 
 
 ## When Not to Route
 
-Do not force an ArcForge workflow when the task is:
-
-- A simple factual answer or direct clarification.
-- Read-only inspection where no workflow decision is needed.
-- Harness, eval, or grading execution that must preserve isolation.
-- A single-skill eval where `arc-using` would contaminate the behavior under test.
-- Explicitly constrained by the user to avoid workflow overhead.
-- Outside ArcForge's domain.
-
-In those cases, proceed directly, and only mention ArcForge skills if they materially help.
+Do not force an ArcForge workflow when the task is a simple factual answer, read-only inspection, harness/eval/grading execution that must preserve isolation, a single-skill eval where `arc-using` would contaminate the behavior under test, explicitly constrained by the user to avoid workflow overhead, or outside ArcForge's domain. Proceed directly, and only mention ArcForge skills if they materially help.
 
 ## Platform Adaptation
 
-Skills describe actions in vendor-neutral terms ("dispatch a subagent", "track
-task progress", "search the web"). If your harness is not Claude Code, read its
-reference for the real tool names:
-
-- Codex: `references/codex-tools.md`
+Skills describe actions in vendor-neutral terms ("dispatch a subagent", "search the web"). If your harness is not Claude Code, read its reference for the real tool names — Codex: `references/codex-tools.md`.
 
 ## User Instructions
 
