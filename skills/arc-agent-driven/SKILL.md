@@ -294,7 +294,7 @@ The full agent roster for arc-agent-driven workflows:
 
 - **arc-using-worktrees** — REQUIRED: Set up isolated workspace before starting
 - **arc-writing-tasks** - Creates the task list this skill executes
-- **arc-requesting-review** - Code review template for reviewer subagents
+- **arc-reviewing** - Code review template for reviewer subagents
 - **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) - Complete development after all tasks
 
 **Subagents should use:**

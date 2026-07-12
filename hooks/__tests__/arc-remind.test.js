@@ -46,7 +46,7 @@ describe('arc-remind buildReminder', () => {
     const msg = buildReminder('gh pr create', false);
     assert.ok(msg, 'should produce a reminder');
     assert.ok(msg.includes('arc-verifying'), 'should mention arc-verifying');
-    assert.ok(msg.includes('arc-requesting-review'), 'should mention arc-requesting-review');
+    assert.ok(msg.includes('arc-reviewing'), 'should mention arc-reviewing');
   });
 
   it('notes when no test was observed this session', () => {
