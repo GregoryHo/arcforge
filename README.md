@@ -283,7 +283,7 @@ npm test
 npm run test:scripts          # Jest — CLI engine (scripts/lib/)
 npm run test:hooks            # Node --test — hook behavior (hooks/__tests__/)
 npm run test:node             # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
-npm run test:skills           # pytest — skill content validation (tests/skills/)
+npm run test:skills           # pytest — skill structure validation (tests/skills/)
 npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-observing/tests/)
 
 # Run CLI

@@ -271,10 +271,6 @@ function assertCanMaterialize(candidate) {
   return true;
 }
 
-function skillTestName(skillName) {
-  return `test_skill_${skillName.replace(/-/g, '_')}.py`;
-}
-
 function assertSafeSkillName(name) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(name || '')) {
     throw new Error('candidate skill name must be lowercase kebab-case');
@@ -289,17 +285,13 @@ function assertSafeArtifactName(name) {
 
 // Path mapping per artifact type. Draft paths must be relative, normalized
 // (no `..`), and stay under the intended directory. Active paths drop the
-// `.draft` suffix. Skill is intentionally a special case (two files).
+// `.draft` suffix. Skills carry no per-skill test file — the structure checker
+// (tests/skills/test_skill_structure.py) iterates skills/ dynamically and picks
+// up any activated skill.
 const ARTIFACT_PATHS = {
   skill: (name) => ({
-    draft: [
-      path.join('skills', name, 'SKILL.md.draft'),
-      path.join('tests', 'skills', `${skillTestName(name)}.draft`),
-    ],
-    active: [
-      path.join('skills', name, 'SKILL.md'),
-      path.join('tests', 'skills', skillTestName(name)),
-    ],
+    draft: [path.join('skills', name, 'SKILL.md.draft')],
+    active: [path.join('skills', name, 'SKILL.md')],
   }),
   instinct: (name) => ({
     draft: [path.join('.arcforge', 'learning', 'instincts', `${name}.md.draft`)],
