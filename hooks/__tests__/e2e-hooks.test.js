@@ -356,8 +356,9 @@ describe('E2E: quality-check/main.js', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  it('should detect console.log in edited JS file', () => {
-    // Create a JS file with console.log
+  // v5: quality-check is a PostToolUse ACCUMULATOR — it records the edited path
+  // and emits nothing; findings are batched at Stop (session-tracker/end.js).
+  it('is silent on an Edit of a JS file with console.log (accumulate-only)', () => {
     const jsFile = path.join(testDir, 'test-consolelog.js');
     fs.writeFileSync(jsFile, 'function foo() {\n  console.log("debug");\n  return 42;\n}\n');
 
@@ -369,13 +370,11 @@ describe('E2E: quality-check/main.js', () => {
     const result = runNodeHook(scriptPath, input);
 
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-
-    // RV-3: console.* is model-actionable → the model channel (additionalContext),
-    // emitted as exactly one JSON object on stdout.
-    const parsed = JSON.parse(result.stdout.trim());
-    const ctx = parsed.hookSpecificOutput?.additionalContext;
-    assert.ok(ctx, `Should output additionalContext. stdout: "${result.stdout.trim()}"`);
-    assert.ok(ctx.includes('console'), `model channel should mention console. Got: "${ctx}"`);
+    assert.strictEqual(
+      result.stdout.trim(),
+      '',
+      `accumulate-only → no PostToolUse output. Got: "${result.stdout.trim()}"`,
+    );
   });
 
   it('should exit 0 on non-JS file', () => {
@@ -384,27 +383,9 @@ describe('E2E: quality-check/main.js', () => {
     assert.strictEqual(result.exitCode, 0);
   });
 
-  it('should detect console.log in Write-created JS file', () => {
-    // Write tool: the file exists on disk by the time PostToolUse fires
+  it('is silent on a Write-created JS file (accumulate-only)', () => {
     const content = 'function foo() {\n  console.log("debug");\n  return 42;\n}\n';
     const jsFile = path.join(testDir, 'written.js');
-    fs.writeFileSync(jsFile, content);
-
-    const input = makeToolUseInput('PostToolUse', 'Write', { file_path: jsFile, content });
-    const result = runNodeHook(scriptPath, input);
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-
-    // RV-3: console.* finding reaches the model via the PostToolUse model channel.
-    const parsed = JSON.parse(result.stdout.trim());
-    const ctx = parsed.hookSpecificOutput?.additionalContext;
-    assert.ok(ctx, `Should output additionalContext. stdout: "${result.stdout.trim()}"`);
-    assert.ok(ctx.includes('console'), `model channel should mention console. Got: "${ctx}"`);
-  });
-
-  it('should NOT emit output for Write-created file with only console.error', () => {
-    const content = 'function fail(msg) {\n  console.error("Error: " + msg);\n}\n';
-    const jsFile = path.join(testDir, 'cli-errors.js');
     fs.writeFileSync(jsFile, content);
 
     const input = makeToolUseInput('PostToolUse', 'Write', { file_path: jsFile, content });
@@ -414,7 +395,7 @@ describe('E2E: quality-check/main.js', () => {
     assert.strictEqual(
       result.stdout.trim(),
       '',
-      `console.error-only file should produce no output. Got: "${result.stdout.trim()}"`,
+      `accumulate-only → no PostToolUse output. Got: "${result.stdout.trim()}"`,
     );
   });
 });

@@ -319,85 +319,114 @@ function emitNudge(cwd, text) {
   }
 }
 
+/**
+ * Pure decision core for a PostToolUse event. Runs the reminder rules (with
+ * their per-session side effects: counter bumps and SKILL.md-path recording)
+ * and returns the nudge to emit as `{ modelReason, systemMessage }`, or null to
+ * emit nothing.
+ *
+ * `modelReason` is populated only for the autopilot-aware nudges when a live
+ * loop sentinel is present for cwd (they reach the model channel); user-only
+ * nudges leave it null. The caller (main() or the PostToolUse dispatcher) turns
+ * this shape into the merged single JSON object.
+ *
+ * @param {Object|null} input - Parsed hook stdin. Session id must already be set.
+ * @returns {{ modelReason: string|null, systemMessage: string|null }|null}
+ */
+function evaluate(input) {
+  if (!input) return null;
+  const tool = input.tool_name;
+
+  // Edit/Write: track SKILL.md edits, and nudge once on the first code edit to main.
+  if (tool === 'Edit' || tool === 'Write') {
+    const filePath = input.tool_input?.file_path || '';
+    const cwd = input.cwd || process.cwd();
+    if (isSkillFile(filePath)) {
+      bump('arc-remind-skill-edited');
+      recordSkillEdit(filePath, cwd);
+    }
+
+    // SDD stage nudge: spec.xml written but its dag.yaml is missing -> plan next.
+    // Once per spec-id (spec.xml is written across several edits).
+    const specId = specIdFromSpecXml(filePath);
+    if (specId && dagMissingForSpec(filePath, cwd)) {
+      const warned = `arc-remind-spec-planned-${specId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      if (counter(warned).read() === 0) {
+        bump(warned);
+        return { modelReason: null, systemMessage: planAfterSpecNudge(specId) };
+      }
+    }
+
+    if (
+      isCodeFile(filePath) &&
+      counter('arc-remind-main-warned').read() === 0 &&
+      isMainBranch(cwd)
+    ) {
+      bump('arc-remind-main-warned');
+      return { modelReason: null, systemMessage: mainBranchNudge() };
+    }
+    return null;
+  }
+
+  if (tool !== 'Bash') return null;
+  const command = input.tool_input?.command || '';
+  const cwd = input.cwd || process.cwd();
+
+  // Record that a test ran (used by the PR-boundary note). A compound command
+  // (e.g. `npm test && gh pr create`) can match multiple predicates at once —
+  // isTestCommand alongside isPrBoundary, isWorktreeAdd, or isShipCommand — so
+  // don't return here; every check below still runs for the same event.
+  if (isTestCommand(command)) {
+    bump('arc-remind-test-seen');
+  }
+
+  // PR-boundary and ship-a-skill both reach the model over the same
+  // PostToolUse channel in autopilot mode (RV-5), and a compound command like
+  // `git commit && git push && gh pr create` can independently satisfy both —
+  // collect whichever nudge(s) apply here and emit them together as ONE
+  // merged message, rather than letting isPrBoundary's early return silently
+  // drop the ship nudge.
+  const nudgeTexts = [];
+  if (isPrBoundary(command)) {
+    nudgeTexts.push(buildReminder(command, counter('arc-remind-test-seen').read() > 0));
+  }
+
+  if (isWorktreeAdd(command) && isArcforgeProject(cwd)) {
+    return { modelReason: null, systemMessage: worktreeAddNudge() };
+  }
+
+  // Ship-a-skill nudge: committing/pushing after editing a SKILL.md, once/session.
+  if (
+    isShipCommand(command) &&
+    counter('arc-remind-skill-edited').read() > 0 &&
+    counter('arc-remind-skill-ship-warned').read() === 0
+  ) {
+    bump('arc-remind-skill-ship-warned');
+    nudgeTexts.push(buildEvalShipNudge(cwd));
+  }
+
+  if (nudgeTexts.length > 0) {
+    const text = nudgeTexts.join('');
+    if (loopSentinelPresent(cwd)) return { modelReason: text, systemMessage: text };
+    return { modelReason: null, systemMessage: text };
+  }
+  return null;
+}
+
 function main() {
   try {
     const input = parseStdinJson(readStdinSync());
     if (!input) return;
     setSessionIdFromInput(input);
-    const tool = input.tool_name;
-
-    // Edit/Write: track SKILL.md edits, and nudge once on the first code edit to main.
-    if (tool === 'Edit' || tool === 'Write') {
-      const filePath = input.tool_input?.file_path || '';
-      const cwd = input.cwd || process.cwd();
-      if (isSkillFile(filePath)) {
-        bump('arc-remind-skill-edited');
-        recordSkillEdit(filePath, cwd);
-      }
-
-      // SDD stage nudge: spec.xml written but its dag.yaml is missing -> plan next.
-      // Once per spec-id (spec.xml is written across several edits).
-      const specId = specIdFromSpecXml(filePath);
-      if (specId && dagMissingForSpec(filePath, cwd)) {
-        const warned = `arc-remind-spec-planned-${specId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-        if (counter(warned).read() === 0) {
-          bump(warned);
-          output({ systemMessage: planAfterSpecNudge(specId) });
-          return;
-        }
-      }
-
-      if (
-        isCodeFile(filePath) &&
-        counter('arc-remind-main-warned').read() === 0 &&
-        isMainBranch(cwd)
-      ) {
-        bump('arc-remind-main-warned');
-        output({ systemMessage: mainBranchNudge() });
-      }
-      return;
-    }
-
-    if (tool !== 'Bash') return;
-    const command = input.tool_input?.command || '';
-    const cwd = input.cwd || process.cwd();
-
-    // Record that a test ran (used by the PR-boundary note). A compound command
-    // (e.g. `npm test && gh pr create`) can match multiple predicates at once —
-    // isTestCommand alongside isPrBoundary, isWorktreeAdd, or isShipCommand — so
-    // don't return here; every check below still runs for the same event.
-    if (isTestCommand(command)) {
-      bump('arc-remind-test-seen');
-    }
-
-    // PR-boundary and ship-a-skill both reach the model over the same
-    // PostToolUse channel in autopilot mode (RV-5), and a compound command like
-    // `git commit && git push && gh pr create` can independently satisfy both —
-    // collect whichever nudge(s) apply here and emit them together as ONE
-    // merged message, rather than letting isPrBoundary's early return silently
-    // drop the ship nudge.
-    const nudgeTexts = [];
-    if (isPrBoundary(command)) {
-      nudgeTexts.push(buildReminder(command, counter('arc-remind-test-seen').read() > 0));
-    }
-
-    if (isWorktreeAdd(command) && isArcforgeProject(cwd)) {
-      output({ systemMessage: worktreeAddNudge() });
-      return;
-    }
-
-    // Ship-a-skill nudge: committing/pushing after editing a SKILL.md, once/session.
-    if (
-      isShipCommand(command) &&
-      counter('arc-remind-skill-edited').read() > 0 &&
-      counter('arc-remind-skill-ship-warned').read() === 0
-    ) {
-      bump('arc-remind-skill-ship-warned');
-      nudgeTexts.push(buildEvalShipNudge(cwd));
-    }
-
-    if (nudgeTexts.length > 0) {
-      emitNudge(cwd, nudgeTexts.join(''));
+    const result = evaluate(input);
+    if (!result) return;
+    if (result.modelReason) {
+      outputPostToolUseFeedback(
+        result.modelReason,
+        result.systemMessage ? { systemMessage: result.systemMessage } : undefined,
+      );
+    } else if (result.systemMessage) {
+      output({ systemMessage: result.systemMessage });
     }
   } catch {
     // Non-blocking — never crash the session.
@@ -431,6 +460,7 @@ module.exports = {
   mainBranchNudge,
   planAfterSpecNudge,
   emitNudge,
+  evaluate,
   TEST_CMD_RE,
   PR_BOUNDARY_RE,
   SPEC_XML_RE,

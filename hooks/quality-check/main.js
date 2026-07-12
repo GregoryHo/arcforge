@@ -1,30 +1,28 @@
 #!/usr/bin/env node
 /**
- * Quality check orchestrator for PostToolUse (Edit and Write tools)
+ * Quality check for edited TypeScript/JavaScript files.
  *
- * Runs automatically after Edit/Write of TypeScript/JavaScript files:
- * 1. Auto-format with Prettier (if available)
- * 2. Type-check with TypeScript (if available)
- * 3. Warn about console.log/debug/info statements
- *    (console.warn/error are intentionally NOT flagged — they are the
- *    prescribed CLI error-output layer; see coding standards)
+ * v5 Stop-time batching: on PostToolUse this hook is a path ACCUMULATOR only —
+ * it records the edited .ts/.tsx/.js/.jsx path into a session temp file and
+ * emits nothing. The heavy work (Prettier + tsc + console.* scan) runs ONCE at
+ * Stop over the unique accumulated paths (runStopBatch, invoked by the Stop hook
+ * session-tracker/end.js) instead of after every edit.
  *
- * Output channels (RV-3):
- * - TypeScript errors + console.* findings are actionable for the model →
- *   the model-visible PostToolUse channel (additionalContext) so the next
- *   turn can fix them.
- * - The `Formatted:` notice is a fait accompli (Prettier already rewrote the
- *   file) — user-visible systemMessage only, never the model channel.
+ * Behavior delta (documented): files are no longer auto-formatted mid-task, and
+ * findings arrive at Stop over the user-visible systemMessage channel only — the
+ * PostToolUse model channel (additionalContext) is unavailable at Stop, and lint
+ * findings must NOT block the Stop with a decision.
  */
 
+const fs = require('node:fs');
 const path = require('node:path');
 const {
   readStdinSync,
   parseStdinJson,
-  output,
-  outputPostToolUseFeedback,
   log,
   readFileSafe,
+  getTempDir,
+  getSessionId,
 } = require('../../scripts/lib/utils');
 const {
   detectPackageManager,
@@ -32,6 +30,80 @@ const {
 } = require('../../scripts/lib/package-manager');
 const { runPrettier } = require('./prettier');
 const { runTypeCheck } = require('./typescript');
+
+const QUALITY_EXT_RE = /\.(ts|tsx|js|jsx)$/;
+
+/**
+ * Session-scoped file accumulating the edited paths pending a Stop-time batch.
+ * Mirrors the tmp-dir counter layout so it is wiped between sessions.
+ */
+function accumPath() {
+  return path.join(getTempDir(), `arcforge-quality-paths-${getSessionId()}`);
+}
+
+/**
+ * Read the accumulated edited paths (deduped, absolute). [] when none.
+ */
+function readAccumulated() {
+  const raw = readFileSafe(accumPath());
+  if (!raw) return [];
+  return [...new Set(raw.split('\n').filter(Boolean))];
+}
+
+/**
+ * PostToolUse rule: record an edited quality-eligible path for the Stop batch.
+ * Emits nothing (returns null). Non-Edit/Write tools and non-code paths no-op.
+ *
+ * @param {Object|null} input - Parsed hook stdin.
+ * @returns {null}
+ */
+function accumulate(input) {
+  if (!input) return null;
+  const tool = input.tool_name;
+  if (tool !== 'Edit' && tool !== 'Write') return null;
+  const filePath = input.tool_input?.file_path;
+  if (typeof filePath !== 'string' || !QUALITY_EXT_RE.test(filePath)) return null;
+
+  const cwd = input.cwd || process.cwd();
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath);
+  try {
+    const existing = new Set(readAccumulated());
+    if (!existing.has(absolutePath)) {
+      fs.appendFileSync(accumPath(), `${absolutePath}\n`);
+    }
+  } catch {
+    // Non-blocking — a dropped accumulation just skips one file's Stop-time check.
+  }
+  return null;
+}
+
+/**
+ * Run the Stop-time quality batch over the accumulated paths and clear the
+ * accumulator. Runs Prettier + tsc + console.* scan once per unique path and
+ * folds every finding (model-actionable + fait-accompli) into a single
+ * user-visible systemMessage string. Returns null when there is nothing to say.
+ *
+ * @param {string} projectDir - Directory used for package-manager detection.
+ * @returns {string|null}
+ */
+function runStopBatch(projectDir) {
+  const paths = readAccumulated();
+  if (paths.length === 0) return null;
+  try {
+    fs.rmSync(accumPath(), { force: true });
+  } catch {
+    // Best-effort — a stale accumulator only re-reports on the next Stop.
+  }
+
+  const messages = [];
+  for (const absolutePath of paths) {
+    if (!fs.existsSync(absolutePath)) continue;
+    const { modelReason, systemMessage } = collectFindings(absolutePath, absolutePath, projectDir);
+    if (systemMessage) messages.push(systemMessage);
+    if (modelReason) messages.push(modelReason);
+  }
+  return messages.length > 0 ? messages.join('\n') : null;
+}
 
 /**
  * Check for console.log/debug/info statements in a file.
@@ -112,39 +184,23 @@ function collectFindings(absolutePath, filePath, projectDir) {
 }
 
 /**
- * Main entry point
+ * Main entry point — PostToolUse accumulator (emits nothing).
  */
 function main() {
   const stdin = readStdinSync();
   const input = parseStdinJson(stdin);
-  if (!input) {
-    process.exit(0);
-    return;
-  }
-
-  const filePath = input.tool_input?.file_path;
-  if (!filePath || !/\.(ts|tsx|js|jsx)$/.test(filePath)) {
-    process.exit(0);
-    return;
-  }
-
-  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-  const { modelReason, systemMessage } = collectFindings(absolutePath, filePath, process.cwd());
-
-  // Model-actionable findings go to the model channel (additionalContext),
-  // merging the `Formatted:` notice as a user-visible systemMessage into the
-  // same JSON object when present. The formatted-only case must NOT call the
-  // helper — it throws on an empty reason — so route it through plain output().
-  if (modelReason) {
-    outputPostToolUseFeedback(modelReason, systemMessage ? { systemMessage } : undefined);
-  } else if (systemMessage) {
-    output({ systemMessage });
-  }
-
+  accumulate(input);
   process.exit(0);
 }
 
-module.exports = { checkConsoleLogs, collectFindings };
+module.exports = {
+  checkConsoleLogs,
+  collectFindings,
+  accumulate,
+  runStopBatch,
+  accumPath,
+  readAccumulated,
+};
 
 try {
   if (require.main === module) main();

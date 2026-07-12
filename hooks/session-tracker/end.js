@@ -26,7 +26,9 @@ const {
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
+const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { parseTranscript } = require('../../scripts/lib/transcript');
+const { runStopBatch } = require('../quality-check/main');
 
 /**
  * Calculate duration in minutes between two ISO timestamps
@@ -136,9 +138,13 @@ function main() {
   session.userMessages = userCount;
   session.toolCalls = toolCount;
 
-  // Enrich with transcript data if available
+  // Enrich with transcript data ONLY when the diary threshold fired. Below
+  // threshold, parsing the transcript is wasted work (the diary won't capture),
+  // so it is skipped entirely (documented delta: below-threshold session JSON
+  // loses userMessageContent/toolsUsed/filesModified enrichment).
   const transcriptPath = input?.transcript_path;
-  const transcriptData = transcriptPath ? parseTranscript(transcriptPath) : null;
+  const transcriptData =
+    shouldTrigger(userCount, toolCount) && transcriptPath ? parseTranscript(transcriptPath) : null;
 
   if (transcriptData) {
     session.userMessageContent = transcriptData.userMessages;
@@ -165,6 +171,13 @@ function main() {
     },
   });
 
+  // Stop-time quality batch: run Prettier + tsc + console.* scan ONCE over the
+  // paths accumulated by the PostToolUse dispatcher this session. Findings are
+  // user-visible only (systemMessage) — the model channel is unavailable at Stop
+  // and lint findings must not block the Stop.
+  const qualityMessage = runStopBatch(input?.cwd || process.cwd());
+
+  const systemMessages = [];
   if (triggered) {
     const reflectStatus = checkReflectReady(session.project);
     if (reflectStatus?.ready) {
@@ -176,9 +189,14 @@ function main() {
     // Only surface the 'Session paused' notification when the diary threshold
     // actually fired — a Stop worth telling the user about. Below threshold a
     // per-Stop user message is noise, so it is downgraded to a stderr log.
-    output({ systemMessage: formatTriggeredMessage(userCount, toolCount) });
+    systemMessages.push(formatTriggeredMessage(userCount, toolCount));
   } else {
     log(formatShortMessage(userCount, toolCount));
+  }
+  if (qualityMessage) systemMessages.push(qualityMessage);
+
+  if (systemMessages.length > 0) {
+    output({ systemMessage: systemMessages.join('\n\n') });
   }
 
   process.exit(0);
