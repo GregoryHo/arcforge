@@ -1,0 +1,169 @@
+{
+ "items": [
+  {
+   "target": "hooks/hooks.json",
+   "action": "verify",
+   "detail": "CURRENT REGISTRATION INVENTORY — 19 matcher-groups covering 14 (event,script) pairs (decision doc says '13'; actual count is 19 groups/14 pairs — reconcile in plan). SessionStart: [1] 'startup|resume|clear|compact' → run-hook.cmd inject-skills/main.sh (sync, bash); [2] 'startup|resume|clear|compact' → session-tracker/inject-context.js (sync); [3] 'startup|resume|clear' → session-tracker/start.js (async:true). UserPromptSubmit: [4] '.*' → user-message-counter/main.js (sync). PreToolUse: [5-7] 'Bash','Edit','Write' (3 groups) → arc-guard/main.js (sync); [8-9] 'Edit','Write' → sdd-ledger-guard/main.js (sync); [10] 'Bash' → sdd-ratify-guard/main.js (sync); [11] '.*' → observe/main.js pre (async:true). PostToolUse: [12] 'Edit|Write' → quality-check/main.js (sync); [13] '.*' → observe/main.js post (async:true); [14] '.*' → compact-suggester/main.js (sync); [15-17] 'Bash','Edit','Write' → arc-remind/main.js (sync). Stop: [18] '.*' → session-tracker/end.js (sync). PreCompact: [19] '.*' → pre-compact/main.js (sync). Per-Edit today: 7 node spawns (5 sync: arc-guard, sdd-ledger-guard, quality-check, compact-suggester, arc-remind; 2 async: observe pre/post). Per-Bash: 6 spawns (4 sync)."
+  },
+  {
+   "target": "hooks/hooks.json",
+   "action": "edit",
+   "detail": "WS2: restructure to ~6 entries: one sync PreToolUse dispatcher, one sync PostToolUse dispatcher, SessionStart, UserPromptSubmit, Stop, PreCompact. Add stable `id` + description per entry and ARCFORGE_DISABLED_HOOKS support. OPEN DESIGN POINTS the plan must settle: (a) observe pre is currently async '.*' on PreToolUse — folding it into the sync guard dispatcher adds fs-append/daemon-signal latency to every tool call; either fold with a strict fast-path or keep as the one extra async entry (making 7); (b) SessionStart currently has 3 entries with DIFFERENT matchers (start.js excludes 'compact') and one is bash via run-hook.cmd — a single SessionStart dispatcher must preserve the source-gating and the CLAUDE_ENV_FILE bash injection."
+  },
+  {
+   "target": "hooks/hooks.json",
+   "action": "verify",
+   "detail": "PreToolUse dispatcher merges: hooks/arc-guard/main.js (Bash+Edit+Write; evaluate() at :176-184 already dispatches by tool_name), hooks/sdd-ledger-guard/main.js (Edit+Write; evaluate :229), hooks/sdd-ratify-guard/main.js (Bash; evaluate :36), plus WS3 additions: dag-guard (Edit/Write + Bash-redirect denies), secrets-guard (Edit/Write + git-commit scan, warn mode), autopilot denies (Bash gh pr merge / git push). PostToolUse dispatcher merges: hooks/quality-check/main.js (→ path accumulator only), hooks/arc-remind/main.js, hooks/compact-suggester/main.js (counter + suggestion), hooks/observe/main.js post. Untouched standalone events: user-message-counter (UserPromptSubmit), session-tracker/end.js (Stop, + new quality batch), pre-compact/main.js (PreCompact), SessionStart trio."
+  },
+  {
+   "target": "hooks/run-hook.cmd",
+   "action": "verify",
+   "detail": "13-line bash dispatcher used ONLY for inject-skills/main.sh (SessionStart env injection — the sole non-Node hook per .claude/rules/hooks.md). Stays as-is unless SessionStart consolidation absorbs it."
+  },
+  {
+   "target": "scripts/lib/utils.js",
+   "action": "verify",
+   "detail": "Canonical shared hook helpers (all hooks import '../../scripts/lib/utils'): setSessionIdFromInput :22, readFileSafe :66, writeFileSafe :77, getTempDir :156, parseStdinJson :243, readStdinSync :255, log :311 (stderr), output :332 (single stdout JSON), outputContext :350, outputCombined :367, outputDecision :392 (Stop decision:block), outputDecisionHighlight :402, buildPostToolUseFeedback :425, outputPostToolUseFeedback :449 (merged additionalContext+systemMessage; THROWS on empty reason — see quality-check main.js:137-139 comment), getSessionId :480, createSessionCounter :667 (temp file arcforge-<name>-<sessionId>), loadSession :705, saveSession :719. Dispatcher fail-open wrapper moves here or into a new dispatcher module; NOTE utils.js caches session id at module level — safe today because every hook is a fresh process, but a dispatcher sharing one process must call setSessionIdFromInput exactly once per event."
+  },
+  {
+   "target": "scripts/lib/sdd-utils.js:92",
+   "action": "verify",
+   "detail": "Facade re-exporting the WS3-critical primitives from scripts/lib/sdd-decision-ledger.js: loopSentinelPresent (:381 — autopilot gate: status 'running' + fresh heartbeat, worktree cwd resolves via .arcforge-epic), getHeadLedgerContent (:47), parseDecisionLedgerContent (:77), validateDecisionLedger (:146), LOOP_SENTINEL, LOOP_HEARTBEAT_STALE_MS. Consumers: arc-remind/main.js:54, sdd-ratify-guard/main.js:23, sdd-ledger-guard/main.js:36-40."
+  },
+  {
+   "target": "hooks/package.json",
+   "action": "verify",
+   "detail": "test runner: `npm run test:hooks` → `cd hooks && npm test` → `node --test __tests__/*.test.js`. Baseline green as of this inventory: 333 tests / 98 suites / 0 fail / ~14s. hooks/package.json version 1.2.0 — remember plugin-cache rule: hook changes without a plugin.json version bump do not propagate to installed copies."
+  },
+  {
+   "target": "hooks/__tests__/",
+   "action": "verify",
+   "detail": "TEST→HOOK MAP: arc-guard.test.js→arc-guard/main (evaluate + main() wire format + no-op invariant); arc-remind.test.js→arc-remind/main (558 lines; classification, freshness nudge :222, autopilot RV-5 channel :398, compound commands :482); compact-suggester.test.js→compact-suggester/main + scripts/lib/thresholds; quality-check.test.js→quality-check/main + typescript (incl. hooks.json registration assertion, see separate item); sdd-ledger-guard.test.js→sdd-ledger-guard/main (636 lines); sdd-ratify-guard.test.js→dynamic require(HOOK_PATH) of sdd-ratify-guard/main; observe.test.js (1101 lines)→observe/main + learning + sanitize-observation + session-utils; session-tracker-end.test.js→end.js (unit: duration calc + Stop message gating ONLY — no transcript-parse coverage); inject-context.test.js + diary-enricher.test.js→inject-context.js; inject-skills.test.js→spawnSync of main.sh; pre-compact.test.js→pre-compact/main; learning-unification.test.js→end.js+start.js+inject-context.js+libs; e2e-hooks.test.js→spawnSync of real entry files: inject-skills :97, inject-context :138, start.js :202, user-message-counter :255, observe :300, quality-check :347, compact-suggester :426, pre-compact :498, end.js :571; utils.test.js/diary-enricher-e2e/inject-activated-instincts/instinct-keyspace-migration→libs only."
+  },
+  {
+   "target": "hooks/__tests__/quality-check.test.js:204-229",
+   "action": "edit",
+   "detail": "Asserts hooks.json registers quality-check EXACTLY ONCE on PostToolUse with matcher literally 'Edit|Write'. This test WILL FAIL when hooks.json becomes dispatcher entries — it is the only registration-level test today. Rewrite it (and add sibling assertions for every dispatcher) as the new registration contract; do not delete without replacement or registration regressions become invisible."
+  },
+  {
+   "target": "hooks/__tests__/e2e-hooks.test.js",
+   "action": "verify",
+   "detail": "E2E tests spawn each main.js DIRECTLY via spawnSync — they keep passing even if hooks.json stops referencing a file. Therefore green e2e tests do NOT prove wiring; behavior preservation needs (a) these stay green against the same entry files/dispatcher and (b) a hooks.json-level parity test (new dispatcher test that pipes recorded fixture stdin and asserts stdout JSON is byte-identical to the pre-consolidation per-hook outputs for: arc-guard deny, sdd-ledger-guard deny, sdd-ratify-guard deny, quality-check findings, compact-suggester threshold hit, arc-remind each nudge, no-op cases emitting NOTHING)."
+  },
+  {
+   "target": "hooks/arc-remind/main.js:57-58",
+   "action": "verify",
+   "detail": "WS3 test-seen predicate SOURCE: TEST_CMD_RE (npm test|jest|vitest|pytest|go test|cargo test|...); isTestCommand :69-71; recorded at :369-371 via bump('arc-remind-test-seen'); consumed at :381 `counter('arc-remind-test-seen').read() > 0`; buildReminder :139-150 renders 'No test command was observed this session' (:141-143). State file: <tmpdir>/arcforge-arc-remind-test-seen-<sessionId> (utils.js createSessionCounter :667-670). WS3 promotion reads the SAME counter from the PreToolUse dispatcher to deny `gh pr merge`/`git push` when loopSentinelPresent(cwd) && counter==0. NOTE: PR_BOUNDARY_RE :59 matches `gh pr (create|merge)` — the deny per decision doc item 4 targets merge/push only; a new narrower regex is needed, plus `git push` which today only matches SHIP_RE :61 (git commit|push)."
+  },
+  {
+   "target": "hooks/arc-remind/main.js:280-288",
+   "action": "verify",
+   "detail": "WS3 stale-eval predicate SOURCE: buildEvalShipNudge — stale branch at :287 fires when latestBenchmarkTime <= lastSkillEditTime. Components: latestBenchmarkTime :219-233 (evals/benchmarks/latest.json `generated` ISO field, mtime fallback); lastSkillEditTime :236-247 (max mtime over recorded SKILL.md paths); recording chain: SKILL_FILE_RE :62 → isSkillFile :81-83 → recordSkillEdit :190-201 → state file skillEditStatePath :185-187 (<tmpdir>/arcforge-arc-remind-skill-paths-<sessionId>, JSON array of abs paths) → readSkillEdits :204-211; ship trigger gate :389-397 (SHIP_RE && skill-edited>0 && ship-warned==0). Autopilot channel today: emitNudge :314-320 (loopSentinelPresent → outputPostToolUseFeedback, else systemMessage only). WS3 promotes the stale branch to a PreToolUse deny in autopilot; attended mode keeps nudge-only."
+  },
+  {
+   "target": "hooks/arc-remind/main.js:173",
+   "action": "edit",
+   "detail": "D8 coupling (name sweep, but stage in WS2/WS3 plan): evalBeforeShipNudge (:171-177) and staleEvalNudge (:254-261, doc ref ':258') both name 'arc-writing-skills' — reword to direct action at running evals, because arc-writing-skills becomes disable-model-invocation in v5 and an autopilot following the nudge would dead-end on a blocked Skill invocation."
+  },
+  {
+   "target": "hooks/sdd-ledger-guard/main.js:176-218",
+   "action": "verify",
+   "detail": "RESULTING-CONTENT MACHINERY dag-guard clones: computeWriteContent :176-180 (Write = full replacement); computeEditContent :190-218 (reads disk, replaces old_string→new_string, replace_all regex-escape at :208-217, unreadable/no-match → null → ALLOW); evaluate :229-265 (tool gate :232-233, basename self-gate :239 `path.basename(filePath) !== 'decisions.yml'`, resulting-content dispatch :244-252, HEAD fetch :255 getHeadLedgerContent, S8 on-disk fallback baseline :262 readFileSafe); decideLedgerEdit :140-163 (parse both sides, fail-open on non-array); deny wire format main() :271-286 ({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason}} exit 0, silent-catch fail-open)."
+  },
+  {
+   "target": "hooks/dag-guard/main.js",
+   "action": "create",
+   "detail": "WS3 new hard guard cloning sdd-ledger-guard pattern: self-gate on basename==='dag.yaml'; compute resulting content (reuse computeWriteContent/computeEditContent — extract to a shared module rather than copy); baseline = HEAD else on-disk; deny (a) illegal TaskStatus transitions — completed is monotonic; enum at scripts/lib/dag-schema.js:15-20 (pending|in_progress|completed|blocked) — and (b) dependency deletion. Needs a YAML parse of dag.yaml both sides (arcforge has an in-repo YAML layer — see dag-schema.js / tests under tests/node yaml tests; zero-external-deps rule applies). Register inside the PreToolUse dispatcher. Ship with no-op-invariant test (non-dag.yaml paths and non-Edit/Write tools emit nothing)."
+  },
+  {
+   "target": "scripts/lib/coordinator-core.js:225-233",
+   "action": "edit",
+   "detail": "dag-guard ENGINE-SIDE TWIN anchor: task.status = TaskStatus.COMPLETED and parent-epic completion writes live here; DAG writes are lock-guarded via scripts/lib/locking.js (acquireLock :46, withLock wrapper :145). Engine-side transition validation (completed-monotonic + dependency preservation) must be added on the write path used by scripts/loop.js and skills/arc-finishing/scripts/finish-epic.js, because PreToolUse denies are void under --dangerously-skip-permissions (same doctrine as sdd-ratify-guard's ratify-command.js primary gate)."
+  },
+  {
+   "target": "hooks/arc-guard/main.js:41",
+   "action": "edit",
+   "detail": "WS3 bypass closure: GIT_MERGE_RE `/\\bgit\\s+merge(?!...)/` does not match `git -C <path> merge` or `git --git-dir ... merge`. Extend the regex and resolve the -C target for the marker check (hasArcforgeMarker currently checks input cwd only — scripts/lib/marker.js). Deny-message strings that the v5 name sweep also touches: :62 ('arc-finishing flow ... finish-epic.js merge'), :72 ('see arc-looping'), :164 ('arc-researching's Iron Law #1'). Also add the Bash-side deny for redirects/`sed -i`/`tee` targeting decisions.yml, dag.yaml, research-config.md inside their gated contexts (closes the documented sdd-ledger-guard coverage boundary at sdd-ledger-guard/main.js:20-22)."
+  },
+  {
+   "target": "hooks/quality-check/main.js:117-145",
+   "action": "edit",
+   "detail": "PER-EDIT FLOW to batch at Stop: main() gates on /\\.(ts|tsx|js|jsx)$/ (:126) then collectFindings :73-112 runs synchronously per Edit/Write — prettier :80-85 (runPrettier, 15s timeout, prettier.js:26), tsc :88-97 (runTypeCheck, 30s timeout, typescript.js:124), console.log scan :100-109. WS2 change: PostToolUse dispatcher only accumulates the edited path into session state; Stop runs prettier+tsc once over unique paths. DESIGN CONSTRAINT: today's model feedback uses PostToolUse additionalContext (outputPostToolUseFeedback :138-139); at Stop the model channel is `{decision:'block', reason}` (utils.js outputDecision :392) or user-only systemMessage — plan must choose (blocking Stop on lint findings is a behavior change; systemMessage loses model visibility)."
+  },
+  {
+   "target": "hooks/observe/main.js:11-33",
+   "action": "edit",
+   "detail": "FAST-PATH TARGET (D4): module-level requires load scripts/lib/{utils,session-utils,learning,sanitize-observation} plus a module-level side effect at :42 (SIGNAL_TIMESTAMP_FILE = getObserverSignalFile()) BEFORE any gate; the disable gate shouldObserve (:74-89, wraps isLearningEnabled from scripts/lib/learning.js) only runs at :394 inside main(), after getProjectName() :393. Fix: hoist a minimal learning-disabled check (env ARCFORGE_OBSERVE_EXPLICIT_SKIP/ARCFORGE_OBSERVE_SELF_ANALYSIS + config file existence) to the very top of the file before the heavy requires and exit 0. Note comment at :59-60 'parsed once at module load (hook is a fresh process per event)' — this assumption breaks if observe folds in-process into a dispatcher; USER_SKIP_ENTRIES and SIGNAL_TIMESTAMP_FILE become stale-able."
+  },
+  {
+   "target": "hooks/observe/main.js:362-365",
+   "action": "verify",
+   "detail": "spawnDaemonIfNeeded resolves '../../skills/arc-observing/scripts/observer-daemon.sh' — same path also in hooks/session-tracker/start.js:81-84 (checkDaemon). Both relocate in the arc-learning merge workstream (decision doc merge #2); WS2 must not hardcode it into a dispatcher in a way that hides the later rename (silent-catch would swallow the ENOENT)."
+  },
+  {
+   "target": "hooks/session-tracker/end.js:140-141",
+   "action": "edit",
+   "detail": "TRANSCRIPT-PARSE LOCATION for the threshold gate: `parseTranscript(transcriptPath)` (import :29 from scripts/lib/transcript.js:23) runs UNCONDITIONALLY on every Stop; the diary threshold check happens only later inside runDiaryCapture (scripts/lib/diary-capture.js:235, gate :239 shouldTrigger → scripts/lib/thresholds.js:20-22, userCount>=10 || toolCount>=50; counts via readCounts diary-capture.js:42). Fix: call readCounts+shouldTrigger in end.js BEFORE parseTranscript; parse only when triggered. BEHAVIOR DELTA to document/test: below threshold, session JSON (:143-151 saveSessionJson) loses userMessageContent/toolsUsed/filesModified enrichment — learning-unification.test.js and session-tracker-end.test.js are the tripwires; add an explicit test that parseTranscript is NOT invoked below threshold."
+  },
+  {
+   "target": "hooks/compact-suggester/main.js:216",
+   "action": "verify",
+   "detail": "BINDING COUPLING when killing compact-suggester as a standalone hook: incrementSharedToolCount() (scripts/lib/diary-capture.js:62) is the diary threshold's SINGLE SOURCE OF TRUTH for tool counts — the PostToolUse dispatcher MUST keep calling it on every event or diary capture, end.js Stop messaging, and reflect-ready pending actions silently degrade to user-message-count-only triggering. Suggester state path getSuggesterStatePath (diary-capture.js:77) is also reset by pre-compact/main.js resetSuggesterState (:40+) — the folded counter must keep the exact same state file or 'zero after compaction' breaks silently."
+  },
+  {
+   "target": "hooks/user-message-counter/main.js:23-25",
+   "action": "verify",
+   "detail": "Quirk: writes raw stdin back to stdout ('NOT hook chaining' per its own comment). Harmless standalone; if ever folded into a dispatcher that also emits JSON, the passthrough would corrupt the single-JSON-object hook protocol. Registration stays standalone in the ~6-entry plan."
+  },
+  {
+   "target": "hooks/README.md",
+   "action": "edit",
+   "detail": "Operability item 9: add the blocking-vs-advisory doc table, stable hook ids, and ARCFORGE_DISABLED_HOOKS documentation. Current README documents the per-hook layout that WS2 restructures."
+  },
+  {
+   "target": "scripts/check-hooks-schema.js",
+   "action": "create",
+   "detail": "Operability item 9: hooks.json JSON-schema validation + CI wiring (fits the existing scripts/check-*.js linter family — check-version-sync.js, check-doc-refs.js, etc.). Should validate: known event names, matcher syntax, sync (no async) on blocking guards, ${CLAUDE_PLUGIN_ROOT} path form, stable unique ids. Wire into test:node or lint per how check-cli-consumers.js is wired."
+  },
+  {
+   "target": "hooks/secrets-guard (module within PreToolUse dispatcher)",
+   "action": "create",
+   "detail": "WS3: regex scan of Write/Edit resulting content and `git commit` Bash commands for key/token patterns; WARN-first (systemMessage) with test-credential allowlist; deny flip deferred to 5.x. Reuse the resulting-content helpers extracted from sdd-ledger-guard. Control-char/sanitization per .claude/rules/security.md."
+  },
+  {
+   "target": "hooks/__tests__/dispatcher parity + new-guard tests",
+   "action": "create",
+   "detail": "New test files WS2/WS3 must add: (1) dispatcher parity test (fixture stdin → stdout JSON identical to pre-consolidation per-hook output, incl. the no-op-emits-nothing invariant for every folded hook); (2) per-subhook fault isolation test (one folded hook throws → others still run, dispatcher exits 0 — replaces the process-isolation guarantee that per-hook registration gave for free); (3) dag-guard tests (deny illegal transitions, allow legal, no-op invariant); (4) autopilot-deny tests (loopSentinelPresent true/false × test-seen/stale-eval); (5) secrets-guard warn tests; (6) observe fast-path test (learning disabled → exit 0 before heavy requires, no observation written); (7) end.js O(1) test (parseTranscript not called below threshold); (8) Stop-batch quality test (no tsc per Edit; one tsc at Stop covering all accumulated paths)."
+  }
+ ],
+ "verify_commands": [
+  "npm run test:hooks   # baseline today: 333 tests / 98 suites / 0 fail (~14s); must stay 0 fail after WS2, and grow with WS3 guard tests",
+  "npm test   # all 5 runners green (scripts/hooks/node/skills/observer-daemon)",
+  "node -e \"const h=require('./hooks/hooks.json').hooks;const c=Object.fromEntries(Object.entries(h).map(([k,v])=>[k,v.length]));console.log(JSON.stringify(c));process.exit((c.PreToolUse===1&&c.PostToolUse===1)?0:1)\"   # consolidation proof: exactly one PreToolUse and one PostToolUse matcher-group (today prints PreToolUse:7, PostToolUse:6 and exits 1)",
+  "node -e \"const h=require('./hooks/hooks.json').hooks;const n=[...(h.PreToolUse||[]),...(h.PostToolUse||[])].filter(e=>{try{return new RegExp(e.matcher).test('Edit')}catch{return false}}).flatMap(e=>e.hooks).filter(x=>!x.async).length;console.log('sync node spawns per Edit:',n);process.exit(n<=2?0:1)\"   # per-Edit sync spawn count dropped: today prints 5 and exits 1; target <=2",
+  "cd hooks && node --test __tests__/e2e-hooks.test.js   # entry-file behavior preserved (spawns real main.js files)",
+  "cd hooks && node --test __tests__/quality-check.test.js   # includes the rewritten hooks.json registration contract (old assertion at :204-229 must be replaced, not deleted)",
+  "cd hooks && node --test __tests__/dispatcher.test.js __tests__/dag-guard.test.js   # to be created in WS2/WS3: parity + fault isolation + new-guard no-op invariants",
+  "ARCFORGE_OBSERVE_NO_SPAWN=1 node -e \"const{execFileSync}=require('child_process');const out=execFileSync('node',['hooks/observe/main.js','pre'],{input:JSON.stringify({tool_name:'Read',tool_input:{file_path:'/tmp/x'},cwd:process.cwd()}),env:{...process.env,ARCFORGE_OBSERVE_EXPLICIT_SKIP:'1'}});process.exit(out.length===0?0:1)\"   # observe disabled path emits nothing and exits 0 (fast-path preserves this contract)",
+  "node scripts/check-hooks-schema.js   # to be created: hooks.json schema + stable-id validation, wired into CI"
+ ],
+ "risks": [
+  "Silent-catch doctrine makes every WS2 breakage invisible at runtime: a dispatcher bug that swallows a sub-hook exception disables that hook with zero symptoms. Per-subhook try/catch + the fault-isolation test are mandatory, not optional.",
+  "Diary/tool-count coupling: compact-suggester/main.js:216 incrementSharedToolCount() is the ONLY writer of the shared tool counter (diary-capture.js:62). Dropping it during the fold silently kills diary capture, Stop 'Session paused' messages, and reflect-ready pending actions.",
+  "PreCompact↔suggester state coupling: pre-compact resets the suggester state file via getSuggesterStatePath (diary-capture.js:77); if the folded counter changes its state path, suggestions survive compaction silently.",
+  "quality-check.test.js:204-229 is the only hooks.json registration test; the dispatcher restructure breaks it by design — replacing it with weaker assertions would leave future registration regressions untestable.",
+  "e2e-hooks.test.js spawns entry files directly, not via hooks.json — green e2e proves nothing about wiring; a typo'd dispatcher command in hooks.json would pass the whole suite while disabling all hooks in real sessions.",
+  "Async/sync semantics: async hooks cannot block. If observe-pre folds into the sync PreToolUse dispatcher, its fs append + daemon spawn/signal (observe/main.js:324-375) moves onto the blocking path of every tool call; if it stays async-separate, the '~6 entries' count is 7. Either way the deny path must stay sync.",
+  "Single-JSON-object protocol: each hook process may emit at most one stdout JSON object. A dispatcher merging arc-remind + compact-suggester + quality-check outputs must merge systemMessage/additionalContext fields into ONE object per event (compact-suggester and arc-remind can both fire on the same Bash event today only because they are separate processes).",
+  "In-process state assumptions break in a dispatcher: utils.js caches sessionId at module level; observe/main.js:59-63 parses ARCFORGE_OBSERVE_SKIP_PATHS 'once at module load (fresh process per event)'; getSuggesterStatePath memoization. All safe today via process-per-event; a long-lived or shared-module dispatcher must re-derive per event.",
+  "Cross-event state for WS3 autopilot denies: the PreToolUse deny reads counters written by the PostToolUse recorder (arcforge-arc-remind-test-seen / -skill-paths temp files, keyed by sessionId). A sessionId mismatch between events (setSessionIdFromInput ordering) yields deny-never-fires — silently, in unattended loops where nobody is watching.",
+  "PreToolUse denies are void under --dangerously-skip-permissions (documented in sdd-ratify-guard/main.js:12-17): dag-guard and autopilot denies are meaningless without their engine-side twins (loop.js / finish-epic.js / coordinator-core.js write paths).",
+  "Stop-time quality batching changes the feedback channel: PostToolUse additionalContext is unavailable at Stop; routing findings through Stop decision:block can loop the session (stop_hook_active), while systemMessage-only means the model never sees type errors. Also end.js currently owns Stop exclusively and calls process.exit(0) at :184 — a Stop dispatcher must sequence quality batch before/around it.",
+  "end.js O(1) change drops transcript enrichment (userMessageContent/toolsUsed/filesModified) from session JSON on below-threshold Stops — downstream consumers (learning-unification flows, inject-context resume summaries) must be checked for reliance on those fields.",
+  "arc-remind PR_BOUNDARY_RE covers `gh pr create` too; promoting it wholesale would deny PR creation in loops, not just merge/push — WS3 needs a narrower deny predicate than the existing nudge predicate.",
+  "Plugin cache: hook changes without a version bump don't propagate to the installed marketplace copy (project plugin rule) — WS2 'behavior-preserving' verification in a live session requires `claude --plugin-dir .`, not the installed plugin.",
+  "GIT_MERGE_RE extension for `git -C <path> merge` must resolve the -C target for the marker check; matching the regex but checking the wrong cwd would create false denies in the base checkout — the exact failure mode (false-positive block) the guard doctrine forbids.",
+  "ARCFORGE_DISABLED_HOOKS control plane: if a disabled guard id silently also disables the shared counter increments living in the same dispatcher pass, unrelated features (diary, compact suggestions) die with it — per-id granularity must map to sub-hooks, not dispatcher processes."
+ ],
+ "notes": "Counts reconciliation: decision doc says '13 registrations'; ground truth in hooks/hooks.json is 19 matcher-groups across 14 distinct (event,script) pairs (arc-guard and arc-remind each occupy 3 groups; sdd-ledger-guard 2; observe registers twice as pre/post). Per-Edit cost today: 7 node spawns (5 sync), per-Bash: 6 (4 sync) — matches the audit's '~7 (5 sync)'. Baseline hook suite is green (333/333, ~14s). Key file anchors: hooks/hooks.json (19 entries); shared helpers scripts/lib/utils.js (readStdinSync :255, parseStdinJson :243, output :332, outputPostToolUseFeedback :449, createSessionCounter :667); WS3 predicates hooks/arc-remind/main.js (test-seen :57-58/:369-371/:381, stale-eval :219-247/:280-288, autopilot emitNudge :314-320); dag-guard clone source hooks/sdd-ledger-guard/main.js (computeWriteContent :176, computeEditContent :190, evaluate :229, deny wire :271-286); TaskStatus enum scripts/lib/dag-schema.js:15-20; quality-check per-edit flow hooks/quality-check/main.js:73-145 (tsc 30s timeout typescript.js:124, prettier 15s prettier.js:26); observe fast-path target hooks/observe/main.js:11-33 (requires) vs gate :394; end.js transcript parse hooks/session-tracker/end.js:140-141 with threshold gate downstream in scripts/lib/diary-capture.js:235-239 → scripts/lib/thresholds.js:20-22."
+}

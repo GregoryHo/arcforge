@@ -1,0 +1,349 @@
+{
+ "items": [
+  {
+   "target": "tests/skills/",
+   "action": "verify",
+   "detail": "WS6 scope baseline: 42 .py files + pressure/ + empty __init__.py; NO conftest.py, NO shared helpers — every test file duplicates its own _read/_parse_frontmatter helper (e.g. test_skill_arc_tdd.py:9-22). 592 tests currently pass in ~0.5s via `python3 -m pytest tests/skills/ -v` (package.json:38 test:skills). pytest config in pyproject.toml (testpaths=[\"tests\"], pythonpath=[\".\"]) — several files use relative Path(\"skills/...\") so repo-root cwd is load-bearing."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_agent_driven.py",
+   "action": "delete",
+   "detail": "29 asserts: 28 literal-prose / 1 heading / 0 exists. Replace with generic structure checker (D6)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_auditing_spec.py",
+   "action": "delete",
+   "detail": "203 asserts: 169 literal-prose / 3 heading / 31 file-exists (references/*.md + agents). Largest file (1497 lines). File-exists checks must be absorbed by the structure checker, not dropped."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_brainstorming.py",
+   "action": "delete",
+   "detail": "67 asserts: 65 literal-prose / 2 heading. Named as the canonical pattern in CONTRIBUTING.md:172 and .claude/rules/skills.md — update those pointers."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_compacting.py",
+   "action": "delete",
+   "detail": "18 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_coordinating.py",
+   "action": "delete",
+   "detail": "15 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_debugging.py",
+   "action": "delete",
+   "detail": "13 asserts: 5 literal-prose (incl. Iron Law sentence 'NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST' at :20) / 4 heading / 4 file-exists (root-cause-tracing.md, defense-in-depth.md, condition-based-waiting.md at :34-36). Supporting-file existence must move to structure checker."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_diagramming_obsidian.py",
+   "action": "delete",
+   "detail": "60 asserts: 59 literal-prose / 1 heading."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_dispatching_parallel.py",
+   "action": "delete",
+   "detail": "14 asserts: 12 literal-prose / 2 heading."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_dispatching_teammates.py",
+   "action": "delete",
+   "detail": "36 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_evaluating.py",
+   "action": "delete",
+   "detail": "51 asserts: 47 literal-prose / 3 heading / 1 exists."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_executing_tasks.py",
+   "action": "delete",
+   "detail": "12 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_finishing.py",
+   "action": "delete",
+   "detail": "39 asserts: 38 literal-prose / 1 heading. Covers worktree-safety git mechanics prose flagged 'untouchable' in D7 — after deletion only eval layer protects it, and arc-finishing has NO eval scenario."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_implementing.py",
+   "action": "delete",
+   "detail": "16 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_journaling.py",
+   "action": "delete",
+   "detail": "19 asserts: 13 literal-prose / 6 heading."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_learning.py",
+   "action": "delete",
+   "detail": "38 asserts: 32 literal-prose / 5 heading / 1 exists. arc-learning survives merge — new structure checker picks it up dynamically."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_looping.py",
+   "action": "delete",
+   "detail": "20 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_maintaining_obsidian.py",
+   "action": "delete",
+   "detail": "184 asserts: 165 literal-prose / 13 heading / 6 exists (1089 lines)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_managing_sessions.py",
+   "action": "delete",
+   "detail": "26 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_observing.py",
+   "action": "delete",
+   "detail": "25 asserts: 16 literal-prose / 4 heading / 5 exists. Skill itself is deleted by the arc-observing→arc-learning merge — coordinate with merge PR (which also owns package.json:39 test:observer-daemon path skills/arc-observing/tests/run-tests.sh)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_planning.py",
+   "action": "delete",
+   "detail": "45 asserts, all literal-prose (332 lines)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_recalling.py",
+   "action": "delete",
+   "detail": "16 asserts: 10 literal-prose / 3 heading / 3 exists."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_receiving_review.py",
+   "action": "delete",
+   "detail": "9 asserts, all literal-prose. Skill deleted by arc-reviewing merge — coordinate with merge PR."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_refining.py",
+   "action": "delete",
+   "detail": "138 asserts, ALL literal-prose (1355 lines) — heaviest prose coupling in the suite; arc-refining is also a line-budget allowlist entry (300)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_reflecting.py",
+   "action": "delete",
+   "detail": "17 asserts: 15 literal-prose / 2 heading."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_requesting_review.py",
+   "action": "delete",
+   "detail": "14 asserts, all literal-prose. Skill renamed to arc-reviewing — coordinate with merge PR."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_researching.py",
+   "action": "delete",
+   "detail": "35 asserts: 34 literal-prose / 1 heading."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_tdd.py",
+   "action": "delete",
+   "detail": "12 asserts: 8 literal-prose (incl. Iron Law 'NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST' :46 and 'digraph tdd_cycle' :55 — the digraph is a D7 deletion class, so this assert would block the diet anyway) / 4 heading. Has the canonical _parse_frontmatter helper (:9-22) worth lifting into the new checker."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_using.py",
+   "action": "delete",
+   "detail": "28 asserts: 27 literal-prose / 1 heading. Includes router-table prose — after deletion the router-lies invariant is only guarded by arc-using eval scenarios + name-graph sweep gates."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_using_worktrees.py",
+   "action": "delete",
+   "detail": "28 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_verifying.py",
+   "action": "delete",
+   "detail": "12 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_writing_skills.py",
+   "action": "delete",
+   "detail": "37 asserts: 31 literal-prose / 3 heading / 3 exists."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_writing_tasks.py",
+   "action": "delete",
+   "detail": "10 asserts, all literal-prose."
+  },
+  {
+   "target": "tests/skills/test_skill_cross_references.py",
+   "action": "edit",
+   "detail": "Already structure-only — keep or fold into new checker. Mechanics: regex r\"(?:REQUIRED SUB-SKILL|REQUIRED BACKGROUND).*?(arc-[\\w-]+)\" (:14-16) scans every skills/*/SKILL.md line-by-line, extracts first arc-* token after the marker, parametrizes one test per ref (currently 17 marker lines repo-wide), asserts target dir skills/<name>/SKILL.md exists (:53-59), plus sanity floor >=3 refs (:62-66). Gap: refs to references/*.md paths (e.g. arc-auditing-spec:97) only validate the embedded skill name, not the file. Uses relative Path(\"skills\") — cwd-dependent. No current marker references arc-requesting-review/arc-receiving-review/arc-observing, so the merges do not trip it."
+  },
+  {
+   "target": "tests/skills/test_skill_structure.py",
+   "action": "create",
+   "detail": "New generic structure checker (D6+D7), parametrized over skills/*/SKILL.md via iterdir: (1) frontmatter parses (pyyaml already required), (2) frontmatter name == dirname, (3) description present & non-empty (name+description < 1024 chars — existing convention), (4) required sections exist per category, (5) cross-references resolve (absorb test_skill_cross_references.py), (6) referenced supporting/references/*.md files exist, (7) line budget: soft 150 / hard 250 with two-entry allowlist {arc-refining: 300, arc-finishing: 430}. Dynamic iteration means merges/renames need zero test edits."
+  },
+  {
+   "target": "scripts/lib/learning-drafts.js:46-62",
+   "action": "edit",
+   "detail": "renderSkillTestDraft() is the test-file materializer (D6 says learning.js but the template lives here; consumed via renderDraft :199-216 → learning.js:391 in materializeCandidate). Currently emits a 2-test pytest file (draft-suffix check + frontmatter/candidate-id containment). Update to emit the structure-only form — or drop the second file entirely if the generic checker covers materialized skills automatically (it iterates skills/, so it does)."
+  },
+  {
+   "target": "scripts/lib/learning.js:274-303",
+   "action": "edit",
+   "detail": "skillTestName() (:274-276) and ARTIFACT_PATHS.skill (:293-303) hardwire draft/active pytest paths tests/skills/test_skill_<name>.py(.draft). If per-skill test files disappear, decide: keep emitting a stub, or remove the second tuple entry — must change in lockstep with learning-drafts.js and tests/scripts/learning.test.js."
+  },
+  {
+   "target": "tests/scripts/learning.test.js",
+   "action": "edit",
+   "detail": "Jest expectations on materialized pytest paths at :379-386, :624, :708-733, :795-828, :865-895, :910, :1080-1084, :1183, :1214 (all 'tests/skills/test_skill_arc_releasing.py[.draft]'). Breaks loudly if learning.js/learning-drafts.js change — update in the same PR. Run: npx jest tests/scripts/learning.test.js."
+  },
+  {
+   "target": "tests/skills/test_eval_scenario_format.py",
+   "action": "verify",
+   "detail": "KEEP (not one of the 32). Asserts every evals/scenarios/*.md has '# Eval:' + '## Assertions' and bans '0-10 scale' and mtime-based transcript selection in code graders. Constrains WS9 scenario edits — retargeted/new scenarios must comply."
+  },
+  {
+   "target": "tests/skills/test_pressure_fixtures.py",
+   "action": "verify",
+   "detail": "KEEP. Structural validation of tests/skills/pressure/{arc-finishing-completion-format,arc-using-path-reconstruction,arc-using-worktrees-cli-failure}.md + README.md (required sections/metadata). Pressure fixtures are frozen manual regression records — untouched by conversion."
+  },
+  {
+   "target": "tests/skills/test_eval_agents_contract.py",
+   "action": "verify",
+   "detail": "KEEP but note: asserts literal contract strings in skills/arc-evaluating/agents/{eval-grader,eval-analyzer}.md — a body diet of arc-evaluating's agents dir could break it; it is a contract test, not skill prose, so exempt from D6."
+  },
+  {
+   "target": "tests/skills/test_task_reviewer_contract.py",
+   "action": "verify",
+   "detail": "KEEP. Targets templates/task-reviewer-prompt.md + agents/task-reviewer.md (template contract, not skill prose)."
+  },
+  {
+   "target": "tests/skills/test_minimal_toolkit_docs.py",
+   "action": "verify",
+   "detail": "KEEP but fragile: literal assertions against README.md, docs/guide/{skills-reference,hooks-system}.md, hooks/README.md, .claude/rules/architecture.md, skills/arc-using/SKILL.md, skills/arc-refining/SKILL.md — the v5 name sweep/diet will likely break specific asserts here; budget an edit pass."
+  },
+  {
+   "target": "tests/skills/test_learning_subsystem_mvp_plan.py",
+   "action": "verify",
+   "detail": "KEEP (asserts docs/plans/learning-subsystem-mvp.md). Contributor-plan test, out of D6 scope."
+  },
+  {
+   "target": "tests/skills/test_optional_automatic_learning_plan.py",
+   "action": "verify",
+   "detail": "KEEP (asserts docs/plans/optional-automatic-learning.md). Out of D6 scope."
+  },
+  {
+   "target": "tests/skills/test_arc_managing_sessions_eval_scenarios.py",
+   "action": "verify",
+   "detail": "KEEP. Asserts the three eval-arc-managing-sessions-*.md scenarios exist with lowercased '## target\\nskills/arc-managing-sessions/skill.md' — couples pytest to WS9 scenario files; retiring/renaming those scenarios fails pytest."
+  },
+  {
+   "target": "tests/scripts/check-ci-gates.test.js:36",
+   "action": "verify",
+   "detail": "skillsNeedingEval fixture includes 'tests/skills/test_skill_arc_tdd.py' (:36) and 'tests/skills/test_skill_arc_debugging.py' (:64) as literal strings — verify the gate logic still behaves when per-skill test files no longer exist (fixture strings, likely fine, but the gate's 'skill edit → eval needed' pairing may key off these paths)."
+  },
+  {
+   "target": "CONTRIBUTING.md:172",
+   "action": "edit",
+   "detail": "Instructs creating tests/skills/test_skill_arc_<name>.py per skill following test_skill_arc_brainstorming.py; also :314 runner table. Rewrite to structure-checker convention."
+  },
+  {
+   "target": "README.md:286",
+   "action": "edit",
+   "detail": "'pytest — skill content validation (tests/skills/)' — reword to structure validation."
+  },
+  {
+   "target": ".claude/rules/skills.md",
+   "action": "edit",
+   "detail": "'Test File Convention' section (one test file per skill, follow test_skill_arc_brainstorming.py) — rewrite for structure-only layer."
+  },
+  {
+   "target": ".claude/rules/testing.md",
+   "action": "edit",
+   "detail": "pytest runner row 'Skill content validation' + 'File naming: test_skill_arc_<name>.py' section — update."
+  },
+  {
+   "target": "package.json:38",
+   "action": "verify",
+   "detail": "test:skills = 'python3 -m pytest tests/skills/ -v' — invocation unchanged by conversion; runs from repo root (satisfies relative-path tests)."
+  },
+  {
+   "target": "evals/scenarios/",
+   "action": "verify",
+   "detail": "WS9 scope baseline: 63 active scenario .md files (flat; discovery = eval-scenario.js listScenarios :206-215, non-recursive readdirSync filtered to *.md — evals/scenarios/retired/ 4 files are invisible to the CLI). 57 have '## Target'; 6 have none (eval-plugin-dir-*, eval-release-flow-destructive-action-gate, eval-sessionstart-* — workflow/infra scope, no dangling risk). Target parsed at eval-scenario.js:163 (section('target')); Target text may be a path, comma-separated paths, or prose (completion-pipeline-ordering.md, sdd-v2-arc-implementing-delegation.md)."
+  },
+  {
+   "target": "scripts/cli/eval-command.js:330-340",
+   "action": "verify",
+   "detail": "Dangling-target mechanics for `eval ab` skill scope: :330 skillFile = --skill-file || scenario.target; :332-336 error 'requires --skill-file <path> or ## Target in scenario' (exit 1) when Target absent; :339 'Error: skill file not found: <path>' (exit 1) when Target dangles — this (:339, not :333) is what fires after the arc-requesting-review→arc-reviewing rename. Second scenario.target use at :370 (blind-comparator skillName). Entry points: cli.js:149 → runEvalCommand; subcommands list/run/preflight/lint/report/ab/compare/history/audit/dashboard (cli.js:19-28)."
+  },
+  {
+   "target": "evals/scenarios/eval-arc-requesting-review-dispatch-fidelity.md:8-9",
+   "action": "edit",
+   "detail": "Target = skills/arc-requesting-review/SKILL.md — dangles after rename; retarget to skills/arc-reviewing/SKILL.md (and consider renaming the scenario file + updating benchmark history keying). CAUTION: last benchmark shows 10 trials pass_rate 0 — skill-eval-coverage.md records it as one of the 4 Wave-6 scenarios reverted to draft on 2026-06-24 (A4-flaky); repair or retire before it anchors the merged skill's baseline."
+  },
+  {
+   "target": "evals/scenarios/ (arc-reviewing receive-half)",
+   "action": "create",
+   "detail": "arc-receiving-review has ZERO eval scenarios (grep across evals/scenarios/ confirms) — D5 requires both merged skills re-baselined, so the merged arc-reviewing needs a receive-review scenario authored (or the merge ships with only the request-half covered)."
+  },
+  {
+   "target": "evals/scenarios/ (arc-learning merge pair)",
+   "action": "verify",
+   "detail": "arc-observing has zero scenarios; arc-learning is targeted by activated-skill-behavior.md, dashboard-concurrency-guard.md, dashboard-promote-gate.md, dashboard-safety-ack-required.md, deactivate-reviewer-ack-required.md, pending-candidate-boundary.md — all Targets survive the merge unchanged (skills/arc-learning/SKILL.md). Re-run these post-merge; they are learning-scope `eval run` scenarios, not ABs."
+  },
+  {
+   "target": "evals/scenarios/ (discipline-skill map)",
+   "action": "verify",
+   "detail": "Per-skill scenario inventory for D5 re-baseline: arc-tdd → eval-arc-tdd-test-first-gate (benchmarked 07-09: 5 trials pass 1.0, ~21s/trial); arc-debugging → eval-arc-debugging-root-cause-first-gate (5 trials pass 1.0, ~76s/trial); arc-verifying → eval-arc-verifying-stale-evidence-gate (header: 'Preflight: PENDING — not yet run'; NO results dir); arc-evaluating → 9 scenarios (eval-arc-evaluating-{ab-noisy-delta-interpretation, adversarial-proxy-grader, claim-lifecycle-arbitration, grader-selection-boundary, metric-regression-separation, model-grader-calibration, preflight-ceiling-redesign, scenario-audit, workflow-vs-skill-boundary}) — only scenario-audit ever benchmarked (pass 0), other 8 have NO results dirs; arc-researching → eval-arc-researching-predict-audit (no results); arc-writing-skills → eval-arc-writing-skills-match-form-to-failure + eval-arc-writing-skills-micro-test-control (results 20260709 exist, post-date the 07-09 benchmark) + eval-other-skill-noninterference (10 trials pass 1.0); arc-requesting-review → dispatch-fidelity (see above)."
+  },
+  {
+   "target": "scripts/lib/eval-benchmark.js:291-373",
+   "action": "verify",
+   "detail": "Re-baseline write path: generateBenchmark(:291) builds {generated, by_claim_type, evals{name:{scope, claim_type, grader, trials, pass_rate, avg_score, stddev, ci95, pass_at_k, pass_all_k, last_run, metrics{duration_ms,input_tokens,output_tokens}}}}, writes benchmarks/latest.json (:371) + timestamped YYYY-MM-DD.json snapshot (same-day overwrite, :373); writeRawBenchmarkData (:225-229) writes benchmarks/raw/. Invoked ONLY via `node scripts/cli.js eval report` (eval-command.js:460). Silent-omission property: scenarios with no results rows simply don't appear — no error for un-run scenarios."
+  },
+  {
+   "target": "evals/benchmarks/latest.json",
+   "action": "edit",
+   "detail": "Regenerate as the v5 baseline epoch (D5). Current state is inconsistent: latest.json generated 2026-07-02 (35 evals) while 2026-07-09.json (37 evals) + raw/2026-07-09.json sit UNTRACKED in git — reconcile/commit before declaring the epoch, else the baseline is ambiguous."
+  },
+  {
+   "target": "scripts/lib/eval-stats.js:171-177",
+   "action": "verify",
+   "detail": "defaultK: scenario '## Trials' override wins; AB runs default k=5/condition (code grader) or k=10/condition (model/human grader); single runs 3/5. Cost model from 2026-07-09 metrics: per-trial 5–104s → one k=5 AB ≈ 4–20 min wall; full discipline+merged sweep ≈ 17+ scenarios, dominated by arc-evaluating's 9; expect hours of wall time, run per-skill not as one batch."
+  },
+  {
+   "target": "evals/skill-eval-coverage.md",
+   "action": "edit",
+   "detail": "247-line coverage ledger keyed by '## Target is skills/<skill>/SKILL.md' — must be updated for the rename (arc-requesting-review row), the merges, and the re-baseline verdicts; it also documents the validated-vs-draft tier rules the re-baseline should follow."
+  },
+  {
+   "target": "evals/scenarios/retired/",
+   "action": "verify",
+   "detail": "4 files (memory-resume-continuity, research-deeper-optimization, research-fixed-judge, research-outcome-quality) — already outside discovery; the 'retire' motion for flaky scenarios is `git mv` into this dir (also satisfies test_eval_scenario_format.py by removing them from the active glob... note that test globs evals/scenarios/*.md non-recursively, so retired/ is exempt)."
+  }
+ ],
+ "verify_commands": [
+  "npm run test:skills",
+  "python3 -m pytest tests/skills/ -q -k \"cross_reference\"",
+  "test \"$(ls tests/skills/test_skill_arc_*.py 2>/dev/null | wc -l | tr -d ' ')\" = \"0\" && test -f tests/skills/test_skill_structure.py && echo CONVERSION-OK",
+  "! grep -rn \"NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST\\|NO FIXES WITHOUT ROOT CAUSE\" tests/skills/ --include='*.py' && echo NO-LITERAL-PROSE-OK",
+  "for f in skills/*/SKILL.md; do n=$(wc -l < \"$f\"); limit=250; case \"$f\" in *arc-refining*) limit=300;; *arc-finishing*) limit=430;; esac; [ \"$n\" -le \"$limit\" ] || echo \"OVER-BUDGET: $f $n > $limit\"; done",
+  "npx jest tests/scripts/learning.test.js",
+  "for f in evals/scenarios/*.md; do t=$(awk '/^## Target/{getline; while($0==\"\"){getline}; print; exit}' \"$f\"); for p in $(echo \"$t\" | tr ',' ' '); do case \"$p\" in skills/*|templates/*|hooks/*|scripts/*) [ -e \"$p\" ] || echo \"DANGLING-TARGET: $f -> $p\";; esac; done; done",
+  "node scripts/cli.js eval ab eval-arc-tdd-test-first-gate --k 5",
+  "node scripts/cli.js eval ab eval-arc-debugging-root-cause-first-gate --k 5",
+  "node scripts/cli.js eval preflight eval-arc-verifying-stale-evidence-gate && node scripts/cli.js eval ab eval-arc-verifying-stale-evidence-gate --k 5",
+  "node scripts/cli.js eval ab eval-arc-requesting-review-dispatch-fidelity --k 5",
+  "for s in ab-noisy-delta-interpretation adversarial-proxy-grader claim-lifecycle-arbitration grader-selection-boundary metric-regression-separation model-grader-calibration preflight-ceiling-redesign scenario-audit workflow-vs-skill-boundary; do node scripts/cli.js eval ab \"eval-arc-evaluating-$s\"; done",
+  "node scripts/cli.js eval ab eval-arc-researching-predict-audit",
+  "node scripts/cli.js eval ab eval-arc-writing-skills-match-form-to-failure && node scripts/cli.js eval ab eval-arc-writing-skills-micro-test-control && node scripts/cli.js eval ab eval-other-skill-noninterference",
+  "for s in activated-skill-behavior dashboard-concurrency-guard dashboard-promote-gate dashboard-safety-ack-required deactivate-reviewer-ack-required pending-candidate-boundary; do node scripts/cli.js eval run \"$s\"; done",
+  "node scripts/cli.js eval report && python3 -c \"import json; d=json.load(open('evals/benchmarks/latest.json')); print(d['generated'], len(d['evals']))\""
+ ],
+ "risks": [
+  "Lost regression coverage: structure-only conversion deletes ~1,300 literal assertions, including the exact Iron Law sentences (arc-tdd, arc-debugging), rationalization tables, router-table prose, and worktree-safety git mechanics that D7 marks 'survives every diet' — after conversion NOTHING mechanically asserts their presence, and the eval layer only covers what has validated scenarios: arc-verifying, 8/9 arc-evaluating scenarios, and arc-researching have never produced a single benchmark row (no results dirs), and arc-finishing/arc-refining/arc-brainstorming heavyweights have partial/failing coverage. The conversion PR should land only after (or with) the re-baseline proving eval coverage of the sentences it stops asserting.",
+  "Sequencing collision: roadmap puts pytest conversion (step 7) BEFORE body diets (step 8), but 15 of 32 skills currently exceed the 250-line hard cap (max 675, arc-writing-skills) — the line-budget check must ship with a temporary allowlist of the current oversized set (burned down per diet PR) or warn-only until step 8 completes, else CI is red for the whole diet window. Permanent allowlist is exactly two entries: arc-refining 300, arc-finishing 430.",
+  "File-exists assertions silently dropped: 54 .exists() checks (arc-auditing-spec 31, arc-maintaining-obsidian 6, arc-observing 5, arc-debugging 4, arc-recalling 3, arc-writing-skills 3...) validate references/*.md and supporting files; the current cross-ref test does NOT check those paths (its regex only validates the embedded arc-* skill name). The new checker must validate referenced supporting files or broken references/ pointers rot invisibly.",
+  "Materializer split-brain: the pytest template lives in scripts/lib/learning-drafts.js:46-62, the path mapping in scripts/lib/learning.js:274-303, and Jest expectations in tests/scripts/learning.test.js — changing one without the others either breaks Jest loudly or (if only the template changes) silently keeps materializing per-skill test files into a layout that no longer has them.",
+  "Benchmark silent omission: generateBenchmark only includes scenarios with recorded results — forgetting to run a scenario during re-baseline produces no error, just a hole in the v5 epoch. Also latest.json (2026-07-02) is already stale vs the untracked 2026-07-09 snapshot; commit/reconcile first or the epoch diff is ambiguous.",
+  "Dangling Targets never fail statically: only `eval ab` at runtime errors (eval-command.js:339); `eval lint`, pytest, and CI don't check Target resolution — after the arc-reviewing rename the dispatch-fidelity scenario dangles silently until someone runs it. The DANGLING-TARGET sweep above should become a CI check.",
+  "Flaky-scenario anchoring: eval-arc-requesting-review-dispatch-fidelity (pass 0/10, A4-flaky per skill-eval-coverage.md) and eval-arc-evaluating-scenario-audit (pass 0/5) would make the merged/dieted skills look like regressions if re-baselined as-is — repair or retire before the epoch.",
+  "Aux pytest coupling to v5 changes outside WS6: test_minimal_toolkit_docs.py (literal asserts on README/docs/rules/arc-using/arc-refining prose) and test_arc_managing_sessions_eval_scenarios.py (asserts scenario Targets) will break during the name sweep/diet PRs — they are keep-files but need edit passes, don't mistake their failures for conversion bugs.",
+  "cwd dependence: half the tests use relative Path('skills/...') and pass only because npm runs pytest from repo root; the new checker should use Path(__file__).parents[2] to be cwd-proof."
+ ],
+ "notes": "Key mechanics confirmed: (1) test:skills = `python3 -m pytest tests/skills/ -v` (package.json:38), pyproject.toml sets testpaths=tests; 592 tests green in 0.45s today; no conftest.py, no shared helpers — every file self-contains its frontmatter parser. (2) Cross-ref test: 17 REQUIRED SUB-SKILL/BACKGROUND markers across 10 skills; none reference the merge-pair names, so merges don't trip it. (3) The 'learning.js test-file materializer' from D6 is actually renderSkillTestDraft in scripts/lib/learning-drafts.js:46-62 (learning.js:274-303 only maps paths; learning-curator/materialize.js is instinct-only first-slice). (4) Eval side: 63 active scenarios + 4 retired; discovery non-recursive; Target parsed at eval-scenario.js:163; the dangling-target runtime error is eval-command.js:339 ('skill file not found') — :333 fires only when Target is absent entirely. Re-baseline flow = `eval ab <name>` per scenario (results → evals/results/<scenario>/<runId>/<condition>.jsonl) then `eval report` (regenerates benchmarks/latest.json + dated snapshot + raw/). defaultK (eval-stats.js:171): AB 5/condition code-graded, 10 model-graded. Cost: per-trial 5–104s observed → ~4–20 min per k=5 AB scenario; arc-evaluating (9 scenarios) dominates the sweep. Discrepancy noted for the plan author: decision record line 198 says arc-researching is 202 lines but the file is 287 (repo total 8,134 matches). arc-learning skill is currently 88 lines (pre-merge), arc-requesting/receiving-review 83/84."
+}
