@@ -7,9 +7,15 @@
  * otherwise. A false-positive on the block path is the expensive failure mode
  * (users disable arcforge hooks wholesale), so every rule is narrow.
  *
- * Bash rules — gated by the `.arcforge-epic` marker in cwd (i.e. inside a worktree):
+ * Bash rules — gated by the `.arcforge-epic` marker (G2 resolves the marker at the
+ * merge's `-C`/`--git-dir` target; G3 checks cwd):
  *   G2  raw `git merge`        -> redirect to the arc-finishing coordinator flow (epic path)
  *   G3  arcforge loop launch   -> loops run from the base session, not a worktree
+ *
+ * Bash bypass denies — gated on the guarded file's own context, not the marker:
+ *   a redirect / `sed -i` / `tee` writing to specs/<id>/decisions.yml, specs/<id>/
+ *   dag.yaml, or a locked research-config.md bypasses the Edit/Write guards, so it
+ *   is denied here (closes the sdd-ledger-guard coverage boundary).
  *
  * Edit/Write rules — gated by `research-config.md` in cwd (i.e. an arc-researching
  * loop is locked):
@@ -34,11 +40,16 @@ const path = require('node:path');
 const { readStdinSync, parseStdinJson, output } = require('../../scripts/lib/utils');
 const { hasArcforgeMarker, readArcforgeMarker } = require('../../scripts/lib/marker');
 
-// `git merge` that INITIATES a merge. Excludes `git merge-base`/`-file` (lookahead:
-// next char is whitespace or end) AND conflict-recovery (`--abort`/`--continue`/
-// `--quit`) — those are exactly what a worktree implementer runs during the
-// arc-finishing conflict flow (epic path), so blocking them would misdirect.
-const GIT_MERGE_RE = /\bgit\s+merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
+// `git merge` that INITIATES a merge. Allows global options between `git` and
+// `merge` (`-C <path>`, `--git-dir`, `--work-tree`) so the `-C <worktree> merge`
+// bypass form is caught too — evaluateBash resolves that target dir for the
+// marker check, so the deny lands on the repo the merge acts on, not the caller's
+// cwd. Excludes `git merge-base`/`-file` (lookahead: next char is whitespace or
+// end) AND conflict-recovery (`--abort`/`--continue`/`--quit`) — those are exactly
+// what a worktree implementer runs during the arc-finishing conflict flow (epic
+// path), so blocking them would misdirect.
+const GIT_MERGE_RE =
+  /\bgit\s+(?:(?:-C\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+))\s+)*merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
 // Arcforge loop INVOCATIONS only — not reading/diffing a file named loop.js.
 // Matches arcforge's own loop invocation (scripts/loop.js, `cli.js loop`,
 // `arcforge loop`) — NOT any project file ending in loop.js (game-loop.js,
@@ -75,16 +86,122 @@ function denyReason(command, specId) {
   return null;
 }
 
-/** Bash rule dispatch (G2/G3). */
+// Guarded state files whose Edit/Write hooks a Bash redirect / `sed -i` / `tee`
+// would bypass. decisions.yml (sdd-ledger-guard) and dag.yaml (dag-guard) are
+// gated on the canonical SDD layout (path under `specs/`); research-config.md
+// (arc-guard's own R-immutable rule) is gated on a locked contract in cwd.
+const LEDGER_BYPASS_FILES = ['decisions.yml', 'dag.yaml'];
+
+/** Strip a single layer of surrounding quotes from a shell token. */
+function unquote(token) {
+  return token.replace(/^['"]|['"]$/g, '');
+}
+
+/**
+ * If `command` writes to a file whose basename is `name` via a shell redirect
+ * (`>`/`>>`), `sed -i`, or `tee`, return the matched target path; else null.
+ * @param {string} command
+ * @param {string} name - protected file basename
+ * @returns {string|null}
+ */
+function bypassTarget(command, name) {
+  const esc = name.replace(/\./g, '\\.');
+  const fileRef = `(\\S*${esc})(?![\\w.])`;
+  const patterns = [
+    new RegExp(`>>?\\s*${fileRef}`),
+    new RegExp(`\\bsed\\s+[^|;&\\n]*-i[^|;&\\n]*?${fileRef}`),
+    new RegExp(`\\btee\\s+(?:-a\\s+)?[^|;&\\n]*?${fileRef}`),
+  ];
+  for (const re of patterns) {
+    const m = command.match(re);
+    if (m) return unquote(m[1]);
+  }
+  return null;
+}
+
+function bypassDenyReason(name) {
+  const why =
+    name === 'decisions.yml'
+      ? 'The decision ledger is append-only and its accepted/ratified fields may only be minted by `arcforge ratify`. '
+      : name === 'dag.yaml'
+        ? 'The DAG enforces completed-monotonic status and dependency preservation. '
+        : 'research-config.md is the locked research contract and must not change mid-loop. ';
+  return (
+    `Blocked — a shell redirect / \`sed -i\` / \`tee\` is writing to \`${name}\`, which ` +
+    `bypasses the Edit/Write guard that protects it. ${why}` +
+    'Make the change through the Edit/Write tool (or the proper CLI) so the guard can validate it.'
+  );
+}
+
+/** Bash-side deny for redirect/sed/tee writes that bypass a guarded state file. */
+function evaluateBashBypass(command, cwd) {
+  for (const name of LEDGER_BYPASS_FILES) {
+    const target = bypassTarget(command, name);
+    // Canonical SDD layout: specs/<id>/{decisions.yml,dag.yaml}. Requiring a
+    // `specs/` segment keeps false positives near-zero (an unrelated repo's
+    // dag.yaml at the root is not fenced).
+    if (target && /(?:^|\/)specs\//.test(target)) return bypassDenyReason(name);
+  }
+
+  if (bypassTarget(command, RESEARCH_CONFIG)) {
+    const configPath = path.resolve(cwd, RESEARCH_CONFIG);
+    try {
+      if (
+        fs.existsSync(configPath) &&
+        looksLikeResearchContract(fs.readFileSync(configPath, 'utf8'))
+      ) {
+        return bypassDenyReason(RESEARCH_CONFIG);
+      }
+    } catch {
+      // Unreadable → fall through to allow.
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the directory a `git merge` acts on: the `-C <path>` target, or the
+ * worktree root implied by `--git-dir`, else cwd. Running the epic-marker check
+ * against the repo the merge actually targets both closes the
+ * `git -C <worktree> merge` bypass and prevents a false deny when a worktree
+ * session legitimately runs `git -C <base> merge`.
+ */
+function gitMergeTargetDir(command, cwd) {
+  const cMatch = command.match(/(?:^|\s)-C\s+(\S+)/);
+  if (cMatch) return path.resolve(cwd, unquote(cMatch[1]));
+  const gitDirMatch = command.match(/--git-dir(?:=|\s+)(\S+)/);
+  if (gitDirMatch) {
+    const gitDir = path.resolve(cwd, unquote(gitDirMatch[1]));
+    return path.basename(gitDir) === '.git' ? path.dirname(gitDir) : gitDir;
+  }
+  return cwd;
+}
+
+/** Bash rule dispatch (bypass denies + G2/G3). */
 function evaluateBash(input, cwd) {
   const command = input.tool_input?.command;
   if (typeof command !== 'string' || !command) return null;
-  // Self-gating + no-op invariant: only active inside an epic worktree.
-  if (!hasArcforgeMarker(cwd)) return null;
-  // Cheap pattern check before the (rare) YAML parse for spec id.
-  if (!GIT_MERGE_RE.test(command) && !LOOP_RE.test(command)) return null;
-  const marker = readArcforgeMarker(cwd);
-  return denyReason(command, marker?.spec_id);
+
+  // Bash-side bypass denies: a redirect / `sed -i` / `tee` writing to a guarded
+  // ledger / DAG / research-config file, independent of the epic marker.
+  const bypass = evaluateBashBypass(command, cwd);
+  if (bypass) return bypass;
+
+  // G2 — raw `git merge`. Resolve the target dir so the marker check runs against
+  // the repo the merge acts on (catches `git -C <worktree> merge`).
+  if (GIT_MERGE_RE.test(command)) {
+    const targetDir = gitMergeTargetDir(command, cwd);
+    if (!hasArcforgeMarker(targetDir)) return null;
+    return denyReason(command, readArcforgeMarker(targetDir)?.spec_id);
+  }
+
+  // G3 — arcforge loop launch, scoped to the session cwd being an epic worktree.
+  if (LOOP_RE.test(command)) {
+    if (!hasArcforgeMarker(cwd)) return null;
+    return denyReason(command, readArcforgeMarker(cwd)?.spec_id);
+  }
+
+  return null;
 }
 
 /**
@@ -204,6 +321,9 @@ module.exports = {
   evaluate,
   denyReason,
   parseCannotPaths,
+  bypassTarget,
+  evaluateBashBypass,
+  gitMergeTargetDir,
   GIT_MERGE_RE,
   LOOP_RE,
   RESEARCH_CONFIG,

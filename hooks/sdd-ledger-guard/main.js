@@ -30,7 +30,6 @@
  *     previous=null → immutability checks skip → ALLOW (fail-open).
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const { readStdinSync, parseStdinJson, output, readFileSafe } = require('../../scripts/lib/utils');
 const {
@@ -38,6 +37,7 @@ const {
   validateDecisionLedger,
   getHeadLedgerContent,
 } = require('../../scripts/lib/sdd-utils');
+const { computeWriteContent, computeEditContent } = require('../../scripts/lib/resulting-content');
 
 // ---------------------------------------------------------------------------
 // Pure decision core — no git, no fs. Tests for cases (a/b/c) call this directly.
@@ -160,61 +160,6 @@ function decideLedgerEdit(resultingContent, headContent) {
     errors.join('\n') +
     '\nTo correct a frozen entry, record a new superseding entry instead of editing in-place.'
   );
-}
-
-// ---------------------------------------------------------------------------
-// Content computation helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the resulting on-disk content after a Write tool call.
- * Write replaces the entire file with tool_input.content.
- *
- * @param {Object} tool_input
- * @returns {string|null}
- */
-function computeWriteContent(tool_input) {
-  const content = tool_input?.content;
-  if (typeof content !== 'string') return null;
-  return content;
-}
-
-/**
- * Compute the resulting on-disk content after an Edit tool call.
- * Edit replaces the first occurrence of old_string with new_string (or all if replace_all).
- *
- * @param {Object} tool_input
- * @param {string} absPath - Absolute path to the file being edited.
- * @returns {string|null}
- */
-function computeEditContent(tool_input, absPath) {
-  const oldStr = tool_input?.old_string;
-  const newStr = tool_input?.new_string;
-  if (typeof oldStr !== 'string' || typeof newStr !== 'string') return null;
-
-  let onDisk;
-  try {
-    onDisk = fs.readFileSync(absPath, 'utf8');
-  } catch {
-    // File doesn't exist on disk or unreadable → can't compute result → ALLOW.
-    return null;
-  }
-
-  if (!onDisk.includes(oldStr)) {
-    // old_string not found → edit would fail anyway → ALLOW.
-    return null;
-  }
-
-  const replaceAll = tool_input?.replace_all === true;
-  if (replaceAll) {
-    // Escape regex special chars and replace all occurrences.
-    const escaped = oldStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Use a function replacer to avoid $& interpretation in replacement string.
-    return onDisk.replace(new RegExp(escaped, 'g'), () => newStr);
-  }
-  // Replace first occurrence only.
-  const idx = onDisk.indexOf(oldStr);
-  return onDisk.slice(0, idx) + newStr + onDisk.slice(idx + oldStr.length);
 }
 
 // ---------------------------------------------------------------------------
