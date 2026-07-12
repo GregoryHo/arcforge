@@ -1,6 +1,6 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **EXECUTING — Wave 5 (2026-07-12, opus 4.8)**
+Overall: **EXECUTING — Wave 6 (2026-07-12, opus 4.8)**
 Plan: `2026-07-12-v5-implementation-plan.md` · Decisions: `2026-07-12-v5-redesign-decisions.md`
 Integration branch: `v5/main` · Worktrees: `../arcforge-v5/<ws>/`
 Merge policy: green workstreams auto-merge into `v5/main`; `main` untouched until final maintainer review.
@@ -23,8 +23,8 @@ Last updated: 2026-07-12 (Wave 3 merged; Wave 4 dispatched)
 | WS7c | Diet lane: discipline (5) | 4 | WS5, WS6 | done | 1 | 2026-07-12 | v5/main (122fa91); review=pass; tdd 413→184, debugging 296→231, verifying 172→109, researching 287→200 (+refs) |
 | WS7d | Diet lane: memory (6) | 4 | WS5, WS6 | done | 1 | 2026-07-12 | v5/main (cd8c16d); review=pass; journaling 312→173, reflecting 416→205, managing-sessions 241→125 (+refs) |
 | WS7e | Diet lane: knowledge+meta (5) | 4 | WS5, WS6 | done | 2 | 2026-07-12 | v5/main (71d9741+dc02029); review flagged arc-evaluating Red Flags deletion → restored verbatim (attempt 2); writing-skills 673→**249**, diagramming 320→248, using 157→112 |
-| WS8 | Descriptions, frontmatter, index | 5 | WS7 | in-progress | 1 | — | branch v5/ws8-descriptions |
-| WS9 | Eval re-baseline (v5 epoch, full D5) | 6 | WS7, WS8 | waiting | 0 | — | — |
+| WS8 | Descriptions, frontmatter, index | 5 | WS7 | done | 1 | 2026-07-12 | v5/main (b32d7be,15019ce); 27 model-invoked 150–280 chars, 3 DMI ≤120 (auditing-spec/recalling/writing-skills, hook-safety verified); category+status frontmatter; index rebuilt; body-only line budget |
+| WS9 | Eval re-baseline (v5 epoch, full D5) | 6 | WS7, WS8 | in-progress | 1 | — | branch v5/ws9-evals; prep + harness smoke first |
 | WS10 | Release 5.0.0 | 7 | all | waiting | 0 | — | — |
 
 ## WS7 temp line-budget allowlist burn-down — DONE
