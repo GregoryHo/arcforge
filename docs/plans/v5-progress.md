@@ -1,6 +1,6 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **EXECUTING — Wave 1**
+Overall: **EXECUTING — Wave 1 (resumed 2026-07-12, opus 4.8)**
 Plan: `2026-07-12-v5-implementation-plan.md` · Decisions: `2026-07-12-v5-redesign-decisions.md`
 Integration branch: `v5/main` · Worktrees: `../arcforge-v5/<ws>/`
 Merge policy: green workstreams auto-merge into `v5/main`; `main` untouched until final maintainer review.
