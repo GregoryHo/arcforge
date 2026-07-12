@@ -1,21 +1,21 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **EXECUTING — Wave 1 (resumed 2026-07-12, opus 4.8)**
+Overall: **EXECUTING — Wave 2 (2026-07-12, opus 4.8)**
 Plan: `2026-07-12-v5-implementation-plan.md` · Decisions: `2026-07-12-v5-redesign-decisions.md`
 Integration branch: `v5/main` · Worktrees: `../arcforge-v5/<ws>/`
 Merge policy: green workstreams auto-merge into `v5/main`; `main` untouched until final maintainer review.
 Eval scope: full D5.
-Last updated: 2026-07-12 (Wave 1 dispatched)
+Last updated: 2026-07-12 (Wave 1 merged; Wave 2 dispatched)
 
 ## Workstream status
 
 | ID | Workstream | Wave | Deps | Status | Attempts | Verified | Evidence |
 |----|-----------|------|------|--------|----------|----------|----------|
-| WS1 | Platform removal (gemini/opencode) | 1 | — | in-progress | 1 | — | branch v5/ws1-platform |
-| WS2 | Hook consolidation (behavior-preserving) | 1 | — | in-progress | 1 | — | branch v5/ws2-hooks |
-| WS6 | pytest structure-only conversion | 1 | — | in-progress | 1 | — | branch v5/ws6-pytest |
-| WS3 | New guards + autopilot denies | 2 | WS2 | waiting | 0 | — | — |
-| WS4 | Merges: arc-reviewing / arc-learning | 2 | WS2, WS6 | waiting | 0 | — | — |
+| WS1 | Platform removal (gemini/opencode) | 1 | — | done | 1 | 2026-07-12 | v5/main e82ce89 (d5248fc,4364863); indep re-verified: deletes+zero-ref+check:versions+check:docs+npm test green |
+| WS2 | Hook consolidation (behavior-preserving) | 1 | — | done | 1 | 2026-07-12 | v5/main 8215f9c (bdd426b); 7 entries, sync spawn/Edit=2, hooks 360 pass, +27 new tests |
+| WS6 | pytest structure-only conversion | 1 | — | done | 1 | 2026-07-12 | v5/main da383a3 (9b34da0); 32 files→test_skill_structure.py (139 tests), no literal prose, materializer dropped |
+| WS3 | New guards + autopilot denies | 2 | WS2 | in-progress | 1 | — | branch v5/ws3-guards |
+| WS4 | Merges: arc-reviewing / arc-learning | 2 | WS2, WS6 | in-progress | 1 | — | branch v5/ws4-merges |
 | WS5 | Name-graph sweep | 3 | WS4 | waiting | 0 | — | — |
 | WS7a | Diet lane: sdd (8 skills) | 4 | WS5, WS6 | waiting | 0 | — | — |
 | WS7b | Diet lane: orchestration (6) | 4 | WS5, WS6 | waiting | 0 | — | — |
