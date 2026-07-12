@@ -18,11 +18,8 @@ Capture session reflections as structured diary entries for the **learning cycle
 | **Finalize draft** | `node "${SKILL_ROOT}/scripts/diary.js" finalize --project {p} --date {d} --session {s}` |
 | **Key principle** | Reflect from memory, NOT by reading files — **except** an existing draft (see "Draft Finalization Workflow"): read it first, never rewrite it from memory |
 | **Permission** | NEVER auto-save - always ask first |
-| **Template location** | See "Template" section below |
 
 ## Infrastructure Commands
-
-Node.js utilities handle file paths and directory creation. Optional but recommended.
 
 **Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
 ```bash
@@ -45,21 +42,6 @@ node "${SKILL_ROOT}/scripts/diary.js" save \
   --content "{diary_content}"
 ```
 
-**Verify path (for debugging):**
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-journaling}"
-node "${SKILL_ROOT}/scripts/diary.js" path \
-  --project {project} \
-  --date {YYYY-MM-DD} \
-  --session {sessionId}
-```
-
-**Core distinction:**
-
-- **Diary = observations, context, decisions made** (stored in session directory)
-- **Evolve = instinct combination** (the dashboard Evolve action — `arcforge learn dashboard` — combines related instincts into a successor candidate)
-
 **Storage:** `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
 
 ## Pre-Diary Check (Noise Gate)
@@ -71,29 +53,15 @@ Before creating a diary entry, verify at least ONE of these criteria is met:
 - **User preference was expressed** (explicit or implicit)
 - **Technique was discovered** (new pattern, integration insight)
 
-**Auto-skip these sessions** (no diary needed):
-- Pure Q&A (answering questions without making changes)
-- Retrying the same operation (build failures, test reruns)
-- Pure exploration (reading files without decisions)
-- Trivial fixes (typos, formatting, single-line changes)
+**Auto-skip these sessions** (no diary needed): pure Q&A, retrying the same operation (build failures, test reruns), pure exploration without decisions, trivial fixes (typos, formatting, single-line changes).
 
 This is a **soft gate**: Claude judges based on conversation memory. User can always override by invoking `arc-journaling` explicitly.
 
-## When to Use
+## When to Use / When NOT to Use
 
-- User invokes `/arcforge:arc-journaling`
-- PreCompact hook triggers (conversation getting long)
-- End of significant work session
-- After important design decisions
-- When user says "remember this" or "note this down"
+**Use** when `/arcforge:arc-journaling` is invoked, the PreCompact hook triggers, at the end of a significant work session, after important design decisions, or when the user says "remember this" / "note this down".
 
-## When NOT to Use
-
-- Quick Q&A sessions (< 5 tool calls)
-- Pure research without decisions
-- Already captured in previous diary entry this session
-- Pattern extraction needed (use arc-recalling instead)
-- **Fails Pre-Diary Check** — unless user explicitly requests
+**Do NOT use** for quick Q&A (< 5 tool calls), pure research without decisions, a session already captured in a previous diary entry this session, or when the Pre-Diary Check fails (unless the user explicitly requests). For reusable-pattern extraction, use arc-recalling instead.
 
 ## Draft Finalization Workflow
 
@@ -127,14 +95,7 @@ Never respond to the draft-ready nudge by reflecting from memory and calling `sa
 
 (This flow is for a fresh entry with no pending draft. If a draft exists, use "Draft Finalization Workflow" above instead.)
 
-Review the conversation from memory. **DO NOT read files to gather context.**
-
-Ask yourself:
-
-- What decisions were made and why?
-- What preferences did the user express?
-- What worked well? What didn't?
-- What context would help next session?
+Review the conversation from memory. **DO NOT read files to gather context.** Ask: what decisions were made and why? What preferences did the user express? What worked well, what didn't? What context would help next session?
 
 ### 2. Fill Template Sections
 
@@ -179,9 +140,7 @@ _Captured at {timestamp}_
 
 ### 3. Save to Session Directory
 
-1. Ensure session directory exists
-2. Write to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`
-3. Confirm save location with path
+Ensure the session directory exists, write to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`, and confirm the save location with its path.
 
 ### 4. Offer Follow-up
 
@@ -191,122 +150,24 @@ After saving, briefly mention:
 
 ## Key Principles
 
-### Observation Over Prescription
-
-Record what happened, not rules. Patterns that should become rules belong in `arc-reflecting`.
-
-### User Intent Over Implementation
-
-Focus on WHY decisions were made, not just WHAT was done.
-
-### Minimal Effort
-
-Keep entries focused. Don't over-document routine work.
-
-## Common Mistakes
-
-### Reading Files for Context
-
-**Wrong:** Reading project files to "understand" what to write
-**Right:** Reflect on conversation memory only
-
-### Capturing Implementation Details
-
-**Wrong:** "Changed line 42 of app.js to use const"
-**Right:** "Decided to prefer const over let for immutability"
-
-### Creating Diary for Trivial Sessions
-
-**Wrong:** Diary for "fixed a typo" session
-**Right:** Skip diary, or note "No significant reflections this session"
-
-### Duplicating Learn Content
-
-**Wrong:** Same pattern in both diary and instinct
-**Right:** Diary captures context; learn extracts reusable pattern
-
-### Not Asking Permission
-
-**Wrong:** Auto-saving without confirmation
-**Right:** Present draft, ask "Should I save this diary entry?"
-
-### Skipping the Generalizable Marker
-
-**Wrong:** Leaving Generalizable? empty or omitting it
-**Right:** Always mark solutions as Yes/No - helps arc-reflecting identify patterns
-
-### Rewriting an Existing Draft From Scratch
-
-**Wrong:** Seeing "Diary draft ready" and reflecting from memory into a brand-new `save` call
-**Right:** Read the draft first, fill only remaining placeholders in place, then `finalize` it (see "Draft Finalization Workflow")
+- **Observation over prescription** — record what happened, not rules (rules belong in `arc-reflecting`).
+- **User intent over implementation** — capture WHY, not line-by-line WHAT ("prefer const for immutability", not "changed line 42").
+- **Minimal effort** — keep entries focused; for a trivial session, skip the diary or note "No significant reflections this session".
+- **Always mark Generalizable?** — Yes/No on each solution helps arc-reflecting identify patterns.
+- **Never auto-save** — present the draft and ask before writing.
 
 ## Template Variables
 
-| Variable       | Source                                                 |
-| -------------- | ------------------------------------------------------ |
-| `{project}`    | `CLAUDE_PROJECT_DIR` or `path.basename(process.cwd())` |
-| `{YYYY-MM-DD}` | Current date                                           |
-| `{sessionId}`  | `CLAUDE_SESSION_ID` or generated                       |
-| `{timestamp}`  | ISO timestamp                                          |
+`{project}` = `CLAUDE_PROJECT_DIR` or `path.basename(process.cwd())` · `{YYYY-MM-DD}` = current date · `{sessionId}` = `CLAUDE_SESSION_ID` or generated · `{timestamp}` = ISO timestamp.
 
 ## Output Location
 
 ```
 ~/.arcforge/diaries/{project}/{YYYY-MM-DD}/
-├── diary-{sessionId}.md      # Diary entry (from arc-journaling)
+├── diary-{sessionId}.md          # Diary entry (from arc-journaling)
 └── diary-{sessionId}-draft.md    # Auto-generated draft (PreCompact/Stop hook); promote with `finalize`, do not overwrite with `save`
-
-~/.arcforge/sessions/{project}/{YYYY-MM-DD}/
-└── {sessionId}.json          # Session data (auto-generated)
 ```
 
-Diary files live under `~/.arcforge/diaries/` (not `~/.claude/sessions/`)
-because Claude Code v2.1.78+ blocks subprocess writes to `~/.claude/`.
-The Stop-hook background enricher needs to be able to write there.
+Diary files live under `~/.arcforge/diaries/` (not `~/.claude/`) because Claude Code v2.1.78+ blocks subprocess writes to `~/.claude/`, and the Stop-hook background enricher needs to write there.
 
-## Example Diary Entry
-
-```markdown
-# Session Diary: my-api-project
-
-**Date:** 2025-01-24
-**Session ID:** abc123-def456
-
-## Decisions Made
-
-- Chose PostgreSQL over MySQL: JSON column support needed for flexible schema
-- Connection pooling with PgBouncer: scalability requirement for multi-tenant
-
-## User Preferences Observed
-
-- Prefers explicit error handling over try-catch blocks
-- Likes detailed commit messages with context
-
-## What Worked Well
-
-- TDD approach helped catch edge case early
-- Breaking large migration into smaller steps
-
-## Challenges & Solutions
-
-- **Challenge**: Docker networking issues blocked local development
-- **Solution**: Used host network mode instead of bridge
-- **Generalizable?**: Yes - applies to any Docker-based local dev
-
-- **Challenge**: Prisma limitation with composite keys
-- **Solution**: Workaround using @@id directive with custom naming
-- **Generalizable?**: No - specific to this Prisma version
-
-## PR/Review Feedback (if any)
-
-- "Add rollback logic to migration": Added down() method to all migration files
-
-## Context for Next Session
-
-- Migration is half-complete; start with users table
-- Test database needs to be reset before next run
-
----
-
-_Captured at 2025-01-24T15:30:00Z_
-```
+For a filled-in example, see `references/example-diary.md`.

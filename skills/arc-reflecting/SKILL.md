@@ -7,7 +7,7 @@ description: Use when the user asks to reflect on accumulated diaries (/arcforge
 
 ## Overview
 
-Analyze multiple diary entries to identify recurring patterns. Save insights to `~/.arcforge/diaryed/` for user review.
+Analyze multiple diary entries to identify recurring patterns. Save insights to `~/.arcforge/diaryed/` for user review. A pattern MUST appear in **3+ diary entries** to be labeled "Pattern"; 1-2 occurrences are "Observation".
 
 ## Quick Reference
 
@@ -24,8 +24,6 @@ Analyze multiple diary entries to identify recurring patterns. Save insights to 
 
 ## Infrastructure Commands
 
-Node.js utilities handle diary scanning and processed.log management.
-
 **Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
@@ -36,57 +34,21 @@ if [ ! -d "$SKILL_ROOT" ]; then
 fi
 ```
 
-**Determine strategy (auto-detect):**
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
-node "${SKILL_ROOT}/scripts/reflect.js" strategy --project {project}
-# Returns: unprocessed | project_focused | recent_window
-```
-
-**Scan for diaries:**
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
-node "${SKILL_ROOT}/scripts/reflect.js" scan \
-  --project {project} \
-  --strategy unprocessed
-# Returns: List of unprocessed diary file paths
-```
-
-**Update processed.log after reflection:**
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
-node "${SKILL_ROOT}/scripts/reflect.js" update-log \
-  --project {project} \
-  --diaries "diary-1.md,diary-2.md,diary-3.md" \
-  --reflection "2026-01-reflection-2.md"
-```
-
-## Subagent for Diary Analysis
+Run the `strategy`, `scan`, and `update-log` subcommands from the Quick Reference table (each after setting `SKILL_ROOT`). `strategy` returns `unprocessed | project_focused | recent_window`; `scan` returns the list of diary file paths; `update-log` records which diaries a reflection consumed.
 
 For large diary sets, use the diary-analyzer subagent (see `diary-analyzer.md`) to read diaries in an isolated context without polluting the main conversation.
 
-**Integration with instincts:**
-- `arc-reflecting` → `~/.arcforge/diaryed/` (reflections) + instincts saved via `save-instinct`
-- `arc-recalling` → retrieves instincts and learned patterns
-
-**Core principle:** Patterns must appear 3+ times across diary entries to be considered "Pattern". 1-2 occurrences are labeled "Observation".
+**Integration:** `arc-reflecting` writes reflections to `~/.arcforge/diaryed/` plus instincts via `save-instinct`; `arc-recalling` retrieves instincts and learned patterns.
 
 ## When to Use
 
-- User invokes `/arcforge:arc-reflecting`
-- 5+ diary entries accumulated
-- User asks "what have I learned?" or "show me patterns"
-- User wants to review preferences across sessions
+- User invokes `/arcforge:arc-reflecting`, or asks "what have I learned?" / "show me patterns"
+- 5+ diary entries accumulated, or the user wants to review preferences across sessions
 
 ## When NOT to Use
 
-- Fewer than 3 diary entries exist
-- User wants patterns auto-loaded (use arc-recalling instead)
-- Single-session insights (use arc-journaling instead)
-- No meaningful patterns found
+- Fewer than 3 diary entries exist, or no meaningful patterns found
+- User wants patterns auto-loaded (use arc-recalling) or single-session insights (use arc-journaling)
 
 ## Storage
 
@@ -115,24 +77,8 @@ diary-def456.md | 2025-01-24 | 2025-01-reflection-1.md
 
 ### 1. Smart Filter Selection (Auto)
 
-Before reading diaries, determine the optimal filtering strategy:
+Determine the strategy via the `strategy` subcommand (see Quick Reference): `unprocessed` when 5+ unprocessed diaries exist, else `project_focused` when the project has 5+ total, else `recent_window` (recent 10). Output the strategy header at the start of the reflection:
 
-```
-Strategy Selection Algorithm:
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Check processed.log for project                         │
-│ 2. Count unprocessed diaries                                │
-│                                                             │
-│ IF unprocessed >= 5:                                        │
-│   → Mode: "unprocessed" - analyze only new diaries          │
-│ ELIF current_project has 5+ total diaries:                  │
-│   → Mode: "project_focused" - analyze project diaries       │
-│ ELSE:                                                       │
-│   → Mode: "recent_window" - analyze recent 10 diaries       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Output the strategy header at start of reflection:
 ```markdown
 ## Reflect Strategy
 **Mode:** {unprocessed|project_focused|recent_window}
@@ -143,52 +89,26 @@ Output the strategy header at start of reflection:
 
 ### 2. Locate Diary Entries
 
-Search for diary files:
-```
-~/.arcforge/diaries/{project}/*/diary-*.md
-```
-
-Count entries. If fewer than 3:
+Search `~/.arcforge/diaries/{project}/*/diary-*.md`. If fewer than 3:
 > "Found only X diary entries. Run more sessions with arc-journaling before reflecting."
 
 ### 3. Read CLAUDE.md Rules (if exists)
 
-Before analyzing diaries, read the project's CLAUDE.md to:
-- Extract existing rules and conventions
-- Enable detection of rule violations in diary entries
-
-This enables the skill to detect when diaries show user corrections for breaking existing rules.
+Read the project's CLAUDE.md to extract existing rules, so you can detect when diaries show user corrections for breaking an existing rule.
 
 ### 4. Read and Analyze Diaries
 
-Read each diary entry. Look for:
-- Repeated decisions
-- Consistent preferences
-- Recurring challenges (and solutions if marked Generalizable)
-- Common techniques
-- **Rule violations:** Cases where user corrected Claude for breaking a CLAUDE.md rule
+Read each diary entry. Look for repeated decisions, consistent preferences, recurring challenges (and solutions if marked Generalizable), common techniques, and **rule violations** (user corrected Claude for breaking a CLAUDE.md rule).
 
-**Observation Cross-Reference:** When observations are available (`~/.arcforge/observations/{project}/observations.jsonl`), cross-reference diary patterns with tool call data for stronger evidence. Tool usage sequences that match diary-reported techniques provide quantitative backing for patterns. For example, if a diary mentions "always grep before editing", check observations for Grep→Read→Edit sequences to confirm frequency.
+**Observation Cross-Reference:** When `~/.arcforge/observations/{project}/observations.jsonl` is available, cross-reference diary patterns with tool-call data for stronger evidence (e.g. a diary claim "always grep before editing" backed by Grep→Read→Edit sequences).
 
 ### 5. Identify Patterns and Violations
 
-**Pattern threshold (3+ occurrences):** A pattern MUST appear in 3+ diary entries to be labeled "Pattern".
-
-**Observation (1-2 occurrences):** Noted but not promoted to pattern status.
-
-For each potential pattern, track:
-- Which diary entries contain it
-- How it manifested each time
-- Whether it's a preference, technique, or decision
-
-For rule violations, track:
-- Which CLAUDE.md rule was violated
-- Which diary entries show user corrections
-- Specific correction quotes as evidence
+A pattern MUST appear in 3+ diary entries to be a "Pattern"; 1-2 occurrences stay "Observation". For each pattern track which diaries contain it, how it manifested, and whether it's a preference, technique, or decision. For rule violations track the violated CLAUDE.md rule, the correcting diaries, and specific correction quotes as evidence.
 
 ### 6. Draft Reflection Output
 
-Use this structure (with strategy header from step 1):
+Use this structure (with the strategy header from step 1):
 
 ```markdown
 ## Reflect Strategy
@@ -228,33 +148,21 @@ Use this structure (with strategy header from step 1):
 - {observation}: seen in {N} session(s)
 ```
 
-**Note:** Rule violations appear FIRST (priority) before patterns.
-
-#### Instincts to Create
-<!-- For each pattern found, create an instinct -->
-- **ID**: [pattern-name]
-- **Trigger**: [when does this apply]
-- **Action**: [what to do]
-- **Domain**: [category]
-- **Evidence count**: [how many times seen]
+Rule violations appear FIRST (priority) before patterns. For each pattern, also note an instinct to create (ID, Trigger, Action, Domain, Evidence count).
 
 ### 7. Auto-Save and Inform
 
-Reflections and instincts are auto-saved. Inform user of what was saved.
-
+Reflections and instincts are auto-saved. Inform the user of what was saved:
 > "I found these patterns/violations across X diary entries. Saving reflection and instincts."
 
-For rule violations, additionally inform:
+For rule violations, additionally:
 > "These rule violations suggest strengthening CLAUDE.md. Would you like to update those rules?"
 
 ### 8. Save Reflections and Instincts
 
-1. Ensure `~/.arcforge/diaryed/{project}/` or `~/.arcforge/diaryed/global/` exists
-2. Write the reflection markdown file (e.g., `YYYY-MM-reflection-N.md`)
-3. **Update processed.log** with each diary that was analyzed:
-   ```
-   diary-abc123.md | 2025-01-24 | 2025-01-reflection-1.md
-   ```
+1. Ensure `~/.arcforge/diaryed/{project}/` or `~/.arcforge/diaryed/global/` exists.
+2. Write the reflection markdown file (e.g., `YYYY-MM-reflection-N.md`).
+3. **Update processed.log** with each analyzed diary (`diary-abc123.md | 2025-01-24 | 2025-01-reflection-1.md`).
 4. For each Pattern, save an instinct:
    ```bash
    : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
@@ -268,8 +176,7 @@ For rule violations, additionally inform:
      --evidence "{source diary references}" \
      --evidence-count {N}
    ```
-5. **Save a reflection record** so the learning curator has evidence that this
-   reflection happened:
+5. **Save a reflection record** so the learning curator has evidence that this reflection happened:
    ```bash
    : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
    : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
@@ -279,138 +186,20 @@ For rule violations, additionally inform:
      --diaries "{analyzed diary filenames}" \
      --summary "{one-line summary of the reflection}"
    ```
-   The `--reflect-id` MUST start with `reflect-` (the curator batch-assembler
-   only matches `reflect-*.md` records).
-6. Confirm save location, processed.log update, and instincts saved
+   The `--reflect-id` MUST start with `reflect-` (the curator batch-assembler only matches `reflect-*.md` records).
+6. Confirm save location, processed.log update, and instincts saved.
 
 ## Key Principles
 
-### Evidence-Based Only
-Every pattern MUST cite specific diary entries as evidence. No patterns based on general assumptions.
+- **Evidence-based only** — every pattern MUST cite specific diary entries; no assumptions.
+- **Non-prescriptive** — insights are observations, not rules ("Observed: chose TypeScript in 4/5 projects", not "always use TypeScript"). The user decides how to act.
+- **Separate from recall** — diaryed patterns are for reflection; if the user wants auto-loading, redirect to arc-recalling.
+- **Never auto-update CLAUDE.md** — report rule violations and ask before changing rules.
+- **Always update processed.log** after saving, so diaries are not re-extracted next time.
 
-### Auto-Save with Notification
-Reflections and instincts are auto-saved. Inform user of what was saved.
+## Red Flags — DO NOT Extract as Pattern
 
-### Non-Prescriptive
-Insights are observations, not rules. User decides how to act on them.
+- Fewer than 3 diary entries (use "Observation") · no specific diary citations · prescriptive language
+- Already extracted in a previous reflect session (check processed.log) or already captured as an instinct
 
-### Separate from Recall
-Diaryed patterns are for reflection. If user wants auto-loading, redirect to arc-recalling.
-
-## Common Mistakes
-
-### Extracting Patterns from Few Entries
-**Wrong:** "You mentioned preferring TypeScript twice" → calling it a Pattern
-**Right:** 1-2 occurrences = Observation, 3+ occurrences = Pattern
-
-### Not Citing Evidence
-**Wrong:** "You seem to prefer X"
-**Right:** "Based on sessions from Jan 15 and Jan 20, you consistently chose X"
-
-### Confusing with arc-recalling
-**Wrong:** Putting reusable techniques here
-**Right:** Observations go to diaryed; techniques go to learned
-
-### Making Prescriptive Rules
-**Wrong:** "You should always use TypeScript"
-**Right:** "Observed: Chose TypeScript in 4/5 new projects"
-
-### Skipping processed.log Update
-**Wrong:** Saving reflection but not updating processed.log
-**Right:** Always append processed diary filenames to log after save
-
-### Auto-Updating CLAUDE.md
-**Wrong:** Automatically updating CLAUDE.md when violations found
-**Right:** Report violations and ask user if they want to update rules
-
-### Ignoring Strategy Header
-**Wrong:** Starting reflection without showing the filtering strategy
-**Right:** Always output strategy header (Mode, Diaries, Reason, Projects)
-
-## Example Output
-
-### Input: 5 Diary Entries
-
-#### Diary 1 (2025-01-15)
-```
-## Decisions Made
-- Chose PostgreSQL for JSON support
-- Used connection pooling
-
-## Challenges & Solutions
-- **Challenge**: User corrected "Added with AI assistance" in commit
-- **Solution**: Removed AI attribution
-- **Generalizable?**: Yes
-```
-
-#### Diary 2 (2025-01-18)
-```
-## User Preferences Observed
-- Prefers explicit error handling
-- Likes PostgreSQL for complex queries
-```
-
-#### Diary 3 (2025-01-20)
-```
-## Decisions Made
-- Selected PostgreSQL again for new service
-```
-
-#### Diary 4 (2025-01-22)
-```
-## Challenges & Solutions
-- **Challenge**: User said "Don't mention Claude in PR description"
-- **Solution**: Removed AI mention
-- **Generalizable?**: Yes
-```
-
-### Extracted Reflection
-
-```markdown
-## Reflect Strategy
-**Mode:** unprocessed
-**Diaries analyzed:** 5
-**Reason:** 5 new diaries since last reflection (2025-01-10)
-**Projects covered:** my-api-project (5)
-
----
-
-## Rule Violations Detected (PRIORITY)
-
-### Violation: AI Attribution
-**Existing Rule:** "Never add AI attribution to commits" (from CLAUDE.md)
-**Violation Pattern:** User corrected Claude in 2 sessions
-**Evidence:**
-- [2025-01-15] diary-abc123: "User corrected 'Added with AI assistance' in commit"
-- [2025-01-22] diary-ghi789: "User said 'Don't mention Claude in PR description'"
-**Suggested Action:** Strengthen rule in CLAUDE.md to include PR descriptions
-
----
-
-## Patterns Identified (3+ occurrences)
-
-### Pattern: prefers-postgresql
-**Occurrences:** 3 sessions
-**Evidence:**
-- [2025-01-15] Session abc123: Chose PostgreSQL for JSON support
-- [2025-01-18] Session def456: Expressed preference for PostgreSQL complex queries
-- [2025-01-20] Session ghi789: Selected PostgreSQL for new service
-**Implication:** PostgreSQL is the preferred default database
-**Confidence:** High
-
----
-
-## Observations (1-2 occurrences)
-
-- Prefers connection pooling: seen in 1 session
-- Prefers explicit error handling: seen in 1 session
-```
-
-## Red Flags - DO NOT Extract as Pattern
-
-- Pattern based on fewer than 3 diary entries (use "Observation" label instead)
-- No specific diary citations
-- Prescriptive language ("always do X")
-- Already extracted in previous reflect session (check processed.log)
-- Already captured as instinct (check for duplicates)
-- Auto-updating CLAUDE.md without user approval
+For a worked five-diary example, see `references/example-reflection.md`.
