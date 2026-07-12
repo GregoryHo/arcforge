@@ -1,6 +1,6 @@
-# Eval: eval-arc-requesting-review-dispatch-fidelity
+# Eval: eval-arc-reviewing-dispatch-fidelity
 
-<!-- status: draft-unvalidated 2026-06-24 — A4-flawed for this describe-style scenario; rework pending. HONEST VARIANCE CORRECTION (supersedes the 2026-06-23 validated-nonregression record): the earlier single-rep k=5 5/5 SHIP was FAVORABLE VARIANCE. A fresh k=5 on main (all fixes merged, effect-based A4 = fixture src/sync.py sha256 + artifact scan) reproduced the same pattern as its sibling autonomy scenarios — A1✓ A2✓ A3✓ but A4✗ (agent created artifacts), flipping trials to BLOCKED. A1–A3 (the dispatch-fidelity discriminators — the real signal) pass CONSISTENTLY, so the dispatch-fidelity behavior is non-regressing; but A4 (no-artifact) is FLAKY. A4 tests no-write instruction-following, ORTHOGONAL to the review-dispatch skill, and the agent does it inconsistently, flipping the overall verdict. A4 needs rework/removal for this describe-style scenario (follow-up tracked). Measured baseline preserved: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash db3fe84f) — confirming plan §6.6 (modern Claude captures faithful context unaided); the behavior is baseline-competent. Marked draft-unvalidated so the recompute snippet stops counting this as clean-validated: the per-scenario verdict is VARIANT, not a clean SHIP. A1/A2/A3 and the grader code are unchanged. Direct behavioral coverage target: skills/arc-requesting-review/SKILL.md. -->
+<!-- status: draft-unvalidated 2026-06-24 — A4-flawed for this describe-style scenario; rework pending. HONEST VARIANCE CORRECTION (supersedes the 2026-06-23 validated-nonregression record): the earlier single-rep k=5 5/5 SHIP was FAVORABLE VARIANCE. A fresh k=5 on main (all fixes merged, effect-based A4 = fixture src/sync.py sha256 + artifact scan) reproduced the same pattern as its sibling autonomy scenarios — A1✓ A2✓ A3✓ but A4✗ (agent created artifacts), flipping trials to BLOCKED. A1–A3 (the dispatch-fidelity discriminators — the real signal) pass CONSISTENTLY, so the dispatch-fidelity behavior is non-regressing; but A4 (no-artifact) is FLAKY. A4 tests no-write instruction-following, ORTHOGONAL to the review-dispatch skill, and the agent does it inconsistently, flipping the overall verdict. A4 needs rework/removal for this describe-style scenario (follow-up tracked). Measured baseline preserved: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash db3fe84f) — confirming plan §6.6 (modern Claude captures faithful context unaided); the behavior is baseline-competent. Marked draft-unvalidated so the recompute snippet stops counting this as clean-validated: the per-scenario verdict is VARIANT, not a clean SHIP. A1/A2/A3 and the grader code are unchanged. Direct behavioral coverage target: skills/arc-reviewing/SKILL.md. -->
 
 ## Scope
 skill
@@ -26,7 +26,7 @@ Constraints:
   context you will hand the reviewer.
 
 ## Context
-This is a direct behavioral eval for `arc-requesting-review`. The target behavior
+This is a direct behavioral eval for `arc-reviewing`. The target behavior
 is dispatching a review with **faithful PR/branch context**: capture the real
 commit range with `git rev-parse` (`BASE_SHA=$(git rev-parse HEAD~1)`,
 `HEAD_SHA=$(git rev-parse HEAD)`) and fill the code-reviewer template's named

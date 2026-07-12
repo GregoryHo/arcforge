@@ -16,7 +16,7 @@ Run `npm test` before every PR. It executes 5 separate runners:
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
 | pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
-| Bash | `npm run test:observer-daemon` | `skills/arc-observing/tests/` | Observer daemon behavior |
+| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
 
 ## Jest Tests (`tests/scripts/`)
 

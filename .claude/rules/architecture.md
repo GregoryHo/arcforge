@@ -54,7 +54,7 @@ Skills compose in three ways depending on type:
 | Discipline | Conditional routing | `arc-using` maps concrete conditions → skills |
 | Meta | Direct invocation | User, maintainer, or project-level task triggers as needed |
 
-Discipline skills (arc-tdd, arc-debugging, arc-verifying, arc-requesting-review, arc-receiving-review, arc-evaluating) are quality gates that fire when their condition is actually present. They should be documented in `arc-using`'s conditional trigger table, but they are not mandatory steps for every message.
+Discipline skills (arc-tdd, arc-debugging, arc-verifying, arc-reviewing, arc-evaluating) are quality gates that fire when their condition is actually present. They should be documented in `arc-using`'s conditional trigger table, but they are not mandatory steps for every message.
 
 ## Multi-Platform
 

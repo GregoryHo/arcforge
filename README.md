@@ -143,16 +143,14 @@ All 32 skills, each listed once. Workflow skills hand off sequentially, discipli
 - **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
 - **arc-debugging** - Systematic debugging with four phases
 - **arc-verifying** - Verification evidence before completion claims
-- **arc-requesting-review** - When and how to request code review
-- **arc-receiving-review** - How to handle review feedback with technical rigor
+- **arc-reviewing** - Request code review, then process the feedback with technical rigor
 - **arc-evaluating** - Measure whether skills and workflows change agent behavior
 
 ### Session & Learning Skills
 
 - **arc-journaling** - Session journaling for capturing reflections before compaction
 - **arc-reflecting** - Analyze diary entries for insights and patterns
-- **arc-learning** - Extract reusable patterns from sessions
-- **arc-observing** - Tool call observation for behavioral pattern detection
+- **arc-learning** - Opt-in observe→curate→review→activate lifecycle for behavioral instincts
 - **arc-recalling** - Manual instinct creation from session insights
 - **arc-managing-sessions** - Session save/resume with alias support
 - **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
@@ -179,7 +177,7 @@ Skills delegate focused work to 9 specialized subagents (Claude Code only). You 
 | `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
 | `task-reviewer` | Per-task review: spec compliance + task quality in one pass (arc-agent-driven) |
 | `spec-reviewer` | Epic-acceptance spec compliance, whole merged branch (arc-dispatching-teammates / arc-dispatching-parallel) |
-| `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
+| `code-reviewer` | Review a completed step against plan and standards (arc-reviewing) |
 | `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
 | `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
 | `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
