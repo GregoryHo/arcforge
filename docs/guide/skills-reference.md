@@ -1,19 +1,18 @@
 # arcforge Skills Reference
 
-This is the offline reference for all 32 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
+This is the offline reference for all 30 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
-  - Planning: [arc-brainstorming](#arc-brainstorming) · [arc-refining](#arc-refining) · [arc-writing-tasks](#arc-writing-tasks) · [arc-planning](#arc-planning)
-  - Execution: [arc-executing-tasks](#arc-executing-tasks) · [arc-agent-driven](#arc-agent-driven) · [arc-implementing](#arc-implementing) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping)
-  - Coordination: [arc-using](#arc-using) · [arc-using-worktrees](#arc-using-worktrees) · [arc-compacting](#arc-compacting) · [arc-coordinating](#arc-coordinating) · [arc-finishing](#arc-finishing) · [arc-managing-sessions](#arc-managing-sessions)
-  - Quality: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-evaluating](#arc-evaluating) · [arc-reviewing](#arc-reviewing)
-  - Learning: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-researching](#arc-researching)
-  - Knowledge Base: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
-  - Meta: [arc-writing-skills](#arc-writing-skills) · [arc-auditing-spec](#arc-auditing-spec)
+  - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-refining](#arc-refining) · [arc-planning](#arc-planning) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-implementing](#arc-implementing) · [arc-finishing](#arc-finishing) · [arc-auditing-spec](#arc-auditing-spec)
+  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-coordinating](#arc-coordinating) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
+  - Discipline: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing) · [arc-researching](#arc-researching)
+  - Memory: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
+  - Knowledge: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
+  - Meta: [arc-using](#arc-using) · [arc-writing-skills](#arc-writing-skills) · [arc-evaluating](#arc-evaluating)
 - [Workflow Patterns](#workflow-patterns)
 - [Comparison Tables](#comparison-tables)
 - [Operating Principles](#operating-principles)
@@ -59,23 +58,22 @@ What are you trying to do?
 
 ## Skill Categories
 
-arcforge's 32 skills are organized into a three-layer model:
+arcforge's 30 skills are organized into a three-layer model:
 
 1. **Core toolkit** — the small promoted surface most users should learn first.
 2. **Optional workflows** — recipes and advanced orchestration used only when the task justifies them.
 3. **Harness/eval layer** — tests and evaluation skills that verify both activation and non-activation behavior.
 
-The complete catalog still uses functional categories for lookup:
+The complete catalog is grouped by `category` frontmatter. Within each category, model-invoked skills auto-trigger from their description; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task:
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
-| **Planning** | arc-brainstorming, arc-refining, arc-writing-tasks, arc-planning | Explore, specify, break down |
-| **Execution** | arc-executing-tasks, arc-agent-driven, arc-implementing, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping | Build and ship |
-| **Coordination** | arc-using, arc-using-worktrees, arc-coordinating, arc-finishing, arc-compacting, arc-managing-sessions | Route, isolate, integrate |
-| **Quality** | arc-tdd, arc-debugging, arc-verifying, arc-reviewing, arc-evaluating | Test, debug, verify, review |
-| **Learning** | arc-journaling, arc-reflecting, arc-learning, arc-recalling, arc-researching | Capture, extract, evolve |
-| **Knowledge Base** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-writing-skills, arc-auditing-spec | Maintain ArcForge's own skills; audit SDD spec families |
+| **SDD** | arc-brainstorming, arc-refining, arc-planning, arc-writing-tasks, arc-executing-tasks, arc-implementing, arc-finishing, arc-auditing-spec _(user-invoked)_ | Explore, specify, plan, build, integrate a spec family |
+| **Orchestration** | arc-agent-driven, arc-coordinating, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
+| **Discipline** | arc-tdd, arc-debugging, arc-verifying, arc-reviewing, arc-researching | Condition-triggered quality gates |
+| **Memory** | arc-journaling, arc-reflecting, arc-learning, arc-recalling _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
+| **Knowledge** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
+| **Meta** | arc-using, arc-writing-skills _(user-invoked)_, arc-evaluating | Route, evaluate, and maintain the catalog itself |
 
 **How skills flow through a project:**
 
@@ -90,21 +88,21 @@ The complete catalog still uses functional categories for lookup:
                     |
                     +--- using-worktrees, coordinating
 
-  QUALITY                   LEARNING              META
-  -------                   --------              ----
-  tdd (during execution)    journaling            writing-skills
-  debugging (on failure)    reflecting
-  verifying (before done)   learning
-  evaluating (skill eval)   observing
-  requesting-review         recalling
-  receiving-review          researching
+  DISCIPLINE                MEMORY                META
+  ----------                ------                ----
+  tdd (during execution)    journaling            using (router)
+  debugging (on failure)    reflecting            evaluating (skill eval)
+  verifying (before done)   learning              writing-skills
+  reviewing (on completion) recalling
+  researching (metric opt)  managing-sessions
+                            compacting
 ```
 
 ---
 
 ## Complete Skill Catalog
 
-### Planning Skills
+### SDD Skills
 
 ---
 
@@ -112,7 +110,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Purpose:** Explore ideas before implementation through structured discovery and design.
 
-**When to use:** When exploring ideas before implementation or when user says "let's build X".
+**When to use:** When intent is vague, a new feature needs design, or an existing spec needs another iteration — the front door to the SDD pipeline.
 
 **Key workflow:**
 1. Phase 0 Scan and Route — list `specs/<spec-id>/` directories; user confirms new topic vs. iterating on existing spec-id
@@ -134,7 +132,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Purpose:** Transform design documents into structured XML specifications that serve as the single source of truth.
 
-**When to use:** When converting design documents to structured specs, when spec quality is below threshold, or when requirements need formal acceptance criteria.
+**When to use:** When a design.md is ready to become the authoritative `spec.xml`, or spec quality is below threshold.
 
 **Key workflow:**
 1. Validate design doc via the `sdd-gate design` CLI stage (`arcforge sdd-gate design --design <path>`)
@@ -152,32 +150,11 @@ The complete catalog still uses functional categories for lookup:
 
 ---
 
-### arc-writing-tasks
-
-**Purpose:** Break features into bite-sized (2-5 minute) tasks with exact code and commands.
-
-**When to use:** When breaking down features into executable tasks, when preparing for implementation, or when tasks need exact code and commands.
-
-**Key workflow:**
-1. Read feature spec or design document
-2. Identify files needed
-3. Break into 2-5 minute tasks with exact code (not "add validation")
-4. Add test commands with expected output per task
-5. Output task list in TDD order (test first, then implementation)
-
-**Artifacts:**
-- Input: design doc, feature spec, or epic.md
-- Output: `docs/tasks/<feature-name>-tasks.md`
-
-**Related:** arc-brainstorming or arc-refining --> **arc-writing-tasks** --> arc-executing-tasks or arc-agent-driven
-
----
-
 ### arc-planning
 
 **Purpose:** Convert specs into an executable DAG with epic/feature breakdown and strict 1:1 traceability.
 
-**When to use:** When breaking down specifications, when `specs/<spec-id>/spec.xml` exists, or when planning epic and feature structure.
+**When to use:** When `specs/<spec-id>/spec.xml` exists and needs decomposition into a dependency-ordered DAG of epics and features.
 
 **Key workflow:**
 1. Verify `specs/<spec-id>/spec.xml` and `specs/<spec-id>/details/` exist (else route to arc-refining)
@@ -195,7 +172,24 @@ The complete catalog still uses functional categories for lookup:
 
 ---
 
-### Execution Skills
+### arc-writing-tasks
+
+**Purpose:** Break features into bite-sized (2-5 minute) tasks with exact code and commands.
+
+**When to use:** When a spec or feature is ready and you need concrete, executable implementation steps with exact code before coding.
+
+**Key workflow:**
+1. Read feature spec or design document
+2. Identify files needed
+3. Break into 2-5 minute tasks with exact code (not "add validation")
+4. Add test commands with expected output per task
+5. Output task list in TDD order (test first, then implementation)
+
+**Artifacts:**
+- Input: design doc, feature spec, or epic.md
+- Output: `docs/tasks/<feature-name>-tasks.md`
+
+**Related:** arc-brainstorming or arc-refining --> **arc-writing-tasks** --> arc-executing-tasks or arc-agent-driven
 
 ---
 
@@ -203,7 +197,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Purpose:** Human-in-the-loop task execution with batch checkpoints and verification.
 
-**When to use:** When executing a prepared task list, when running batch implementation, or when tasks are already broken down.
+**When to use:** When tasks are already broken down and you implement them in-session with human-in-the-loop checkpoints. For isolated subagent-per-task execution, use arc-agent-driven.
 
 **Key workflow:**
 1. Load and review task file from `docs/tasks/`
@@ -221,32 +215,11 @@ The complete catalog still uses functional categories for lookup:
 
 ---
 
-### arc-agent-driven
-
-**Purpose:** Fully autonomous task execution with fresh subagent per task and a single task-reviewer returning both verdicts (spec compliance + task quality).
-
-**When to use:** When executing task lists where each task requires isolated execution.
-
-**Key workflow:**
-1. Read task list, create TodoWrite tracking
-2. Per task: dispatch implementer subagent with full task text
-3. Dispatch task-reviewer — returns both verdicts (spec compliance + task quality) in one pass
-4. Max 3 review cycles per task — escalate to human if not converging
-5. After all tasks: dispatch final code reviewer, then arc-finishing
-
-**Artifacts:**
-- Input: `docs/tasks/<name>-tasks.md`
-- Output: committed code per task, review reports
-
-**Related:** arc-writing-tasks --> **arc-agent-driven** --> arc-finishing
-
----
-
 ### arc-implementing
 
 **Purpose:** Orchestrator for large projects — automatically expands epic to features to tasks to execution.
 
-**When to use:** When orchestrating large project implementation in a worktree.
+**When to use:** When driving one epic's build end-to-end inside a worktree. For cross-epic worktree and DAG-state management, use arc-coordinating.
 
 **Key workflow:**
 1. Phase 0: Sync and check dependencies via arc-coordinating
@@ -263,11 +236,98 @@ The complete catalog still uses functional categories for lookup:
 
 ---
 
+### arc-finishing
+
+**Purpose:** Guide completion of development work with structured options. One skill, two paths — Step 0 discriminates on `.arcforge-epic`: an **epic path** (coordinator integration + DAG updates for marker'd worktrees) and a **non-epic path** (plain git for regular branches and generic worktrees).
+
+**When to use:** When implementation is complete and tests pass and you need to decide how to integrate — Step 0 discriminates epic worktree (`.arcforge-epic`) vs regular branch.
+
+**Key workflow:**
+1. Step 0 — read `.arcforge-epic` to pick the path (epic vs non-epic)
+2. Epic path only: sync from base via finish-epic.js
+3. Verify all tests pass (auto-detect test command)
+4. Determine base branch
+5. Present 4 options: merge (epic: via coordinator; non-epic: into the base checkout), create PR, keep as-is, discard
+6. Look up the worktree path (epic: `status --json` on the base dag; non-epic: `worktree list --json`)
+7. Cleanup worktree for Options 1 and 4 only (cd to base first)
+
+**Artifacts:**
+- Input: completed branch or epic worktree with passing tests
+- Output: merged code/epic, PR, preserved branch, or discarded work (+ DAG updated on the epic path)
+
+**Related:** arc-executing-tasks / arc-agent-driven / arc-implementing --> **arc-finishing** --> done / arc-coordinating status
+
+---
+
+### arc-auditing-spec
+
+**Purpose:** Read-only advisory audit of an SDD spec family (design.md, spec.xml, dag.yaml, decisions.yml, product/vision.md) across three axes: internal consistency, cross-artifact alignment, and state-transition integrity.
+
+**When to use:** When you explicitly run `/arcforge:arc-auditing-spec <spec-id>`. User-invoked only (disable-model-invocation) — never auto-invoked from a pipeline skill.
+
+**Key workflow:**
+1. Phase 0 — verify `specs/<spec-id>/` exists (graceful degradation: only design.md is required)
+2. Fan out three parallel audit subagents, one per axis
+3. Aggregate findings into a single advisory report
+4. Print a Decisions table and exit — the skill never edits anything (`--save` optionally writes the report to `~/.arcforge/reviews/`)
+
+**Artifacts:**
+- Input: `specs/<spec-id>/` family + D6 anchor artifacts
+- Output: advisory report (display only, or saved via `--save`); zero mutations
+
+**Related:** user runs `/arcforge:arc-auditing-spec <spec-id>` --> **arc-auditing-spec** --> main session owns any actual edits
+
+---
+
+### Orchestration Skills
+
+---
+
+### arc-agent-driven
+
+**Purpose:** Fully autonomous task execution with fresh subagent per task and a single task-reviewer returning both verdicts (spec compliance + task quality).
+
+**When to use:** When tasks need isolated contexts (one fresh subagent + task-reviewer per task) to avoid cross-task pollution. For in-session human-checkpoint execution, use arc-executing-tasks.
+
+**Key workflow:**
+1. Read task list, create TodoWrite tracking
+2. Per task: dispatch implementer subagent with full task text
+3. Dispatch task-reviewer — returns both verdicts (spec compliance + task quality) in one pass
+4. Max 3 review cycles per task — escalate to human if not converging
+5. After all tasks: dispatch final code reviewer, then arc-finishing
+
+**Artifacts:**
+- Input: `docs/tasks/<name>-tasks.md`
+- Output: committed code per task, review reports
+
+**Related:** arc-writing-tasks --> **arc-agent-driven** --> arc-finishing
+
+---
+
+### arc-coordinating
+
+**Purpose:** CLI-based worktree lifecycle management and cross-session coordination via Node.js.
+
+**When to use:** When `specs/<spec-id>/dag.yaml` exists and epics run in parallel worktrees needing sync and merge orchestration. To build a single epic's features, use arc-implementing.
+
+**Key workflow:**
+1. Set SKILL_ROOT from skill loader header
+2. Use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>`
+3. Commands: expand, merge, status, cleanup, sync, next, parallel, block, reboot
+
+**Artifacts:**
+- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
+- Output: worktrees created/merged, DAG status updated
+
+**Related:** arc-planning --> **arc-coordinating** --> arc-implementing
+
+---
+
 ### arc-dispatching-parallel
 
 **Purpose:** Dispatch multiple agents for independent tasks in parallel.
 
-**When to use:** When dispatching multiple independent features within a worktree session.
+**When to use:** When fanning out multiple independent features to parallel subagents you drive yourself within one worktree. For epic-level teammates you monitor as a present lead, use arc-dispatching-teammates.
 
 **Key workflow:**
 1. Identify independent tasks (no shared dependencies or files)
@@ -290,7 +350,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between `arc-coordinating` (single-epic interactive) and `arc-looping` (multi-epic unattended).
 
-**When to use:** When `specs/<spec-id>/dag.yaml` has 2+ epics in a ready state AND the user is staying at the keyboard to monitor (not walking away). The discriminator against `arc-looping` is **attendance, not risk** — a risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still `arc-looping`.
+**When to use:** When `specs/<spec-id>/dag.yaml` has 2+ ready epics and you stay present to monitor a live team. For walk-away loops use arc-looping; for feature fan-out use arc-dispatching-parallel.
 
 **Key workflow:**
 1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
@@ -317,7 +377,7 @@ The complete catalog still uses functional categories for lookup:
 
 **Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
 
-**When to use:** When tasks can run fully unattended across sessions with no human judgment needed per task.
+**When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
 
 **Key workflow:**
 1. Verify DAG exists (from arc-planning) and baseline tests pass
@@ -335,31 +395,6 @@ The complete catalog still uses functional categories for lookup:
 
 ---
 
-### Coordination Skills
-
----
-
-### arc-using
-
-**Purpose:** Bounded router and skill index for ArcForge tasks — helps choose the smallest useful workflow without becoming a global policy layer.
-
-**When to use:** When an ArcForge task needs routing help, when the user asks which skill/workflow applies, or when task scope is ambiguous enough that a skill choice matters.
-
-**Key workflow:**
-1. Understand the user request and constraints
-2. Decide whether routing adds value; skip routing for simple answers, read-only inspection, grading, or isolated evals
-3. If useful, pick the smallest applicable skill or workflow path
-4. Read/invoke only the relevant skill(s)
-5. Preserve harness/eval isolation and higher-priority instructions
-
-**Artifacts:**
-- Input: user request that benefits from routing
-- Output: selected skill(s) or direct continuation when routing is unnecessary
-
-**Related:** optional session bootstrap --> **arc-using** --> any applicable skill, or direct task execution
-
----
-
 ### arc-using-worktrees
 
 **Purpose:** Isolated git worktrees for **any** repo, in two tiers. A
@@ -368,8 +403,7 @@ branch, an experiment, or a review checkout in any project; a **composition
 tier** hands single-epic work to the coordinator. Both derive the canonical
 path at runtime — you never invent one.
 
-**When to use:** When work needs an isolated workspace — a parallel branch,
-an experiment, a review checkout, or scoping to one epic — in any git repo.
+**When to use:** When work needs an isolated workspace — a parallel branch, experiment, or review checkout — in any git repo, even if the user never says "worktree". Epic context auto-escalates to the coordinator.
 
 **Key workflow (top-down, first match wins):**
 1. `.arcforge-epic` exists in cwd → already inside an epic worktree; never
@@ -395,90 +429,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-compacting
-
-**Purpose:** Guide compaction decisions at logical workflow boundaries instead of letting auto-compaction fire mid-task.
-
-**When to use:** When the compact-suggester hook fires, when transitioning between workflow phases, or when a long session has accumulated stale context.
-
-**Key workflow:**
-1. Check phase transition — compact between phases (when state is persisted to files), not during
-2. Pre-compact: save decisions to files/memory, invoke `arc-journaling` if session was substantial
-3. Check for un-committed work — ensure valuable changes are committed
-4. Compact with focused seed text: `/compact Focus on implementing [next task]`
-5. Post-compact: run `arcforge reboot`, re-read needed files
-
-**Artifacts:**
-- Input: session context, rule files, memory files
-- Output: compacted context focused on next phase
-
-**Related:** compact-suggester hook --> **arc-compacting** --> arc-agent-driven, arc-planning
-
----
-
-### arc-coordinating
-
-**Purpose:** CLI-based worktree lifecycle management and cross-session coordination via Node.js.
-
-**When to use:** When managing worktrees for multi-epic projects, when `specs/<spec-id>/dag.yaml` exists, or when coordinating parallel development.
-
-**Key workflow:**
-1. Set SKILL_ROOT from skill loader header
-2. Use `node "${SKILL_ROOT}/scripts/coordinator.js" <command>`
-3. Commands: expand, merge, status, cleanup, sync, next, parallel, block, reboot
-
-**Artifacts:**
-- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
-- Output: worktrees created/merged, DAG status updated
-
-**Related:** arc-planning --> **arc-coordinating** --> arc-implementing
-
----
-
-### arc-finishing
-
-**Purpose:** Guide completion of development work with structured options. One skill, two paths — Step 0 discriminates on `.arcforge-epic`: an **epic path** (coordinator integration + DAG updates for marker'd worktrees) and a **non-epic path** (plain git for regular branches and generic worktrees).
-
-**When to use:** When implementation is complete and all tests pass, and you need to decide how to integrate — whether in an epic worktree (`.arcforge-epic` present) or on a regular branch.
-
-**Key workflow:**
-1. Step 0 — read `.arcforge-epic` to pick the path (epic vs non-epic)
-2. Epic path only: sync from base via finish-epic.js
-3. Verify all tests pass (auto-detect test command)
-4. Determine base branch
-5. Present 4 options: merge (epic: via coordinator; non-epic: into the base checkout), create PR, keep as-is, discard
-6. Look up the worktree path (epic: `status --json` on the base dag; non-epic: `worktree list --json`)
-7. Cleanup worktree for Options 1 and 4 only (cd to base first)
-
-**Artifacts:**
-- Input: completed branch or epic worktree with passing tests
-- Output: merged code/epic, PR, preserved branch, or discarded work (+ DAG updated on the epic path)
-
-**Related:** arc-executing-tasks / arc-agent-driven / arc-implementing --> **arc-finishing** --> done / arc-coordinating status
-
----
-
-### arc-managing-sessions
-
-**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.arcforge/sessions/` directory layout.
-
-**Purpose:** Lightweight, user-controlled session continuity. Default = handover, not archive — most handoffs need only a short handover (quick bullet list, full context summary, or a tail marker); reach for a durable archive snapshot only when the session holds decisions or patterns worth preserving weeks or months later.
-
-**When to use:** When ending a session and handing off to a future session — default is a lightweight handover (quick bullets, full context summary, or a tail "you are here" marker, no file written unless asked). Escalate to an archive snapshot (save) only when the archive-recommendation heuristics fire (explicit ask, high decision density, lasting value); use resume/list/alias to work with archived sessions.
-
-**Key workflow:**
-1. **Handover (default):** Pick the lightest mode that unblocks the next session — Quick Handover (5–10 line bullets, no file by default), Full Context Summary (longer, for cross-agent/cross-person handoff), or Tail Handover (last exchanges + immediate next step only).
-2. **Archive (advanced, opt-in):** Only when the archive-recommendation heuristics say the work is worth preserving — `save [alias]` reflects on the conversation and writes an enriched durable file; `resume [alias]` resolves the alias, reads the file, presents a structured briefing, and WAITs for user confirmation; `list` browses history (`--limit`, `--date`, `--query`); `alias` creates friendly names.
-
-**Artifacts:**
-- Input: current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
-- Output: handovers print inline by default (optional `handover-{slug}.md` if asked); archive snapshots write `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
-
-**Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
-
----
-
-### Quality Skills
+### Discipline Skills
 
 ---
 
@@ -486,7 +437,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Enforce test-driven development: write the test first, watch it fail, write minimal code to pass.
 
-**When to use:** When implementing any feature or bugfix, before writing implementation code.
+**When to use:** When about to write any feature or bugfix code — before the implementation, write the failing test first.
 
 **Key workflow:**
 1. Find similar implementations first (reference before building)
@@ -508,7 +459,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Systematic root cause investigation using a four-phase scientific method.
 
-**When to use:** When encountering any bug, test failure, or unexpected behavior, before proposing fixes.
+**When to use:** When hitting any bug, test failure, or unexpected behavior, before proposing a fix.
 
 **Key workflow:**
 1. Phase 1: Root Cause Investigation — read errors, reproduce, check recent changes, trace data flow
@@ -529,7 +480,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Evidence-first verification mindset — no completion claims without fresh verification evidence.
 
-**When to use:** When you need to verify work is complete before making completion claims.
+**When to use:** When about to make a completion claim ('done', 'fixed', 'passing') — gather fresh evidence first.
 
 **Key workflow:**
 1. IDENTIFY — what command proves this claim?
@@ -546,35 +497,11 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-evaluating
-
-**Platform:** Claude Code only — eval harness invokes `claude` subprocess to execute scenario trials.
-
-**Purpose:** Measure whether skills, agents, and workflows actually change AI agent behavior — unit tests for AI agent behavior.
-
-**When to use:** Before shipping a new skill, after modifying an existing one, or when comparing alternative approaches.
-
-**Key workflow:**
-1. Confirm eval scope with user: skill (behavior change), agent (task outcome), or workflow (toolkit effect)
-2. Define the question first: "What are you trying to learn?"
-3. Design scenario with assertions and grader type (code, model, or human)
-4. Run scenario validity preflight (expected baseline failure, ceiling/floor risk, answer leakage)
-5. Run eval trials (`arc eval run` or `arc eval ab` for A/B comparison)
-6. Grade results, track in JSONL, report verdict: SHIP / NEEDS WORK / BLOCKED
-
-**Artifacts:**
-- Input: scenario files in `evals/scenarios/`
-- Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
-
-**Related:** arc-brainstorming --> **arc-evaluating** --> arc-writing-skills (for shipping)
-
----
-
 ### arc-reviewing
 
 **Purpose:** Request code review with faithful context, then process the feedback with technical rigor — one request→receive loop.
 
-**When to use:** When completing a task or feature to request code review, and when handling the reviewer feedback that comes back.
+**When to use:** When a task or feature is complete and needs code review, and when processing the reviewer feedback that returns.
 
 **Key workflow:**
 1. Get git SHAs (base and head)
@@ -591,7 +518,29 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### Learning Skills
+### arc-researching
+
+**Purpose:** Autonomous hypothesis-driven experimentation to optimize any measurable metric — build times, algorithm efficiency, prompt quality, or any target with a numeric signal.
+
+**When to use:** When optimizing a measurable metric with a numeric signal through free-form hypothesis-driven experimentation rather than a predefined task list.
+
+**Key workflow:**
+1. Phase 1 (Interactive): Analyze target, propose `research-config.md` contract (scope, goal, evaluation, constraints), lock with user
+2. Phase 2: Create research branch, run evaluation, establish baseline metric, start dashboard
+3. Phase 3 (Autonomous loop): Hypothesize, implement, commit, run, extract metric, keep or revert, log to `results.tsv`
+4. Decision rules: improved = keep, same/worse = revert, crash = log + revert
+5. Stuck protocol: 3+ failures in same direction, change direction entirely
+6. Phase 4: Report baseline, best result, improvement %, experiment counts
+
+**Artifacts:**
+- Input: measurable metric, target files, evaluation command
+- Output: `research-config.md` (locked contract), `results.tsv` (untracked), `research/{tag}` branch
+
+**Related:** arc-brainstorming --> **arc-researching** --> manual cherry-pick to main
+
+---
+
+### Memory Skills
 
 ---
 
@@ -599,7 +548,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Capture session reflections as structured diary entries for future pattern extraction.
 
-**When to use:** When the user asks to journal session reflections (/arcforge:arc-journaling), when PreCompact hook triggers, or at end of significant work session.
+**When to use:** When a significant work session ends, the user asks to journal, or the PreCompact hook fires before context is compacted.
 
 **Key workflow:**
 1. Pre-diary check — verify session had non-trivial decisions or challenges
@@ -619,7 +568,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Analyze multiple diary entries to identify recurring patterns and save insights.
 
-**When to use:** When the user asks to reflect on accumulated diaries (/arcforge:arc-reflecting), after 5+ diary entries accumulate, or when asked to summarize preferences from past sessions.
+**When to use:** When 5+ diaries have accumulated, the user asks to summarize learnings from past sessions, or inject-context flags reflection is due.
 
 **Key workflow:**
 1. Smart filter selection (unprocessed, project_focused, or recent_window)
@@ -642,7 +591,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Turn repeated project observations into reviewable learning candidates and activated artifacts through the dashboard — the full observe → curate → review → activate lifecycle.
 
-**When to use:** When optional learning is enabled and observations should become reviewable candidates, inactive drafts, and explicitly activated artifacts.
+**When to use:** When the default-off learning module is enabled and observations should become reviewable candidates, inactive drafts, then activated instincts.
 
 **Key workflow:**
 1. Enable learning: `arcforge learn enable --project`
@@ -666,7 +615,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Manually save patterns and insights as instincts from the current session context.
 
-**When to use:** When the user wants to manually save a pattern or insight as an instinct. When the user invokes /arcforge:arc-recalling with a description.
+**When to use:** When you want to manually save a pattern or insight from the current session as a reusable instinct. User-invoked only (disable-model-invocation).
 
 **Key workflow:**
 1. Receive user's natural language description
@@ -683,29 +632,48 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-researching
+### arc-managing-sessions
 
-**Purpose:** Autonomous hypothesis-driven experimentation to optimize any measurable metric — build times, algorithm efficiency, prompt quality, or any target with a numeric signal.
+**Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.arcforge/sessions/` directory layout.
 
-**When to use:** When optimizing a measurable metric through free-form experimentation rather than a predefined task list.
+**Purpose:** Lightweight, user-controlled session continuity. Default = handover, not archive — most handoffs need only a short handover (quick bullet list, full context summary, or a tail marker); reach for a durable archive snapshot only when the session holds decisions or patterns worth preserving weeks or months later.
+
+**When to use:** When ending a session and handing off, summarizing recent context to continue, or archiving, resuming, or aliasing a saved session.
 
 **Key workflow:**
-1. Phase 1 (Interactive): Analyze target, propose `research-config.md` contract (scope, goal, evaluation, constraints), lock with user
-2. Phase 2: Create research branch, run evaluation, establish baseline metric, start dashboard
-3. Phase 3 (Autonomous loop): Hypothesize, implement, commit, run, extract metric, keep or revert, log to `results.tsv`
-4. Decision rules: improved = keep, same/worse = revert, crash = log + revert
-5. Stuck protocol: 3+ failures in same direction, change direction entirely
-6. Phase 4: Report baseline, best result, improvement %, experiment counts
+1. **Handover (default):** Pick the lightest mode that unblocks the next session — Quick Handover (5–10 line bullets, no file by default), Full Context Summary (longer, for cross-agent/cross-person handoff), or Tail Handover (last exchanges + immediate next step only).
+2. **Archive (advanced, opt-in):** Only when the archive-recommendation heuristics say the work is worth preserving — `save [alias]` reflects on the conversation and writes an enriched durable file; `resume [alias]` resolves the alias, reads the file, presents a structured briefing, and WAITs for user confirmation; `list` browses history (`--limit`, `--date`, `--query`); `alias` creates friendly names.
 
 **Artifacts:**
-- Input: measurable metric, target files, evaluation command
-- Output: `research-config.md` (locked contract), `results.tsv` (untracked), `research/{tag}` branch
+- Input: current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
+- Output: handovers print inline by default (optional `handover-{slug}.md` if asked); archive snapshots write `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
 
-**Related:** arc-brainstorming --> **arc-researching** --> manual cherry-pick to main
+**Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
 
 ---
 
-### Knowledge Base Skills
+### arc-compacting
+
+**Purpose:** Guide compaction decisions at logical workflow boundaries instead of letting auto-compaction fire mid-task.
+
+**When to use:** When deciding whether to compact now — at clean seams between workflow phases rather than mid-task; the compact-suggester hook may route here as context grows.
+
+**Key workflow:**
+1. Check phase transition — compact between phases (when state is persisted to files), not during
+2. Pre-compact: save decisions to files/memory, invoke `arc-journaling` if session was substantial
+3. Check for un-committed work — ensure valuable changes are committed
+4. Compact with focused seed text: `/compact Focus on implementing [next task]`
+5. Post-compact: run `arcforge reboot`, re-read needed files
+
+**Artifacts:**
+- Input: session context, rule files, memory files
+- Output: compacted context focused on next phase
+
+**Related:** compact-suggester hook --> **arc-compacting** --> arc-agent-driven, arc-planning
+
+---
+
+### Knowledge Skills
 
 ---
 
@@ -715,7 +683,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Vault interface — resolves which registered Obsidian vault to operate on (via `--vault=<name>`, cwd match, or the single-vault default), then dispatches one of three universal actions (ingest, query, audit) against that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema). Vaults are domain-agnostic; `init-vault` bootstraps a new vault from a preset (minimal, llm-wiki, news, project-tracker).
 
-**When to use:** When creating, querying, or maintaining an Obsidian vault. Triggers on saving notes, capturing ideas/decisions, sharing URLs to document, asking vault questions ("what do I know about X"), auditing vault health (missing links, orphan notes, stale content), or ingesting raw files (Excalidraw, PDFs, screenshots, papers); also when initializing a new vault (`init-vault`), registering an existing vault (`register`), or managing the multi-vault registry (`list-vaults`, `unregister`, `set-default`).
+**When to use:** When saving notes/ideas/URLs, querying vault knowledge, auditing vault health, or initializing/registering a vault. Not for diagrams — use arc-diagramming-obsidian.
 
 **Key workflow:**
 - **Registry-level** (vault-agnostic): `init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>]` runs an 11-step bootstrap that authors `AGENTS.md` + `SCHEMA.md` from the chosen preset and registers the vault; `register` / `unregister` / `set-default` / `list-vaults` manage `~/.arcforge/obsidian-vaults.json`.
@@ -737,7 +705,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Create Excalidraw diagrams directly in an Obsidian vault via structured JSON write with a render-validate loop, applying a cool minimal color palette for visual consistency.
 
-**When to use:** When the user wants an Excalidraw diagram, architecture visualization, flowchart, mind map, or any visual representation of concepts and relationships. Trigger on mentions of drawing, diagramming, visualizing, mapping, or illustrating — especially when `arc-maintaining-obsidian`'s Visuals decision tree routes here for complex spatial layouts.
+**When to use:** When the user wants an Excalidraw diagram or visual — architecture, flowchart, mind map, casual "draw this". Also when arc-maintaining-obsidian delegates Synthesis visuals.
 
 **Key workflow:**
 1. Identify target concept and relationships (nodes + edges)
@@ -758,11 +726,32 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
+### arc-using
+
+**Purpose:** Bounded router and skill index for ArcForge tasks — helps choose the smallest useful workflow without becoming a global policy layer.
+
+**When to use:** When unsure which skill applies or the user asks where to start. A bounded router and index — skip it for simple answers, read-only inspection, grading, or isolated evals.
+
+**Key workflow:**
+1. Understand the user request and constraints
+2. Decide whether routing adds value; skip routing for simple answers, read-only inspection, grading, or isolated evals
+3. If useful, pick the smallest applicable skill or workflow path
+4. Read/invoke only the relevant skill(s)
+5. Preserve harness/eval isolation and higher-priority instructions
+
+**Artifacts:**
+- Input: user request that benefits from routing
+- Output: selected skill(s) or direct continuation when routing is unnecessary
+
+**Related:** optional session bootstrap --> **arc-using** --> any applicable skill, or direct task execution
+
+---
+
 ### arc-writing-skills
 
 **Purpose:** ArcForge project-level meta skill for maintaining ArcForge's own skill system using TDD for process documentation.
 
-**When to use:** When maintaining ArcForge itself: creating new ArcForge skills, editing existing ArcForge skills, or verifying ArcForge skills before deployment. This is not a general promoted/user-facing core skill for ordinary product work.
+**When to use:** When maintaining ArcForge itself — creating, editing, or verifying ArcForge skills and skill tests before deployment. User-invoked only (disable-model-invocation); project-level meta, not a user-facing product skill.
 
 **Key workflow:**
 1. RED — run pressure scenario WITHOUT skill, document baseline failures
@@ -779,23 +768,27 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-auditing-spec
+### arc-evaluating
 
-**Purpose:** Read-only advisory audit of an SDD spec family (design.md, spec.xml, dag.yaml, decisions.yml, product/vision.md) across three axes: internal consistency, cross-artifact alignment, and state-transition integrity.
+**Platform:** Claude Code only — eval harness invokes `claude` subprocess to execute scenario trials.
 
-**When to use:** When the user explicitly runs `/arcforge:arc-auditing-spec <spec-id>`. Never auto-invoked from pipeline skills (arc-brainstorming, arc-refining, arc-planning) — invocation is always user-initiated.
+**Purpose:** Measure whether skills, agents, and workflows actually change AI agent behavior — unit tests for AI agent behavior.
+
+**When to use:** When shipping a new skill, after modifying an existing one, or comparing alternative approaches — measure whether behavior actually changes.
 
 **Key workflow:**
-1. Phase 0 — verify `specs/<spec-id>/` exists (graceful degradation: only design.md is required)
-2. Fan out three parallel audit subagents, one per axis
-3. Aggregate findings into a single advisory report
-4. Print a Decisions table and exit — the skill never edits anything (`--save` optionally writes the report to `~/.arcforge/reviews/`)
+1. Confirm eval scope with user: skill (behavior change), agent (task outcome), or workflow (toolkit effect)
+2. Define the question first: "What are you trying to learn?"
+3. Design scenario with assertions and grader type (code, model, or human)
+4. Run scenario validity preflight (expected baseline failure, ceiling/floor risk, answer leakage)
+5. Run eval trials (`arc eval run` or `arc eval ab` for A/B comparison)
+6. Grade results, track in JSONL, report verdict: SHIP / NEEDS WORK / BLOCKED
 
 **Artifacts:**
-- Input: `specs/<spec-id>/` family + D6 anchor artifacts
-- Output: advisory report (display only, or saved via `--save`); zero mutations
+- Input: scenario files in `evals/scenarios/`
+- Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
 
-**Related:** user runs `/arcforge:arc-auditing-spec <spec-id>` --> **arc-auditing-spec** --> main session owns any actual edits
+**Related:** arc-brainstorming --> **arc-evaluating** --> arc-writing-skills (for shipping)
 
 ---
 
