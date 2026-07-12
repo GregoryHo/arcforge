@@ -12,9 +12,11 @@ This file holds only the contributor-side conventions that don't belong in shipp
 
 ## Test File Convention
 
-- Location: `tests/skills/test_skill_arc_<name>.py` (one test file per skill)
-- Runner: pytest — validates frontmatter + content structure
-- Pattern: follow existing tests (e.g., `test_skill_arc_brainstorming.py`)
+- Single generic checker: `tests/skills/test_skill_structure.py` (no per-skill file)
+- Runner: pytest — discovers every `skills/*/SKILL.md` dynamically, so merges,
+  renames, and new skills need zero test edits
+- Validates: frontmatter, `name` == dirname, description, `## ` section + body,
+  cross-references, referenced supporting files, and the line budget
 
 ## Evaluating skill edits (not just new skills)
 

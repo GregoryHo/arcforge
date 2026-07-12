@@ -169,7 +169,7 @@ description: Use when [specific triggering conditions and symptoms]
 
 ### Test File
 
-Create `tests/skills/test_skill_arc_<name>.py` following the pattern in existing test files (e.g., `test_skill_arc_brainstorming.py`). Tests use pytest and validate skill content structure.
+No per-skill test file is needed. A single generic checker, `tests/skills/test_skill_structure.py`, discovers every `skills/*/SKILL.md` dynamically and validates frontmatter, `name` == directory, a non-empty description, at least one `## ` section, resolvable cross-references, referenced supporting files, and the line budget. Make sure `npm run test:skills` passes; behavioral protection lives in the eval layer (see `arc-evaluating`), not in pytest.
 
 ### Quick Checklist
 
@@ -180,7 +180,7 @@ Create `tests/skills/test_skill_arc_<name>.py` following the pattern in existing
 - [ ] Ran baseline scenario WITHOUT skill (RED)
 - [ ] Skill addresses specific baseline failures (GREEN)
 - [ ] Closed loopholes from additional testing (REFACTOR)
-- [ ] pytest test file created and passing
+- [ ] `npm run test:skills` passes (the structure checker picks up the new skill)
 
 See [`skills/arc-writing-skills/SKILL.md`](skills/arc-writing-skills/SKILL.md) for the full creation checklist.
 
@@ -311,7 +311,7 @@ arcforge uses five separate test runners. **All must pass before submitting a PR
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
-| pytest | `npm run test:skills` | `tests/skills/` | Skill content validation |
+| pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
 | Jest | `npm run test:scripts` | `tests/scripts/` | CLI engine (diary, reflect, session-utils) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |

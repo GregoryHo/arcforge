@@ -43,24 +43,6 @@ ${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.ses
 `;
 }
 
-function renderSkillTestDraft(candidate) {
-  const safeName = candidate.name.replace(/-/g, '_');
-  return `from pathlib import Path
-
-
-def test_${safeName}_draft_is_not_active():
-    draft = Path(__file__).with_suffix(Path(__file__).suffix + ".draft")
-    assert draft.name.endswith(".draft")
-
-
-def test_${safeName}_draft_frontmatter_mentions_candidate():
-    draft = Path(__file__).parents[2] / "skills" / "${candidate.name}" / "SKILL.md.draft"
-    text = draft.read_text()
-    assert "name: ${candidate.name}" in text
-    assert "candidate: ${candidate.id}" in text or "${candidate.id}" in text
-`;
-}
-
 function renderInstinctDraft(candidate) {
   return `---
 name: ${candidate.name}
@@ -199,7 +181,7 @@ ${candidate.evidence.map((item) => `- ${item.source}: ${item.reason} (${item.ses
 function renderDraft(candidate) {
   switch (candidate.artifact_type) {
     case 'skill':
-      return [renderSkillDraft(candidate), renderSkillTestDraft(candidate)];
+      return [renderSkillDraft(candidate)];
     case 'instinct':
       return [renderInstinctDraft(candidate)];
     case 'command':
