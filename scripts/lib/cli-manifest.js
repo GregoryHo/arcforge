@@ -236,6 +236,7 @@ const CLI_MANIFEST = {
     flags: [
       '--k',
       '--model',
+      '--effort',
       '--no-isolate',
       '--plugin-dir',
       '--max-turns',
