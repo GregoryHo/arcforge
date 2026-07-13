@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-13T12:18:15.443Z",
+  "generated": "2026-07-13T13:50:17.575Z",
   "by_claim_type": {
     "non-regression": {
       "scenarios": 23,
@@ -12,46 +12,46 @@
       "claim_type": "non-regression",
       "grader": "code",
       "trials": 5,
-      "pass_rate": 0.6,
-      "avg_score": 0.7,
-      "stddev": 0.41,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
       "ci95": {
-        "lower": 0.19,
+        "lower": 1,
         "upper": 1,
-        "width": 1.02
+        "width": 0
       },
       "pass_at_k": true,
-      "pass_all_k": false,
-      "last_run": "2026-07-13T10:37:41.333Z",
+      "pass_all_k": true,
+      "last_run": "2026-07-13T12:29:04.957Z",
       "metrics": {
         "duration_ms": {
           "count": 5,
-          "avg": 561751.6,
-          "min": 10576,
-          "max": 1429418,
-          "total": 2808758
+          "avg": 10398,
+          "min": 7626,
+          "max": 15526,
+          "total": 51990
         },
         "input_tokens": {
-          "count": 3,
-          "avg": 8,
-          "min": 8,
+          "count": 5,
+          "avg": 6.4,
+          "min": 6,
           "max": 8,
-          "total": 24
+          "total": 32
         },
         "output_tokens": {
-          "count": 3,
-          "avg": 531,
-          "min": 511,
-          "max": 553,
-          "total": 1593
+          "count": 5,
+          "avg": 468.6,
+          "min": 376,
+          "max": 576,
+          "total": 2343
         }
       },
       "by_model": {
         "claude-sonnet-5": {
           "trials": 5,
-          "pass_rate": 0.6,
-          "avg_score": 0.7,
-          "last_run": "2026-07-13T10:37:41.333Z"
+          "pass_rate": 1,
+          "avg_score": 1,
+          "last_run": "2026-07-13T12:29:04.957Z"
         }
       }
     },
@@ -60,46 +60,46 @@
       "claim_type": "non-regression",
       "grader": "code",
       "trials": 5,
-      "pass_rate": 0,
-      "avg_score": 0.48,
-      "stddev": 0.44,
+      "pass_rate": 0.8,
+      "avg_score": 0.84,
+      "stddev": 0.36,
       "ci95": {
-        "lower": 0,
+        "lower": 0.4,
         "upper": 1,
-        "width": 1.09
+        "width": 0.89
       },
-      "pass_at_k": false,
+      "pass_at_k": true,
       "pass_all_k": false,
-      "last_run": "2026-07-13T11:25:42.700Z",
+      "last_run": "2026-07-13T13:45:10.142Z",
       "metrics": {
         "duration_ms": {
           "count": 5,
-          "avg": 310393.2,
-          "min": 17587,
-          "max": 889957,
-          "total": 1551966
+          "avg": 26388,
+          "min": 9847,
+          "max": 79464,
+          "total": 131940
         },
         "input_tokens": {
-          "count": 3,
-          "avg": 6,
-          "min": 6,
-          "max": 6,
+          "count": 5,
+          "avg": 3.6,
+          "min": 2,
+          "max": 4,
           "total": 18
         },
         "output_tokens": {
-          "count": 3,
-          "avg": 917.67,
-          "min": 888,
-          "max": 967,
-          "total": 2753
+          "count": 5,
+          "avg": 578.8,
+          "min": 132,
+          "max": 797,
+          "total": 2894
         }
       },
       "by_model": {
         "claude-sonnet-5": {
           "trials": 5,
-          "pass_rate": 0,
-          "avg_score": 0.48,
-          "last_run": "2026-07-13T11:25:42.700Z"
+          "pass_rate": 0.8,
+          "avg_score": 0.84,
+          "last_run": "2026-07-13T13:45:10.142Z"
         }
       }
     },
@@ -108,46 +108,46 @@
       "claim_type": "non-regression",
       "grader": "code",
       "trials": 5,
-      "pass_rate": 0,
-      "avg_score": 0.52,
-      "stddev": 0.39,
+      "pass_rate": 0.6,
+      "avg_score": 0.92,
+      "stddev": 0.11,
       "ci95": {
-        "lower": 0.04,
+        "lower": 0.78,
         "upper": 1,
-        "width": 0.97
+        "width": 0.27
       },
-      "pass_at_k": false,
+      "pass_at_k": true,
       "pass_all_k": false,
-      "last_run": "2026-07-13T12:11:22.275Z",
+      "last_run": "2026-07-13T13:47:22.745Z",
       "metrics": {
         "duration_ms": {
           "count": 5,
-          "avg": 545242.6,
-          "min": 30699,
-          "max": 2293995,
-          "total": 2726213
+          "avg": 27636,
+          "min": 18120,
+          "max": 46248,
+          "total": 138180
         },
         "input_tokens": {
-          "count": 3,
-          "avg": 42.33,
-          "min": 6,
-          "max": 113,
-          "total": 127
+          "count": 5,
+          "avg": 273.2,
+          "min": 4,
+          "max": 1346,
+          "total": 1366
         },
         "output_tokens": {
-          "count": 3,
-          "avg": 3157.33,
-          "min": 2375,
-          "max": 4328,
-          "total": 9472
+          "count": 5,
+          "avg": 1806.6,
+          "min": 1123,
+          "max": 2637,
+          "total": 9033
         }
       },
       "by_model": {
         "claude-sonnet-5": {
           "trials": 5,
-          "pass_rate": 0,
-          "avg_score": 0.52,
-          "last_run": "2026-07-13T12:11:22.275Z"
+          "pass_rate": 0.6,
+          "avg_score": 0.92,
+          "last_run": "2026-07-13T13:47:22.745Z"
         }
       }
     },
