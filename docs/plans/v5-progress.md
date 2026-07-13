@@ -1,7 +1,11 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **REVIEW — Waves 1–5 merged to v5/main; PR opened; WS9 eval approach pending maintainer decision**
-Maintainer reviewed the v5/main direction (artifact dashboard) on 2026-07-13 → "direction is right, open a PR." PR raised v5/main → main (Waves 1–5). WS9 eval re-baseline + WS10 release still pending; WS9 run-strategy (full D5 / smoke-first / defer) not yet chosen.
+Overall: **EXECUTING — Wave 6 (WS9 eval re-baseline, full D5) — PR #134 open (draft)**
+Maintainer decisions (2026-07-13): (1) the 2 line-budget exceptions (arc-finishing 526, arc-refining 387) are ACCEPTED; (2) WS9 runs the FULL D5 scope. PR #134 (v5/main → main, draft) open for review. main untouched.
+WS9 plan: prep (DONE — effort passthrough, dispatch-fidelity repaired, receive-half scenario authored, dangling-target check, exceptions marked accepted; merged to v5/main) → harness smoke (DONE — k=1 AB works on claude-sonnet-5/xhigh, 35s) → CANARY batch running (6 discipline AB gates k=5) → full D5 sweep → eval report → v5 epoch.
+Eval model: trials on claude-sonnet-5 + effort xhigh (maintainer); model grader stays default.
+YELLOW FLAG (k=1, non-conclusive): eval-arc-tdd-test-first-gate treatment FAILED A3/A4 at k=1 (baseline passed) → single-sample REGRESSED. A4 penalizes Bash/edits/artifacts; likely a re-baseline artifact (sonnet-5/xhigh is highly agentic, jumps to action) rather than a diet regression. Canary k=5 will resolve; if it holds as a real regression on a discipline skill, STOP per S6 and investigate the diet before the full sweep.
+Prep finding: eval-arc-evaluating-scenario-audit was NOT flaky (passed 30/30 at k=30, 2026-05-02, unchanged) — the "pass 0/5" grounding premise was stale; kept unchanged, live sweep gives authoritative data.
 Plan: `2026-07-12-v5-implementation-plan.md` · Decisions: `2026-07-12-v5-redesign-decisions.md`
 Integration branch: `v5/main` · Worktrees: `../arcforge-v5/<ws>/`
 Merge policy: green workstreams auto-merge into `v5/main`; `main` untouched until final maintainer review.
