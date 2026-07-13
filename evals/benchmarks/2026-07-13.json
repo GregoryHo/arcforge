@@ -1,9 +1,9 @@
 {
-  "generated": "2026-07-13T12:29:54.731Z",
+  "generated": "2026-07-13T13:49:22.403Z",
   "by_claim_type": {
     "non-regression": {
       "scenarios": 23,
-      "trials": 122
+      "trials": 127
     }
   },
   "evals": {
@@ -11,46 +11,46 @@
       "scope": "learning",
       "claim_type": "non-regression",
       "grader": "code",
-      "trials": 10,
-      "pass_rate": 0.8,
-      "avg_score": 0.85,
-      "stddev": 0.32,
+      "trials": 5,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
       "ci95": {
-        "lower": 0.62,
+        "lower": 1,
         "upper": 1,
-        "width": 0.45
+        "width": 0
       },
       "pass_at_k": true,
-      "pass_all_k": false,
+      "pass_all_k": true,
       "last_run": "2026-07-13T12:29:04.957Z",
       "metrics": {
         "duration_ms": {
-          "count": 10,
-          "avg": 286074.8,
+          "count": 5,
+          "avg": 10398,
           "min": 7626,
-          "max": 1429418,
-          "total": 2860748
+          "max": 15526,
+          "total": 51990
         },
         "input_tokens": {
-          "count": 8,
-          "avg": 7,
+          "count": 5,
+          "avg": 6.4,
           "min": 6,
           "max": 8,
-          "total": 56
+          "total": 32
         },
         "output_tokens": {
-          "count": 8,
-          "avg": 492,
+          "count": 5,
+          "avg": 468.6,
           "min": 376,
           "max": 576,
-          "total": 3936
+          "total": 2343
         }
       },
       "by_model": {
         "claude-sonnet-5": {
-          "trials": 10,
-          "pass_rate": 0.8,
-          "avg_score": 0.85,
+          "trials": 5,
+          "pass_rate": 1,
+          "avg_score": 1,
           "last_run": "2026-07-13T12:29:04.957Z"
         }
       }
@@ -59,47 +59,47 @@
       "scope": "skill",
       "claim_type": "non-regression",
       "grader": "code",
-      "trials": 5,
-      "pass_rate": 0,
-      "avg_score": 0.48,
-      "stddev": 0.44,
+      "trials": 10,
+      "pass_rate": 0.4,
+      "avg_score": 0.66,
+      "stddev": 0.42,
       "ci95": {
-        "lower": 0,
-        "upper": 1,
-        "width": 1.09
+        "lower": 0.36,
+        "upper": 0.96,
+        "width": 0.6
       },
-      "pass_at_k": false,
+      "pass_at_k": true,
       "pass_all_k": false,
-      "last_run": "2026-07-13T11:25:42.700Z",
+      "last_run": "2026-07-13T13:45:10.142Z",
       "metrics": {
         "duration_ms": {
-          "count": 5,
-          "avg": 310393.2,
-          "min": 17587,
+          "count": 10,
+          "avg": 168390.6,
+          "min": 9847,
           "max": 889957,
-          "total": 1551966
+          "total": 1683906
         },
         "input_tokens": {
-          "count": 3,
-          "avg": 6,
-          "min": 6,
+          "count": 8,
+          "avg": 4.5,
+          "min": 2,
           "max": 6,
-          "total": 18
+          "total": 36
         },
         "output_tokens": {
-          "count": 3,
-          "avg": 917.67,
-          "min": 888,
+          "count": 8,
+          "avg": 705.88,
+          "min": 132,
           "max": 967,
-          "total": 2753
+          "total": 5647
         }
       },
       "by_model": {
         "claude-sonnet-5": {
-          "trials": 5,
-          "pass_rate": 0,
-          "avg_score": 0.48,
-          "last_run": "2026-07-13T11:25:42.700Z"
+          "trials": 10,
+          "pass_rate": 0.4,
+          "avg_score": 0.66,
+          "last_run": "2026-07-13T13:45:10.142Z"
         }
       }
     },
@@ -107,47 +107,47 @@
       "scope": "skill",
       "claim_type": "non-regression",
       "grader": "code",
-      "trials": 5,
-      "pass_rate": 0,
-      "avg_score": 0.52,
-      "stddev": 0.39,
+      "trials": 10,
+      "pass_rate": 0.3,
+      "avg_score": 0.72,
+      "stddev": 0.34,
       "ci95": {
-        "lower": 0.04,
-        "upper": 1,
-        "width": 0.97
+        "lower": 0.47,
+        "upper": 0.97,
+        "width": 0.49
       },
-      "pass_at_k": false,
+      "pass_at_k": true,
       "pass_all_k": false,
-      "last_run": "2026-07-13T12:11:22.275Z",
+      "last_run": "2026-07-13T13:47:22.745Z",
       "metrics": {
         "duration_ms": {
-          "count": 5,
-          "avg": 545242.6,
-          "min": 30699,
+          "count": 10,
+          "avg": 286439.3,
+          "min": 18120,
           "max": 2293995,
-          "total": 2726213
+          "total": 2864393
         },
         "input_tokens": {
-          "count": 3,
-          "avg": 42.33,
-          "min": 6,
-          "max": 113,
-          "total": 127
+          "count": 8,
+          "avg": 186.63,
+          "min": 4,
+          "max": 1346,
+          "total": 1493
         },
         "output_tokens": {
-          "count": 3,
-          "avg": 3157.33,
-          "min": 2375,
+          "count": 8,
+          "avg": 2313.13,
+          "min": 1123,
           "max": 4328,
-          "total": 9472
+          "total": 18505
         }
       },
       "by_model": {
         "claude-sonnet-5": {
-          "trials": 5,
-          "pass_rate": 0,
-          "avg_score": 0.52,
-          "last_run": "2026-07-13T12:11:22.275Z"
+          "trials": 10,
+          "pass_rate": 0.3,
+          "avg_score": 0.72,
+          "last_run": "2026-07-13T13:47:22.745Z"
         }
       }
     },

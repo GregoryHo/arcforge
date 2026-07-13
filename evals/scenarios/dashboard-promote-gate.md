@@ -20,7 +20,7 @@ Review the candidate queue after the promote action and answer:
 3. Do both candidates appear in `readCurrentCandidates()`?
 
 Relevant files:
-- `queue.jsonl` — candidate queue after the promote action.
+- `queue-dir/queue.jsonl` — candidate queue after the promote action.
 - Source candidate_id: `cand_project_source_001`
 - Expected new global candidate has `scope.kind === "global"` and
   `relationships.promoted_from_candidate_id === "cand_project_source_001"`.
