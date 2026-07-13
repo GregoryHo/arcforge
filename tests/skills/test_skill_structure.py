@@ -42,7 +42,8 @@ ALLOWED_STATUSES = {"promoted", "incubating", "deprecated"}
 # accumulation + attended/unattended split + pytest-pinned Boundary, and arc-finishing's
 # ~440 lines of worktree-safety git mechanics. Kept verbatim per the maintainer
 # line-budget ruling ("break the cap only where an untouchable block cannot be preserved
-# otherwise"). FLAGGED FOR MAINTAINER REVIEW. arc-finishing is tracked to fall below its
+# otherwise"). ACCEPTED by the maintainer on 2026-07-13 (arc-finishing 525 / arc-refining
+# 386 body lines). arc-finishing is tracked to fall below its
 # floor in 5.x once option mechanics move into scripts/finish-epic.js (decision record D7).
 PERMANENT_LINE_BUDGET = {
     "arc-refining": 386,
