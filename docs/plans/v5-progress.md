@@ -1,6 +1,7 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **EXECUTING — Wave 6 (2026-07-12, opus 4.8)**
+Overall: **REVIEW — Waves 1–5 merged to v5/main; PR opened; WS9 eval approach pending maintainer decision**
+Maintainer reviewed the v5/main direction (artifact dashboard) on 2026-07-13 → "direction is right, open a PR." PR raised v5/main → main (Waves 1–5). WS9 eval re-baseline + WS10 release still pending; WS9 run-strategy (full D5 / smoke-first / defer) not yet chosen.
 Plan: `2026-07-12-v5-implementation-plan.md` · Decisions: `2026-07-12-v5-redesign-decisions.md`
 Integration branch: `v5/main` · Worktrees: `../arcforge-v5/<ws>/`
 Merge policy: green workstreams auto-merge into `v5/main`; `main` untouched until final maintainer review.
