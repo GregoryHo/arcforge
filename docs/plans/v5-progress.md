@@ -1,6 +1,6 @@
 # arcforge v5.0.0 — Progress
 
-Overall: **EXECUTING — Wave 6 (WS9 eval re-baseline, full D5) — PR #134 open (draft)**
+Overall: **WS10 release-prep DONE on v5/main (cb64163) — awaiting maintainer sign-off for `v5/main → main` merge + post-merge tag. PR #134 open.**
 Maintainer decisions (2026-07-13): (1) the 2 line-budget exceptions (arc-finishing 526, arc-refining 387) are ACCEPTED; (2) WS9 runs the FULL D5 scope. PR #134 (v5/main → main, draft) open for review. main untouched.
 WS9 plan: prep (DONE — effort passthrough, dispatch-fidelity repaired, receive-half scenario authored, dangling-target check, exceptions marked accepted; merged to v5/main) → harness smoke (DONE — k=1 AB works on claude-sonnet-5/xhigh, 35s) → CANARY batch running (6 discipline AB gates k=5) → full D5 sweep → eval report → v5 epoch.
 Eval model: trials on claude-sonnet-5 + effort xhigh (maintainer); model grader stays default.
@@ -41,7 +41,7 @@ Last updated: 2026-07-12 (Wave 3 merged; Wave 4 dispatched)
 | WS7e | Diet lane: knowledge+meta (5) | 4 | WS5, WS6 | done | 2 | 2026-07-12 | v5/main (71d9741+dc02029); review flagged arc-evaluating Red Flags deletion → restored verbatim (attempt 2); writing-skills 673→**249**, diagramming 320→248, using 157→112 |
 | WS8 | Descriptions, frontmatter, index | 5 | WS7 | done | 1 | 2026-07-12 | v5/main (b32d7be,15019ce); 27 model-invoked 150–280 chars, 3 DMI ≤120 (auditing-spec/recalling/writing-skills, hook-safety verified); category+status frontmatter; index rebuilt; body-only line budget |
 | WS9 | Eval re-baseline (v5 epoch, full D5) | 6 | WS7, WS8 | done | 1 | 2026-07-13 | v5/main; full D5 swept on sonnet-5/xhigh; clean v5 epoch (23 evals). NO prose-diet regressions. Root-caused the 2 v4-regressions to transcript level: activated-skill = transient API errors (clean re-run 5/5); dashboard = a real fixture path bug (prompt said queue.jsonl, Setup writes queue-dir/queue.jsonl) forcing agentic Bash-find → A5 fail; corrected the path (reasoning test A1-A4 unchanged) → concurrency-guard 4/5, promote-gate 3/5. Residual A5 misses = genuine sonnet-5 occasional-Bash on v5-UNCHANGED learning code (default-off); NOT gamed away. |
-| WS10 | Release 5.0.0 | 7 | all | waiting | 0 | — | — |
+| WS10 | Release 5.0.0 | 7 | all | done (on-branch) | 1 | 2026-07-22 | v5/main cb64163; CHANGELOG 5.0.0 (authored + adversarially verified, 5 draft claims corrected), 9-location bump→5.0.0 (check:versions green), README doc-audit nits, full suite+lint+check:docs green, benchmark fresh. Gated remainder (main merge, tag, wiki ingest, marketplace, ws* cleanup) left for maintainer. |
 
 ## WS7 temp line-budget allowlist burn-down — DONE
 
