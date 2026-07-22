@@ -52,7 +52,7 @@
     "PreToolUse": [
       {
         "id": "guard-dispatcher",
-        "description": "Sync BLOCK guard dispatcher: arc-guard + sdd-ledger-guard + sdd-ratify-guard.",
+        "description": "Sync guard dispatcher: deny guards (arc-guard, sdd-ledger-guard, dag-guard, sdd-ratify-guard, autopilot-deny) then a secrets-guard warn-only pass.",
         "matcher": ".*",
         "hooks": [
           {

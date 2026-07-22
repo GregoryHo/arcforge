@@ -251,6 +251,9 @@ class Coordinator {
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
     }
+    if (task.status === TaskStatus.COMPLETED) {
+      throw new Error(`Cannot block task "${taskId}": it is already completed — a terminal state.`);
+    }
 
     task.status = TaskStatus.BLOCKED;
     this.dag.blocked.push(

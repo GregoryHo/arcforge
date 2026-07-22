@@ -42,7 +42,7 @@ function disabledSet() {
  * Run a list of sub-hook rules against one hook event.
  *
  * @param {Array<{id: string, evaluate: (input: object|null) => any}>} rules
- * @returns {{ input: object|null, results: Array<{id: string, value: any}> }}
+ * @returns {{ input: object|null, results: Array<{id: string, value: any}>, disabled: Set<string> }}
  */
 function runRules(rules) {
   const input = parseStdinJson(readStdinSync());
@@ -65,7 +65,7 @@ function runRules(rules) {
     }
     results.push({ id: rule.id, value });
   }
-  return { input, results };
+  return { input, results, disabled };
 }
 
 module.exports = { runRules, disabledSet };

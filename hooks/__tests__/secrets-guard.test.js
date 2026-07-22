@@ -8,6 +8,9 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const { evaluate, scanForSecrets } = require('../secrets-guard/main');
 
@@ -51,6 +54,44 @@ describe('secrets-guard evaluate', () => {
     assert.ok(warning, 'should warn');
     assert.ok(warning.includes('AWS access key id'), 'names the finding category');
     assert.ok(!warning.includes(AWS_KEY), 'must NOT echo the secret itself');
+  });
+
+  it('warns when an Edit adds a secret in new_string', () => {
+    const warning = evaluate({
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: 'src/config.js',
+        old_string: 'const port = 3000;',
+        new_string: `const key = "${AWS_KEY}";`,
+      },
+      cwd: '/tmp',
+    });
+    assert.ok(warning, 'should warn');
+    assert.ok(warning.includes('AWS access key id'), 'names the finding category');
+    assert.ok(!warning.includes(AWS_KEY), 'must NOT echo the secret itself');
+  });
+
+  it('scans ONLY the added text of an Edit, not a pre-existing on-disk secret', () => {
+    // A real file whose UNCHANGED body holds a secret; the Edit only rewrites a
+    // benign line. The guard must not re-warn on the pre-existing secret — an Edit
+    // scans new_string alone, never the whole resulting file.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'secrets-guard-'));
+    const file = path.join(dir, 'config.js');
+    fs.writeFileSync(file, `const key = "${AWS_KEY}";\nconst port = 3000;\n`);
+    try {
+      const warning = evaluate({
+        tool_name: 'Edit',
+        tool_input: {
+          file_path: file,
+          old_string: 'const port = 3000;',
+          new_string: 'const port = 8080;',
+        },
+        cwd: dir,
+      });
+      assert.strictEqual(warning, null, 'benign edit must not warn on a pre-existing secret');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('warns on a git commit command carrying a secret', () => {

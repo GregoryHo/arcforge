@@ -406,6 +406,41 @@ describe('arc-guard research-config blocks (Edit/Write)', () => {
   });
 });
 
+// GIT_MERGE_RE must catch a raw `git merge` even when git global options sit
+// between `git` and `merge` (`-c x=y`, `--no-pager`, `-p`, `-C <path>`,
+// `--git-dir=<path>`), else the merge slips past G2. Broadening is bounded to
+// DASH-PREFIXED tokens only — a bare word between `git` and `merge` (e.g.
+// `merge-base`, `config merge.tool`) must never match, since a too-wide deny that
+// blocks legit commands is the expensive failure (users disable the hooks).
+describe('GIT_MERGE_RE global-flag coverage', () => {
+  it('MATCHES a raw merge preceded by git global options', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    for (const cmd of [
+      'git merge topic',
+      'git -c a=b merge topic',
+      'git --no-pager merge topic',
+      'git -p merge',
+      'git -C /wt merge topic',
+      'git --git-dir=/r/.git merge',
+    ]) {
+      assert.strictEqual(GIT_MERGE_RE.test(cmd), true, `should match (deny fires): ${cmd}`);
+    }
+  });
+
+  it('does NOT match merge-adjacent commands or a bare word before merge', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    for (const cmd of [
+      'git merge-base a b',
+      'git merge --abort',
+      'git mergetool',
+      'git commit -m "resolve merge conflict"',
+      'git config merge.tool vimdiff',
+    ]) {
+      assert.strictEqual(GIT_MERGE_RE.test(cmd), false, `should NOT match (no deny): ${cmd}`);
+    }
+  });
+});
+
 // WS3 bypass closures: `git -C <path> merge` target resolution + Bash redirect
 // denies for guarded ledger/DAG/research-config files.
 describe('arc-guard bypass closures', () => {

@@ -88,4 +88,25 @@ describe('coordinator dag-guard engine twin (_saveDag)', () => {
     const reloaded = new Coordinator(root, DEFAULT_SPEC_ID);
     expect(reloaded.dag.epics.find((e) => e.id === 'epic-a').status).toBe(TaskStatus.COMPLETED);
   });
+
+  it('refuses to block a completed task with a clear error and no half-mutation', () => {
+    root = setupRepo();
+    writeDag(withCompletedA()); // epic-a is completed
+    const coord = new Coordinator(root, DEFAULT_SPEC_ID);
+
+    let err;
+    try {
+      coord.blockTask('epic-a', 'boom');
+    } catch (e) {
+      err = e;
+    }
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toMatch(/epic-a/);
+    expect(err.message).toMatch(/already completed/i);
+    expect(err.message).toMatch(/terminal/i);
+    // No half-mutation: status unchanged and no BlockedItem appended.
+    expect(coord.dag.epics[0].status).toBe(TaskStatus.COMPLETED);
+    expect(coord.dag.blocked).toHaveLength(0);
+  });
 });

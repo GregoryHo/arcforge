@@ -40,16 +40,22 @@ const path = require('node:path');
 const { readStdinSync, parseStdinJson, output } = require('../../scripts/lib/utils');
 const { hasArcforgeMarker, readArcforgeMarker } = require('../../scripts/lib/marker');
 
-// `git merge` that INITIATES a merge. Allows global options between `git` and
-// `merge` (`-C <path>`, `--git-dir`, `--work-tree`) so the `-C <worktree> merge`
-// bypass form is caught too — evaluateBash resolves that target dir for the
-// marker check, so the deny lands on the repo the merge acts on, not the caller's
-// cwd. Excludes `git merge-base`/`-file` (lookahead: next char is whitespace or
-// end) AND conflict-recovery (`--abort`/`--continue`/`--quit`) — those are exactly
-// what a worktree implementer runs during the arc-finishing conflict flow (epic
-// path), so blocking them would misdirect.
+// `git merge` that INITIATES a merge, redirected to the coordinator flow. This is
+// a best-effort redirect heuristic, NOT a security boundary — a determined caller
+// can always reshape a command to evade it; the goal is to catch the raw form an
+// implementer would naturally type. Allows dash-prefixed git global-option tokens
+// between `git` and `merge` (e.g. `-c a=b`, `-C <path>`, `--no-pager`, `-p`,
+// `--git-dir[=| ]<path>`, `--work-tree <path>`) so bypass forms like
+// `git -c x=y merge` and `git -C <worktree> merge` are caught too — evaluateBash
+// resolves the `-C`/`--git-dir` target dir for the marker check, so the deny lands
+// on the repo the merge acts on, not the caller's cwd. Only dash-prefixed tokens
+// (and their known separate values) are allowed between `git` and `merge`, never a
+// bare word. Excludes `git merge-base`/`-file` (lookahead: next char is whitespace
+// or end) AND conflict-recovery (`--abort`/`--continue`/`--quit`) — those are
+// exactly what a worktree implementer runs during the arc-finishing conflict flow
+// (epic path), so blocking them would misdirect.
 const GIT_MERGE_RE =
-  /\bgit\s+(?:(?:-C\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+))\s+)*merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
+  /\bgit\s+(?:(?:-[cC]\s+\S+|--(?:git-dir|work-tree|namespace|exec-path|super-prefix)(?:=\S+|\s+\S+)|-[pP]|--[\w-]+(?:=\S+)?)\s+)*merge(?!\s+--(?:abort|continue|quit)\b)(?=\s|$)/;
 // Arcforge loop INVOCATIONS only — not reading/diffing a file named loop.js.
 // Matches arcforge's own loop invocation (scripts/loop.js, `cli.js loop`,
 // `arcforge loop`) — NOT any project file ending in loop.js (game-loop.js,

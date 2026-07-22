@@ -304,22 +304,6 @@ function bump(name) {
 }
 
 /**
- * Emit an autopilot-aware nudge (RV-5). Attended (no live loop sentinel for
- * cwd): user-facing `systemMessage` only — unchanged behavior. Autopilot
- * (`loopSentinelPresent(cwd)` true, worktree-aware via AF-2): ADDITIONALLY
- * surface the same text to the model over the PostToolUse model channel, kept
- * in the single merged JSON object the helper guarantees. systemMessage stays
- * present in both modes.
- */
-function emitNudge(cwd, text) {
-  if (loopSentinelPresent(cwd)) {
-    outputPostToolUseFeedback(text, { systemMessage: text });
-  } else {
-    output({ systemMessage: text });
-  }
-}
-
-/**
  * Pure decision core for a PostToolUse event. Runs the reminder rules (with
  * their per-session side effects: counter bumps and SKILL.md-path recording)
  * and returns the nudge to emit as `{ modelReason, systemMessage }`, or null to
@@ -459,7 +443,6 @@ module.exports = {
   buildEvalShipNudge,
   mainBranchNudge,
   planAfterSpecNudge,
-  emitNudge,
   evaluate,
   TEST_CMD_RE,
   PR_BOUNDARY_RE,

@@ -16,7 +16,7 @@
  * per-hook guards). MUST be sync — async hooks cannot block.
  */
 
-const { runRules, disabledSet } = require('../scripts/lib/hook-dispatch');
+const { runRules } = require('../scripts/lib/hook-dispatch');
 const { output } = require('../scripts/lib/utils');
 
 const arcGuard = require('./arc-guard/main');
@@ -41,7 +41,7 @@ const WARN_RULES = [{ id: 'secrets-guard', evaluate: secretsGuard.evaluate }];
 
 function main() {
   try {
-    const { input, results } = runRules(RULES);
+    const { input, results, disabled } = runRules(RULES);
     for (const { value } of results) {
       if (value) {
         output({
@@ -57,8 +57,7 @@ function main() {
 
     // No deny — run the warn rules and emit at most one systemMessage (the
     // single-JSON-object protocol). Each warn rule is fault-isolated and honors
-    // ARCFORGE_DISABLED_HOOKS by id, mirroring runRules.
-    const disabled = disabledSet();
+    // ARCFORGE_DISABLED_HOOKS by id, reusing the disabled set runRules computed.
     const warnings = [];
     for (const rule of WARN_RULES) {
       if (disabled.has(rule.id)) continue;

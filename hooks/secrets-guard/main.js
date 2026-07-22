@@ -2,10 +2,11 @@
 /**
  * secrets-guard — PreToolUse WARN-first scan for hardcoded credentials.
  *
- * Scans the resulting content of an Edit/Write, and the string of a `git commit`
- * Bash command, for common key/token shapes (AWS access keys, private-key PEM
- * headers, provider tokens, hardcoded credential assignments). On a hit it emits
- * a user-facing WARNING (systemMessage) — NOT a deny in 5.0. A test-credential
+ * Scans the new text of an Edit / the full content of a Write, and the string of
+ * a `git commit` Bash command, for common key/token shapes (AWS access keys,
+ * private-key PEM headers, provider tokens, hardcoded credential assignments). On a
+ * hit it emits a user-facing WARNING (systemMessage) — NOT a deny in 5.0. A
+ * test-credential
  * allowlist (lines/paths containing test/example/fixture/dummy/…) suppresses the
  * common false positives.
  *
@@ -14,9 +15,8 @@
  * the message are stripped of control characters (security.md).
  */
 
-const path = require('node:path');
 const { readStdinSync, parseStdinJson, output } = require('../../scripts/lib/utils');
-const { computeWriteContent, computeEditContent } = require('../../scripts/lib/resulting-content');
+const { computeWriteContent } = require('../../scripts/lib/resulting-content');
 
 const SECRET_PATTERNS = [
   { name: 'AWS access key id', re: /\bAKIA[0-9A-Z]{16}\b/ },
@@ -90,12 +90,21 @@ function evaluate(input) {
     const filePath = input.tool_input?.file_path;
     if (typeof filePath !== 'string' || !filePath) return null;
     if (isTestPath(filePath)) return null;
-    const cwd = input.cwd || process.cwd();
-    const absPath = path.resolve(cwd, filePath);
-    const content =
-      tool === 'Write'
-        ? computeWriteContent(input.tool_input)
-        : computeEditContent(input.tool_input, absPath);
+    // Write replaces the whole file, so scan the full resulting content. An Edit
+    // only introduces new_string, so scan ONLY that added text — a pre-existing
+    // secret elsewhere in the file is not this edit's doing and must not re-warn on
+    // every unrelated change. Accepted warn-only gap: a secret whose KEY name is
+    // already on disk while only its VALUE lands in new_string can slip past the
+    // generic credential pattern (which needs key + value on one line), but the
+    // shape patterns (AKIA / xox / ghp / PEM) still catch a value-only secret.
+    let content;
+    if (tool === 'Write') {
+      content = computeWriteContent(input.tool_input);
+    } else if (typeof input.tool_input.new_string === 'string') {
+      content = input.tool_input.new_string;
+    } else {
+      content = null;
+    }
     const findings = scanForSecrets(content);
     if (findings.length === 0) return null;
     return buildWarning(findings, `\`${sanitize(filePath)}\``);
