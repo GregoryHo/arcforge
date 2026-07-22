@@ -1,6 +1,6 @@
 {
   "name": "arcforge",
-  "version": "4.0.1",
+  "version": "5.0.0",
   "description": "Skill-based autonomous agent toolkit for Claude Code and Codex",
   "license": "MIT",
   "author": {

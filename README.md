@@ -1,6 +1,6 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-4.0.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
@@ -68,7 +68,7 @@ Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arc
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.codex/INSTALL.md
 ```
 
 **Detailed docs:** `docs/README.codex.md`
@@ -116,7 +116,7 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-All 30 skills, grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
+Skills grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
 
 ### SDD (idea → spec → tasks → integration)
 
@@ -170,7 +170,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 ### Agents
 
-Skills delegate focused work to 9 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
+Skills delegate focused work to specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
 
 | Agent | Role |
 |-------|------|
