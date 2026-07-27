@@ -16,7 +16,7 @@
 ## Versioning
 
 - Set version in `plugin.json` (canonical source — wins if both `plugin.json` and `marketplace.json` set it)
-- Also sync to `package.json` and `.opencode/plugins/arcforge.js` for non-Claude platforms
+- Also sync to `package.json` and `.codex-plugin/plugin.json` for non-Claude platforms
 - Bumping version is critical — plugin code is cached by version, changes without version bump won't propagate
 
 ## Hook Registration
@@ -44,14 +44,12 @@
 
 ## Multi-Platform Packaging
 
-One repo, four platforms:
+One repo, two platforms:
 
 | Directory | Platform | Notes |
 |-----------|----------|-------|
 | `.claude-plugin/` | Claude Code | Hooks + marketplace |
 | `.codex/` | Codex | Installation guide (symlinks to `~/.agents/`) |
-| `.gemini/` | Gemini CLI | Per-skill symlinks |
-| `.opencode/` | OpenCode | Plugin + installation guide (includes `arcforge.js`) |
 
 ## Distribution
 

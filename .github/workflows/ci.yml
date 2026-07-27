@@ -18,7 +18,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: biomejs/setup-biome@v2
         with:
-          version: latest
+          # Pin to the version declared in biome.json / package-lock (2.3.14).
+          # `latest` drifts (e.g. 2.5.5 reformats it.each blocks), failing CI on
+          # files formatted with the pinned local version.
+          version: 2.3.14
       - run: biome ci .
 
   skill-eval-annotation:

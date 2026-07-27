@@ -1,0 +1,247 @@
+{
+ "items": [
+  {
+   "target": "skills/arc-requesting-review/SKILL.md",
+   "action": "delete",
+   "detail": "Merge 1 source A (83 lines; name/title at :2,:6; self-referencing template path at :36 'arc-requesting-review/code-reviewer.md'; references arc-receiving-review at :49,:76,:83). Content folds into new skills/arc-reviewing/SKILL.md (~140-line target per decision record)."
+  },
+  {
+   "target": "skills/arc-receiving-review/SKILL.md",
+   "action": "delete",
+   "detail": "Merge 1 source B (84 lines; name/title at :2,:6; back-references arc-requesting-review at :74,:83). Folds into arc-reviewing."
+  },
+  {
+   "target": "skills/arc-requesting-review/code-reviewer.md",
+   "action": "edit",
+   "detail": "146-line reviewer subagent template lives INSIDE the skill dir — must relocate to skills/arc-reviewing/code-reviewer.md and the new SKILL.md must reference the new relative path (old ref: SKILL.md:36). Distinct from agents/code-reviewer.md (which has zero merge-name references — verified)."
+  },
+  {
+   "target": "skills/arc-reviewing/SKILL.md",
+   "action": "create",
+   "detail": "Merged request-receive loop skill, ~140 lines. Frontmatter name: arc-reviewing. No name collision exists today (only mention of 'arc-reviewing' repo-wide is a FICTIONAL premise in evals/scenarios/eval-arc-writing-skills-micro-test-control.md:16,19)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_requesting_review.py",
+   "action": "delete",
+   "detail": "Pytest for merge-1 source A: path at :6, template path at :11, frontmatter name assert at :39, receiving-review cross-ref asserts at :59-60, template-mention assert at :75. Replace with tests/skills/test_skill_arc_reviewing.py (merges come before roadmap item 7 pytest conversion, so the merge PR still needs a passing pytest)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_receiving_review.py",
+   "action": "delete",
+   "detail": "Pytest for merge-1 source B: path at :5, frontmatter name assert at :29. Fold into test_skill_arc_reviewing.py."
+  },
+  {
+   "target": "hooks/arc-remind/main.js:147",
+   "action": "edit",
+   "detail": "PR-boundary nudge string '  • Review before merge — see arc-requesting-review.' → arc-reviewing. Also header comment :22. This is the decision record's arc-remind :146-173 nudge block; other names in that block (arc-verifying:146, arc-using-worktrees:155, arc-executing-tasks/arc-coordinating:166-167, arc-writing-skills:173,:258) are NOT renamed by these merges — leave."
+  },
+  {
+   "target": "hooks/__tests__/arc-remind.test.js:49",
+   "action": "edit",
+   "detail": "assert.ok(msg.includes('arc-requesting-review')) pins the old nudge string — must flip to 'arc-reviewing' in the same commit as main.js:147 or test:hooks fails."
+  },
+  {
+   "target": "hooks/arc-remind/README.md:12",
+   "action": "edit",
+   "detail": "Doc table row cites backticked `arc-requesting-review` — backticked, so check:docs R4 (error severity) will fail post-delete if missed."
+  },
+  {
+   "target": "skills/arc-using/SKILL.md:119-120",
+   "action": "edit",
+   "detail": "Router table (## Discipline Skills — Conditional Triggers, table at :114): row :119 'Task or feature complete → arc-requesting-review' and row :120 'Received code review feedback → arc-receiving-review' collapse into one arc-reviewing row. This is the router-lies invariant sync point for merge 1."
+  },
+  {
+   "target": "skills/arc-using/SKILL.md:133",
+   "action": "edit",
+   "detail": "Instinct & Learning Routes table (:128-134): row :133 'Review / confirm / contradict auto-detected instincts → arc-observing' merges into the :134 arc-learning row. Router-lies sync point for merge 2."
+  },
+  {
+   "target": "skills/arc-agent-driven/SKILL.md:297",
+   "action": "edit",
+   "detail": "Handoff mention: '**arc-requesting-review** - Code review template for reviewer subagents' → arc-reviewing."
+  },
+  {
+   "target": "skills/arc-writing-skills/SKILL.md:264",
+   "action": "edit",
+   "detail": "Naming-convention example table uses `arc-requesting-review` as an exemplar — swap for a surviving name (e.g. arc-writing-tasks stays)."
+  },
+  {
+   "target": "docs/guide/skills-reference.md",
+   "action": "edit",
+   "detail": "Merge-1 refs at :13,:75,:573 (### arc-requesting-review),:588,:592 (### arc-receiving-review),:610,:941. Merge-2 refs at :14,:26 (Claude-Code-only list names arc-observing),:76,:676,:682 (### arc-observing),:701,:722. Sections need consolidation into ### arc-reviewing / expanded ### arc-learning."
+  },
+  {
+   "target": "README.md",
+   "action": "edit",
+   "detail": "Merge-1: :166 (arc-requesting-review bullet), :167 (arc-receiving-review bullet), :202 (code-reviewer agent table row cites arc-requesting-review). Merge-2: :175 (arc-observing bullet), :287 (test:observer-daemon comment cites skills/arc-observing/tests/). Plain prose (not backticked) — escapes check:docs R4, only the grep gate catches these."
+  },
+  {
+   "target": "website/page/sections.jsx:337-338,346",
+   "action": "edit",
+   "detail": "Skill catalog arrays: :337 arc-requesting-review, :338 arc-receiving-review, :346 arc-observing. Then regenerate the committed build output sections.js (single line :825 contains all three) via npm run build:website — index.html:94 loads sections.js, not jsx."
+  },
+  {
+   "target": ".claude/rules/architecture.md:57",
+   "action": "edit",
+   "detail": "Discipline-skills list names arc-requesting-review + arc-receiving-review → arc-reviewing (contributor rule; loads into every arcforge session)."
+  },
+  {
+   "target": ".claude/rules/testing.md:19",
+   "action": "edit",
+   "detail": "Test-runner table cites skills/arc-observing/tests/ → new location."
+  },
+  {
+   "target": "CONTRIBUTING.md:318",
+   "action": "edit",
+   "detail": "Same test-runner table row: `skills/arc-observing/tests/` → new location."
+  },
+  {
+   "target": "evals/scenarios/eval-arc-requesting-review-dispatch-fidelity.md",
+   "action": "edit",
+   "detail": "## Target at :8-9 points to skills/arc-requesting-review/SKILL.md; body refs at :3,:29. scripts/cli/eval-command.js:333 errors on missing Target and :338 exits on nonexistent target file — retarget Target to skills/arc-reviewing/SKILL.md (and ideally rename the scenario file) in the merge PR even though full eval re-baseline is roadmap item 10."
+  },
+  {
+   "target": "skills/arc-observing/SKILL.md",
+   "action": "delete",
+   "detail": "Merge 2 source (177 lines; name :2; SKILL_ROOT default `$ARCFORGE_ROOT/skills/arc-observing` at :33). Folds into skills/arc-learning/SKILL.md (currently 88 lines; target ~170)."
+  },
+  {
+   "target": "skills/arc-observing/scripts/",
+   "action": "edit",
+   "detail": "Relocate observer-daemon.sh + observer-prompt.md + instinct.js → skills/arc-learning/scripts/. observer-daemon.sh derives ARCFORGE_ROOT as ../../../ from its own dir (:24, comment :23) — skills/arc-learning/scripts keeps the same depth so derivation survives; update the :23 comment. instinct.js has no self-path references. Note: tests/skills/test_skill_arc_learning.py:101 asserts skills/arc-learning/scripts/learn.js does NOT exist — relocation is compatible (only learn.js prohibited)."
+  },
+  {
+   "target": "skills/arc-observing/tests/run-tests.sh",
+   "action": "edit",
+   "detail": "Relocate → skills/arc-learning/tests/run-tests.sh. DAEMON_SCRIPT derivation (:11) is relative (dirname $0/../scripts) so it survives the move; update usage comment :5."
+  },
+  {
+   "target": "package.json:39",
+   "action": "edit",
+   "detail": "\"test:observer-daemon\": \"bash skills/arc-observing/tests/run-tests.sh\" → new path. Fails LOUDLY if missed (npm test breaks) — the one non-silent coupling."
+  },
+  {
+   "target": "hooks/session-tracker/start.js:83",
+   "action": "edit",
+   "detail": "checkDaemon() daemonPath = path.join(__dirname,'../../skills/arc-observing/scripts/observer-daemon.sh') at :81-84, guarded by fs.existsSync (:86) inside try/catch — SILENT failure mode: stale path → existsSync false → daemon simply never starts at SessionStart, no error anywhere."
+  },
+  {
+   "target": "hooks/observe/main.js:364",
+   "action": "edit",
+   "detail": "maybeSpawnDaemon() daemonScript = path.resolve(__dirname,'../../skills/arc-observing/scripts/observer-daemon.sh') at :361-364, then spawn('bash',[daemonScript,'start']) detached inside try/catch — SILENT: spawn of a nonexistent script still returns 'spawned'; daemon never runs."
+  },
+  {
+   "target": "scripts/lib/learning-curator/batch-assembler.js:358",
+   "action": "edit",
+   "detail": "renderPrompt() promptTemplatePath = path.join(__dirname,'../../../skills/arc-observing/scripts/observer-prompt.md') at :356-359; readFileSync failure throws 'Failed to read observer-prompt.md' — but the caller is the background daemon's curator CLI, so the throw lands in a daemon log, invisible to the user: candidate generation halts silently."
+  },
+  {
+   "target": "hooks/session-tracker/inject-context.js:106",
+   "action": "edit",
+   "detail": "Injected instinct block ends with 'Invoke /arcforge:arc-observing to confirm/contradict these patterns.' — a slash command that stops resolving post-merge (no shims per D1). Reword to /arcforge:arc-learning (or the merged skill's confirm flow). No test pins this literal (verified) — pure silent staleness."
+  },
+  {
+   "target": "hooks/session-tracker/inject-context.js:252",
+   "action": "edit",
+   "detail": "Reflect pending-action string (:250-253): '**${count} unprocessed diaries ready for reflection.** Run /arcforge:arc-reflecting to analyze patterns.' — the anchor for the arc-remind/arc-reflecting rewording items. Sibling journaling literal at :244 ('use /arcforge:arc-journaling'). Both slash names survive v5 but the wording items in the decision record attach here."
+  },
+  {
+   "target": "hooks/observe/README.md",
+   "action": "edit",
+   "detail": ":3 '(arc-observing / arc-learning)' and :21 'See `skills/arc-observing/SKILL.md`' — :21 is a backticked path so check:docs R1 catches it; :3 is prose."
+  },
+  {
+   "target": "tests/scripts/instinct.test.js:12",
+   "action": "edit",
+   "detail": "require('../../skills/arc-observing/scripts/instinct') — jest fails loudly if missed. Same fix in instinct-curator-lifecycle.test.js:35, inject-activated-instincts-contract.test.js:106, learning-curator-prompt.test.js:11 (observer-prompt.md path)."
+  },
+  {
+   "target": "tests/skills/test_skill_arc_observing.py",
+   "action": "delete",
+   "detail": "Asserts skills/arc-observing/SKILL.md exists (:10,:20), frontmatter name (:29), scripts dir (:95), daemon script (:108). Fold surviving assertions into test_skill_arc_learning.py."
+  },
+  {
+   "target": "tests/skills/test_learning_subsystem_mvp_plan.py:18",
+   "action": "verify",
+   "detail": "Asserts 'arc-observing' appears in docs/plans/learning-subsystem-mvp.md (a sanctioned historical doc) — keeps passing untouched, but it codifies the OLD observing/learning split as current architecture. Decide: retire or annotate in the merge PR; do NOT sweep the plan doc to satisfy it."
+  },
+  {
+   "target": "skills/arc-recalling/SKILL.md:11,72",
+   "action": "edit",
+   "detail": "Prose refs: ':11 automatic instinct detection (arc-observing)' and ':72 already auto-detected by arc-observing (use confirm instead)' → arc-learning."
+  },
+  {
+   "target": "CHANGELOG.md",
+   "action": "create",
+   "detail": "Add v5.0.0 old→new mapping table entry per D1 (arc-requesting-review→arc-reviewing, arc-receiving-review→arc-reviewing, arc-observing→arc-learning). CHANGELOG is a sanctioned exception for OLD-name mentions (3/2/12 historical occurrences respectively)."
+  },
+  {
+   "target": "specs/sdd-downstream-contract/spec.xml:38",
+   "action": "verify",
+   "detail": "Ratified spec out-of-scope reason names arc-requesting-review→arc-receiving-review chain; specs/arc-auditing-spec/spec.xml:38 likewise. Treat as historical ratified records (sanctioned exception, same class as docs/plans) — sdd-ratify-guard doesn't block edits, but rewriting ratified anchors changes decision history. Must be listed in the sweep's exception set."
+  },
+  {
+   "target": "evals/skill-eval-coverage.md",
+   "action": "edit",
+   "detail": "Historical eval-promotion narrative mentions arc-requesting-review x6 (:38,:131,:147,:163,:177,:238), arc-receiving-review :172, arc-observing :172. Recommend a one-line old→new mapping note at top rather than rewriting measurement history; either way it must be an explicit sanctioned exception or updated, or the sweep grep never goes green."
+  },
+  {
+   "target": "evals/benchmarks/",
+   "action": "verify",
+   "detail": "Generated snapshots (2026-07-02.json, 2026-07-09.json, latest.json + raw/) contain scenario id eval-arc-requesting-review-dispatch-fidelity (33 hits). Sanctioned historical data; latest.json regenerates on the next `arcforge eval benchmark`. Exclude the whole dir from the sweep grep."
+  },
+  {
+   "target": "scripts/check-doc-refs.js + scripts/lib/doc-refs.js:410-431",
+   "action": "verify",
+   "detail": "R4 behavior for renamed skills: every BACKTICKED `arc-<name>` token in skills/, docs/guide/, agents/, templates/, hooks/ markdown + README.md must resolve to skills/<name>/, hooks/<name>/, or agents/<name>.md; R4_SEVERITY='error' (doc-refs.js:45) so stale backticked old names FAIL `npm run check:docs` the moment the old dirs are deleted. Limits: plain-prose mentions (README bullets, website .js/.jsx, .claude/rules, package.json, tests) are NOT scanned — the WS5 grep gate is the only guard there. R1 similarly catches backticked stale PATHS like `skills/arc-observing/SKILL.md`."
+  },
+  {
+   "target": "hooks/arc-guard/main.js:62,72,144",
+   "action": "verify",
+   "detail": "Name-graph sweep checkpoints from the decision record: :62 arc-finishing, :72 arc-looping, :144-163 arc-researching — none are merge-renamed; verify-only that they still name real skills after the sweep (check:docs does not scan .js strings)."
+  },
+  {
+   "target": "agents/ + templates/",
+   "action": "verify",
+   "detail": "grep confirms ZERO references to arc-requesting-review / arc-receiving-review / arc-observing in agents/*.md (including the three arc-auditing-spec-*.md) and templates/*.md — nothing to change for these merges; the decision record's agents/arc-auditing-spec-*.md sweep item concerns other names."
+  },
+  {
+   "target": "evals/scenarios/eval-arc-writing-skills-micro-test-control.md:16,19",
+   "action": "verify",
+   "detail": "Scenario premise uses `skills/arc-reviewing/SKILL.md` as a FICTIONAL skill; post-merge it becomes a real shipped path, subtly changing the eval's premise. Flag for the eval re-baseline pass (roadmap 10)."
+  },
+  {
+   "target": "hooks/__tests__/observe.test.js:749,818 + hooks/__tests__/e2e-hooks.test.js:211",
+   "action": "verify",
+   "detail": "Observer-daemon-adjacent hook tests rely on ARCFORGE_OBSERVE_NO_SPAWN=1, not on the skills/arc-observing path literal — they pass either way and thus do NOT protect the daemon path; only the relocated bash suite (test:observer-daemon) and the two silent hook couplings' manual grep do."
+  }
+ ],
+ "verify_commands": [
+  "test ! -d skills/arc-requesting-review && test ! -d skills/arc-receiving-review && test ! -d skills/arc-observing && test -f skills/arc-reviewing/SKILL.md && test -f skills/arc-reviewing/code-reviewer.md && test -f skills/arc-learning/SKILL.md && test -f skills/arc-learning/scripts/observer-daemon.sh && test -f skills/arc-learning/scripts/observer-prompt.md && test -f skills/arc-learning/scripts/instinct.js && test -f skills/arc-learning/tests/run-tests.sh && echo WS4-LAYOUT-OK",
+  "! grep -rn 'arc-requesting-review\\|arc-receiving-review\\|arc-observing' skills hooks scripts agents templates tests website docs/guide .claude/rules README.md CONTRIBUTING.md package.json evals/scenarios --exclude-dir=node_modules && echo WS5-SWEEP-CLEAN",
+  "! grep -rn 'skills/arc-observing\\|skills/arc-requesting-review\\|skills/arc-receiving-review' hooks scripts tests package.json --exclude-dir=node_modules && echo WS5-PATHS-CLEAN",
+  "grep -q 'arc-reviewing' skills/arc-using/SKILL.md && grep -q 'arc-learning' skills/arc-using/SKILL.md && echo ROUTER-SYNCED",
+  "npm run check:docs",
+  "npm run lint",
+  "npm test",
+  "npm run test:observer-daemon",
+  "npm run build:website && git diff --exit-code website/page/sections.js website/page/hero.js && echo WEBSITE-BUILD-IN-SYNC",
+  "node -e \"const p=require('path');['hooks/session-tracker/start.js','hooks/observe/main.js','scripts/lib/learning-curator/batch-assembler.js'].forEach(f=>{const s=require('fs').readFileSync(f,'utf8');const m=s.match(/\\.\\.\\/(?:\\.\\.\\/)+skills\\/[A-Za-z0-9._\\/-]+/g)||[];m.forEach(r=>{const abs=p.resolve(p.dirname(f),r);if(!require('fs').existsSync(abs))throw new Error(f+' -> '+r)})});console.log('HOOK-SKILL-PATHS-RESOLVE')\"",
+  "grep -c 'arc-reviewing\\|arc-learning' CHANGELOG.md | awk '$1>=2{print \"CHANGELOG-MAPPING-PRESENT\"}'"
+ ],
+ "risks": [
+  "hooks/session-tracker/start.js:83 (checkDaemon): stale daemon path is gated by fs.existsSync inside a silent catch — SessionStart simply stops starting the observer daemon forever, zero errors, zero test coverage of the literal path.",
+  "hooks/observe/main.js:364 (maybeSpawnDaemon): spawn('bash', [nonexistent], {detached}) still returns 'spawned' and unrefs — lazy daemon start dies silently; observe.test.js only exercises the NO_SPAWN env branch, not path validity.",
+  "scripts/lib/learning-curator/batch-assembler.js:358: throws 'Failed to read observer-prompt.md', but the caller is the background daemon's curator CLI — the throw lands in a daemon log; candidate generation halts invisibly while observations keep accumulating.",
+  "hooks/session-tracker/inject-context.js:106: injects '/arcforge:arc-observing' advice into every session with active instincts; post-merge the command doesn't resolve (D1: no shims) — user-facing broken guidance, no test pins the literal so nothing fails.",
+  "check:docs R4 only scans BACKTICKED arc-<name> tokens in markdown under skills/, docs/guide/, agents/, templates/, hooks/ + README.md — plain-prose mentions (README bullets :166/:167/:175, .claude/rules, CONTRIBUTING.md, website sections.js/jsx, package.json, JS string literals in hooks) all escape it; the WS5 grep gate is the only enforcement for those.",
+  "website/page/sections.js is a committed BUILD ARTIFACT (index.html:94 loads .js, not .jsx): editing sections.jsx without `npm run build:website` ships the old skill list live and no test catches it — hence the build+git-diff verify command.",
+  "hooks/__tests__/arc-remind.test.js:49 pins the OLD name: renaming the main.js:147 nudge without the test → loud failure (good), but skipping BOTH leaves a permanently green stale nudge (silent).",
+  "Relocating observer-daemon.sh anywhere other than skills/<name>/scripts/ (same 3-deep) silently breaks its ARCFORGE_ROOT ../../../ fallback (line 24) — CURATOR_CLI then resolves to a nonexistent path only when ARCFORGE_ROOT env is unset, i.e. exactly in non-plugin/manual invocations.",
+  "evals/scenarios/eval-arc-requesting-review-dispatch-fidelity.md Target (line 9) dangles after the dir delete: eval-command.js:338 exits 'skill file not found' only WHEN the eval is run — a dormant break if the eval re-baseline (roadmap 10) is assumed to cover it and doesn't.",
+  "tests/skills/test_learning_subsystem_mvp_plan.py:18 asserts 'arc-observing' in docs/plans/learning-subsystem-mvp.md — an over-eager sweep of sanctioned docs/plans breaks pytest; conversely leaving the test codifies the retired split as current.",
+  "test_skill_arc_learning.py:101 asserts skills/arc-learning/scripts/learn.js does NOT exist — safe for the planned relocation, but renaming instinct.js/daemon files to 'learn.js' during the merge would trip it.",
+  "Plugin cache: per .claude/rules/plugin.md, plugin code is cached by version — the merged skill layout won't propagate to installed sessions until the v5.0.0 version bump; mid-stream testing must use `claude --plugin-dir .`."
+ ],
+ "notes": "Name-sweep totals (occurrences, excluding .git/node_modules). arc-requesting-review: skills 8 (own SKILL.md 3, arc-receiving-review 2, arc-using :119, arc-agent-driven :297, arc-writing-skills :264), hooks 5 (arc-remind/main.js :22,:147; arc-remind/README.md :12; __tests__/arc-remind.test.js :49 x2), docs/guide 6, README.md 2 (:166,:202), pytest 4, website 2 (sections.js:825, sections.jsx:337), .claude/rules 1 (:57), specs 2, evals-live 10 (scenario file 4 + skill-eval-coverage.md 6), sanctioned 53 (docs/plans 15, benchmarks 33, CHANGELOG 3, SP6-PROGRESS 3 — minus research 2 double-count; treat docs/research as sanctioned too). arc-receiving-review: skills 6, docs/guide 7, README 1 (:167), pytest 4 (2 files), website 2 (jsx:338), .claude/rules 1, specs 2, skill-eval-coverage 1, sanctioned 11 (plans 9, CHANGELOG 2). arc-observing: skills 8 (own dir 4 incl. SKILL.md:2,:33, daemon.sh:23, run-tests.sh:5; arc-recalling :11,:72; arc-using :133), hooks 5 (observe/main.js:364, observe/README.md:3,:21, session-tracker/start.js:83, inject-context.js:106), scripts/lib 1 (batch-assembler.js:358), package.json 1 (:39), tests/scripts 4 (instinct.test.js:12, instinct-curator-lifecycle.test.js:35, inject-activated-instincts-contract.test.js:106, learning-curator-prompt.test.js:11), tests/skills 8 (test_skill_arc_observing.py 7, test_learning_subsystem_mvp_plan.py :18), docs/guide 8, README 2 (:175,:287), CONTRIBUTING 1 (:318), .claude/rules/testing.md 1 (:19), website 2 (jsx:346), skill-eval-coverage 1, sanctioned 39 (plans 24, research 3, CHANGELOG 12). Sanctioned-exception set for the WS5 grep: CHANGELOG.md, SP6-PROGRESS.md, docs/plans/, docs/research/, evals/benchmarks/, specs/*.xml (ratified anchors), tests/skills/test_learning_subsystem_mvp_plan.py (pending its own decision). arc-using router table lives at skills/arc-using/SKILL.md — Discipline table :114-122 (rows :119,:120) and Instinct & Learning table :128-134 (row :133). check:docs (R4, error severity since SRH-5) is the mechanical gate for backticked names; CI runs it at .github/workflows/ci.yml:61. No references to the merge names exist in agents/, templates/, hooks/inject-skills/, hooks/hooks.json, .codex/, .agents/, .gemini/, .opencode/. eval-command.js Target handling: scripts/cli/eval-command.js:331-338."
+}

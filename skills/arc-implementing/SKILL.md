@@ -1,58 +1,30 @@
 ---
 name: arc-implementing
-description: Use when orchestrating large project implementation in a worktree
+description: Orchestrate implementation of a large multi-feature project inside a worktree. Use when driving one epic's build end-to-end; for cross-epic worktree and DAG-state management use arc-coordinating instead.
+category: sdd
+status: promoted
 ---
 
 # arc-implementing
 
 ## Overview
 
-Orchestrator for large projects. Automatically expands epic → features → tasks → execution.
+Orchestrator for large projects. Automatically expands epic → features → tasks → execution. It calls other skills and does not write code itself.
 
-**Use when:**
-- project has `specs/<spec-id>/dag.yaml`
-- in a worktree session (`.arcforge-epic` marker carries both epic and spec_id)
-- `specs/<spec-id>/epics/<epic-id>/epic.md` or `specs/<spec-id>/epics/<epic-id>/features/*.md` present
+**Use when** in a worktree session with `specs/<spec-id>/dag.yaml`, an `.arcforge-epic` marker (supplies both `epic` and `spec_id`), and `specs/<spec-id>/epics/<epic-id>/epic.md` or `.../features/*.md` present.
 
-**Do not use when:**
-- small projects (use writing-tasks + agent-driven directly)
-- tasks without a structured spec
-
-## Role
-
-Implementer is the Orchestrator. It calls other skills and does not write code itself.
-
-## Trigger
-
-- in a worktree session
-- `.arcforge-epic` marker exists (supplies both `epic` and `spec_id`)
-- or `specs/<spec-id>/epics/<epic-id>/epic.md` / `specs/<spec-id>/epics/<epic-id>/features/*.md` present
+**Do not use** for small projects (use writing-tasks + agent-driven directly) or tasks without a structured spec.
 
 ## The Process
 
-1. For each epic in the worktree, run the following phases in order.
-2. Phase 0: Sync and check dependencies.
-   - Run `arc-coordinating` to sync from base and check `blocked_by`.
-   - If `blocked_by` is not empty: STOP and use the blocked format.
-   - If ready: continue to Phase 1.
-3. Phase 1: Confirm features exist.
-   - `specs/<spec-id>/epics/<epic-id>/features/*.md` is produced by `arc-planning`
-     Phase 3 (co-created with `epic.md` in the same two-pass write) — it already
-     exists by the time this skill triggers. No skill call here; read the feature
-     files directly and proceed to Phase 2.
-4. Phase 2: Per Feature.
-   - 2a: Feature → Tasks.
-     - Call `arc-writing-tasks`
-     - Input: `specs/<spec-id>/epics/<epic-id>/features/<feature>.md`
-     - Output: `docs/tasks/<feature>-tasks.md`
-     - Quality gate: If tasks are vague or missing tests/commands, STOP and re-run `arc-writing-tasks` to refine. **Max 2 refinement cycles** — if still vague, escalate to human.
-   - 2b: Execute Tasks.
-     - Call `arc-agent-driven`
-     - Input: tasks file
-     - Output: completed code + commits
-     - Model tiers: arc-agent-driven's Model Selection ladder governs per-dispatch model choice (never inherit).
-5. Phase 3: Feature complete.
-   - Move to next feature, or finish the epic.
+For each epic in the worktree, run these phases in order:
+
+1. **Phase 0 — Sync and check dependencies.** Run `arc-coordinating` to sync from base and check `blocked_by`. If `blocked_by` is not empty: STOP and use the blocked format. If ready: continue.
+2. **Phase 1 — Confirm features exist.** `specs/<spec-id>/epics/<epic-id>/features/*.md` was produced by `arc-planning` Phase 3 and already exists. Read the feature files directly; no skill call here.
+3. **Phase 2 — Per feature:**
+   - **2a: Feature → Tasks.** Call `arc-writing-tasks`. Input: `specs/<spec-id>/epics/<epic-id>/features/<feature>.md`. Output: `docs/tasks/<feature>-tasks.md`. Quality gate: if tasks are vague or missing tests/commands, STOP and re-run to refine — **max 2 refinement cycles**, then escalate to human.
+   - **2b: Execute Tasks.** Call `arc-agent-driven`. Input: tasks file. Output: completed code + commits. Model tiers: arc-agent-driven's Model Selection ladder governs per-dispatch model choice (never inherit).
+4. **Phase 3 — Feature complete.** Move to next feature, or finish the epic.
 
 ## Skills Called
 
@@ -68,8 +40,7 @@ Implementer is the Orchestrator. It calls other skills and does not write code i
 
 - ❌ Write code directly (delegate to agent-driven)
 - ❌ Split tasks manually (delegate to writing-tasks)
-- ❌ Perform reviews (handled inside agent-driven)
-- ❌ Run TDD cycle (handled inside agent-driven)
+- ❌ Perform reviews or run the TDD cycle (handled inside agent-driven)
 
 ## Durable Progress
 
@@ -78,8 +49,7 @@ the `.arcforge/sdd/progress.md` ledger (a self-ignoring runtime recovery
 artifact) as `Task N: complete (commits <base7>..<head7>, review clean)`. If a
 compaction or fresh session drops your place mid-epic, read that ledger plus
 `git log` and resume AFTER the last task marked complete — never re-dispatch a
-feature or task the ledger already records as done; reconcile against `git log`
-before dispatching anything.
+feature or task the ledger already records as done.
 
 ## Completion Format
 
@@ -90,10 +60,9 @@ before dispatching anything.
 Features implemented:
 - feature-1: 4 tasks, all passing
 - feature-2: 6 tasks, all passing
-- feature-3: 3 tasks, all passing
 
-Total: 13 tasks, 0 failures
-Commits: 13
+Total: N tasks, 0 failures
+Commits: N
 
 Next: Use arc-finishing to decide merge/PR/keep/discard
 ─────────────────────────────────────────────────
@@ -101,37 +70,15 @@ Next: Use arc-finishing to decide merge/PR/keep/discard
 
 ## Blocked Format
 
-### Dependencies Not Ready
-
-```
-─────────────────────────────────────────────────
-⚠️ Implementer blocked: waiting for dependencies
-
-Epic: <epic-name>
-Blocked by: <dep-1>, <dep-2>
-
-To resolve:
-1. Complete blocking epics first
-2. Run `arc-coordinating` sync from base
-3. Verify `blocked_by` is empty
-
-Then resume implementer
-─────────────────────────────────────────────────
-```
-
-### Task Failure
-
 ```
 ─────────────────────────────────────────────────
 ⚠️ Implementer blocked
 
 Epic: <epic-name>
-Feature: <feature-name>
-Task: <task-id>
-Issue: [description]
-
-To resolve:
-1. [action]
+[Dependencies] Blocked by: <dep-1>, <dep-2>
+  → Complete blocking epics, run `arc-coordinating` sync from base, verify `blocked_by` empty
+[Task failure] Feature: <feature-name>  Task: <task-id>  Issue: [description]
+  → [action]
 
 Then resume implementer
 ─────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 ---
 name: arc-diagramming-obsidian
-description: Use when the user wants an Excalidraw diagram or any visual representation — architecture, flowchart, mind map — including casual "draw this" / "show me how this works visually". Also use when arc-maintaining-obsidian delegates Synthesis visuals beyond embedded Mermaid.
+description: Create an Excalidraw diagram or visual — architecture, flowchart, mind map — including casual 'draw this' / 'show me visually'. Also use when arc-maintaining-obsidian delegates Synthesis visuals beyond embedded Mermaid.
+category: knowledge
+status: promoted
 ---
 
 # arc-diagramming-obsidian
@@ -13,14 +15,9 @@ Diagrams should ARGUE, not DISPLAY. A diagram is a visual argument — structure
 DESIGN → BUILD → VALIDATE → SAVE
 ```
 
-You own the full workflow. For complex diagrams, delegate mechanical phases (Build, Validate, Save) to subagents that read from `agents/` — this keeps your context clean. For simple diagrams or when subagents aren't available, execute each phase yourself. The instructions below are self-contained either way.
+You own the full workflow. For complex diagrams, delegate mechanical phases (Build, Validate, Save) to subagents that read from `agents/` to keep context clean; for simple diagrams or when subagents aren't available, execute each phase yourself. The instructions below are self-contained either way.
 
-The rest of this skill is split into two layers of guidance:
-
-- **HARD** — physical and mechanical invariants. The tools can verify these, or violating them silently corrupts the output. Non-negotiable.
-- **SOFT** — concept judgments. Depend on what you're drawing, not on what the tools require. Reasoning, not rules.
-
-Both layers apply across all four phases.
+Guidance splits into two layers, both applying across all four phases: **HARD** — physical/mechanical invariants the tools verify or that silently corrupt output; non-negotiable. **SOFT** — concept judgments that depend on what you're drawing; reasoning, not rules.
 
 ---
 
@@ -63,58 +60,19 @@ Mentally trace every planned arrow from source to target before writing EA code.
 
 ## SOFT: The Design Space
 
-HARD keeps the diagram technically valid. SOFT is where you make it *good*. These are concept judgments — they depend on what you're drawing.
+HARD keeps the diagram valid. SOFT is where you make it *good* — concept judgments that depend on what you're drawing.
 
-### Think First, Draw Second
+**Think first, draw second.** For each major concept, answer before reaching for shapes: what does it DO (the verb)? What relationships and core transformation (input → output, state A → state B)? What would someone need to SEE to understand it?
 
-For each major concept in the diagram, answer before reaching for shapes:
+**Every element serves the concept.** Before adding anything, ask: *what does this communicate that labels alone don't?* If "nothing", it's noise; if "this is where flow starts / a zone boundary / the concept is symmetric", it's doing work. Match two registers — **language** (monolingual prompt → monolingual labels, no bilingual subtitles unless asked) and **conceptual** (symmetric concept → equal-sized peers; don't fabricate a hero the concept doesn't claim).
 
-- What does it DO? (the verb — not the noun)
-- What relationships exist with other elements?
-- What's the core transformation (input → output, state A → state B)?
-- What would someone need to SEE to understand this?
+**Scale reflects real importance.** Size the genuine hero (a convergence point, the concept the diagram is *about*) larger; size genuine peers equally. Size ranges in `references/painters-toolkit.md` are suggestions, not tiers.
 
-### Reasoning About What to Add
+**Isomorphism self-check.** Before building, ask: with all text removed, would the structure alone communicate the concept? A fan-out says "one source, many outputs"; a convergence says "many inputs, one result"; a cycle says "feedback". If the structure is just labeled boxes and arrows with no isomorphism, revisit. This is a check, not a gate — sometimes "A connects to B" is genuinely the concept.
 
-Every element should serve the concept. Before adding anything, ask: *what does this communicate that labels alone don't?*
+**Brushes** — shape variety, subtitles, zone labels, accents, separators, containers, footers — are a vocabulary to pick from, not a menu to copy. See `references/painters-toolkit.md`. For pattern inspiration (fan-out, convergence, tree, timeline, cycle, assembly line, side-by-side, gap) see `references/visual-patterns.md`; if two adjacent sections look structurally identical, redesign one — visual monotony kills comprehension.
 
-If the answer is "nothing" — the element is noise. If the answer is "this is where the flow starts" / "this is state the user should sense" / "this is a zone boundary" / "this shows the concept is symmetric" — the element is doing work.
-
-Two registers to match:
-
-- **Language register.** If the prompt is monolingual, keep labels in that language. Don't add bilingual subtitles unless asked.
-- **Conceptual register.** If the concept is symmetric (three equal stages, parallel peers, `Input → Process → Output`), give peers the same size. Hero sizing implies real importance — don't fabricate one where the concept doesn't claim it.
-
-Decoration is not the enemy. *Unjustified* decoration is.
-
-### Scale Reflects Real Importance
-
-When one element is genuinely more important than peers (a convergence point that everything flows into, the hero concept the diagram is *about*), size it larger. When peers are genuinely equal, size them equally. Concrete size ranges are in `references/painters-toolkit.md` — they're suggestions for reference, not mandated tiers.
-
-### Isomorphism Self-Check (Heuristic)
-
-Before building, ask: if I removed all text from this design, would the structure communicate anything about the concept? A fan-out says "one source, many outputs" without any labels. A convergence says "many inputs, one result." A cycle says "feedback."
-
-If your planned structure is just "labeled boxes connected by arrows" with no isomorphism to the concept — the structure isn't doing work. Revisit.
-
-This is a check, not a gate. Sometimes "A connects to B" is genuinely what the concept says, and that's fine. But the check prompts verification before committing.
-
-### The Painter's Toolkit
-
-Shape variety, subtitles, zone labels, decorative accents, separators, containers, footer annotations — these are your brushes. Read `references/painters-toolkit.md` during design to see the full vocabulary, then pick what serves the current concept.
-
-Not a menu to copy from. A vocabulary to pick from.
-
-### Visual Patterns (Reference)
-
-For pattern inspiration — fan-out, convergence, tree, timeline, spiral/cycle, cloud, assembly line, side-by-side, gap — see `references/visual-patterns.md`. Each pattern has ASCII sketches, shape-meaning tables, and "when NOT to use."
-
-Each major concept in a diagram typically uses a different pattern. If two adjacent sections look structurally identical, consider redesigning one — visual monotony kills comprehension.
-
-### Depth and Layout Planning
-
-- For comprehensive/technical depth (research mandate, multi-zoom architecture, evidence artifacts), see `references/depth-enhancements.md`.
-- For diagrams with 20+ elements or evidence artifacts, use `references/plan_layout.py` to compute coordinates automatically — it enforces systematic spacing and two-column separation that prevents the most common overlap defects.
+**Depth and layout:** for comprehensive/technical depth (research, multi-zoom, evidence artifacts) see `references/depth-enhancements.md`; for 20+ elements use `references/plan_layout.py` to compute coordinates automatically (systematic spacing + two-column separation that prevents common overlaps).
 
 ---
 
@@ -161,13 +119,7 @@ Before writing EA code, read `references/layout-heuristics.md` Part 1 for grid-b
 })()
 ```
 
-Key build rules (these restate the mechanical invariants above in context):
-
-- **Style before element** — `ea.style.*` applies to the NEXT element created
-- **`addText` with box returns the BOX id** — use this for `connectObjects`, not the text id
-- **Stagger anchors** when multiple arrows leave one shape (left/bottom/right, not all bottom)
-- **Diamond text ≤ 12 chars** — diamonds have ~50% less usable area than rectangles
-- **`viewBackgroundColor`** — `#1e1e1e` (dark) or `#ffffff` (light), per Process Invariants
+Beyond the Mechanical Invariants above: **style before element** (`ea.style.*` applies to the NEXT element created); **stagger anchors** when multiple arrows leave one shape (left/bottom/right, not all bottom); **diamond text ≤ 12 chars** (diamonds have ~50% less usable area than rectangles).
 
 Read `references/element-templates.md` for the full EA API reference, raw JSON templates for Phase 2 fixes, and the binding checklist.
 
@@ -234,8 +186,6 @@ Two paths — prefer `ea.create()`, fall back to manual write only if EA is unre
 })()
 ```
 
-`ea.elementsDict` is a documented public property used in official Excalidraw scripts.
-
 ### Fallback: Manual Canonical Format
 
 Only use when `obsidian eval code="typeof window.ExcalidrawAutomate"` returns empty (EA plugin unavailable). Obsidian checks format heuristics — any deviation causes silent corruption. Read `references/save-format.md` for the byte-exact template.
@@ -252,25 +202,21 @@ Exits non-zero on format corruption or render mismatch. For the manual-fallback 
 
 ### Embed in Wiki Notes
 
-```markdown
-![[diagram-name]]
-```
-
-Place outside bilingual callouts (diagrams are language-neutral).
+Embed with `![[diagram-name]]`, placed outside bilingual callouts (diagrams are language-neutral).
 
 ---
 
 ## Delegation (Optional)
 
-For complex diagrams, spawn a subagent for each mechanical phase to keep context clean. For simple diagrams or when subagents aren't available, follow the phases above directly.
+For complex diagrams, spawn a subagent per mechanical phase to keep context clean. Pass the design spec and relevant context; each subagent reads its instructions and the reference files it needs:
 
-When delegating, pass the agent file and relevant context. Each subagent reads its instructions and the reference files it needs:
+- **Build** — pass the design spec (theme, zones, elements, connections, brushes chosen); read `agents/diagram-builder.md`. Output: `/tmp/diagram.excalidraw` + element count.
+- **Validate** — pass the diagram path and a 1-2 sentence design intent; read `agents/diagram-validator.md`. Output: validated `.excalidraw` + PNG at `/tmp/diagram.png` + issues report.
+- **Save** — pass the diagram path, filename, folder, and embed target; read `agents/diagram-saver.md`. Output: vault path.
 
-- **Build** — pass the design spec (theme, zones, elements, connections, brushes chosen) and tell the subagent to read `agents/diagram-builder.md`. Output: `/tmp/diagram.excalidraw` + element count.
-- **Validate** — pass the diagram path and a 1-2 sentence design intent summary. Tell the subagent to read `agents/diagram-validator.md`. Output: validated `.excalidraw` + PNG at `/tmp/diagram.png` + issues report.
-- **Save** — pass the diagram path, filename, folder, and embed target. Tell the subagent to read `agents/diagram-saver.md`. Output: vault path of saved file.
+**Quality gate:** After validation returns, view the PNG yourself before Save. If it doesn't match your design intent, revise the spec and re-run Build, or give a new Validate pass specific fixes.
 
-**Quality gate:** After validation returns, view the PNG yourself before proceeding to Save. If it doesn't match your design intent, revise the spec and re-run Build, or give specific fix instructions to a new Validate pass.
+Do yourself: element generation, PNG render, overlap/layout checks (`check_overlaps.py`, `plan_layout.py`), direct `.excalidraw.md` vault write (or `ea.create()`). Delegate to `obsidian:obsidian-cli`: theme detection, vault-path/note search, embedding in a wiki note, reloading a changed diagram.
 
 ### Reference Files (Read on Demand)
 
@@ -283,22 +229,6 @@ When delegating, pass the agent file and relevant context. Each subagent reads i
 - `references/save-format.md` — Manual `.excalidraw.md` canonical template (fallback save path)
 - `references/plan_layout.py` — Automatic coordinate computation for 20+ elements
 - `references/verify_saved_diagram.py` — Post-save verification (format markers + render check)
-
-### What to do yourself vs. delegate
-
-Keep in-scope tasks yourself; route out-of-scope tasks to the dedicated skill.
-
-| Task | Do yourself | Delegate to |
-|------|------------|-------------|
-| Generate elements (EA API or raw JSON) | ✓ | — |
-| Render to PNG (Playwright) | ✓ | — |
-| Check overlaps (`check_overlaps.py`) | ✓ | — |
-| Layout planning (`plan_layout.py`) | ✓ | — |
-| Detect Obsidian theme | — | `obsidian:obsidian-cli` (via `obsidian eval`) |
-| Find vault path / search existing notes | — | `obsidian:obsidian-cli` |
-| Write `.excalidraw.md` to vault | ✓ (direct filesystem write) — OR `ea.create()` | — |
-| Embed diagram in a wiki note | — | `obsidian:obsidian-cli` + `obsidian:obsidian-markdown` |
-| Reload a changed diagram in Obsidian | — | `obsidian:obsidian-cli` |
 
 ---
 

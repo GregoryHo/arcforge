@@ -1,6 +1,8 @@
 ---
 name: arc-learning
-description: Use when optional learning is enabled and observations should become reviewable candidates, inactive drafts, and explicitly activated artifacts.
+description: "Run the opt-in learning lifecycle: turn observations into reviewable candidates, inactive drafts, then explicitly activated instincts. Use when the default-off learning module is enabled and observations should become artifacts."
+category: memory
+status: promoted
 ---
 
 # Optional Learning Candidate Lifecycle
@@ -69,17 +71,77 @@ The full set of statuses a candidate moves through:
 - **Fail closed for artifact writes.** Materialization requires approval; activation requires materialized drafts and defaults to `supersede_with_backup`; only refuses when the policy is not `supersede_with_backup`.
 - **Duplicate suppression.** The curator should not append semantic duplicate candidates for the same learned behavior.
 
+## Observer Daemon & Behavioral Instincts
+
+The candidate queue is fed by a background **observer daemon** that runs as a
+four-layer orchestrator: (1) `hooks/observe/main.js` captures every tool call to
+`~/.arcforge/observations/{project}/observations.jsonl`; (2) the daemon assembles
+recent observation windows into a batch; (3) it invokes the LLM curator
+(`claude --model haiku --print --output-format json`) to produce candidate
+proposals; (4) it ingests those proposals into the review queue. The daemon never
+writes instinct `.md` files directly — only the dashboard's activation gate does.
+
+**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
+```bash
+: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
+: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-learning}"
+if [ ! -d "$SKILL_ROOT" ]; then
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  exit 1
+fi
+```
+
+| Task | Command |
+|------|---------|
+| **Daemon status** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" status` |
+| **Start daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" start` |
+| **Stop daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" stop` |
+| **View instincts** | `node "${SKILL_ROOT}/scripts/instinct.js" status --project {p}` |
+| **Confirm pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" confirm {id} --project {p}` |
+| **Contradict pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" contradict {id} --project {p}` |
+
+### Confirming / Contradicting
+
+When a user agrees or disagrees with an auto-detected pattern: run the
+confirm/contradict CLI, show the updated confidence, and explain the change.
+Always offer the chance to validate or reject — do not present instincts as fixed.
+
+### Confidence Lifecycle
+
+Confidence is metadata on the candidate / activated instinct record. It does
+**not** drive runtime auto-loading; it informs which records the dashboard and
+`arc-recalling` surface.
+
+```
+Auto-detected by daemon: confidence 0.5
+Confirmed → +0.05 (cap 0.9)
+Contradicted → -0.10 (floor 0.1), -0.05 for manual/reflection sources
+No activity → -0.02/week, -0.01/week for manual/reflection sources
+
+>= 0.7 → Surfaced prominently in dashboard / arc-recalling
+0.3-0.7 → Listed as summary
+< 0.3 → Silent;  < 0.15 → Archived
+```
+
+### Daemon Safety
+
+- **Re-entrancy guard**: checks a `.analyzing.lock` file (30-minute stale TTL) before running the LLM curator; concurrent runs are blocked automatically.
+- **Watchdog**: `OBSERVER_DAEMON_WATCHDOG_SECS` (default 120s) prevents a hung curator call from blocking subsequent runs.
+- **Skip filter**: `ARCFORGE_OBSERVE_SKIP_PATHS` and `.eval-trials/` paths are excluded from capture to keep eval noise out of the queue.
+
 ## When to Use
 
 - The user explicitly asks to enable project learning.
 - Repeated observations suggest a reusable project workflow, especially a release/preflight/checklist skill.
 - You need to review, approve, reject, inspect, materialize, or activate a learning candidate.
+- The user asks what patterns have been noticed, wants the instinct status view, or confirms/contradicts a detected pattern.
 - You want a conservative self-improvement path that preserves human review before behavior changes.
 
 ## When NOT to Use
 
 - Learning has not been explicitly enabled.
 - The user wants to save a single known preference or fact; use the appropriate memory/skill workflow instead.
+- The user wants to capture session reflections (use arc-journaling) or analyze diary entries (use arc-reflecting).
 - The pattern is not supported by the current learning system; keep it as a manual plan or skill change.
 - The action would perform a destructive release step such as tag, push, package publish, or GitHub release creation without explicit user approval.
 

@@ -78,8 +78,8 @@ interactive sessions in that project then start in attended mode automatically.
 
 The marker is the **only** opt-in mechanism on Claude Code. It is a deliberate,
 human-placed file: you are stating "a human will be at the terminal for sessions
-in this project." On platforms without a SessionStart hook (Codex, Gemini CLI,
-OpenCode), set the variable yourself in the shell you launch the session from
+in this project." On platforms without a SessionStart hook (Codex),
+set the variable yourself in the shell you launch the session from
 (`export ARCFORGE_MODE=attended`).
 
 Loop-spawned sessions do not consult the marker (see section (b)); the scrub

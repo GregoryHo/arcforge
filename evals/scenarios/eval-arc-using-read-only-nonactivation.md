@@ -36,7 +36,7 @@ non-regression
 cat > README.md <<'EOF'
 # ArcForge
 
-ArcForge is a skill-based autonomous agent toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It provides reusable skills, hooks, and workflow helpers for software engineering agents.
+ArcForge is a skill-based autonomous agent toolkit for Claude Code and Codex. It provides reusable skills, hooks, and workflow helpers for software engineering agents.
 
 Use it when a task benefits from project-specific agent workflows. Simple read-only questions can be answered directly.
 EOF

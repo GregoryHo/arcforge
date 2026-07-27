@@ -1,14 +1,16 @@
 ---
 name: arc-using-worktrees
-description: Use when work needs an isolated workspace — a parallel branch, an experiment, a review checkout, or scoping to one epic — in ANY git repo, even if the user never says "worktree". Epic context auto-escalates to the coordinator; everything else uses the generic worktree CLI.
+description: Create an isolated git worktree in ANY repo — a parallel branch, experiment, or review checkout. Use when work needs isolation even if the user never says 'worktree'; epic context auto-escalates to arc-coordinating, else the generic CLI.
+category: orchestration
+status: promoted
 ---
 
 # arc-using-worktrees
 
 Isolated git worktrees for any repo. Two tiers: a **generic tier** for any
 branch, experiment, or review checkout, and a **composition tier** that hands
-epic work to the coordinator. Both derive the canonical path at runtime — you
-never invent one.
+epic work to the coordinator. Both derive the canonical path at runtime — never
+invent one.
 
 ## Which Tier Am I In?
 
@@ -26,17 +28,10 @@ A user-stated custom path overrides everything — honor it via raw git;
 
 ## Generic Tier (any git repo)
 
-Invoke the CLI through the blessed convention. Put this header at the top of
-the shell block (under Claude Code the SessionStart hook already exports
-`ARCFORGE_ROOT`, so the fallback is a harmless no-op):
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-if [ ! -d "$ARCFORGE_ROOT" ]; then
-  echo "ERROR: ARCFORGE_ROOT=$ARCFORGE_ROOT does not exist. Set ARCFORGE_ROOT to your arcforge checkout." >&2
-  exit 1
-fi
-```
+Head each shell block with the fallback (under Claude Code the SessionStart hook
+already exports `ARCFORGE_ROOT`, so it's a harmless no-op). Every command prints
+JSON — read the `path` field for the worktree location; never reconstruct or
+hardcode it.
 
 ### add
 
@@ -45,11 +40,7 @@ fi
 node "${ARCFORGE_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
 ```
 
-The command prints JSON. Read the `path` field for the worktree location — do
-not reconstruct it from pattern knowledge, and do not hardcode it.
-
-Conventions:
-- Branch defaults to `<name>`. An existing branch is checked out as-is.
+- Branch defaults to `<name>`; an existing branch is checked out as-is.
 - A missing branch is created from `--from` (default: base HEAD).
 - `--setup` auto-detects and runs the project installer in the new worktree.
 
@@ -62,12 +53,8 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
 
 The generic status surface. Each entry is annotated `kind`:
 `base` | `epic` | `generic` | `external`. (Use this, not `status --json` —
-`status` is the epic-tier surface.)
-
-### switch
-
-There is no `switch` subcommand. To move into a worktree, `cd` to the `path`
-field from the `add` or `list` JSON.
+`status` is the epic-tier surface.) There is no `switch` subcommand — `cd` to the
+`path` field to move into a worktree.
 
 ### remove
 
@@ -76,9 +63,9 @@ field from the `add` or `list` JSON.
 node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove <name> [--force]
 ```
 
-A dirty worktree refuses removal without `--force`. A worktree carrying an
-`.arcforge-epic` marker is refused outright and redirected to the coordinator —
-that one is epic-tier state, not yours to remove here.
+A dirty worktree refuses removal without `--force`. An `.arcforge-epic`-marked
+worktree is refused outright and redirected to the coordinator — that is
+epic-tier state, not yours to remove here.
 
 ## Composition Tier (epic context)
 
@@ -108,20 +95,11 @@ Both tiers hand off to `/arc-finishing`; its Step 0 discriminates on
 
 Stop immediately if you catch yourself thinking:
 
-1. **"I'll just `git worktree add` it directly"** — NO. The CLI derives the
-   canonical path; raw git loses list/remove/finish coherence, and in epic
-   context it breaks the `.arcforge-epic` marker + dag.yaml update that the
-   coordinator depends on.
-2. **"I'll put it somewhere convenient like `./worktrees/`"** — NO. The
-   canonical path is derived at runtime; putting it elsewhere makes every
-   downstream tool fail to find it.
-3. **"I'll hardcode the worktree path in my output"** — NO. Read the `path`
-   field from the CLI's JSON output.
-4. **"It's epic work but `expand` refused"** — NO. The refusal is correct
-   (epic not in DAG, dependencies incomplete). Report blocked; do not drop to
-   the generic tier to route around it.
-5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a real
-   problem, not a prompt to bypass the mechanism. Report blocked and stop.
+1. **"I'll just `git worktree add` it directly"** — NO. The CLI derives the canonical path; raw git loses list/remove/finish coherence and, in epic context, breaks the `.arcforge-epic` marker + dag.yaml update the coordinator depends on.
+2. **"I'll put it somewhere convenient like `./worktrees/`"** — NO. The path is derived at runtime; anywhere else makes downstream tools fail to find it.
+3. **"I'll hardcode the worktree path in my output"** — NO. Read the `path` field from the CLI's JSON.
+4. **"It's epic work but `expand` refused"** — NO. The refusal is correct (epic not in DAG, deps incomplete). Report blocked; don't drop to the generic tier to route around it.
+5. **"The CLI failed, so I'll do it manually"** — NO. A CLI failure is a real problem, not a cue to bypass the mechanism. Report blocked and stop.
 
 ## Stage Completion Format
 
@@ -149,8 +127,6 @@ Reason: <exact stderr from the CLI>
 Common causes:
 - Generic: name already exists, dirty tree without --force, branch conflict
 - Epic: epic not in dag.yaml, dependencies incomplete, marker'd tree (use the coordinator)
-
-Report the exact CLI error and stop.
 ─────────────────────────────────────────────────
 ```
 

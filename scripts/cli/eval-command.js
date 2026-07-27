@@ -12,6 +12,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   const { generateRunId } = require('../lib/utils');
   const subcommand = args.positional[0];
   const model = args.options.model;
+  const effort = args.options.effort;
   const runId = generateRunId();
   const parseK = (scenario, isAb = false) =>
     args.options.k ? parseInt(args.options.k, 10) : eval_.defaultK(scenario || {}, isAb);
@@ -141,6 +142,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const result = eval_.runTrial(scenario, t, k, {
           projectRoot,
           model,
+          effort,
           runId,
           isolated,
           pluginDir,
@@ -181,6 +183,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
     const { runPreflight } = require('../lib/eval-preflight');
     const model = args.options.model;
+    const effort = args.options.effort;
 
     // Resolve scenario for trial execution
     const scenario = eval_.findScenario(scenarioName, projectRoot);
@@ -196,6 +199,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       eval_.runTrial(scenario, t, totalK, {
         projectRoot,
         model,
+        effort,
         runId,
         isolated: true,
       });
@@ -211,6 +215,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       runTrial: stubRunTrial,
       gradeResult: stubGrade,
       model,
+      effort,
     });
 
     console.log(`Verdict: ${outcome.verdict}`);
@@ -283,6 +288,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'ab') {
     const scenario = requireScenario(args.positional[1], 'ab');
     const model = args.options.model;
+    const effort = args.options.effort;
 
     // Preflight gate: require a PASS preflight for this (scenario, model)
     // before running A/B eval. Gate is keyed by both — a PASS produced
@@ -322,6 +328,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         interleave,
         onTrialComplete,
         model,
+        effort,
         runId,
         pluginDir,
         maxTurns,
@@ -350,6 +357,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         interleave,
         onTrialComplete,
         model,
+        effort,
         runId,
         pluginDir,
         maxTurns,

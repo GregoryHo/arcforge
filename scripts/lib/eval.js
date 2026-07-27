@@ -100,6 +100,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     isolationSettings,
     isolated = true,
     model,
+    effort,
     runId,
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
@@ -185,6 +186,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   if (resolvedMaxTurns != null) claudeArgs.push('--max-turns', String(resolvedMaxTurns));
 
   if (model) claudeArgs.push('--model', model);
+  if (effort) claudeArgs.push('--effort', effort);
 
   // Debug: log command for troubleshooting
   if (process.env.EVAL_DEBUG) {
@@ -297,6 +299,7 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     isolationSettings,
     isolated,
     model,
+    effort,
     runId,
     pluginDir,
     maxTurns,
@@ -307,6 +310,7 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     isolationSettings,
     isolated,
     model,
+    effort,
     runId,
     pluginDir,
     maxTurns,
@@ -384,6 +388,7 @@ function runSkillEval(scenario, k, options = {}) {
     onTrialComplete,
     interleave = false,
     model,
+    effort,
     runId,
     pluginDir,
     maxTurns,
@@ -401,6 +406,7 @@ function runSkillEval(scenario, k, options = {}) {
     onTrialComplete,
     isolationSettings,
     model,
+    effort,
     runId,
   };
   const tOpts = {
@@ -409,6 +415,7 @@ function runSkillEval(scenario, k, options = {}) {
     onTrialComplete,
     isolationSettings,
     model,
+    effort,
     runId,
     ...(pluginDir ? { pluginDir, isolated: false } : {}),
     ...(maxTurns != null ? { maxTurns } : {}),
@@ -434,6 +441,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     onTrialComplete,
     interleave = false,
     model,
+    effort,
     runId,
     pluginDir,
     maxTurns,
@@ -452,6 +460,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     isolationSettings,
     isolated: true,
     model,
+    effort,
     runId,
   };
 
@@ -461,6 +470,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     onTrialComplete,
     isolated: false,
     model,
+    effort,
     runId,
     ...(resolvedPluginDir ? { pluginDir: resolvedPluginDir, isolationSettings: semiSettings } : {}),
     ...(maxTurns != null ? { maxTurns } : {}),

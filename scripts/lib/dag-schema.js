@@ -495,6 +495,74 @@ function validate(dag) {
   return { valid: errors.length === 0, errors };
 }
 
+/**
+ * Flatten a parsed DAG object into a Map of task-id → { status, depends_on },
+ * covering both epics and their nested features.
+ * @param {Object} dag
+ * @returns {Map<string, {status: string, depends_on: string[]}>}
+ */
+function collectDagTasks(dag) {
+  const map = new Map();
+  if (!dag || !Array.isArray(dag.epics)) return map;
+  for (const epic of dag.epics) {
+    if (epic && typeof epic.id === 'string') {
+      map.set(epic.id, {
+        status: epic.status,
+        depends_on: Array.isArray(epic.depends_on) ? epic.depends_on : [],
+      });
+    }
+    if (epic && Array.isArray(epic.features)) {
+      for (const feat of epic.features) {
+        if (feat && typeof feat.id === 'string') {
+          map.set(feat.id, {
+            status: feat.status,
+            depends_on: Array.isArray(feat.depends_on) ? feat.depends_on : [],
+          });
+        }
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Validate a DAG state transition (prev → next) against the two hard invariants
+ * the dag-guard hook and the engine write path both enforce:
+ *   (a) completed is monotonic — a task that was `completed` cannot leave that state.
+ *   (b) dependency preservation — a task's depends_on list cannot lose an id.
+ *
+ * Only tasks present in BOTH states are checked; additions and removals are out
+ * of scope (planning legitimately adds tasks; removals are a different operation).
+ * @param {Object} prev - Parsed DAG at the baseline.
+ * @param {Object} next - Parsed DAG being written.
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateDagTransition(prev, next) {
+  const errors = [];
+  const prevTasks = collectDagTasks(prev);
+  const nextTasks = collectDagTasks(next);
+
+  for (const [id, prevTask] of prevTasks) {
+    const nextTask = nextTasks.get(id);
+    if (!nextTask) continue;
+
+    if (prevTask.status === TaskStatus.COMPLETED && nextTask.status !== TaskStatus.COMPLETED) {
+      errors.push(
+        `Task "${id}" cannot leave the completed state ` +
+          `(attempted ${prevTask.status} → ${nextTask.status}). Completed status is monotonic.`,
+      );
+    }
+
+    for (const dep of prevTask.depends_on) {
+      if (!nextTask.depends_on.includes(dep)) {
+        errors.push(`Task "${id}" cannot drop dependency "${dep}" — dependencies are preserved.`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 module.exports = {
   TaskStatus,
   normalizeStatus,
@@ -505,4 +573,6 @@ module.exports = {
   objectToYaml,
   formatValue,
   validate,
+  collectDagTasks,
+  validateDagTransition,
 };

@@ -17,7 +17,7 @@ const { execFileSync } = require('node:child_process');
 const { DAG, Feature, BlockedItem, TaskStatus } = require('./models');
 const { parseDagYaml, stringifyDagYaml } = require('./yaml-parser');
 const { withLock } = require('./locking');
-const { objectToYaml } = require('./dag-schema');
+const { objectToYaml, validateDagTransition } = require('./dag-schema');
 const { getWorktreePath, parseWorktreePath } = require('./worktree-paths');
 const { readArcforgeMarker } = require('./marker');
 const { parseSpecHeader } = require('./sdd-spec-header');
@@ -250,6 +250,9 @@ class Coordinator {
     const task = this.dag.getTask(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
+    }
+    if (task.status === TaskStatus.COMPLETED) {
+      throw new Error(`Cannot block task "${taskId}": it is already completed — a terminal state.`);
     }
 
     task.status = TaskStatus.BLOCKED;
@@ -521,7 +524,19 @@ class Coordinator {
 
   _saveDag() {
     withLock(this.projectRoot, () => {
-      const content = stringifyDagYaml(this.dag.toObject());
+      const next = this.dag.toObject();
+      // Engine-side twin of the dag-guard PreToolUse hook: the hook's deny is
+      // void under --dangerously-skip-permissions, so enforce the same two hard
+      // invariants (completed is monotonic, dependencies are preserved) here on
+      // the canonical write path. A missing baseline (first save) skips the check.
+      const baseline = readFileSafe(this.dagPath);
+      if (baseline !== null) {
+        const { valid, errors } = validateDagTransition(parseDagYaml(baseline), next);
+        if (!valid) {
+          throw new Error(`Refusing to write dag.yaml — invalid transition:\n${errors.join('\n')}`);
+        }
+      }
+      const content = stringifyDagYaml(next);
       fs.writeFileSync(this.dagPath, content);
     });
   }

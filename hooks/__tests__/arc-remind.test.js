@@ -46,7 +46,7 @@ describe('arc-remind buildReminder', () => {
     const msg = buildReminder('gh pr create', false);
     assert.ok(msg, 'should produce a reminder');
     assert.ok(msg.includes('arc-verifying'), 'should mention arc-verifying');
-    assert.ok(msg.includes('arc-requesting-review'), 'should mention arc-requesting-review');
+    assert.ok(msg.includes('arc-reviewing'), 'should mention arc-reviewing');
   });
 
   it('notes when no test was observed this session', () => {
@@ -102,7 +102,7 @@ describe('arc-remind worktree-add + ship-a-skill nudges', () => {
   it('builds the worktree-add and eval-before-ship nudges', () => {
     const { worktreeAddNudge, evalBeforeShipNudge } = require('../arc-remind/main');
     assert.ok(worktreeAddNudge().includes('arcforge expand'));
-    assert.ok(evalBeforeShipNudge().includes('arc-writing-skills'));
+    assert.ok(evalBeforeShipNudge().includes('re-run the skill'));
   });
 
   it('worktree-add nudge points BOTH directions (epic + non-epic)', () => {
@@ -535,7 +535,7 @@ describe('arc-remind compound Bash commands (merged nudges)', () => {
     });
     const text = systemMessageOf(raw);
     assert.ok(text.includes('PR boundary'), 'should include the PR-boundary nudge text');
-    assert.ok(text.includes('arc-writing-skills'), 'should include the ship-a-skill nudge text');
+    assert.ok(text.includes('re-run the skill'), 'should include the ship-a-skill nudge text');
   });
 
   it('test + worktree-add compound command still fires the worktree-add nudge', () => {
@@ -553,6 +553,6 @@ describe('arc-remind compound Bash commands (merged nudges)', () => {
 
     const raw = run('Bash', { command: 'npm test && git commit -m x' });
     const text = systemMessageOf(raw);
-    assert.ok(text.includes('arc-writing-skills'), 'should include the ship-a-skill nudge text');
+    assert.ok(text.includes('re-run the skill'), 'should include the ship-a-skill nudge text');
   });
 });

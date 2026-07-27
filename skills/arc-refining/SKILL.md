@@ -1,6 +1,8 @@
 ---
 name: arc-refining
-description: Use when converting design documents to structured specs, when spec quality is below threshold, or when requirements need formal acceptance criteria
+description: Formalize an approved design into a structured spec.xml with acceptance criteria. Use when a design.md is ready to become the authoritative spec, or spec quality is below threshold — the delta authority, hands to arc-planning.
+category: sdd
+status: promoted
 ---
 
 # Refiner
@@ -19,7 +21,7 @@ Every criterion the refiner emits MUST trace to a design phrase or a user Q&A ro
 
 ## Overview
 
-Transform design documents into structured XML specifications. The spec becomes Source of Truth — downstream skills read it directly, never the design doc. The refiner is the central transformation: raw source (design.md) → live contract (spec.xml).
+Transform design documents into structured XML specifications: raw source (design.md) → live contract (spec.xml). The spec becomes Source of Truth — downstream skills read it directly, never the design doc.
 
 ## Boundary
 
@@ -33,11 +35,9 @@ Transform design documents into structured XML specifications. The spec becomes 
 
 ## Core Rules
 
-1. **ask, don't assume** — if unclear, ask the user; never invent requirements
-2. **source of truth** — spec.xml is authoritative; downstream skills quote it, never the design doc
-3. **checklist validation** — complete quality checklist before writing any files
-4. **iterative refinement** — ask 2–3 clarifying questions per iteration
-5. **R2 unidirectional** — refiner MUST NOT write to `docs/plans/`. On non-R3 blocks (DAG gate, design-doc validation, identity-header validation), refiner writes nothing — terminal output and non-zero exit only. On R3 axis blocks (Phase 4 axis-1/2/3, Phase 5.5a self-contradiction, Phase 5.5b axis-3-LLM, Phase 6b mechanical-auth-check), refiner writes ONLY the ephemeral `specs/<spec-id>/_pending-conflict.md` per fr-rf-015 — never `spec.xml`, never `details/`. The Iron Law's "NEVER WRITE AUTHORITATIVE STATE ON BLOCK" governs both cases.
+1. **ask, don't assume / iterate** — never invent requirements; ask 2–3 clarifying questions per iteration and complete the quality checklist before writing any files.
+2. **source of truth** — spec.xml is authoritative; downstream skills quote it, never the design doc.
+3. **R2 unidirectional** — refiner MUST NOT write to `docs/plans/`. On non-R3 blocks (DAG gate, design-doc validation, identity-header validation), refiner writes nothing — terminal output and non-zero exit only. On R3 axis blocks (Phase 4 axis-1/2/3, Phase 5.5a self-contradiction, Phase 5.5b axis-3-LLM, Phase 6b mechanical-auth-check), refiner writes ONLY the ephemeral `specs/<spec-id>/_pending-conflict.md` — never `spec.xml`, never `details/`. The Iron Law's "NEVER WRITE AUTHORITATIVE STATE ON BLOCK" governs both cases.
 
 ## Phase 0 — Locate Inputs
 
@@ -58,25 +58,15 @@ Before producing a new spec version, verify that the prior sprint is complete. T
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate dag --spec-id <spec-id>
 ```
 
-Reads the stable JSON: `status: "pass"` (exit 0) → proceed; `status: "block"`
-(exit 1) → the JSON's `dag.incompleteEpics` lists the unfinished epics and
-`message` is the user-facing block reason. `dag: null` means no `dag.yaml` (legal:
-refined but not yet planned).
+Reads the stable JSON, giving three outcomes:
 
-Three outcomes:
-
-1. **`checkDagStatus` returns null** (no `dag.yaml` exists) → proceed. Legal state: user refined but did not yet run the planner.
-2. **All epics in `"completed"` status** → proceed with the new iteration.
-3. **Any epic NOT in `"completed"` status** → **BLOCK**. Print the incomplete epic list to terminal, print "Complete current sprint before iterating.", exit non-zero. Write no files (no `spec.xml`, no `details/`, no report).
+1. `dag: null` (no `dag.yaml`) → proceed. Legal: refined but not yet planned.
+2. `status: "pass"` (exit 0, all epics `"completed"`) → proceed with the new iteration.
+3. `status: "block"` (exit 1) → **BLOCK**. `dag.incompleteEpics` lists the unfinished epics; print them plus "Complete current sprint before iterating.", exit non-zero, write no files (no `spec.xml`, no `details/`, no report).
 
 ### No escape hatch
 
-When the gate blocks, the user has exactly two paths forward:
-
-a. Complete the remaining epics in the current sprint (status → `completed`), then re-run refiner.
-b. Abandon the entire spec by deleting `specs/<spec-id>/` (a filesystem action — not an arcforge primitive), then start over.
-
-There is no `--force` flag, no `abandoned` epic status, no environment-variable override, no partial abandonment mechanism. Partial abandonment would corrupt `dag.yaml` status semantics (from "actual execution state" to "what the user wishes were the state"), polluting every downstream tool that reads it. **If you find yourself wanting to add an escape hatch, stop and surface the underlying need to the user instead.**
+When the gate blocks, the user has exactly two paths: (a) complete the remaining epics (status → `completed`), then re-run refiner; or (b) abandon the spec by deleting `specs/<spec-id>/`, then start over. There is no `--force` flag, no `abandoned` epic status, no override, no partial-abandonment mechanism. **If you find yourself wanting to add an escape hatch, stop and surface the underlying need to the user instead.**
 
 ## Phase 2 — Input Validation
 
@@ -97,9 +87,7 @@ After input validation passes, load vision and ledger context (read-only), then 
 
 ### 2.5a — Load Context
 
-If `specs/<spec-id>/vision.md` exists, read it as context — it describes the product's long-horizon intent and informs which design changes align with the stated vision. If `specs/<spec-id>/decisions.yml` exists, read it as context — the existing ledger entries show which decisions are already recorded and their status.
-
-Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do NOT edit existing ledger entries; the B2 immutability hook will deny any such write.
+If `specs/<spec-id>/vision.md` exists, read it as context (long-horizon intent). If `specs/<spec-id>/decisions.yml` exists, read it as context (recorded decisions and their status). Both are read-only inputs: do NOT write to `vision.md`, and do NOT edit existing ledger entries — the B2 immutability hook will deny any such write.
 
 ### 2.5b — Validate Vision and Ledger (sdd-gate context)
 
@@ -108,10 +96,7 @@ Both files are read-only inputs to the refiner. Do NOT write to `vision.md`. Do 
 node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate context --spec-id <spec-id>
 ```
 
-The gate chains three sub-checks in order — vision, ledger (append-only against
-HEAD), then spec↔decision↔anchor graph. `status: "pass"` (exit 0) → proceed;
-`status: "block"` (exit 1) names the failing sub-gate in `gate` and lists the
-errors. No-op rule: when `specs/<spec-id>/decisions.yml`, `specs/<spec-id>/vision.md`, and `specs/<spec-id>/spec.xml` are absent, the gate MUST PASS. Only present files are validated. This gate does not write any files. On ERROR: **BLOCK** — print issues to terminal, exit non-zero, write no files (per fr-rf-015-ac2: non-R3 block, terminal output only).
+The gate chains three sub-checks — vision, ledger (append-only against HEAD), then spec↔decision↔anchor graph. `status: "pass"` (exit 0) → proceed; `status: "block"` (exit 1) names the failing sub-gate in `gate` and lists errors. No-op rule: when `decisions.yml`, `vision.md`, and `spec.xml` are all absent, the gate MUST PASS (only present files are validated). Writes no files. On ERROR: **BLOCK** — terminal output only, exit non-zero, no files (non-R3 block).
 
 ## Phase 3 — Detect Behavior Context
 
@@ -120,9 +105,7 @@ Check the filesystem for a prior spec at the canonical path:
 - `specs/<spec-id>/spec.xml` **exists** → this is an iteration; the design doc must contain Context + Change Intent sections.
 - `specs/<spec-id>/spec.xml` **does not exist** → this is the first formalization (v1); the design doc carries prose with problem / solution / requirements / scope.
 
-This is one refiner behavior with conditional fields based on filesystem state — not two modes. There is no mode parameter, no path-style label, no greek-letter framing. The filesystem is the single source of truth for which sections to expect.
-
-When a prior spec exists, the design doc MUST have both Context and Change Intent sections. Missing either is ERROR — block with: "Iteration design doc must have Context and Change Intent sections — re-run brainstorming with the prior spec in scope."
+This is one refiner behavior with conditional fields based on filesystem state — not two modes. The filesystem is the single source of truth for which sections to expect. When a prior spec exists, the design doc MUST have both Context and Change Intent sections; missing either is ERROR — block with: "Iteration design doc must have Context and Change Intent sections — re-run brainstorming with the prior spec in scope."
 
 When the design doc's date folder is older than or equal to the spec's recorded `design_iteration`, produce a WARNING: "design iteration `<date>` is not newer than spec source `<spec-date>` — this may be a stale design doc."
 
@@ -138,12 +121,7 @@ Before drafting the spec, read the design doc and the brainstorming Q&A decision
 
 **Axis 2 — design.md ↔ user Q&A answers.**
 
-If design says X and a user Q&A row says ¬X, the conflict is unresolved. Refiner does not silently pick one — **silently picking either side is forbidden even if the Q&A answer is more recent than the design.** Terminal output MUST cite both the design line range and the Q&A row q_id. Examples:
-
-- Design says `windowSec: 60`; Q&A row says "use `windowMs` for consistency" → axis 2 fires.
-- Design says `max=32`; Q&A row says "make 32 the default but configurable via flag" → axis 2 fires.
-
-The refiner has no authorization to pick. Authoring `windowMs: 60000` (or any reconciled middle ground) without surfacing the conflict is the failure mode this axis catches.
+If design says X and a user Q&A row says ¬X, the conflict is unresolved. Refiner does not silently pick one — **silently picking either side is forbidden even if the Q&A answer is more recent than the design.** Terminal output MUST cite both the design line range and the Q&A row q_id. Example: design says `windowSec: 60`; Q&A row says "use `windowMs` for consistency" → axis 2 fires. Authoring a reconciled middle ground (`windowMs: 60000`) without surfacing the conflict is the failure mode this axis catches.
 
 **Axis 3 — spec-draft coverage (deferral and invention).**
 
@@ -176,24 +154,15 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate conflict --spec-id <spec-id> <<'
 JSON
 ```
 
-**Required payload fields (per `PENDING_CONFLICT_RULES`) — all four are mandatory; a missing or empty field exits non-zero. Reproduce these keys exactly (no synonyms):**
-- `axis_fired` — the string `"1"`, `"2"`, or `"3"` (the axis that fired). Axis-3 blocks (invention, Phase 5.5a self-contradiction, Phase 5.5b unauthorized criterion) use `"3"`.
-- `conflict_description` — the specific design line ranges and Q&A `q_id`s in conflict.
-- `candidate_resolutions` — a list of **1–3** concrete, user-pickable resolutions (never zero, never more than three).
-- `user_action_prompt` — the recovery route, always `Run /arc-brainstorming iterate <spec-id> to resolve this conflict.`
+**All four payload keys (per `PENDING_CONFLICT_RULES`) are mandatory; reproduce them exactly (no synonyms), a missing/empty field exits non-zero:** `axis_fired` is `"1"`/`"2"`/`"3"` (invention, Phase 5.5a, and Phase 5.5b all use `"3"`); `conflict_description` names the design line ranges and Q&A `q_id`s; `candidate_resolutions` is a list of **1–3** (never zero, never >3) user-pickable resolutions; `user_action_prompt` is always `Run /arc-brainstorming iterate <spec-id> to resolve this conflict.`
 
-The schema source of truth is `PENDING_CONFLICT_RULES` (from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md` (the path is echoed back as `conflict_marker` in the gate JSON). It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed (fr-bs-008), then deletes it on successful new-design write. Refiner does NOT clean it up. A malformed payload (missing required field, zero resolutions) exits non-zero with a descriptive error and writes nothing.
+The schema source of truth is `PENDING_CONFLICT_RULES` (from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils`). The file is written at `specs/<spec-id>/_pending-conflict.md` (echoed back as `conflict_marker` in the gate JSON). It is **ephemeral** — brainstorming Phase 0 reads it as Change Intent seed, then deletes it on successful new-design write; refiner does NOT clean it up. A malformed payload (missing required field, zero resolutions) exits non-zero and writes nothing.
 
-**MUST NOT write `_pending-conflict.md` for non-R3-axis blocks (fr-rf-015-ac2):**
-- DAG completion gate failure (fr-rf-012) → terminal output only, exit non-zero, no file written.
-- Design-doc validation failure (fr-rf-009) → terminal output only, exit non-zero, no file written.
-- Identity-header validation errors (fr-rf-010-ac1 through fr-rf-010-ac4) → terminal output only, exit non-zero, no file written.
+**MUST NOT write `_pending-conflict.md` for non-R3-axis blocks** — the DAG completion gate, design-doc validation, and identity-header validation are pipeline-mechanical or programmer-error blocks, not axis contradictions: terminal output only, exit non-zero, no file written.
 
-These are pipeline-mechanical or programmer-error blocks, not axis contradictions. Their output channel is terminal only.
+On an R3 axis block: the `_pending-conflict.md` is the only file written — no `spec.xml`, no `details/`, no report. The user routes through `/arc-brainstorming iterate <spec-id>` to author a new dated `design.md`; refiner re-runs against it, no stale state to clean up.
 
-Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`, no report. The `_pending-conflict.md` is the only file written. The user routes through `/arc-brainstorming iterate <spec-id>` to author a new dated `design.md` (R1-authorized), refiner re-runs against the new design, no stale state to clean up.
-
-Ask at least 2–3 clarifying questions when gaps or ambiguities (not contradictions) surface — gaps are unbound axes (legal under axis 3 by leaving the axis unbound), not R3 triggers.
+Ask at least 2–3 clarifying questions when gaps or ambiguities (not contradictions) surface — gaps are unbound axes (legal under axis 3), not R3 triggers.
 
 ## Phase 5 — Draft Spec In Memory (Two-Pass Write)
 
@@ -207,13 +176,13 @@ Refiner MUST NOT author criteria from training-data inference. When a design phr
 2. **Leave the axis unbound.** No criterion at all on that axis. Downstream stages (planner, implementing) may surface the unbound axis as a planning question; refiner does not pre-answer it.
 3. **BLOCK with candidate resolutions.** When ambiguity is large enough that neither (1) nor (2) is honest — for example, the design's qualitative phrase is so vague that any SHOULD wording would itself be invention — route the user through brainstorming via Phase 4's block flow.
 
-Inventing a concrete MUST from training-data common practice ("most rate-limiters use 60-second windows, so MUST window=60s") is **not** on this list. It violates the Iron Law's first clause.
+Inventing a concrete MUST from training-data common practice ("most rate-limiters use 60-second windows, so MUST window=60s") is **not** on this list — it violates the Iron Law's first clause.
 
-**Deferral signals (ac2).** A Q&A row carries `deferral_signal=true` when its `user_answer_verbatim` matches one of the canonical deferral phrases — the four canonical phrases per `DECISION_LOG_RULES.deferral_signal_canonical_phrases` are: "use defaults", "covered.", "skip", "you decide". When `deferral_signal=true`, the corresponding axis is unbound. Deferral does NOT authorize a concrete MUST derived from training-data common practice — the same three legitimate moves apply. A deferred answer means the user deliberately left the axis open; refiner has no authorization to pre-fill it.
+**Deferral signals.** A Q&A row carries `deferral_signal=true` when its `user_answer_verbatim` matches a canonical phrase per `DECISION_LOG_RULES.deferral_signal_canonical_phrases` ("use defaults", "covered.", "skip", "you decide"). A deferred axis is unbound; deferral does NOT authorize a concrete MUST — the same three legitimate moves apply.
 
-**Every concrete MUST must be sourced (ac3).** For every concrete MUST the refiner is about to author, it MUST be able to point to a non-deferral source — either a design phrase that contains the concrete value, or a Q&A row whose `user_answer_verbatim` contains the concrete value with `deferral_signal=false`. If no such source exists, the criterion is invention and MUST NOT be authored; use one of the three legitimate moves instead. This rule is the runtime invariant that `mechanicalAuthorizationCheck` (in `${ARCFORGE_ROOT}/scripts/lib/sdd-validators.js`) verifies at Phase 6 — every concrete MUST in the produced spec will be checked mechanically, so any invention the LLM drafts here will be caught and cause a block downstream.
+**Every concrete MUST must be sourced.** For every concrete MUST, point to a non-deferral source — a design phrase containing the concrete value, or a Q&A row whose `user_answer_verbatim` contains it with `deferral_signal=false`. No such source = invention; use one of the three moves instead. `mechanicalAuthorizationCheck` (in `${ARCFORGE_ROOT}/scripts/lib/sdd-validators.js`) verifies this at Phase 6, so any invention drafted here is caught and blocks downstream.
 
-Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md` — already listed under REQUIRED BACKGROUND above. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
+Field tables (identity header, per-spec directory layout, detail-file requirement rules, unchanged-requirements rule) are in `references/spec-structure.md`. The decision logic below (wiki-style delta accumulation, version increment semantics) stays here.
 
 ### Mode-Split: Unattended vs. Attended
 
@@ -240,7 +209,7 @@ The refiner reads `ARCFORGE_MODE` from the environment (set by the calling envir
 4. **Do NOT author the concrete MUST** until a ratified (`status: accepted` + `ratified_by`) entry exists in the ledger.
 5. Once ratification has occurred (the human has run `arcforge ratify`), the refiner may cite `<trace>D-NNN:value</trace>` where `value` is an exact item from `authorized_values` — the value the human confirmed at ratify.
 
-The refiner NEVER mints an `accepted` entry itself and NEVER authors the concrete MUST without a pre-existing ratified entry. The attended deferral clause (fr-rf-013) is a scoped addition to the unattended path: the unattended behavior is unchanged; the attended path adds a draft-then-ratify exit rather than unconditionally leaving the axis unbound or blocking.
+The refiner NEVER mints an `accepted` entry itself and NEVER authors the concrete MUST without a pre-existing ratified entry. The unattended behavior is unchanged; the attended path only adds a draft-then-ratify exit rather than unconditionally leaving the axis unbound or blocking.
 
 For how attended mode is opted into, how the human resolves and runs `arcforge ratify` under a plugin install, and where draft-then-ratify sits in the end-to-end pipeline, see `${ARCFORGE_ROOT}/docs/guide/sdd-pipeline.md`.
 
@@ -298,27 +267,13 @@ Before Phase 6 output validation, re-read each requirement's `<description>` aga
 - **Scope mismatch.** Description says "the system handles X" (covering both success and failure paths), but ACs only test the success path. The description's scope and the AC set's coverage diverge — readers will infer requirements that the spec does not actually test. Remediation hint: "widen ACs to cover failure path, or narrow description to match ACs."
 - **RFC-2119 verb mismatch.** Description uses MUST but a sibling AC for the same axis uses SHOULD (or vice versa). The verb's strength must be consistent across description and ACs for the same axis. Mismatches signal copy-paste drift between drafting passes. Remediation hint: "align verbs across description and ACs for the same axis."
 
-If any requirement fails this sub-pass — **BLOCK (R3 enforcement severity).** Print to terminal: requirement ID, the specific scope or verb mismatch, and the relevant remediation hint above. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`. **Phase 5.5 findings MUST NOT be downgraded to WARNING** — a WARN would let the spec ship with internal contradictions.
-
-**Before exiting non-zero, MUST write the conflict handoff file (fr-rf-014-ac5):** run the `sdd-gate conflict` recipe from Phase 4 (the `<<'JSON'` heredoc), supplying these payload values:
-- `axis_fired: '3'`
-- `conflict_description`: `'<requirement ID>: <specific scope or verb mismatch> — <remediation hint from ac1/ac2>'` (ac1: widen/narrow scope; ac2: align verbs)
-- `candidate_resolutions`: 1–3 concrete user-pickable resolutions
-- `user_action_prompt`: `'Run /arc-brainstorming iterate <spec-id> to resolve this conflict.'`
-
-This is the single recovery surface for every R3 BLOCK — self-contradiction is not exempted from the handoff.
+If any requirement fails this sub-pass — **BLOCK (R3 severity, MUST NOT downgrade to WARNING).** Before exiting non-zero, run the Phase 4 `sdd-gate conflict` heredoc with `axis_fired: '3'`, a `conflict_description` of `'<requirement ID>: <scope or verb mismatch> — <remediation hint>'`, 1–3 candidate resolutions, and the standard `user_action_prompt`. Print the requirement ID and mismatch to terminal; write no authoritative files. Self-contradiction is not exempted from the single R3 recovery surface.
 
 ### 5.5b — Axis-3 LLM Judgment Pass
 
-Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) citable source. This is the LLM-judgment layer of axis 3 (the mechanical layer runs at Phase 6 via `mechanicalAuthorizationCheck` — Phase 5.5b is LLM judgment, Phase 6 is the mechanical follow-up over `<trace>` elements). Criteria with no citable source trigger BLOCK per fr-rf-001 axis 3.
+Re-read each criterion in the in-memory draft and verify it traces to a (design phrase ∪ Q&A row) citable source (the LLM-judgment layer of axis 3; Phase 6's `mechanicalAuthorizationCheck` is the mechanical follow-up over `<trace>` elements). Criteria with no citable source — **BLOCK (R3 severity, MUST NOT downgrade to WARNING):** run the Phase 4 `sdd-gate conflict` heredoc with `axis_fired: '3'`, print which criterion has no source plus 1–3 candidate resolutions, exit non-zero. `_pending-conflict.md` is the only file written.
 
-If any criterion has no traceable source — **BLOCK (write conflict file, per fr-rf-015-ac1, R3 enforcement severity).** Phase 5.5 findings MUST NOT be downgraded to WARNING. Before exiting non-zero:
-
-1. Run the `sdd-gate conflict` recipe from Phase 4 (same `<<'JSON'` heredoc shown above), setting `axis_fired: '3'` in the payload.
-2. Print to terminal: which criterion has no source, and the 1–3 candidate resolutions.
-3. Exit non-zero. Write no authoritative files — no `spec.xml`, no `details/`.
-
-This sub-pass is independent of Phase 4's three axes. Phase 4 catches conflicts between the design inputs; Phase 5.5 catches the spec-to-be contradicting itself (5.5a) or having invented criteria (5.5b). Both 5.5a and 5.5b write `_pending-conflict.md` — single recovery surface for every R3 BLOCK.
+Phase 4 catches conflicts between the design inputs; Phase 5.5 catches the spec-to-be contradicting itself (5.5a) or having invented criteria (5.5b) — both write `_pending-conflict.md`, the single recovery surface for every R3 BLOCK.
 
 ## Phase 6 — Output Validation (Two-Pass Write, continued)
 
@@ -333,31 +288,16 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" sdd-gate header --spec-id <spec-id> <<'SP
 SPECXML
 ```
 
-The `header` stage reads only the `<overview>` block, so the single `spec.xml`
-suffices — the in-memory `details/*.xml` are not inputs to this gate. `status:
-"pass"` (exit 0) → continue to 6b; `status: "block"` (exit 1) → the `issues`
-array carries the ERROR findings.
+The `header` stage reads only the `<overview>` block, so the single `spec.xml` suffices (the in-memory `details/*.xml` are not inputs). `status: "pass"` (exit 0) → continue to 6b; `status: "block"` (exit 1) → the `issues` array carries the ERROR findings. Phase 6 runs two checks:
 
-Phase 6 runs two checks:
+**6a — Identity-header validation (non-R3 block):** `validateSpecHeader` verifies that `spec_id`, `spec_version`, `status`, `source`, and `scope` are all present and well-formed; any missing/malformed field is ERROR.
 
-**6a — Identity-header validation (non-R3 block, per fr-cc-if-002):**
-
-`validateSpecHeader` verifies the identity-header contract (fr-cc-if-002): `spec_id`, `spec_version`, `status`, `source`, and `scope` must all be present and well-formed. Any missing or malformed field is ERROR.
-
-- If `validateSpecHeader` returns any `level: 'ERROR'` — **BLOCK (no conflict file, per fr-rf-015-ac2)**. Print all findings with remediation guidance to terminal, exit non-zero, write no files (no `spec.xml`, no `details/`, no report file). **Do NOT write `_pending-conflict.md`** — header validation errors are schema/programmer errors, not axis contradictions.
-- WARNINGs are surfaced to the user but do not block writing.
+- Any `level: 'ERROR'` — **BLOCK (no conflict file)**. Print findings with remediation to terminal, exit non-zero, write no files. **Do NOT write `_pending-conflict.md`** — header errors are schema/programmer errors, not axis contradictions.
+- WARNINGs are surfaced but do not block writing.
 
 **6b — Axis-3 mechanical authorization check (R3-axis block, writes conflict file):**
 
-Pipe the **combined in-memory draft** to the `authorize` gate stage. The
-mechanical check reads `<requirement>/<criterion>/<trace>` elements — and those
-live in the `details/*.xml` content, NOT in the `<overview>` of `spec.xml`. So
-the input here is the full in-memory draft you built in Phase 5 (the overview
-plus every requirement and every `<trace>`), as a single concatenated XML stream
-— before the two-pass write splits it into `spec.xml` + `details/`. On a failed
-check the CLI deterministically writes `specs/<spec-id>/_pending-conflict.md`
-with `axis_fired: '3'` and the unauthorized-trace summary — the agent does NOT
-hand-build the marker for this stage:
+Pipe the **combined in-memory draft** to the `authorize` gate stage. The mechanical check reads `<requirement>/<criterion>/<trace>` elements, which live in the `details/*.xml` content — so the input is the full Phase 5 draft (overview + every requirement + every `<trace>`) as a single concatenated XML stream, before the two-pass write splits it into `spec.xml` + `details/`. On a failed check the CLI deterministically writes `specs/<spec-id>/_pending-conflict.md` with `axis_fired: '3'` and the unauthorized-trace summary — the agent does NOT hand-build the marker here:
 
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
@@ -450,5 +390,3 @@ Hand off to `/arc-planning` — the planner reads `specs/<spec-id>/spec.xml` and
 - files written (all other blocks): **none** (no spec.xml, no details/, no report)
 - exit: non-zero
 - action: for R3 axis blocks → run `/arc-brainstorming iterate <spec-id>` to resolve. For other blocks → address issues then re-run refiner.
-
-There is no `refiner-report.md` artifact. Block behavior is intentionally transient — terminal output + non-zero exit, no authoritative filesystem state. The `_pending-conflict.md` is the only permitted artifact on R3 axis blocks; it is ephemeral (brainstorming deletes it). Clean retry semantics: resolve the conflict (or fix the design doc / finish the sprint), re-run.

@@ -1,6 +1,8 @@
 ---
 name: arc-verifying
-description: Use when you need to verify work is complete before making completion claims
+description: Gather fresh evidence that work is actually complete before a completion claim. Use when about to say 'done', 'fixed', or 'passing' — rerun the checks and read real output rather than trusting prior state.
+category: discipline
+status: promoted
 ---
 
 # arc-verifying
@@ -59,36 +61,11 @@ Skipping RED means you don't know the test proves anything.
 
 ## Requirements Verification
 
-If claiming requirements are met:
-1. Re-read the requirements
-2. Make a checklist
-3. Verify each item with evidence
-4. Report any gaps explicitly
+If claiming requirements are met: re-read the requirements, make a checklist, verify each item with evidence, and report any gaps explicitly.
 
 ## When Verification Cannot Run
 
-**Core principle:** Cannot verify ≠ skip verification. Must inform user and choose alternative.
-
-### Flow
-
-```dot
-digraph cannot_verify {
-    "Cannot run verification?" [shape=diamond];
-    "Inform user immediately" [shape=box];
-    "User chooses" [shape=diamond];
-    "Fix the blocker" [shape=box];
-    "Add debug output" [shape=box];
-    "User reports result" [shape=box];
-
-    "Cannot run verification?" -> "Inform user immediately" [label="yes"];
-    "Inform user immediately" -> "User chooses";
-    "User chooses" -> "Fix the blocker" [label="fix env"];
-    "User chooses" -> "Add debug output" [label="manual test"];
-    "Add debug output" -> "User reports result";
-}
-```
-
-### Handling
+**Cannot verify ≠ skip verification.** Inform the user immediately and choose an alternative with them.
 
 | Situation | Action |
 |-----------|--------|
@@ -96,21 +73,7 @@ digraph cannot_verify {
 | Cannot run Simulator/Emulator | Ask user: fix blocker OR add debug print |
 | Requires manual UI testing | Describe expected behavior, ask user to verify |
 
-### Rationalizations
-
-| Excuse | Reality |
-|--------|---------|
-| "Should work now" | Assumption ≠ verification |
-| "I changed it, should be fine" | Changed ≠ verified |
-| "Continue for now, verify later" | Cannot verify = stop here |
-
-### Red Flags - Cannot Verify
-
-- Cannot verify but don't inform user
-- Multiple changes without any verification
-- Assuming "should work"
-
-## Red Flags - STOP
+## Red Flags — STOP
 
 - Using "should", "probably", "seems to"
 - Expressing satisfaction BEFORE verification ("Great!", "Perfect!", "Done!")
@@ -118,15 +81,17 @@ digraph cannot_verify {
 - Trusting agent success reports
 - Relying on partial verification
 - Assuming linter success implies build/test success
+- Cannot verify but don't inform user
 - Feeling tired and wanting it over
-- Using different wording to imply success without evidence
 
 ## Rationalization Prevention
 
 | Excuse | Reality |
 |--------|---------|
 | "Should work now" | RUN the verification |
+| "I changed it, should be fine" | Changed ≠ verified |
 | "I'm confident" | Confidence ≠ evidence |
+| "Continue for now, verify later" | Cannot verify = stop here |
 | "Just this once" | No exceptions |
 | "Agent said success" | Verify independently |
 | "Partial check is enough" | Partial proves nothing |
@@ -134,35 +99,9 @@ digraph cannot_verify {
 | "I already ran it earlier" | Run it again, now |
 | "The logs look fine" | Logs ≠ verification |
 
-## Key Patterns
-
-**Tests:**
-```
-✅ [Run test command] [See: 34/34 pass] "All tests pass"
-❌ "Should pass now" / "Looks correct"
-```
-
-**Build:**
-```
-✅ [Run build] [See: exit 0] "Build passes"
-❌ "Linter passed" (linter doesn't check compilation)
-```
-
-**Agent delegation:**
-```
-✅ Agent reports success → Check VCS diff → Verify changes → Report actual state
-❌ Trust agent report
-```
-
-**Requirements:**
-```
-✅ Re-read plan → Create checklist → Verify each → Report gaps or completion
-❌ "Tests pass, phase complete"
-```
-
 ## Integration
 
-**Discoverable from:** `arc-using` when a task is approaching a completion claim and verification guidance would help.
+**Discoverable from:** `arc-using` when a task approaches a completion claim.
 
 **Also embedded in:**
 - **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — verify tests before offering merge options

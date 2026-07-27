@@ -51,7 +51,7 @@ def test_skills_reference_has_bounded_arc_using_and_meta_only_writing_skills():
     assert "bounded router" in lower
     assert "project-level meta" in lower
     assert "arc-writing-skills" in content
-    assert "32 skills" in content
+    assert "30 skills" in content
     assert "three-layer model" in lower
     assert "core toolkit" in lower
     assert "optional workflows" in lower
@@ -118,9 +118,9 @@ def test_arc_verifying_disclaims_spec_authoring_and_drift_sync():
 
 def test_sessionstart_bootstrap_does_not_smuggle_spec_sync_or_routing_pressure():
     """SessionStart hook must inject only minimal bootstrap — no spec-sync, no global routing."""
-    # The bootstrap body lives in the shared bootstrap.txt (read by main.sh and the
-    # OpenCode plugin); scan both so the positive posture and the no-smuggling guards
-    # cover the effective injected content wherever it is authored.
+    # The bootstrap body lives in the shared bootstrap.txt (read by main.sh); scan
+    # both the hook and bootstrap.txt so the positive posture and the no-smuggling
+    # guards cover the effective injected content wherever it is authored.
     content = _read("hooks/inject-skills/main.sh") + "\n" + _read("hooks/inject-skills/bootstrap.txt")
     lower = content.lower()
 

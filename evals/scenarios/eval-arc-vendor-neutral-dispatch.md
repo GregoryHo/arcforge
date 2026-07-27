@@ -39,7 +39,7 @@ This is a no-tool, describe-only behavioral eval for `arc-auditing-spec` running
 on a **non-Claude harness**. arcforge skills are meant to be platform-agnostic:
 they speak in vendor-neutral actions ("dispatch a subagent") and map those
 actions to each harness's real tools via
-`skills/arc-using/references/codex-tools.md` and `opencode-tools.md`. On Codex,
+`skills/arc-using/references/codex-tools.md`. On Codex,
 subagent dispatch is `spawn_agent` / `wait_agent` / `close_agent`; Claude Code's
 `Task` tool does not exist here.
 

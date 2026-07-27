@@ -1,7 +1,7 @@
 # CLI Invocation Convention
 
-> The one blessed way to invoke the arcforge CLI, on all four platforms
-> (Claude Code, Codex, Gemini CLI, OpenCode). Skills, templates, agents,
+> The one blessed way to invoke the arcforge CLI, on both platforms
+> (Claude Code, Codex). Skills, templates, agents,
 > and docs that invoke the CLI follow this convention; this document is
 > the authority they defer to.
 
@@ -34,11 +34,11 @@ Nothing to do. The SessionStart hook (`inject-skills`) exports
 `ARCFORGE_ROOT` pointing at the installed plugin directory, so the
 blessed form works as-is in every plugin session.
 
-### Codex / Gemini CLI / OpenCode (fallback header)
+### Codex (fallback header)
 
-These platforms have no SessionStart hook, so `ARCFORGE_ROOT` is unset.
-All three install guides standardize the clone location at
-`~/.agents/arcforge`, which makes a one-line fallback valid everywhere.
+Codex has no SessionStart hook, so `ARCFORGE_ROOT` is unset.
+Its install guide standardizes the clone location at
+`~/.agents/arcforge`, which makes a one-line fallback valid.
 Put this header at the top of any shell block that invokes the CLI:
 
 ```bash
@@ -55,11 +55,11 @@ How it behaves per platform:
 | Platform | `ARCFORGE_ROOT` before header | Result |
 |----------|-------------------------------|--------|
 | Claude Code | Set by SessionStart hook | Hook value wins — `:=` only assigns when unset/null |
-| Codex / Gemini CLI / OpenCode | Unset | Falls back to `~/.agents/arcforge` (the standard clone location) |
+| Codex | Unset | Falls back to `~/.agents/arcforge` (the standard clone location) |
 | Any, nonstandard install | Unset, clone elsewhere | Existence check reports the bad path; export `ARCFORGE_ROOT` manually |
 
-Do **not** use the abort form `"${ARCFORGE_ROOT:?}"` instead — on the
-three non-Claude platforms the variable starts unset, so a bare `:?`
+Do **not** use the abort form `"${ARCFORGE_ROOT:?}"` instead — on
+Codex the variable starts unset, so a bare `:?`
 turns the very first command into a dead end. The `:=` fallback plus an
 existence check is the blessed pattern.
 

@@ -104,3 +104,103 @@ describe('Stop message gating (ICL-11)', () => {
     assert.ok(res.stderr.includes('Session paused'), 'paused notice logged to stderr');
   });
 });
+
+// ---------------------------------------------------------------------------
+// v5: transcript parse is gated behind the diary threshold (perf). Below
+// threshold the transcript is NOT parsed, so the session JSON loses the
+// userMessageContent/toolsUsed enrichment (documented behavior delta).
+// ---------------------------------------------------------------------------
+
+describe('Stop transcript-parse threshold gate (v5)', () => {
+  const originalEnv = { ...process.env };
+  let tmpDir;
+  let homeDir;
+  const sessionId = 'v5-transcript-gate';
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v5-tg-tmp-'));
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v5-tg-home-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  function counterPath(name) {
+    return path.join(tmpDir, `arcforge-${name}-session-${sessionId}`);
+  }
+
+  function runStop(projectDir, transcriptPath) {
+    return spawnSync('node', [END], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'Stop',
+        cwd: projectDir,
+        transcript_path: transcriptPath,
+      }),
+      encoding: 'utf-8',
+      env: { ...process.env, HOME: homeDir, TMPDIR: tmpDir, CLAUDE_PROJECT_DIR: projectDir },
+    });
+  }
+
+  function savedSession(projectDir) {
+    const project = path.basename(projectDir);
+    const date = new Date().toISOString().split('T')[0];
+    const file = path.join(
+      homeDir,
+      '.arcforge',
+      'sessions',
+      project,
+      date,
+      `session-${sessionId}.json`,
+    );
+    return JSON.parse(fs.readFileSync(file, 'utf-8'));
+  }
+
+  it('below threshold: transcript is NOT parsed → no enrichment in session JSON', () => {
+    fs.writeFileSync(counterPath('tool-count'), '3');
+    fs.writeFileSync(counterPath('user-count'), '2');
+
+    const transcript = path.join(tmpDir, 'transcript.jsonl');
+    fs.writeFileSync(transcript, `${JSON.stringify({ type: 'user', content: 'hello there' })}\n`);
+
+    const projectDir = path.join(homeDir, 'v5tg-low');
+    fs.mkdirSync(projectDir, { recursive: true });
+
+    const res = runStop(projectDir, transcript);
+    assert.strictEqual(res.status, 0, res.stderr);
+
+    const session = savedSession(projectDir);
+    assert.strictEqual(
+      session.userMessageContent,
+      undefined,
+      'below threshold must NOT enrich userMessageContent',
+    );
+    assert.strictEqual(session.toolsUsed, undefined, 'below threshold must NOT enrich toolsUsed');
+    assert.deepStrictEqual(session.filesModified, [], 'filesModified defaults to empty');
+  });
+
+  it('above threshold: transcript IS parsed → enrichment present in session JSON', () => {
+    fs.writeFileSync(counterPath('tool-count'), '60');
+    fs.writeFileSync(counterPath('user-count'), '0');
+
+    const transcript = path.join(tmpDir, 'transcript.jsonl');
+    fs.writeFileSync(transcript, `${JSON.stringify({ type: 'user', content: 'hello there' })}\n`);
+
+    const projectDir = path.join(homeDir, 'v5tg-high');
+    fs.mkdirSync(projectDir, { recursive: true });
+
+    const res = runStop(projectDir, transcript);
+    assert.strictEqual(res.status, 0, res.stderr);
+
+    const session = savedSession(projectDir);
+    assert.deepStrictEqual(
+      session.userMessageContent,
+      ['hello there'],
+      'above threshold enriches userMessageContent from the transcript',
+    );
+  });
+});

@@ -735,16 +735,6 @@ function Platforms({
     tag: 'SUPPORTED',
     cmd: 'Fetch .codex/INSTALL.md',
     note: 'Manual install. Core skills + SDD pipeline.'
-  }, {
-    name: 'Gemini CLI',
-    tag: 'SUPPORTED',
-    cmd: 'Fetch .gemini/INSTALL.md',
-    note: 'Manual install. Core skills + SDD pipeline.'
-  }, {
-    name: 'OpenCode',
-    tag: 'SUPPORTED',
-    cmd: 'Clone + symlink plugin',
-    note: 'Plugin-shaped. Lives in ~/.config/opencode/plugins.'
   }];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
@@ -757,8 +747,8 @@ function Platforms({
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "four harnesses.")),
-    sub: "Claude Code gets the deepest integration via the plugin marketplace. Codex, Gemini CLI, and OpenCode ship manually but share the same skill library.",
+    }, "two harnesses.")),
+    sub: "Claude Code gets the deepest integration via the plugin marketplace. Codex ships manually but shares the same skill library.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
@@ -822,7 +812,7 @@ function SkillsGrid({
   // Aligned to the seven functional categories in docs/guide/skills-reference.md.
   // Meta is called out as project-level, not a normal user-facing skill.
   const layers = [['Core toolkit', t.ember, '8 promoted skills', 'The small surface most users should learn first: router, design, specs, planning, TDD, debugging, verification, and eval.'], ['Optional workflows', t.brass, '24 opt-in skills', 'Advanced orchestration for SDD, worktrees, reviews, sessions, learning, and knowledge work — only when scope earns them.'], ['Harness + eval', t.dim, 'gated behavior', 'Activation, non-activation, instruction-strength, spec sync, drift, and reconstruction checks keep the layers honest.']];
-  const groups = [['Planning', t.brass, [['arc-brainstorming', 'design exploration'], ['arc-refining', 'spec generation'], ['arc-writing-tasks', 'break into tasks'], ['arc-planning', 'DAG breakdown']]], ['Execution', t.ember, [['arc-executing-tasks', 'human-in-the-loop'], ['arc-agent-driven', 'subagent per task + review'], ['arc-implementing', 'epic orchestrator'], ['arc-dispatching-parallel', 'parallel agent dispatch'], ['arc-dispatching-teammates', 'multi-epic teammates'], ['arc-looping', 'cross-session autonomy']]], ['Coordination', t.brass, [['arc-using', 'bounded router · skill index'], ['arc-using-worktrees', 'isolated workspaces'], ['arc-coordinating', 'worktree lifecycle'], ['arc-finishing', 'branch completion'], ['arc-finishing-epic', 'epic completion'], ['arc-compacting', 'strategic /compact timing'], ['arc-managing-sessions', 'handover + archive']]], ['Quality', t.ember, [['arc-tdd', 'RED → GREEN → REFACTOR'], ['arc-debugging', 'four-phase debug'], ['arc-verifying', 'evidence before claims'], ['arc-requesting-review', 'when to request review'], ['arc-receiving-review', 'handle feedback rigor'], ['arc-evaluating', 'measure behavioral change'], ['arc-auditing-spec', 'read-only spec audit']]], ['Learning', t.brass, [['arc-journaling', 'pre-compaction reflection'], ['arc-reflecting', 'insights from diaries'], ['arc-learning', 'opt-in candidate lifecycle'], ['arc-observing', 'tool-call observation'], ['arc-recalling', 'instinct creation'], ['arc-researching', 'hypothesis experiments']]], ['Knowledge Base', t.ember, [['arc-maintaining-obsidian', 'vault lifecycle'], ['arc-diagramming-obsidian', 'Excalidraw diagrams']]], ['Meta · project-level', t.dim, [['arc-writing-skills', 'TDD for ArcForge\'s own skills']]]];
+  const groups = [['Planning', t.brass, [['arc-brainstorming', 'design exploration'], ['arc-refining', 'spec generation'], ['arc-writing-tasks', 'break into tasks'], ['arc-planning', 'DAG breakdown']]], ['Execution', t.ember, [['arc-executing-tasks', 'human-in-the-loop'], ['arc-agent-driven', 'subagent per task + review'], ['arc-implementing', 'epic orchestrator'], ['arc-dispatching-parallel', 'parallel agent dispatch'], ['arc-dispatching-teammates', 'multi-epic teammates'], ['arc-looping', 'cross-session autonomy']]], ['Coordination', t.brass, [['arc-using', 'bounded router · skill index'], ['arc-using-worktrees', 'isolated workspaces'], ['arc-coordinating', 'worktree lifecycle'], ['arc-finishing', 'branch completion'], ['arc-finishing-epic', 'epic completion'], ['arc-compacting', 'strategic /compact timing'], ['arc-managing-sessions', 'handover + archive']]], ['Quality', t.ember, [['arc-tdd', 'RED → GREEN → REFACTOR'], ['arc-debugging', 'four-phase debug'], ['arc-verifying', 'evidence before claims'], ['arc-reviewing', 'request review + process feedback'], ['arc-evaluating', 'measure behavioral change'], ['arc-auditing-spec', 'read-only spec audit']]], ['Learning', t.brass, [['arc-journaling', 'pre-compaction reflection'], ['arc-reflecting', 'insights from diaries'], ['arc-learning', 'opt-in observe→activate lifecycle'], ['arc-recalling', 'instinct creation'], ['arc-researching', 'hypothesis experiments']]], ['Knowledge Base', t.ember, [['arc-maintaining-obsidian', 'vault lifecycle'], ['arc-diagramming-obsidian', 'Excalidraw diagrams']]], ['Meta · project-level', t.dim, [['arc-writing-skills', 'TDD for ArcForge\'s own skills']]]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
     id: "skills"
@@ -1154,11 +1144,7 @@ function Install({
       fontSize: 13,
       lineHeight: 1.7
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("b", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
     style: {
       color: t.ink,
       fontFamily: 'monospace'
@@ -1168,26 +1154,7 @@ function Install({
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, ".codex/INSTALL.md")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("b", {
-    style: {
-      color: t.ink,
-      fontFamily: 'monospace'
-    }
-  }, "Gemini:"), " Fetch ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: t.brass,
-      fontFamily: 'monospace'
-    }
-  }, ".gemini/INSTALL.md")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
-    style: {
-      color: t.ink,
-      fontFamily: 'monospace'
-    }
-  }, "OpenCode:"), " Clone + symlink plugin")))));
+  }, ".codex/INSTALL.md"))))));
 }
 
 // ─── Footer ───
@@ -1234,7 +1201,7 @@ function Footer({
     style: {
       color: t.dim
     }
-  }, "MIT \xB7 v4.0.1 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
+  }, "MIT \xB7 v5.0.0 \xB7 By Gregory Ho")), /*#__PURE__*/React.createElement("div", {
     className: "af-footer-links",
     style: {
       display: 'flex',

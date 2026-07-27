@@ -405,3 +405,166 @@ describe('arc-guard research-config blocks (Edit/Write)', () => {
     );
   });
 });
+
+// GIT_MERGE_RE must catch a raw `git merge` even when git global options sit
+// between `git` and `merge` (`-c x=y`, `--no-pager`, `-p`, `-C <path>`,
+// `--git-dir=<path>`), else the merge slips past G2. Broadening is bounded to
+// DASH-PREFIXED tokens only — a bare word between `git` and `merge` (e.g.
+// `merge-base`, `config merge.tool`) must never match, since a too-wide deny that
+// blocks legit commands is the expensive failure (users disable the hooks).
+describe('GIT_MERGE_RE global-flag coverage', () => {
+  it('MATCHES a raw merge preceded by git global options', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    for (const cmd of [
+      'git merge topic',
+      'git -c a=b merge topic',
+      'git --no-pager merge topic',
+      'git -p merge',
+      'git -C /wt merge topic',
+      'git --git-dir=/r/.git merge',
+    ]) {
+      assert.strictEqual(GIT_MERGE_RE.test(cmd), true, `should match (deny fires): ${cmd}`);
+    }
+  });
+
+  it('does NOT match merge-adjacent commands or a bare word before merge', () => {
+    const { GIT_MERGE_RE } = require('../arc-guard/main');
+    for (const cmd of [
+      'git merge-base a b',
+      'git merge --abort',
+      'git mergetool',
+      'git commit -m "resolve merge conflict"',
+      'git config merge.tool vimdiff',
+    ]) {
+      assert.strictEqual(GIT_MERGE_RE.test(cmd), false, `should NOT match (no deny): ${cmd}`);
+    }
+  });
+});
+
+// WS3 bypass closures: `git -C <path> merge` target resolution + Bash redirect
+// denies for guarded ledger/DAG/research-config files.
+describe('arc-guard bypass closures', () => {
+  let dirs;
+  beforeEach(() => {
+    dirs = [];
+    delete require.cache[require.resolve('../arc-guard/main')];
+    delete require.cache[require.resolve('../../scripts/lib/marker')];
+  });
+  afterEach(() => {
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  function wt(specId = 'demo-spec') {
+    const d = makeWorktree(specId);
+    dirs.push(d);
+    return d;
+  }
+  function base() {
+    const d = makeBase();
+    dirs.push(d);
+    return d;
+  }
+
+  it('DENIES `git -C <worktree> merge`, resolving the marker at the -C target', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const targetWt = wt('bypass-spec');
+    // Caller is in a markerless base checkout; the merge acts on the worktree.
+    const reason = evaluate({
+      tool_name: 'Bash',
+      tool_input: { command: `git -C ${targetWt} merge main` },
+      cwd: base(),
+    });
+    assert.ok(reason, 'should deny the -C merge into a worktree');
+    assert.ok(reason.includes('finish-epic.js'), 'redirects to the coordinator flow');
+    assert.ok(reason.includes('bypass-spec'), 'names the spec from the target marker');
+  });
+
+  it('does NOT deny `git -C <base> merge` from a worktree (correct target = base)', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const targetBase = base(); // no marker
+    const reason = evaluate({
+      tool_name: 'Bash',
+      tool_input: { command: `git -C ${targetBase} merge main` },
+      cwd: wt('some-spec'), // caller IS a worktree, but the merge targets the base
+    });
+    assert.strictEqual(reason, null, 'a merge into the base must not false-deny');
+  });
+
+  it('DENIES a shell redirect writing to specs/<id>/decisions.yml', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const reason = evaluate({
+      tool_name: 'Bash',
+      tool_input: { command: 'echo "- D-id: D-9" >> specs/my/decisions.yml' },
+      cwd: base(),
+    });
+    assert.ok(reason, 'should deny the ledger redirect bypass');
+    assert.ok(reason.includes('decisions.yml'));
+  });
+
+  it('DENIES `sed -i` and `tee` writing to specs/<id>/dag.yaml', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const cwd = base();
+    assert.ok(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: { command: "sed -i 's/pending/completed/' specs/my/dag.yaml" },
+        cwd,
+      }),
+      'sed -i bypass should deny',
+    );
+    assert.ok(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: { command: 'echo x | tee specs/my/dag.yaml' },
+        cwd,
+      }),
+      'tee bypass should deny',
+    );
+  });
+
+  it('does NOT deny a redirect to a non-specs dag.yaml, or a read', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const cwd = base();
+    assert.strictEqual(
+      evaluate({ tool_name: 'Bash', tool_input: { command: 'echo x > dag.yaml' }, cwd }),
+      null,
+      'a repo-root dag.yaml is not the SDD-layout file',
+    );
+    assert.strictEqual(
+      evaluate({ tool_name: 'Bash', tool_input: { command: 'cat specs/my/decisions.yml' }, cwd }),
+      null,
+      'reading is not a write bypass',
+    );
+  });
+
+  it('DENIES a redirect to a locked research-config.md, but not a foreign one', () => {
+    const { evaluate } = require('../arc-guard/main');
+    const locked = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-guard-rc-'));
+    dirs.push(locked);
+    fs.writeFileSync(
+      path.join(locked, 'research-config.md'),
+      '# Research Config\n\nCANNOT modify: src/\n',
+    );
+    assert.ok(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: { command: 'echo x > research-config.md' },
+        cwd: locked,
+      }),
+      'redirect to the locked contract should deny',
+    );
+
+    const foreign = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-guard-rc-f-'));
+    dirs.push(foreign);
+    fs.writeFileSync(path.join(foreign, 'research-config.md'), '# Hyperparameters\nlr: 0.01\n');
+    assert.strictEqual(
+      evaluate({
+        tool_name: 'Bash',
+        tool_input: { command: 'echo x > research-config.md' },
+        cwd: foreign,
+      }),
+      null,
+      'a foreign research-config.md must not be fenced',
+    );
+  });
+});

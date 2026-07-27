@@ -1,6 +1,9 @@
 ---
 name: arc-auditing-spec
-description: Use when the user explicitly invokes `/arcforge:arc-auditing-spec <spec-id>` for a read-only advisory audit of an SDD spec family (design, spec, dag, decision anchors). Only triggered by direct user invocation; never auto-invoked from any pipeline skill.
+description: Read-only advisory audit of an SDD spec family — design, spec, dag, and decision anchors.
+category: sdd
+status: promoted
+disable-model-invocation: true
 argument-hint: "<spec-id> [--save]"
 ---
 
@@ -55,14 +58,7 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 
 ## Phase Structure
 
-| Phase | What | Contract |
-|---|---|---|
-| 0 | Precondition check above | fr-sc-001-ac1, fr-sc-001-ac2 |
-| 1 | Parallel fan-out to three read-only sub-agents via subagent dispatch | `agents/arc-auditing-spec-*.md`; fr-aa-001 |
-| 2 | Print Summary + Findings Overview + per-finding Detail markdown | `specs/arc-auditing-spec/details/output-and-interaction.xml` fr-oi-001 |
-| 3 | Triage UX — AskUserQuestion multi-select over HIGH findings | fr-oi-002 |
-| 4 | Resolution UX — batched per-finding AskUserQuestion with diff previews | fr-oi-003 |
-| 5 | Print Decisions markdown table; skill exits | fr-oi-004 |
+Phase 0 precondition check (above) → Phase 1 parallel fan-out → Phase 2 markdown report → Phase 3 triage → Phase 4 resolution → Phase 5 Decisions table (terminal).
 
 ### Phase 1 — Parallel Fan-Out to Three Audit Axes
 
@@ -70,8 +66,7 @@ Then exit non-zero. Write nothing. Spawn no sub-agent. This is the only valid re
 parallel subagent dispatches.** Do NOT dispatch them one at a time. Sequential
 dispatch is the baseline failure mode this rule exists to prevent — a stock
 agent defaults to serial execution; this skill forbids it. (For your harness's
-subagent-dispatch tool, see `arc-using/references/codex-tools.md` or
-`arc-using/references/opencode-tools.md`.)
+subagent-dispatch tool, see `arc-using/references/codex-tools.md`.)
 
 Dispatch these three agents concurrently, in a single message:
 - `arc-auditing-spec-cross-artifact-alignment`
@@ -107,11 +102,7 @@ failed mid-audit. The main session MUST:
 3. NOT halt the audit because one axis encountered an error.
 
 One axis's `error_flag` does NOT stop the other two axes' findings from being
-shown and triaged.
-
-See `skills/arc-auditing-spec/references/report-templates.md` for full worked
-examples with exact column headers. The summary below is the decision logic;
-the reference file is the layout authority.
+shown and triaged. The sections below are the decision logic; the reference file carries the full worked examples with exact column headers.
 
 **REQUIRED BACKGROUND:** `skills/arc-auditing-spec/references/report-templates.md`
 
@@ -127,13 +118,7 @@ its counts with `ERR` and note the error below the table.
 Every finding from all three axes MUST appear — MED, LOW, and INFO findings
 appear in this table exactly as HIGH findings do. No omissions.
 
-When exactly one HIGH-severity finding exists across the full finding set
-(N_HIGH == 1), the Title cell for that single-HIGH row MUST start with `⚠️`
-and MUST render the title text in markdown bold: `⚠️ **<title>**`. This visual
-emphasis ensures the lone HIGH is conspicuous even when Phase 3 triage does not
-fire. When N_HIGH is 0 or >= 2, render all Overview rows without the `⚠️`
-prefix (baseline rendering). The `⚠️` prefix MUST NOT appear in the
-per-finding Detail block header — the emphasis is Overview-row-only.
+When exactly one HIGH finding exists (N_HIGH == 1), the Title cell for that row MUST start with `⚠️` and render the title in bold: `⚠️ **<title>**` — so the lone HIGH is conspicuous even when Phase 3 triage does not fire. When N_HIGH is 0 or >= 2, render all Overview rows without the `⚠️` prefix. The prefix MUST NOT appear in the per-finding Detail block header — it is Overview-row-only.
 
 **Section C — Per-finding Detail blocks**. One block per finding, same order
 as the Overview. Each block contains:
@@ -143,9 +128,7 @@ as the Overview. Each block contains:
   Side-effect / Cost`). When a resolution has a `preview` diff from the
   agent, append the diff block under the table row.
 
-MED, LOW, and INFO findings MUST have full Detail blocks rendered here —
-even though they will not enter triage in Phase 3. All findings require
-visibility; the Phase 3 multi-select is not the only visibility mechanism.
+MED, LOW, and INFO findings get full Detail blocks here even though they do not enter Phase 3 triage — the Detail block is the visibility mechanism for them.
 
 ### Phase 3 — Triage UX
 
@@ -157,21 +140,9 @@ N_HIGH >= 2; below that threshold the skill takes a degraded path.
 **Step 0 — Threshold check (MANDATORY before any AskUserQuestion call).**
 Count the HIGH-severity findings across all three axes (N_HIGH).
 
-- **N_HIGH == 0**: Phase 3 does NOT fire. Do NOT issue any AskUserQuestion
-  call. Do NOT enter Phase 4. Do NOT render a Phase 5 Decisions table.
-  Instead, print the concluding recommendation line (template:
-  `references/report-templates.md` §Concluding Recommendation Line) and
-  exit cleanly. The Phase 2 Detail blocks are the complete deliverable;
-  no alternative injection channel is provided.
+- **N_HIGH == 0**: Phase 3 does NOT fire. Do NOT issue any AskUserQuestion call, enter Phase 4, or render a Phase 5 Decisions table. Print the concluding recommendation line (`references/report-templates.md` §Concluding Recommendation Line) and exit cleanly. The Phase 2 Detail blocks are the complete deliverable.
 
-- **N_HIGH == 1**: Phase 3 multi-select does NOT fire (a single-option
-  multi-select would violate `options.minItems: 2`). Skip Phase 3 entirely.
-  The Phase 2 Findings Overview row for the lone HIGH already carries the
-  visual emphasis from fr-oi-001-ac5. Proceed directly into Phase 4 with
-  that single HIGH as the sole Stage-2 queue entry. Phase 4 then proceeds
-  per its existing rules (fr-oi-003). No Other injection channel exists on
-  this path; the Other pull-in channel only exists when Phase 3 actually
-  fires (N_HIGH >= 2).
+- **N_HIGH == 1**: Phase 3 multi-select does NOT fire (a single option would violate `options.minItems: 2`). Skip Phase 3; proceed directly into Phase 4 with that single HIGH as the sole Stage-2 queue entry (its Overview row already carries the visual emphasis). No Other injection channel exists on this path.
 
 - **N_HIGH >= 2**: Phase 3 fires. Continue to the steps below.
 
@@ -187,13 +158,7 @@ every HIGH finding has been presented exactly once.
 Use `AskUserQuestion` with `header: "Triage"` and `multiSelect: true`. **Template:** see `references/report-templates.md` §Phase 3.
 
 **Step 3 — Parse Other free-text.**
-The AskUserQuestion tool appends an auto-generated Other field. After each
-call, scan the Other string for the regex pattern `A[1-3]-\d{3}`. Add each
-matched finding ID to the Stage 2 resolution queue alongside any HIGH IDs
-the user checked. This is the ONLY channel through which MED, LOW, and INFO
-findings enter the queue. This channel only exists when Phase 3 actually
-fires (N_HIGH >= 2); it is not available on the N_HIGH == 0 or N_HIGH == 1
-degraded paths.
+The AskUserQuestion tool appends an auto-generated Other field. After each call, scan the Other string for the regex `A[1-3]-\d{3}` and add each matched finding ID to the Stage 2 resolution queue alongside the HIGH IDs the user checked. This is the ONLY channel through which MED, LOW, and INFO findings enter the queue, and it exists only when Phase 3 fires (N_HIGH >= 2).
 
 ### Phase 4 — Resolution UX
 
@@ -222,45 +187,13 @@ Rules:
 - Other free-text is a valid decision — accept it, do not throw or drop it.
   Record it verbatim in the Phase 5 Decisions table User Note column.
 
-**Per-Finding Skip Rule (fr-oi-003-ac6):** When Phase 4 iterates to a
-finding whose suggested-resolutions count is less than 2 (i.e., 0 or 1
-resolution), the skill MUST NOT issue any AskUserQuestion question for it.
-AskUserQuestion's `options.minItems: 2` constraint forbids a single-option
-question, and asking among a single option is pure ceremony. Such findings
-rely on their Phase 2 Detail block's Suggested Resolutions table as the
-deliverable — the user reads it and decides what to do in the main session.
-Note: skipped findings still appear in the Phase 2 Detail block with their
-full Resolutions table. The skip only suppresses the interactive question,
-not the data surface.
-
-When the Decisions table is rendered (per fr-oi-004), a skipped finding's
-row MUST have its Chosen Resolution column set to the sentinel string
-`(no ceremony — see Detail)` and its User Note column left empty.
-
-This skip is NOT an error. Do not treat it as a failure, do not log a
-warning, and do not halt the Phase 4 loop. Simply proceed to the next
-finding in the queue.
+**Per-Finding Skip Rule:** When a finding has fewer than 2 suggested resolutions (0 or 1), the skill MUST NOT issue an AskUserQuestion question for it (`options.minItems: 2` forbids a single-option question). Such findings rely on their Phase 2 Detail block's Resolutions table as the deliverable. In the Decisions table, a skipped finding's Chosen Resolution column is the sentinel `(no ceremony — see Detail)` with an empty User Note. This skip is NOT an error — do not warn or halt the loop; proceed to the next finding.
 
 ### Phase 5 — Decisions Table (TERMINAL)
 
-**Conditional firing gate (fr-oi-004-ac1):** Phase 5 renders the Decisions
-table ONLY when Phase 3 or Phase 4 actually fired during this invocation.
-Use the in-memory `ceremony_fired` flag that is set to `true` the moment
-either phase issues its first AskUserQuestion call. This single rule
-covers every path uniformly: the standard N_HIGH >= 2 path flips the flag
-on Phase 3's first call; the N_HIGH == 1 + ≥2-resolutions direct-to-Phase-4
-path (fr-oi-002-ac6) flips the flag on Phase 4's first question; the
-N_HIGH == 1 + <2-resolutions path enters Phase 4 but issues no question,
-so the flag correctly stays `false` and no Decisions table renders. Do
-NOT re-derive this condition at Phase 5 entry — carry the flag forward
-from wherever ceremony began.
+**Conditional firing gate:** Phase 5 renders the Decisions table ONLY when Phase 3 or Phase 4 actually fired. Use the in-memory `ceremony_fired` flag, set to `true` the moment either phase issues its first AskUserQuestion call; carry it forward, do NOT re-derive it at Phase 5 entry. The N_HIGH == 1 + <2-resolutions path and the N_HIGH == 0 exit both issue no question, so the flag stays `false`.
 
-**N_HIGH == 0 path (fr-oi-004-ac4):** When both Phase 3 and Phase 4 were
-skipped per fr-oi-002-ac5 (the zero-HIGH exit), `ceremony_fired` remains
-`false`. In that case Phase 5 MUST NOT print a Decisions table, MUST NOT
-print a stub "No decisions" line, and MUST NOT produce any Phase 5 output.
-The concluding recommendation line already printed at the end of Phase 3's
-threshold check is the skill's terminal output on this path.
+When `ceremony_fired` is `false`, Phase 5 MUST NOT print a Decisions table, a stub "No decisions" line, or any output — the concluding recommendation line from Phase 3's threshold check is the terminal output on that path.
 
 When `ceremony_fired` is `true`, print the Decisions table, then exit.
 This is the final deliverable. **Template:** see `references/report-templates.md` §Phase 5.
@@ -287,23 +220,13 @@ about to invoke `/arc-refining` to apply changes, STOP — see Red Flags.
 
 ### --save Flag
 
-When `--save` is present, the main session writes the full Phase 2 report
-+ Phase 5 Decisions table to
-`~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md`
-after Phase 5 prints (24-hour time). Without `--save`: **zero files are
-written** anywhere. Derive `<project-hash>` via a `node` subprocess
-calling `hashRepoPath` from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` — never
-reimplement the hash inline (drift risk). The reference file carries the
-exact subprocess one-liner, concrete filename example, and `mkdir -p`
-parent-directory command.
+When `--save` is present, the main session writes the full Phase 2 report + Phase 5 Decisions table to `~/.arcforge/reviews/<project-hash>/<spec-id>/<YYYY-MM-DD-HHMM>.md` after Phase 5 prints (24-hour time). Without `--save`: **zero files are written** anywhere. Derive `<project-hash>` via a `node` subprocess calling `hashRepoPath` from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` — never reimplement the hash inline (drift risk). The reference file carries the exact subprocess one-liner, filename example, and `mkdir -p` command.
 
 **REQUIRED BACKGROUND:** `skills/arc-auditing-spec/references/save-flag.md`
 
 ## Hard Boundaries
 
-- Skill body and all sub-agents MUST NOT invoke Edit, Write, or any state-mutating Bash command. This is enforced **structurally** via the `tools:` allowlist in each agent's frontmatter (`agents/arc-auditing-spec-*.md`) — not via prose in system prompts. See fr-sc-002-ac3.
-- No git commit, branch creation, worktree creation, or file deletion — under any phase, at any point.
-- Phase 5 is terminal. The skill does NOT loop back to "apply" after the user picks resolutions. The Decisions table is the deliverable; downstream action is main session's responsibility and explicitly out of scope (fr-oi-004-ac3).
+- The read-only constraint is enforced **structurally** via the `tools:` allowlist in each agent's frontmatter (`agents/arc-auditing-spec-*.md`) — not via prose. No Edit, Write, git commit, branch/worktree creation, or file deletion, at any phase.
 - `--save` is the ONLY permitted write, and only to `~/.arcforge/reviews/` under the arcforge home directory — never into `specs/`, `docs/`, or any project-tracked path.
 
 ## Red Flags — STOP
@@ -325,13 +248,3 @@ If you find yourself doing any of these, STOP immediately:
 | "I'll reimplement the project hash inline — it's just sha256 of cwd" | fr-oi-005-ac3: the hash MUST come from `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js` so a single project has one hash across worktree paths and review paths. Reimplementing risks drift. | Use the subprocess one-liner shown in the --save section. |
 | "Without `--save`, I'll save the report anyway — it's harmless and the user will appreciate it" | fr-oi-005-ac1: without `--save`, ZERO files are written. Default is read-only. | Do not write any file unless `--save` is explicitly present. |
 
-## Implementation Delegation
-
-Per fr-sc-003, evals live under `skills/arc-auditing-spec/evals/` and exercise each of the three audit axes (fr-sc-003-ac2); the suite MUST pass before shipping.
-
-## Cross-References
-
-- Agents: `agents/arc-auditing-spec-cross-artifact-alignment.md`, `agents/arc-auditing-spec-internal-consistency.md`, `agents/arc-auditing-spec-state-transition-integrity.md`
-- Spec: `specs/arc-auditing-spec/spec.xml` + `specs/arc-auditing-spec/details/{skill-contract,audit-agents,output-and-interaction}.xml`
-- Design: `docs/plans/arc-auditing-spec/2026-04-22/design.md` · `docs/plans/arc-auditing-spec/2026-04-24-iterate2/design.md`
-- Eval scenarios: `skills/arc-auditing-spec/evals/`

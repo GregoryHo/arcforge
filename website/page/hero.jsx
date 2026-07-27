@@ -17,7 +17,7 @@ function Hero({theme}) {
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <Logo size={22} ember={t.ember} brass={t.brass}/>
           <span style={{fontFamily:'"Fraunces",serif',fontSize:18,letterSpacing:0,fontWeight:500,color:t.ink}}>arcforge</span>
-          <span style={{color:t.dim,marginLeft:6}}>v4.0.1</span>
+          <span style={{color:t.dim,marginLeft:6}}>v5.0.0</span>
         </div>
         <div className="af-nav-links" style={{display:'flex',gap:28,color:t.dim,textTransform:'uppercase'}}>
           <a href="#pipeline" style={{color:'inherit',textDecoration:'none'}}>Pipeline</a>
@@ -42,7 +42,7 @@ function Hero({theme}) {
             agents.
           </h1>
           <p style={{marginTop:32,fontSize:16,lineHeight:1.7,color:t.mute,maxWidth:520,fontFamily:'"JetBrains Mono",ui-monospace,monospace'}}>
-            A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws — your agent picks the{' '}
+            A minimal, composable skill toolkit for Claude Code and Codex. Skills are tools, not laws — your agent picks the{' '}
             <span style={{color:t.ink}}>smallest useful workflow</span> for the task and runs direct when nothing more is needed.
           </p>
           <p style={{marginTop:14,fontSize:14,lineHeight:1.7,color:t.dim,maxWidth:520,fontFamily:'"Fraunces",serif',fontStyle:'italic'}}>
@@ -80,7 +80,7 @@ function Hero({theme}) {
         padding:'0 80px',fontSize:11,color:t.dim,letterSpacing:2,justifyContent:'space-between',
         fontFamily:'"JetBrains Mono",monospace',
       }}>
-        <span>◆ CLAUDE CODE · CODEX · GEMINI · OPENCODE</span>
+        <span>◆ CLAUDE CODE · CODEX</span>
         <span>SCALE 1:1 — DRAFT 05.02.26 — SHEET 01/08</span>
       </div>
     </section>

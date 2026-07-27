@@ -15,8 +15,8 @@ Run `npm test` before every PR. It executes 5 separate runners:
 | Jest | `npm run test:scripts` | `tests/scripts/` | Core engine (diary, reflect, session-utils) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
 | Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
-| pytest | `npm run test:skills` | `tests/skills/` | Skill content validation |
-| Bash | `npm run test:observer-daemon` | `skills/arc-observing/tests/` | Observer daemon behavior |
+| pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
+| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
 
 ## Jest Tests (`tests/scripts/`)
 
@@ -33,8 +33,8 @@ Run `npm test` before every PR. It executes 5 separate runners:
 ## pytest Tests (`tests/skills/`)
 
 - Requires Python 3 + `pip install pytest pyyaml`
-- File naming: `test_skill_arc_<name>.py`
-- Validate frontmatter and content structure
+- Generic checker: `test_skill_structure.py` iterates every `skills/*/SKILL.md`
+- Validates frontmatter, `name` == dirname, sections, references, and line budget
 
 ## Custom Runner (`tests/node/`)
 

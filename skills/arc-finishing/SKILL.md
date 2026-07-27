@@ -1,6 +1,8 @@
 ---
 name: arc-finishing
-description: Use when implementation is complete and all tests pass, and you need to decide how to integrate — works for both epic worktrees (.arcforge-epic present) and regular branches. Step 0 discriminates on the marker.
+description: Integrate finished work once implementation is complete and tests pass. Use when deciding how to merge — Step 0 discriminates epic worktrees (.arcforge-epic present) from regular branches and runs the matching path.
+category: sdd
+status: promoted
 ---
 
 # arc-finishing
@@ -348,7 +350,7 @@ while the base stays half-merged.
 - Silently retry `finish-epic.js merge` hoping git produces a different result
 - Report completion until the conflict is resolved AND tests re-verified
 
-**Why escalation beats auto-resolve in the multi-teammate case:** teammates work in isolation and see only their own epic's spec. The conflicting hunks may come from a teammate who will still make more changes, or from a semantic disagreement the other teammate needs to know about. The lead is the only role that can verify the resolution is globally consistent.
+Escalation beats auto-resolve because teammates see only their own epic's spec; the lead is the only role that can verify the resolution is globally consistent.
 
 After the user or lead provides resolution guidance and you edit/commit, re-run the test suite (per arc-verifying's iron law: no completion without fresh evidence) and then return to Step 4.5 as if the merge had succeeded on the first try.
 
@@ -434,81 +436,38 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove "$WT_NAME"
 
 ## Completion Format
 
-### If Merged (Option 1)
+Fill the `Worktree:` line from the Step 4.6 lookup — never a hardcoded template path. Use the variant for the chosen option:
 
 ```
-<Epic | Branch> merged → <base-branch>
-
-Branch: <branch-name> (deleted)
-Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
-Commits: [N commits merged]
-
-Next: Continue with next epic / start next task, or check status
-```
-
-### If PR Created (Option 2)
-
-```
-Pull request created → #<PR-number>
-
-URL: <PR-URL>
-Branch: <branch-name>
-Worktree: <absolute path from Step 4.6 lookup> (kept for now)
-
-Next: Review PR, then merge/close and clean up worktree
-```
-
-### If Kept (Option 3)
-
-```
-<Epic | Branch> preserved for future work
-
-Branch: <branch-name>
-Worktree: <absolute path from Step 4.6 lookup> (kept)
-Backup: Pushed to origin/<branch-name> (epic path only)
-
-Next: Resume work or run this skill again when ready
-```
-
-### If Discarded (Option 4)
-
-```
-Work discarded
-
-Branch: <branch-name> (deleted)
-Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
-
-Next: Start fresh or check status
+Option 1 (merged):   <Epic | Branch> merged → <base-branch>
+                     Branch: <branch-name> (deleted)
+                     Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
+                     Commits: [N merged]   Next: next epic/task, or check status
+Option 2 (PR):       Pull request created → #<PR-number>   URL: <PR-URL>
+                     Branch: <branch-name>
+                     Worktree: <absolute path from Step 4.6 lookup> (kept for now)
+                     Next: review PR, then merge/close and clean up worktree
+Option 3 (kept):     <Epic | Branch> preserved for future work
+                     Branch: <branch-name>
+                     Worktree: <absolute path from Step 4.6 lookup> (kept)
+                     Backup: origin/<branch-name> (epic path only)   Next: resume, or re-run
+Option 4 (discarded): Work discarded   Branch: <branch-name> (deleted)
+                     Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
+                     Next: start fresh or check status
 ```
 
 ## Blocked Format
 
-### Tests Failing
+**Tests Failing / Missing Epic File:**
 
 ```
 Completion blocked
 
-Issue: Tests failing (<N> failures)
-Location: <absolute path from Step 4.6 lookup>
+Issue: [Tests failing (<N> failures) | .arcforge-epic missing or empty]
+Location: <absolute path from Step 4.6 lookup | Current directory>
 
 To resolve:
-1. Fix failing tests
-2. Re-run verification
-
-Then retry this skill.
-```
-
-### Missing Epic File (Epic Path expected but marker absent)
-
-```
-Completion blocked
-
-Issue: .arcforge-epic missing or empty
-Location: Current directory
-
-To resolve:
-1. Verify you are in an epic worktree
-2. Recreate .arcforge-epic with the epic id
+1. [Fix failing tests, re-run verification | Verify you are in an epic worktree, recreate .arcforge-epic]
 
 Then retry this skill.
 ```
@@ -546,26 +505,7 @@ Wait for the lead's response before taking further git action. Hold `epic` branc
 
 ### Coordinator Not Available (Epic Path)
 
-```
-Epic completion blocked
-
-Issue: Node.js CLI not available
-Checked: ${SKILL_ROOT}/scripts/finish-epic.js
-
-To resolve:
-1. Ensure Node.js is available
-
-Then retry this skill.
-```
-
-## Quick Reference
-
-| Option | Merge | Push | Keep Worktree | Cleanup Branch |
-|--------|-------|------|---------------|----------------|
-| 1. Merge locally | ✓ (epic: coordinator) | - | - | ✓ |
-| 2. Create PR | - | ✓ | ✓ | - |
-| 3. Keep as-is | - | ✓ (epic: backup) | ✓ | - |
-| 4. Discard | - | - | - | ✓ (force) |
+Block with "Epic completion blocked — Node.js CLI not available (checked `${SKILL_ROOT}/scripts/finish-epic.js`); ensure Node.js is available, then retry."
 
 ## Red Flags
 
@@ -580,39 +520,12 @@ Then retry this skill.
 - Auto-resolve a merge conflict in a multi-teammate context — escalate to lead via SendMessage using the Merge Conflict (Multi-Teammate) blocked format
 
 **Always:**
-- Verify tests before offering options
-- Present exactly 4 options
-- Get typed confirmation for Option 4
+- Verify tests before offering options; present exactly 4 options; get typed confirmation for Option 4
 - On the epic path, use coordinator merge for Option 1
 - Clean up the worktree for Options 1 & 4 only (cd to base first)
 
-## Common Mistakes
-
-**Skipping test verification**
-- **Problem:** Merge broken code, create failing PR
-- **Fix:** Always verify tests before offering options
-
-**Open-ended questions**
-- **Problem:** "What should I do next?" → ambiguous
-- **Fix:** Present exactly 4 structured options
-
-**Automatic worktree cleanup**
-- **Problem:** Remove worktree when might need it (Option 2, 3)
-- **Fix:** Only cleanup for Options 1 and 4
-
-**No confirmation for discard**
-- **Problem:** Accidentally delete work
-- **Fix:** Require typed "discard" confirmation
-
 ## Integration
 
-**Called by:**
-- **arc-agent-driven** - After all tasks complete
-- **arc-executing-tasks** - After all tasks complete
-- **arc-implementing** - After an epic completes (epic path)
-
-**Pairs with:**
-- **arc-using-worktrees** - Cleans up the worktree created by that skill
-- **arc-coordinating** - epic path delegates merge/cleanup to the coordinator
-
-**Related:** Use `arc-verifying` mindset throughout
+- **Called by:** arc-agent-driven, arc-executing-tasks (after all tasks complete), arc-implementing (after an epic completes, epic path)
+- **Pairs with:** arc-using-worktrees (cleans up its worktree), arc-coordinating (epic path delegates merge/cleanup to the coordinator)
+- **Related:** use `arc-verifying` mindset throughout

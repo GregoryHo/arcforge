@@ -75,7 +75,7 @@ function Hero({
       color: t.dim,
       marginLeft: 6
     }
-  }, "v4.0.1")), /*#__PURE__*/React.createElement("div", {
+  }, "v5.0.0")), /*#__PURE__*/React.createElement("div", {
     className: "af-nav-links",
     style: {
       display: 'flex',
@@ -163,7 +163,7 @@ function Hero({
       maxWidth: 520,
       fontFamily: '"JetBrains Mono",ui-monospace,monospace'
     }
-  }, "A minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
+  }, "A minimal, composable skill toolkit for Claude Code and Codex. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.ink
     }
@@ -261,7 +261,7 @@ function Hero({
       justifyContent: 'space-between',
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX \xB7 GEMINI \xB7 OPENCODE"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
+  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
 }
 function HeroSchematic({
   theme: t

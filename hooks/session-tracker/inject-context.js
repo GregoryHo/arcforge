@@ -103,7 +103,7 @@ function loadAutoInstincts(project) {
     lines.push(`- **${inst.id}** (${pctStr}%): ${inst.trigger || inst.action || ''}`);
   }
 
-  lines.push('\nInvoke /arcforge:arc-observing to confirm/contradict these patterns.');
+  lines.push('\nInvoke /arcforge:arc-learning to confirm/contradict these patterns.');
 
   return { text: lines.join('\n'), count: top.length };
 }

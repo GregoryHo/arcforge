@@ -26,7 +26,7 @@ Read the scenario queue and answer:
    is absent (omitted from the request)?
 
 Relevant files:
-- `queue.jsonl` — candidate queue after Reviewer A's dismiss action.
+- `queue-dir/queue.jsonl` — candidate queue after Reviewer A's dismiss action.
 - Source candidate_id: `cand_concurrency_001`
 
 Constraints:

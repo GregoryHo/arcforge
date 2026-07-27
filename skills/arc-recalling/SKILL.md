@@ -1,6 +1,9 @@
 ---
 name: arc-recalling
-description: Use when the user wants to manually save a pattern or insight as an instinct from the current session context, invokes /arcforge:arc-recalling with a description, or identifies a reusable technique worth preserving
+description: Manually save a pattern or insight from the current session as a reusable instinct.
+category: memory
+status: promoted
+disable-model-invocation: true
 argument-hint: "<description of the pattern to remember>"
 ---
 
@@ -8,7 +11,7 @@ argument-hint: "<description of the pattern to remember>"
 
 ## Overview
 
-Save patterns and insights from the current session as instincts. This skill bridges the gap between automatic instinct detection (arc-observing) and structured reflection (arc-reflecting) — it handles ad-hoc "I want to remember this" moments.
+Save patterns and insights from the current session as instincts. This skill bridges the gap between automatic instinct detection (arc-learning) and structured reflection (arc-reflecting) — it handles ad-hoc "I want to remember this" moments.
 
 ## Quick Reference
 
@@ -69,7 +72,7 @@ fi
 
 ## When NOT to Use
 
-- Pattern was already auto-detected by arc-observing (use confirm instead)
+- Pattern was already auto-detected by arc-learning (use confirm instead)
 - User wants to analyze multiple diaries for patterns (use arc-reflecting)
 - User wants to combine related instincts into a higher-level candidate (use the dashboard Evolve action: `arcforge learn dashboard`)
 - User is just discussing patterns without wanting to save them

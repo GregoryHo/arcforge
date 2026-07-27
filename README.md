@@ -1,10 +1,10 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-4.0.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a minimal, composable skill toolkit for Claude Code, Codex, Gemini CLI, and OpenCode. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
+arcforge is a minimal, composable skill toolkit for Claude Code and Codex. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
 
 ## Why arcforge
 
@@ -30,7 +30,7 @@ Skills are tools, not laws. You can enter through `arc-using` for routing help o
 
 ## Installation
 
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex and OpenCode require manual setup.
+**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex requires manual setup.
 
 ### Claude Code (Plugin Marketplace)
 
@@ -68,30 +68,10 @@ Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arc
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.codex/INSTALL.md
 ```
 
 **Detailed docs:** `docs/README.codex.md`
-
-### Gemini CLI
-
-Tell Gemini CLI:
-
-```
-Fetch and follow instructions from https://github.com/GregoryHo/arcforge/blob/main/.gemini/INSTALL.md
-```
-
-**Detailed docs:** `docs/README.gemini.md`
-
-### OpenCode
-
-Tell OpenCode:
-
-```
-Clone https://github.com/GregoryHo/arcforge to ~/.agents/arcforge, then create directory ~/.config/opencode/skills, then symlink ~/.agents/arcforge/skills to ~/.config/opencode/skills/arcforge, then create directory ~/.config/opencode/plugins, then symlink ~/.agents/arcforge/.opencode/plugins/arcforge.js to ~/.config/opencode/plugins/arcforge.js, then restart opencode.
-```
-
-**Detailed docs:** `docs/README.opencode.md`
 
 ## Quick Start: Common Commands
 
@@ -136,70 +116,68 @@ These are the most frequently used commands:
 
 ## What's Inside
 
-All 32 skills, each listed once. Workflow skills hand off sequentially, discipline skills fire as quality gates when their condition is present, and meta skills are invoked directly (see `arc-using` for routing).
+Skills grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
 
-### Routing
+### SDD (idea → spec → tasks → integration)
 
-- **arc-using** - Canonical router: maps task conditions to the smallest useful skill or workflow
+- **arc-brainstorming** - Explore and shape a design before implementation
+- **arc-refining** - Formalize an approved design into a structured `spec.xml`
+- **arc-planning** - Break a refined spec into an executable DAG of epics
+- **arc-writing-tasks** - Break a feature into small executable tasks with exact code
+- **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
+- **arc-implementing** - Orchestrate a large multi-feature project inside a worktree
+- **arc-finishing** - Integrate finished work; Step 0 discriminates epic worktree vs branch on `.arcforge-epic`
+- **arc-auditing-spec** _(user-invoked)_ - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
 
-### Workflow Skills (idea → spec → tasks → integration)
+### Orchestration (subagents, worktrees, loops)
 
-- **arc-brainstorming** - Design exploration
-- **arc-refining** - Convert design documents to structured specs
-- **arc-planning** - Break a spec into an executable DAG of epics
-- **arc-writing-tasks** - Break features into executable tasks
-- **arc-executing-tasks** - Human-in-the-loop execution with checkpoints
-- **arc-agent-driven** - Automated execution with subagent per task and a single task-reviewer (both verdicts)
-- **arc-implementing** - Orchestrate large project implementation in a worktree
-- **arc-coordinating** - Worktree management for multi-epic projects
-- **arc-using-worktrees** - Isolated git worktree for any repo: a branch, experiment, or review checkout via the generic CLI; epic work auto-escalates to the coordinator
-- **arc-dispatching-parallel** - Dispatch multiple agents for independent tasks
-- **arc-dispatching-teammates** - Lead-present multi-epic parallelism via agent teammates
-- **arc-looping** - Autonomous cross-session loop execution
-- **arc-finishing** - Completion with merge decision; Step 0 discriminates epic worktree vs normal branch on `.arcforge-epic`
+- **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
+- **arc-coordinating** - Coordinate multi-epic worktrees and cross-epic DAG state
+- **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
+- **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
+- **arc-looping** - Autonomous unattended cross-session DAG execution
+- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout); epic work auto-escalates to the coordinator
 
-### Discipline Skills (quality gates)
+### Discipline (quality gates)
 
-- **arc-tdd** - Test-driven development (RED → GREEN → REFACTOR cycle)
-- **arc-debugging** - Systematic debugging with four phases
-- **arc-verifying** - Verification evidence before completion claims
-- **arc-requesting-review** - When and how to request code review
-- **arc-receiving-review** - How to handle review feedback with technical rigor
-- **arc-evaluating** - Measure whether skills and workflows change agent behavior
+- **arc-tdd** - Test-first implementation (RED → GREEN → REFACTOR)
+- **arc-debugging** - Systematic root-cause investigation before any fix
+- **arc-verifying** - Fresh evidence before completion claims
+- **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
+- **arc-researching** - Autonomous hypothesis-driven metric optimization
 
-### Session & Learning Skills
+### Memory (session continuity + learning; default-off module)
 
-- **arc-journaling** - Session journaling for capturing reflections before compaction
-- **arc-reflecting** - Analyze diary entries for insights and patterns
-- **arc-learning** - Extract reusable patterns from sessions
-- **arc-observing** - Tool call observation for behavioral pattern detection
-- **arc-recalling** - Manual instinct creation from session insights
-- **arc-managing-sessions** - Session save/resume with alias support
+- **arc-journaling** - Capture session reflections into a durable diary before compaction
+- **arc-reflecting** - Analyze accumulated diaries for patterns and preferences
+- **arc-learning** - Opt-in observe → curate → review → activate instinct lifecycle
+- **arc-recalling** _(user-invoked)_ - Manually save a session pattern as a reusable instinct
+- **arc-managing-sessions** - Hand off, save, or resume session state across turns
 - **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
-- **arc-researching** - Autonomous hypothesis-driven experimentation
 
 The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
 
-### Knowledge Base Skills
+### Knowledge (Obsidian vault)
 
-- **arc-maintaining-obsidian** - Unified Obsidian vault lifecycle: ingest, query, audit (Karpathy LLM Wiki pattern)
+- **arc-maintaining-obsidian** - Ingest, query, audit, or initialize an Obsidian vault (Karpathy LLM Wiki pattern)
 - **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
 
-### Meta & Audit Skills
+### Meta (operates on the catalog itself)
 
-- **arc-writing-skills** - Maintain ArcForge's own skills and skill tests (project-level meta)
-- **arc-auditing-spec** - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
+- **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
+- **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
+- **arc-writing-skills** _(user-invoked)_ - Create, edit, or verify ArcForge's own skills and skill tests
 
 ### Agents
 
-Skills delegate focused work to 9 specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
+Skills delegate focused work to specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
 
 | Agent | Role |
 |-------|------|
 | `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
 | `task-reviewer` | Per-task review: spec compliance + task quality in one pass (arc-agent-driven) |
 | `spec-reviewer` | Epic-acceptance spec compliance, whole merged branch (arc-dispatching-teammates / arc-dispatching-parallel) |
-| `code-reviewer` | Review a completed step against plan and standards (arc-requesting-review) |
+| `code-reviewer` | Review a completed step against plan and standards (arc-reviewing) |
 | `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
 | `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
 | `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
@@ -213,7 +191,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 ### Review Templates
 
 Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from any
-harness that can dispatch a subagent (Claude Code, Codex, Gemini CLI, OpenCode):
+harness that can dispatch a subagent (Claude Code, Codex):
 
 - `templates/implementer-prompt.md` - TDD implementer subagent prompt
 - `templates/task-reviewer-prompt.md` - Per-task reviewer prompt (spec compliance + task quality)
@@ -283,8 +261,8 @@ npm test
 npm run test:scripts          # Jest — CLI engine (scripts/lib/)
 npm run test:hooks            # Node --test — hook behavior (hooks/__tests__/)
 npm run test:node             # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
-npm run test:skills           # pytest — skill content validation (tests/skills/)
-npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-observing/tests/)
+npm run test:skills           # pytest — skill structure validation (tests/skills/)
+npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-learning/tests/)
 
 # Run CLI
 node scripts/cli.js --help

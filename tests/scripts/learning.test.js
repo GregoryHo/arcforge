@@ -374,18 +374,9 @@ describe('learning subsystem MVP-1', () => {
     });
 
     expect(result.candidate.status).toBe('materialized');
-    expect(result.candidate.draft_paths).toEqual([
-      'skills/arc-releasing/SKILL.md.draft',
-      'tests/skills/test_skill_arc_releasing.py.draft',
-    ]);
+    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(
-      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
-    ).toBe(true);
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
-      false,
-    );
 
     const draft = fs.readFileSync(
       path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'),
@@ -619,10 +610,7 @@ describe('learning subsystem MVP-1', () => {
 
     expect(result.scope).toBe('project');
     expect(result.candidate.status).toBe('materialized');
-    expect(result.candidate.draft_paths).toEqual([
-      'skills/arc-releasing/SKILL.md.draft',
-      'tests/skills/test_skill_arc_releasing.py.draft',
-    ]);
+    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
   });
@@ -703,35 +691,20 @@ describe('learning subsystem MVP-1', () => {
     });
 
     expect(result.candidate.status).toBe('activated');
-    expect(result.candidate.active_paths).toEqual([
-      'skills/arc-releasing/SKILL.md',
-      'tests/skills/test_skill_arc_releasing.py',
-    ]);
+    expect(result.candidate.active_paths).toEqual(['skills/arc-releasing/SKILL.md']);
     expect(result.candidate.activated_at).toBe('2026-05-01T00:04:00Z');
-    expect(result.candidate.draft_paths).toEqual([
-      'skills/arc-releasing/SKILL.md.draft',
-      'tests/skills/test_skill_arc_releasing.py.draft',
-    ]);
+    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
     expect(result.candidate.evidence).toHaveLength(1);
 
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
-      true,
-    );
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
       false,
     );
-    expect(
-      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
-    ).toBe(false);
 
     const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(persisted).toHaveLength(1);
     expect(persisted[0].status).toBe('activated');
-    expect(persisted[0].active_paths).toEqual([
-      'skills/arc-releasing/SKILL.md',
-      'tests/skills/test_skill_arc_releasing.py',
-    ]);
+    expect(persisted[0].active_paths).toEqual(['skills/arc-releasing/SKILL.md']);
   });
 
   it('refuses to activate global scope candidates in this MVP', () => {
@@ -792,12 +765,9 @@ describe('learning subsystem MVP-1', () => {
   it('refuses to activate materialized candidates whose recorded draft paths are missing', () => {
     const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
     const draftSkillPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-    const draftTestPath = path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft');
     fs.mkdirSync(path.dirname(queuePath), { recursive: true });
     fs.mkdirSync(path.dirname(draftSkillPath), { recursive: true });
-    fs.mkdirSync(path.dirname(draftTestPath), { recursive: true });
     fs.writeFileSync(draftSkillPath, '---\nname: arc-releasing\ndescription: draft\n---\n', 'utf8');
-    fs.writeFileSync(draftTestPath, '# draft test\n', 'utf8');
     fs.writeFileSync(
       queuePath,
       `${JSON.stringify(candidate({ status: 'materialized' }))}\n`,
@@ -823,10 +793,7 @@ describe('learning subsystem MVP-1', () => {
         candidate({
           status: 'materialized',
           scope: 'global',
-          draft_paths: [
-            'skills/arc-releasing/SKILL.md.draft',
-            'tests/skills/test_skill_arc_releasing.py.draft',
-          ],
+          draft_paths: ['skills/arc-releasing/SKILL.md.draft'],
         }),
       )}\n`,
       'utf8',
@@ -861,15 +828,9 @@ describe('learning subsystem MVP-1', () => {
     const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(persisted[0].status).toBe('materialized');
     expect(persisted[0].active_paths).toBeUndefined();
-    expect(
-      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
-    ).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
-      false,
-    );
   });
 
-  it('refuses to overwrite an existing active SKILL.md and does not move the test draft', () => {
+  it('refuses to overwrite an existing active SKILL.md', () => {
     appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
     materializeCandidate('arc-releasing-20260501-001', {
       scope: 'project',
@@ -889,39 +850,9 @@ describe('learning subsystem MVP-1', () => {
 
     expect(fs.readFileSync(activeSkillPath, 'utf8')).toBe('pre-existing content');
     expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(
-      fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py.draft')),
-    ).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py'))).toBe(
-      false,
-    );
 
     const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(persisted[0].status).toBe('materialized');
-  });
-
-  it('refuses to overwrite an existing active test file and does not move the skill draft', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
-    materializeCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-    const activeTestPath = path.join(projectRoot, 'tests/skills/test_skill_arc_releasing.py');
-    fs.mkdirSync(path.dirname(activeTestPath), { recursive: true });
-    fs.writeFileSync(activeTestPath, '# pre-existing test', 'utf8');
-
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/already exists/i);
-
-    expect(fs.readFileSync(activeTestPath, 'utf8')).toBe('# pre-existing test');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
   });
 
   it('CLI learn activate promotes a materialized candidate to active artifacts', () => {
@@ -1077,11 +1008,9 @@ describe('learning subsystem MVP-1', () => {
       expect(summary.candidate.status).toBe('materialized');
       expect(summary.artifacts.draft_paths).toEqual([
         { path: 'skills/arc-releasing/SKILL.md.draft', exists: true },
-        { path: 'tests/skills/test_skill_arc_releasing.py.draft', exists: true },
       ]);
       expect(summary.artifacts.active_paths).toEqual([
         { path: 'skills/arc-releasing/SKILL.md', exists: false },
-        { path: 'tests/skills/test_skill_arc_releasing.py', exists: false },
       ]);
       const actionText = summary.next_actions.join(' ').toLowerCase();
       expect(actionText).toMatch(/review/);
@@ -1180,7 +1109,6 @@ describe('learning subsystem MVP-1', () => {
       expect(summary.candidate.active_paths).toBeUndefined();
       expect(summary.artifacts.draft_paths).toEqual([
         { path: 'skills/arc-releasing/SKILL.md.draft', exists: false },
-        { path: 'tests/skills/test_skill_arc_releasing.py.draft', exists: false },
       ]);
       expect(JSON.stringify(summary)).not.toContain('../../outside');
     });
@@ -1211,7 +1139,6 @@ describe('learning subsystem MVP-1', () => {
       expect(summary.next_actions.join(' ').toLowerCase()).toMatch(/already active/);
       expect(summary.artifacts.active_paths).toEqual([
         { path: 'skills/arc-releasing/SKILL.md', exists: true },
-        { path: 'tests/skills/test_skill_arc_releasing.py', exists: true },
       ]);
     });
 

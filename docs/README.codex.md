@@ -42,8 +42,6 @@ Codex scans `~/.agents/skills/` for skill directories at startup. Each directory
 
 The symlink `~/.agents/skills/arcforge` points into the cloned repo's `skills/` directory, making all arcforge skills visible to Codex without copying files. The `description` field in each skill's SKILL.md frontmatter tells Codex when to auto-activate the skill (e.g., `"Use when exploring ideas before implementation"`).
 
-> **Note:** The `~/.agents/arcforge` clone is shared with Gemini CLI and OpenCode. If you already installed arcforge for either, skip step 1 and reuse the existing clone.
-
 ## Usage
 
 Skills are discovered automatically after installation. Use them as you would any native Codex skill.
@@ -102,8 +100,6 @@ Remove the symlink and optionally delete the clone:
 unlink ~/.agents/skills/arcforge
 rm -rf ~/.agents/arcforge   # optional: remove the repo
 ```
-
-> **Note:** If Gemini CLI or OpenCode also use this clone, removing `~/.agents/arcforge` will affect them too.
 
 ## Windows
 

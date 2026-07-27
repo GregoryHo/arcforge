@@ -1,6 +1,8 @@
 ---
 name: arc-maintaining-obsidian
-description: Use when the user wants to create, query, audit, or initialize an Obsidian vault — saving notes/ideas/URLs into it ("save this" / "file this back" included), querying vault knowledge, auditing health (missing links, orphans, drift), ingesting files, or registering vaults. Not for Excalidraw diagrams — use arc-diagramming-obsidian.
+description: "Manage an Obsidian vault: ingest, query, audit, or initialize. Use when saving notes, ideas, or URLs ('save this' / 'file this back'), querying vault knowledge, or auditing health (orphans, drift). Not for diagrams — use arc-diagramming-obsidian."
+category: knowledge
+status: promoted
 argument-hint: "help | ingest <url|text> [--batch] [--link] [--vault=<name>] | query <question> [--vault=<name>] | audit [link|lint|grow] [--vault=<name>] | init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>] | register <path> --name <name> [--default] | list-vaults | unregister <name> | set-default <name>"
 ---
 

@@ -266,16 +266,14 @@ function Platforms({theme:t}) {
   const plats = [
     {name:'Claude Code',tag:'PRIMARY',cmd:'/plugin install arcforge@arcforge-dev',note:'Full plugin marketplace. Hooks, agents, teammates, commands — all native.',primary:true},
     {name:'Codex',tag:'SUPPORTED',cmd:'Fetch .codex/INSTALL.md',note:'Manual install. Core skills + SDD pipeline.'},
-    {name:'Gemini CLI',tag:'SUPPORTED',cmd:'Fetch .gemini/INSTALL.md',note:'Manual install. Core skills + SDD pipeline.'},
-    {name:'OpenCode',tag:'SUPPORTED',cmd:'Clone + symlink plugin',note:'Plugin-shaped. Lives in ~/.config/opencode/plugins.'},
   ];
   return (
     <PageSection theme={t} id="platforms">
       <SectionHeader
         n="09"
         kicker="PLATFORMS"
-        title={<>One toolkit, <em style={{color:t.brass,fontStyle:'italic'}}>four harnesses.</em></>}
-        sub="Claude Code gets the deepest integration via the plugin marketplace. Codex, Gemini CLI, and OpenCode ship manually but share the same skill library."
+        title={<>One toolkit, <em style={{color:t.brass,fontStyle:'italic'}}>two harnesses.</em></>}
+        sub="Claude Code gets the deepest integration via the plugin marketplace. Codex ships manually but shares the same skill library."
         theme={t}
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
@@ -334,16 +332,14 @@ function SkillsGrid({theme:t}) {
       ['arc-tdd','RED → GREEN → REFACTOR'],
       ['arc-debugging','four-phase debug'],
       ['arc-verifying','evidence before claims'],
-      ['arc-requesting-review','when to request review'],
-      ['arc-receiving-review','handle feedback rigor'],
+      ['arc-reviewing','request review + process feedback'],
       ['arc-evaluating','measure behavioral change'],
       ['arc-auditing-spec','read-only spec audit'],
     ]],
     ['Learning', t.brass, [
       ['arc-journaling','pre-compaction reflection'],
       ['arc-reflecting','insights from diaries'],
-      ['arc-learning','opt-in candidate lifecycle'],
-      ['arc-observing','tool-call observation'],
+      ['arc-learning','opt-in observe→activate lifecycle'],
       ['arc-recalling','instinct creation'],
       ['arc-researching','hypothesis experiments'],
     ]],
@@ -470,9 +466,7 @@ function Install({theme:t}) {
           <div style={{fontSize:10,letterSpacing:3,color:t.brass,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>OTHER HARNESSES</div>
           <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Manual install</h3>
           <div style={{color:t.mute,fontSize:13,lineHeight:1.7}}>
-            <div style={{marginBottom:10}}><b style={{color:t.ink,fontFamily:'monospace'}}>Codex:</b> Fetch <span style={{color:t.brass,fontFamily:'monospace'}}>.codex/INSTALL.md</span></div>
-            <div style={{marginBottom:10}}><b style={{color:t.ink,fontFamily:'monospace'}}>Gemini:</b> Fetch <span style={{color:t.brass,fontFamily:'monospace'}}>.gemini/INSTALL.md</span></div>
-            <div><b style={{color:t.ink,fontFamily:'monospace'}}>OpenCode:</b> Clone + symlink plugin</div>
+            <div><b style={{color:t.ink,fontFamily:'monospace'}}>Codex:</b> Fetch <span style={{color:t.brass,fontFamily:'monospace'}}>.codex/INSTALL.md</span></div>
           </div>
         </div>
       </div>
@@ -490,7 +484,7 @@ function Footer({theme:t}) {
             <Logo size={20} ember={t.ember} brass={t.brass}/>
             <span style={{fontFamily:'"Fraunces",serif',fontSize:16,color:t.ink,fontWeight:500}}>arcforge</span>
           </div>
-          <div style={{color:t.dim}}>MIT · v4.0.1 · By Gregory Ho</div>
+          <div style={{color:t.dim}}>MIT · v5.0.0 · By Gregory Ho</div>
         </div>
         <div className="af-footer-links" style={{display:'flex',gap:48,letterSpacing:2,textTransform:'uppercase'}}>
           <a href="https://github.com/GregoryHo/arcforge" style={{color:t.ember,textDecoration:'none'}}>GitHub ↗</a>
