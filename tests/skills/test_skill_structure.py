@@ -56,16 +56,13 @@ MIN_SKILL_COUNT = 10
 
 # Permanent exceptions — skills floored above the hard cap by untouchable content.
 # Values are BODY lines (frontmatter excluded): the budget governs SKILL.md prose
-# depth, and mandated metadata is not prose. Both entries land above their targets
-# (arc-refining 300, arc-finishing 430) because the untouchable content alone
-# exceeds the target — arc-refining's six CLI heredoc sdd-gate recipes +
-# three-legal-moves + delta accumulation + attended/unattended split +
-# pytest-pinned Boundary, and arc-finishing's ~440 lines of worktree-safety git
-# mechanics. ACCEPTED by the maintainer on 2026-07-13. Both keys are legacy and
-# must stay legacy: `test_permanent_budget_is_legacy_only` forbids opening a line
-# budget exception for any v6 skill.
+# depth, and mandated metadata is not prose. The entry lands above its target
+# (arc-finishing 430) because the untouchable content alone exceeds the target —
+# arc-finishing's ~440 lines of worktree-safety git mechanics. ACCEPTED by the
+# maintainer on 2026-07-13. The key is legacy and must stay legacy:
+# `test_permanent_budget_is_legacy_only` forbids opening a line budget exception
+# for any v6 skill. (arc-refining's entry was removed in P2 with the skill.)
 PERMANENT_LINE_BUDGET = {
-    "arc-refining": 386,
     "arc-finishing": 525,
 }
 

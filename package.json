@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "version": "5.0.0",
-  "description": "Skill-based autonomous agent toolkit for Claude Code and Codex",
+  "description": "Skill-based autonomous agent toolkit for Claude Code",
   "license": "MIT",
   "author": {
     "name": "Gregory Ho"
@@ -17,12 +17,7 @@
     "skills/",
     "hooks/",
     "scripts/",
-    "templates/",
-    "agents/",
     ".claude-plugin/",
-    ".codex-plugin/",
-    ".agents/",
-    ".codex/",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"

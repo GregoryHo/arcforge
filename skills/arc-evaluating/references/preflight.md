@@ -50,7 +50,7 @@ A scenario file may include a `## Preflight` section whose body is `skip` to exp
 skip
 ```
 
-`shouldSkipPreflightGate()` (`${ARCFORGE_ROOT}/scripts/lib/eval-preflight.js`) checks for this exact directive, case-insensitive. When present, `arc eval ab` prints `Preflight: skipped by scenario policy (<name>)` and proceeds without checking for a cached PASS record. This exists for non-regression / non-interference scenarios where a ceiling-effect check does not apply. Because it lives in the version-controlled scenario file, bypassing the gate for an existing scenario requires editing and committing that file — visible in code review, unlike a CLI flag.
+`shouldSkipPreflightGate()` (`scripts/lib/eval-preflight.js`) checks for this exact directive, case-insensitive. When present, `arc eval ab` prints `Preflight: skipped by scenario policy (<name>)` and proceeds without checking for a cached PASS record. This exists for non-regression / non-interference scenarios where a ceiling-effect check does not apply. Because it lives in the version-controlled scenario file, bypassing the gate for an existing scenario requires editing and committing that file — visible in code review, unlike a CLI flag.
 
 ## Preflight is Exempt from INSUFFICIENT_DATA (fr-vr-001)
 

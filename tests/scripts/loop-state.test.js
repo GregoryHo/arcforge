@@ -178,17 +178,15 @@ describe('loop-state', () => {
       expect(p.blocked).toEqual([{ id: 'T-9', reason: 'failed after retries' }]);
     });
 
-    it('writes a terminal sentinel that passes the AF-2 loop-sentinel gate (S3-4)', () => {
-      // After finalize, the on-disk sentinel is terminal, so the ratify command
-      // named in the morning notification is NOT denied by the sentinel gate.
-      const { loopSentinelPresent } = require('../../scripts/lib/sdd-utils');
+    it('leaves the state file on disk after finalize (AF-5 resume depends on it)', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';
       finalizeLoop(state, 50, tmpDir);
 
-      // Sentinel exists (resume depends on it) but reads as terminal.
       expect(fs.existsSync(path.join(tmpDir, '.arcforge-loop.json'))).toBe(true);
-      expect(loopSentinelPresent(tmpDir)).toBe(false);
+      const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, '.arcforge-loop.json'), 'utf8'));
+      expect(onDisk.status).toBe('complete');
+      expect(typeof onDisk.finished_at).toBe('string');
     });
   });
 

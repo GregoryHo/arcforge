@@ -228,6 +228,30 @@ function scanR1Paths(file, spans, exists) {
   return findings;
 }
 
+/**
+ * The `--json` output skeleton R3 should validate a span's field promises
+ * against, or null when nothing is pinned for it.
+ *
+ * A command may pin its shape at the top level, or (for commands that dispatch
+ * subcommands, e.g. `worktree list`) on one subcommand. When the top level is
+ * unpinned, the shape is taken from the subcommand the span names — but only
+ * when the span names EXACTLY one pinned subcommand, so an ambiguous span is
+ * skipped rather than validated against a guess.
+ *
+ * @param {Object|undefined} entry - manifest entry for the span's command
+ * @param {string} text - the code span, used to spot a subcommand token
+ * @returns {*} output skeleton, or null when unpinned/ambiguous
+ */
+function resolveOutputShape(entry, text) {
+  if (!entry) return null;
+  if (entry.output !== null && entry.output !== undefined) return entry.output;
+  if (!entry.subcommands) return null;
+  const pinned = Object.entries(entry.subcommands).filter(
+    ([name, sub]) => sub.output != null && new RegExp(`(^|\\s|["'])${name}(\\s|["']|$)`).test(text),
+  );
+  return pinned.length === 1 ? pinned[0][1].output : null;
+}
+
 function scanR2AndR3Cli(file, spans, manifest) {
   const findings = [];
   const commands = manifestCommands();
@@ -267,13 +291,14 @@ function scanR2AndR3Cli(file, spans, manifest) {
     const promise = findJqFieldPromises(text);
     if (promise) {
       const entry = manifest[promise.command];
-      if (entry && entry.output !== null) {
+      const shape = resolveOutputShape(entry, text);
+      if (shape !== null) {
         const anchors = promise.anchors.map((a) => fieldSegments(a));
         for (const field of promise.fields) {
           const segs = fieldSegments(field);
           if (segs.length === 0) continue;
-          const fromRoot = fieldExists(entry.output, segs);
-          const fromAnchor = anchors.some((a) => fieldExists(entry.output, [...a, ...segs]));
+          const fromRoot = fieldExists(shape, segs);
+          const fromAnchor = anchors.some((a) => fieldExists(shape, [...a, ...segs]));
           if (!fromRoot && !fromAnchor) {
             findings.push(
               makeFinding(

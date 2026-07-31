@@ -26,12 +26,11 @@ Analyze multiple diary entries to identify recurring patterns. Save insights to 
 
 ## Infrastructure Commands
 
-**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
+**Set SKILL_ROOT** (fallback default below when unset):
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-reflecting}"
 if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set SKILL_ROOT manually." >&2
   exit 1
 fi
 ```
@@ -167,8 +166,7 @@ For rule violations, additionally:
 3. **Update processed.log** with each analyzed diary (`diary-abc123.md | 2025-01-24 | 2025-01-reflection-1.md`).
 4. For each Pattern, save an instinct:
    ```bash
-   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
+   : "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-reflecting}"
    node "${SKILL_ROOT}/scripts/reflect.js" save-instinct \
      --project {project} \
      --id {pattern-name} \
@@ -180,8 +178,7 @@ For rule violations, additionally:
    ```
 5. **Save a reflection record** so the learning curator has evidence that this reflection happened:
    ```bash
-   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-reflecting}"
+   : "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-reflecting}"
    node "${SKILL_ROOT}/scripts/reflect.js" save-record \
      --project {project} \
      --reflect-id reflect-{id} \

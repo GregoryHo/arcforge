@@ -32,7 +32,7 @@ Once the daemon is running and learning is enabled, the **dashboard** is where a
 
 ### Retired / Deprecated CLI commands
 
-Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI. Under `--project` scope they read/write a project-local queue that the dashboard and curator never touch — informational only, safe to ignore. Under `--global` scope, `review|inbox|inspect|drafts` read the *same* canonical `~/.arcforge/learning/candidates/queue.jsonl` file the curator populates (verify: `getCandidateQueuePath({scope:'global'})` in `${ARCFORGE_ROOT}/scripts/lib/learning.js` resolves to the identical path as the curator's `${ARCFORGE_ROOT}/scripts/lib/learning-curator/queue-writer.js`) and remain read-only informational in that scope; `approve|reject|materialize|activate --global` now throw and refuse to run outright, since they would otherwise rewrite that file wholesale without acquiring the curator's `store.lock` — use the dashboard instead of any legacy subcommand, in either scope.
+Legacy `arcforge learn analyze|review|inbox|approve|reject|materialize|activate|inspect|drafts` subcommands remain in the CLI. Under `--project` scope they read/write a project-local queue that the dashboard and curator never touch — informational only, safe to ignore. Under `--global` scope, `review|inbox|inspect|drafts` read the *same* canonical `~/.arcforge/learning/candidates/queue.jsonl` file the curator populates (verify: `getCandidateQueuePath({scope:'global'})` in `scripts/lib/learning.js` resolves to the identical path as the curator's `scripts/lib/learning-curator/queue-writer.js`) and remain read-only informational in that scope; `approve|reject|materialize|activate --global` now throw and refuse to run outright, since they would otherwise rewrite that file wholesale without acquiring the curator's `store.lock` — use the dashboard instead of any legacy subcommand, in either scope.
 
 Use `--json` on any command when another tool or test needs machine-readable output.
 
@@ -81,12 +81,11 @@ recent observation windows into a batch; (3) it invokes the LLM curator
 proposals; (4) it ingests those proposals into the review queue. The daemon never
 writes instinct `.md` files directly — only the dashboard's activation gate does.
 
-**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
+**Set SKILL_ROOT** (fallback default below when unset):
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-learning}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-learning}"
 if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set SKILL_ROOT manually." >&2
   exit 1
 fi
 ```

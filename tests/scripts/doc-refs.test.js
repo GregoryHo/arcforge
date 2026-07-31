@@ -86,7 +86,7 @@ describe('doc-refs engine (SRH-4)', () => {
     });
 
     test('an undeclared flag for a known command is a finding', () => {
-      const doc = 'Run `arcforge status --bogus-flag`.\n';
+      const doc = 'Run `arcforge learn --bogus-flag`.\n';
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       const r2 = findings.filter((f) => f.rule === 'R2');
       expect(r2).toHaveLength(1);
@@ -94,7 +94,7 @@ describe('doc-refs engine (SRH-4)', () => {
     });
 
     test('a declared flag (incl. subcommand flag) produces nothing', () => {
-      const doc = 'Run `arcforge status --json` and `arcforge worktree add --branch x`.\n';
+      const doc = 'Run `arcforge learn --json` and `arcforge worktree add --branch x`.\n';
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       expect(findings.filter((f) => f.rule === 'R2')).toHaveLength(0);
     });
@@ -108,15 +108,16 @@ describe('doc-refs engine (SRH-4)', () => {
     test('R2 flag validation reads the live manifest, not a hardcoded copy', () => {
       // Sanity: the manifest is the source the engine consults. A flag the
       // manifest declares must pass; one it does not must fail.
-      expect(CLI_MANIFEST.status.flags).toContain('--json');
-      const ok = lintDoc('d.md', 'Run `arcforge status --json`.', ALL_EXIST);
+      expect(CLI_MANIFEST.learn.flags).toContain('--json');
+      const ok = lintDoc('d.md', 'Run `arcforge learn --json`.', ALL_EXIST);
       expect(ok.findings.filter((f) => f.rule === 'R2')).toHaveLength(0);
     });
   });
 
   describe('R3 — --json field promises (against manifest output shapes)', () => {
     test('a field absent from the pinned output shape is a finding', () => {
-      const doc = "Get it: `arcforge status --json | jq '.epics[0].nonexistent_field'`.\n";
+      const doc =
+        "Get it: `arcforge worktree list --json | jq '.worktrees[0].nonexistent_field'`.\n";
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       const r3 = findings.filter((f) => f.rule === 'R3');
       expect(r3.length).toBeGreaterThanOrEqual(1);
@@ -124,15 +125,16 @@ describe('doc-refs engine (SRH-4)', () => {
     });
 
     test('a piped jq selector resolves relative to its array anchor (no false positive)', () => {
-      const doc = '`arcforge status --json | jq -r \'.epics[] | select(.id=="e") | .path\'`\n';
+      const doc =
+        '`arcforge worktree list --json | jq -r \'.worktrees[] | select(.kind=="base") | .path\'`\n';
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
-      // .epics[].path and .epics[].id both exist; .path/.id resolve via the
-      // .epics[] anchor — so NO R3 finding.
+      // .worktrees[].path and .worktrees[].kind both exist; .path/.kind resolve
+      // via the .worktrees[] anchor — so NO R3 finding.
       expect(findings.filter((f) => f.rule === 'R3')).toHaveLength(0);
     });
 
     test('a real top-level field promise produces nothing', () => {
-      const doc = "`arcforge status --json | jq '.blocked'`\n";
+      const doc = "`arcforge worktree list --json | jq '.count'`\n";
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       expect(findings.filter((f) => f.rule === 'R3')).toHaveLength(0);
     });
@@ -207,7 +209,7 @@ describe('doc-refs engine (SRH-4)', () => {
   describe('ignore escape hatch (reason mandatory)', () => {
     test('an ignore directive suppresses the matching rule on its line', () => {
       const doc =
-        'Run `arcforge status --bogus`. <!-- doc-ref-lint: ignore R2 example flag for docs -->\n';
+        'Run `arcforge learn --bogus`. <!-- doc-ref-lint: ignore R2 example flag for docs -->\n';
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       expect(findings.filter((f) => f.rule === 'R2')).toHaveLength(0);
     });
@@ -228,7 +230,7 @@ describe('doc-refs engine (SRH-4)', () => {
     });
 
     test('a reason-less ignore directive is itself a finding', () => {
-      const doc = 'Run `arcforge status --bogus`. <!-- doc-ref-lint: ignore R2 -->\n';
+      const doc = 'Run `arcforge learn --bogus`. <!-- doc-ref-lint: ignore R2 -->\n';
       const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
       const ig = findings.filter((f) => f.rule === 'ignore');
       expect(ig).toHaveLength(1);
@@ -262,7 +264,7 @@ describe('doc-refs engine (SRH-4)', () => {
     test('R3 mutation: promised --json field that is not in the shape', () => {
       const { findings } = lintDoc(
         'docs/guide/x.md',
-        "`arcforge status --json | jq '.epics[0].ghost'`",
+        "`arcforge worktree list --json | jq '.worktrees[0].ghost'`",
         probes,
       );
       expect(rulesOf(findings)).toEqual(['R3']);
@@ -278,8 +280,8 @@ describe('doc-refs engine (SRH-4)', () => {
   describe('helpers', () => {
     test('findCliInvocations strips quotes and resolves the command token', () => {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: literal blessed-invocation form the linter must parse
-      const inv = findCliInvocations('node "${ARCFORGE_ROOT}/scripts/cli.js" status --json');
-      expect(inv).toEqual([{ command: 'status', flags: ['--json'] }]);
+      const inv = findCliInvocations('node "${ARCFORGE_ROOT}/scripts/cli.js" learn --json');
+      expect(inv).toEqual([{ command: 'learn', flags: ['--json'] }]);
     });
 
     test('fieldExists walks array element shapes', () => {

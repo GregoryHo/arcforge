@@ -140,7 +140,7 @@ outputContext('You have arcforge skills available...', 'SessionStart');
 
 **What happens**: The text is injected into Claude's context as `additionalContext`. Claude sees it as part of its instructions. The user does NOT see it directly.
 
-**Available on**: SessionStart, UserPromptSubmit, and PostToolUse (PostToolUse spike-verified on Claude Code v2.1.172, including Task-subagent tool calls; rendered to the model as "PostToolUse:<Tool> hook additional context: <text>"). Other events ignore this field. For PostToolUse, use `outputPostToolUseFeedback(reason, { systemMessage })` from `scripts/lib/utils.js` (see `hooks/arc-remind/main.js` for a working example) — the plain `outputContext` helper is scoped to SessionStart/UserPromptSubmit.
+**Available on**: SessionStart, UserPromptSubmit, and PostToolUse (PostToolUse spike-verified on Claude Code v2.1.172, including Task-subagent tool calls; rendered to the model as "PostToolUse:<Tool> hook additional context: <text>"). Other events ignore this field. For PostToolUse, use `outputPostToolUseFeedback(reason, { systemMessage })` from `scripts/lib/utils.js` — the plain `outputContext` helper is scoped to SessionStart/UserPromptSubmit.
 
 **Use for**: Injecting skill information, active instincts, pending action notifications.
 
@@ -210,18 +210,13 @@ In `hooks.json`:
 
 | Event | Hook | Sync/Async | Purpose |
 |-------|------|-----------|---------|
-| SessionStart | inject-skills | sync | Inject minimal ArcForge bootstrap context into Claude |
-| SessionStart | inject-context | sync | Inject active instincts + pending actions |
+| SessionStart | session-tracker/inject-context | sync | Inject active instincts + pending actions |
 | SessionStart | session-tracker/start | async | Initialize session file, run decay |
 | UserPromptSubmit | user-message-counter | sync | Count user prompts |
+| PreToolUse | secrets-guard | sync | Block writes that would commit a secret |
 | PreToolUse | observe | async | Record tool call to observations |
-| PreToolUse | arc-guard | sync | Block Worktree Rule violations (raw git merge/loop in epic cwd) and locked research-config.md edits |
-| PreToolUse | sdd-ledger-guard | sync | Enforce append-only immutability on specs/<id>/decisions.yml |
-| PreToolUse | sdd-ratify-guard | sync | Deny arcforge ratify while an autonomous loop is live |
-| PostToolUse | quality-check | sync | Auto-format, type-check, console.log warn |
-| PostToolUse | observe | async | Record tool result |
 | PostToolUse | compact-suggester | sync | Suggest /compact at threshold |
-| PostToolUse | arc-remind | sync | User-facing nudges: verify/review before PR, prefer CLI worktree add, eval-before-ship, branch-before-edit |
+| PostToolUse | observe | async | Record tool result |
 | PreCompact | pre-compact | sync | Log compaction, update session |
 | Stop | session-tracker/end | sync | Update session, generate diary |
 
@@ -258,7 +253,7 @@ assert.ok(result.stdout.includes('systemMessage'));
 
 ### Eval (behavioral verification)
 
-For hooks that inject context into Claude (inject-skills, inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. See `evals/scenarios/eval-sessionstart-minimal-bootstrap.md` for a current-format SessionStart example.
+For hooks that inject context into Claude (session-tracker/inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. See `evals/scenarios/eval-sessionstart-minimal-bootstrap.md` for a current-format SessionStart example.
 
 ## Common Mistakes
 

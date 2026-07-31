@@ -84,12 +84,6 @@ function Hero({
       textTransform: 'uppercase'
     }
   }, /*#__PURE__*/React.createElement("a", {
-    href: "#pipeline",
-    style: {
-      color: 'inherit',
-      textDecoration: 'none'
-    }
-  }, "Pipeline"), /*#__PURE__*/React.createElement("a", {
     href: "#skills",
     style: {
       color: 'inherit',

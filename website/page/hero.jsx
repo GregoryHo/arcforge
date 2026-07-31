@@ -20,7 +20,6 @@ function Hero({theme}) {
           <span style={{color:t.dim,marginLeft:6}}>v5.0.0</span>
         </div>
         <div className="af-nav-links" style={{display:'flex',gap:28,color:t.dim,textTransform:'uppercase'}}>
-          <a href="#pipeline" style={{color:'inherit',textDecoration:'none'}}>Pipeline</a>
           <a href="#skills" style={{color:'inherit',textDecoration:'none'}}>Skills</a>
           <a href="#hooks" style={{color:'inherit',textDecoration:'none'}}>Hooks</a>
           <a href="#platforms" style={{color:'inherit',textDecoration:'none'}}>Platforms</a>

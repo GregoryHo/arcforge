@@ -23,12 +23,11 @@ Save patterns and insights from the current session as instincts. This skill bri
 
 ## Infrastructure Commands
 
-**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
+**Set SKILL_ROOT** (fallback default below when unset):
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-recalling}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-recalling}"
 if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set SKILL_ROOT manually." >&2
   exit 1
 fi
 ```
@@ -51,8 +50,7 @@ fi
 6. **Save record** of the recall operation so the learning curator has evidence
    that this recall happened:
    ```bash
-   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-recalling}"
+   : "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-recalling}"
    node "${SKILL_ROOT}/scripts/recall.js" save-record \
      --project {project} \
      --recall-id recall-{id} \

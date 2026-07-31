@@ -43,7 +43,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 // Shipped prose surfaces a CLI command should be referenced from. Markdown
 // only — code files invoke commands via the engine, not by name in prose.
-const SCAN_DIRS = ['skills', 'docs/guide', 'templates', 'agents'];
+const SCAN_DIRS = ['skills', 'docs/guide'];
 
 // Commands intentionally exempt from the zero-consumer check. Mirrors the
 // `doc-ref-lint: ignore` precedent. Shipped EMPTY — add an entry only with a
@@ -51,7 +51,7 @@ const SCAN_DIRS = ['skills', 'docs/guide', 'templates', 'agents'];
 const ALLOWLIST = new Set([]);
 
 // Flipped to true at v4.0.1: the SDD-6 migration wired sdd-gate's consumers
-// (arc-refining + arc-planning), so a zero-consumer command now fails the check.
+// so a zero-consumer command now fails the check.
 const GATING = true;
 
 /** Recursively collect *.md files under a directory (skips node_modules + dotdirs). */

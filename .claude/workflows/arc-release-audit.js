@@ -180,19 +180,19 @@ Return JSON {markdown: "<the section, starting at the ## header>"}.`,
 const AXES = [
   {
     key: 'install-surface',
-    prompt: `Audit arcforge's two install-surface files (READ-ONLY): .codex/INSTALL.md, docs/README.codex.md.
-Flag, with the exact file: (1) hardcoded skill/symlink/agent COUNTS that drift across releases (e.g. "24 symlinks") — should be invariants; (2) stale path references; (3) install commands that look broken; (4) uneven Windows shell variants within the Codex docs (usually real drift; a missing Codex Tool-Mapping table is intentional — do not flag that). Return JSON per schema (empty findings is a valid result).`,
+    prompt: `Audit arcforge's install surface (READ-ONLY): the Installation section of README.md.
+Flag, with the exact file: (1) hardcoded skill/agent COUNTS that drift across releases (e.g. "24 skills") — should be invariants; (2) stale path references; (3) install commands that look broken. Return JSON per schema (empty findings is a valid result).`,
   },
   {
     key: 'stale-patterns',
-    prompt: `Search arcforge shipped surface (skills/, docs/guide/, .claude-plugin/, hooks/, commands/, agents/, templates/) for stale strings (READ-ONLY).
+    prompt: `Search arcforge shipped surface (skills/, docs/guide/, .claude-plugin/, hooks/, scripts/) for stale strings (READ-ONLY).
 Specifically: (1) the OLD version string "${prevVersion}" hardcoded anywhere outside canonical version locations; (2) references to removed/renamed helpers or deprecated paths. Use \`grep -rn\`. Do NOT flag: docs/plans/*, .claude/rules/*, or tests that deliberately blacklist an old pattern (those SHOULD keep the old string). Return JSON per schema.`,
   },
   {
     key: 'version-locations',
-    prompt: `Verify the 9 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
-package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), .codex-plugin/plugin.json (version), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
-For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ .codex-plugin/ README.md website/page/\` and note the hit count. Return JSON per schema.`,
+    prompt: `Verify the 8 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
+package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
+For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ README.md website/page/\` and note the hit count. Return JSON per schema.`,
   },
 ];
 

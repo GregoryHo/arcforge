@@ -175,21 +175,35 @@ function validateTaskList(content) {
   return parsed;
 }
 
+/** Default indent for a detail bullet the writer has to create from scratch. */
+const DEFAULT_DETAIL_INDENT = '  ';
+
 /**
  * Set one task's status, preserving the rest of the file byte for byte.
+ *
+ * `note` exists so a writer that blocks a task can state the reason in the same
+ * call: `validateTaskList` REQUIRES a `note:` on every `[!]` task, so a status
+ * write with no way to attach a reason would produce a file its own validator
+ * rejects. Passing a note replaces the task's existing `note:` bullet if it has
+ * one, and otherwise inserts one directly below its detail block.
  *
  * @param {string} content
  * @param {string} id task id, e.g. 'T3'
  * @param {string} status one of TASK_STATUSES
+ * @param {string} [note] reason to record as the task's `note:` detail bullet
  * @returns {string} updated content
- * @throws {Error} on an unknown status or an id that is not in the list
+ * @throws {Error} on an unknown status, an id that is not in the list, or a
+ *   note that is not a non-empty string
  */
-function updateTaskStatus(content, id, status) {
+function updateTaskStatus(content, id, status, note) {
   if (typeof id !== 'string' || !id.trim()) {
     throw new TypeError('updateTaskStatus requires a non-empty task id');
   }
   if (!STATUS_TO_MARKER.has(status)) {
     fail(`unknown status "${status}"; expected one of ${TASK_STATUSES.join(', ')}`);
+  }
+  if (note !== undefined && (typeof note !== 'string' || !note.trim())) {
+    throw new TypeError('updateTaskStatus note must be a non-empty string when provided');
   }
 
   const parsed = parseTaskList(content);
@@ -203,6 +217,30 @@ function updateTaskStatus(content, id, status) {
   const lines = content.split('\n');
   const idx = target.line - 1;
   lines[idx] = lines[idx].replace(/\[(.?)\]/, `[${marker}]`);
+  if (note === undefined) return lines.join('\n');
+
+  // A note is one line by construction — the grammar has no continuation, so a
+  // multi-line reason would parse as an orphan bullet or silent prose.
+  const text = note.trim().replace(/\s+/g, ' ');
+
+  // Walk the task's detail block (the run of indented `- key: value` bullets
+  // directly below it) to find an existing note and the block's end.
+  let end = idx + 1;
+  let noteLine = -1;
+  let indent = null;
+  while (end < lines.length) {
+    const detail = lines[end].match(DETAIL_LINE_RE);
+    if (!detail) break;
+    if (indent === null) indent = lines[end].slice(0, lines[end].indexOf('-'));
+    if (detail[1] === 'note') noteLine = end;
+    end++;
+  }
+
+  if (noteLine !== -1) {
+    lines[noteLine] = lines[noteLine].replace(/note:.*$/, `note: ${text}`);
+  } else {
+    lines.splice(end, 0, `${indent ?? DEFAULT_DETAIL_INDENT}- note: ${text}`);
+  }
   return lines.join('\n');
 }
 

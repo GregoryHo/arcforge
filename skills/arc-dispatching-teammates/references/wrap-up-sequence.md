@@ -78,10 +78,7 @@ lists user options — you don't execute them.
 
 From the project root (NOT from inside a teammate's worktree):
 
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <epic-id-1> <epic-id-2> ...
-```
+Remove the accepted epics' worktrees from the project root.
 
 Pass only epic IDs whose acceptance check passed. The CLI's
 `cleanupWorktrees()` with explicit `epicIds` bypasses the default
@@ -116,9 +113,8 @@ teammate's test output, or manually revert the commits on the dev
 branch. The final report already tells them which worktrees were
 retained and where.
 
-If the user later decides to discard a failed epic, they can run
-cleanup manually — `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <failed-epic-id>`
-from the project root.
+If the user later decides to discard a failed epic, they can remove its
+worktree manually from the project root.
 
 ## 8c — Shut down teammates, then `TeamDelete`
 
@@ -165,39 +161,3 @@ still running. If you see this error:
 3. If the teammate is genuinely still running (probably a retry that
    hasn't finished), you should not be at Step 8 yet — go back to
    Step 5 (monitor) and wait for terminal state.
-
-## Known limitation: dag.yaml is race-prone during active dispatch
-
-dag.yaml is a shared mutable file in the base worktree. During an
-active dispatch, it can be read/written by:
-
-- The lead (editing status, adding epics, etc.)
-- Each teammate's `arcforge sync --direction to-base`
-- Each teammate's `arcforge merge` (via the Coordinator)
-- `arcforge expand` for queued epics
-- `arcforge cleanup` at wrap-up
-
-The `_dagTransaction` helper serializes Coordinator-to-Coordinator races
-via file locking. But it does **NOT** protect against:
-
-1. **Lead editing dag.yaml directly in a text editor** while a
-   Coordinator write is in flight. The text editor doesn't know about
-   the lock file.
-2. **Non-Coordinator scripts** that write dag.yaml directly (e.g., a
-   custom hook that updates status via `fs.writeFileSync`).
-
-These dag.yaml conflicts during expand/cleanup/lead-edit interplay are
-resolvable but can surprise a lead who doesn't expect the file to be a
-shared concurrent resource.
-
-### Practical advice for the lead
-
-- **Avoid manually editing dag.yaml while teammates are actively
-  finishing.** If you need to change a status, use `arcforge` CLI
-  commands (which go through the Coordinator and respect the lock).
-- **If you must hand-edit**, save, then immediately run
-  `arcforge status` to verify the file parses correctly. A malformed
-  dag.yaml will break every subsequent Coordinator operation.
-- **During the monitoring phase (Step 5)**, the lead's main
-  interaction with the dag is read-only (`arcforge status --json`).
-  Reads are safe and don't race.

@@ -1,6 +1,6 @@
 ---
 name: arc-dispatching-teammates
-description: Run epic-level parallel work via agent teammates while staying present to monitor. Use when dag.yaml has 2+ ready epics and you want a live team; for walk-away loops use arc-looping, for feature fan-out use arc-dispatching-parallel.
+description: Run epic-level parallel work via agent teammates while staying present to monitor. Use when 2+ epics are ready and you want a live team; for walk-away loops use arc-looping, for feature fan-out use arc-dispatching-parallel.
 category: orchestration
 status: promoted
 ---
@@ -20,20 +20,18 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 | Condition | Route to |
 |---|---|
 | 2+ ready epics, lead staying present ("I'll watch", "step in if needed") | **arc-dispatching-teammates** (this skill) |
-| 2+ ready epics, lead walking away ("overnight", "going to bed") | arc-looping `--pattern dag` |
-| 1 ready epic | arc-coordinating expand + arc-implementing |
+| 2+ ready epics, lead walking away ("overnight", "going to bed") | arc-looping |
+| 1 ready epic | arc-using-worktrees + arc-executing-tasks |
 | Feature-level parallelism inside one worktree | arc-dispatching-parallel |
-| No `specs/<spec-id>/dag.yaml` | arc-planning first |
 
 **The boundary vs arc-looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still arc-looping.
 
 **REQUIRED BACKGROUND:** arc-using — call it if routing context is needed.
-**REQUIRED PRECEDENT:** arc-planning must have produced `specs/<spec-id>/dag.yaml`.
 
 ## Preconditions
 
-1. **2+ ready epics** — `arcforge status --json` shows epics with `status: pending`, `worktree: null`, deps completed. If < 2, skill does not apply.
-2. **Single spec.** Cross-spec ready epics → report blocked, user picks with `--spec-id <id>`.
+1. **2+ ready epics** — epics with no worktree yet and no unfinished dependency. If < 2, skill does not apply.
+2. **One coherent scope.** Ready epics spanning unrelated scopes → report blocked, let the user pick.
 3. **Agent tool supports `team_name` and `name`.** If dispatch errors with "unknown parameter team_name", report blocked.
 4. **Lead is in project root**, not a worktree. Move to base worktree if `.arcforge-epic` is in cwd.
 5. **On a dev branch, not `main`/`master`.** Teammates merge back to the lead's branch. If on `main`/`master`, create one first: `git switch -c dispatch/<spec-id>-$(date +%Y-%m-%d)`. If the user named a branch, or the lead is already off the default, use that — never override an explicit choice.
@@ -42,15 +40,15 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 ## Core Workflow
 
-1. **Identify ready epics.** From `arcforge status --json`, collect every epic with `status: pending` and `worktree: null`. Call this set R.
+1. **Identify ready epics.** Collect every epic that has no worktree yet and no unfinished dependency. Call this set R.
 
 2. **Cap team size at 5 (default).** If `|R| > 5`, take the first 5 as the initial team and queue the rest. ≤5 teammates is Anthropic's documented best practice; beyond 5 coordination overhead exceeds benefit. Honor a higher cap only when the user explicitly asks for one.
 
 3. **`TeamCreate` BEFORE any Agent dispatch.** Use a descriptive name like `dispatch-<project>-<timestamp>`. Per [Agent Teams docs](https://code.claude.com/docs/en/agent-teams), passing `team_name` to Agent does NOT auto-create — it triggers a state-sync bug.
 
 4. **Expand worktrees and dispatch teammates in parallel.** For each epic in the initial 5:
-   - `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` from the project root — creates the canonical worktree and stamps `.arcforge-epic`. Per-epic, not batch.
-   - Read the absolute worktree path from `arcforge status --json`; do not reconstruct it.
+   - Create the epic's worktree from the project root — per-epic, not batch — and stamp it with an `.arcforge-epic` marker naming the epic and spec id.
+   - Read the absolute worktree path back from `git worktree list`; do not reconstruct it.
    - Dispatch via Agent with `team_name=<team>`, `name=worker-<epic-id>`, spawn prompt from `references/spawn-prompt-template.md`.
 
    **Parallel, not sequential** — documented good pattern. If some spawns fail with `Failed to create teammate pane`, you hit [GH #40168](https://github.com/anthropics/claude-code/issues/40168); retry those sequentially. See `references/tmux-timing-race.md`.
@@ -59,8 +57,8 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 
 6. **Acceptance check (per teammate completion) — delegate, do NOT inline.** The lead dispatches two subagents with fresh context; the lead does NOT locate code or run tests itself. When a teammate reports done:
 
-   - **Spec compliance** — `Agent(subagent_type='arcforge:spec-reviewer')` with `specs/<spec-id>/epics/<epic-id>/epic.md` and its `features/*.md` attached (name `<spec-id>` in the prompt). It locates every acceptance criterion in the merged dev branch and returns PASS/FAIL with file:line evidence.
-   - **Fresh-eyes verification** — `Agent(subagent_type='arcforge:verifier')` with the project test command. It runs tests from an empty context and returns raw output.
+   - **Acceptance-criteria compliance** — a fresh-context subagent with the epic's acceptance criteria attached. It locates every criterion in the merged dev branch and returns PASS/FAIL with file:line evidence.
+   - **Fresh-eyes verification** — a fresh-context subagent with the project test command. It runs tests from an empty context and returns raw output.
 
    Both PASS → accept. Either FAIL → Step 7 **unless** the FAIL is a spec defect (spec references wrong file/path, not an impl gap) — see `references/acceptance-and-retry.md` override-accept protocol. **Subagents ARE the gate** — running either check inline defeats the purpose. The lead's job is to READ the reports and decide, not execute the checks.
 
@@ -71,7 +69,7 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 7. **Retry loop (on rejection).** Up to **3 retries per epic** (max 4 total attempts). On rejection:
    - Shut down the rejected teammate's session (reclaim the pane).
    - Formulate feedback naming the failed criterion, quoting spec text verbatim, stating current-vs-required behavior.
-   - `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>` — fresh worktree, fix-forward from current dev HEAD.
+   - Create a fresh worktree for the epic, fix-forward from current dev HEAD.
    - Dispatch `worker-<epic-id>-retry<N>` using `references/spawn-prompt-template.md` with a prepended `## Previous Attempt Feedback` section (cumulative).
    - Track retry count in session memory. Retry 3 also fails → mark **permanently failed**, record reason for Step 8.
 
@@ -80,12 +78,12 @@ Precondition failure = hard fail. Do not silently fall back to arc-looping or ma
 8. **Wrap up (three actions, in order).** When every epic reaches a terminal state:
 
    - **8a.** Emit the Final Report (format in `references/wrap-up-sequence.md` §8a). The dev branch IS the deliverable — do NOT auto-merge to main or revert failed epics. Those are user decisions.
-   - **8b.** Clean up **accepted** worktrees from the project root: `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" cleanup <accepted-epic-id-1> <accepted-epic-id-2> ...`. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT call cleanup from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
+   - **8b.** Clean up **accepted** worktrees from the project root. The merge commits are already on the dev branch; the worktrees are orphaned scaffolding. **Skip** permanently failed epics — the user may need their worktree to debug. Do NOT clean up from inside a teammate's worktree — per Agent Teams docs, teammates should not run cleanup.
    - **8c.** Shut down any remaining teammates (most already down from Steps 6/7), then call `TeamDelete`. See `references/wrap-up-sequence.md` for ordering and failure handling.
 
 ## Spawn Prompt Template
 
-Lives in `references/spawn-prompt-template.md` with three sections: **Your Authority** (autonomous end-to-end execution grant), **Your Workspace** (cd + invoke `/arc-implementing`), **Coordination** (SendMessage-only). Read that file before dispatching, fill in `<epic-id>` and `<absolute-worktree-path>`, paste into each Agent call. Teammate plain text is invisible to the lead — SendMessage is the only channel.
+Lives in `references/spawn-prompt-template.md` with three sections: **Your Authority** (autonomous end-to-end execution grant), **Your Workspace** (cd into the worktree and start executing), **Coordination** (SendMessage-only). Read that file before dispatching, fill in `<epic-id>` and `<absolute-worktree-path>`, paste into each Agent call. Teammate plain text is invisible to the lead — SendMessage is the only channel.
 
 ## Red Flags
 
@@ -100,9 +98,8 @@ Rationalizations observed in baseline testing. If you catch yourself saying any 
 - **"I'm on `main`, dispatching from here is fine."** No — teammates merge back to the lead's branch. Create a dev branch first (Precondition 5).
 - **"Parallel burst hit `Failed to create teammate pane` — downscale the team."** No. You hit GH #40168. Retry the failed spawns sequentially. See `references/tmux-timing-race.md`.
 - **"I need to tell teammates which shared files to avoid."** No. Let conflicts happen; arc-finishing escalates them via the Merge Conflict (Multi-Teammate) path. Static prediction is over-engineering.
-- **"Pin arcforge version inline: `ARCFORGE_ROOT=... node "${ARCFORGE_ROOT}/scripts/cli.js"`."** POSIX footgun — `"${VAR}"` expands before the inline assignment, resolving to the *old* value. `export ARCFORGE_ROOT=...` on its own line first, then the blessed form.
-- **"I already know what this epic does — I'll skip the spec-reviewer and just map test names to ACs."** This is the qmd baseline failure verbatim. The lead's prior context is precisely what makes inline acceptance unreliable. Always dispatch `arcforge:spec-reviewer` per Step 6; it has fresh context and cannot rationalize.
-- **"The teammate already ran tests green — running verifier is redundant."** Same mistake. The verifier runs from an empty context; "redundant" is the rationalization that skips the gate. Dispatch `arcforge:verifier` per Step 6.
+- **"I already know what this epic does — I'll skip the acceptance subagent and just map test names to ACs."** This is the qmd baseline failure verbatim. The lead's prior context is precisely what makes inline acceptance unreliable. Always dispatch the acceptance subagent per Step 6; it has fresh context and cannot rationalize.
+- **"The teammate already ran tests green — running the verification subagent is redundant."** Same mistake. It runs from an empty context; "redundant" is the rationalization that skips the gate. Dispatch it per Step 6.
 - **"I'll close tmux panes manually later, skip `TeamDelete`."** Without TeamDelete, panes orphan and the team's runtime state lingers across sessions. Step 8c is not optional.
 
 ## Completion Formats
@@ -125,7 +122,7 @@ and decide what to do with the dev branch.
 
 See `references/wrap-up-sequence.md` (§8a) for the full Final Report example.
 
-Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). Missing = Step 6 was skipped. Failed epics show the last subagent FAIL and are NOT auto-cleaned. "Next actions" lists user options — you don't execute them.
+Each accepted epic MUST show subagent evidence (both acceptance subagents PASS). Missing = Step 6 was skipped. Failed epics show the last subagent FAIL and are NOT auto-cleaned. "Next actions" lists user options — you don't execute them.
 
 ## Blocked Format
 
@@ -133,11 +130,11 @@ Each accepted epic MUST show subagent evidence (spec-reviewer + verifier PASS). 
 ⚠️ Teammate dispatch: blocked
 - Issue: <precondition that failed, e.g. only 1 ready epic, Agent team_name unsupported>
 - Checked: <exact command or tool invocation>
-- Action: <remediation — e.g. arc-coordinating for 1 epic, enable teammates, or fall back to arc-looping>
+- Action: <remediation — e.g. enable teammates, or fall back to arc-looping>
 ```
 
 ## After This Skill
 
-- **Each teammate** hands off to `arc-finishing` (Step 0 selects the epic path) as part of `/arc-implementing`.
-- **Lead session** dispatches `arcforge:spec-reviewer` + `arcforge:verifier` per Step 6 on each completion; does NOT run `arc-verifying` inline.
+- **Each teammate** hands off to `arc-finishing` when its epic is done.
+- **Lead session** dispatches the two acceptance subagents per Step 6 on each completion; does NOT run `arc-verifying` inline.
 - **Blocked teammates** → route to `arc-debugging` on the specific epics. Do not auto-retry.

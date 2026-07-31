@@ -30,7 +30,7 @@ Three modes (Ingest, Query, Audit) with PROPAGATE as the key differentiator. [De
 
 ![arc-dispatching-teammates flow](../assets/arc-dispatching-teammates-flow.png)
 
-Three numbered stages (Dispatch, Accept, Deliver) with AND-gated acceptance — both spec-reviewer and verifier must PASS from fresh context before merge to the dev branch. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Dispatching-Teammates)
+Three numbered stages (Dispatch, Accept, Deliver) with AND-gated acceptance — both acceptance subagents must PASS from fresh context before merge to the dev branch. [Deep dive →](https://publish.obsidian.md/greghodev/ArcForge/ArcForge-Skill-Arc-Dispatching-Teammates)
 
 ## Local Docs
 
@@ -39,4 +39,3 @@ These files are kept in-repo as raw source material for the wiki:
 - **Guides**: `guide/eval-system.md`, `guide/composable-skill-eval-coverage.md`, `guide/hooks-system.md`, `guide/worktree-workflow.md`, `guide/skills-reference.md`, `guide/learning-dashboard.md`
 - **Designs**: `plans/` — architecture decision records
 - **Research**: `research/` — landscape analysis and experiment baselines
-- **Platform Install**: `README.codex.md`

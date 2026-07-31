@@ -42,7 +42,7 @@ Use words Claude would search for:
 | `arc-<acronym>` | Well-known abbreviation | `arc-tdd` |
 
 **Avoid:**
-- Agent-nouns: `arc-coordinator` → `arc-coordinating` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
+- Agent-nouns: `arc-reviewer` → `arc-reviewing` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
 - Bare verbs: `arc-debug` → `arc-debugging` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
 - Noun-first: `arc-task-writer` → `arc-writing-tasks` <!-- doc-ref-lint: ignore R4 deliberately-wrong naming anti-pattern shown for teaching, not a skill reference -->
 
@@ -54,7 +54,7 @@ Skills use progressive disclosure — not everything loads at once:
 |-------|-----------|------|------------|
 | **1. Description** | `name` + `description` frontmatter | Always in context | ~100 tokens per skill |
 | **2. SKILL.md body** | Full markdown content | On skill invocation | 500–4,000 tokens |
-| **3. References** | Files in `references/`, `agents/`, etc. | On-demand when agent reads them | Zero until needed |
+| **3. References** | Files in `references/`, etc. | On-demand when agent reads them | Zero until needed |
 
 **Keep SKILL.md lean and high-signal. Move detail to references.**
 

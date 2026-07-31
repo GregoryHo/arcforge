@@ -23,6 +23,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSession } = require('../../scripts/lib/loop-session');
 const { runLoop } = require('../../scripts/loop');
+const { validateTaskList } = require('../../scripts/lib/task-list');
 
 const BANNER =
   '> arcforge task list v1 — `[ ]` pending, `[~]` in-progress, `[x]` done, `[!]` blocked';
@@ -186,24 +187,36 @@ describe('runLoop over a task list', () => {
     expect(state.completed_tasks).toEqual(['T1', 'T2']);
   });
 
-  it('resumes over a list it blocked itself (a loop-written [!] has no note:)', () => {
+  it('writes a note: when it blocks a task, so its own output still validates', () => {
     writeTasks('- [ ] T1 — Doomed\n- [ ] T2 — Later\n');
     spawnSession.mockReturnValue({ exitCode: 1, stdout: '', stderr: 'boom', costUsd: 0 });
     runLoop(options());
-    expect(readTasks()).toContain('- [!] T1');
+    const afterFirst = readTasks();
+    expect(afterFirst).toContain('- [!] T1');
+    // The reason is recorded, not just the marker — that is what keeps the
+    // file valid rather than making the loop swallow its own validation rule.
+    expect(afterFirst).toMatch(/- note: .*boom/);
+    expect(() => validateTaskList(afterFirst)).not.toThrow();
 
     // Second run over the loop's own output must start, not die on the
-    // blocked-with-no-note rule (see validateTaskListForRun).
+    // blocked-with-no-note rule.
     spawnSession.mockReturnValue({ exitCode: 0, stdout: '', stderr: '', costUsd: 0 });
     const state = runLoop(options());
 
     expect(state.completed_tasks).toContain('T2');
   });
 
-  it('still rejects a duplicate id when the blocked-note rule was swallowed', () => {
-    // The block-note swallow must not let later semantic rules through: a
-    // duplicate id would make updateTaskStatus mark the wrong task.
-    writeTasks('- [!] T1 — Blocked by a prior run\n- [ ] T2 — Work\n- [ ] T2 — Same id\n');
+  it('refuses to start on a hand-written [!] with no note: (rule is fatal again)', () => {
+    writeTasks('- [!] T1 — Blocked by a human\n- [ ] T2 — Work\n');
+
+    expect(() => runLoop(options())).toThrow(/blocked with no "note:"/);
+    expect(spawnSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duplicate id before spawning anything', () => {
+    // updateTaskStatus resolves an id to its first match, so a duplicate would
+    // make the loop mark the wrong task.
+    writeTasks('- [ ] T1 — Work\n- [ ] T2 — Work\n- [ ] T2 — Same id\n');
 
     expect(() => runLoop(options())).toThrow(/duplicate task id T2/);
     expect(spawnSession).not.toHaveBeenCalled();

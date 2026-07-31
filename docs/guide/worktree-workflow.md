@@ -61,14 +61,14 @@ base_branch: main                # The branch expand was launched from
 local:
   status: in_progress            # pending | in_progress | completed | blocked
   started_at: 2026-04-10T...Z
-synced: null                     # Populated by arc-coordinating sync
+synced: null                     # Populated by the sync step
 ```
 
 **Key facts:**
 
 - The file is authored by `coordinator.js` during `expand`; do **not** write
   it by hand.
-- `arc-coordinating sync` uses it to find the base DAG (`base_worktree`) and
+- The sync step uses it to find the base DAG (`base_worktree`) and
   to carry local status back to it.
 - If the file is missing, the directory is not an arcforge worktree even if
   it lives under `~/.arcforge/worktrees/`.
@@ -78,8 +78,8 @@ synced: null                     # Populated by arc-coordinating sync
 
 ## Cleanup Semantics
 
-Worktrees are removed via `arcforge cleanup` (or `arc-coordinating cleanup`),
-which delegates to `git worktree remove <absolute-path>`.
+Worktrees are removed via the CLI, which delegates to
+`git worktree remove <absolute-path>`.
 
 - The helper-computed path is always the source of truth — the coordinator
   resolves it via `getWorktreePath(projectRoot, specId, epicId)` before
@@ -152,13 +152,10 @@ definition, the managed-but-markerless case.
 Because a generic worktree has no `.arcforge-epic` marker, the
 coordinator's DAG machinery cannot see it and never touches it:
 
-- `arc-coordinating sync` keys off marker files, so a generic worktree is
+- The sync step keys off marker files, so a generic worktree is
   skipped — its progress is never carried into any `dag.yaml`.
 - `_findBaseWorktree` / `arcforge merge` walk the worktree list and reason
   only over base + epic entries; the generic one is inert to them.
-- `arc-guard`'s worktree rules self-gate on the marker, so raw `git merge`
-  or a loop launch inside a generic worktree is **not** blocked — it is the
-  user's own business, not coordinator territory.
 
 This is the build-time seam fix: a generic worktree is invisible to epic
 tooling by construction, not by special-casing.
@@ -260,7 +257,7 @@ cd "$(arcforge status --json | jq -r '.epics[] | select(.id=="epic-auth") | .pat
 # 4. 檢查依賴
 arcforge sync --direction from-base
 
-# 5. 開始實作（使用 arc-implementing）
+# 5. 開始實作
 ```
 
 ### 情境 2：完成 Epic / Finishing an epic
@@ -329,7 +326,7 @@ worktree whose base has been moved, or the base checkout was removed. Run
 
 ### Worktree directory exists but `.arcforge-epic` is missing
 This happens when someone ran `git worktree add ~/.arcforge/worktrees/...`
-by hand. The directory is invisible to `arc-coordinating sync` (which keys
+by hand. The directory is invisible to the sync step (which keys
 off marker files). Either delete it with `git worktree remove` and re-run
 `arcforge expand`, or recreate the marker manually by copying from another
 worktree — but the correct fix is always to use the CLI.

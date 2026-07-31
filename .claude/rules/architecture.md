@@ -20,11 +20,12 @@ No external runtime dependencies — Node.js standard library only.
 | `skills/` | Self-contained markdown (+ skill-local scripts) | N/A |
 | `docs/` | Design docs, guides, plans | N/A |
 
-**Exception:** the learning dashboard control plane (an HTTP server plus inline
-HTML — `scripts/lib/learning-dashboard-http.js` and
-`scripts/lib/learning-dashboard.html`) lives in `scripts/lib/` as an intentional
-exception to the engine-only role. It is a local review/control surface, but it
-ships in the canonical lib directory.
+**Exception:** two local dashboard control planes (HTTP server + inline HTML)
+live in `scripts/lib/` as intentional exceptions to the engine-only role —
+the learning dashboard (`scripts/lib/learning-dashboard-http.js` +
+`scripts/lib/learning-dashboard.html`) and the eval dashboard
+(`scripts/lib/eval-dashboard/`). They are local review/control surfaces, but
+they ship in the canonical lib directory.
 
 ## Canonical Source Rule
 

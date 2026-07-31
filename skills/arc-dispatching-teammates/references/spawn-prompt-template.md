@@ -5,7 +5,7 @@ SKILL.md references this file — do not duplicate the template there.
 
 ## Why the Authority section exists
 
-A terse spawn prompt (`"cd to X, invoke /arc-implementing, SendMessage on
+A terse spawn prompt (`"cd to X, invoke /arc-agent-driven, SendMessage on
 completion"`) is not enough: without an explicit grant of autonomous
 end-to-end execution authority, a teammate can stop after an early phase
 and wait for the lead to dispatch the next one.
@@ -27,7 +27,7 @@ Per teammate, the lead fills in:
 
 - `<spec-id>` — the spec identifier (the parent directory under `specs/`)
 - `<epic-id>` — the epic identifier from `specs/<spec-id>/dag.yaml`
-- `<absolute-worktree-path>` — read from `arcforge status --json` after expand
+- `<absolute-worktree-path>` — read from `git worktree list` after creating the worktree
 
 ## Template (verbatim — copy/paste and substitute)
 
@@ -40,11 +40,9 @@ You are teammate worker-<epic-id> implementing epic <epic-id> from spec <spec-id
 
 You are the sole implementer of epic <epic-id>. You have full authority
 to execute all phases of this epic autonomously (from Phase 0 through
-finishing) without per-phase approval from the lead. Run the appropriate
-arcforge workflow end-to-end — default to `/arc-implementing`, use
-`/arc-agent-driven` only if the epic spec explicitly requires task-list
-execution. Work through TDD red/green/refactor cycles, verify, and
-finish the epic yourself.
+finishing) without per-phase approval from the lead. Run the arcforge
+execution workflow end-to-end via `/arc-agent-driven`. Work through TDD
+red/green/refactor cycles, verify, and finish the epic yourself.
 
 You do NOT need the lead to dispatch individual features or phases, and
 you should NOT wait for acknowledgment between phases. Run straight
@@ -68,9 +66,7 @@ lead does not need or want them.
 ## Your Workspace
 
 1. cd to <absolute-worktree-path>
-2. Invoke `/arc-implementing` to execute epic <epic-id> end-to-end. (If
-   the epic's `epic.md` explicitly specifies `arc-agent-driven` as the
-   execution pattern, invoke `/arc-agent-driven` instead.)
+2. Invoke `/arc-agent-driven` to execute epic <epic-id> end-to-end.
 
 ## Coordination
 
@@ -149,8 +145,3 @@ they occur, are handled at finishing time via the arc-finishing
 Merge Conflict (Multi-Teammate) escalation path — not via pre-dispatch
 constraint lists.
 
-**Pick `/arc-implementing` or `/arc-agent-driven` based on the epic's
-own spec.** Most epics use `/arc-implementing`. Some epics that have
-been pre-decomposed into a task list and stored in `docs/tasks/` may
-prefer `/arc-agent-driven`. The epic's `epic.md` should state this; if
-it doesn't, default to `/arc-implementing`.

@@ -219,11 +219,12 @@ function selectNextTask(tasks) {
  * @param {string} tasksPath - Absolute path to the task list
  * @param {string} id - Task id
  * @param {string} status - One of TASK_STATUSES
+ * @param {string} [note] - Reason, recorded as the task's `note:` bullet
  * @returns {string} The updated file contents
  * @throws {Error} on an unknown id/status or an unwritable file
  */
-function setTaskStatus(tasksPath, id, status) {
-  const updated = updateTaskStatus(readTaskList(tasksPath), id, status);
+function setTaskStatus(tasksPath, id, status, note) {
+  const updated = updateTaskStatus(readTaskList(tasksPath), id, status, note);
   try {
     fs.writeFileSync(tasksPath, updated);
   } catch (err) {
@@ -432,34 +433,23 @@ function runTask(task, state, options) {
   return true;
 }
 
-/** The one validateTaskList rule the loop cannot satisfy when it blocks a task. */
-const MISSING_BLOCK_NOTE_RE = /blocked with no "note:"/;
-
 /**
  * Validate the task list once, before any session is spawned — a malformed list
  * must fail loudly rather than silently running zero tasks.
  *
- * ONE exception: `[!]` with no `note:`. The loop marks blocked tasks through
- * updateTaskStatus, which rewrites only the marker (task-list.js owns the
- * format and exposes no way to attach a reason), so a run that blocked a task
- * would refuse to resume over its OWN output. That rule is downgraded to a
- * warning here; every other semantic violation stays fatal.
+ * Every semantic rule is fatal, including "blocked with no note:": the loop
+ * writes its own blocks through setTaskStatus WITH a reason, so a list it
+ * produced always satisfies the rule and a list that violates it was authored
+ * by something that got the format wrong.
  *
- * validateTaskList throws on its FIRST violation, so swallowing one leaves the
- * rules after it unchecked. Duplicate ids are re-checked explicitly because
- * updateTaskStatus resolves an id to its first match — a duplicate would let
- * the loop mark the wrong task.
+ * validateTaskList throws on its FIRST violation, so duplicate ids are
+ * re-checked explicitly afterwards: updateTaskStatus resolves an id to its
+ * first match, and a duplicate would let the loop mark the wrong task.
  * @param {string} content - Task list contents
- * @throws {Error} on any validation failure except the missing block note
+ * @throws {Error} on any validation failure
  */
 function validateTaskListForRun(content) {
-  try {
-    validateTaskList(content);
-    return;
-  } catch (err) {
-    if (!MISSING_BLOCK_NOTE_RE.test(err.message)) throw err;
-    console.error(`[loop] ${err.message} — continuing (blocked tasks are skipped)`);
-  }
+  validateTaskList(content);
   const seen = new Set();
   for (const task of parseTaskList(content).tasks) {
     if (seen.has(task.id)) {
@@ -467,6 +457,25 @@ function validateTaskListForRun(content) {
     }
     seen.add(task.id);
   }
+}
+
+/**
+ * The reason to record on a task the loop just blocked. Uses the most recent
+ * error recorded for that task so the note points at the actual failure;
+ * falls back to a generic statement when the failure produced no error entry
+ * (e.g. a verifier FAIL that recorded a verdict rather than an error).
+ * @param {Object} state - Loop state
+ * @param {string} taskId - Task the loop is blocking
+ * @returns {string} One-line reason
+ */
+function blockReasonFor(state, taskId) {
+  const errors = Array.isArray(state.errors) ? state.errors : [];
+  for (let i = errors.length - 1; i >= 0; i--) {
+    if (errors[i].task_id === taskId && errors[i].error) {
+      return `loop blocked after failed run: ${String(errors[i].error).slice(0, 200)}`;
+    }
+  }
+  return 'loop blocked after a failed run — see .arcforge-loop.json for details';
 }
 
 /**
@@ -520,7 +529,11 @@ function runLoop(options) {
       tasksFile: state.tasks_file,
       remaining,
     });
-    setTaskStatus(tasksPath, task.id, success ? 'done' : 'blocked');
+    if (success) {
+      setTaskStatus(tasksPath, task.id, 'done');
+    } else {
+      setTaskStatus(tasksPath, task.id, 'blocked', blockReasonFor(state, task.id));
+    }
     saveLoopState(state, projectRoot);
 
     if (!success) {

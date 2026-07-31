@@ -2,7 +2,7 @@
  * loop-command.js - Handler for the `arcforge loop` CLI command.
  *
  * Owns flag parsing/validation for the autonomous loop and nothing else; the
- * loop itself lives in scripts/loop.js. Kept out of dag-commands.js because the
+ * loop itself lives in scripts/loop.js. Kept in its own handler because the
  * loop's task source is the D3 task list, not a DAG — it shares no state with
  * the coordinator commands.
  */

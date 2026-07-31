@@ -325,14 +325,10 @@ arcforge targets multiple AI coding platforms:
 
 | Component | Platform Scope |
 |-----------|---------------|
-| Skills, CLI, Templates | Platform-agnostic (all platforms) |
+| Skills, CLI | Platform-agnostic |
 | Hooks, Commands | Claude Code-specific |
-| Agents | Claude Code-specific |
 
-At minimum, test your contribution on Claude Code (the primary platform). For platform-specific documentation, see:
-- [`docs/README.codex.md`](docs/README.codex.md)
-
-Adding a **third** platform (a new IDE, CLI, or agent runner)? See [`docs/guide/porting-to-a-new-platform.md`](docs/guide/porting-to-a-new-platform.md) for the invariants a platform must satisfy, the integration-shape routing, and the end-to-end porting procedure.
+arcforge targets Claude Code. Test your contribution there.
 
 ---
 

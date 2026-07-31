@@ -162,7 +162,7 @@ Top mistakes that waste the most eval runs. Full catalog in references/common-mi
 
 ## Integration
 
-Design the target with **arc-brainstorming**; define success with **arc-planning**. Results inform whether to SHIP or iterate; track benchmarks over time in `evals/benchmarks/latest.json`.
+Design the target with **arc-brainstorming**; define success with **arc-writing-tasks**. Results inform whether to SHIP or iterate; track benchmarks over time in `evals/benchmarks/latest.json`.
 
 **Numeric vs qualitative analysis:** Numeric comparison (delta, CI, verdict) is programmatic — the harness computes it. The `eval-analyzer` agent adds qualitative analysis for model/human-graded A/B results; it does not replace the programmatic verdict.
 

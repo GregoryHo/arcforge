@@ -1,6 +1,6 @@
 ---
 name: arc-releasing
-description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 9-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
+description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 8-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
 ---
 
 # arc-releasing
@@ -80,18 +80,10 @@ grep -rn "<old-version>" skills/ docs/guide/
 
 Also check for renamed helpers, removed CLI flags, or deprecated config keys that the SKILL.md / rules / guides still mention.
 
-**Install docs and platform READMEs get missed every release** because they sit off the main code path — "what did this release touch" diffs usually light up `scripts/`, `skills/`, `docs/guide/`, not `.codex/` / `docs/README.*.md`. Audit both every release:
-
-| File | Why it matters |
-|---|---|
-| `.codex/INSTALL.md` | Fetched and executed by the quick-install one-liner — broken commands ship silently to every new user |
-| `docs/README.codex.md` | Human-facing platform guide |
-
 Things to verify, with reasoning:
 
 - **No hardcoded skill/symlink counts.** Values like "24 symlinks" drift every time a skill ships. Replace with invariants ("one symlink per skill") — a description that stays true across all releases needs no maintenance.
 - **No stale path references.** If this release moved anything (state dirs, worktree paths, config locations), greps from the examples above apply here too.
-- **Parity, with judgment.** When the Codex doc's variants diverge, ask whether the asymmetry is intentional before "fixing" it. Windows shell variants (cmd/PowerShell/Git Bash) being uneven is usually real drift; a missing Tool Mapping table in the Codex doc is intentional (Codex's tool vocabulary isn't publicly documented). Don't blindly force parity — verify *why* they differ first.
 - **Pre-v1.0.0: no "Migrating from old paths" sections.** Before the first public release, migration sections describe fictional users — there is no prior published version they could be migrating from. Keep only the latest setup until after v1.0.0 ships.
 
 **Never rewrite past `CHANGELOG.md` entries.** They are history, and downstream users, the vault's Decision notes, and `git log vPREV..vCURRENT` workflows all depend on them being stable. If a past entry turns out wrong, add a correction inside the *new* release's entry. Stealth edits break provenance.
@@ -150,14 +142,13 @@ Include only sections that have entries. Order: Fixed → Changed → Added → 
 
 **Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. The `release.yml` workflow extracts this exact `## [X.Y.Z]` section verbatim into the GitHub Release body when the tag is pushed (it slices from the version header to the next `## [` header), so this is the text users read on the GitHub release page — treat it as a user-facing artifact. The release job **fails** if no matching CHANGELOG section exists, which enforces the "no bump without CHANGELOG entry" rule below.
 
-### 5. Bump the version in **all 9 canonical locations**
+### 5. Bump the version in **all 8 canonical locations**
 
 | File | Where in the file |
 |---|---|
 | `package.json` | top-level `"version"` field |
 | `.claude-plugin/plugin.json` | top-level `"version"` field (canonical per `.claude/rules/plugin.md`) |
 | `.claude-plugin/marketplace.json` | `plugins[0].version` |
-| `.codex-plugin/plugin.json` | top-level `"version"` field (Codex marketplace manifest) |
 | `README.md` | version badge URL (shields.io, near line 3) |
 | `website/page/hero.jsx` | hero version label (`vX.Y.Z` near top of component) |
 | `website/page/sections.jsx` | footer line (`MIT · vX.Y.Z · By ...`) |
@@ -175,23 +166,23 @@ The babel output is committed to the repo (no separate publish pipeline reads it
 Verify with a single grep after bumping + building:
 
 ```bash
-grep -rn "X\.Y\.Z" package.json .claude-plugin/ .codex-plugin/ README.md website/page/
+grep -rn "X\.Y\.Z" package.json .claude-plugin/ README.md website/page/
 ```
 
-Expect **exactly 9 hits**. Fewer means a split-brain bump (dangerous — different platforms or the website disagree about the current version). More means a stale copy elsewhere that also needs attention.
+Expect **exactly 8 hits**. Fewer means a split-brain bump (dangerous — different platforms or the website disagree about the current version). More means a stale copy elsewhere that also needs attention.
 
 For an authoritative pass/fail that compares every location against the canonical `plugin.json` version, run `npm run check:versions` (zero-dep `scripts/check-version-sync.js`). It prints a location → version table and exits non-zero on any drift. The same check runs in CI and gates `release.yml` before the GitHub Release is created, so a drifted bump fails the release rather than shipping silently.
 
 `package-lock.json` top-level `"version"` is known-stale at an older value. Leave it unless you're doing a dedicated lockfile refresh; never combine that with a release commit, since mixed diffs make rollback painful.
 
-For releases that change **shipped surface area** (new skill, removed CLI flag, new marketing claim), also audit the website **content** — `website/page/hero.jsx`, `sections.jsx`, and `sdd.jsx` carry the project framing. Patch releases usually just need the version label bumped; minor/major releases often need copy adjustments too. Confirm with the user before rewriting hero copy or feature lists.
+For releases that change **shipped surface area** (new skill, removed CLI flag, new marketing claim), also audit the website **content** — `website/page/hero.jsx` and `sections.jsx` carry the project framing. Patch releases usually just need the version label bumped; minor/major releases often need copy adjustments too. Confirm with the user before rewriting hero copy or feature lists.
 
 ### 6. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
-- Stage exactly the 10 release files (9 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
+- Stage exactly the 9 release files (8 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 9-location grep returned exactly 9 hits
+- `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
 
 ### 7. After PR merges to main — tag it
 
@@ -212,17 +203,16 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Ingest before bump.** Once the version flips, the "why" narrative is harder to reconstruct for the vault. That's why it's step 1, not step 5.
 - **Website version labels + babel rebuild.** `website/page/hero.jsx` and `sections.jsx` both carry the version, and the committed `.js` siblings must be regenerated via `npm run build:website` to match — easy to miss because the website looks like a "doc only" surface but `.jsx` ≠ `.js` in a single commit is a real defect.
 - **README badge URL.** The shields.io badge is image-cached; stale numbers visually persist even after every other file is correct. Worth an extra explicit mention.
-- **The two install-surface files.** `.codex/INSTALL.md` plus `docs/README.codex.md` sit off the main code path and don't light up in normal "what did this release touch" diffs. Step 2 covers the audit details.
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
 - **The post-merge tag.** Merging the PR does not auto-tag. This is the single most commonly skipped step.
 
 ## Anti-Patterns (from real arcforge release incidents)
 
-- **Silent version drift** — v1.4.0 discovered `.claude-plugin/marketplace.json` had been stuck two versions behind. The 9-location grep is designed to catch exactly this. v3.0.1 expanded the surface to include `website/page/{hero,sections}.{jsx,js}` after the website was found to have been silently bumped manually during v3.0.0.
+- **Silent version drift** — v1.4.0 discovered `.claude-plugin/marketplace.json` had been stuck two versions behind. The 8-location grep is designed to catch exactly this. v3.0.1 expanded the surface to include `website/page/{hero,sections}.{jsx,js}` after the website was found to have been silently bumped manually during v3.0.0.
 - **Version bump without CHANGELOG entry** — the marketplace release cache is version-keyed. A bump with no CHANGELOG entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG *before* version bump) enforces pairing them.
 - **Editing past CHANGELOG entries** — downstream users and vault Decision notes depend on past entries being stable. Add corrections to the current entry; never stealth-edit the past.
-- **Partial bump shipped** — bumping a subset of the 9 locations produces a release where Claude Code, Codex, the marketplace JSON, or the website disagree about the current version. Always use the 9-location grep as a post-bump gate.
+- **Partial bump shipped** — bumping a subset of the 8 locations produces a release where Claude Code, the marketplace JSON, or the website disagree about the current version. Always use the 8-location grep as a post-bump gate.
 - **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 10 release files. Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
 - **Skipping the post-merge tag** — without the tag, the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. Missing tags cause the *next* release to either drop entries or include already-shipped ones.
 
