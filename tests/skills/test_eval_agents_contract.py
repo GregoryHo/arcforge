@@ -22,7 +22,7 @@ def _parse_frontmatter(text: str) -> dict:
 
 
 def test_eval_grader_doc_matches_trial_level_contract():
-    text = _read("skills/arc-evaluating/agents/eval-grader.md")
+    text = _read("scripts/lib/prompts/eval-grader.md")
     lower = text.lower()
     front = _parse_frontmatter(text)
 
@@ -33,7 +33,7 @@ def test_eval_grader_doc_matches_trial_level_contract():
 
 
 def test_eval_grader_doc_describes_structured_json_response():
-    text = _read("skills/arc-evaluating/agents/eval-grader.md")
+    text = _read("scripts/lib/prompts/eval-grader.md")
     lower = text.lower()
 
     assert '"scores"' in text
@@ -46,7 +46,7 @@ def test_eval_grader_doc_describes_structured_json_response():
 
 
 def test_eval_analyzer_doc_is_qualitative_not_numeric_engine():
-    text = _read("skills/arc-evaluating/agents/eval-analyzer.md")
+    text = _read("scripts/lib/prompts/eval-analyzer.md")
     lower = text.lower()
     front = _parse_frontmatter(text)
 
@@ -57,7 +57,7 @@ def test_eval_analyzer_doc_is_qualitative_not_numeric_engine():
 
 
 def test_eval_analyzer_doc_requests_analysis_over_per_assertion_math():
-    text = _read("skills/arc-evaluating/agents/eval-analyzer.md")
+    text = _read("scripts/lib/prompts/eval-analyzer.md")
     lower = text.lower()
 
     # Analyzer documents analysis fields (no verdict authority).

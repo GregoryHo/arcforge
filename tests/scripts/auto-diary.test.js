@@ -9,7 +9,7 @@ const {
   getDraftPath,
   summarizeObservations,
   parseArgs,
-} = require('../../skills/arc-journaling/scripts/auto-diary');
+} = require('../../scripts/lib/auto-diary');
 
 describe('auto-diary', () => {
   const testDir = path.join(os.tmpdir(), `auto-diary-test-${Date.now()}`);

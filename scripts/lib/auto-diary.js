@@ -7,17 +7,11 @@
  *   finalize --project X --date Y --session Z    Promote draft to final
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const {
-  getDiaryPath,
-  getObservationsPath,
-} = require('../../../scripts/lib/session-utils');
-const {
-  getSessionDir,
-  getDiaryDraftPath,
-} = require('../../../scripts/lib/utils');
+const { getDiaryPath, getObservationsPath } = require('./session-utils');
+const { getSessionDir, getDiaryDraftPath } = require('./utils');
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -104,7 +98,7 @@ function summarizeObservations(project) {
     return {
       totalObservations: lines.length,
       topTools,
-      topSequences: topSeqs
+      topSequences: topSeqs,
     };
   } catch {
     return null;
@@ -135,7 +129,7 @@ function generateDraft(project, date, sessionId) {
     '',
     `**Date:** ${date}`,
     `**Session ID:** ${sessionId}`,
-    ''
+    '',
   ];
 
   // Metrics section (auto-filled)
@@ -198,7 +192,7 @@ function generateDraft(project, date, sessionId) {
   lines.push('');
   lines.push('## In Progress');
   lines.push('');
-  lines.push('<!-- TO BE ENRICHED — What\'s still ongoing? -->');
+  lines.push("<!-- TO BE ENRICHED — What's still ongoing? -->");
   lines.push('- ');
   lines.push('');
   lines.push('## Context for Next Session');
@@ -279,7 +273,7 @@ module.exports = {
   summarizeObservations,
   generateDraft,
   getDraftPath,
-  parseArgs
+  parseArgs,
 };
 
 if (require.main === module) {

@@ -10,10 +10,10 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const eval_ = require('../../../scripts/lib/eval');
-const stats = require('../../../scripts/lib/eval-stats');
-const { classifyAssertions } = require('../../../scripts/lib/eval-graders');
-const { sanitizeFilename } = require('../../../scripts/lib/utils');
+const eval_ = require('../eval');
+const stats = require('../eval-stats');
+const { classifyAssertions } = require('../eval-graders');
+const { sanitizeFilename } = require('../utils');
 
 // ── SSE Client Management ────────────────────────────────────
 
@@ -377,8 +377,7 @@ function handleApiTranscript(res, projectRoot, query) {
   // startsWith(resultsDir) lets sibling directories whose name shares
   // the prefix (e.g. `evals/results2`, `evals/results.bak`) bypass the
   // guard, exposing arbitrary files under the parent.
-  const isInside =
-    resolved === resultsDir || resolved.startsWith(resultsDir + path.sep);
+  const isInside = resolved === resultsDir || resolved.startsWith(resultsDir + path.sep);
   if (!isInside) {
     return sendError(res, 403, 'Path traversal not allowed');
   }
@@ -412,7 +411,9 @@ function handleApiBenchmarkRawSummary(res, projectRoot) {
   ];
   const coverage = {};
   for (const field of fields) {
-    const populated = rows.filter((row) => row[field] !== null && row[field] !== undefined && row[field] !== '').length;
+    const populated = rows.filter(
+      (row) => row[field] !== null && row[field] !== undefined && row[field] !== '',
+    ).length;
     coverage[field] = totalRows > 0 ? populated / totalRows : 0;
   }
 

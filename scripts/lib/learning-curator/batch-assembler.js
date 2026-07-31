@@ -353,10 +353,7 @@ function buildAggregateContext(evidenceItems) {
 // ---------------------------------------------------------------------------
 
 function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryItems }) {
-  const promptTemplatePath = path.join(
-    __dirname,
-    '../../../skills/arc-learning/scripts/observer-prompt.md',
-  );
+  const promptTemplatePath = path.join(__dirname, 'observer-prompt.md');
 
   let template;
   try {

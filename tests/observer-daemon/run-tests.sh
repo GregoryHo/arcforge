@@ -2,13 +2,13 @@
 # Bash tests for observer-daemon.sh behavior (Slice B)
 # Minimal POSIX shell test framework — no external deps.
 #
-# Usage: bash skills/arc-learning/tests/run-tests.sh
+# Usage: bash tests/observer-daemon/run-tests.sh
 # Requires: bash 4+ (macOS ships bash 3.2 but uses zsh by default — this
 # script is invoked as 'bash run-tests.sh' so homebrew bash is not required)
 
 set -uo pipefail
 
-DAEMON_SCRIPT="$(cd "$(dirname "$0")/../scripts" && pwd)/observer-daemon.sh"
+DAEMON_SCRIPT="$(cd "$(dirname "$0")/../../scripts/lib/learning-curator" && pwd)/observer-daemon.sh"
 PASS=0
 FAIL=0
 ERRORS=()
@@ -101,8 +101,6 @@ mkdir -p "$TEST_HOME_C3"
 # Test 1: pre-create .analyzing.lock → analyze_all_projects must skip and log
 C3_LOCKED_LOG=$(
   HOME="$TEST_HOME_C3"
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -122,8 +120,6 @@ TEST_HOME_C3B="${TMPDIR_C3}/home2"
 mkdir -p "$TEST_HOME_C3B"
 C3_CLEAN_RESULT=$(
   HOME="$TEST_HOME_C3B"
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -142,8 +138,6 @@ TEST_HOME_C3C="${TMPDIR_C3}/home3"
 mkdir -p "$TEST_HOME_C3C"
 C3_CLEAN_LOG=$(
   HOME="$TEST_HOME_C3C"
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -191,8 +185,6 @@ C4_LOG=$(
   HOME="$TEST_HOME_C4"
   PATH="${STUB_BIN}:${PATH}"
   OBSERVER_DAEMON_WATCHDOG_SECS=3
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   set +e
   # shellcheck source=/dev/null
   source "$DAEMON_SCRIPT" 2>/dev/null
@@ -254,7 +246,6 @@ fi
 echo ""
 echo "=== PR-F-T1: transport_error failure manifest ==="
 
-ARCFORGE_REPO_ROOT_PRF="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMPDIR_PRF=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_PRF"' EXIT
 TEST_HOME_PRF="${TMPDIR_PRF}/home"
@@ -279,10 +270,7 @@ done
 
 PRF_RESULT=$(
   HOME="$TEST_HOME_PRF"
-  ARCFORGE_ROOT="$ARCFORGE_REPO_ROOT_PRF"
   PATH="${STUB_BIN_PRF}:${PATH}"
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   OBSERVER_DAEMON_WATCHDOG_SECS=10
   set +e
   # shellcheck source=/dev/null
@@ -370,14 +358,13 @@ fi
 # Strategy:
 #   (a) seed observations in a temp dir
 #   (b) stub 'claude' CLI that writes a known CandidateProposalPayload JSON to stdout
-#   (c) source daemon + invoke analyze_project with ARCFORGE_ROOT pointing to repo
+#   (c) source daemon + invoke analyze_project (curator CLI resolves as a sibling)
 #   (d) assert queue.jsonl has one new candidate, instincts dir for the project is empty
 # ─────────────────────────────────────────────
 
 echo ""
 echo "=== E2-G3: End-to-end integration test ==="
 
-ARCFORGE_REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMPDIR_G3=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_G3"' EXIT
 TEST_HOME_G3="${TMPDIR_G3}/home"
@@ -400,7 +387,7 @@ done
 # and handles cli.js calls with hardcoded responses.
 #
 # Actually: simplest approach — stub only 'claude' to emit known JSON.
-# Let node calls go to real node (ARCFORGE_ROOT is set to repo root).
+# Let node calls go to real node (the daemon resolves cli.js as its own sibling).
 
 # Slice E.2b: daemon calls claude with `--output-format json --json-schema ...`,
 # so the response file is a CLI envelope whose .structured_output holds the payload.
@@ -469,17 +456,12 @@ chmod +x "${STUB_BIN_G3}/claude"
 # Run analyze_project via sourced daemon.
 # Key overrides:
 #   HOME          = TEST_HOME_G3 (isolates all .arcforge paths)
-#   ARCFORGE_ROOT = ARCFORGE_REPO_ROOT (so cli.js path resolves correctly)
 #   PATH          = stub bin first (so our stub claude is found)
-#   SCRIPT_DIR    = real scripts dir (for observer-prompt.md)
 #   OBSERVER_DAEMON_WATCHDOG_SECS = 10 (fast watchdog for test)
 
 G3_RESULT=$(
   HOME="$TEST_HOME_G3"
-  ARCFORGE_ROOT="$ARCFORGE_REPO_ROOT"
   PATH="${STUB_BIN_G3}:${PATH}"
-  SCRIPT_DIR="$(dirname "$DAEMON_SCRIPT")"
-  OBSERVER_PROMPT="${SCRIPT_DIR}/observer-prompt.md"
   OBSERVER_DAEMON_WATCHDOG_SECS=10
   set +e
   # shellcheck source=/dev/null

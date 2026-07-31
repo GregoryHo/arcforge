@@ -75,7 +75,7 @@ Per-trial grading output written by the eval harness after the `eval-grader` age
 
 ## comparison.json
 
-Output from the `eval-blind-comparator` agent (anonymized, blind A/B comparison). Authoritative definition: `skills/arc-evaluating/agents/eval-blind-comparator.md`.
+Output from the `eval-blind-comparator` agent (anonymized, blind A/B comparison). Authoritative definition: `scripts/lib/prompts/eval-blind-comparator.md`.
 
 ```json
 {

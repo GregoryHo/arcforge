@@ -2,8 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { createRouter, setupWatchers } = require('../eval-dashboard');
-const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../../../scripts/lib/eval');
+const { createRouter, setupWatchers } = require('../../scripts/lib/eval-dashboard/eval-dashboard');
+const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../scripts/lib/eval');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-dashboard-'));
@@ -557,10 +557,14 @@ describe('dashboard', () => {
       const req = {
         url,
         method: 'POST',
-        headers: { host: 'localhost:3333', 'content-type': 'application/json', 'content-length': String(bodyBuf.length) },
+        headers: {
+          host: 'localhost:3333',
+          'content-type': 'application/json',
+          'content-length': String(bodyBuf.length),
+        },
         _body: bodyBuf,
       };
-      return { req, res, triggerClose: () => closeHandler && closeHandler() };
+      return { req, res, triggerClose: () => closeHandler?.() };
     }
 
     function callPostRouter(router, url, body) {
@@ -700,7 +704,10 @@ describe('dashboard', () => {
 
   describe('SSE subscription cleanup (fr-dash-004-ac3)', () => {
     it('should remove client on disconnect', () => {
-      const { sseClients, addSseClient } = require('../eval-dashboard');
+      const {
+        sseClients,
+        addSseClient,
+      } = require('../../scripts/lib/eval-dashboard/eval-dashboard');
       const countBefore = sseClients.size;
       let closeFn = null;
       const fakeRes = {
@@ -723,12 +730,56 @@ describe('dashboard', () => {
   describe('GET /api/compare/:name — metric deltas (fr-dash-001-ac3)', () => {
     it('should include metricDeltas when results carry duration_ms and tokens', () => {
       writeResult(tempDir, 'metrics-eval', '20260320-100000', 'baseline', [
-        { eval: 'metrics-eval-baseline', trial: 1, k: 2, passed: true, score: 0.8, grader: 'code', timestamp: '2026-03-20T10:00:00Z', duration_ms: 1000, input_tokens: 100, output_tokens: 50 },
-        { eval: 'metrics-eval-baseline', trial: 2, k: 2, passed: true, score: 0.8, grader: 'code', timestamp: '2026-03-20T10:00:01Z', duration_ms: 2000, input_tokens: 200, output_tokens: 80 },
+        {
+          eval: 'metrics-eval-baseline',
+          trial: 1,
+          k: 2,
+          passed: true,
+          score: 0.8,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:00Z',
+          duration_ms: 1000,
+          input_tokens: 100,
+          output_tokens: 50,
+        },
+        {
+          eval: 'metrics-eval-baseline',
+          trial: 2,
+          k: 2,
+          passed: true,
+          score: 0.8,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:01Z',
+          duration_ms: 2000,
+          input_tokens: 200,
+          output_tokens: 80,
+        },
       ]);
       writeResult(tempDir, 'metrics-eval', '20260320-100000', 'treatment', [
-        { eval: 'metrics-eval-treatment', trial: 1, k: 2, passed: true, score: 1.0, grader: 'code', timestamp: '2026-03-20T10:00:02Z', duration_ms: 1500, input_tokens: 120, output_tokens: 60 },
-        { eval: 'metrics-eval-treatment', trial: 2, k: 2, passed: true, score: 1.0, grader: 'code', timestamp: '2026-03-20T10:00:03Z', duration_ms: 2500, input_tokens: 220, output_tokens: 90 },
+        {
+          eval: 'metrics-eval-treatment',
+          trial: 1,
+          k: 2,
+          passed: true,
+          score: 1.0,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:02Z',
+          duration_ms: 1500,
+          input_tokens: 120,
+          output_tokens: 60,
+        },
+        {
+          eval: 'metrics-eval-treatment',
+          trial: 2,
+          k: 2,
+          passed: true,
+          score: 1.0,
+          grader: 'code',
+          timestamp: '2026-03-20T10:00:03Z',
+          duration_ms: 2500,
+          input_tokens: 220,
+          output_tokens: 90,
+        },
       ]);
 
       const router = createRouter(tempDir, '');
@@ -746,7 +797,10 @@ describe('dashboard', () => {
   // ── Dashboard decision surface ─────────────────────────────────
   describe('dashboard UI — benchmark decision surface', () => {
     it('uses benchmark snapshot data for health, filters, and data-quality review', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../eval-dashboard-ui.html'), 'utf8');
+      const html = fs.readFileSync(
+        path.join(__dirname, '../../scripts/lib/eval-dashboard/eval-dashboard-ui.html'),
+        'utf8',
+      );
 
       expect(html).toContain("api('/api/benchmark')");
       expect(html).toContain('Benchmark Health');

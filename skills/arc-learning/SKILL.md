@@ -93,9 +93,6 @@ fi
 
 | Task | Command |
 |------|---------|
-| **Daemon status** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" status` |
-| **Start daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" start` |
-| **Stop daemon** | `bash "${SKILL_ROOT}/scripts/observer-daemon.sh" stop` |
 | **View instincts** | `node "${SKILL_ROOT}/scripts/instinct.js" status --project {p}` |
 | **Confirm pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" confirm {id} --project {p}` |
 | **Contradict pattern** | `node "${SKILL_ROOT}/scripts/instinct.js" contradict {id} --project {p}` |

@@ -14,15 +14,12 @@ OBS_DIR="${ARCFORGE_DIR}/observations"
 LOCK_DIR="${INSTINCTS_DIR}/.observer.lock"
 LOG_FILE="${INSTINCTS_DIR}/observer.log"
 
-# ARCFORGE_ROOT: path to the arcforge repo containing scripts/lib/learning-curator/cli.js
-# Prefer env var (set by plugin sessions + tests); fall back to grandparent of SCRIPT_DIR.
-# SCRIPT_DIR is set below, but we need it here — so we derive it first.
-if [ -z "${SCRIPT_DIR:-}" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-fi
-# Derive ARCFORGE_ROOT from SCRIPT_DIR (skills/arc-learning/scripts → repo root = ../../../)
-ARCFORGE_ROOT="${ARCFORGE_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
-CURATOR_CLI="${ARCFORGE_ROOT}/scripts/lib/learning-curator/cli.js"
+# The daemon lives INSIDE the curator module, so every engine file it needs is a
+# sibling. BASH_SOURCE (not $0) is used so the path stays correct when the tests
+# `source` this file instead of executing it — no env-var handshake, no repo-root
+# derivation, nothing to keep in sync with a directory layout.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CURATOR_CLI="${SCRIPT_DIR}/cli.js"
 
 # Daemon configuration
 POLL_INTERVAL=300      # 5 minutes
@@ -140,7 +137,7 @@ analyze_project() {
     return
   fi
   if [ ! -f "$CURATOR_CLI" ]; then
-    log_msg "ERROR: curator CLI not found at ${CURATOR_CLI} (ARCFORGE_ROOT=${ARCFORGE_ROOT})"
+    log_msg "ERROR: curator CLI not found at ${CURATOR_CLI}"
     return
   fi
 
@@ -212,7 +209,7 @@ analyze_project() {
   local retry_count=0
   local max_retries=1
   local last_was_timeout=false
-  local schema_path="${ARCFORGE_ROOT}/scripts/lib/learning-curator/candidate-proposal-schema.json"
+  local schema_path="${SCRIPT_DIR}/candidate-proposal-schema.json"
   if [ ! -f "$schema_path" ]; then
     log_msg "ERROR: candidate-proposal-schema.json not found at ${schema_path}"
     echo $((fail_count + 1)) > "$fail_count_file"
