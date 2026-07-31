@@ -41,7 +41,7 @@ Batch pressure-scenario definitions used by the skill-creator eval methodology. 
 
 ## grading/trial-N.json
 
-Per-trial grading output written by the eval harness after the `eval-grader` agent scores a single trial. Located at `evals/results/<scenarioName>/<runId>/grading/trial-<N>.json` (see `collectGradingData` in `${ARCFORGE_ROOT}/scripts/lib/eval-audit.js`). **REQUIRED BACKGROUND:** references/grading-and-execution.md defines `discovered_claims`/`weak_assertions` in full; this is a shape reference only.
+Per-trial grading output written by the eval harness after the `eval-grader` agent scores a single trial. Located at `evals/results/<scenarioName>/<runId>/grading/trial-<N>.json` (see `collectGradingData` in `scripts/lib/eval-audit.js`). **REQUIRED BACKGROUND:** references/grading-and-execution.md defines `discovered_claims`/`weak_assertions` in full; this is a shape reference only.
 
 ```json
 {
@@ -75,7 +75,7 @@ Per-trial grading output written by the eval harness after the `eval-grader` age
 
 ## comparison.json
 
-Output from the `eval-blind-comparator` agent (anonymized, blind A/B comparison). Authoritative definition: `skills/arc-evaluating/agents/eval-blind-comparator.md`.
+Output from the `eval-blind-comparator` agent (anonymized, blind A/B comparison). Authoritative definition: `scripts/lib/prompts/eval-blind-comparator.md`.
 
 ```json
 {

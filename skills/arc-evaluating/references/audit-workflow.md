@@ -6,7 +6,7 @@ The audit workflow governs what happens to eval results after a verdict is reach
 
 The `arc eval audit` command processes the eval result corpus and surfaces two categories for human review:
 
-1. **Promotion candidates** — `discovered_claims` from grading entries, ranked by `score = frequency × failure_rate` (see `buildPromotionCandidates` in `${ARCFORGE_ROOT}/scripts/lib/eval-audit.js`). These are NOT the claims that passed most consistently — they are claims that occurred often AND failed often. A promotion candidate is a frequent, failing behavior pattern: one the agent exhibits regularly but does not reliably get right, and therefore a candidate to formalize as an explicit assertion so future evals grade it directly instead of relying on the grader noticing it incidentally.
+1. **Promotion candidates** — `discovered_claims` from grading entries, ranked by `score = frequency × failure_rate` (see `buildPromotionCandidates` in `scripts/lib/eval-audit.js`). These are NOT the claims that passed most consistently — they are claims that occurred often AND failed often. A promotion candidate is a frequent, failing behavior pattern: one the agent exhibits regularly but does not reliably get right, and therefore a candidate to formalize as an explicit assertion so future evals grade it directly instead of relying on the grader noticing it incidentally.
 
 2. **Retirement candidates** — Claims currently in the skill body that the eval corpus contradicts, or `weak_assertions` patterns that indicate the assertion no longer tests meaningful behavior. These require a human to decide whether to remove, revise, or escalate the claim.
 
@@ -47,7 +47,7 @@ The audit workflow is human-arbitrated rather than automated for three reasons:
 ## Operational Notes
 
 - Run `arc eval audit` to generate the current promotion and retirement candidate lists.
-- Audit reads grading entries from `evals/results/<scenarioName>/<runId>/grading/trial-*.json` (see `collectGradingData` in `${ARCFORGE_ROOT}/scripts/lib/eval-audit.js`). It does not read `evals/benchmarks/latest.json` — that file is written by `arc eval report` and consumed separately by `scripts/check-benchmark-freshness.js`.
+- Audit reads grading entries from `evals/results/<scenarioName>/<runId>/grading/trial-*.json` (see `collectGradingData` in `scripts/lib/eval-audit.js`). It does not read `evals/benchmarks/latest.json` — that file is written by `arc eval report` and consumed separately by `scripts/check-benchmark-freshness.js`.
 - Promotion candidates appear with their evidence count, scenario list, and claim text.
 - Retirement candidates appear with the `weak_assertions` pattern summary and the contradicting trial count.
 - The audit output is a review document, not an action — a human must take action based on it.

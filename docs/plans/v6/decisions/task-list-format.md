@@ -1,7 +1,7 @@
 # D3 — task list format (frozen, v1)
 
 Status: **frozen in P1**. Owner: `scripts/lib/task-list.js` (engine side, per D8).
-Consumers: `looping` (P6 skill), `scripts/lib/loop.js` (P2 shell), `task-list`
+Consumers: `looping` (P6 skill), `scripts/loop.js` (P2 shell), `task-list`
 (P6 skill). Changing the grammar after P1 means bumping the banner version and
 updating the parser + this file in the same commit.
 
@@ -62,6 +62,15 @@ Rules:
 - **Ids are prefixed and stable, not positional.** Line numbers move; a loop
   that addresses tasks by position corrupts the file the moment a human inserts
   one. `updateTaskStatus` looks tasks up by id and rewrites only the marker.
+- **The status writer can also write the `note:`.** `note:` is REQUIRED on a
+  `[!]` task, so a writer able to set `blocked` but not to state a reason
+  produces a file its own validator rejects — which is exactly what happened in
+  P2, where `scripts/loop.js` had to swallow that rule to resume over its own
+  output. `updateTaskStatus` therefore takes an optional 4th argument: the
+  reason. It replaces the task's existing `note:` bullet or inserts one below
+  its detail block, and touches nothing else. Swallowing a validation rule in a
+  consumer is not an option — the rule moves into the writer or it stops being
+  a rule.
 - **The parser is strict.** A malformed checkbox line throws with the line
   number and the expected shape rather than being skipped. A silently ignored
   task is a task the loop never runs — the worst possible failure for a file
@@ -73,13 +82,14 @@ Rules:
 ## API (`scripts/lib/task-list.js`)
 
 ```
-parseTaskList(content)              → { version, title, tasks[] }   throws on malformed lines
-validateTaskList(content)           → same, plus semantic rules     throws on banner/id/blocked violations
-updateTaskStatus(content, id, next) → new content string            throws on unknown id or status
-TASK_STATUSES                       → ['pending','in-progress','done','blocked']
+parseTaskList(content)                    → { version, title, tasks[] }   throws on malformed lines
+validateTaskList(content)                 → same, plus semantic rules     throws on banner/id/blocked violations
+updateTaskStatus(content, id, next[,note])→ new content string            throws on unknown id/status or an empty note
+TASK_STATUSES                             → ['pending','in-progress','done','blocked']
 ```
 
 `tasks[]` entries: `{ id, status, text, verify, note, line }` (`line` is 1-based,
 for error messages). `updateTaskStatus` is a pure string transform — everything
-except the one marker character is preserved byte for byte, so a human's
-comments, ordering, and formatting survive an automated run.
+except the one marker character (and, when a `note` is passed, that one
+`note:` bullet) is preserved byte for byte, so a human's comments, ordering,
+and formatting survive an automated run.

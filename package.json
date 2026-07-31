@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
   "version": "5.0.0",
-  "description": "Skill-based autonomous agent toolkit for Claude Code and Codex",
+  "description": "Skill-based autonomous agent toolkit for Claude Code",
   "license": "MIT",
   "author": {
     "name": "Gregory Ho"
@@ -17,12 +17,7 @@
     "skills/",
     "hooks/",
     "scripts/",
-    "templates/",
-    "agents/",
     ".claude-plugin/",
-    ".codex-plugin/",
-    ".agents/",
-    ".codex/",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"
@@ -34,7 +29,7 @@
     "test:hooks": "node --test hooks/__tests__/*.test.js",
     "test:node": "node tests/node/run-tests.js",
     "test:skills": "python3 -m pytest tests/skills/ -v",
-    "test:observer-daemon": "bash skills/arc-learning/tests/run-tests.sh",
+    "test:observer-daemon": "bash tests/observer-daemon/run-tests.sh",
     "check:versions": "node scripts/check-version-sync.js",
     "check:docs": "node scripts/check-doc-refs.js",
     "check:cli-consumers": "node scripts/check-cli-consumers.js",

@@ -1,7 +1,7 @@
 # Registry Maintenance
 
 The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The
-skill manages this file end-to-end through `${ARCFORGE_ROOT}/scripts/cli.js
+skill manages this file end-to-end through `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js
 obsidian <subcommand>` — never hand-edit.**
 
 ## Schema
@@ -34,10 +34,10 @@ acquisition). The CLI handles all of those atomically.
 
 | Subcommand | Behavior |
 |---|---|
-| `${ARCFORGE_ROOT}/scripts/cli.js obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."] [--qmd-collection <name>]` | Add a vault. First-registered becomes default automatically. `--qmd-collection` implies `--search-preferred=qmd`. |
-| `${ARCFORGE_ROOT}/scripts/cli.js obsidian unregister <name>` | Remove the entry. Vault files at `<path>` untouched. If the removed entry was the default, default is cleared. |
-| `${ARCFORGE_ROOT}/scripts/cli.js obsidian set-default <name>` | Update `default`. Errors if `<name>` not registered. |
-| `${ARCFORGE_ROOT}/scripts/cli.js obsidian list-vaults [--json]` | Print the registry. Default marker, preset, search baseline shown. |
+| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."] [--qmd-collection <name>]` | Add a vault. First-registered becomes default automatically. `--qmd-collection` implies `--search-preferred=qmd`. |
+| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian unregister <name>` | Remove the entry. Vault files at `<path>` untouched. If the removed entry was the default, default is cleared. |
+| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian set-default <name>` | Update `default`. Errors if `<name>` not registered. |
+| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian list-vaults [--json]` | Print the registry. Default marker, preset, search baseline shown. |
 
 The `init-vault` workflow is LLM-driven (see
 `bootstrap-workflow.md`); only the registry mutation at step 9
@@ -53,7 +53,7 @@ no mode entered.
 
 - The CLI atomically writes through a sibling tmp file rename, so a
   half-written registry never lands.
-- Mutations are paired with file-locking (`${ARCFORGE_ROOT}/scripts/lib/locking.js`)
+- Mutations are paired with file-locking (`scripts/lib/locking.js`)
   so concurrent sessions don't race.
 - A user who hand-edits today drifts from schema tomorrow when fields
   are added.

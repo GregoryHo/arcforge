@@ -56,8 +56,7 @@ Otherwise produce a handover. Pure Q&A or read-only inspection, trivial fixes wi
 Set `SKILL_ROOT` before running scripts:
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-managing-sessions}"
 ```
 
 ### `save [alias]`
@@ -65,8 +64,7 @@ Set `SKILL_ROOT` before running scripts:
 Archive the current session with enrichment. Get session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`, use transcript data if available (user messages, tools used, files modified), then enrich from the conversation — **Summary** (what was accomplished), **What Worked**, **What Failed** (approaches abandoned, with reasons), **Blockers**, **Next Step**. Save to `~/.arcforge/sessions/{project}/{date}/session-{alias}.md` and create the alias if a name is given.
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" save <alias> [summary] [whatWorked] [whatFailed] [blockers] [nextStep]
 ```
 
@@ -77,8 +75,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" save <alias> [summary] [whatWorked] [wh
 Resolve alias → session file path, read the session file completely, present the structured briefing, then **wait for user confirmation before doing any work.**
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" resume [alias]
 ```
 
@@ -89,8 +86,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" resume [alias]
 Browse sessions with metadata — both auto-tracked (from hooks) and user-archived. Options: `--limit N` (default 20), `--date YYYY-MM-DD`, `--query id` (session ID substring).
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [--query id]
 ```
 
@@ -99,8 +95,7 @@ node "${SKILL_ROOT}/scripts/sessions.js" list [--limit N] [--date YYYY-MM-DD] [-
 Create an alias for easy reference, or list all aliases.
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-managing-sessions}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-managing-sessions}"
 node "${SKILL_ROOT}/scripts/sessions.js" alias <session-path> <name>
 node "${SKILL_ROOT}/scripts/sessions.js" aliases
 ```

@@ -36,11 +36,11 @@ package live in the self-ignoring `.arcforge/sdd/` workspace:
 
 1. **Before dispatching the implementer**, record the current commit as the task
    BASE: `git rev-parse HEAD`. Optionally assemble the brief with
-   `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/task-brief.js" --task "<text>" --acceptance "<criteria>" --base <BASE>`
+   `node "${CLAUDE_PLUGIN_ROOT}/skills/arc-agent-driven/scripts/task-brief.js" --task "<text>" --acceptance "<criteria>" --base <BASE>`
    (it prints the brief path).
 2. **After the implementer commits**, build the review package for the whole task
    range — never just the last commit — with
-   `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
+   `node "${CLAUDE_PLUGIN_ROOT}/skills/arc-agent-driven/scripts/review-package.js" <BASE> HEAD`.
    It writes the commit list plus `git diff --stat` and `git diff -U10` for
    `<BASE>..HEAD` into one file and prints that file's path.
 3. **Hand the task-reviewer that path** as `{DIFF_FILE}`. The reviewer reads the
@@ -79,20 +79,20 @@ below are the mid-tier floor, not a ceiling.
 - **Prose-plan implementer and the task-reviewer → `sonnet` floor.** Cheaper
   models take 2-3× the turns on multi-step judgment, costing more overall. Scale
   the reviewer above the floor only for a large or subtle diff.
-- **Final whole-branch review → `opus`** — pinned in `agents/code-reviewer.md`;
-  the one architecture-level judgment here.
+- **Final whole-branch review → `opus`** — the one architecture-level judgment
+  here.
 
 **Headless caveat (arc-looping):** the loop path spawns agents through headless
 `claude -p`, which strips agent frontmatter and does NOT honor a `model:` pin
-(`${ARCFORGE_ROOT}/scripts/lib/loop-verifier.js`) — under arc-looping, pass
+(`scripts/lib/loop-verifier.js`) — under arc-looping, pass
 `--model` explicitly on the dispatch, or the intended tier is ignored.
 
 ## Agents & Templates
 
 Two ways to dispatch each role, depending on platform support.
 
-**Pre-built agents** (when your platform supplies named subagents — e.g. Claude
-Code's `agents/`) bundle tool isolation and methodology:
+**Pre-built agents** (when your platform supplies named subagents) bundle tool
+isolation and methodology:
 
 | Agent | Role | Model | Access |
 |-------|------|-------|--------|

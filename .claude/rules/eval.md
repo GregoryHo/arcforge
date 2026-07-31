@@ -2,7 +2,7 @@
 paths:
   - "evals/**"
   - "scripts/lib/eval*.js"
-  - "scripts/eval-dashboard*"
+  - "scripts/lib/eval-dashboard/**"
 ---
 
 # Eval-Driven Development

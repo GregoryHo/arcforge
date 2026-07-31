@@ -14,7 +14,7 @@ status: promoted
 Use it when:
 
 - The user asks to use ArcForge or an ArcForge skill.
-- The task is an ArcForge workflow task: brainstorming, refining specs, planning, implementing epics, verifying, evaluating, or maintaining ArcForge skills.
+- The task is an ArcForge workflow task: brainstorming, dispatching work, verifying, evaluating, or maintaining ArcForge skills.
 - You are unsure which ArcForge skill should handle the next step.
 
 Respect higher-priority instructions, explicit user constraints, and the host harness. Skills are tools, not laws — prefer the smallest useful workflow, and if one would add more friction than value, do not force it. Strong workflows are opt-in by task fit, not always-on behavior.
@@ -25,26 +25,16 @@ Respect higher-priority instructions, explicit user constraints, and the host ha
 
 **In other environments:** Use the platform's skill-loading mechanism, or read the relevant skill documentation when no tool exists.
 
-## File Artifacts = Truth
-
-SDD pipeline v2 uses per-spec layout:
-
-- `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` → Design documents
-- `specs/<spec-id>/spec.xml` + `specs/<spec-id>/details/*.xml` → Refined specifications
-- `specs/<spec-id>/dag.yaml` + `specs/<spec-id>/epics/` → Implementation plans
-- Isolated feature work → see Worktree Rule below
-
 ## Worktree Rule
 
-ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`, computed at runtime by `${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js`. Two tiers exist: **epic worktrees** carry an `.arcforge-epic` marker and are coordinator-managed; **generic worktrees** (experiments, hotfixes, review checkouts) carry no marker.
+ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`, computed at runtime by the CLI. Worktrees carrying an `.arcforge-epic` marker belong to another lifecycle; **generic worktrees** (experiments, hotfixes, review checkouts) carry no marker.
 
 When touching worktrees:
 
 - Don't hardcode paths in output. Use abstract language like "the worktree" or fill paths from CLI output.
-- Don't create worktrees manually. For epic work, delegate to `arc-coordinating expand`; for everything else, delegate to `arc-using-worktrees` — so marker schema and DAG sync stay valid.
-- Re-entering an **epic** worktree: read its absolute `.path` from `arcforge status --json` (the epic-tier surface); do not reconstruct paths from memory.
-- Locating a **generic** worktree: read its `path` from `arcforge worktree list --json` (the generic surface) — never `status --json`, which only knows epic worktrees.
-- Direct file-editing belongs in a worktree; base sessions coordinate, worktree sessions implement. The `.arcforge-epic` marker distinguishes an epic worktree from a generic one.
+- Don't create worktrees manually — delegate to `arc-using-worktrees` so path derivation stays valid.
+- Locating a worktree: read its `path` from `arcforge worktree list --json` — do not reconstruct paths from memory.
+- Direct file-editing belongs in a worktree; base sessions coordinate, worktree sessions implement.
 
 For derivation rules, marker schema, and cleanup semantics, see `docs/guide/worktree-workflow.md`.
 
@@ -53,16 +43,14 @@ For derivation rules, marker schema, and cleanup semantics, see `docs/guide/work
 When multiple skills could apply, choose the smallest useful one:
 
 1. **Clarify intent** — `arc-brainstorming` when requirements or decisions are unclear.
-2. **Formalize source of truth** — `arc-refining` when converting a design/decision log into structured specs.
-3. **Plan work** — `arc-planning` when a refined spec needs an implementation DAG.
-4. **Execute work** — `arc-coordinating`, `arc-dispatching-teammates`, `arc-looping`, or `arc-implementing` based on DAG/worktree context.
-5. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
+2. **Write down the work** — `arc-writing-tasks` when the change is clear enough to break into tasks.
+3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `arc-dispatching-teammates`, or `arc-looping` based on task-list/worktree context.
+4. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
 
 Examples:
 
-- "Let's build X" → `arc-brainstorming` if design is unclear; `arc-planning` if a refined spec already exists.
+- "Let's build X" → `arc-brainstorming` if design is unclear; `arc-writing-tasks` if it is already clear.
 - "Fix this bug" → `arc-debugging` if cause is unknown; `arc-tdd` if cause and expected behavior are clear.
-- "Implement epic" → `arc-planning` if no `specs/<spec-id>/dag.yaml`; coordination/implementation skills if the DAG exists.
 
 ## Execution & Finishing Choosers
 
@@ -71,9 +59,9 @@ When two skills cover the same step, pick by the concrete condition:
 | Decision | Pick |
 |----------|------|
 | Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + single task-reviewer, both verdicts) |
-| Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-epic via DAG, lead present) |
-| Set up an isolated workspace | `arc-coordinating expand` for epic work (DAG-tracked, marker'd); `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo, no DAG) |
-| Finish work | `arc-finishing` (Step 0 discriminates on `.arcforge-epic`: epic path = coordinator merge; non-epic path = 4-option gate) |
+| Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-worktree, lead present) |
+| Set up an isolated workspace | `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo) |
+| Finish work | `arc-finishing` (4-option gate on the current worktree) |
 
 Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.
 

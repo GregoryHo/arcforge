@@ -2,17 +2,6 @@
   "hooks": {
     "SessionStart": [
       {
-        "id": "inject-skills",
-        "description": "Inject the minimal arcforge bootstrap context + ARCFORGE_ROOT (bash, writes CLAUDE_ENV_FILE).",
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" inject-skills/main.sh"
-          }
-        ]
-      },
-      {
         "id": "inject-context",
         "description": "Inject resume context (session summary, activated instincts).",
         "matcher": "startup|resume|clear|compact",
@@ -39,7 +28,7 @@
     "UserPromptSubmit": [
       {
         "id": "user-message-counter",
-        "description": "Increment the diary user-message counter (stdin-passthrough; stays standalone).",
+        "description": "Increment the diary user-message counter (stdin-passthrough).",
         "matcher": ".*",
         "hooks": [
           {
@@ -51,13 +40,13 @@
     ],
     "PreToolUse": [
       {
-        "id": "guard-dispatcher",
-        "description": "Sync guard dispatcher: deny guards (arc-guard, sdd-ledger-guard, dag-guard, sdd-ratify-guard, autopilot-deny) then a secrets-guard warn-only pass.",
+        "id": "secrets-guard",
+        "description": "Warn-only scan for hardcoded credentials in Edit/Write content and git commit commands.",
         "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch-pre.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/secrets-guard/main.js\""
           }
         ]
       },
@@ -76,13 +65,13 @@
     ],
     "PostToolUse": [
       {
-        "id": "post-dispatcher",
-        "description": "Sync PostToolUse dispatcher: quality-check accumulator + arc-remind + compact-suggester.",
+        "id": "compact-suggester",
+        "description": "Increment the shared diary tool-count on every event and suggest /compact at the threshold.",
         "matcher": ".*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch-post.js\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/compact-suggester/main.js\""
           }
         ]
       },
@@ -102,7 +91,7 @@
     "Stop": [
       {
         "id": "session-end",
-        "description": "Finalize the session, run the diary-capture threshold, and batch the quality checks.",
+        "description": "Finalize the session and run the threshold-gated diary capture.",
         "matcher": ".*",
         "hooks": [
           {

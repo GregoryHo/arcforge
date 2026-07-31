@@ -12,20 +12,16 @@ Run `npm test` before every PR. It executes 5 separate runners:
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
-| Jest | `npm run test:scripts` | `tests/scripts/`, `skills/**/__tests__/` | Core engine + the contract lints (see below) |
+| Jest | `npm run test:scripts` | `tests/scripts/` | Core engine + the contract lints (see below) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
-| Custom | `npm run test:node` | `tests/node/` | CLI, schemas, models, YAML parser |
+| Custom | `npm run test:node` | `tests/node/` | CLI manifest contract, YAML parser, locking |
 | pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
-| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
+| Bash | `npm run test:observer-daemon` | `tests/observer-daemon/` | Observer daemon behavior |
 
 `hooks/` is **not** a separate npm project — there is no `hooks/package.json`,
 no `cd hooks && npm install`, and no second lockfile. `test:hooks` runs
 `node --test hooks/__tests__/*.test.js` from the repo root; hook tests resolve
 paths from `__dirname`, so they must stay cwd-independent.
-
-`test:observer-daemon` still points into `skills/arc-learning/` — that is a
-tracked D8 allowlist entry, not a pattern to copy. It moves to the engine side
-in P2.
 
 ## Static Checks (all 5 run in CI)
 

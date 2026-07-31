@@ -1,8 +1,9 @@
 /**
- * yaml-parser.js - Simple YAML parser for dag.yaml
+ * yaml-parser.js - Simple YAML reader for arcforge's small config/marker files.
  *
- * This is NOT a general-purpose YAML parser. It only handles the specific
- * format used by dag.yaml, which is machine-generated and has a fixed structure.
+ * This is NOT a general-purpose YAML parser. It handles only the flat,
+ * machine-written subset arcforge reads (e.g. the `.arcforge-epic` worktree
+ * marker and frontmatter-shaped blocks).
  *
  * Supported features:
  * - Key-value pairs (key: value)
@@ -13,7 +14,7 @@
  * - Numbers and booleans
  * - Comments (# ...)
  *
- * NOT supported (not needed for dag.yaml):
+ * NOT supported:
  * - Anchors and aliases
  * - Multi-line strings (|, >)
  * - Complex types
@@ -241,124 +242,7 @@ function parseValue(str) {
   return str;
 }
 
-/**
- * Serialize a JavaScript object to YAML string
- * Uses the objectToYaml from dag-schema for consistency
- * @param {Object} obj - Object to serialize
- * @returns {string} YAML string
- */
-function stringify(obj) {
-  const { objectToYaml } = require('./dag-schema');
-  return objectToYaml(obj);
-}
-
-/**
- * Parse dag.yaml file content
- * Validates structure according to dag-schema
- * @param {string} content - File content
- * @returns {Object} Parsed DAG object
- */
-function parseDagYaml(content) {
-  const dag = parse(content);
-
-  // Ensure arrays exist
-  if (!dag.epics) dag.epics = [];
-  if (!dag.blocked) dag.blocked = [];
-
-  // Fill in defaults for epics
-  for (const epic of dag.epics) {
-    if (!epic.status) epic.status = 'pending';
-    if (!epic.depends_on) epic.depends_on = [];
-    if (!epic.features) epic.features = [];
-    if (epic.worktree === undefined) epic.worktree = null;
-
-    // Fill in defaults for features
-    for (const feature of epic.features) {
-      if (!feature.status) feature.status = 'pending';
-      if (!feature.depends_on) feature.depends_on = [];
-    }
-  }
-
-  return dag;
-}
-
-/**
- * Serialize DAG object to YAML file content
- * @param {Object} dag - DAG object to serialize
- * @returns {string} YAML string
- */
-function stringifyDagYaml(dag) {
-  // Clean up undefined values
-  const clean = {
-    epics: dag.epics.map((epic) => ({
-      id: epic.id,
-      name: epic.name,
-      status: epic.status,
-      spec_path: epic.spec_path,
-      worktree: epic.worktree || null,
-      depends_on: epic.depends_on || [],
-      features: (epic.features || []).map((feat) => {
-        const f = {
-          id: feat.id,
-          name: feat.name,
-          status: feat.status,
-          depends_on: feat.depends_on || [],
-        };
-        if (feat.source_requirement) {
-          f.source_requirement = feat.source_requirement;
-        }
-        return f;
-      }),
-    })),
-  };
-
-  if (dag.blocked && dag.blocked.length > 0) {
-    clean.blocked = dag.blocked.map((b) => ({
-      task_id: b.task_id,
-      reason: b.reason,
-      blocked_at: b.blocked_at,
-      attempts: b.attempts || [],
-    }));
-  }
-
-  return stringify(clean);
-}
-
-// ---------------------------------------------------------------------------
-// parseYamlSequence — helper for YAML root-level arrays.
-// ---------------------------------------------------------------------------
-// yaml-parser.js only supports YAML with an object at the root. Decision-log
-// and decision-ledger files are YAML sequences (root `- ` items). This helper
-// wraps the sequence in a `__seq__:` key, calls the existing parse(), and unwraps.
-//
-// Relocated from sdd-validators.js (where it was private) so sdd-utils.js can
-// import it without creating a circular dependency (sdd-utils -> sdd-validators
-// -> sdd-utils). yaml-parser.js is a leaf with no sdd-* dependencies.
-//
-// Supported row formats for sequence items:
-//   - key: value    (key-value lines at item indent)
-//
-function parseYamlSequence(content) {
-  // Wrap root-level `- ` items under a synthetic key so the existing parser
-  // can handle them. Each `- ` at column 0 becomes `  - ` under `__seq__:`.
-  const wrapped =
-    `__seq__:\n` +
-    content
-      .split('\n')
-      .map((line) => `  ${line}`)
-      .join('\n');
-  const obj = parse(wrapped);
-  if (!obj || !Array.isArray(obj.__seq__)) {
-    return null;
-  }
-  return obj.__seq__;
-}
-
 module.exports = {
   parse,
   parseValue,
-  stringify,
-  parseDagYaml,
-  stringifyDagYaml,
-  parseYamlSequence,
 };

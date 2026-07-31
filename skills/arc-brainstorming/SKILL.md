@@ -14,8 +14,6 @@ argument-hint: "[topic or feature to explore]"
 
 Never skip to design just because "requirements seem clear" or time is tight. Exploration validates assumptions and uncovers edge cases.
 
-**REQUIRED BACKGROUND:** Read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/design.md` before producing any design doc — it carries the canonical schema (required/forbidden sections, heading regexes, enforcement authority). The CLI alternative `node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" design` produces equivalent content. One schema covers both branches (prose when no prior spec; Context + Change Intent when prior spec exists); filesystem state decides which conditional fields apply.
-
 ## When NOT to Use
 
 - Requirements are already clear and documented
@@ -32,7 +30,7 @@ Never skip to design just because "requirements seem clear" or time is tight. Ex
 
 If it exists at the start of Phase 0, brainstorming MUST automatically enter the iterate branch — DO NOT ask "new spec or iteration?". The iterate target is determined by filesystem state; the user-consent gate is satisfied by the resolution-pick prompt below.
 
-Use `parseConflictMarker(filePath)` to load the file. It returns `{ axis_fired, conflict_description, candidate_resolutions, user_action_prompt }`. Treat the conflict body (`conflict_description` + cited design line ranges / Q&A `q_ids`) as the Change Intent seed. The canonical path is `specs/<spec-id>/_pending-conflict.md`.
+Read the file. It carries `axis_fired`, `conflict_description`, `candidate_resolutions`, and `user_action_prompt`. Treat the conflict body (`conflict_description` + cited design line ranges / Q&A `q_ids`) as the Change Intent seed. The canonical path is `specs/<spec-id>/_pending-conflict.md`.
 
 Present `candidate_resolutions` to the user VERBATIM from the pending file — do not paraphrase. Prompt:
 
@@ -129,7 +127,7 @@ Ask what is changing and why — one question at a time. Use the 2-Action Rule (
 
 #### Phase 2 Decision-Ledger Output (D6)
 
-After the change intent and key rationale are clear, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant decision. Follow the `DECISION_LEDGER_RULES` field shape exported from `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`:
+After the change intent and key rationale are clear, append a `status: proposed` entry to `specs/<spec-id>/decisions.yml` for each significant decision, using this field shape:
 
 ```yaml
 - D-id: D-NNN          # monotonically increasing, e.g. D-001, D-002
@@ -147,11 +145,9 @@ After the change intent and key rationale are clear, append a `status: proposed`
 
 The design doc carries a Context summary plus a natural-language Change Intent. The refiner reads this alongside `specs/<spec-id>/spec.xml` and **derives the structured `<delta>` itself** — the design doc carries human-authored narrative, never a pre-authored ADDED/MODIFIED/REMOVED list.
 
-Follow the canonical schema (REQUIRED BACKGROUND above); `validateDesignDoc` enforces it and wins on any disagreement.
-
 **Validate before writing to disk:**
 
-- Context section present (matching the regex printed by `print-schema.js`)
+- Context section present
 - Change Intent section present
 - No pre-authored structured delta section (Added/Modified/Removed/Renamed/Delta)
 
@@ -167,7 +163,7 @@ Write to: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md`
 
 Applies to **both branches**. Every session that elicits Q&A MUST emit the Q&A history as a structured decision-log in YAML at `docs/plans/<spec-id>/<YYYY-MM-DD>[-suffix]/decision-log.yml` — the refiner parses it mechanically via `parseDecisionLog` (its Phase 6 authorization check iterates rows by `q_id`), so brainstorming MUST NOT emit free-form prose.
 
-**Schema source of truth:** Before writing or validating `decision-log.yml`, direct-read `${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/decision-log.md` and follow the `DECISION_LOG_RULES` contract exported via `${ARCFORGE_ROOT}/scripts/lib/sdd-utils.js`. Do not copy a template into this skill; the generated schema is authoritative for required fields (`q_id`, `question`, `user_answer_verbatim`, `deferral_signal`), valid/invalid examples, canonical path, and the deferral-signal phrases used to set `deferral_signal: true` (currently `use defaults`, `covered.`, `skip`, `you decide`).
+**Required fields:** `q_id`, `question`, `user_answer_verbatim`, `deferral_signal`. Set `deferral_signal: true` when the answer defers the decision (`use defaults`, `covered.`, `skip`, `you decide`).
 
 **q_id stability:** Assign q_ids sequentially (`q1`, `q2`, ...). Once a question receives `q1`, that q_id MUST NOT be reassigned to a different question within the same session; added or revised rows get the next sequential q_id.
 
@@ -202,11 +198,7 @@ git commit -m "docs: add <spec-id> design and decision artifacts"
 
 If no ledger entries were appended this session and `specs/<spec-id>/decisions.yml` does not exist, skip its `git add` line.
 
-**3) Hand off to refiner** — always route to `/arc-refining` next:
-
-`/arc-refining` → `/arc-planning` → `/arc-coordinating`
-
-The refiner reads the complete design doc and runs the DAG completion gate before a new iteration spec, so an incomplete prior sprint will block.
+**3) Hand off** — always route to `/arc-writing-tasks` next, so the design becomes an executable task list.
 
 ## Common Rationalizations
 
@@ -228,7 +220,7 @@ The refiner reads the complete design doc and runs the DAG completion gate befor
 ─────────────────────────────────────────────────
 ✅ Brainstorm complete → docs/plans/<spec-id>/<YYYY-MM-DD>/design.md (committed)
 
-Next: /arc-refining → /arc-planning → /arc-coordinating
+Next: /arc-writing-tasks
 ─────────────────────────────────────────────────
 ```
 

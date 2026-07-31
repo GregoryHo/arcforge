@@ -98,8 +98,6 @@ function App() {
     theme: theme
   }), /*#__PURE__*/React.createElement(BeforeAfter, {
     theme: theme
-  }), /*#__PURE__*/React.createElement(SDDPipeline, {
-    theme: theme
   }), /*#__PURE__*/React.createElement(DayInLife, {
     theme: theme
   }), /*#__PURE__*/React.createElement(Wiki, {

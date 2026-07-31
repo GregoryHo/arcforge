@@ -23,20 +23,18 @@ Capture session reflections as structured diary entries for the **learning cycle
 
 ## Infrastructure Commands
 
-**Set SKILL_ROOT** from `ARCFORGE_ROOT` (fallback default below when unset):
+**Set SKILL_ROOT** (fallback default below when unset):
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-journaling}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-journaling}"
 if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
+  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set SKILL_ROOT manually." >&2
   exit 1
 fi
 ```
 
 **Save diary to correct location:**
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-journaling}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-journaling}"
 node "${SKILL_ROOT}/scripts/diary.js" save \
   --project {project} \
   --date {YYYY-MM-DD} \
@@ -79,8 +77,7 @@ Do this instead of writing a new entry from scratch:
 2. **If placeholders remain and you have conversation memory of that session**, edit the draft file in place to replace the `<!-- TO BE ENRICHED -->` blocks with real content — do not create a separate entry via `save`. If you do NOT have memory of the flagged session (e.g. the nudge surfaced in a later, unrelated session), leave the placeholders as-is rather than fabricating content.
 3. **Promote the draft to the final diary:**
    ```bash
-   : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-   : "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-journaling}"
+   : "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/arc-journaling}"
    node "${SKILL_ROOT}/scripts/diary.js" finalize \
      --project {project} \
      --date {YYYY-MM-DD} \

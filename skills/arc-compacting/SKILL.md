@@ -29,8 +29,8 @@ Use this skill when:
 | Debugging → next feature | **Yes** | Debug traces pollute context for unrelated work |
 | Mid-implementation | **No** | Losing variable names, file paths, partial state is costly |
 | After failed approach | **Yes** | Clear dead-end reasoning before new approach |
-| After `arc-brainstorming` produces design doc | **Yes** | Design is saved to file; compact before refining |
-| After `arc-planning` produces dag.yaml | **Yes** | DAG persists; free context for implementation |
+| After `arc-brainstorming` produces design doc | **Yes** | Design is saved to file; compact before the next step |
+| After `arc-writing-tasks` produces a task list | **Yes** | The list persists on disk; free context for execution |
 
 ## What Survives vs What's Lost
 
@@ -82,7 +82,7 @@ The summary text becomes the seed for the compressed context. Make it actionable
 - **compact-suggester hook** — triggers threshold notifications that reference this skill
 - **pre-compact hook** — auto-triggers diary capture before compaction
 - **arc-agent-driven** — compact between task batches, not mid-task; its `.arcforge/sdd/progress.md` ledger is your per-task recovery map after any compact or fresh session
-- **arc-planning** — compact after DAG is written to disk
+- **arc-writing-tasks** — compact after the task list is written to disk
 
 **Red Flags:**
 - Compacting while holding un-persisted design decisions

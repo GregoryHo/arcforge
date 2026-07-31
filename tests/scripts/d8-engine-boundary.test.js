@@ -33,11 +33,12 @@ const { REPO_ROOT } = require('./v6-legacy-skills');
 //   - `.claude/skills/…` is this repo's own contributor-side skill dir, not the
 //     shipped `skills/` tree, so it never counts.
 //
-// OUT-OF-PARTITION reverse references that exist today and are NOT in the
-// allowlist below because they live outside scripts/ and hooks/:
-//   - package.json  → `test:observer-daemon` runs skills/arc-learning/tests/…
-//   - jest.config.js → testMatch includes `**/skills/**/__tests__/**`
-// Both move to the engine side in P2 (observer daemon) / P5.
+// The two OUT-OF-PARTITION reverse references this file used to track —
+// package.json's `test:observer-daemon` and jest.config.js's
+// `**/skills/**/__tests__/**` testMatch — are gone as of P2: the observer daemon
+// moved to scripts/lib/learning-curator/ (tests to tests/observer-daemon/) and
+// the eval dashboard moved to scripts/lib/eval-dashboard/ (tests to
+// tests/scripts/), so no skill tree holds engine code or engine tests any more.
 //
 // ALLOWLIST CONTRACT: the allowlist is compared for EXACT EQUALITY against the
 // scan result. A new violation fails; so does a stale entry left behind after a
@@ -63,15 +64,13 @@ const PATH_SHAPE_RE = /(?<![\w-])(?<!\.claude\/)skills\/([a-z0-9][a-z0-9-]*)(?![
 const SEGMENT_SHAPE_RE = /['"]skills['"]\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"]/g;
 
 // file + skill → number of references. Empty by the P5 gate.
-const ALLOWLIST = [
-  { file: 'hooks/observe/main.js', skill: 'arc-learning', count: 1 },
-  { file: 'hooks/session-tracker/end.js', skill: 'arc-reflecting', count: 1 },
-  { file: 'hooks/session-tracker/start.js', skill: 'arc-learning', count: 1 },
-  { file: 'scripts/cli/eval-command.js', skill: 'arc-evaluating', count: 1 },
-  { file: 'scripts/lib/diary-capture.js', skill: 'arc-journaling', count: 1 },
-  { file: 'scripts/lib/eval-grader-model.js', skill: 'arc-evaluating', count: 4 },
-  { file: 'scripts/lib/learning-curator/batch-assembler.js', skill: 'arc-learning', count: 1 },
-];
+//
+// P2 burned every `scripts/**` entry down to zero by relocating the files the
+// engine was reaching for: observer-daemon.sh + observer-prompt.md →
+// scripts/lib/learning-curator/, auto-diary.js → scripts/lib/, the three eval
+// agent prompts → scripts/lib/prompts/, the eval dashboard →
+// scripts/lib/eval-dashboard/. What survives is `hooks/**` only.
+const ALLOWLIST = [{ file: 'hooks/session-tracker/end.js', skill: 'arc-reflecting', count: 1 }];
 
 function isExcluded(name) {
   return name.startsWith('.') || name === 'node_modules' || name === '__tests__';
@@ -160,8 +159,10 @@ describe('D8 engine/skill boundary', () => {
 
   it('is empty by the P5 gate (tracking assertion)', () => {
     // Not yet enforceable — P5 flips this to expect(ALLOWLIST).toEqual([]).
-    // Until then it pins the direction: the list must only shrink.
-    expect(ALLOWLIST.length).toBeLessThanOrEqual(7);
+    // Until then it pins the direction: the list must only shrink. Ratcheted
+    // 7 → 1 in P2; every remaining entry lives under hooks/.
+    expect(ALLOWLIST.length).toBeLessThanOrEqual(1);
+    expect(ALLOWLIST.every((e) => e.file.startsWith('hooks/'))).toBe(true);
   });
 });
 

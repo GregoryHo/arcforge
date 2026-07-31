@@ -6,7 +6,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PROMPT_PATH = path.resolve(__dirname, '../../skills/arc-learning/scripts/observer-prompt.md');
+const PROMPT_PATH = path.resolve(
+  __dirname,
+  '../../scripts/lib/learning-curator/observer-prompt.md',
+);
 
 let promptContent;
 

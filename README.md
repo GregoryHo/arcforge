@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a minimal, composable skill toolkit for Claude Code and Codex. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
+arcforge is a minimal, composable skill toolkit for Claude Code. It gives agents lightweight routing, self-contained skills, and eval-backed quality gates without turning every task into a mandatory workflow.
 
 ## Why arcforge
 
@@ -19,18 +19,16 @@ The outcome: your agent has disciplined workflows when the task justifies them, 
 ArcForge is split into three layers:
 
 1. **Core toolkit** — a small promoted surface for routing, design, specs, planning, TDD, debugging, verification, and eval.
-2. **Optional workflows** — recipes for SDD, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
+2. **Optional workflows** — recipes for feature work, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
 3. **Harness/eval layer** — tests that verify both activation and non-activation behavior, including instruction-strength regressions.
 
-When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, `ARCFORGE_ROOT` is set, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
+When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
 
 Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a single per-task reviewer that returns both verdicts in one pass (spec compliance and task quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
 Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
 
 ## Installation
-
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex requires manual setup.
 
 ### Claude Code (Plugin Marketplace)
 
@@ -63,16 +61,6 @@ Check that commands appear:
 
 Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:arc-tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
 
-### Codex
-
-Tell Codex:
-
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.codex/INSTALL.md
-```
-
-**Detailed docs:** `docs/README.codex.md`
-
 ## Quick Start: Common Commands
 
 These are the most frequently used commands:
@@ -94,16 +82,16 @@ These are the most frequently used commands:
 
 | Context | Recommended skills | Entry point |
 |---------|-------------------|-------------|
-| Vague idea, new requirement | brainstorming, refining, planning | `arc-brainstorming` |
+| Vague idea, new requirement | brainstorming | `arc-brainstorming` |
 | Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
-| Large multi-epic initiative | planning, coordinating, implementing | `arc-planning` |
+| Large multi-epic initiative | using-worktrees, dispatching-teammates | `arc-dispatching-teammates` |
 | Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
 | Bug or regression | debugging, tdd, verifying | `arc-debugging` |
 | End of session | journaling | `arc-journaling` |
 
 **Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
 
-**Finishing:** `arc-finishing` for both — its Step 0 discriminates on `.arcforge-epic` (epic worktree vs normal branch).
+**Finishing:** `arc-finishing` for both.
 
 ## Terminology
 
@@ -111,32 +99,25 @@ These are the most frequently used commands:
 - **feature** - A scoped deliverable inside an epic.
 - **task** - A small, executable step produced by `arc-writing-tasks`.
 - **design** - The design document from `arc-brainstorming`.
-- **spec** - The structured spec output from `arc-refining`.
-- **dag** - The dependency graph produced by `arc-planning`.
 
 ## What's Inside
 
 Skills grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
 
-### SDD (idea → spec → tasks → integration)
+### Task workflow (idea → tasks → integration)
 
 - **arc-brainstorming** - Explore and shape a design before implementation
-- **arc-refining** - Formalize an approved design into a structured `spec.xml`
-- **arc-planning** - Break a refined spec into an executable DAG of epics
 - **arc-writing-tasks** - Break a feature into small executable tasks with exact code
 - **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
-- **arc-implementing** - Orchestrate a large multi-feature project inside a worktree
-- **arc-finishing** - Integrate finished work; Step 0 discriminates epic worktree vs branch on `.arcforge-epic`
-- **arc-auditing-spec** _(user-invoked)_ - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
+- **arc-finishing** - Integrate finished work
 
 ### Orchestration (subagents, worktrees, loops)
 
 - **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
-- **arc-coordinating** - Coordinate multi-epic worktrees and cross-epic DAG state
 - **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
 - **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
-- **arc-looping** - Autonomous unattended cross-session DAG execution
-- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout); epic work auto-escalates to the coordinator
+- **arc-looping** - Autonomous unattended cross-session task-list execution
+- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout)
 
 ### Discipline (quality gates)
 
@@ -144,7 +125,6 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 - **arc-debugging** - Systematic root-cause investigation before any fix
 - **arc-verifying** - Fresh evidence before completion claims
 - **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
-- **arc-researching** - Autonomous hypothesis-driven metric optimization
 
 ### Memory (session continuity + learning; default-off module)
 
@@ -168,73 +148,35 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 - **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
 - **arc-writing-skills** _(user-invoked)_ - Create, edit, or verify ArcForge's own skills and skill tests
 
-### Agents
-
-Skills delegate focused work to specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
-
-| Agent | Role |
-|-------|------|
-| `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
-| `task-reviewer` | Per-task review: spec compliance + task quality in one pass (arc-agent-driven) |
-| `spec-reviewer` | Epic-acceptance spec compliance, whole merged branch (arc-dispatching-teammates / arc-dispatching-parallel) |
-| `code-reviewer` | Review a completed step against plan and standards (arc-reviewing) |
-| `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
-| `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
-| `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
-| `arc-auditing-spec-cross-artifact-alignment` | Spec audit axis 2 (arc-auditing-spec) |
-| `arc-auditing-spec-state-transition-integrity` | Spec audit axis 3 (arc-auditing-spec) |
-
 ### Hooks
 
-ArcForge registers event hooks (Claude Code only) that work silently in the background: a SessionStart bootstrap, session tracking, observation logging, SDD guards, and journaling triggers. They inject at most a few hundred tokens per session and never block normal work. See the **[Hooks System guide](docs/guide/hooks-system.md)** for the full list and how each one behaves.
-
-### Review Templates
-
-Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from any
-harness that can dispatch a subagent (Claude Code, Codex):
-
-- `templates/implementer-prompt.md` - TDD implementer subagent prompt
-- `templates/task-reviewer-prompt.md` - Per-task reviewer prompt (spec compliance + task quality)
-- `templates/spec-reviewer-prompt.md` - Epic-acceptance spec compliance reviewer prompt
+ArcForge registers event hooks (Claude Code only) that work silently in the background: session tracking, observation logging, a secrets guard, compaction handling, and journaling triggers. They inject at most a few hundred tokens per session and never block normal work. See the **[Hooks System guide](docs/guide/hooks-system.md)** for the full list and how each one behaves.
 
 ## CLI Usage
 
-The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
+You typically do not run the CLI directly — skills invoke it. For manual use or debugging:
 
-The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>` — the SessionStart hook sets `ARCFORGE_ROOT` to the installed plugin directory. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
+The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" <cmd>` — `CLAUDE_PLUGIN_ROOT` is provided natively by Claude Code. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
 
 ```bash
-# Show workflow status
-arcforge status
+# Generic (non-epic) worktree management
+arcforge worktree add <name> [--from <ref>] [--setup]
+arcforge worktree list [--json]
+arcforge worktree remove <name> [--force]
 
-# Get next available task
-arcforge next
+# Autonomous cross-session loop over a markdown task list
+arcforge loop --tasks tasks.md [--max-runs N] [--verifier]
 
-# Mark task as completed
-arcforge complete <task-id>
+# Eval harness
+arcforge eval list
+arcforge eval run <scenario> [--k N]
 
-# Mark task as blocked with reason
-arcforge block <task-id> <reason>
+# Optional learning subsystem
+arcforge learn status
+arcforge learn dashboard [--port N]
 
-# Show parallelizable epics
-arcforge parallel
-
-# Create worktrees for ready epics (--verify runs baseline tests)
-arcforge expand [--verify]
-
-# Merge completed epics into base branch
-arcforge merge [--base <branch>]
-
-# Remove merged worktree directories
-arcforge cleanup
-
-# Sync state between worktree and base DAG
-arcforge sync [--direction from-base|to-base|both|scan]
-
-# Show 5-Question Reboot context:
-#   Where am I? / Where am I going? / What's the goal?
-#   What have I learned? / What have I done?
-arcforge reboot
+# Obsidian vault registry
+arcforge obsidian list-vaults [--json]
 ```
 
 ## Development
@@ -259,9 +201,9 @@ npm test
 # Individual runners
 npm run test:scripts          # Jest — CLI engine (scripts/lib/)
 npm run test:hooks            # Node --test — hook behavior (hooks/__tests__/)
-npm run test:node             # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
+npm run test:node             # Custom — CLI manifest contract, YAML parser (tests/node/)
 npm run test:skills           # pytest — skill structure validation (tests/skills/)
-npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-learning/tests/)
+npm run test:observer-daemon  # Bash — observer daemon behavior (tests/observer-daemon/)
 
 # Run CLI
 node scripts/cli.js --help

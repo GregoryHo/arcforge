@@ -1,28 +1,45 @@
 /**
- * loop-verifier.test.js — AF-9 verifier-agent gate + verbatim-feedback retry.
+ * loop-verifier.test.js — verifier-agent gate + verbatim-feedback retry.
  *
- * Layered ON TOP of AF-8's deterministic floor. The verifier session spawn is a
+ * Layered ON TOP of the deterministic floor. The verifier session spawn is a
  * stub callback (no real `claude -p`); the verdict is parsed from its text
  * result, never inferred from an exit code. Invariants pinned here:
  *   - parseVerdict: explicit `Final verdict:` line, last-wins, markdown-tolerant;
  *     SHIP/garbage/empty → null (the stub-vs-real divergence STOP signal).
- *   - --verifier OFF → no extra session, byte-identical (no-op gate).
- *   - FAIL → verbatim feedback re-spawn → PASS → completeTask.
- *   - FAIL exhausted → block with last verdict; attempts round-trip persisted.
- *   - UNPARSEABLE verdict → block, NEVER inferred PASS.
+ *   - --verifier OFF → no extra session (no-op gate).
+ *   - FAIL → verbatim feedback re-spawn → PASS → passes.
+ *   - FAIL exhausted → fail with last verdict; attempts round-trip persisted.
+ *   - UNPARSEABLE verdict → fail, NEVER inferred PASS.
  *   - cost-stop > retry: maxCost crossing stops the retry without re-spawning.
- *   - S4-8: missing-criteria fixture → verifier skipped (not blocked).
+ *   - unreadable verifier prompt → gate skipped (not blocked).
+ *
+ * The verifier prompt body is injected through readFileSafe: the gate SKIPS on
+ * an unreadable prompt file, so depending on the real file would make every
+ * gate assertion pass vacuously if it ever moved.
  */
 
-const fs = require('node:fs');
-const os = require('node:os');
+const mockVerifier = { body: '---\nname: verifier\n---\n# Verifier\nYou verify work.' };
+
+jest.mock('../../scripts/lib/utils', () => {
+  const actual = jest.requireActual('../../scripts/lib/utils');
+  const { sep } = require('node:path');
+  return {
+    ...actual,
+    readFileSafe: (filePath, fallback) =>
+      typeof filePath === 'string' && filePath.endsWith(`prompts${sep}verifier.md`)
+        ? mockVerifier.body
+        : actual.readFileSafe(filePath, fallback),
+  };
+});
+
 const path = require('node:path');
 
 const {
   DEFAULT_MAX_RETRIES,
+  VERIFIER_AGENT_PATH,
   parseVerdict,
   loadVerifierBody,
-  loadVerifierCriteria,
+  buildTaskCriteria,
   assembleVerifierPrompt,
   recordVerifierAttempt,
   runVerifierGate,
@@ -57,21 +74,36 @@ describe('parseVerdict', () => {
   });
 });
 
-// --- agent body + assembly (read-only; never edits agents/verifier.md) ----------
+// --- prompt location + body loading (read-only; never edits the prompt) --------
+
+describe('VERIFIER_AGENT_PATH', () => {
+  it('points at the engine-side prompt, not a skill or agents/ directory', () => {
+    expect(
+      VERIFIER_AGENT_PATH.endsWith(path.join('scripts', 'lib', 'prompts', 'verifier.md')),
+    ).toBe(true);
+  });
+});
 
 describe('loadVerifierBody', () => {
-  it('reads agents/verifier.md and strips frontmatter', () => {
+  it('reads the verifier prompt and strips frontmatter', () => {
     const body = loadVerifierBody();
     expect(body).toBeTruthy();
     expect(body.startsWith('---')).toBe(false);
     expect(body).toContain('Verifier');
+  });
+
+  it('returns null when the prompt file is unreadable', () => {
+    const saved = mockVerifier.body;
+    mockVerifier.body = '';
+    expect(loadVerifierBody()).toBeNull();
+    mockVerifier.body = saved;
   });
 });
 
 describe('assembleVerifierPrompt', () => {
   const base = {
     agentBody: 'AGENT BODY',
-    task: { id: 'epic-a', name: 'Epic A' },
+    task: { id: 'T1', text: 'Implement the parser' },
     criteria: 'criterion one',
     verifyCommand: ['npm', 'test'],
   };
@@ -94,43 +126,27 @@ describe('assembleVerifierPrompt', () => {
   });
 });
 
-// --- S4-8 criteria degradation ladder ------------------------------------------
+// --- acceptance criteria come from the D3 task itself --------------------------
 
-describe('loadVerifierCriteria (S4-8 degradation)', () => {
-  let tmp;
-  beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'af9-crit-'));
-  });
-  afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }));
-
-  function coord(specId) {
-    return { specId };
-  }
-
-  it('uses specs/<spec>/epics/<epic>/ markdown when present', () => {
-    const dir = path.join(tmp, 'specs', 'spec1', 'epics', 'epic-a');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'epic.md'), '# Acceptance\n- do the thing\n');
-    const criteria = loadVerifierCriteria(coord('spec1'), { id: 'epic-a' }, tmp);
-    expect(criteria).toContain('do the thing');
+describe('buildTaskCriteria', () => {
+  it("uses the task's text as the criterion", () => {
+    expect(buildTaskCriteria({ id: 'T1', text: 'Implement the parser' })).toContain(
+      'Implement the parser',
+    );
   });
 
-  it('falls back to spec_path contents + feature names when epics/ dir absent', () => {
-    fs.writeFileSync(path.join(tmp, 'spec-doc.md'), 'SPEC BODY CRITERIA');
-    const epic = {
-      id: 'epic-a',
-      spec_path: 'spec-doc.md',
-      features: [{ name: 'Feature One' }, { name: 'Feature Two' }],
-    };
-    const criteria = loadVerifierCriteria(coord('spec1'), epic, tmp);
-    expect(criteria).toContain('SPEC BODY CRITERIA');
-    expect(criteria).toContain('Feature One');
-    expect(criteria).toContain('Feature Two');
+  it("includes the task's own verify command as a hard criterion", () => {
+    const criteria = buildTaskCriteria({ id: 'T1', text: 'Do it', verify: 'npm test' });
+    expect(criteria).toContain('npm test');
   });
 
-  it('returns empty string when no epics/, no spec_path, and no features', () => {
-    const criteria = loadVerifierCriteria(coord('spec1'), { id: 'epic-a', features: [] }, tmp);
-    expect(criteria).toBe('');
+  it("includes the task's note when present", () => {
+    const criteria = buildTaskCriteria({ id: 'T1', text: 'Do it', note: 'blocked on creds' });
+    expect(criteria).toContain('blocked on creds');
+  });
+
+  it('never returns empty for a task with text — the gate always has criteria', () => {
+    expect(buildTaskCriteria({ id: 'T1', text: 'Do it' })).not.toBe('');
   });
 });
 
@@ -139,13 +155,13 @@ describe('loadVerifierCriteria (S4-8 degradation)', () => {
 describe('recordVerifierAttempt round-trip', () => {
   it('persists attempts to loop state and survives JSON serialize/parse', () => {
     const state = { iteration: 2, run_id: 'r1' };
-    recordVerifierAttempt(state, 'epic-a', {
+    recordVerifierAttempt(state, 'T1', {
       attempt: 1,
       verdict: 'FAIL',
       feedback: 'x',
       cost_usd: 0.5,
     });
-    recordVerifierAttempt(state, 'epic-a', {
+    recordVerifierAttempt(state, 'T1', {
       attempt: 2,
       verdict: 'PASS',
       feedback: '',
@@ -154,7 +170,7 @@ describe('recordVerifierAttempt round-trip', () => {
     const roundTripped = JSON.parse(JSON.stringify(state));
     expect(roundTripped.verifier_attempts).toHaveLength(2);
     expect(roundTripped.verifier_attempts[0]).toMatchObject({
-      task_id: 'epic-a',
+      task_id: 'T1',
       attempt: 1,
       verdict: 'FAIL',
       run_id: 'r1',
@@ -166,30 +182,20 @@ describe('recordVerifierAttempt round-trip', () => {
 // --- runVerifierGate: the gate + retry sub-loop --------------------------------
 
 describe('runVerifierGate', () => {
-  let tmp;
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'af9-gate-'));
-    // A resolvable criteria source so the gate does not skip on missing criteria.
-    const dir = path.join(tmp, 'specs', 'spec1', 'epics', 'epic-a');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'epic.md'), '# Acceptance\n- ship it\n');
+    mockVerifier.body = '# Verifier\nYou verify work.';
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
-  afterEach(() => {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    jest.restoreAllMocks();
-  });
+  afterEach(() => jest.restoreAllMocks());
 
-  const task = { id: 'epic-a', name: 'Epic A' };
+  const task = { id: 'T1', text: 'Implement the parser' };
   function ctxBase(overrides = {}) {
     return {
-      coord: { specId: 'spec1' },
       task,
       state: { iteration: 1, total_cost: 0 },
       options: { verifier: true, maxRetries: 2, verifyCommand: ['true'] },
-      cwd: tmp,
-      projectRoot: tmp,
+      cwd: process.cwd(),
       spawnImplementer: jest.fn(() => ({ exitCode: 0, stdout: '', costUsd: 1 })),
       spawnVerifier: jest.fn(),
       buildImplementerPrompt: (fb) => `IMPL ${fb}`,
@@ -284,12 +290,9 @@ describe('runVerifierGate', () => {
     expect(ctx.spawnImplementer).not.toHaveBeenCalled();
   });
 
-  it('S4-8: missing criteria → verifier SKIPPED (not blocked), no session, warning fires', () => {
-    // Empty epic dir, no spec_path, no features → no criteria resolvable.
-    const ctx = ctxBase({
-      coord: { specId: 'spec-none' },
-      task: { id: 'epic-z', name: 'Epic Z', features: [] },
-    });
+  it('unreadable verifier prompt → gate SKIPPED (not blocked), no session, warning fires', () => {
+    mockVerifier.body = '';
+    const ctx = ctxBase();
     const out = runVerifierGate(ctx);
     expect(out.passed).toBe(true);
     expect(out.skipped).toBe(true);

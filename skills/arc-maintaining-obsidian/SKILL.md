@@ -66,7 +66,7 @@ Every vault-level mode runs **Domain Contract Orientation first**, then loads th
 
 | Mode | Order |
 |---|---|
-| **init-vault** | Exception: read `references/bootstrap-workflow.md` first because no vault contract exists yet; that workflow authors the contract and registers via `${ARCFORGE_ROOT}/scripts/cli.js obsidian register`. |
+| **init-vault** | Exception: read `references/bootstrap-workflow.md` first because no vault contract exists yet; that workflow authors the contract and registers via `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian register`. |
 | **Ingest** | Resolve vault → read `references/domain-contract-orientation.md` → load `references/page-templates.md` for Raw Source / sha256 / extraction mechanisms if AGENTS.md adopts them → at the Visuals step, load `references/visuals-decision-tree.md`. |
 | **Query** | Resolve vault → orientation → `references/search-strategies.md` for route selection and output adaptation. |
 | **Audit** | Resolve vault → orientation → `references/audit-checks.md` for LINK / LINT / GROW mechanics; apply vault-declared domain policy from SCHEMA.md. |
@@ -87,7 +87,7 @@ Before any vault-level mode, read `<vault>/AGENTS.md` (runtime contract) and `<v
 
 ### Registry Maintenance
 
-The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill manages this file end-to-end through `${ARCFORGE_ROOT}/scripts/cli.js obsidian <subcommand>` — never hand-edit, never construct JSON manually.** Subcommands: `register`, `unregister`, `set-default`, `list-vaults`. The CLI applies first-becomes-default, atomic write, and file locking. Schema, behavior table, and rationale in `references/registry-maintenance.md`.
+The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The skill manages this file end-to-end through `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian <subcommand>` — never hand-edit, never construct JSON manually.** Subcommands: `register`, `unregister`, `set-default`, `list-vaults`. The CLI applies first-becomes-default, atomic write, and file locking. Schema, behavior table, and rationale in `references/registry-maintenance.md`.
 
 ### init-vault Bootstrap
 

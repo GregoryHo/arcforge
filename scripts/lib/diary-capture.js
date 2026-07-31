@@ -127,7 +127,7 @@ function draftIsStale(filePath) {
  */
 function tryGenerateAutoDiary(project, date, sessionId) {
   try {
-    const autoDiaryPath = path.join(__dirname, '../../skills/arc-journaling/scripts/auto-diary.js');
+    const autoDiaryPath = path.join(__dirname, 'auto-diary.js');
     const result = execFileSync(
       'node',
       [autoDiaryPath, 'generate', '--project', project, '--date', date, '--session', sessionId],

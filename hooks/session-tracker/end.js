@@ -28,7 +28,6 @@ const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { parseTranscript } = require('../../scripts/lib/transcript');
-const { runStopBatch } = require('../quality-check/main');
 
 /**
  * Calculate duration in minutes between two ISO timestamps
@@ -171,12 +170,6 @@ function main() {
     },
   });
 
-  // Stop-time quality batch: run Prettier + tsc + console.* scan ONCE over the
-  // paths accumulated by the PostToolUse dispatcher this session. Findings are
-  // user-visible only (systemMessage) — the model channel is unavailable at Stop
-  // and lint findings must not block the Stop.
-  const qualityMessage = runStopBatch(input?.cwd || process.cwd());
-
   const systemMessages = [];
   if (triggered) {
     const reflectStatus = checkReflectReady(session.project);
@@ -193,7 +186,6 @@ function main() {
   } else {
     log(formatShortMessage(userCount, toolCount));
   }
-  if (qualityMessage) systemMessages.push(qualityMessage);
 
   if (systemMessages.length > 0) {
     output({ systemMessage: systemMessages.join('\n\n') });

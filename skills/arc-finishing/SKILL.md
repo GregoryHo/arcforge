@@ -1,6 +1,6 @@
 ---
 name: arc-finishing
-description: Integrate finished work once implementation is complete and tests pass. Use when deciding how to merge — Step 0 discriminates epic worktrees (.arcforge-epic present) from regular branches and runs the matching path.
+description: Integrate finished work once implementation is complete and tests pass. Use when deciding how to merge a finished branch or worktree — verify tests, present the options, execute the choice, clean up.
 category: sdd
 status: promoted
 ---
@@ -10,52 +10,15 @@ status: promoted
 ## Overview
 
 Guide completion of development work by presenting clear options and handling the
-chosen workflow. One skill, two paths: an **epic path** (a `.arcforge-epic`
-worktree integrated through the coordinator) and a **non-epic path** (a regular
-branch or generic worktree integrated with plain git). Step 0 reads the marker
-and selects the path — you never need a sibling skill.
+chosen workflow. It covers a regular branch and a worktree created by
+`arc-using-worktrees`, both integrated with plain git — you never need a sibling
+skill.
 
 **Core principle:** Verify tests → Present options → Execute choice → Clean up.
 
 **REQUIRED BACKGROUND:** You MUST use verification mindset. See `arc-verifying`.
 
 ## The Process
-
-### Step 0: Pick the Path
-
-```bash
-# The .arcforge-epic marker decides which path you are on.
-if [ -f .arcforge-epic ]; then
-  cat .arcforge-epic   # EPIC PATH — coordinator merge (Step 0.5 onward, epic branches)
-else
-  echo "non-epic"      # NON-EPIC PATH — plain git in a base checkout (skip to Step 1)
-fi
-```
-
-- **`.arcforge-epic` present → Epic Path.** Do Step 0.5 (sync), then the epic
-  variants of every step below.
-- **`.arcforge-epic` absent → Non-Epic Path.** Skip Step 0.5; do the non-epic
-  variants. A non-epic path covers a regular branch and a generic worktree
-  created by `arc-using-worktrees`.
-
-The two paths share the test gate (Step 1), the 4-option prompt (Step 3), and the
-typed-discard confirmation (Step 4 Option 4). Only the integration mechanics
-differ.
-
-### Step 0.5: Sync Before Finish (Epic Path only)
-
-```bash
-# Derive SKILL_ROOT from ARCFORGE_ROOT (hook-set under Claude; fallback default elsewhere), then sync
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
-  exit 1
-fi
-node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction from-base
-```
-
-**Purpose:** Verify no dependency changes since last sync. If dependencies changed (e.g., a blocking epic was reverted), the synced section will reflect this.
 
 ### Step 1: Verify Tests
 
@@ -108,9 +71,6 @@ Which option?
 
 ### Step 4: Execute Choice
 
-The choice is the same; the mechanics differ by path. Each option below has an
-**Epic** variant and a **Non-Epic** variant — run the one Step 0 selected.
-
 #### Option 1: Merge Locally
 
 **Migrate before you destroy.** Capture the branch and the base checkout path
@@ -121,40 +81,7 @@ inside. **Never `git checkout <base-branch>` inside a linked worktree** (git 2.5
 exits 128); always merge into the base from the base checkout (`cd` there, or
 `git -C <base>`).
 
-**Epic Path — use coordinator merge (NOT git merge directly):**
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-# Capture the live epic branch (the engine names it <spec-id>/<epic-id>) and the
-# base worktree path from the marker — BEFORE anything is removed.
-EPIC_BRANCH="$(git branch --show-current)"
-BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
-
-# Merge via coordinator (auto-detects epic + base). Safe to run from the worktree.
-node "${SKILL_ROOT}/scripts/finish-epic.js" merge
-
-# Move to the base checkout so cleanup, status, and branch -d all act on the
-# base dag and you are not standing in the directory about to be removed.
-cd "$BASE_WORKTREE"
-
-# Clean up merged worktrees (delegates to base; removes the epic worktree).
-node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup
-
-# Look up the (now null) path for the completion format, then delete the merged
-# branch. `-d` is the honest, safe delete — it refuses if the branch was not
-# fully merged, which is exactly the guard you want.
-node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
-git branch -d "$EPIC_BRANCH"
-```
-
-**If the merge produces a conflict** (coordinator returns non-zero, or `git status` shows unmerged paths), STOP before resolving. Go to **Step 4.1: Merge Conflict Handling** below. Do NOT auto-resolve, hand-edit conflict markers, or retry blindly.
-
-**If `git branch -d` refuses** ("not fully merged"), STOP — do NOT force with `-D`. A refusal means the merge did not actually land; investigate before destroying the branch.
-
-Report completion format when done — and only claim the branch is deleted after `git branch -d` actually succeeded.
-
-**Non-Epic Path — merge into the base checkout (NEVER checkout the base inside this worktree):**
+**Merge into the base checkout (NEVER checkout the base inside this worktree):**
 
 ```bash
 # Capture the feature branch BEFORE you move.
@@ -162,8 +89,7 @@ FEATURE_BRANCH="$(git branch --show-current)"
 
 # Locate the base checkout. `worktree list --json` annotates kind; the base
 # checkout is the kind:base entry (falls back to the porcelain first entry).
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-BASE_WORKTREE="$(node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json \
+BASE_WORKTREE="$(node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const w=JSON.parse(s).worktrees;const b=w.find(x=>x.kind==="base")||w[0];process.stdout.write(b.path)})')
 
 # Merge into the base from the base checkout — git -C keeps you in this worktree.
@@ -175,32 +101,14 @@ git -C "$BASE_WORKTREE" merge "$FEATURE_BRANCH"
 ( cd "$BASE_WORKTREE" && <test command> )
 ```
 
-Then: Cleanup worktree (Step 5). In a non-epic worktree, **the branch delete
+Then: Cleanup worktree (Step 5). In a worktree, **the branch delete
 happens only AFTER the worktree is removed** (Step 5), executed from the base
 checkout: `git -C "$BASE_WORKTREE" branch -d "$FEATURE_BRANCH"`. On a plain branch
 with no worktree, that same base `branch -d` is all you need.
 
+**If `git branch -d` refuses** ("not fully merged"), STOP — do NOT force with `-D`. A refusal means the merge did not actually land; investigate before destroying the branch.
+
 #### Option 2: Push and Create PR
-
-**Epic Path:**
-
-```bash
-# Push the current epic branch (engine names it <spec-id>/<epic-id>)
-EPIC_BRANCH="$(git branch --show-current)"
-git push -u origin "$EPIC_BRANCH"
-
-# Create PR
-gh pr create --title "feat: <Epic Title>" --body "$(cat <<'EOF'
-## Summary
-Epic: <epic-name> complete. All tests passing.
-
-## Test Plan
-- [ ] <verification steps>
-EOF
-)"
-```
-
-**Non-Epic Path:**
 
 ```bash
 # Push the current branch
@@ -222,27 +130,9 @@ Keep worktree until PR merged.
 
 #### Option 3: Keep As-Is
 
-**Epic Path:**
-
-```bash
-# Resolve the current epic branch (engine names it <spec-id>/<epic-id>)
-EPIC_BRANCH="$(git branch --show-current)"
-
-# Push for backup
-git push -u origin "$EPIC_BRANCH"
-
-# Tag completion state
-git tag -a "epic/${EPIC_BRANCH}-complete" -m "Epic complete, all tests pass"
-git push origin "epic/${EPIC_BRANCH}-complete"
-```
-
-Report: "Keeping epic <name>. Worktree preserved."
-
-**Non-Epic Path:**
-
 Report: "Keeping branch <name>. Worktree preserved at <path>."
 
-**Don't cleanup worktree** (either path).
+**Don't cleanup worktree.**
 
 #### Option 4: Discard
 
@@ -258,114 +148,24 @@ Type 'discard' to confirm.
 
 Wait for exact confirmation.
 
-**Epic Path — if confirmed:**
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-# Capture identifiers from the marker BEFORE destroying anything. `block` and
-# `cleanup` take the epic *id*; `git branch -D` takes the live branch name
-# (engine: <spec-id>/<epic-id>); cleanup + branch -D must run from the base.
-EPIC_ID="$(grep '^epic:' .arcforge-epic | sed 's/^epic:[[:space:]]*//')"
-EPIC_BRANCH="$(git branch --show-current)"
-BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
-
-# Update DAG and sync BEFORE destroying the worktree.
-# The per-spec dag.yaml lives in the base worktree (specs/<spec-id>/dag.yaml);
-# the current worktree carries only the .arcforge-epic marker, which the
-# coordinator uses to reconnect to that dag and push local status back.
-if [ -f .arcforge-epic ]; then
-  node "${SKILL_ROOT}/scripts/finish-epic.js" block "$EPIC_ID" "Cancelled by user"
-  node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
-fi
-
-# Move to the base checkout before removing the worktree — you cannot delete a
-# worktree (or its branch) while standing inside it, and cleanup only acts on
-# the base dag.
-cd "$BASE_WORKTREE"
-
-# Delegate worktree removal to the coordinator — it derives the canonical
-# path via ${ARCFORGE_ROOT}/scripts/lib/worktree-paths.js and handles
-# force-remove of the .arcforge-epic marker. Never call `git worktree remove` by hand.
-node "${SKILL_ROOT}/scripts/finish-epic.js" cleanup "$EPIC_ID"
-git branch -D "$EPIC_BRANCH"
-```
-
-**Non-Epic Path — if confirmed:**
+**If confirmed:**
 
 ```bash
 # Capture the feature branch and the base checkout BEFORE you move.
 FEATURE_BRANCH="$(git branch --show-current)"
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-BASE_WORKTREE="$(node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json \
+BASE_WORKTREE="$(node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const w=JSON.parse(s).worktrees;const b=w.find(x=>x.kind==="base")||w[0];process.stdout.write(b.path)})')
 
-# Remove the generic worktree FIRST (Step 5: cd base → worktree remove), THEN
+# Remove the worktree FIRST (Step 5: cd base → worktree remove), THEN
 # delete the branch from the base — you cannot delete a branch that is still
 # checked out in a present worktree. For a plain branch with no worktree, run
 # only the branch -d below.
 git -C "$BASE_WORKTREE" branch -D "$FEATURE_BRANCH"
 ```
 
-For a non-epic *worktree*, do Step 5 (cd base → `worktree remove`) BEFORE the
+For a *worktree*, do Step 5 (cd base → `worktree remove`) BEFORE the
 `branch -D` line above. For a plain branch with no worktree, the base `branch -D`
 is all you need.
-
-### Step 4.1: Merge Conflict Handling (Epic Path, Option 1 only)
-
-A merge conflict during epic finishing means another change has landed on the base branch since your epic started. In a multi-teammate dispatch (epics dispatched via `arc-dispatching-teammates`), the conflict typically comes from another teammate's already-merged epic touching a shared file.
-
-**First, always abort to a clean state.** The half-merged state lives in the
-**base checkout**, not your worktree — the coordinator checks the base branch
-out in the base worktree before merging. So abort through the coordinator, which
-finds the base worktree and runs the abort there even though you are in the
-epic worktree:
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-node "${SKILL_ROOT}/scripts/finish-epic.js" merge --abort
-
-# Verify the BASE working tree is clean again — the abort happened there, so
-# check git's working-tree state in the base, not the DAG. `git -C` keeps you in
-# the worktree while inspecting the base; expect no unmerged paths.
-BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
-git -C "$BASE_WORKTREE" status   # expect: no "Unmerged paths", base on its branch
-```
-
-Do NOT run a bare `git merge --abort` from the worktree — your worktree is on
-the epic branch and has no merge in progress, so it would be a silent no-op
-while the base stays half-merged.
-
-**Then decide based on context:**
-
-| Context | Resolution Path |
-|---|---|
-| **Solo epic** — you (or a human user) invoked this skill directly, no team-lead in the loop | Present the conflict to the user. Show the unmerged files, the conflicting hunks verbatim, and ask for resolution guidance. Wait for explicit direction before editing. |
-| **Multi-teammate dispatch** — you are a teammate spawned via `arc-dispatching-teammates`, a lead is present | **SendMessage to `team-lead`** using the Merge Conflict (Multi-Teammate) blocked format below. Do NOT auto-resolve. The lead has the global view of which teammates landed in what order and is the correct arbiter. |
-
-**Never:**
-- Auto-resolve conflicts by taking "ours" / "theirs" / a guessed union
-- Hand-edit conflict markers without explicit authorization (from user or lead)
-- Silently retry `finish-epic.js merge` hoping git produces a different result
-- Report completion until the conflict is resolved AND tests re-verified
-
-Escalation beats auto-resolve because teammates see only their own epic's spec; the lead is the only role that can verify the resolution is globally consistent.
-
-After the user or lead provides resolution guidance and you edit/commit, re-run the test suite (per arc-verifying's iron law: no completion without fresh evidence) and then return to Step 4.5 as if the merge had succeeded on the first try.
-
-### Step 4.5: Sync After Choice (Epic Path only)
-
-**After Option 2 (PR) — merge delegates to base internally, keep has no DAG change, discard syncs inline above:**
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-# Sync to base to ensure DAG reflects new status
-node "${SKILL_ROOT}/scripts/finish-epic.js" sync --direction to-base
-```
-
-**Purpose:** Ensure the base DAG reflects the epic's final status (completed or merged).
 
 ### Step 4.6: Look Up the Worktree Path
 
@@ -373,35 +173,10 @@ Before emitting the completion format, resolve the worktree's absolute path —
 don't reconstruct it from pattern knowledge, because the derivation rule can
 change and the cached value is authoritative.
 
-**Epic Path — query `status --json` against the BASE dag, never the worktree's
-local copy.** A worktree's own dag copy carries `worktree: null` for every epic,
-so `status --json` run from a worktree cwd reports `path: null` even when the
-worktree is alive — which would wrongly print a null path for the kept-worktree
-options. Only the base dag holds the real `worktree`/`path` value.
+**Read the `path` from `worktree list --json`:**
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-: "${SKILL_ROOT:=$ARCFORGE_ROOT/skills/arc-finishing}"
-# Options 1 and 4: you already ran `cd "$BASE_WORKTREE"`, so the base dag is the
-# current cwd — query it directly.
-node "${SKILL_ROOT}/scripts/finish-epic.js" status --json
-
-# Options 2 and 3: the worktree is kept, so you are still inside it. Resolve the
-# base AND the spec id from the marker, then query the base dag in a subshell
-# (keeps you in the worktree for later steps). Pass --spec-id: the base has no
-# marker to pin the spec, so without it a multi-spec base returns the nested
-# `{ specs: { <id>: ... } }` shape instead of a flat `{ epics: [...] }`.
-SPEC_ID="$(grep '^spec_id:' .arcforge-epic | sed 's/^spec_id:[[:space:]]*//')"
-BASE_WORKTREE="$(grep '^base_worktree:' .arcforge-epic | sed 's/^base_worktree:[[:space:]]*//')"
-( cd "$BASE_WORKTREE" && node "${SKILL_ROOT}/scripts/finish-epic.js" status --json --spec-id "$SPEC_ID" )
-```
-
-**Non-Epic Path — read the `path` from `worktree list --json`** (the generic
-surface; `status --json` is the epic-tier surface and reports null here):
-
-```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
+node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
 ```
 
 Match your worktree by `branch` and read its `path` field. If the worktree has
@@ -417,29 +192,22 @@ Worktree line.
 standing in strands the persistent shell, and you cannot delete a worktree from
 inside it. `cd` to the base checkout first, then remove.
 
-**Epic Path:** cleanup is the coordinator's `finish-epic.js cleanup` call already
-shown in Option 1 / Option 4 — it runs from the base (after `cd "$BASE_WORKTREE"`)
-and removes the epic worktree.
-
-**Non-Epic Path:**
-
 ```bash
 # You captured BASE_WORKTREE in Step 4. Leave the worktree first, then remove it
 # by name. Removal must happen BEFORE the branch -d/-D from Step 4.
 WT_NAME="<worktree name>"   # the name you passed to `worktree add`
 cd "$BASE_WORKTREE"
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-node "${ARCFORGE_ROOT}/scripts/cli.js" worktree remove "$WT_NAME"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove "$WT_NAME"
 ```
 
-**For Option 3:** Keep worktree (either path).
+**For Option 3:** Keep worktree.
 
 ## Completion Format
 
 Fill the `Worktree:` line from the Step 4.6 lookup — never a hardcoded template path. Use the variant for the chosen option:
 
 ```
-Option 1 (merged):   <Epic | Branch> merged → <base-branch>
+Option 1 (merged):   Branch merged → <base-branch>
                      Branch: <branch-name> (deleted)
                      Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
                      Commits: [N merged]   Next: next epic/task, or check status
@@ -447,10 +215,10 @@ Option 2 (PR):       Pull request created → #<PR-number>   URL: <PR-URL>
                      Branch: <branch-name>
                      Worktree: <absolute path from Step 4.6 lookup> (kept for now)
                      Next: review PR, then merge/close and clean up worktree
-Option 3 (kept):     <Epic | Branch> preserved for future work
+Option 3 (kept):     Branch preserved for future work
                      Branch: <branch-name>
                      Worktree: <absolute path from Step 4.6 lookup> (kept)
-                     Backup: origin/<branch-name> (epic path only)   Next: resume, or re-run
+                     Next: resume, or re-run
 Option 4 (discarded): Work discarded   Branch: <branch-name> (deleted)
                      Worktree: <absolute path from Step 4.6 lookup> (removed if applicable)
                      Next: start fresh or check status
@@ -458,16 +226,16 @@ Option 4 (discarded): Work discarded   Branch: <branch-name> (deleted)
 
 ## Blocked Format
 
-**Tests Failing / Missing Epic File:**
+**Tests Failing:**
 
 ```
 Completion blocked
 
-Issue: [Tests failing (<N> failures) | .arcforge-epic missing or empty]
+Issue: Tests failing (<N> failures)
 Location: <absolute path from Step 4.6 lookup | Current directory>
 
 To resolve:
-1. [Fix failing tests, re-run verification | Verify you are in an epic worktree, recreate .arcforge-epic]
+1. Fix failing tests, re-run verification
 
 Then retry this skill.
 ```
@@ -501,31 +269,25 @@ I am waiting for arbitration. Not pushing, not creating PR, not
 re-attempting merge until you respond.
 ```
 
-Wait for the lead's response before taking further git action. Hold `epic` branch state, do not modify or push.
-
-### Coordinator Not Available (Epic Path)
-
-Block with "Epic completion blocked — Node.js CLI not available (checked `${SKILL_ROOT}/scripts/finish-epic.js`); ensure Node.js is available, then retry."
+Wait for the lead's response before taking further git action. Hold branch state, do not modify or push.
 
 ## Red Flags
 
 **Never:**
 - Proceed with failing tests
 - `git checkout <base-branch>` inside a linked worktree — git 2.52 exits 128; merge into the base from the base checkout (`cd` there, or `git -C <base>`)
-- On the epic path, use `git merge` directly (use coordinator merge)
 - Remove a worktree while standing inside it (cd to the base first)
-- Delete a non-epic worktree's branch BEFORE the worktree is removed
+- Delete a worktree's branch BEFORE the worktree is removed
 - Delete work without typed "discard" confirmation
 - Force-push without explicit request
 - Auto-resolve a merge conflict in a multi-teammate context — escalate to lead via SendMessage using the Merge Conflict (Multi-Teammate) blocked format
 
 **Always:**
 - Verify tests before offering options; present exactly 4 options; get typed confirmation for Option 4
-- On the epic path, use coordinator merge for Option 1
 - Clean up the worktree for Options 1 & 4 only (cd to base first)
 
 ## Integration
 
-- **Called by:** arc-agent-driven, arc-executing-tasks (after all tasks complete), arc-implementing (after an epic completes, epic path)
-- **Pairs with:** arc-using-worktrees (cleans up its worktree), arc-coordinating (epic path delegates merge/cleanup to the coordinator)
+- **Called by:** arc-agent-driven, arc-executing-tasks (after all tasks complete)
+- **Pairs with:** arc-using-worktrees (cleans up its worktree)
 - **Related:** use `arc-verifying` mindset throughout

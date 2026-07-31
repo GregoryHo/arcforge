@@ -16,9 +16,9 @@ node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>
 Examples:
 
 ```bash
-node "${ARCFORGE_ROOT}/scripts/cli.js" status
-node "${ARCFORGE_ROOT}/scripts/cli.js" next
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50
+node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
+node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50
 ```
 
 Why one form: arcforge is installed in different places on different
@@ -66,7 +66,7 @@ existence check is the blessed pattern.
 ## Skill-local scripts: SKILL_ROOT
 
 Some skills ship their own `scripts/` directory (e.g.
-`skills/arc-coordinating/scripts/`). **Any skill that ships its own
+`skills/arc-journaling/scripts/`). **Any skill that ships its own
 `scripts/` directory** may anchor those scripts with a `SKILL_ROOT`
 fallback header — this is an attribute-based rule, not an enumerated
 allowlist of skill names:
@@ -91,17 +91,17 @@ the same command that expands it:
 
 ```bash
 # FORBIDDEN — POSIX expansion trap
-ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" status
+ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
 ```
 
 POSIX shells expand the argument words *before* the temporary inline
 assignment takes effect, so `"${ARCFORGE_ROOT}"` expands to the
 *previous* value. If the variable was unset, the command actually run
-is `node /scripts/cli.js status`:
+is `node /scripts/cli.js eval list`:
 
 ```text
 $ unset ARCFORGE_ROOT
-$ ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" status
+$ ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
 Error: Cannot find module '/scripts/cli.js'
 ```
 
@@ -110,7 +110,7 @@ line — then the blessed form works:
 
 ```bash
 export ARCFORGE_ROOT=/opt/arcforge
-node "${ARCFORGE_ROOT}/scripts/cli.js" status
+node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
 ```
 
 ## Bare form: local checkout only

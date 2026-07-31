@@ -40,9 +40,6 @@ Discovered through eval — don't repeat:
 | Platform | Skills Directory |
 |----------|------------------|
 | Claude Code | `~/.claude/skills/` |
-| Codex | `~/.agents/skills/` |
-
-> arcforge installs into these directories via symlink: Codex uses `~/.agents/skills/arcforge` → `~/.agents/arcforge/skills` (see `.codex/INSTALL.md`).
 
 ```
 skills/
@@ -50,7 +47,6 @@ skills/
     SKILL.md              # Core logic and decisions (required)
     references/           # Detailed material, loaded on-demand
     scripts/              # Executable utilities (run, not loaded)
-    agents/               # Subagent templates
 ```
 
 - **What stays in SKILL.md:** Core rule, decision logic, routing, red flags, checklists.

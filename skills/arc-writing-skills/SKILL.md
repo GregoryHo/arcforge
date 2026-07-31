@@ -34,7 +34,7 @@ Two orthogonal axes — **composition** (how it's triggered) and **content** (wh
 |------|---------|-------------|---------|
 | **Workflow** | Handoff from previous step | "After This Skill" section defines next step | `arc-brainstorming` → `arc-writing-tasks` |
 | **Discipline** | Conditional — fires during ANY workflow when its condition is met | Listed in `arc-using` routing table | `arc-tdd`, `arc-verifying` |
-| **Meta** | Independent — user, maintainer, or project task invokes directly | No routing needed | `arc-writing-skills`, `arc-auditing-spec` |
+| **Meta** | Independent — user, maintainer, or project task invokes directly | No routing needed | `arc-writing-skills`, `arc-using` |
 
 When creating a new skill:
 
@@ -46,44 +46,36 @@ By content: **Technique** (concrete method), **Pattern** (way of thinking), **Re
 
 ## Path Resolution (Plugin Distribution Awareness)
 
-arcforge ships as a plugin. At runtime the LLM works in a user's project — cwd is the user's project, NOT the plugin install. Any reference to plugin internal files from skill prose must be absolute, derived from `${ARCFORGE_ROOT}` — never bare cwd-relative.
+arcforge ships as a plugin. At runtime the LLM works in a user's project — cwd is the user's project, NOT the plugin install. Any reference to plugin internal files from skill prose must be absolute, derived from `${CLAUDE_PLUGIN_ROOT}` — never bare cwd-relative.
 
-`${ARCFORGE_ROOT}` is set by the SessionStart hook (`inject-skills`) and points at the plugin install root.
+`${CLAUDE_PLUGIN_ROOT}` is set by the host harness and points at the plugin install root.
 
 ### Which prefix to use
 
 | Reference target | Prefix | Example |
 |---|---|---|
-| Plugin shared library (`${ARCFORGE_ROOT}/scripts/lib/`, `${ARCFORGE_ROOT}/scripts/cli.js`) | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/scripts/lib/print-schema.js` |
+| Plugin CLI | `${CLAUDE_PLUGIN_ROOT}/` | `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js` |
 | Skill's own files (`skills/<name>/scripts/`, `references/`) | `${SKILL_ROOT}/` | `${SKILL_ROOT}/scripts/planner.js` |
-| Plugin templates / agents referenced from a skill | `${ARCFORGE_ROOT}/` | `${ARCFORGE_ROOT}/templates/<name>.md` |
 | User's project files (not plugin) | (none — bare is correct) | `specs/<spec-id>/spec.xml` |
 
 `${SKILL_ROOT}` is set via the skill loader header. Use this idiom at the top of any Bash block that needs it:
 
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/<your-skill-name>}"
+: "${SKILL_ROOT:=${CLAUDE_PLUGIN_ROOT}/skills/<your-skill-name>}"
 ```
 
 ### Anti-patterns
 
 ```bash
 # WRONG — cwd-relative require breaks when cwd ≠ plugin root
-node -e "require('./scripts/lib/sdd-utils')"
+node -e "require('./scripts/cli.js')"
 
 # WRONG — bare prose path; LLM follows literally and fails in user's cwd
-"Read scripts/lib/sdd-schemas/spec.md for the schema."
-
-# CORRECT — direct read with prefix (preferred for LLM consumption)
-"Read ${ARCFORGE_ROOT}/scripts/lib/sdd-schemas/spec.md for the schema."
+"Run cli.js loop to start the loop."
 
 # CORRECT — Bash invocation with prefix
-node "${ARCFORGE_ROOT}/scripts/lib/print-schema.js" spec --markdown
+node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
 ```
-
-### CI enforcement
-
-CI lint scans `skills/**/SKILL.md`, `skills/**/references/**/*.md`, `templates/**/*.md`, and `agents/**/*.md` for `${ARCFORGE_ROOT}/scripts/lib/` discipline: any plugin shared-library reference must use that exact prefix. Failures block merge. The only exception is this fenced Anti-patterns teaching block. Skill-local relative paths (using `${SKILL_ROOT}/`, or `cd ${SKILL_ROOT}` then bare) are author's judgment — not enforced.
 
 ## SKILL.md Structure
 

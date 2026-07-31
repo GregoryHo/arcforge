@@ -7,9 +7,9 @@ pass, both verdicts (spec compliance + task quality).
 built what was requested (nothing missing, nothing extra) AND that it is
 well-built (clean, tested, maintainable).
 
-Dispatch the `task-reviewer` agent where your platform provides named subagents
-(`agents/task-reviewer.md`); otherwise dispatch a fresh general-purpose subagent
-with the prompt below, using whatever subagent mechanism your platform provides.
+Dispatch the `task-reviewer` agent where your platform provides named subagents;
+otherwise dispatch a fresh general-purpose subagent with the prompt below, using
+whatever subagent mechanism your platform provides.
 Give the dispatch a short description like `Review Task N (both verdicts)`.
 
 ```
@@ -57,7 +57,5 @@ only for a specific doubt. Categorize each issue by its actual severity (Critica
 report it Important, labeled plan-mandated. Verdict: Approved / Needs fixes.
 
 Your review is read-only on the checkout. Cite file:line for every finding, and
-return both verdicts from this single read. The full report format and severity
-calibration live in templates/task-reviewer-prompt.md — consult it for anything
-this summary leaves implicit.
+return both verdicts from this single read.
 ```

@@ -58,8 +58,7 @@ function pathExists(relPath, docDir) {
 /**
  * Existence probe for a backticked arc-<name> reference. Resolves against all
  * three component trees a doc may legitimately name: a skill dir, a hook dir,
- * or an agent file. (arc-guard / arc-remind are hooks; arc-auditing-spec-*
- * are dispatched agents — neither lives under skills/.)
+ * or an agent file — a referenced component need not live under skills/.
  */
 function skillExists(name) {
   return (

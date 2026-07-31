@@ -337,10 +337,9 @@ as no feedback.
 
 ## Retry mechanics
 
-### Fresh worktree via `cli.js expand`
+### Fresh worktree
 
-On rejection, call `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"; node "${ARCFORGE_ROOT}/scripts/cli.js" expand --epic <epic-id>`. The
-CLI creates a new worktree at the canonical path. The new worktree's
+On rejection, create a new worktree for the epic at the canonical path. The new worktree's
 starting commit is the current dev-branch HEAD — which already
 contains the rejected attempt's merge commits.
 

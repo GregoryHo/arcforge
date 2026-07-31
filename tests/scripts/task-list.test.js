@@ -228,3 +228,74 @@ describe('updateTaskStatus', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// updateTaskStatus(…, note) — the writer can state a blocking reason.
+//
+// validateTaskList REQUIRES a note: on every [!] task, so a writer that can set
+// `blocked` but not attach a reason emits a file its own validator rejects.
+// These cases pin that the round-trip closes.
+// ---------------------------------------------------------------------------
+
+describe('updateTaskStatus with a note', () => {
+  it('blocking a task with a note produces a list that still validates', () => {
+    const doc = `${BANNER}\n- [ ] T1 Do it\n`;
+    const after = updateTaskStatus(doc, 'T1', 'blocked', 'verify command failed twice');
+    expect(() => validateTaskList(after)).not.toThrow();
+    const task = parseTaskList(after).tasks[0];
+    expect(task.status).toBe('blocked');
+    expect(task.note).toBe('verify command failed twice');
+  });
+
+  it('blocking WITHOUT a note is what validateTaskList rejects (the reason this exists)', () => {
+    const after = updateTaskStatus(`${BANNER}\n- [ ] T1 Do it\n`, 'T1', 'blocked');
+    expect(() => validateTaskList(after)).toThrow(/blocked with no "note:"/);
+  });
+
+  it('inserts the note below an existing detail block, matching its indent', () => {
+    const doc = [BANNER, '- [ ] T1 Do it', '    - verify: `npm test`', ''].join('\n');
+    const after = updateTaskStatus(doc, 'T1', 'blocked', 'flaky');
+    expect(after.split('\n')).toEqual([
+      BANNER,
+      '- [ ] T1 Do it'.replace('[ ]', '[!]'),
+      '    - verify: `npm test`',
+      '    - note: flaky',
+      '',
+    ]);
+    expect(parseTaskList(after).tasks[0].verify).toBe('npm test');
+  });
+
+  it('replaces an existing note instead of adding a second one', () => {
+    const after = updateTaskStatus(GOOD, 'T4', 'blocked', 'still waiting on the signing key');
+    expect(after).not.toContain('waiting on release credentials');
+    expect(after.match(/- note:/g)).toHaveLength(1);
+    expect(parseTaskList(after).tasks[3].note).toBe('still waiting on the signing key');
+  });
+
+  it('leaves every other task and the surrounding prose untouched', () => {
+    const before = GOOD.split('\n');
+    const after = updateTaskStatus(GOOD, 'T2', 'blocked', 'upstream API changed').split('\n');
+    expect(after.filter((l) => !before.includes(l))).toEqual([
+      '- [!] T2 — Implement the parser',
+      '  - note: upstream API changed',
+    ]);
+  });
+
+  it('collapses a multi-line reason into one line (the grammar has no continuation)', () => {
+    const after = updateTaskStatus(`${BANNER}\n- [ ] T1 Do it\n`, 'T1', 'blocked', 'a\nb\n  c');
+    expect(parseTaskList(after).tasks[0].note).toBe('a b c');
+    expect(() => validateTaskList(after)).not.toThrow();
+  });
+
+  it('rejects an empty or non-string note rather than writing a bullet with no value', () => {
+    expect(() => updateTaskStatus(GOOD, 'T1', 'blocked', '   ')).toThrow(TypeError);
+    expect(() => updateTaskStatus(GOOD, 'T1', 'blocked', 42)).toThrow(TypeError);
+  });
+
+  it('a note can be attached to any status, not only blocked', () => {
+    const after = updateTaskStatus(`${BANNER}\n- [ ] T1 Do it\n`, 'T1', 'done', 'landed in #42');
+    const task = parseTaskList(after).tasks[0];
+    expect(task.status).toBe('done');
+    expect(task.note).toBe('landed in #42');
+  });
+});
