@@ -12,7 +12,7 @@
 
 - [x] P0.0 前置閘 — gate: PASS (2026-07-31)
 - [x] P1 強制層可用化 + 契約凍結 — gate: PASS (2026-07-31, PR #136, tag gate-p1)
-- [ ] P2 引擎瘦身 + 反向耦合翻正
+- [x] P2 引擎瘦身 + 反向耦合翻正 — gate: PASS (2026-07-31, PR #137, tag gate-p2)
 - [ ] P3 meta skill + 2 pilots + 最小 eval 迴路
 - [ ] P4 紀律叢集
 - [ ] P5 保留系統叢集（D1/D8 驗證場）
@@ -46,11 +46,28 @@
 - 已知前瞻風險：R4 slash floor 現靠 v5 legacy 文件撐（router 表尚空）；P8 刪 v5 文件前 v6 rows 必須先補上
 - `tests/skills/test_minimal_toolkit_docs.py` 是 v5 doctrine 快照測試，P2 刪檔時必須同 commit 處理（無主，已指派給 P2）
 
+## P2 任務（全數完成，PR #137，兩波五 worker）
+
+- [x] Wave1-E：hooks 14→6 實體（刪 8 目錄+兩支派送器；session-tracker 拔 SDD 渲染）
+- [x] Wave1-F1：D8 翻正——daemon/auto-diary/eval prompts/dashboard 搬引擎側；allowlist 7→1
+- [x] Wave1-F2：loop 任務來源 DAG→D3 清單（--tasks）；loop-verifier 去 SDD
+- [x] Wave2-D-core：scripts/lib −19 檔、CLI 22→5、agents/templates/Codex/dogfood/integration 全刪、website sdd 頁移除、task-list blocked note 參數
+- [x] Wave2-D-skills：6 支 doomed skills 刪除、legacy 30→24、ARCFORGE_ROOT 四出貨目錄歸零、v5 快照 pytest 刪除、check:docs 52 條追到 0
+- [x] verifier 修正：README/plugin.json/marketplace.json 出貨面假敘述（ARCFORGE_ROOT/SDD 宣傳）清除
+
+### P2 gate 備註
+- 「不採信自報」再度生效：兩個 worker 的 `git grep "a\|b\|c"` 單模式寫法會靜默回 0（假綠），D-skills 自查發現後改 `-e` 多模式，追回 11 處 R4 掃不到的 dangling 引用
+- `${CLAUDE_PLUGIN_ROOT}` 在 skill Bash 區塊的 runtime 可用性「形式合規、runtime 未證」——P3 的 D1 scenario（[tool_called] 斷言）是驗收點
+- 留給 P7/P8：cli-invocation.md 與 worktree-workflow.md 敘事層重寫（守衛掃不到的過期教學）、website Codex 卡片/skill 計數、evals 歷史紀錄、retired scenarios
+- D8 allowlist = 1（session-tracker→reflect.js），P5 歸零
+
 ## 偏離紀錄
 
 | 日期 | 偏離 | 理由 |
 |------|------|------|
 | 2026-07-31 | 回滾 tag 命名由 `v6-p<N>` 改為 `gate-p<N>` | `release.yml` 的 `on.push.tags: ['v*']` 會被 `v6-p0.0` 誤觸發（跑 release job 並因版本比對噴錯）。`gate-` 前綴避開 glob。 |
+| 2026-07-31 | P2 AC「hooks.json 10→6 條目」改判為「hook 實體 14→6」 | verifier 查證：baseline 本來就是 6 events（該讀法無鑑別力），而 6 條目按 check-hooks-schema 自身規則（sync/async 分列）不可達。實體 14→6 精準命中計畫 Context 的「14→6」。條目實況 9。 |
+| 2026-07-31 | P0.0 直接 commit 到 v6（未走 phase PR） | v6 分支自舉的雞生蛋問題（分支存在前無法對它開 PR）；P1 起全部走 phase PR。 |
 
 ## 新開裁決（D9+）
 
