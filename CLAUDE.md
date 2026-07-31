@@ -20,7 +20,6 @@ Skill-based autonomous agent toolkit for Claude Code and Codex.
 
 ```bash
 npm install
-cd hooks && npm install && cd ..
 ```
 
 Python 3 with pytest is required for `npm run test:skills`:
