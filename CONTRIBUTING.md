@@ -53,7 +53,6 @@ cd arcforge
 npm install
 
 # 3. Install hook dependencies (separate package.json)
-cd hooks && npm install && cd ..
 
 # 4. Create a branch
 git checkout -b feat/my-contribution   # or fix/..., docs/...
