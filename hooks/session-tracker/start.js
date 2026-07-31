@@ -78,7 +78,10 @@ function checkDaemon() {
     // both must honor ARCFORGE_OBSERVE_NO_SPAWN. Without this, setting the
     // env still spawned a daemon here on every SessionStart.
     if (process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1') return;
-    const daemonPath = path.join(__dirname, '../../skills/arc-learning/scripts/observer-daemon.sh');
+    const daemonPath = path.join(
+      __dirname,
+      '../../scripts/lib/learning-curator/observer-daemon.sh',
+    );
     if (fs.existsSync(daemonPath)) {
       execFileSync('bash', [daemonPath, 'start'], { stdio: 'ignore', timeout: 5000 });
     }

@@ -173,58 +173,15 @@ function loadStaleDraftWarning(project) {
 }
 
 /**
- * Render the overnight loop-finished review-queue line. The north-star morning
- * surface: what landed, what's blocked, on which branch.
- * @param {Object} payload - { status, completed_count, blocked, base_branch, total_cost }
- * @returns {string}
- */
-function renderLoopFinished(payload) {
-  const merged = payload.completed_count || 0;
-  const blocked = Array.isArray(payload.blocked) ? payload.blocked : [];
-  const onBranch = payload.base_branch ? ` on ${payload.base_branch}` : '';
-  const lines = [
-    `**🌙 Loop finished: ${merged} merged${onBranch}, ${blocked.length} blocked — review before ratifying.**`,
-  ];
-  if (typeof payload.total_cost === 'number' && payload.total_cost > 0) {
-    lines.push(`   Total cost: $${payload.total_cost.toFixed(2)}.`);
-  }
-  for (const b of blocked) {
-    lines.push(`   - blocked: ${b.id}${b.reason ? ` (${b.reason})` : ''}`);
-  }
-  return lines.join('\n');
-}
-
-/**
- * Render the pending-ratification line. Uses the PARSABLE ratify invocation
- * (no bare `arcforge` bin — not on PATH for marketplace/git-clone installs)
- * and points at the ${ARCFORGE_ROOT}-relative pipeline guide.
- * @param {Object} payload - { count, specs: [{ spec_id, decision_ids: [...] }] }
- * @returns {string}
- */
-function renderRatifyPending(payload) {
-  const count = payload.count || 0;
-  const specs = Array.isArray(payload.specs) ? payload.specs : [];
-  const first = specs[0];
-  const specId = first?.spec_id || '<spec-id>';
-  const dId = first?.decision_ids?.[0] || '<D-id>';
-  return [
-    `**⚖️ ${count} decision${count === 1 ? '' : 's'} pending ratification.** Review, then ratify each in attended mode:`,
-    `   ARCFORGE_MODE=attended node "$ARCFORGE_ROOT/scripts/cli.js" ratify ${specId} ${dId}`,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: ${ARCFORGE_ROOT} is a literal placeholder the model expands, not JS interpolation.
-    '   See ${ARCFORGE_ROOT}/docs/guide/sdd-pipeline.md for the ratification workflow.',
-  ].join('\n');
-}
-
-/**
  * Load and consume pending actions for context injection.
  */
 function loadPendingActions(project) {
   try {
     // Relay-isolation: a session arcforge spawned itself (e.g. the detached
     // diary enricher, or a loop's headless task session) must NOT consume the
-    // user's pending actions — otherwise it eats diary-ready / reflect-ready /
-    // ratify-pending / loop-finished before the user's next SessionStart sees
-    // them. Mirrors the observe hook's eval-isolation precedent (S7-1).
+    // user's pending actions — otherwise it eats diary-ready / reflect-ready
+    // before the user's next SessionStart sees them. Mirrors the observe hook's
+    // eval-isolation precedent (S7-1).
     if (process.env.ARCFORGE_SPAWNED) return { text: null, summary: null };
 
     const actions = getPendingActions(project);
@@ -233,11 +190,9 @@ function loadPendingActions(project) {
     const lines = [];
     const summaryParts = [];
 
-    const DEDICATED_TYPES = ['diary-ready', 'reflect-ready', 'loop-finished', 'ratify-pending'];
+    const DEDICATED_TYPES = ['diary-ready', 'reflect-ready'];
     const diaryActions = actions.filter((a) => a.type === 'diary-ready');
     const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
-    const loopFinishedActions = actions.filter((a) => a.type === 'loop-finished');
-    const ratifyActions = actions.filter((a) => a.type === 'ratify-pending');
     const otherActions = actions.filter((a) => !DEDICATED_TYPES.includes(a.type));
 
     if (diaryActions.length > 0) {
@@ -252,23 +207,6 @@ function loadPendingActions(project) {
         `**${count} unprocessed diaries ready for reflection.** Run /arcforge:arc-reflecting to analyze patterns.`,
       );
       summaryParts.push(`${count} diaries pending reflection`);
-    }
-
-    // Overnight loop outcome — the morning review-queue surface (north star).
-    // Render before the ratify prompt so the user sees what landed first.
-    if (loopFinishedActions.length > 0) {
-      const latest = loopFinishedActions[loopFinishedActions.length - 1];
-      lines.push(renderLoopFinished(latest.payload || {}));
-      summaryParts.push('loop finished');
-    }
-
-    // Pending ratification — point at the PARSABLE ratify invocation, not the
-    // bare `arcforge` bin (not on PATH for marketplace/git-clone installs).
-    if (ratifyActions.length > 0) {
-      const latest = ratifyActions[ratifyActions.length - 1];
-      lines.push(renderRatifyPending(latest.payload || {}));
-      const count = latest.payload?.count || ratifyActions.length;
-      summaryParts.push(`${count} decision${count === 1 ? '' : 's'} pending ratification`);
     }
 
     for (const action of otherActions) {
@@ -408,8 +346,6 @@ module.exports = {
   loadInstinctFiles,
   loadPendingActions,
   loadStaleDraftWarning,
-  renderLoopFinished,
-  renderRatifyPending,
   loadAvailableAliases,
   loadNewGlobalPromotions,
 };

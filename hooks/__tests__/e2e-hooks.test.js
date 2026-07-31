@@ -46,10 +46,6 @@ function runNodeHook(scriptPath, stdinJson, env = {}) {
   return runHook('node', scriptPath, { stdinJson, env });
 }
 
-function runBashHook(scriptPath, stdinJson, env = {}) {
-  return runHook('bash', scriptPath, { stdinJson, env });
-}
-
 /**
  * Build hook event input JSON matching real Claude Code schema.
  * Fields based on captured live session input (2026-03-30).
@@ -89,47 +85,6 @@ function makeStopInput(overrides = {}) {
     overrides,
   );
 }
-
-// ─────────────────────────────────────────────
-// SessionStart: inject-skills/main.sh
-// ─────────────────────────────────────────────
-
-describe('E2E: inject-skills/main.sh', () => {
-  const scriptPath = path.join(HOOKS_DIR, 'inject-skills', 'main.sh');
-
-  it('should inject minimal arcforge bootstrap context with ARCFORGE_ROOT', () => {
-    const envFile = path.join(os.tmpdir(), `test-env-${Date.now()}`);
-    const result = runBashHook(scriptPath, null, { CLAUDE_ENV_FILE: envFile });
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-
-    const parsed = JSON.parse(result.stdout);
-    const ctx = parsed.hookSpecificOutput.additionalContext;
-    assert.ok(ctx.includes('arcforge'), 'Should mention arcforge');
-    assert.ok(ctx.includes('ARCFORGE_ROOT'), 'Should include ARCFORGE_ROOT');
-    assert.ok(ctx.includes('smallest useful workflow'), 'Should prefer small workflows');
-    assert.ok(ctx.includes('read or invoke'), 'Should tell agents how to use skills on demand');
-    assert.ok(!ctx.includes('<EXTREMELY_IMPORTANT>'), 'Should not use high-pressure wrapper');
-    assert.ok(!ctx.includes('Even a 1% chance'), 'Should not inject 1% routing pressure');
-    assert.ok(
-      !ctx.includes('Below is the full content'),
-      'Should not inject full arc-using content',
-    );
-    assert.ok(ctx.length < 1200, `Bootstrap should stay compact. Got ${ctx.length} chars`);
-
-    assert.ok(fs.existsSync(envFile), 'Should write CLAUDE_ENV_FILE');
-    fs.rmSync(envFile, { force: true });
-  });
-
-  it('should exit 0 without CLAUDE_ENV_FILE', () => {
-    const cleanEnv = { ...process.env };
-    delete cleanEnv.CLAUDE_ENV_FILE;
-    const result = runBashHook(scriptPath, null, cleanEnv);
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-    assert.ok(JSON.parse(result.stdout).hookSpecificOutput, 'Should produce valid JSON');
-  });
-});
 
 // ─────────────────────────────────────────────
 // SessionStart: session-tracker/inject-context.js
@@ -337,66 +292,6 @@ describe('E2E: observe/main.js', () => {
     const input = makeToolUseInput('PostToolUse', 'Edit', { file_path: '/tmp/test.js' });
     const result = runNodeHook(scriptPath, input, { CLAUDE_PROJECT_DIR: testDir, HOME: testDir });
     assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-  });
-});
-
-// ─────────────────────────────────────────────
-// PostToolUse: quality-check/main.js
-// ─────────────────────────────────────────────
-
-describe('E2E: quality-check/main.js', () => {
-  const scriptPath = path.join(HOOKS_DIR, 'quality-check', 'main.js');
-  let testDir;
-
-  beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-qc-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  // v5: quality-check is a PostToolUse ACCUMULATOR — it records the edited path
-  // and emits nothing; findings are batched at Stop (session-tracker/end.js).
-  it('is silent on an Edit of a JS file with console.log (accumulate-only)', () => {
-    const jsFile = path.join(testDir, 'test-consolelog.js');
-    fs.writeFileSync(jsFile, 'function foo() {\n  console.log("debug");\n  return 42;\n}\n');
-
-    const input = makeToolUseInput('PostToolUse', 'Edit', {
-      file_path: jsFile,
-      old_string: 'old',
-      new_string: 'new',
-    });
-    const result = runNodeHook(scriptPath, input);
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-    assert.strictEqual(
-      result.stdout.trim(),
-      '',
-      `accumulate-only → no PostToolUse output. Got: "${result.stdout.trim()}"`,
-    );
-  });
-
-  it('should exit 0 on non-JS file', () => {
-    const input = makeToolUseInput('PostToolUse', 'Edit', { file_path: '/tmp/test-file.md' });
-    const result = runNodeHook(scriptPath, input);
-    assert.strictEqual(result.exitCode, 0);
-  });
-
-  it('is silent on a Write-created JS file (accumulate-only)', () => {
-    const content = 'function foo() {\n  console.log("debug");\n  return 42;\n}\n';
-    const jsFile = path.join(testDir, 'written.js');
-    fs.writeFileSync(jsFile, content);
-
-    const input = makeToolUseInput('PostToolUse', 'Write', { file_path: jsFile, content });
-    const result = runNodeHook(scriptPath, input);
-
-    assert.strictEqual(result.exitCode, 0, `stderr: ${result.stderr}`);
-    assert.strictEqual(
-      result.stdout.trim(),
-      '',
-      `accumulate-only → no PostToolUse output. Got: "${result.stdout.trim()}"`,
-    );
   });
 });
 
