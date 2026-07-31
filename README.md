@@ -243,7 +243,6 @@ arcforge reboot
 
 ```bash
 npm install
-cd hooks && npm install && cd ..
 pip install pytest pyyaml    # Required for test:skills
 ```
 

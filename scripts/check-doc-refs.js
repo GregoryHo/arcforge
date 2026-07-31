@@ -84,12 +84,14 @@ function gatherFiles() {
 function main() {
   const files = gatherFiles();
   const allFindings = [];
+  let r4Probed = 0;
 
   for (const abs of files) {
     const rel = path.relative(repoRoot, abs);
     const content = fs.readFileSync(abs, 'utf8');
-    const { findings } = lintDoc(rel, content, { pathExists, skillExists });
+    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists });
     allFindings.push(...findings);
+    r4Probed += stats.r4.total;
   }
 
   const errors = allFindings.filter((f) => f.severity === 'error');
@@ -110,6 +112,14 @@ function main() {
     for (const f of errors) {
       console.error(`  [${f.rule}] ${f.file}:${f.line}  ${f.message}`);
     }
+    process.exit(1);
+  }
+
+  // R4 sanity floor: if the scan probed zero skill references across the whole
+  // shipped surface, the R4 patterns have silently stopped matching (e.g. a
+  // rename broke both tracks) — that is a linter failure, not a clean pass.
+  if (r4Probed === 0) {
+    console.error('R4 sanity floor: zero skill references probed across the shipped surface.');
     process.exit(1);
   }
 

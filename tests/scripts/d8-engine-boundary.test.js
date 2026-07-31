@@ -1,0 +1,240 @@
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const { REPO_ROOT } = require('./v6-legacy-skills');
+
+// ---------------------------------------------------------------------------
+// D8 — engine/skill boundary lint (v6).
+// ---------------------------------------------------------------------------
+//
+// D8 (unrevisable decision): the engine owns the disk formats; skills consume
+// them through the CLI. Dependency flows ONE way — skills may call the engine,
+// the engine must never reach into `skills/`. Every reverse reference is a
+// coupling that makes a skill undeletable.
+//
+// Rule: no file under `scripts/**` or `hooks/**` may name a CONCRETE skill
+// directory. Two shapes are detected:
+//   `skills/<name>/…`                     (path string)
+//   path.join(…, 'skills', '<name>', …)   (segment list)
+//
+// Generic tree access is NOT a violation: `skills/` with no literal name, or a
+// templated segment (`skills/${name}/`, path.join(dir, 'skills', name)) is how
+// the repo-scanning guards legitimately work, and it survives any individual
+// skill being deleted. Only a hard-coded skill NAME couples the engine to a
+// skill's existence.
+//
+// SCOPE / EXCLUSIONS (deliberate, documented so nobody widens them silently):
+//   - Code files only (.js/.mjs/.cjs/.sh/.json). Markdown under hooks/ is
+//     prose, policed by the doc-reference linter (check:docs), not here.
+//   - Test files (`__tests__/` dirs, `*.test.js`) are excluded: they are
+//     contributor surface, they are being relocated during P1/P2, and pinning
+//     their paths here would make an unrelated move turn this suite red.
+//   - `.claude/skills/…` is this repo's own contributor-side skill dir, not the
+//     shipped `skills/` tree, so it never counts.
+//
+// OUT-OF-PARTITION reverse references that exist today and are NOT in the
+// allowlist below because they live outside scripts/ and hooks/:
+//   - package.json  → `test:observer-daemon` runs skills/arc-learning/tests/…
+//   - jest.config.js → testMatch includes `**/skills/**/__tests__/**`
+// Both move to the engine side in P2 (observer daemon) / P5.
+//
+// ALLOWLIST CONTRACT: the allowlist is compared for EXACT EQUALITY against the
+// scan result. A new violation fails; so does a stale entry left behind after a
+// reference is removed. Entries are keyed on file + skill (not line number) so
+// that reformatting or unrelated edits in the same file don't produce spurious
+// failures. THE ALLOWLIST MUST BE EMPTY AT THE P5 GATE — that emptiness is the
+// formal machine proof that the D8 boundary decision landed. It may only ever
+// shrink; adding an entry requires a maintainer decision, not a test edit.
+
+const SCAN_ROOTS = ['scripts', 'hooks'];
+const CODE_EXTS = new Set(['.js', '.mjs', '.cjs', '.sh', '.json']);
+
+// `skills/<name>` as a path string. The first lookbehind stops `inject-skills/`
+// from reading as `skills/`; the second exempts `.claude/skills/`. The trailing
+// slash is OPTIONAL on purpose: hoisting the coupling into a variable
+// (`const d = 'skills/arc-learning'`) strips the slash and would otherwise empty
+// the allowlist while the coupling survives — exactly the evasion that would
+// fake the P5 zero-assertion. The trailing boundary keeps `skills/foo` from
+// matching inside `skills/foobar`.
+const PATH_SHAPE_RE = /(?<![\w-])(?<!\.claude\/)skills\/([a-z0-9][a-z0-9-]*)(?![\w-])/g;
+// path.join(root, 'skills', 'arc-evaluating', …) — the segmented evasion of the
+// shape above. A variable segment (…, 'skills', name) is generic and not matched.
+const SEGMENT_SHAPE_RE = /['"]skills['"]\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"]/g;
+
+// file + skill → number of references. Empty by the P5 gate.
+const ALLOWLIST = [
+  { file: 'hooks/observe/main.js', skill: 'arc-learning', count: 1 },
+  { file: 'hooks/session-tracker/end.js', skill: 'arc-reflecting', count: 1 },
+  { file: 'hooks/session-tracker/start.js', skill: 'arc-learning', count: 1 },
+  { file: 'scripts/cli/eval-command.js', skill: 'arc-evaluating', count: 1 },
+  { file: 'scripts/lib/diary-capture.js', skill: 'arc-journaling', count: 1 },
+  { file: 'scripts/lib/eval-grader-model.js', skill: 'arc-evaluating', count: 4 },
+  { file: 'scripts/lib/learning-curator/batch-assembler.js', skill: 'arc-learning', count: 1 },
+];
+
+function isExcluded(name) {
+  return name.startsWith('.') || name === 'node_modules' || name === '__tests__';
+}
+
+function collectCodeFiles(dir, acc = []) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return acc;
+  }
+  for (const entry of entries) {
+    if (isExcluded(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) collectCodeFiles(full, acc);
+    else if (entry.isFile() && CODE_EXTS.has(path.extname(entry.name))) {
+      if (entry.name.endsWith('.test.js')) continue;
+      acc.push(full);
+    }
+  }
+  return acc;
+}
+
+/** @returns {{file:string, skill:string, line:number, content:string}[]} */
+function findSkillReferences(absFile, repoRoot) {
+  const rel = path.relative(repoRoot, absFile).split(path.sep).join('/');
+  const lines = fs.readFileSync(absFile, 'utf8').split('\n');
+  const hits = [];
+  for (let i = 0; i < lines.length; i++) {
+    for (const re of [PATH_SHAPE_RE, SEGMENT_SHAPE_RE]) {
+      for (const m of lines[i].matchAll(re)) {
+        hits.push({ file: rel, skill: m[1], line: i + 1, content: lines[i].trim().slice(0, 120) });
+      }
+    }
+  }
+  return hits;
+}
+
+/** Scan roots under `repoRoot`, returning sorted {file, skill, count} entries. */
+function scanEngineBoundary(repoRoot, roots = SCAN_ROOTS) {
+  const hits = [];
+  for (const root of roots) {
+    for (const file of collectCodeFiles(path.join(repoRoot, root))) {
+      hits.push(...findSkillReferences(file, repoRoot));
+    }
+  }
+  const counts = new Map();
+  for (const h of hits) {
+    const key = `${h.file}\u0000${h.skill}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return {
+    entries: [...counts.entries()]
+      .map(([key, count]) => {
+        const [file, skill] = key.split('\u0000');
+        return { file, skill, count };
+      })
+      .sort((a, b) => a.file.localeCompare(b.file) || a.skill.localeCompare(b.skill)),
+    hits,
+  };
+}
+
+describe('D8 engine/skill boundary', () => {
+  const { entries, hits } = scanEngineBoundary(REPO_ROOT);
+
+  it('scans a non-empty engine surface (sanity floor)', () => {
+    const files = collectCodeFiles(path.join(REPO_ROOT, 'scripts')).length;
+    expect(files).toBeGreaterThan(20);
+  });
+
+  it('reverse references match the allowlist exactly (no additions, no stale entries)', () => {
+    // Deep equality both ways: a new coupling fails, and so does an allowlist
+    // entry whose reference has already been removed (forcing the ratchet down).
+    expect(entries).toEqual(ALLOWLIST);
+  });
+
+  it('reports file, line and content for every tracked reference', () => {
+    // Keeps the report actionable for whoever burns the allowlist down in P2/P5.
+    for (const h of hits) {
+      expect(typeof h.line).toBe('number');
+      expect(h.content.length).toBeGreaterThan(0);
+    }
+    expect(hits.length).toBe(ALLOWLIST.reduce((n, e) => n + e.count, 0));
+  });
+
+  it('is empty by the P5 gate (tracking assertion)', () => {
+    // Not yet enforceable — P5 flips this to expect(ALLOWLIST).toEqual([]).
+    // Until then it pins the direction: the list must only shrink.
+    expect(ALLOWLIST.length).toBeLessThanOrEqual(7);
+  });
+});
+
+describe('D8 detectors (synthetic fixtures)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'd8-lint-'));
+    fs.mkdirSync(path.join(tmpDir, 'scripts', 'lib'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const write = (rel, content) => {
+    const abs = path.join(tmpDir, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content);
+  };
+
+  it('flags a path-shaped reference to a concrete skill', () => {
+    write('scripts/lib/a.js', "require('../../skills/arc-learning/scripts/x.js');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/a.js', skill: 'arc-learning', count: 1 },
+    ]);
+  });
+
+  it('flags a path.join segment list naming a concrete skill', () => {
+    write('scripts/lib/b.js', "path.join(root, 'skills', 'arc-evaluating', 'agents', 'g.md');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/b.js', skill: 'arc-evaluating', count: 1 },
+    ]);
+  });
+
+  it('allows generic tree access with no literal skill name', () => {
+    write('scripts/lib/c.js', "const dir = 'skills/';\npath.join(root, 'skills', name);\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('allows a templated skill segment', () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source text, not a JS template
+    write('scripts/lib/d.js', 'const p = `skills/${name}/SKILL.md`;\n');
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('flags a skill dir hoisted into a variable (no trailing slash)', () => {
+    write('scripts/lib/h.js', "const dir = 'skills/arc-learning';\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/h.js', skill: 'arc-learning', count: 1 },
+    ]);
+  });
+
+  it('does not read inject-skills/ as skills/', () => {
+    write('scripts/lib/e.js', "run('hooks/inject-skills/main.sh');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('does not count the contributor-side .claude/skills/ tree', () => {
+    write('scripts/lib/f.js', '// see .claude/skills/arc-releasing/SKILL.md\n');
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('excludes test files from the scanned surface', () => {
+    write('scripts/lib/g.test.js', "require('../../skills/arc-learning/x.js');\n");
+    write('scripts/lib/__tests__/h.js', "require('../../skills/arc-learning/x.js');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('counts repeated references to the same skill in one file', () => {
+    write('scripts/lib/i.js', "'skills/arc-learning/a'\n'skills/arc-learning/b'\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/i.js', skill: 'arc-learning', count: 2 },
+    ]);
+  });
+});

@@ -16,14 +16,18 @@
  *                 promise tied to a command) must exist in that command's
  *                 manifest `output` shape (only checked for commands whose
  *                 shape is pinned — `output !== null`).
- *   R4  skills  — a backticked `arc-<name>` reference must resolve to an
- *                 existing `skills/<name>/` directory, `hooks/<name>/` directory,
- *                 or `agents/<name>.md` file (the caller-supplied skillExists
- *                 probe resolves against all three component trees, since a
- *                 backticked arc-<name> token equally names a skill, a hook, or
- *                 a dispatched agent). GATING (severity 'error') as of the
- *                 SRH-5 R4-flip follow-up — WT-6 has merged, so the finishing
- *                 twin no longer dangles. See R4_SEVERITY below.
+ *   R4  skills  — a doc's claim that a skill exists must resolve to a shipped
+ *                 component. TWO TRACKS, because v6 drops the `arc-` prefix (D7)
+ *                 while v5 docs still ship:
+ *                   legacy — a backticked `arc-<name>` token.
+ *                   slash  — a code span that IS a slash invocation, `/<name>`
+ *                            or `/<namespace>:<name>` (the v6 form, since a
+ *                            prefix-free skill name is not recognizable as a
+ *                            skill reference on its own).
+ *                 Both resolve through the caller-supplied skillExists probe,
+ *                 which spans all three component trees a doc may name (skill
+ *                 dir, hook dir, agent file). GATING (severity 'error').
+ *                 See R4_SEVERITY and the sanity floor in `stats.r4` below.
  *
  * The manifest (scripts/lib/cli-manifest.js) is the SINGLE source of truth for
  * R2 flags and R3 field promises — this engine reads it and is FORBIDDEN a
@@ -407,36 +411,122 @@ function findJqFieldPromises(text) {
   return { command, fields, anchors };
 }
 
+// A code span that IS a slash invocation and nothing else: `/finishing`,
+// `/arcforge:tdd`. Requiring the span to be exactly the token (not merely to
+// contain one) is what keeps this precise — a slash-prefixed word is otherwise
+// structurally indistinguishable from a filesystem path or a regex fragment.
+const SLASH_INVOCATION_RE = /^\/(?:([a-z0-9][a-z0-9-]*):)?([a-z0-9][a-z0-9-]*)$/;
+
+// Two false-positive families the slash shape cannot distinguish structurally.
+// Add to these lists rather than loosening SLASH_INVOCATION_RE — the point of
+// the rule is that an unrecognized `/token` IS a suspected broken promise.
+//   (1) host slash commands — Claude Code builtins, not arcforge skills.
+//   (2) filesystem roots — `/tmp` is shaped exactly like `/tdd`.
+const HOST_SLASH_COMMANDS = new Set([
+  '/add-dir',
+  '/agents',
+  '/bug',
+  '/clear',
+  '/compact',
+  '/config',
+  '/context',
+  '/cost',
+  '/doctor',
+  '/exit',
+  '/export',
+  '/help',
+  '/hooks',
+  '/ide',
+  '/init',
+  '/login',
+  '/logout',
+  '/mcp',
+  '/memory',
+  '/model',
+  '/output-style',
+  '/permissions',
+  '/pr-comments',
+  '/privacy-settings',
+  '/release-notes',
+  '/resume',
+  '/review',
+  '/rewind',
+  '/status',
+  '/statusline',
+  '/terminal-setup',
+  '/todos',
+  '/usage',
+  '/vim',
+]);
+const FILESYSTEM_ROOTS = new Set([
+  '/bin',
+  '/dev',
+  '/etc',
+  '/home',
+  '/mnt',
+  '/opt',
+  '/proc',
+  '/root',
+  '/sbin',
+  '/srv',
+  '/tmp',
+  '/usr',
+  '/var',
+]);
+
+/**
+ * R4 — skill-reference resolution, both tracks.
+ * Returns findings plus the number of references actually PROBED per track, so
+ * the caller can enforce a sanity floor: a scan that resolves nothing has
+ * silently stopped working (exactly what happens if a prefix rule is dropped
+ * and no new shape replaces it).
+ *
+ * @returns {{ findings: Object[], resolutions: { legacy: number, slash: number } }}
+ */
 function scanR4Skills(file, spans, skillExists) {
   const findings = [];
-  // arc-<name> as a whole backtick-quoted token (already inside a code span).
-  const re = /\barc-[a-z0-9-]+\b/g;
+  const resolutions = { legacy: 0, slash: 0 };
+
+  const probe = (name, track, line, display) => {
+    resolutions[track] += 1;
+    if (skillExists(name)) return;
+    findings.push(
+      makeFinding(
+        'R4',
+        R4_SEVERITY,
+        file,
+        line,
+        `${display} does not resolve to skills/${name}/, hooks/${name}/, or agents/${name}.md`,
+      ),
+    );
+  };
+
+  // Legacy track: arc-<name> as a whole token inside a code span.
+  const legacyRe = /\barc-[a-z0-9-]+\b/g;
   for (const { text, line } of spans) {
-    for (const m of text.matchAll(re)) {
+    for (const m of text.matchAll(legacyRe)) {
       const name = m[0];
       const before = m.index > 0 ? text[m.index - 1] : '';
       const after = text[m.index + name.length] || '';
-      // Skip arc-<name> embedded in a path (`skills/arc-releasing/SKILL.md`):
-      // that is a path component, owned by R1, not a standalone skill reference.
+      // Skip arc-<name> embedded in a path (`skills/<name>/SKILL.md`): that is a
+      // path component, owned by R1, not a standalone skill reference.
       if (before === '/' || after === '/') continue;
       // Skip eval-scenario identifiers (`eval-arc-using-harness-isolation`):
       // these are eval labels, not a claim that a component named arc-<name>
       // ships. R4 polices handoff/reference promises, not the eval catalog.
       if (text.slice(Math.max(0, m.index - 5), m.index) === 'eval-') continue;
-      if (!skillExists(name)) {
-        findings.push(
-          makeFinding(
-            'R4',
-            R4_SEVERITY,
-            file,
-            line,
-            `reference does not resolve to skills/${name}/, hooks/${name}/, or agents/${name}.md`,
-          ),
-        );
-      }
+      probe(name, 'legacy', line, 'reference');
     }
+
+    // Slash track: the span is exactly `/name` or `/namespace:name`.
+    const token = text.trim();
+    const slash = token.match(SLASH_INVOCATION_RE);
+    if (!slash) continue;
+    if (HOST_SLASH_COMMANDS.has(token) || FILESYSTEM_ROOTS.has(token)) continue;
+    probe(slash[2], 'slash', line, `slash invocation ${token}`);
   }
-  return findings;
+
+  return { findings, resolutions };
 }
 
 /**
@@ -450,7 +540,9 @@ function scanR4Skills(file, spans, skillExists) {
  *   file's directory (relative to repo root) so the probe can also try
  *   doc-relative resolution (skill docs cite skill-local paths).
  * @param {(skillName: string) => boolean} probes.skillExists - skill dir exists
- * @returns {{ findings: Object[] }}
+ * @returns {{ findings: Object[], stats: { r4: { legacy: number, slash: number,
+ *   total: number } } }} — `stats.r4` counts references PROBED (not findings);
+ *   a caller aggregating across the doc surface must fail on a zero total.
  */
 function lintDoc(file, content, probes = {}) {
   if (typeof content !== 'string') {
@@ -464,10 +556,11 @@ function lintDoc(file, content, probes = {}) {
   const spans = extractCodeSpans(content);
   const lines = content.split('\n');
 
+  const r4 = scanR4Skills(file, spans, skillExists);
   let findings = [
     ...scanR1Paths(file, spans, pathExists),
     ...scanR2AndR3Cli(file, spans, CLI_MANIFEST),
-    ...scanR4Skills(file, spans, skillExists),
+    ...r4.findings,
   ];
 
   // Build a per-line suppression map: line number → ignore directive. A
@@ -515,7 +608,16 @@ function lintDoc(file, content, probes = {}) {
     }
   }
 
-  return { findings: [...findings, ...ignoreFindings] };
+  return {
+    findings: [...findings, ...ignoreFindings],
+    stats: {
+      r4: {
+        legacy: r4.resolutions.legacy,
+        slash: r4.resolutions.slash,
+        total: r4.resolutions.legacy + r4.resolutions.slash,
+      },
+    },
+  };
 }
 
 module.exports = {
@@ -527,4 +629,6 @@ module.exports = {
   findCliInvocations,
   R4_SEVERITY,
   PATH_PREFIXES,
+  HOST_SLASH_COMMANDS,
+  FILESYSTEM_ROOTS,
 };
