@@ -83,18 +83,18 @@ COMMANDS:
       --json       Output schema as JSON
       --example    Show complete example
 
-  loop [--pattern sequential|dag] [--max-runs N] [--max-cost N] [--epic <id>] [--spec-id <id>]
-       [--task-timeout N] [--permission-mode <mode>] [--allowed-tools <tools>] [--verify-cmd "..."]
+  loop --tasks <file> [--max-runs N] [--max-cost N] [--task-timeout N] [--model <tier>]
+       [--permission-mode <mode>] [--allowed-tools <tools>] [--verify-cmd "..."]
        [--verifier] [--max-retries N] [--reset]
-      Run autonomous cross-session execution loop.
-      --pattern          Execution pattern: sequential (default) or dag
-      --epic             Scope loop to a single epic (auto-detected in worktrees)
+      Run autonomous cross-session execution loop over a markdown task list.
+      --tasks            Task list to work through (required); the loop's only task state
       --max-runs         Maximum iterations (default: 50)
       --max-cost         Maximum cost in dollars (default: unlimited)
       --task-timeout     Per-session timeout in seconds (default: 600)
+      --model            Pass --model through to spawned claude sessions
       --permission-mode  Pass --permission-mode through to spawned claude sessions
       --allowed-tools    Pass --allowed-tools through to spawned claude sessions
-      --verify-cmd       Acceptance floor run after each session exits 0; non-zero fails the task
+      --verify-cmd       Fallback acceptance floor for tasks with no own verify: line
       --verifier         After the floor passes, spawn an independent verifier agent;
                          FAIL → retry with feedback, exhausted/unparseable → block (opt-in)
       --max-retries      Verifier feedback retries before blocking (default: 2)

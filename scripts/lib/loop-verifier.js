@@ -1,13 +1,13 @@
 /**
  * loop-verifier.js - Verifier-agent gate + feedback retry protocol (AF-9).
  *
- * Layers ON TOP of AF-8's deterministic acceptance floor (loop-verify.js): when
- * `--verifier` is on, a session that exits 0 AND passes the --verify-cmd floor is
- * NOT yet trusted. An independent verifier session is spawned in the work cwd
- * (the epic worktree in dag mode), assembled at runtime from agents/verifier.md's
- * body + the epic's acceptance criteria + the verify-cmd evidence + an
- * assembler-layer "Final verdict: PASS|FAIL" instruction. The verifier's verdict
- * is parsed from its text result — NEVER inferred from an exit code.
+ * Layers ON TOP of the deterministic acceptance floor (loop-verify.js): when
+ * `--verifier` is on, a session that exits 0 AND passes the floor is NOT yet
+ * trusted. An independent verifier session is spawned in the work cwd,
+ * assembled at runtime from the verifier prompt's body + the task's acceptance
+ * criteria + the verify-command evidence + an assembler-layer
+ * "Final verdict: PASS|FAIL" instruction. The verifier's verdict is parsed from
+ * its text result — NEVER inferred from an exit code.
  *
  * On FAIL the implementer is re-spawned with verbatim cumulative feedback
  * prepended, up to --max-retries (default 2). Exhausted retries → the caller
@@ -15,16 +15,15 @@
  * the task is blocked (never completed) and the caller surfaces it for the
  * verdict-protocol escalation — the floor's exit-code is never used to infer PASS.
  *
- * S4-8 missing-criteria degradation: criteria come from
- * specs/<spec-id>/epics/<epic-id>/ when present, else the epic's spec_path
- * contents + dag feature names. When NEITHER yields any criteria the verifier is
- * SKIPPED (with a warning) rather than spawned on empty criteria — AF-8's
- * deterministic floor still gates, so the task may still complete.
+ * Acceptance criteria come from the D3 task itself (its text, its `verify:`
+ * line, its `note:`) — the task list is the loop's only task state, so there is
+ * no second criteria store to degrade through. When the verifier prompt file is
+ * unreadable the gate is SKIPPED (with a warning) rather than spawned on an
+ * empty body; the deterministic floor still gates, so the task may still pass.
  *
- * The agent prompt assembly never edits agents/verifier.md (read-only here).
+ * The prompt assembly never edits the verifier prompt file (read-only here).
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const { readFileSafe } = require('./utils');
 const { recordError } = require('./loop-state');
@@ -32,11 +31,11 @@ const { recordError } = require('./loop-state');
 /** Default retry budget for the verifier feedback loop. */
 const DEFAULT_MAX_RETRIES = 2;
 
-/** Cap assembled criteria text so a huge spec doc can't blow the prompt. */
+/** Cap assembled criteria text so a huge task note can't blow the prompt. */
 const CRITERIA_CAP = 8000;
 
-/** agents/verifier.md, resolved relative to THIS file (not cwd, not env). */
-const VERIFIER_AGENT_PATH = path.join(__dirname, '..', '..', 'agents', 'verifier.md');
+/** The verifier prompt, resolved relative to THIS file (not cwd, not env). */
+const VERIFIER_AGENT_PATH = path.join(__dirname, 'prompts', 'verifier.md');
 
 /**
  * Strip YAML frontmatter from an agent markdown file, returning the body only.
@@ -51,8 +50,8 @@ function stripFrontmatter(content) {
 
 /**
  * Load the verifier agent body (frontmatter stripped). Read-only — this never
- * edits agents/verifier.md. Returns null when the agent file is unreadable so
- * the caller can degrade rather than spawn an empty-bodied verifier.
+ * edits the prompt file. Returns null when it is unreadable so the caller can
+ * degrade rather than spawn an empty-bodied verifier.
  * @returns {string|null} Verifier agent body, or null when unavailable
  */
 function loadVerifierBody() {
@@ -63,94 +62,34 @@ function loadVerifierBody() {
 }
 
 /**
- * Resolve the epic's spec_path to an absolute existing file (S4-8 fallback leg).
- * Mirrors loop.js resolveSpecPath order: spec-dir-relative first, then
- * project-root-relative; only an existing file is returned.
- * @param {string} specPath - Raw spec_path value from dag.yaml
- * @param {string} projectRoot - Project root
- * @param {string|null} specId - Spec id for spec-dir-relative resolution
- * @returns {string|null} Absolute path to an existing spec doc, or null
+ * Build the acceptance criteria text for a D3 task. The task list is the loop's
+ * only task state, so the criteria ARE the task: its text, its `verify:` line
+ * (the command that decides done), and its `note:` when present. Capped so a
+ * long note cannot blow the prompt.
+ * @param {{id:string,text:string,verify:string|null,note:string|null}} task
+ * @returns {string} Criteria text
  */
-function resolveSpecDoc(specPath, projectRoot, specId) {
-  if (!specPath || typeof specPath !== 'string') return null;
-  const candidates = [];
-  if (specId) candidates.push(path.resolve(projectRoot, 'specs', specId, specPath));
-  candidates.push(path.resolve(projectRoot, specPath));
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
+function buildTaskCriteria(task) {
+  const parts = [`- ${task?.text || task?.id || 'the task'}`];
+  if (task?.verify) {
+    parts.push(`- The task's own verify command must pass: \`${task.verify}\``);
   }
-  return null;
+  if (task?.note) parts.push(`- Note recorded on the task: ${task.note}`);
+  return parts.join('\n').slice(0, CRITERIA_CAP);
 }
 
 /**
- * Read every markdown file directly under specs/<spec-id>/epics/<epic-id>/
- * (non-recursive), concatenated. This is the primary criteria source.
- * @param {string} projectRoot - Project root
- * @param {string|null} specId - Spec id
- * @param {string} epicId - Epic id
- * @returns {string} Concatenated epic-dir markdown, or '' when absent
- */
-function readEpicDir(projectRoot, specId, epicId) {
-  if (!specId || !epicId) return '';
-  const epicDir = path.join(projectRoot, 'specs', specId, 'epics', epicId);
-  let entries;
-  try {
-    entries = fs.readdirSync(epicDir, { withFileTypes: true });
-  } catch {
-    return '';
-  }
-  const docs = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
-    const content = readFileSafe(path.join(epicDir, entry.name));
-    if (content) docs.push(content.trim());
-  }
-  return docs.join('\n\n');
-}
-
-/**
- * Build the acceptance criteria text for an epic, applying the S4-8 degradation
- * ladder: epics/<id>/ markdown → spec_path doc contents → dag feature names.
- * Returns the assembled criteria (capped). An empty string means NO criteria
- * could be resolved — the caller MUST skip the verifier rather than spawn it
- * with empty criteria.
- * @param {Object} coord - Coordinator (provides specId)
- * @param {Object} epic - Epic carrying id/spec_path/features
- * @param {string} projectRoot - Project root
- * @returns {string} Criteria text ('' when none resolvable)
- */
-function loadVerifierCriteria(coord, epic, projectRoot) {
-  const specId = coord?.specId || null;
-  const epicId = epic?.id;
-
-  const epicDir = readEpicDir(projectRoot, specId, epicId);
-  if (epicDir) return epicDir.slice(0, CRITERIA_CAP);
-
-  const parts = [];
-  const specDoc = resolveSpecDoc(epic?.spec_path, projectRoot, specId);
-  if (specDoc) {
-    const content = readFileSafe(specDoc);
-    if (content?.trim()) parts.push(content.trim());
-  }
-  const features = Array.isArray(epic?.features) ? epic.features : [];
-  const featureNames = features.map((f) => f?.name).filter(Boolean);
-  if (featureNames.length > 0) {
-    parts.push(`Feature acceptance targets:\n${featureNames.map((n) => `- ${n}`).join('\n')}`);
-  }
-  return parts.join('\n\n').slice(0, CRITERIA_CAP);
-}
-
-/**
- * Assemble the verifier session prompt at runtime. NEVER edits agents/verifier.md.
- * Layers: agent body → epic identity + acceptance criteria → verify-cmd evidence
- * instruction → a forceful verdict-protocol override. The override deliberately
- * supersedes the agent body's own SHIP/NEEDS WORK/BLOCKED report vocabulary so a
- * real session emits a parseable `Final verdict:` line, not a divergent verdict.
+ * Assemble the verifier session prompt at runtime. NEVER edits the prompt file.
+ * Layers: agent body → task identity + acceptance criteria → verify-command
+ * evidence instruction → a forceful verdict-protocol override. The override
+ * deliberately supersedes the agent body's own SHIP/NEEDS WORK/BLOCKED report
+ * vocabulary so a real session emits a parseable `Final verdict:` line, not a
+ * divergent verdict.
  * @param {Object} args
  * @param {string} args.agentBody - Verifier agent body (frontmatter stripped)
- * @param {Object} args.task - Task/epic being verified (id, name)
+ * @param {Object} args.task - Task being verified ({ id, text })
  * @param {string} args.criteria - Acceptance criteria text (non-empty)
- * @param {string[]|null} args.verifyCommand - The --verify-cmd argv (or null)
+ * @param {string[]|null} args.verifyCommand - The verify-command argv (or null)
  * @param {string} [args.feedback] - Verbatim cumulative feedback to prepend
  * @returns {string} The assembled verifier prompt
  */
@@ -163,7 +102,7 @@ function assembleVerifierPrompt({ agentBody, task, criteria, verifyCommand, feed
   }
   parts.push(agentBody, '');
   parts.push('## Work Under Verification', '');
-  parts.push(`Task: ${task.name} (${task.id})`, '');
+  parts.push(`Task: ${task.text} (${task.id})`, '');
   parts.push('## Acceptance Criteria', '');
   parts.push(criteria.trim(), '');
   if (Array.isArray(verifyCommand) && verifyCommand.length > 0) {
@@ -262,13 +201,12 @@ function spawnVerifierSession({ spawn, prompt, cwd }) {
 
 /**
  * Run the AF-9 verifier gate + verbatim-feedback retry sub-loop for a task whose
- * session already exited 0 AND passed the AF-8 deterministic floor.
+ * session already exited 0 AND passed the deterministic floor.
  *
- * Synchronous by design: the sequential path keeps byte-identical behavior when
- * `--verifier` is off (a no-op returning `{ passed: true, skipped: true }` with
- * NO extra session), and the dag path calls this in its sequential integration
- * phase so retries reuse the same synchronous spawn. The whole gate+retry loop
- * lives here — neither caller forks it.
+ * Synchronous by design: when `--verifier` is off this is a no-op returning
+ * `{ passed: true, skipped: true }` with NO extra session, so loop behavior is
+ * byte-identical to a run without the gate. The whole gate+retry loop lives
+ * here — the caller never forks it.
  *
  * Flow per attempt: spawn the verifier in `cwd`, parse its verdict.
  *  - PASS → `{ passed: true }`.
@@ -280,33 +218,31 @@ function spawnVerifierSession({ spawn, prompt, cwd }) {
  *    retrying without spawning. Exhausted → `{ passed: false, verdict: <last> }`.
  *
  * @param {Object} ctx
- * @param {Object} ctx.coord - Coordinator (provides specId)
- * @param {Object} ctx.task - Task/epic under verification
+ * @param {Object} ctx.task - Task under verification ({ id, text, verify, note })
  * @param {Object} ctx.state - Loop state (cost + attempts persisted here)
  * @param {Object} ctx.options - Loop options (maxRetries, maxCost, verifyCommand)
- * @param {string} ctx.cwd - Work cwd (epic worktree in dag mode)
- * @param {string} ctx.projectRoot - Project root for criteria resolution
+ * @param {string} ctx.cwd - Work cwd
  * @param {Function} ctx.spawnImplementer - (prompt, cwd) => sync session result
  * @param {Function} ctx.spawnVerifier - (prompt, cwd) => sync session result
  * @param {Function} ctx.buildImplementerPrompt - (feedback) => string
- * @param {Function} ctx.runFloor - (cwd) => boolean (re-run AF-8 floor)
+ * @param {Function} ctx.runFloor - (cwd) => boolean (re-run the floor)
  * @returns {{ passed: boolean, skipped?: boolean, unparseable?: boolean, verdict?: string|null }}
  */
 function runVerifierGate(ctx) {
-  const { coord, task, state, options, cwd, projectRoot } = ctx;
+  const { task, state, options, cwd } = ctx;
   if (!options.verifier) return { passed: true, skipped: true };
 
   const agentBody = loadVerifierBody();
-  const criteria = loadVerifierCriteria(coord, task, projectRoot);
-  // S4-8: never spawn the verifier with empty criteria (or no agent body) —
-  // skip it with a warning. The AF-8 deterministic floor still gated upstream.
-  if (!agentBody || !criteria) {
-    const why = !agentBody ? 'verifier agent unavailable' : 'no acceptance criteria resolvable';
+  // Never spawn a verifier with an empty body — skip it with a warning. The
+  // deterministic floor still gated upstream, so the task may still complete.
+  if (!agentBody) {
     console.error(
-      `[loop] Verifier skipped for ${task.id} — ${why}; deterministic floor still gated`,
+      `[loop] Verifier skipped for ${task.id} — verifier prompt unavailable ` +
+        `(${VERIFIER_AGENT_PATH}); deterministic floor still gated`,
     );
     return { passed: true, skipped: true };
   }
+  const criteria = buildTaskCriteria(task);
 
   const maxRetries =
     typeof options.maxRetries === 'number' ? options.maxRetries : DEFAULT_MAX_RETRIES;
@@ -379,28 +315,23 @@ function runVerifierGate(ctx) {
 }
 
 /**
- * Block a task on a non-passing verifier outcome, recording the reason in loop
- * state. Shared by both loop callers (sequential + dag) so the block tail isn't
- * forked. An unparseable verdict is reported distinctly for the verdict-protocol
- * escalation; PASS is never inferred. A failed blockTask is logged, never thrown.
- * @param {Object} coord - Coordinator (provides blockTask)
- * @param {Object} task - Task/epic to block
+ * Record a non-passing verifier outcome in loop state. An unparseable verdict is
+ * reported distinctly for the verdict-protocol escalation; PASS is never
+ * inferred. This never writes the task list — loop.js owns every status marker,
+ * so the block transition has exactly one write path.
+ * @param {Object} task - Task that failed verification
  * @param {Object} state - Loop state (error + failed_tasks recorded here)
  * @param {{ unparseable?: boolean, verdict?: string|null }} outcome - Gate outcome
  * @returns {false} Always false (callers `return blockOnVerdict(...)`)
  */
-function blockOnVerdict(coord, task, state, outcome) {
+function blockOnVerdict(task, state, outcome) {
   const reason = outcome.unparseable
     ? 'Loop: verifier verdict UNPARSEABLE (escalate verdict protocol)'
     : `Loop: verifier FAIL after retries (last verdict: ${outcome.verdict})`;
   recordError(state, task.id, reason, 1);
   if (!Array.isArray(state.failed_tasks)) state.failed_tasks = [];
   state.failed_tasks.push(task.id);
-  try {
-    coord.blockTask(task.id, reason);
-  } catch (err) {
-    console.error(`[loop] Warning: could not block task ${task.id}: ${err.message}`);
-  }
+  console.error(`[loop] Task ${task.id} blocked — ${reason}`);
   return false;
 }
 
@@ -409,7 +340,7 @@ module.exports = {
   VERIFIER_AGENT_PATH,
   stripFrontmatter,
   loadVerifierBody,
-  loadVerifierCriteria,
+  buildTaskCriteria,
   assembleVerifierPrompt,
   parseVerdict,
   recordVerifierAttempt,

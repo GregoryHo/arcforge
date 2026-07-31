@@ -15,7 +15,7 @@
  *   reboot                          Get context for new session
  *   worktree add|list|remove        Generic (non-epic) worktree management
  *   schema [--json] [--example]     Show dag.yaml schema
- *   loop [--pattern sequential|dag] [--max-runs N] [--max-cost $N]  Run autonomous loop
+ *   loop --tasks <file> [--max-runs N] [--max-cost N]  Run autonomous loop over a task list
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N] [--model <name>] [--no-isolate] [--plugin-dir <path>] [--max-turns N]
  *   eval preflight <name>            Run baseline trials to check scenario discriminability
@@ -43,6 +43,7 @@ const { runDagCommand } = require('./cli/dag-commands');
 const { runEvalCommand } = require('./cli/eval-command');
 const { printHelp } = require('./cli/help');
 const { runLearnCommand } = require('./cli/learn-command');
+const { runLoopCommand } = require('./cli/loop-command');
 const { runObsidianCommand } = require('./cli/obsidian-command');
 const { runRatifyCommand } = require('./cli/ratify-command');
 const { runSddGateCommand } = require('./cli/sdd-gate-command');
@@ -114,9 +115,13 @@ async function main() {
       case 'merge':
       case 'cleanup':
       case 'sync':
-      case 'reboot':
-      case 'loop': {
+      case 'reboot': {
         runDagCommand(args, { projectRoot, asJson });
+        break;
+      }
+
+      case 'loop': {
+        runLoopCommand(args, { projectRoot });
         break;
       }
 

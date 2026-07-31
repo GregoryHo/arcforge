@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * loop.js - Autonomous loop orchestrator for arcforge
+ * loop.js - Autonomous loop orchestrator for arcforge.
  *
- * Runs arcforge workflows overnight without human intervention.
- * Each iteration spawns a fresh Claude session via `claude -p`.
- * DAG + git persist state across sessions.
+ * Runs a project's work overnight without human intervention. Each iteration
+ * spawns a fresh Claude session via `claude -p`; the D3 markdown task list
+ * (scripts/lib/task-list.js) is the ONLY task source and the only cross-session
+ * task state, so a `/compact`, a dead session, or a human editing the file
+ * mid-run all survive. Loop bookkeeping (iteration, cost, errors) lives in
+ * .arcforge-loop.json.
  *
  * Usage:
- *   node scripts/loop.js [--pattern sequential|dag] [--max-runs N] [--max-cost $N]
+ *   node scripts/loop.js --tasks <file> [--max-runs N] [--max-cost N]
  *
- * Patterns:
- *   sequential - One task at a time, stop on failure (safest)
- *   dag        - Use parallelTasks() for independent tasks in parallel
- *
- * State: .arcforge-loop.json tracks current iteration, costs, errors.
+ * Per iteration: pick the next task (an in-progress one first — crash
+ * recovery — then the first pending), mark it `[~]`, spawn a session, run the
+ * acceptance floor, optionally run the verifier gate, then mark `[x]` or `[!]`.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { Coordinator } = require('./lib/coordinator');
-const { spawnSession, spawnSessionAsync } = require('./lib/loop-session');
+const { spawnSession } = require('./lib/loop-session');
 const {
   loadLoopState,
   saveLoopState,
@@ -28,22 +28,16 @@ const {
   finalizeLoop,
 } = require('./lib/loop-state');
 const { isStalled, isRetryStorm, checkStopConditions, printSummary } = require('./lib/loop-state');
-const { warnIfBaseBranch, selectRoundEpics, runDagRound } = require('./lib/loop-dag');
 const { parseVerifyCommand, runVerify, recordVerifyResult } = require('./lib/loop-verify');
 const { runVerifierGate, blockOnVerdict, DEFAULT_MAX_RETRIES } = require('./lib/loop-verifier');
-const { Feature } = require('./lib/models');
+const { parseTaskList, validateTaskList, updateTaskStatus } = require('./lib/task-list');
 const {
   detectPackageManager,
   getDefaultTestCommand,
   getPmRunCommand,
   hasScript,
 } = require('./lib/package-manager');
-const { getTimestamp, readFileSafe } = require('./lib/utils');
-
-const MAX_RETRIES = 1;
-
-/** Default concurrency cap for the DAG pattern's per-round worktree batch. */
-const DEFAULT_MAX_PARALLEL = 5;
+const { getTimestamp } = require('./lib/utils');
 
 /**
  * Parse loop CLI arguments
@@ -52,12 +46,9 @@ const DEFAULT_MAX_PARALLEL = 5;
  */
 function parseLoopArgs(args) {
   const options = {
-    pattern: 'sequential',
+    tasksFile: null,
     maxRuns: 50,
     maxCost: null,
-    epic: null,
-    maxParallel: DEFAULT_MAX_PARALLEL,
-    projectSetup: true,
     taskTimeoutMs: null,
     model: null,
     permissionMode: null,
@@ -70,12 +61,8 @@ function parseLoopArgs(args) {
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case '--pattern':
-        options.pattern = args[++i];
-        if (!['sequential', 'dag'].includes(options.pattern)) {
-          console.error(`Error: Invalid pattern "${options.pattern}". Use "sequential" or "dag".`);
-          process.exit(1);
-        }
+      case '--tasks':
+        options.tasksFile = args[++i];
         break;
       case '--max-runs':
         options.maxRuns = parseInt(args[++i], 10);
@@ -84,25 +71,12 @@ function parseLoopArgs(args) {
           process.exit(1);
         }
         break;
-      case '--max-parallel':
-        options.maxParallel = parseInt(args[++i], 10);
-        if (Number.isNaN(options.maxParallel) || options.maxParallel < 1) {
-          console.error('Error: --max-parallel must be a positive integer');
-          process.exit(1);
-        }
-        break;
-      case '--no-project-setup':
-        options.projectSetup = false;
-        break;
       case '--max-cost':
         options.maxCost = parseFloat(args[++i]);
         if (Number.isNaN(options.maxCost) || options.maxCost <= 0) {
           console.error('Error: --max-cost must be a positive number');
           process.exit(1);
         }
-        break;
-      case '--epic':
-        options.epic = args[++i];
         break;
       case '--task-timeout': {
         const seconds = parseInt(args[++i], 10);
@@ -163,126 +137,112 @@ function printLoopHelp() {
 arcforge loop - Autonomous cross-session execution
 
 USAGE:
-  node scripts/loop.js [options]
+  node scripts/loop.js --tasks <file> [options]
 
 OPTIONS:
-  --pattern sequential|dag   Execution pattern (default: sequential)
+  --tasks <file>             Task list to work through (required). A D3 markdown
+                             checkbox list — it is the loop's only task state
   --max-runs N               Maximum iterations (default: 50)
   --max-cost N               Maximum cost in dollars (default: unlimited)
-  --epic <id>                Scope loop to a single epic (safe for parallel loops)
-  --max-parallel N           Max concurrent epics per round in dag mode (default: 5)
-  --no-project-setup         Skip per-worktree installer in dag mode (default: on)
   --task-timeout N           Per-session timeout in seconds (default: 600)
   --model <tier>             Pass --model through to every spawned claude session
                              (implementer + verifier); default: CLI default tier
   --permission-mode <mode>   Pass --permission-mode through to spawned claude sessions
   --allowed-tools <tools>    Pass --allowed-tools through to spawned claude sessions
-  --verify-cmd "<cmd>"       Run this command after each session exits 0; a
-                             non-zero exit fails the task (retry/block, no complete)
-  --verifier                 After the --verify-cmd floor passes, spawn an
+  --verify-cmd "<cmd>"       Fallback acceptance floor for tasks with no own
+                             \`verify:\` line; a non-zero exit fails the task
+  --verifier                 After the acceptance floor passes, spawn an
                              independent verifier agent; FAIL → retry with verbatim
                              feedback, exhausted → block (opt-in; off by default)
   --max-retries N            Verifier feedback retries before blocking (default: 2)
   --help, -h                 Show this help
 
-PATTERNS:
-  sequential   One task at a time, stop on failure (safest)
-  dag          Run independent tasks in parallel sessions
+TASK LIST:
+  Tasks come from the --tasks file and nowhere else. A task's own \`verify:\`
+  line is its acceptance floor; --verify-cmd covers tasks that have none.
+  The loop marks each task [~] while working, then [x] or [!].
 
 STATE:
   Loop state is tracked in .arcforge-loop.json
   Errors are logged with timestamps for monitoring
-
-MONITORING:
-  Use the loop-operator agent to monitor a running loop.
 `);
 }
 
 /**
- * Detect if running inside a worktree by checking for .arcforge-epic marker.
- * @param {string} projectRoot - Current project root
- * @returns {{ inWorktree: boolean, epicId: string|null, basePath: string|null }}
- */
-function detectWorktree(projectRoot) {
-  const content = readFileSafe(path.join(projectRoot, '.arcforge-epic'));
-  if (!content) {
-    return { inWorktree: false, epicId: null, basePath: null };
-  }
-  try {
-    const { parseDagYaml } = require('./lib/yaml-parser');
-    const data = parseDagYaml(content);
-    return {
-      inWorktree: true,
-      epicId: data.epic || null,
-      basePath: data.base_worktree || null,
-    };
-  } catch {
-    return { inWorktree: true, epicId: null, basePath: null };
-  }
-}
-
-/**
- * Resolve epic scope from explicit flag or worktree auto-detection.
- * @param {string|null} epic - Explicit epic ID from --epic flag
+ * Resolve the --tasks value against the project root.
+ * @param {string} tasksFile - Raw --tasks value
  * @param {string} projectRoot - Project root directory
- * @returns {string|null} Resolved epic scope
+ * @returns {string} Absolute path to the task list
+ * @throws {Error} when no task list was given
  */
-function resolveEpicScope(epic, projectRoot) {
-  const scope = epic || detectWorktree(projectRoot).epicId;
-  if (!epic && scope) {
-    console.log(`[loop] Detected worktree for epic ${scope} — auto-scoping`);
+function resolveTasksPath(tasksFile, projectRoot) {
+  if (typeof tasksFile !== 'string' || !tasksFile.trim()) {
+    throw new Error('loop requires a task list: pass --tasks <file>');
   }
-  return scope;
+  return path.resolve(projectRoot, tasksFile);
 }
 
 /**
- * Resolve an epic's spec_path to a spawn-cwd-relative path.
- * Resolution order: spec-dir-relative (`specs/<specId>/<spec_path>`, the
- * sdd-v2 planner convention) first, then project-root-relative. Only paths
- * that exist on disk are emitted — a path the spawned session cannot
- * resolve from its cwd is worse than no path at all.
- * @param {string} specPath - Raw spec_path value from dag.yaml
- * @param {string} projectRoot - Spawn cwd for loop sessions
- * @param {string|null} specId - Spec id for spec-dir-relative resolution
- * @returns {string|null} Spawn-cwd-relative path, or null when unresolvable
+ * Read the task list file. The list IS the state, so an unreadable file is a
+ * hard error rather than a silently empty run.
+ * @param {string} tasksPath - Absolute path to the task list
+ * @returns {string} File contents
+ * @throws {Error} when the file cannot be read
  */
-function resolveSpecPath(specPath, projectRoot, specId) {
-  if (!specPath || typeof specPath !== 'string') return null;
-  const candidates = [];
-  if (specId) {
-    candidates.push(path.resolve(projectRoot, 'specs', specId, specPath));
+function readTaskList(tasksPath) {
+  try {
+    return fs.readFileSync(tasksPath, 'utf8');
+  } catch (err) {
+    throw new Error(`Failed to read task list at ${tasksPath}: ${err.message}`);
   }
-  candidates.push(path.resolve(projectRoot, specPath));
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return path.relative(projectRoot, candidate);
-  }
-  return null;
 }
 
 /**
- * Build the `## Specs` lines for a task's epic.
- * Emits the epic's spec document and the spec epic directory when they
- * exist on disk; legacy dags without spec_path gracefully omit both.
- * @param {Object|null} epic - Epic carrying spec_path (null → no lines)
- * @param {Coordinator} coord - Coordinator instance (provides specId)
- * @param {string} projectRoot - Spawn cwd for loop sessions
- * @returns {string[]} Lines for the Specs section (may be empty)
+ * Pick the task to run next: a task already marked in-progress wins (a previous
+ * run died mid-task and must be resumed, not skipped), otherwise the first
+ * pending task in file order. Done and blocked tasks are never re-run.
+ * @param {Array<{id:string,status:string}>} tasks - Parsed tasks
+ * @returns {Object|null} Next task, or null when nothing is runnable
  */
-function buildSpecLines(epic, coord, projectRoot) {
-  if (!epic) return [];
-  const lines = [];
-  const specId = coord.specId || null;
-  const specDoc = resolveSpecPath(epic.spec_path, projectRoot, specId);
-  if (specDoc) {
-    lines.push(`Spec: ${specDoc}`);
+function selectNextTask(tasks) {
+  if (!Array.isArray(tasks)) return null;
+  return (
+    tasks.find((t) => t.status === 'in-progress') ||
+    tasks.find((t) => t.status === 'pending') ||
+    null
+  );
+}
+
+/**
+ * Write one task's status back to the list. THE single task-list write path —
+ * every status transition the loop makes goes through here.
+ * @param {string} tasksPath - Absolute path to the task list
+ * @param {string} id - Task id
+ * @param {string} status - One of TASK_STATUSES
+ * @returns {string} The updated file contents
+ * @throws {Error} on an unknown id/status or an unwritable file
+ */
+function setTaskStatus(tasksPath, id, status) {
+  const updated = updateTaskStatus(readTaskList(tasksPath), id, status);
+  try {
+    fs.writeFileSync(tasksPath, updated);
+  } catch (err) {
+    throw new Error(`Failed to write task list at ${tasksPath}: ${err.message}`);
   }
-  if (specId) {
-    const epicDir = path.join('specs', specId, 'epics', epic.id);
-    if (fs.existsSync(path.join(projectRoot, epicDir))) {
-      lines.push(`Epic docs: ${epicDir}${path.sep}`);
-    }
-  }
-  return lines;
+  return updated;
+}
+
+/**
+ * Resolve the acceptance floor for one task: its own `verify:` line when it has
+ * one, else the run-wide --verify-cmd, else none.
+ * @param {{verify: string|null}} task - Parsed task
+ * @param {Object} options - Loop options (verifyCommand fallback)
+ * @returns {string[]|null} argv array, or null when no floor applies
+ * @throws {Error} when the task's own verify line cannot be tokenized
+ */
+function resolveTaskVerifyCommand(task, options) {
+  if (!task.verify) return options.verifyCommand || null;
+  return parseVerifyCommand(task.verify);
 }
 
 /**
@@ -310,45 +270,21 @@ function buildVerificationLines(projectRoot) {
 }
 
 /**
- * Build a task context prompt for a spawned Claude session.
- * Uses coordinator.taskContext() for enriched task data.
- * @param {Object} task - Task from coordinator
- * @param {Coordinator} coord - Coordinator instance
- * @param {string} projectRoot - Project root directory (verification + spec
- *   resolution are keyed here; the relative paths emitted resolve identically
- *   from a worktree checkout of the same repo).
- * @param {string} [workspaceRoot] - Actual session workspace for the
- *   `## Project Root:` line. In dag mode this is the epic worktree so the
- *   headless session works there (not the base). Defaults to projectRoot.
+ * Build the task context prompt for a spawned session. Everything the session
+ * needs comes from the task list entry — the loop has no other task store.
+ * @param {Object} task - Parsed task ({ id, text, verify, note })
+ * @param {Object} ctx - Prompt context
+ * @param {string} ctx.projectRoot - Project root (spawn cwd)
+ * @param {string} [ctx.tasksFile] - Task list path shown to the session
+ * @param {number} [ctx.remaining] - Tasks still not done, for pacing
  * @returns {string} Prompt for the spawned session
  */
-function buildTaskPrompt(task, coord, projectRoot, workspaceRoot) {
-  const taskType = task instanceof Feature ? 'feature' : 'epic';
-  const parts = [`# Task: ${task.name}`, ``, `## Task ID: ${task.id}`, `## Type: ${taskType}`];
-
-  // Enrich with coordinator context (dependencies, parent epic, siblings).
-  // The epic resolved here also carries spec_path for the Specs section.
-  let specEpic = taskType === 'epic' ? task : null;
-  try {
-    const ctx = coord.taskContext(task.id);
-    if (ctx.parent_epic) {
-      if (!specEpic) specEpic = coord.dag.getTask(ctx.parent_epic.id);
-      parts.push(
-        `## Parent Epic: ${ctx.parent_epic.name} (${Math.round(ctx.parent_epic.progress)}% complete)`,
-      );
-    }
-    if (ctx.dependencies && ctx.dependencies.length > 0) {
-      parts.push(
-        `## Dependencies: ${ctx.dependencies.map((d) => `${d.name} [${d.status}]`).join(', ')}`,
-      );
-    }
-    if (ctx.sibling_tasks) {
-      const remaining = ctx.sibling_tasks.filter((s) => s.status !== 'completed');
-      parts.push(`## Remaining siblings: ${remaining.length}`);
-    }
-  } catch {
-    // taskContext may fail for epics without features — continue with basic info
-  }
+function buildTaskPrompt(task, ctx = {}) {
+  const { projectRoot, tasksFile, remaining } = ctx;
+  const parts = [`# Task: ${task.text}`, ``, `## Task ID: ${task.id}`];
+  if (task.note) parts.push(`## Note: ${task.note}`);
+  if (tasksFile) parts.push(`## Task list: ${tasksFile}`);
+  if (typeof remaining === 'number') parts.push(`## Remaining tasks: ${remaining}`);
 
   parts.push(
     ``,
@@ -357,9 +293,14 @@ function buildTaskPrompt(task, coord, projectRoot, workspaceRoot) {
     `Implement this task following the project conventions.`,
     `Use TDD: write failing test first, then implement, then refactor.`,
     `Commit your changes with a conventional commit message.`,
+    `Do NOT edit the task list — the loop owns every status marker in it.`,
     ``,
-    `## Project Root: ${workspaceRoot || projectRoot}`,
+    `## Project Root: ${projectRoot}`,
   );
+
+  if (task.verify) {
+    parts.push(``, `## Acceptance`, ``, `This task is done when \`${task.verify}\` passes.`);
+  }
 
   const verification = buildVerificationLines(projectRoot);
   if (verification.length > 0) {
@@ -367,21 +308,16 @@ function buildTaskPrompt(task, coord, projectRoot, workspaceRoot) {
     parts.push(...verification.map((line, idx) => `${idx + 1}. ${line}`));
   }
 
-  const specLines = buildSpecLines(specEpic, coord, projectRoot);
-  if (specLines.length > 0) {
-    parts.push(``, `## Specs`, ...specLines);
-  }
-
   return parts.join('\n');
 }
 
 /**
  * Run the deterministic acceptance floor for a task whose session exited 0.
- * When no --verify-cmd is configured this is a no-op returning true, so the
- * loop's behavior is byte-identical to today's. With a verify command it runs
- * it as an argv array (no shell) in `cwd`, persists the result for AF-9, and
- * returns whether it passed — a non-zero verify exit means the task did NOT
- * actually pass and must route to retry/block, not completeTask.
+ * When the task has no floor (no `verify:` line and no --verify-cmd) this is a
+ * no-op returning true. Otherwise it runs the argv array (no shell) in `cwd`,
+ * persists the result for the verifier gate, and returns whether it passed — a
+ * non-zero verify exit means the task did NOT pass and must route to
+ * retry/block, not to done.
  * @param {Object} task - Task whose session just succeeded
  * @param {Object} state - Loop state (verify result persisted here)
  * @param {Object} options - Loop options (verifyCommand, taskTimeoutMs)
@@ -403,142 +339,156 @@ function runVerifyFloor(task, state, options, cwd, attempt) {
 }
 
 /**
- * Run the AF-9 verifier gate for a task whose session exited 0 and passed the
- * AF-8 floor, in `cwd`. Layered ON TOP of the floor: when `--verifier` is off
- * this is a no-op returning true (no extra session — sequential behavior stays
- * byte-identical). The verbatim-feedback retry loop and verdict parsing live in
- * loop-verifier.js; this only wires the loop's spawn/floor/prompt callbacks and
- * blocks the task on FAIL-exhausted or an unparseable verdict (never inferring
- * PASS). `buildPrompt` re-builds the implementer prompt with prepended feedback.
+ * Run the verifier gate for a task whose session exited 0 and passed the
+ * acceptance floor. Layered ON TOP of the floor: when `--verifier` is off this
+ * is a no-op returning true (no extra session). The verbatim-feedback retry
+ * loop and verdict parsing live in loop-verifier.js; this only wires the loop's
+ * spawn/floor/prompt callbacks and records the block on FAIL-exhausted or an
+ * unparseable verdict (never inferring PASS). `buildPrompt` re-builds the
+ * implementer prompt with prepended feedback.
  * @param {Object} task - Task whose session succeeded
- * @param {Coordinator} coord - Coordinator instance
  * @param {Object} state - Loop state
  * @param {Object} options - Loop options
- * @param {string} cwd - Work cwd (epic worktree in dag mode)
+ * @param {string} cwd - Work cwd
  * @param {Function} buildPrompt - (feedback) => implementer prompt string
  * @returns {boolean} Whether the verifier passed (or was skipped/off)
  */
-function runVerifierGateFor(task, coord, state, options, cwd, buildPrompt) {
+function runVerifierGateFor(task, state, options, cwd, buildPrompt) {
   const outcome = runVerifierGate({
-    coord,
     task,
     state,
     options,
     cwd,
-    projectRoot: options.projectRoot,
     spawnImplementer: (prompt, c) => spawnSession(prompt, c, options),
     spawnVerifier: (prompt, c) => spawnSession(prompt, c, options),
     buildImplementerPrompt: buildPrompt,
     runFloor: (c) => runVerifyFloor(task, state, options, c, 1),
   });
   if (outcome.passed) return true;
-  return blockOnVerdict(coord, task, state, outcome);
+  return blockOnVerdict(task, state, outcome);
 }
 
 /**
- * Run a single task iteration
- * @param {Object} task - Task from coordinator
- * @param {Coordinator} coord - Coordinator instance
+ * Run a single task iteration. Never writes the task list — the caller owns
+ * every status transition.
+ * @param {Object} task - Parsed task from the list
  * @param {Object} state - Loop state
  * @param {Object} options - Loop options (projectRoot + spawn pass-through)
  * @returns {boolean} Whether the task succeeded
  */
-function runTask(task, coord, state, options) {
+function runTask(task, state, options) {
   const { projectRoot } = options;
-  const taskType = task instanceof Feature ? 'feature' : 'epic';
-  console.log(`[loop] Iteration ${state.iteration}: Running ${taskType} ${task.id} — ${task.name}`);
+  console.log(`[loop] Iteration ${state.iteration}: Running ${task.id} — ${task.text}`);
 
-  const prompt = buildTaskPrompt(task, coord, projectRoot);
-  let result = spawnSession(prompt, projectRoot, options);
+  let verifyCommand;
+  try {
+    verifyCommand = resolveTaskVerifyCommand(task, options);
+  } catch (err) {
+    // A task whose own verify line needs a shell can never be accepted — block
+    // that task with the reason instead of crashing the whole run.
+    console.error(`[loop] Task ${task.id} has an unusable verify command: ${err.message}`);
+    recordError(state, task.id, `unusable verify command: ${err.message}`, 1);
+    state.failed_tasks.push(task.id);
+    return false;
+  }
+  const taskOptions = { ...options, verifyCommand };
+
+  const prompt = buildTaskPrompt(task, { projectRoot, tasksFile: options.tasksFile });
+  let result = spawnSession(prompt, projectRoot, taskOptions);
   state.total_cost += result.costUsd;
   // An attempt only succeeds when the session exits 0 AND the acceptance floor
   // passes — a clean exit with a failing verify must still route to retry.
-  let attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, options, projectRoot, 1);
+  let attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, taskOptions, projectRoot, 1);
 
   if (!attemptOk) {
     console.log(`[loop] Task ${task.id} failed, retrying once...`);
     if (result.exitCode !== 0) recordError(state, task.id, result.stderr, 1);
 
     // Retry once
-    result = spawnSession(prompt, projectRoot, options);
+    result = spawnSession(prompt, projectRoot, taskOptions);
     state.total_cost += result.costUsd;
-    attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, options, projectRoot, 2);
+    attemptOk = result.exitCode === 0 && runVerifyFloor(task, state, taskOptions, projectRoot, 2);
     if (!attemptOk) {
       console.log(`[loop] Task ${task.id} failed after retry — blocking`);
       if (result.exitCode !== 0) recordError(state, task.id, result.stderr, 2);
       state.failed_tasks.push(task.id);
-
-      try {
-        coord.blockTask(task.id, `Loop: failed after ${MAX_RETRIES + 1} attempts`);
-      } catch (err) {
-        console.error(`[loop] Warning: could not block task ${task.id}: ${err.message}`);
-      }
       return false;
     }
   }
 
-  // AF-9 verifier gate (opt-in): the floor passed, but with --verifier on an
+  // Verifier gate (opt-in): the floor passed, but with --verifier on an
   // independent verdict must also PASS before completing. A no-op when off.
   if (
-    !runVerifierGateFor(task, coord, state, options, projectRoot, (feedback) =>
+    !runVerifierGateFor(task, state, taskOptions, projectRoot, (feedback) =>
       feedback ? `${feedback}\n\n---\n\n${prompt}` : prompt,
     )
   ) {
     return false;
   }
 
-  // Success — update DAG before recording in state
-  try {
-    coord.completeTask(task.id);
-    state.completed_tasks.push(task.id);
-    state.last_progress_at = getTimestamp();
-    console.log(`[loop] Task ${task.id} completed successfully`);
-  } catch (err) {
-    console.error(`[loop] Warning: DAG update failed for ${task.id}: ${err.message}`);
-    // Don't record as completed since DAG wasn't updated
-    return false;
-  }
+  state.completed_tasks.push(task.id);
+  state.last_progress_at = getTimestamp();
+  console.log(`[loop] Task ${task.id} completed successfully`);
   return true;
 }
 
+/** The one validateTaskList rule the loop cannot satisfy when it blocks a task. */
+const MISSING_BLOCK_NOTE_RE = /blocked with no "note:"/;
+
 /**
- * Try to create a Coordinator, returning null on failure.
+ * Validate the task list once, before any session is spawned — a malformed list
+ * must fail loudly rather than silently running zero tasks.
  *
- * @param {string} projectRoot
- * @param {Object} state
- * @param {string|null} [specId] - spec id (CLI `arcforge loop` resolves
- *   this up front and passes it through loopOptions.specId).
+ * ONE exception: `[!]` with no `note:`. The loop marks blocked tasks through
+ * updateTaskStatus, which rewrites only the marker (task-list.js owns the
+ * format and exposes no way to attach a reason), so a run that blocked a task
+ * would refuse to resume over its OWN output. That rule is downgraded to a
+ * warning here; every other semantic violation stays fatal.
+ *
+ * validateTaskList throws on its FIRST violation, so swallowing one leaves the
+ * rules after it unchecked. Duplicate ids are re-checked explicitly because
+ * updateTaskStatus resolves an id to its first match — a duplicate would let
+ * the loop mark the wrong task.
+ * @param {string} content - Task list contents
+ * @throws {Error} on any validation failure except the missing block note
  */
-function tryCreateCoordinator(projectRoot, state, specId = null) {
+function validateTaskListForRun(content) {
   try {
-    const coord = new Coordinator(projectRoot, specId);
-    // Force eager spec/DAG resolution inside this try so unresolved-spec
-    // errors from lazy `dagPath` / `dag` getters become a clean `no_dag`
-    // status instead of an uncaught throw later in the loop. Accessing
-    // `dag` covers both the specId check and DAG file readability.
-    const _probe = coord.dag;
-    if (coord.syncEpicStatusesFromBase()) {
-      console.log('[loop] Synced epic statuses from base DAG');
+    validateTaskList(content);
+    return;
+  } catch (err) {
+    if (!MISSING_BLOCK_NOTE_RE.test(err.message)) throw err;
+    console.error(`[loop] ${err.message} — continuing (blocked tasks are skipped)`);
+  }
+  const seen = new Set();
+  for (const task of parseTaskList(content).tasks) {
+    if (seen.has(task.id)) {
+      throw new Error(`task list (line ${task.line}): duplicate task id ${task.id}`);
     }
-    return coord;
-  } catch {
-    console.log('[loop] No dag.yaml found — nothing to do');
-    state.status = 'no_dag';
-    return null;
+    seen.add(task.id);
   }
 }
 
 /**
- * Run sequential loop pattern
+ * Run the loop over a D3 task list: one task per iteration, stop on the first
+ * failure. The list is re-read every iteration so a human editing it mid-run
+ * (adding tasks, unblocking one) is picked up on the next pass.
  * @param {Object} options - Loop options
+ * @returns {Object} Final loop state
+ * @throws {Error} when the task list is missing or malformed at start
  */
-function runSequential(options) {
-  const { projectRoot, maxRuns, maxCost, epic } = options;
-  const state = loadLoopState(projectRoot);
-  beginRun(state, { pattern: 'sequential', maxRuns, maxCost });
-  const epicScope = resolveEpicScope(epic, projectRoot);
+function runLoop(options) {
+  const { projectRoot, maxRuns, maxCost } = options;
+  const tasksPath = resolveTasksPath(options.tasksFile, projectRoot);
+  // Validate ONCE up front. Per-iteration reads parse only, so the run cannot
+  // die halfway on a semantic rule it introduced itself.
+  validateTaskListForRun(readTaskList(tasksPath));
 
-  console.log(`[loop] Starting sequential loop (max ${maxRuns} runs)`);
+  const state = loadLoopState(projectRoot);
+  beginRun(state, { pattern: 'tasks', maxRuns, maxCost });
+  state.tasks_file = path.relative(projectRoot, tasksPath);
+
+  console.log(`[loop] Starting loop over ${state.tasks_file} (max ${maxRuns} runs)`);
 
   while (state.iteration < maxRuns) {
     state.iteration++;
@@ -549,21 +499,32 @@ function runSequential(options) {
       break;
     }
 
-    const coord = tryCreateCoordinator(projectRoot, state, options.specId);
-    if (!coord) break;
-
-    const task = coord.nextTask(epicScope);
+    const { tasks } = parseTaskList(readTaskList(tasksPath));
+    const task = selectNextTask(tasks);
     if (!task) {
-      console.log('[loop] All tasks complete!');
-      state.status = 'complete';
+      const blocked = tasks.filter((t) => t.status === 'blocked').length;
+      if (blocked > 0) {
+        console.log(`[loop] No runnable tasks — ${blocked} blocked`);
+        state.status = 'blocked';
+      } else {
+        console.log('[loop] All tasks complete!');
+        state.status = 'complete';
+      }
       break;
     }
 
-    const success = runTask(task, coord, state, options);
+    setTaskStatus(tasksPath, task.id, 'in-progress');
+    const remaining = tasks.filter((t) => t.status !== 'done').length;
+    const success = runTask(task, state, {
+      ...options,
+      tasksFile: state.tasks_file,
+      remaining,
+    });
+    setTaskStatus(tasksPath, task.id, success ? 'done' : 'blocked');
     saveLoopState(state, projectRoot);
 
     if (!success) {
-      console.log('[loop] Task failed — stopping sequential loop');
+      console.log('[loop] Task failed — stopping loop');
       state.status = 'failed';
       break;
     }
@@ -571,86 +532,19 @@ function runSequential(options) {
 
   finalizeLoop(state, maxRuns, projectRoot);
   printSummary(state);
-}
-
-/**
- * Run DAG-parallel loop pattern.
- * Each round runs every ready (and resumable in-progress) epic as an
- * isolated worktree session, then merges the successful ones back to base.
- * @param {Object} options - Loop options
- */
-async function runDag(options) {
-  const { projectRoot, maxRuns, maxCost, epic, maxParallel } = options;
-  const state = loadLoopState(projectRoot);
-  beginRun(state, { pattern: 'dag', maxRuns, maxCost });
-  const epicScope = resolveEpicScope(epic, projectRoot);
-
-  console.log(`[loop] Starting DAG loop (max ${maxRuns} runs)`);
-
-  while (state.iteration < maxRuns) {
-    state.iteration++;
-
-    const stopReason = checkStopConditions(state, maxCost);
-    if (stopReason) {
-      state.status = stopReason;
-      break;
-    }
-
-    const coord = tryCreateCoordinator(projectRoot, state, options.specId);
-    if (!coord) break;
-    if (state.iteration === 1) warnIfBaseBranch(coord);
-
-    // Every round with ≥1 ready/resumable epic takes the isolated worktree
-    // path — chain and diamond-join rounds with a single ready epic included.
-    const batch = selectRoundEpics(coord, epicScope, maxParallel);
-    if (batch.length > 0) {
-      console.log(`[loop] Running ${batch.length} epic(s) in isolated worktrees this round`);
-      const anySuccess = await runDagRound(coord, batch, state, options, buildTaskPrompt);
-      if (!anySuccess) {
-        console.log('[loop] No epics made progress this round');
-        state.status = 'failed';
-        break;
-      }
-      continue;
-    }
-
-    // No isolated epic work — fall back to feature-level next task (legacy
-    // non-isolated path for in-progress epics worked feature by feature).
-    const task = coord.nextTask(epicScope);
-    if (!task) {
-      console.log('[loop] All tasks complete!');
-      state.status = 'complete';
-      break;
-    }
-
-    const success = runTask(task, coord, state, options);
-    saveLoopState(state, projectRoot);
-
-    if (!success) {
-      // In DAG mode, try to continue with other tasks
-      const nextTask = coord.nextTask(epicScope);
-      if (!nextTask) {
-        console.log('[loop] No more tasks available after failure');
-        state.status = 'failed';
-        break;
-      }
-    }
-  }
-
-  finalizeLoop(state, maxRuns, projectRoot);
-  printSummary(state);
+  return state;
 }
 
 /**
  * Main entry point
  */
-async function main() {
+function main() {
   const options = parseLoopArgs(process.argv.slice(2));
-
-  if (options.pattern === 'dag') {
-    await runDag(options);
-  } else {
-    runSequential(options);
+  try {
+    runLoop(options);
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
   }
 }
 
@@ -660,14 +554,20 @@ if (require.main === module) {
 
 module.exports = {
   parseLoopArgs,
+  printLoopHelp,
+  resolveTasksPath,
+  readTaskList,
+  selectNextTask,
+  setTaskStatus,
+  resolveTaskVerifyCommand,
+  validateTaskListForRun,
+  buildVerificationLines,
   buildTaskPrompt,
-  spawnSession,
-  spawnSessionAsync,
+  runVerifyFloor,
   runTask,
+  runLoop,
+  spawnSession,
   isStalled,
   isRetryStorm,
   checkStopConditions,
-  detectWorktree,
-  runSequential,
-  runDag,
 };

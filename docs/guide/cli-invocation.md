@@ -18,7 +18,7 @@ Examples:
 ```bash
 node "${ARCFORGE_ROOT}/scripts/cli.js" status
 node "${ARCFORGE_ROOT}/scripts/cli.js" next
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50
 ```
 
 Why one form: arcforge is installed in different places on different

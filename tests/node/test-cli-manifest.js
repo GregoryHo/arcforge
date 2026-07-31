@@ -404,7 +404,6 @@ const DAG_HANDLERS = {
   cleanup: 'runCleanup',
   sync: 'runSync',
   reboot: 'runReboot',
-  loop: 'runLoop',
 };
 
 // Slice a single `case 'cmd': { ... }` block out of cli.js (for the handlers
@@ -426,6 +425,7 @@ const dagBodies = sliceTopLevelFunctions(
 );
 const evalSource = fs.readFileSync(path.join(CLI_DIR, 'eval-command.js'), 'utf8');
 const learnSource = fs.readFileSync(path.join(CLI_DIR, 'learn-command.js'), 'utf8');
+const loopSource = fs.readFileSync(path.join(CLI_DIR, 'loop-command.js'), 'utf8');
 const obsidianSource = fs.readFileSync(path.join(CLI_DIR, 'obsidian-command.js'), 'utf8');
 const worktreeSource = fs.readFileSync(path.join(LIB_DIR, 'worktree-generic.js'), 'utf8');
 
@@ -442,6 +442,9 @@ for (const [cmd, fn] of Object.entries(DAG_HANDLERS)) {
 }
 liveFlagSets.eval = liveFlagsFromSource(evalSource);
 liveFlagSets.learn = liveFlagsFromSource(learnSource);
+// `loop` is not a DAG command: its handler lives in cli/loop-command.js and it
+// reads no --spec-id (its task source is a task-list file, not a spec DAG).
+liveFlagSets.loop = liveFlagsFromSource(loopSource);
 liveFlagSets.obsidian = liveFlagsFromSource(obsidianSource);
 liveFlagSets.worktree = liveFlagsFromSource(worktreeSource);
 liveFlagSets.schema = liveFlagsFromSource(sliceCaseBlock(CLI_SOURCE, 'schema'));

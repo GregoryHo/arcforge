@@ -128,13 +128,9 @@ const CLI_MANIFEST = {
   // Spawns claude sessions — no JSON contract.
   loop: {
     flags: [
-      '--pattern',
+      '--tasks',
       '--max-runs',
       '--max-cost',
-      '--epic',
-      '--max-parallel',
-      '--no-project-setup',
-      '--spec-id',
       '--task-timeout',
       '--model',
       '--permission-mode',

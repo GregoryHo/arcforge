@@ -25,12 +25,10 @@ arc-planning first.
 
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-# Sequential (default, safest) — one task at a time, stop on failure
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern sequential --max-runs 20
-# DAG (parallel-aware) — parallelTasks() finds independent epics, continues past failures
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50
-# Scoped to one epic; add --max-cost to bound spend
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --epic epic-001 --pattern sequential --max-runs 20
+# One task at a time from the task list, stop on failure
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 20
+# Add --max-cost to bound spend
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 --max-cost 20
 ```
 
 Sequential is best for linear/dependent task lists and first-time use; DAG for
@@ -111,7 +109,7 @@ Pre-authorize so unattended sessions never block — `--permission-mode` and
 
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50 \
+node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 \
   --permission-mode acceptEdits --allowed-tools "Bash,Edit,Write,Read"
 ```
 
@@ -128,7 +126,7 @@ launching shell:
 
 ```bash
 : "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-nohup node "${ARCFORGE_ROOT}/scripts/cli.js" loop --pattern dag --max-runs 50 \
+nohup node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 \
   --permission-mode acceptEdits > loop.log 2>&1 &
 disown
 ```

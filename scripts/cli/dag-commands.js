@@ -1,7 +1,7 @@
 /**
  * dag-commands.js - Handlers for the DAG/coordinator CLI commands:
  * status, next, complete, block, parallel, expand, merge, cleanup,
- * sync, reboot, loop.
+ * sync, reboot.
  *
  * Each handler preserves the exact output shape and exit behavior of the
  * original cli.js case blocks. Errors propagate to cli.js's catch.
@@ -9,8 +9,6 @@
 
 const { Coordinator, syncAllSpecs, rebootAllSpecs } = require('../lib/coordinator');
 const { getWorktreePath } = require('../lib/worktree-paths');
-const { parseVerifyCommand } = require('../lib/loop-verify');
-const { DEFAULT_MAX_RETRIES } = require('../lib/loop-verifier');
 const { output } = require('./shared');
 const {
   resolveSpecId,
@@ -206,93 +204,6 @@ function runReboot(_args, { projectRoot, asJson, specFlag }) {
   output(coord.rebootContext(), asJson);
 }
 
-function runLoop(args, { projectRoot, specFlag }) {
-  const resolved = requireSpecId(resolveSpecId(projectRoot, specFlag), 'loop');
-  const { runSequential, runDag } = require('../loop');
-  const pattern = args.options.pattern || 'sequential';
-  const maxRuns = args.options['max-runs'] ? parseInt(args.options['max-runs'], 10) : 50;
-  const maxCost = args.options['max-cost'] ? parseFloat(args.options['max-cost']) : null;
-
-  if (!['sequential', 'dag'].includes(pattern)) {
-    console.error(`Error: Invalid pattern "${pattern}". Use "sequential" or "dag".`);
-    process.exit(1);
-  }
-
-  const taskTimeout = args.options['task-timeout']
-    ? parseInt(args.options['task-timeout'], 10)
-    : null;
-  if (args.options['task-timeout'] && (Number.isNaN(taskTimeout) || taskTimeout < 1)) {
-    console.error('Error: --task-timeout must be a positive integer (seconds)');
-    process.exit(1);
-  }
-
-  const maxParallel = args.options['max-parallel'] ? parseInt(args.options['max-parallel'], 10) : 5;
-  if (args.options['max-parallel'] && (Number.isNaN(maxParallel) || maxParallel < 1)) {
-    console.error('Error: --max-parallel must be a positive integer');
-    process.exit(1);
-  }
-
-  // --verify-cmd: deterministic acceptance floor run after each session exits 0,
-  // before the task completes. Tokenized as an argv array (no shell); a command
-  // needing shell features exits with the security.md error.
-  let verifyCommand = null;
-  if (args.options['verify-cmd']) {
-    try {
-      verifyCommand = parseVerifyCommand(args.options['verify-cmd']);
-    } catch (err) {
-      console.error(`Error: ${err.message}`);
-      process.exit(1);
-    }
-  }
-
-  // --verifier (opt-in) + --max-retries: the AF-9 verifier-agent gate layered
-  // ON TOP of the --verify-cmd floor. --verifier is a boolean flag; --max-retries
-  // bounds the verbatim-feedback retry loop before the task is blocked.
-  const verifier = Boolean(args.flags.verifier);
-  let maxRetries = DEFAULT_MAX_RETRIES;
-  if (args.options['max-retries'] !== undefined) {
-    maxRetries = parseInt(args.options['max-retries'], 10);
-    if (Number.isNaN(maxRetries) || maxRetries < 0) {
-      console.error('Error: --max-retries must be a non-negative integer');
-      process.exit(1);
-    }
-  }
-
-  // --reset archives any existing state file before this run starts, so the
-  // loop begins from a clean state. Deliberate pre-run action — never mid-run.
-  if (args.flags.reset) {
-    const { resetLoopState } = require('../lib/loop-state');
-    resetLoopState(projectRoot);
-  }
-
-  const epic = args.options.epic || null;
-  const loopOptions = {
-    pattern,
-    maxRuns,
-    maxCost,
-    epic,
-    maxParallel,
-    // dag-mode worktrees start empty (no node_modules) — run the per-worktree
-    // installer by default so a downstream --verify-cmd has a usable tree.
-    // --no-project-setup opts out.
-    projectSetup: !args.flags['no-project-setup'],
-    projectRoot,
-    specId: resolved,
-    taskTimeoutMs: taskTimeout ? taskTimeout * 1000 : null,
-    model: args.options.model || null,
-    permissionMode: args.options['permission-mode'] || null,
-    allowedTools: args.options['allowed-tools'] || null,
-    verifyCommand,
-    verifier,
-    maxRetries,
-  };
-  if (pattern === 'dag') {
-    runDag(loopOptions);
-  } else {
-    runSequential(loopOptions);
-  }
-}
-
 const DAG_COMMANDS = {
   status: runStatus,
   next: runNext,
@@ -304,7 +215,6 @@ const DAG_COMMANDS = {
   cleanup: runCleanup,
   sync: runSync,
   reboot: runReboot,
-  loop: runLoop,
 };
 
 /** Dispatch a DAG/coordinator command. cli.js routes only known commands here. */
