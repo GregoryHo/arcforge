@@ -58,16 +58,19 @@ ends up in a user's installed copy.
 |---|---|---|
 | `skills/` | Yes | arcforge users on their own projects |
 | `hooks/` | Yes | users (loaded into their sessions) |
-| `commands/` | Yes | users (CLI surface) |
-| `agents/` | Yes | users (delegated by skills) |
-| `templates/` | Yes | users (prompt scaffolding) |
-| `scripts/lib/`, `scripts/cli.js` | Yes | users (the engine) |
+| `scripts/cli.js`, `scripts/lib/` | Yes | users (the engine) |
 | `docs/guide/` | Yes | users (how-to documentation) |
 | `.claude-plugin/` | Yes | plugin manifest |
+| `agents/`, `templates/` | Yes — **removed in P2** | legacy; don't add to them |
+| `.codex-plugin/`, `.codex/`, `.agents/` | Yes — **removed in P2** | legacy multi-platform packaging; v6 is Claude Code only |
 | `.claude/rules/` (this file) | **No** | contributors editing arcforge |
 | `docs/plans/` (design docs) | **No** | contributors planning features |
 | `tests/`, `hooks/__tests__/` | **No** | contributors verifying code |
+| `evals/` | **No** | contributors measuring behavior |
 | Auto-memory | **No** (per-user) | the assistant working on arcforge |
+
+(The shipped set is `package.json`'s `files` array; there is no `commands/`
+directory.)
 
 When you're writing or editing anything in the "Ships = Yes" rows, the
 audience is a fresh user installing arcforge tomorrow on their own
