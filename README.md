@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a minimal, composable skill toolkit for Claude Code. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
+arcforge is a minimal, composable skill toolkit for Claude Code. It gives agents lightweight routing, self-contained skills, and eval-backed quality gates without turning every task into a mandatory workflow.
 
 ## Why arcforge
 
@@ -19,7 +19,7 @@ The outcome: your agent has disciplined workflows when the task justifies them, 
 ArcForge is split into three layers:
 
 1. **Core toolkit** — a small promoted surface for routing, design, specs, planning, TDD, debugging, verification, and eval.
-2. **Optional workflows** — recipes for SDD, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
+2. **Optional workflows** — recipes for feature work, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
 3. **Harness/eval layer** — tests that verify both activation and non-activation behavior, including instruction-strength regressions.
 
 When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
@@ -104,7 +104,7 @@ These are the most frequently used commands:
 
 Skills grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
 
-### SDD (idea → spec → tasks → integration)
+### Task workflow (idea → tasks → integration)
 
 - **arc-brainstorming** - Explore and shape a design before implementation
 - **arc-writing-tasks** - Break a feature into small executable tasks with exact code
@@ -156,7 +156,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 
 You typically do not run the CLI directly — skills invoke it. For manual use or debugging:
 
-The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>` — the SessionStart hook sets `ARCFORGE_ROOT` to the installed plugin directory. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
+The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" <cmd>` — `CLAUDE_PLUGIN_ROOT` is provided natively by Claude Code. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
 
 ```bash
 # Generic (non-epic) worktree management
