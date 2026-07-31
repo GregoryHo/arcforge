@@ -4,12 +4,11 @@
  * check-skill-eval-annotation.js — warn (never block) when a PR changes a skill's
  * spec without a matching eval/benchmark update.
  *
- * arc-writing-skills' Iron Law is "eval before ship". A hard CI gate can't enforce
- * it precisely: there is no mechanical way to tell a behavioral SKILL.md edit from
- * a typo/metadata edit (the carve-out), so a blocking check would false-fire. This
- * emits a non-blocking GitHub annotation instead — a visible nudge a reviewer can
- * judge. The deterministic, user-facing enforcement lives in the arc-remind hook;
- * this is the arcforge-repo safeguard (the plugin is disabled here).
+ * A behavioral skill edit is supposed to ship with eval evidence. A hard CI gate
+ * can't enforce that precisely: there is no mechanical way to tell a behavioral
+ * SKILL.md edit from a typo/metadata edit (the carve-out), so a blocking check
+ * would false-fire. This emits a non-blocking GitHub annotation instead — a
+ * visible nudge a reviewer can judge.
  *
  * Always exits 0. Diffs BASE_REF...HEAD (BASE_REF defaults to origin/main).
  */
@@ -62,7 +61,7 @@ function main() {
   for (const name of flagged) {
     console.log(
       `::warning file=skills/${name}/SKILL.md::SKILL.md changed without a matching eval/benchmark ` +
-        `update. If this was a behavioral change, re-run the eval (arc-writing-skills Iron Law). ` +
+        `update. If this was a behavioral change, re-run the eval before shipping. ` +
         `Ignore for typo/metadata-only edits.`,
     );
   }

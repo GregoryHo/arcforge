@@ -104,4 +104,4 @@ this skill parallelizes independent tasks within one worktree.
 ## Related Skills
 
 - **Before:** `/arc-writing-tasks` produces the task list
-- **After:** `/arc-finishing` wraps up the integrated result
+- **After:** `/finishing` wraps up the integrated result

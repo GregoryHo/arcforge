@@ -9,10 +9,10 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Complete Skill Catalog](#complete-skill-catalog)
   - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-finishing](#arc-finishing)
   - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
-  - Discipline: [arc-tdd](#arc-tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
+  - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
-  - Meta: [arc-using](#arc-using) · [arc-writing-skills](#arc-writing-skills) · [arc-evaluating](#arc-evaluating)
+  - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [arc-evaluating](#arc-evaluating)
 - [Workflow Patterns](#workflow-patterns)
 - [Comparison Tables](#comparison-tables)
 - [Operating Principles](#operating-principles)
@@ -28,7 +28,7 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 1. **arc-using** — Bounded router and skill index for ArcForge tasks
 2. **arc-brainstorming** — Design exploration when intent is unclear
 3. **arc-writing-tasks** — Break approved work into an executable task list
-4. **arc-tdd** — Test-driven implementation discipline
+4. **tdd** — Test-driven implementation discipline
 5. **arc-debugging** — Systematic root cause investigation
 6. **arc-verifying** — Fresh evidence before completion claims
 7. **arc-evaluating** — Measure whether skills and workflows change behavior
@@ -43,7 +43,7 @@ What are you trying to do?
 |   +-- Need to explore? --> arc-brainstorming
 |
 +-- Fix a bug?
-|   +-- arc-debugging --> arc-tdd --> arc-verifying
+|   +-- arc-debugging --> tdd --> arc-verifying
 |
 +-- Understand the system?
 |   +-- arc-using (when routing help is useful)
@@ -68,10 +68,10 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 |----------|--------|---------|
 | **SDD** | arc-brainstorming, arc-writing-tasks, arc-executing-tasks, arc-finishing | Explore, specify, build, integrate |
 | **Orchestration** | arc-agent-driven, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
-| **Discipline** | arc-tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
+| **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | arc-journaling, arc-reflecting, arc-learning, arc-recalling _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-using, arc-writing-skills _(user-invoked)_, arc-evaluating | Route, evaluate, and maintain the catalog itself |
+| **Meta** | arc-using, writing-skills _(user-invoked)_, arc-evaluating | Route, evaluate, and maintain the catalog itself |
 
 **How skills flow through a project:**
 
@@ -321,7 +321,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-tdd
+### tdd
 
 **Purpose:** Enforce test-driven development: write the test first, watch it fail, write minimal code to pass.
 
@@ -339,7 +339,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: feature spec or bug report
 - Output: test file + implementation, both committed
 
-**Related:** arc-writing-tasks --> **arc-tdd** (during execution) --> arc-verifying
+**Related:** arc-writing-tasks --> **tdd** (during execution) --> arc-verifying
 
 ---
 
@@ -360,7 +360,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: bug report, test failure, or unexpected behavior
 - Output: root cause identified, failing test, verified fix
 
-**Related:** any failure --> **arc-debugging** --> arc-tdd --> arc-verifying
+**Related:** any failure --> **arc-debugging** --> tdd --> arc-verifying
 
 ---
 
@@ -381,7 +381,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: any completion claim
 - Output: verified status with evidence (test output, build output, etc.)
 
-**Related:** embedded in all skills as a mindset, especially arc-finishing, arc-tdd
+**Related:** embedded in all skills as a mindset, especially arc-finishing, tdd
 
 ---
 
@@ -613,24 +613,24 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-writing-skills
+### writing-skills
 
-**Purpose:** ArcForge project-level meta skill for maintaining ArcForge's own skill system using TDD for process documentation.
+**Purpose:** Meta skill for authoring arcforge skills — invocation choice, description register, information hierarchy, and the evidence a skill needs before it ships.
 
-**When to use:** When maintaining ArcForge itself — creating, editing, or verifying ArcForge skills and skill tests before deployment. User-invoked only (disable-model-invocation); project-level meta, not a user-facing product skill.
+**When to use:** When creating or revising an arcforge skill. User-invoked only (disable-model-invocation); maintainer-facing, not a user-facing product skill.
 
 **Key workflow:**
-1. RED — run pressure scenario WITHOUT skill, document baseline failures
-2. GREEN — write minimal SKILL.md addressing specific rationalizations found
-3. REFACTOR — find new loopholes, add counters, re-test until the skill behavior is covered
-4. Validate: frontmatter (name + description only, max 1024 chars, "Use when...")
-5. Run pytest validation and commit skill changes
+1. Run the no-guidance control; no observed failure means no guidance to write
+2. Classify the failure and match the guidance form to it
+3. Micro-test the wording, then pressure-test the skill
+4. Validate structure (frontmatter schema, description register, line budget)
+5. Add the skill's row to the router in the same change
 
 **Artifacts:**
-- Input: baseline test results showing agent failures
-- Output: `skills/<skill-name>/SKILL.md`, pytest test file
+- Input: a baseline run showing what the agent does without the skill
+- Output: `skills/<skill-name>/SKILL.md` plus its references
 
-**Related:** ArcForge maintainer task --> **arc-writing-skills** --> deployed ArcForge skill
+**Related:** ArcForge maintainer task --> **writing-skills** --> deployed ArcForge skill
 
 ---
 
@@ -654,7 +654,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: scenario files in `evals/scenarios/`
 - Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
 
-**Related:** arc-brainstorming --> **arc-evaluating** --> arc-writing-skills (for shipping)
+**Related:** arc-brainstorming --> **arc-evaluating** --> writing-skills (for shipping)
 
 ---
 
@@ -663,9 +663,9 @@ Rule in `skills/arc-using/SKILL.md`.
 ### 1. Small Feature
 
 ```
-arc-using --> arc-writing-tasks --> arc-executing-tasks --> arc-finishing
+arc-using --> arc-writing-tasks --> arc-executing-tasks --> /finishing
                                         |
-                                   (if bugs) --> arc-debugging --> arc-tdd
+                                   (if bugs) --> arc-debugging --> tdd
 ```
 
 Best for single features with clear requirements. Use arc-writing-tasks to break down, execute with human checkpoints, finish when done.
@@ -682,7 +682,7 @@ arc-brainstorming --> arc-writing-tasks --> arc-using-worktrees
                                           arc-agent-driven
                                                   |
                                                   v
-                                            arc-finishing
+                                            /finishing
 ```
 
 Full workflow for complex projects. Explore design, break it into tasks, isolate in worktrees, dispatch parallel work, implement with subagents.
@@ -690,7 +690,7 @@ Full workflow for complex projects. Explore design, break it into tasks, isolate
 ### 3. Bug Fix
 
 ```
-arc-debugging --> arc-tdd --> arc-verifying --> arc-finishing
+arc-debugging --> tdd --> arc-verifying --> /finishing
      |                            |
      v                            v
   root cause              evidence collected
@@ -708,7 +708,7 @@ arc-journaling --> arc-reflecting --> arc-learning
   diary entry      patterns found    instincts clustered
 ```
 
-Capture session insights in diaries, extract patterns after 5+ entries, and cluster related instincts. ArcForge maintainers may separately use `arc-writing-skills` when a proven pattern should become an ArcForge skill.
+Capture session insights in diaries, extract patterns after 5+ entries, and cluster related instincts. ArcForge maintainers may separately use `/writing-skills` when a proven pattern should become an ArcForge skill.
 
 ---
 
@@ -740,7 +740,7 @@ These principles keep ArcForge disciplined without making every task follow the 
 
 1. **Smallest Useful Workflow** — use direct answers for simple/read-only tasks; route only when a skill adds leverage
 2. **Explore Before Committing to Design** — arc-brainstorming: research existing patterns before proposing new
-3. **No ArcForge Skill Without Failing Test** — arc-writing-skills: project-level TDD for ArcForge skill documentation
+3. **No Guidance Without an Observed Failure** — writing-skills: a no-guidance control comes before any behavior-shaping text
 4. **No Fix Without Hypothesis** — arc-debugging: Observe, Hypothesize, Test, Fix cycle
 5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
 6. **Verify Before Implementing Review Feedback** — arc-reviewing: technical rigor, not performative agreement

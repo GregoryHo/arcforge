@@ -32,7 +32,7 @@ If you have questions about:
 ## Your Job
 
 Once you're clear on requirements:
-1. Implement using TDD (**REQUIRED:** Follow arc-tdd skill)
+1. Implement using TDD (**REQUIRED:** Follow the `/tdd` skill)
 2. Verify all tests pass
 3. Self-review (see below)
 4. Commit your work

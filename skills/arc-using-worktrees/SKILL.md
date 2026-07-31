@@ -13,7 +13,7 @@ The canonical path is derived at runtime — never invent one.
 ## Before You Create One
 
 - `.arcforge-epic` exists in cwd → you are already inside a marked worktree.
-  Never create a nested worktree; integration goes through `arc-finishing`.
+  Never create a nested worktree; integration goes through `/finishing`.
 - Otherwise → create a worktree here. This works in any git repo, arcforge
   project or not.
 
@@ -57,7 +57,7 @@ yours to remove here.
 
 ## Finishing
 
-Hand off to `/arc-finishing` (4-option gate). Its cleanup step removes the
+Hand off to `/finishing` (4-option gate). Its cleanup step removes the
 worktree via `arcforge worktree remove <name>`.
 
 ## Red Flags
@@ -100,4 +100,4 @@ conflict, or a marker'd tree that belongs to another lifecycle.
 ## Related Skills
 
 - **Called by:** `arc-agent-driven`, `arc-executing-tasks`
-- **After this skill:** Work in the created worktree, then `/arc-finishing` to integrate
+- **After this skill:** Work in the created worktree, then `/finishing` to integrate

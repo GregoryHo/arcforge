@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * WT-6 acceptance: the non-epic Option 1 of arc-finishing, executed verbatim
+ * WT-6 acceptance: Option 1 of the `finishing` skill, executed verbatim
  * from INSIDE a generic worktree, completes end-to-end with exit 0.
  *
  * The seam this guards (S1-2): git 2.52 exits 128 on `git checkout <base-branch>`
- * inside a linked worktree, so the merged skill's non-epic path must locate the
+ * inside a linked worktree, so the skill's Option 1 must locate the
  * base via `worktree list --json` (kind:base) and merge into it with
  * `git -C <base> merge <feature-branch>` — never checking out the base in the
  * worktree. This test runs that sequence and asserts:
@@ -23,7 +23,7 @@ const os = require('node:os');
 
 const CLI_PATH = path.resolve(__dirname, '../../scripts/cli.js');
 
-console.log('Testing arc-finishing non-epic Option 1 from a generic worktree...\n');
+console.log('Testing finishing Option 1 from a generic worktree...\n');
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-wt6-'));
 const fakeHome = path.join(tmpRoot, 'home');
@@ -105,7 +105,7 @@ try {
   assert.ok(!fs.existsSync(wtPath), 'the generic worktree directory must be removed');
   git(['-C', baseWorktree, 'branch', '-d', featureBranch], baseWorktree);
 
-  console.log('  PASS: non-epic Option 1 completed end-to-end (exit 0); base checkout rejected.\n');
+  console.log('  PASS: Option 1 completed end-to-end (exit 0); base checkout rejected.\n');
   console.log('All tests passed!');
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true });

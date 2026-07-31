@@ -87,7 +87,7 @@ Worktrees are removed via the CLI, which delegates to
 - If git's own worktree registry still holds a stale entry after removal,
   the coordinator force-removes the directory.
 - Cleanup does **not** delete the epic branch — that is the agent's choice
-  via `arc-finishing` (its epic path).
+  via `/finishing`.
 - After cleanup the epic's `worktree` field in `specs/<spec-id>/dag.yaml`
   is cleared to `null`.
 
@@ -163,8 +163,7 @@ tooling by construction, not by special-casing.
 ### Finishing and removing a generic worktree
 
 A generic worktree is finished through the **non-epic path** of
-`arc-finishing` (its Step 0 marker check routes there when no
-`.arcforge-epic` is present). Cleanup is `arcforge worktree remove <name>`,
+`/finishing`. Cleanup is `arcforge worktree remove <name>`,
 which refuses to touch an epic (marker-bearing) worktree — those belong to
 `arcforge cleanup` — refuses a non-managed path, and refuses a dirty tree
 unless `--force` is given:
@@ -264,7 +263,7 @@ arcforge sync --direction from-base
 
 ```bash
 # 1. 在 worktree 內，所有 feature 完成
-#    → 使用 arc-finishing skill（Step 0 依 .arcforge-epic 選 epic 路徑）
+#    → 使用 /finishing skill
 
 # 2. 選擇 Merge
 arcforge merge         # 自動偵測 epic，merge 回 base

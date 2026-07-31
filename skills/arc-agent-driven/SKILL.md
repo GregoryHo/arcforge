@@ -130,6 +130,6 @@ verdicts — is identical however the subagent is launched (Codex or Claude Code
 - **arc-reviewing** — code-review template for reviewer subagents
 - **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — complete development after all tasks
 
-**Subagents should use arc-tdd** for TDD on each task.
+**Subagents should use `/tdd`** for TDD on each task.
 
 **Alternative:** arc-executing-tasks — human-checkpoint mode instead of automated.

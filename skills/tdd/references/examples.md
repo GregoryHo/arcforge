@@ -1,4 +1,4 @@
-# arc-tdd worked examples
+# tdd worked examples
 
 Illustrative code for the RED and GREEN steps, plus a full bug-fix walkthrough.
 The contract lives in SKILL.md; these examples only show the shape.

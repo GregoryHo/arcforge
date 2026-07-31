@@ -105,7 +105,7 @@ If claiming requirements are met: re-read the requirements, make a checklist, ve
 
 **Also embedded in:**
 - **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — verify tests before offering merge options
-- **arc-tdd** — Verify RED / Verify GREEN steps
+- **`/tdd`** — Verify RED / Verify GREEN steps
 - **Spec reviewer** / **Quality reviewer** — read actual code, run tests
 
 Invoke this skill explicitly before finishing. Embedded verification in other skills is an additional layer, not a replacement.

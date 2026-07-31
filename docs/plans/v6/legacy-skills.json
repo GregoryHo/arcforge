@@ -10,7 +10,6 @@
     "arc-dispatching-teammates",
     "arc-evaluating",
     "arc-executing-tasks",
-    "arc-finishing",
     "arc-journaling",
     "arc-learning",
     "arc-looping",
@@ -19,11 +18,9 @@
     "arc-recalling",
     "arc-reflecting",
     "arc-reviewing",
-    "arc-tdd",
     "arc-using-worktrees",
     "arc-using",
     "arc-verifying",
-    "arc-writing-skills",
     "arc-writing-tasks"
   ]
 }

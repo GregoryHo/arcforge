@@ -134,7 +134,7 @@ IF reviewer suggests "implementing properly":
 
 1. Request review, then process the feedback (both above).
 2. After all feedback is addressed and tested → re-review until the reviewer approves.
-3. Once approved → `arc-verifying` → `arc-finishing` (Step 0 discriminates on `.arcforge-epic`).
+3. Once approved → `arc-verifying` → `/finishing`.
 
 **Manual mode (human-in-loop):** signal completion to the user — they decide whether to re-review, verify, or finish.
 

@@ -13,9 +13,12 @@ If nothing matches, no arcforge skill applies — just do the work.
 
 | Skill | Use when |
 | --- | --- |
+| `/writing-skills` | you are authoring or revising an arcforge skill (user-invoked) |
+| `/tdd` | you are about to write implementation code, fix a bug, or found code with no test |
+| `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
 
-The table is empty on purpose. v6 rebuilds the skill set from zero; each skill
-adds its own row in the same change that creates it.
+v6 rebuilds the skill set from zero; each skill adds its own row in the same
+change that creates it, so the table grows as the rewrite lands.
 
 ## Sync Contract
 

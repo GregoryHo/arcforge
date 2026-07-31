@@ -50,7 +50,7 @@ When multiple skills could apply, choose the smallest useful one:
 Examples:
 
 - "Let's build X" → `arc-brainstorming` if design is unclear; `arc-writing-tasks` if it is already clear.
-- "Fix this bug" → `arc-debugging` if cause is unknown; `arc-tdd` if cause and expected behavior are clear.
+- "Fix this bug" → `arc-debugging` if cause is unknown; `/tdd` if cause and expected behavior are clear.
 
 ## Execution & Finishing Choosers
 
@@ -61,7 +61,7 @@ When two skills cover the same step, pick by the concrete condition:
 | Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + single task-reviewer, both verdicts) |
 | Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-worktree, lead present) |
 | Set up an isolated workspace | `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo) |
-| Finish work | `arc-finishing` (4-option gate on the current worktree) |
+| Finish work | `/finishing` (4-option gate on the current worktree) |
 
 Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.
 
@@ -71,7 +71,7 @@ These skills activate during a workflow when the condition is present. They are 
 
 | Condition | Skill | Gate |
 |-----------|-------|------|
-| About to write implementation code | `arc-tdd` | Failing test before production code |
+| About to write implementation code | `/tdd` | Failing test before production code |
 | Test fails or unexpected behavior appears | `arc-debugging` | Root cause before fixes |
 | About to claim work is complete | `arc-verifying` | Fresh verification evidence before completion claims |
 | Task or feature complete, or review feedback received | `arc-reviewing` | Request review, then process feedback with technical rigor |

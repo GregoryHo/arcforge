@@ -54,17 +54,15 @@ LEGACY_BASELINE = 30
 # Sanity floor: guards against a broken glob silently passing the whole suite.
 MIN_SKILL_COUNT = 10
 
-# Permanent exceptions — skills floored above the hard cap by untouchable content.
-# Values are BODY lines (frontmatter excluded): the budget governs SKILL.md prose
-# depth, and mandated metadata is not prose. The entry lands above its target
-# (arc-finishing 430) because the untouchable content alone exceeds the target —
-# arc-finishing's ~440 lines of worktree-safety git mechanics. ACCEPTED by the
-# maintainer on 2026-07-13. The key is legacy and must stay legacy:
-# `test_permanent_budget_is_legacy_only` forbids opening a line budget exception
-# for any v6 skill. (arc-refining's entry was removed in P2 with the skill.)
-PERMANENT_LINE_BUDGET = {
-    "arc-finishing": 525,
-}
+# Permanent exceptions — per-skill overrides of the hard cap, keyed by skill name
+# and measured in BODY lines (frontmatter excluded). The table is EMPTY and is
+# meant to stay that way: `test_permanent_budget_is_legacy_only` forbids an entry
+# for any v6 skill, so the only legal key would be a grandfathered v5 skill, and
+# every one of those is on its way out. The two historical entries are gone —
+# `arc-refining` with the skill in P2, `arc-finishing` in P3 when the pilot-B
+# rewrite (`finishing`) landed inside the 250-line cap without an exception.
+# Over the cap, the answer is `references/` or the CLI, never a new key here.
+PERMANENT_LINE_BUDGET = {}
 
 # Supporting-file references: references/, scripts/, templates/, agents/ paths ending
 # in a known extension. The lookbehind skips matches embedded in a longer path
@@ -371,7 +369,7 @@ def test_permanent_budget_is_legacy_only():
 
 def test_is_legacy_discriminates():
     """The grandfather predicate reads the manifest, not the shipped skill set."""
-    assert _is_legacy("arc-tdd") is True
+    assert _is_legacy("arc-debugging") is True
     assert _is_legacy("tdd") is False
 
 
