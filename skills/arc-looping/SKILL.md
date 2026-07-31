@@ -25,9 +25,9 @@ arc-writing-tasks first.
 
 ```bash
 # One task at a time from the task list, stop on failure
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 20
+arcforge loop --tasks tasks.md --max-runs 20
 # Add --max-cost to bound spend
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 --max-cost 20
+arcforge loop --tasks tasks.md --max-runs 50 --max-cost 20
 ```
 
 Add `--reset` to archive prior state and start fresh (see Resume vs Reset).
@@ -98,7 +98,7 @@ Pre-authorize so unattended sessions never block — `--permission-mode` and
 `--allowed-tools` pass straight through to each spawned session:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 \
+arcforge loop --tasks tasks.md --max-runs 50 \
   --permission-mode acceptEdits --allowed-tools "Bash,Edit,Write,Read"
 ```
 
@@ -114,7 +114,7 @@ finishes, and the loop dies with it. Launch detached so the loop outlives the
 launching shell:
 
 ```bash
-nohup node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50 \
+nohup arcforge loop --tasks tasks.md --max-runs 50 \
   --permission-mode acceptEdits > loop.log 2>&1 &
 disown
 ```

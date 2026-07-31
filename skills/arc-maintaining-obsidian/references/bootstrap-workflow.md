@@ -95,11 +95,11 @@ First entry:
 
 ### 9. Register via the arcforge CLI (mechanical, not LLM-authored)
 
-Registry mutation goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js`, not
+Registry mutation goes through `arcforge`, not
 hand-written JSON. Run:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" obsidian register \
+arcforge obsidian register \
   --name <name> \
   --path <absolute-path> \
   --preset <preset> \
@@ -154,7 +154,7 @@ If any step fails (file write error, registry write error, QMD failure), undo pr
 Specifically:
 - If step 4 / 5 fails after step 1 / 2, no files were written — clean.
 - If step 6 fails after step 4 / 5 succeeded, leave AGENTS.md + SCHEMA.md (they're useful even without CLAUDE.md), warn user.
-- If step 9 (register) fails after files are written, files stay; tell user to retry `node ${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian register --name <name> --path <path>` once the failure cause is addressed.
+- If step 9 (register) fails after files are written, files stay; tell user to retry `arcforge obsidian register --name <name> --path <path>` once the failure cause is addressed.
 
 ## Worked Example
 

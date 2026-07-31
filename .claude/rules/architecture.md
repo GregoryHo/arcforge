@@ -40,9 +40,12 @@ A skill directory is a closed unit:
 - No file under `skills/<name>/` may `require` / `import` / `source` anything
   outside its own skill directory. Not `scripts/lib/`, not a sibling skill.
 - Engine functionality is reached exactly one way: a **subprocess call to the
-  CLI** via `${CLAUDE_PLUGIN_ROOT}`. That is the black-box boundary.
+  bare `arcforge` CLI** (D9). Claude Code puts every loaded plugin's `bin/` on
+  PATH, and `bin/arcforge` is the shim. That is the black-box boundary.
 - Skill prose must not name engine internals (`scripts/lib/...`) or rely on
-  injected environment (`ARCFORGE_ROOT`).
+  environment variables that are not actually set in skill Bash —
+  `ARCFORGE_ROOT` (removed) and `CLAUDE_PLUGIN_ROOT` (hooks-only; spike-verified
+  UNSET in skill-triggered Bash) are both forbidden in skills.
 
 The payoff is that a skill can be read, tested, moved, or deleted without
 reading the engine, and the engine can be refactored without breaking skills.
@@ -52,9 +55,9 @@ reading the engine, and the engine can be refactored without breaking skills.
 `scripts/**` and `hooks/**` must not reference `skills/`. Combined with D1:
 
 ```
-skills/  ──(subprocess: ${CLAUDE_PLUGIN_ROOT} CLI)──▶  scripts/cli.js  ──▶  scripts/lib/
-                                                        ▲
-                                                  hooks/ ┘   (no arrow back to skills/)
+skills/  ──(subprocess: bare `arcforge` CLI, plugin bin/ on PATH)──▶  scripts/cli.js  ──▶  scripts/lib/
+                                                                       ▲
+                                                                 hooks/ ┘   (no arrow back to skills/)
 ```
 
 Existing violations live in an **explicit allowlist**, which is a debt counter,

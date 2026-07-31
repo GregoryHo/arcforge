@@ -71,4 +71,6 @@
 
 ## 新開裁決（D9+）
 
-（無）
+| # | 日期 | 裁決 | 內容 |
+|---|------|------|------|
+| D9 | 2026-07-31 | **bin/arcforge shim + 裸呼叫**（D1 機制層修正，使用者拍板） | Spike ground truth：`CLAUDE_PLUGIN_ROOT` 只給 hooks，在 skill 觸發的 Bash 中 UNSET；Claude Code 自動把每個 plugin 的 `bin/` 加進 PATH（實測端到端成功）。skill → 引擎的唯一形式改為裸呼叫 `arcforge <cmd>`；出貨 `bin/arcforge` shim；D1 lint 全面禁止 skill 內出現 CLAUDE_PLUGIN_ROOT；P2 寫入的引擎呼叫已改回裸形式。殘留：12 個 legacy 檔的 skill-local `${CLAUDE_PLUGIN_ROOT}` 路徑（豁免中、runtime 已壞、隨各自重寫 phase 以 base-dir 機制處理）。 |

@@ -54,7 +54,7 @@ arcforge ships as a plugin. At runtime the LLM works in a user's project — cwd
 
 | Reference target | Prefix | Example |
 |---|---|---|
-| Plugin CLI | `${CLAUDE_PLUGIN_ROOT}/` | `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js` |
+| Plugin CLI | `${CLAUDE_PLUGIN_ROOT}/` | `arcforge` |
 | Skill's own files (`skills/<name>/scripts/`, `references/`) | `${SKILL_ROOT}/` | `${SKILL_ROOT}/scripts/planner.js` |
 | User's project files (not plugin) | (none — bare is correct) | `specs/<spec-id>/spec.xml` |
 
@@ -74,7 +74,7 @@ node -e "require('./scripts/cli.js')"
 "Run cli.js loop to start the loop."
 
 # CORRECT — Bash invocation with prefix
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
+arcforge worktree list --json
 ```
 
 ## SKILL.md Structure

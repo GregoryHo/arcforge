@@ -11,7 +11,7 @@ const { REPO_ROOT, SKILLS_DIR, legacySkills, governedSkills } = require('./v6-le
 // D1 (unrevisable decision): a skill is a black box. Its executable files NEVER
 // require/import/source anything outside their own `skills/<name>/` directory,
 // and its prose NEVER names engine internals. Engine functionality is reached
-// exactly one way: a subprocess call to the CLI under `${CLAUDE_PLUGIN_ROOT}`.
+// exactly one way: a subprocess call to the bare `arcforge` CLI (plugin bin/ on PATH, D9).
 //
 // This file REPLACES tests/scripts/skill-path-discipline.test.js, which enforced
 // the exact inverse (cc-005 demanded an `${ARCFORGE_ROOT}/scripts/lib/` prefix on
@@ -22,7 +22,7 @@ const { REPO_ROOT, SKILLS_DIR, legacySkills, governedSkills } = require('./v6-le
 // Two rules:
 //   D1-A  executable files (.js/.sh/.py) under skills/<name>/ must not: reference
 //         a path that escapes skills/<name>/; mention ARCFORGE_ROOT; load code
-//         (require/import/source) through ${CLAUDE_PLUGIN_ROOT}, which is for
+//         (require/import/source) from outside; mention CLAUDE_PLUGIN_ROOT (D9:
 //         SUBPROCESS calls only; or name the engine lib path in any spelling.
 //   D1-B  markdown under skills/<name>/ must not contain `scripts/lib/` or
 //         `ARCFORGE_ROOT` — engine internals are not part of a skill's prose.
@@ -68,11 +68,10 @@ function truncate(s, n = 120) {
 const RELATIVE_LITERAL_RE = /['"`](\.\.[^'"`\n]*)['"`]/g;
 const SHELL_SOURCE_RE = /^\s*(?:source|\.)\s+(\S+)/;
 
-// A line that loads code: `require(`, `import(`, `import x from`, `source x`,
-// `. x`. D1 blesses ${CLAUDE_PLUGIN_ROOT} in SUBPROCESS position only — using it
-// to load engine code is the same escape wearing a different token, and it is
-// the first thing a skill author reaches for once they learn the variable.
-const CODE_LOAD_RE = /\b(?:require|import)\s*[(\s]|^\s*(?:source|\.)\s+\S/;
+// D9 (spike-verified): CLAUDE_PLUGIN_ROOT is exported to hooks only and is
+// UNSET in skill-triggered Bash. The blessed engine call from a skill is the
+// bare `arcforge` CLI — Claude Code puts every loaded plugin's bin/ on PATH.
+// Any CLAUDE_PLUGIN_ROOT mention in a skill is therefore a runtime lie.
 const PLUGIN_ROOT_TOKEN = 'CLAUDE_PLUGIN_ROOT';
 // `'scripts', 'lib'` — the engine path spelled as separate join() segments.
 const ENGINE_SEGMENT_RE = /['"]scripts['"]\s*,\s*['"]lib['"]/;
@@ -114,13 +113,16 @@ function findExecutableViolations(absFile, skillDir) {
       flag(
         lineNo,
         line,
-        `mentions ${ARCFORGE_ROOT_TOKEN}; reach the engine via a \${${PLUGIN_ROOT_TOKEN}} CLI subprocess instead`,
+        `mentions ${ARCFORGE_ROOT_TOKEN}; reach the engine via the bare \`arcforge\` CLI (plugin bin/ is on PATH, D9)`,
       );
-    } else if (line.includes(PLUGIN_ROOT_TOKEN) && CODE_LOAD_RE.test(line)) {
+    } else if (line.includes(PLUGIN_ROOT_TOKEN)) {
+      // D9 ground truth: CLAUDE_PLUGIN_ROOT is provided to hooks only — it is
+      // UNSET in skill-triggered Bash. Any use in a skill is a runtime lie; the
+      // blessed engine call is the bare `arcforge` CLI via the plugin bin/ PATH.
       flag(
         lineNo,
         line,
-        `loads code from \${${PLUGIN_ROOT_TOKEN}}; that variable is for SUBPROCESS calls to the CLI, not for require/import/source`,
+        `mentions ${PLUGIN_ROOT_TOKEN}; that variable is unset in skill Bash (hooks-only) — call the bare \`arcforge\` CLI instead (D9)`,
       );
     } else if (line.includes(ENGINE_PATH_TOKEN) || ENGINE_SEGMENT_RE.test(line)) {
       // Also catches the segmented form that walks up one component at a time —
@@ -143,7 +145,7 @@ function findProseViolations(absFile) {
   const lines = fs.readFileSync(absFile, 'utf8').split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    for (const token of [ENGINE_PATH_TOKEN, ARCFORGE_ROOT_TOKEN]) {
+    for (const token of [ENGINE_PATH_TOKEN, ARCFORGE_ROOT_TOKEN, PLUGIN_ROOT_TOKEN]) {
       if (!line.includes(token)) continue;
       out.push({
         rule: 'D1-B',
@@ -272,14 +274,14 @@ describe('D1 detectors (synthetic fixtures)', () => {
     write('scripts/run.sh', 'node "${ARCFORGE_ROOT}/scripts/cli.js" status\n');
     const v = scanSkillDir(skillDir);
     expect(v).toHaveLength(1);
-    expect(v[0].message).toMatch(/CLAUDE_PLUGIN_ROOT/);
+    expect(v[0].message).toMatch(/bare `arcforge` CLI/);
   });
 
-  it('flags the plugin-root variable used to require engine code (not a subprocess)', () => {
+  it('flags the plugin-root variable used to require engine code', () => {
     write('scripts/run.js', "const t = require(process.env.CLAUDE_PLUGIN_ROOT + '/scripts/x');\n");
     const v = scanSkillDir(skillDir);
     expect(v).toHaveLength(1);
-    expect(v[0].message).toMatch(/SUBPROCESS calls to the CLI/);
+    expect(v[0].message).toMatch(/unset in skill Bash/);
   });
 
   it('flags the plugin-root variable used to source a shell library', () => {
@@ -287,7 +289,15 @@ describe('D1 detectors (synthetic fixtures)', () => {
     write('scripts/run.sh', 'source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/common.sh"\n');
     const v = scanSkillDir(skillDir);
     expect(v).toHaveLength(1);
-    expect(v[0].message).toMatch(/SUBPROCESS calls to the CLI/);
+    expect(v[0].message).toMatch(/unset in skill Bash/);
+  });
+
+  it('flags the plugin-root variable even in subprocess position (D9: unset at runtime)', () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: fixture shell source, not a JS template
+    write('scripts/call.sh', 'node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" eval list --json\n');
+    const v = scanSkillDir(skillDir);
+    expect(v).toHaveLength(1);
+    expect(v[0].message).toMatch(/unset in skill Bash/);
   });
 
   it('flags a bare scripts/lib/ literal in an executable', () => {
@@ -313,10 +323,9 @@ describe('D1 detectors (synthetic fixtures)', () => {
     expect(scanSkillDir(skillDir)).toEqual([]);
   });
 
-  it('allows a bare module require and a plugin-root CLI subprocess', () => {
+  it('allows a bare module require and a bare arcforge CLI subprocess (D9)', () => {
     write('scripts/run.js', "const fs = require('node:fs');\n");
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: fixture shell source, not a JS template
-    write('scripts/call.sh', 'node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" status --json\n');
+    write('scripts/call.sh', 'arcforge worktree list --json\n');
     expect(scanSkillDir(skillDir)).toEqual([]);
   });
 

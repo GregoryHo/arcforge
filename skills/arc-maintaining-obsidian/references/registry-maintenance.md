@@ -1,7 +1,7 @@
 # Registry Maintenance
 
 The vault registry lives at `~/.arcforge/obsidian-vaults.json`. **The
-skill manages this file end-to-end through `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js
+skill manages this file end-to-end through `arcforge
 obsidian <subcommand>` — never hand-edit.**
 
 ## Schema
@@ -34,10 +34,10 @@ acquisition). The CLI handles all of those atomically.
 
 | Subcommand | Behavior |
 |---|---|
-| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."] [--qmd-collection <name>]` | Add a vault. First-registered becomes default automatically. `--qmd-collection` implies `--search-preferred=qmd`. |
-| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian unregister <name>` | Remove the entry. Vault files at `<path>` untouched. If the removed entry was the default, default is cleared. |
-| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian set-default <name>` | Update `default`. Errors if `<name>` not registered. |
-| `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian list-vaults [--json]` | Print the registry. Default marker, preset, search baseline shown. |
+| `arcforge obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."] [--qmd-collection <name>]` | Add a vault. First-registered becomes default automatically. `--qmd-collection` implies `--search-preferred=qmd`. |
+| `arcforge obsidian unregister <name>` | Remove the entry. Vault files at `<path>` untouched. If the removed entry was the default, default is cleared. |
+| `arcforge obsidian set-default <name>` | Update `default`. Errors if `<name>` not registered. |
+| `arcforge obsidian list-vaults [--json]` | Print the registry. Default marker, preset, search baseline shown. |
 
 The `init-vault` workflow is LLM-driven (see
 `bootstrap-workflow.md`); only the registry mutation at step 9

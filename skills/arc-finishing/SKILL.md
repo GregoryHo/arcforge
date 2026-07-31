@@ -89,7 +89,7 @@ FEATURE_BRANCH="$(git branch --show-current)"
 
 # Locate the base checkout. `worktree list --json` annotates kind; the base
 # checkout is the kind:base entry (falls back to the porcelain first entry).
-BASE_WORKTREE="$(node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json \
+BASE_WORKTREE="$(arcforge worktree list --json \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const w=JSON.parse(s).worktrees;const b=w.find(x=>x.kind==="base")||w[0];process.stdout.write(b.path)})')
 
 # Merge into the base from the base checkout — git -C keeps you in this worktree.
@@ -153,7 +153,7 @@ Wait for exact confirmation.
 ```bash
 # Capture the feature branch and the base checkout BEFORE you move.
 FEATURE_BRANCH="$(git branch --show-current)"
-BASE_WORKTREE="$(node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json \
+BASE_WORKTREE="$(arcforge worktree list --json \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const w=JSON.parse(s).worktrees;const b=w.find(x=>x.kind==="base")||w[0];process.stdout.write(b.path)})')
 
 # Remove the worktree FIRST (Step 5: cd base → worktree remove), THEN
@@ -176,7 +176,7 @@ change and the cached value is authoritative.
 **Read the `path` from `worktree list --json`:**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
+arcforge worktree list --json
 ```
 
 Match your worktree by `branch` and read its `path` field. If the worktree has
@@ -197,7 +197,7 @@ inside it. `cd` to the base checkout first, then remove.
 # by name. Removal must happen BEFORE the branch -d/-D from Step 4.
 WT_NAME="<worktree name>"   # the name you passed to `worktree add`
 cd "$BASE_WORKTREE"
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove "$WT_NAME"
+arcforge worktree remove "$WT_NAME"
 ```
 
 **For Option 3:** Keep worktree.

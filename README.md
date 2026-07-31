@@ -156,7 +156,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 
 You typically do not run the CLI directly — skills invoke it. For manual use or debugging:
 
-The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" <cmd>` — `CLAUDE_PLUGIN_ROOT` is provided natively by Claude Code. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
+The bare `arcforge <cmd>` form works everywhere that matters: Claude Code adds every loaded plugin's `bin/` directory to PATH, and the plugin ships `bin/arcforge`. From a local checkout without the plugin loaded, use `node scripts/cli.js <cmd>` or `./bin/arcforge <cmd>`.
 
 ```bash
 # Generic (non-epic) worktree management

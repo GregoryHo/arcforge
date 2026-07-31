@@ -28,7 +28,7 @@ never reconstruct or hardcode it.
 ### add
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
+arcforge worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
 ```
 
 - Branch defaults to `<name>`; an existing branch is checked out as-is.
@@ -38,7 +38,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [
 ### list
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
+arcforge worktree list --json
 ```
 
 The status surface. Each entry is annotated `kind`:
@@ -48,7 +48,7 @@ to the `path` field to move into a worktree.
 ### remove
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove <name> [--force]
+arcforge worktree remove <name> [--force]
 ```
 
 A dirty worktree refuses removal without `--force`. An `.arcforge-epic`-marked
@@ -58,7 +58,7 @@ yours to remove here.
 ## Finishing
 
 Hand off to `/arc-finishing` (4-option gate). Its cleanup step removes the
-worktree via `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove <name>`.
+worktree via `arcforge worktree remove <name>`.
 
 ## Red Flags
 

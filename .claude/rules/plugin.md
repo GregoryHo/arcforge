@@ -61,9 +61,10 @@ do not add a `skills` field.
 | `$CLAUDE_CODE_REMOTE` | All hooks | `"true"` in web environments, unset in CLI |
 | `ARCFORGE_ROOT` | Custom — **removed in P2** | Set by the `inject-skills` hook. Legacy: skills must reach the engine by subprocess CLI via `${CLAUDE_PLUGIN_ROOT}` (D1), not by injected env. Don't add new consumers. |
 
-`${CLAUDE_PLUGIN_ROOT}` is also the **skill → engine boundary**: a skill invokes
-engine functionality by spawning `${CLAUDE_PLUGIN_ROOT}/scripts/cli.js` as a
-subprocess (D1, see `.claude/rules/architecture.md`).
+`${CLAUDE_PLUGIN_ROOT}` is a **hooks-only** variable — spike-verified UNSET in
+skill-triggered Bash. The skill → engine boundary is the bare `arcforge` CLI
+(D9): Claude Code adds every loaded plugin's `bin/` to PATH, and `bin/arcforge`
+is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 
 ## Plugin Directory Layout
 
