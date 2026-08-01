@@ -59,7 +59,7 @@ Check that commands appear:
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
-Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:arc-tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
+Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
 
 ## Quick Start: Common Commands
 
@@ -91,7 +91,7 @@ These are the most frequently used commands:
 
 **Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
 
-**Finishing:** `arc-finishing` for both.
+**Finishing:** `/finishing` for both.
 
 ## Terminology
 
@@ -109,7 +109,7 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 - **arc-brainstorming** - Explore and shape a design before implementation
 - **arc-writing-tasks** - Break a feature into small executable tasks with exact code
 - **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
-- **arc-finishing** - Integrate finished work
+- **finishing** - Integrate finished work (`/finishing`)
 
 ### Orchestration (subagents, worktrees, loops)
 
@@ -121,7 +121,7 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 
 ### Discipline (quality gates)
 
-- **arc-tdd** - Test-first implementation (RED → GREEN → REFACTOR)
+- **tdd** - Test-first implementation (RED → GREEN → REFACTOR)
 - **arc-debugging** - Systematic root-cause investigation before any fix
 - **arc-verifying** - Fresh evidence before completion claims
 - **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
@@ -146,7 +146,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 - **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
 - **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
-- **arc-writing-skills** _(user-invoked)_ - Create, edit, or verify ArcForge's own skills and skill tests
+- **writing-skills** _(user-invoked)_ - Author an arcforge skill: invocation, description, guidance form, evidence
 
 ### Hooks
 
@@ -156,7 +156,7 @@ ArcForge registers event hooks (Claude Code only) that work silently in the back
 
 You typically do not run the CLI directly — skills invoke it. For manual use or debugging:
 
-The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" <cmd>` — `CLAUDE_PLUGIN_ROOT` is provided natively by Claude Code. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
+The bare `arcforge <cmd>` form works everywhere that matters: Claude Code adds every loaded plugin's `bin/` directory to PATH, and the plugin ships `bin/arcforge`. From a local checkout without the plugin loaded, use `node scripts/cli.js <cmd>` or `./bin/arcforge <cmd>`.
 
 ```bash
 # Generic (non-epic) worktree management

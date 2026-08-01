@@ -1,4 +1,5 @@
 const {
+  scorableResults,
   passAtK,
   passAllK,
   avgScore,
@@ -742,5 +743,45 @@ describe('verdictMessage (fr-vr-001-ac3)', () => {
         break;
     }
     expect(matched).toBe(true);
+  });
+});
+
+// ── scorableResults: ungraded trials are not zero-scoring trials ──
+
+describe('scorableResults', () => {
+  const graded = makeResult({ trial: 1, score: 0.8, passed: true });
+  const gradeErr = makeResult({ trial: 2, score: 0, gradeError: true });
+  const infraErr = makeResult({ trial: 3, score: 0, infraError: true });
+
+  test('drops gradeError and infraError rows, keeps graded ones', () => {
+    expect(scorableResults([graded, gradeErr, infraErr])).toEqual([graded]);
+  });
+
+  test('statsFromResults ignores an ungraded trial instead of averaging it as 0', () => {
+    const s = statsFromResults([graded, gradeErr]);
+    expect(s.count).toBe(1);
+    expect(s.avg).toBe(0.8);
+  });
+
+  test('computeDelta is not dragged down by an ungraded treatment trial', () => {
+    const baseline = [makeResult({ score: 0.2 }), makeResult({ score: 0.2 })];
+    const treatment = [makeResult({ score: 0.8 }), makeResult({ score: 0, gradeError: true })];
+    expect(computeDelta(baseline, treatment)).toBeCloseTo(0.6, 5);
+  });
+
+  test('verdictFromDeltaCI reports INSUFFICIENT_DATA when scored trials drop below 5', () => {
+    const baseline = Array.from({ length: 5 }, () => makeResult({ score: 0.2 }));
+    const treatment = [
+      ...Array.from({ length: 4 }, () => makeResult({ score: 0.8 })),
+      makeResult({ score: 0, gradeError: true }),
+    ];
+    expect(verdictFromDeltaCI(baseline, treatment)).toBe(INSUFFICIENT_DATA);
+  });
+
+  test('baselineVarianceWarning is computed from scored trials only', () => {
+    const scored = Array.from({ length: 5 }, () => makeResult({ score: 0.5 }));
+    expect(baselineVarianceWarning([...scored, makeResult({ score: 0, infraError: true })])).toBe(
+      null,
+    );
   });
 });

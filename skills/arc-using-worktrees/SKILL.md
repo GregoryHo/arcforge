@@ -13,7 +13,7 @@ The canonical path is derived at runtime — never invent one.
 ## Before You Create One
 
 - `.arcforge-epic` exists in cwd → you are already inside a marked worktree.
-  Never create a nested worktree; integration goes through `arc-finishing`.
+  Never create a nested worktree; integration goes through `/finishing`.
 - Otherwise → create a worktree here. This works in any git repo, arcforge
   project or not.
 
@@ -28,7 +28,7 @@ never reconstruct or hardcode it.
 ### add
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
+arcforge worktree add <name> [--branch <b>] [--from <ref>] [--setup] --json
 ```
 
 - Branch defaults to `<name>`; an existing branch is checked out as-is.
@@ -38,7 +38,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree add <name> [--branch <b>] [
 ### list
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree list --json
+arcforge worktree list --json
 ```
 
 The status surface. Each entry is annotated `kind`:
@@ -48,7 +48,7 @@ to the `path` field to move into a worktree.
 ### remove
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove <name> [--force]
+arcforge worktree remove <name> [--force]
 ```
 
 A dirty worktree refuses removal without `--force`. An `.arcforge-epic`-marked
@@ -57,8 +57,8 @@ yours to remove here.
 
 ## Finishing
 
-Hand off to `/arc-finishing` (4-option gate). Its cleanup step removes the
-worktree via `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" worktree remove <name>`.
+Hand off to `/finishing` (4-option gate). Its cleanup step removes the
+worktree via `arcforge worktree remove <name>`.
 
 ## Red Flags
 
@@ -100,4 +100,4 @@ conflict, or a marker'd tree that belongs to another lifecycle.
 ## Related Skills
 
 - **Called by:** `arc-agent-driven`, `arc-executing-tasks`
-- **After this skill:** Work in the created worktree, then `/arc-finishing` to integrate
+- **After this skill:** Work in the created worktree, then `/finishing` to integrate

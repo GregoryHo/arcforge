@@ -55,8 +55,8 @@ Report to the lead via SendMessage ONLY for:
   progress that is outside the epic's scope or outside your authority.
   Design preferences, test-write ordering, and implementation detail
   choices are NOT blockers; resolve them yourself.
-- **Merge conflicts at finishing time** — follow arc-finishing's
-  Merge Conflict (Multi-Teammate) blocked format.
+- **Merge conflicts at finishing time** — never auto-resolve; SendMessage
+  the conflicting hunks to the lead and wait for arbitration.
 - **Epic completion** — success (ready for lead review) or give-up (you
   tried and cannot proceed). Include a short summary of what was done.
 

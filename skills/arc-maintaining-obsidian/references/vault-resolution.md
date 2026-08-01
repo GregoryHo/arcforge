@@ -19,7 +19,7 @@ registered vaults, do NOT fall through to ad-hoc file writes. Suggest:
 
 - `init-vault <path> --name <name> --preset=<preset>` — bootstrap a new
   vault from a preset
-- `node ${CLAUDE_PLUGIN_ROOT}/scripts/cli.js obsidian register --name <name> --path <path>` —
+- `arcforge obsidian register --name <name> --path <path>` —
   register an existing vault (then author AGENTS.md + SCHEMA.md
   manually)
 

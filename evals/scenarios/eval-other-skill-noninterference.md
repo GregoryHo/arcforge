@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-writing-skills/SKILL.md
+skills/writing-skills/SKILL.md
 
 ## Scenario
 Use the skill-writing guidance to draft a tiny activation section for a hypothetical skill named `tea-brewing`.

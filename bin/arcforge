@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# arcforge CLI shim. Claude Code adds every loaded plugin's bin/ to PATH,
+# so `arcforge <cmd>` works bare in any plugin session (D9).
+exec node "$(cd "$(dirname "$0")/.." && pwd)/scripts/cli.js" "$@"

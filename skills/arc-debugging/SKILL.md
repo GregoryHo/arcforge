@@ -141,7 +141,7 @@ Complete each phase before proceeding — skipping phases leads to symptom fixes
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - Use the `arc-tdd` skill for writing proper failing tests
+   - Use the `/tdd` skill for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -229,5 +229,5 @@ Available in this directory:
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 
 **Related skills:**
-- **arc-tdd** - For creating failing test case (Phase 4, Step 1)
+- **`/tdd`** - For creating failing test case (Phase 4, Step 1)
 - **arc-verifying** - Verify fix worked before claiming success
