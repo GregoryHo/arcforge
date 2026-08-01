@@ -13,7 +13,7 @@
 - [x] P0.0 前置閘 — gate: PASS (2026-07-31)
 - [x] P1 強制層可用化 + 契約凍結 — gate: PASS (2026-07-31, PR #136, tag gate-p1)
 - [x] P2 引擎瘦身 + 反向耦合翻正 — gate: PASS (2026-07-31, PR #137, tag gate-p2)
-- [ ] P3 meta skill + 2 pilots + 最小 eval 迴路
+- [x] P3 meta skill + 2 pilots + 最小 eval 迴路 — gate: PASS (2026-08-01, PR #138, tag gate-p3)
 - [ ] P4 紀律叢集
 - [ ] P5 保留系統叢集（D1/D8 驗證場）
 - [ ] P6 workflow 叢集 + router 收斂
@@ -60,6 +60,24 @@
 - `${CLAUDE_PLUGIN_ROOT}` 在 skill Bash 區塊的 runtime 可用性「形式合規、runtime 未證」——P3 的 D1 scenario（[tool_called] 斷言）是驗收點
 - 留給 P7/P8：cli-invocation.md 與 worktree-workflow.md 敘事層重寫（守衛掃不到的過期教學）、website Codex 卡片/skill 計數、evals 歷史紀錄、retired scenarios
 - D8 allowlist = 1（session-tracker→reflect.js），P5 歸零
+
+## P3 任務（全數完成，PR #138）
+
+- [x] D9 spike + 裁決 + 落地（bin/arcforge shim、D1 lint 更新、16 支呼叫改裸形式）
+- [x] writing-skills（142→150 行 + 2 refs，user-invoked）+ REFACTOR 回饋 ×5
+- [x] pilot tdd：IMPROVED **+0.86** CI[0.75,0.96]（6v6）
+- [x] pilot finishing：IMPROVED **+0.58** CI[0.55,0.62]（10v10 併池，525→154 行、零 PERMANENT 例外）
+- [x] D1/D9 runtime 實證：transcript 記錄裸 arcforge 執行 + `external` kind 字串（僅真實 CLI 可產生）
+- [x] router scenario IMPROVED +0.32（保守下界）；invocation-table 定案
+- [x] skill-schema 三守衛（§3.1/§5.2/§7gap2）mutation 轉紅驗證；eval 引擎修兩缺陷（re: 斷言、error-trial 排除）
+
+### P3 gate 備註（verifier 修正與掛帳）
+- **verifier 否決兩項實作者敘事**：(1) d1「policy 錯位」定性不成立——真因 treatment 觸發不穩（3/5），任何 policy 都不 PASS；AC3 依「行為斷言已證」判 met-with-interpretation，行為閘對 d1 未乾淨通過。(2)「skill 一行未改」僅窄義成立（v1→v2 有未提交視窗的 treatment 輸入變動）；頭條數字 provenance 閉合（全部晚於 skill commit）。
+- **磁碟級發現**：harness 對每個 trial 無條件加 `--disable-slash-commands`——headless trial 永無 Skill 工具；D6/P6 的 router 觸發矩陣與任何 `[tool_called] Skill:*` 斷言在此模態下結構不可能，scenario 設計必須繞開。
+- finishing 的 eval 與 skill 高度耦合（四選項與規避語句逐字對應）——delta 真實但不得讀作泛化證據。
+- **掛帳 P4**：finishing description 違反 no-summarize 規則（動它需自帶 baseline）；第二支 user-invoked skill 落地時重跑 §3.1/§5.2 mutation。
+- **掛帳 P6**：router `/tdd` 與 `/finishing` 列在「實作完成但無測試」狀態上重疊、表無優先序；ROUTER_SKILL 在 pytest/jest 雙處硬編。
+- **掛帳 P7**：rubric 編輯→Version bump 的 lint（防靜默混池）；eval report 與 compare 的 trial 數不一致；parseActions 只留 Bash 首行；d1 scenario 穩定性；Design Notes 改引 --disable-slash-commands。
 
 ## 偏離紀錄
 
