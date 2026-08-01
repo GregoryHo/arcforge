@@ -30,18 +30,37 @@ never a direct call into the repository's CLI entry point.
 
 All of that has so far been checked statically: the D1 lint forbids the wrong
 spellings inside skill files. What no static check can show is that the bare
-command actually resolves at runtime, inside a real session, on the path a skill
-triggers. That is what this scenario measures, so it runs through the real plugin
-loader (`--plugin-dir`) and every assertion is behavioral.
+command actually resolves at runtime, inside a real plugin session. That is what
+this scenario measures, so it runs through the real plugin loader
+(`--plugin-dir`) and every assertion is behavioral.
 
-The user's request forces the seam. `finishing` resolves a worktree path exactly
-one way — by asking the CLI — because reconstructing it from a naming pattern is
-the failure the skill exists to prevent. An agent that answers the path question
-without the CLI call has bypassed the seam, whatever the answer it gives.
+The user's request forces the seam. A worktree path is resolved exactly one way —
+by asking the CLI — because reconstructing it from a naming pattern is the failure
+`finishing` exists to prevent. An agent that answers the path question without the
+CLI call has bypassed the seam, whatever the answer it gives.
 
-Baseline runs isolated: no plugin, so no skill and no `arcforge` on PATH. It can
-satisfy the two negative assertions and neither positive one, which caps it at
-0.5 — below the 0.8 behavioral pass line — while a working seam scores 1.0.
+Baseline runs isolated: no plugin, so no `arcforge` on PATH. It can satisfy the
+two negative assertions and not the positive one, which caps it at 0.67 — below
+the 0.8 behavioral pass line — while a working seam scores 1.0.
+
+Scope, stated exactly: this establishes D9 — the bare command resolves inside a
+plugin session — and nothing about skill routing. Version 1 also asserted
+`[tool_called] Skill:finishing`; it scored 0 in 6/6 trials across both arms, and
+`Skill` appears zero times in the whole stored action corpus. A direct probe
+explains why: a headless `claude -p` session — with `--plugin-dir`, the plugin
+loaded, and `which arcforge` resolving — exposes no `Skill` tool at all. The
+assertion was unsatisfiable by construction rather than failed by the agent, so it
+is gone. The version-1 treatment agents that did reach the CLI got there by
+exploring (`which arcforge`, `arcforge --help`), not by loading `finishing`, which
+was never in their context. Do not re-add a `[tool_called] Skill:*` assertion to
+any scenario until the harness can run a modality where that tool exists; router
+trigger rate is P6's acceptance (`router 觸發矩陣命中率`), measured there, not
+smuggled in here.
+
+The positive assertion is anchored with a regex instead of a bare substring so it
+matches `arcforge worktree list` only in command position — a path such as
+`~/.arcforge/worktrees/...` that merely contains the product name cannot satisfy
+it, and `cd <dir> && arcforge worktree list` still does.
 
 ## Preflight
 skip
@@ -110,8 +129,7 @@ git -C wt-slugify add -A
 git -C wt-slugify commit -q -m "feat: slugify"
 
 ## Assertions
-- [tool_called] Skill:finishing
-- [tool_called] Bash:arcforge worktree list
+- [tool_called] Bash:re:(^|[\s;&|(])arcforge\s+worktree\s+list\b
 - [tool_not_called] Bash:CLAUDE_PLUGIN_ROOT
 - [tool_not_called] Bash:scripts/cli.js
 
@@ -122,13 +140,14 @@ mixed
 Not applicable — every assertion is behavioral and graded deterministically
 against the action log.
 
-The two negative assertions are what make the positive one mean "bare call".
-`[tool_called] Bash:arcforge worktree list` matches on the substring including
-the space, so it cannot be satisfied by a path such as
-`~/.arcforge/worktrees/...` that merely contains the product name.
+The two negative assertions are what make the positive one mean "bare call":
+the CLI has to have been reached as `arcforge`, not through a plugin-root path
+and not through the repository's CLI entry point. The positive assertion is
+anchored to command position, so a path that merely contains the product name
+cannot satisfy it.
 
 ## Trials
-3
+5
 
 ## Version
-1
+2

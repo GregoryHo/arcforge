@@ -57,7 +57,10 @@ Ratchet 三條機械斷言：
 | 可被其他 skill prose-invoke？ | ✅ 可 | ❌ **不可**（見下） |
 
 **規則 3.1（user-invoked 不可被 prose-invoke）**：user-invoked skill 代表「使用者顯式意圖」的入口，其他 skill 的內文不得以 `/name` 呼叫它——那等於繞過使用者意圖閘。
-**P1 狀態：recorded, unenforced。** 目前 30 支全 legacy、cross-ref 全走 legacy 分支，寫斷言等於零覆蓋。等 P3/P4 出現第一支非 legacy 的 user-invoked skill 時，在 `test_cross_reference_resolves` 旁補「target 的 frontmatter 不得 `disable-model-invocation: true`」。
+
+**豁免（P3 補，orchestrator 裁決授權）**：`skills/using` 的 `## Skill Map` 表列**不算** prose invocation。該表是**索引**，不是呼叫——它回答「有哪些 skill、各自在什麼情境成立」，讀者是人與模型的檢索面，執行語意仍由使用者打 `/name` 觸發。沒有這條豁免，§3.1 與 router bijection（每支出貨 skill 必須恰有一列）直接互斥：`writing-skills` 是 user-invoked，一有列就違反 §3.1，一沒列就違反 bijection。豁免範圍寫死為「router 檔的 Skill Map 區段內、符合表列形狀的 `/name`」——router 檔的其他段落、以及任何其他 skill 的內文，一律照 §3.1 判。索引列建議在 Use-when 欄尾標注 `(user-invoked)`，讓讀者看得出該列是索引而非可被呼叫的入口。
+
+**P3 狀態：enforced。** `test_user_invoked_skills_are_not_prose_invoked`（pytest）——cross-ref 的 `ref_type == "INVOCATION"` 且 target 的 frontmatter 帶 `disable-model-invocation: true` 即 fail；Skill Map 表列以 `ref_type == "ROUTER_INDEX"` 分流，仍受「target 必須存在」把關，只豁免本條。真實語料目前只有一組（router → `writing-skills`）且落在豁免側，覆蓋由合成樣本測試承擔（見 §7）。
 
 ## 4. Line budget 政策
 
@@ -86,6 +89,8 @@ Ratchet 三條機械斷言：
 | 5.4 D1 自足 | skill 的可執行檔絕不 `require`/`import`/`source` 逃出自己的 skill 目錄；引擎功能一律經 `${CLAUDE_PLUGIN_ROOT}` 以 subprocess 呼叫 CLI。prose 不得出現 `scripts/lib/`、`ARCFORGE_ROOT` |
 | 5.5 legacy 例外 | legacy skill 沿用 v5 的 `REQUIRED SUB-SKILL:` / `REQUIRED BACKGROUND: arc-<name>` 標記解析；新 skill 不得使用該形式 |
 
+**5.2 守衛範圍（P3 補）**：深連結守衛掃 `skills/<name>/` 底下**全部 markdown**，不只 SKILL.md——跨 skill 深連結最可能出現的位置正是 `references/*.md`，只看 SKILL.md 會在風險所在處留洞。判定形狀：`skills/<other>/...` 與 `../<other>/...`，其中 `<other>` 是**別支**出貨 skill；指向自己（`skills/<self>/...`）不算，因為那不是跨界。
+
 **`/name` 解析器裁決（P3 不得重議）**：
 
 - 正則同時吃 backticked 與裸寫。不採「只認 backticked」的窄解析——那會讓裸寫的 `/name` 靜默逃過驗證。
@@ -106,12 +111,12 @@ Ratchet 三條機械斷言：
 | §2 凍結欄位集合 | `test_frontmatter_schema_frozen`（legacy 跳過） | pytest | ✅ enforced（現為 vacuous，由 `test_schema_violations_rejects_v5_fields` 合成負向樣本承擔覆蓋） |
 | §2 `name == dirname` / description 存在 | `test_frontmatter_valid` | pytest | ✅ enforced |
 | §3 description register（二分法機器可讀半邊） | `test_description_register` | pytest | ✅ enforced（全體適用） |
-| §3.1 user-invoked 不可被 prose-invoke | — | — | ⚠️ **P1: recorded, unenforced**（見 §3） |
+| §3.1 user-invoked 不可被 prose-invoke | `test_user_invoked_skills_are_not_prose_invoked` | pytest | ✅ enforced（P3；Skill Map 索引列豁免，見 §3） |
 | §4 line budget | `test_line_budget` | pytest | ✅ enforced |
 | §4 例外表僅限 legacy | `test_permanent_budget_is_legacy_only` | pytest | ✅ enforced |
 | §5.1 `/name` target 必須存在 | `test_cross_reference_resolves` + `test_cross_references_found`（floor ≥3） | pytest | ✅ enforced（非 legacy 走 slash 解析；解析器覆蓋由 `test_slash_invocations_*` + `test_builtin_slash_commands_are_not_cross_references` 承擔） |
-| §5.2 禁深連結 | — | — | ⚠️ **P1: recorded, unenforced**（P3 首支非 legacy skill 落地時補） |
-| §5.3 supporting file 存在 | `test_referenced_supporting_files_exist` | pytest | ✅ enforced（**gap**：目前允許 repo-root fallback，非 legacy 的 skill-local-only 收緊未寫，見 §7） |
+| §5.2 禁深連結 | `test_no_cross_skill_deep_links` | pytest | ✅ enforced（P3；掃 skill 目錄下全部 markdown） |
+| §5.3 supporting file 存在 | `test_referenced_supporting_files_exist` | pytest | ✅ enforced（P3 收緊：非 legacy 只准 skill-local 解析，repo-root fallback 僅 legacy 保留） |
 | §5.4 D1 自足（可執行檔 + prose） | `tests/scripts/d1-skill-self-containment.test.js` | jest | 🔶 P1 Track B/C 擁有，非本文件 |
 | skill ↔ router 表 bijection | router 雙向契約測試 | jest | 🔶 P1 Track B/C 擁有 |
 | 文件引用實際出貨 skill 名稱（R4 + floor） | `scripts/lib/doc-refs.js` | check:docs | 🔶 P1 Track B/C 擁有 |
@@ -121,6 +126,6 @@ Ratchet 三條機械斷言：
 
 ## 7. 已知缺口（P1 明列，不假裝有覆蓋）
 
-1. **全 vacuous 問題**：30 支 skill 全在 legacy，§2/§5.1 在正常 run 下對真實檔案零觸發。真實覆蓋來自兩處：(a) `test_skill_structure.py` 尾段的合成樣本測試（`_schema_violations` / `_slash_invocations` / `_is_legacy` / builtin 過濾）；(b) P1 期間的 de-grandfather mutation 實測——把 `arc-tdd`／`arc-journaling`／`arc-refining` 暫時移出 legacy 後，`test_frontmatter_schema_frozen` 對 `category`/`status` 轉紅、`test_permanent_budget_is_legacy_only` 對 `arc-refining` 轉紅、slash cross-ref 全部解析成功。P3 第一支非 legacy skill 落地時重跑同樣的 mutation 確認一次。
-2. **§5.3 repo-root fallback**：`test_referenced_supporting_files_exist` 允許指標解析到 repo 根目錄（legacy skill 需要），因此 v6 skill 指向 `scripts/lib/...` 仍會通過該測試。實際攔截依賴 §5.4 的 D1 lint（prose 不得出現 `scripts/lib/`）。若 Track B 的 D1 lint 未覆蓋此形狀，P3 前需在 pytest 補「非 legacy → 僅 skill-local 解析」。
-3. **§3.1、§5.2 無守衛**：兩者都需要至少一支非 legacy skill 才有意義，P1 只凍規格。
+1. **部分 vacuous 問題**（P3 更新）：非 legacy 已有四支（`using`／`writing-skills`／`tdd`／`finishing`），§2/§5.1 對真實檔案已非零觸發。仍 vacuous 的是 §3.1 與 §5.2：唯一的 user-invoked skill 是 `writing-skills`，指向它的唯一 cross-ref 就是被豁免的 Skill Map 列；深連結在四支裡零出現。兩者的真實覆蓋因此由 `test_skill_structure.py` 尾段的合成樣本承擔（`_user_invoked_violations` / `_deep_link_violations` 各有正負向樣本），與 §2/§5.1 當初的作法同構。**「pytest 全綠」不等於這兩條有覆蓋**——判斷是否真的在把關，看合成樣本測試是否存在且會轉紅。
+2. ~~**§5.3 repo-root fallback**~~ **（P3 關閉）**：`test_referenced_supporting_files_exist` 現在對非 legacy skill 只接受 skill-local 解析，repo-root fallback 僅 legacy 保留。v6 skill 指向 `scripts/lib/...` 會同時被本測試與 §5.4 D1 lint 攔下。
+3. ~~**§3.1、§5.2 無守衛**~~ **（P3 關閉）**：兩條均已落地，見 §6。§3.1 帶一條 Skill Map 索引豁免（§3），該豁免本身也有負向合成樣本釘住——豁免只吃 router 檔的 Skill Map 區段，不吃其他位置。

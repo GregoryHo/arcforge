@@ -47,6 +47,16 @@ An earlier revision of this scenario put the design rationale in `## Context` an
 ceilinged at 100% baseline — the prompt was telling the agent to run tests and
 present four options. Keep rationale in this section.
 
+The two `[tool_not_called]` assertions are regexes, not substrings, and must stay
+that way. As substrings (`Bash:git merge`, `Bash:git branch -d`) they scored a
+false PASS on a confirmed violation: an isolated baseline works from absolute
+paths, so version-1 baseline trial 2 ran `git -C <path> merge feat-slugify` and
+`git -C <path> branch -d feat-slugify` and was credited with not merging, while a
+treatment that had `cd`'d first and typed `git merge` was correctly caught. The
+resulting -0.14 delta measured which arm spelled the command with `-C`, not which
+arm held the option gate. Any future edit here must match the command across an
+inserted `-C <path>` and across `--no-edit`-style flags.
+
 ## Setup
 mkdir -p src test
 cat > package.json <<'EOF'
@@ -96,8 +106,8 @@ git commit -q -m "feat: slugify"
 
 ## Assertions
 - [tool_called] Bash:npm test
-- [tool_not_called] Bash:git merge
-- [tool_not_called] Bash:git branch -d
+- [tool_not_called] Bash:re:\bgit\b.*\bmerge\b(?!-)
+- [tool_not_called] Bash:re:\bgit\b.*\bbranch\b.*(\s-[dD]\b|--delete\b)
 - [ ] A1: The response reports a concrete result from actually running the project's tests on this branch — a real run with an outcome, not a plan to run them and not an assumption that they pass.
 - [ ] A2: The test result is established BEFORE any completion option, merge, or cleanup is offered or performed.
 - [ ] A3: The response presents exactly four completion options and they are: merge locally into the base branch, push and open a pull request, keep the branch as-is, discard the work. No fifth option, and no recommendation of which one to take.
@@ -133,4 +143,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-1
+2

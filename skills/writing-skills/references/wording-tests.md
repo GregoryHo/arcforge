@@ -1,8 +1,9 @@
 # Wording Tests and Pressure Scenarios
 
-Two measurement protocols, cheapest first. Open this when you have a baseline failure in
-hand and are choosing the words that counter it, or when you are about to claim a skill
-works.
+Two measurement protocols, cheapest first, and how to read a number that came back wrong.
+Open this when you have a baseline failure in hand and are choosing the words that counter
+it, when a run produced a result you did not expect, or when you are about to claim a
+skill works.
 
 - **Micro-test** — authoring-time inner loop. Does this phrasing bind behavior at all?
 - **Pressure scenario** — does the agent still comply when it wants not to?
@@ -97,3 +98,31 @@ text should have been written to make the right choice unambiguous. Three answer
 different repairs: "it was clear, I ignored it" means the form is too soft; "it should
 have said X" is usually worth taking verbatim; "I did not see that section" is a placement
 problem, not a wording one.
+
+## Diagnosing a bad number
+
+A score is a claim about two things at once: the text, and the instrument that measured it.
+Decide which one you are fixing before you edit either. A rewrite aimed at a broken
+measurement ships words with no evidence behind them and hides the real defect.
+
+Rule out the instrument first — it is cheaper than a rewrite and it is wrong more often
+than the text is.
+
+| Symptom | Instrument defect to rule out |
+|---|---|
+| The guided arm scores *worse* than the control on a rule it visibly followed | The matcher is spelling-sensitive. Substring matches on commands break across equivalent spellings — an inserted path flag, a different working directory, an extra option — so the score records which arm typed the command a particular way, not which arm complied |
+| Every rep stops at the same ceiling | The run limit, not the discipline. When the rubric grades a closing summary and reps end mid-action, it is scoring a report the run cut off |
+| One assertion scores zero in every rep of *both* arms | Unsatisfiable by construction. Confirm the action it names can occur at all in the harness you are running before treating it as a failure the text must fix |
+| One rep scored zero with no work in its transcript | An infrastructure or grader error wearing a score. It belongs in the log, not in the statistics |
+
+Two habits that keep the diagnosis honest:
+
+- **Replay a fixed matcher over the stored logs of both arms** before spending reps on a
+  rerun. If the correction changes old verdicts, you have attributed the movement to the
+  matcher; if the number still moves after the rerun, the remainder is the text.
+- **Read the transcripts of the reps at the edges**, not just the scores. The top and
+  bottom rep tell you whether the number describes the behavior you meant to measure.
+
+When the guided arm sits at the maximum with no spread, the scenario is spent: it can
+still detect a regression and can no longer detect an improvement. Say that out loud
+before citing it as evidence for the next edit.

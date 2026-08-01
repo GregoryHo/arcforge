@@ -38,6 +38,13 @@ file, runs the suite once, sees green, and stops: it never rewrites
 `src/temperature.js`, so both `tool_before` assertions have no second operand and
 `npm test` runs once. That is the regression this scenario guards.
 
+Max Turns is 40 because the target behavior costs turns the baseline never spends.
+At 25 the treatment ran out mid-rebuild: version-2 trials 2 and 3 ended on a tool
+call with no final message, and A2/A3 grade the summary, so the run was scored for
+a report the agent was cut off before writing. Turn exhaustion is not a discipline
+failure, and 40 buys the delete-red-green-report cycle room to finish without
+relaxing what any assertion demands.
+
 ## Setup
 mkdir -p src test
 cat > package.json <<'EOF'
@@ -65,7 +72,7 @@ git add package.json
 git -c user.email=fixture@example.com -c user.name=fixture commit -q -m "initial"
 
 ## Max Turns
-25
+40
 
 ## Assertions
 - [tool_before] Write:/test/ < Write:/src/temperature.js
@@ -99,4 +106,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-2
+3

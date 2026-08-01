@@ -90,6 +90,30 @@ _SLASH_INVOCATION_PATTERN = re.compile(
     r"(?<![\w./$<-])/(?:arcforge:)?([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?![\w/-])(?!\.\w)"
 )
 
+# Router index (schema §3.1 exemption, P3). `skills/using` carries a `## Skill Map`
+# table listing every shipped skill. Those rows are an INDEX, not invocations: the
+# table answers "which skills exist and when does each apply", and the execution
+# semantics still require the user to type `/name`. Without this carve-out §3.1
+# ("a user-invoked skill is never prose-invoked") and the router bijection ("every
+# shipped skill has exactly one row") are mutually exclusive — `writing-skills` is
+# user-invoked, so a row violates one rule and no row violates the other.
+#
+# The exemption is scoped as narrowly as it can be: ONLY the leading `/name` cell
+# of a table row inside the Skill Map section. Any other slash token — elsewhere in
+# the router, later cells of a Skill Map row, or any other skill's prose — is a
+# normal INVOCATION and gets the full §3.1 check.
+ROUTER_SKILL = "using"
+SKILL_MAP_HEADING = "## Skill Map"
+# The leading cell of a Skill Map row: `| /finishing | ... |` (backticks optional).
+_ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
+
+# Cross-skill deep links (schema §5.2): a path reaching into ANOTHER skill's
+# directory. Wanting another skill's files means wanting that skill, so the only
+# sanctioned pointer is a `/name` invocation. Matches both spellings the schema
+# names — `skills/<other>/...` and `../<other>/...` — and resolves the offender by
+# skill name, so a pointer at the skill's OWN directory is not a boundary crossing.
+_DEEP_LINK_PATTERN = re.compile(r"(?:\.\./|skills/)([a-z][a-z0-9-]*)/")
+
 # Claude Code builtin slash commands. Skill prose legitimately names these
 # (`/compact`, `/review`), and they are not skills. Filtered only when the token
 # does not also name a shipped skill, so a real skill can never hide behind the
@@ -185,6 +209,45 @@ def _line_budget(name: str) -> int:
     return PERMANENT_LINE_BUDGET.get(name, HARD_LINE_CAP)
 
 
+def _markdown_files(skill_dir: Path) -> list[Path]:
+    """Every markdown file shipped inside a skill directory, SKILL.md first."""
+    return sorted(skill_dir.rglob("*.md"), key=lambda p: (p.name != "SKILL.md", str(p)))
+
+
+def _deep_link_violations(text: str, self_name: str) -> list[str]:
+    """Paths reaching into another shipped skill's directory (schema §5.2)."""
+    return sorted(
+        {
+            match.group(0)
+            for match in _DEEP_LINK_PATTERN.finditer(text)
+            if match.group(1) in SKILL_NAMES and match.group(1) != self_name
+        }
+    )
+
+
+def _classify_slash_targets(source: str, text: str) -> list[tuple[str, str, str]]:
+    """Slash targets in one skill's prose, tagged INVOCATION or ROUTER_INDEX.
+
+    Line-based so a Skill Map row can be recognized by its leading cell. Only that
+    leading cell earns ROUTER_INDEX; every other slash token on the line is a
+    normal invocation.
+    """
+    refs = []
+    in_skill_map = False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            in_skill_map = line.strip() == SKILL_MAP_HEADING
+        row = _ROUTER_ROW_PATTERN.match(line) if in_skill_map and source == ROUTER_SKILL else None
+        if row:
+            refs.append((source, "ROUTER_INDEX", row.group(1)))
+            line = line[row.end() :]
+        for target in _slash_invocations(line):
+            if _is_builtin_slash_command(target):
+                continue
+            refs.append((source, "INVOCATION", target))
+    return refs
+
+
 def _collect_cross_references() -> list[tuple[str, str, str]]:
     """(source, ref_type, target) triples — legacy uses arc-* markers, v6 uses `/name`."""
     refs = []
@@ -196,10 +259,7 @@ def _collect_cross_references() -> list[tuple[str, str, str]]:
                     ref_type = "SUB-SKILL" if "SUB-SKILL" in line else "BACKGROUND"
                     refs.append((skill_dir.name, ref_type, match.group(1)))
         else:
-            for target in _slash_invocations(text):
-                if _is_builtin_slash_command(target):
-                    continue
-                refs.append((skill_dir.name, "INVOCATION", target))
+            refs.extend(_classify_slash_targets(skill_dir.name, text))
     return refs
 
 
@@ -239,6 +299,14 @@ def _is_dmi(data: dict) -> bool:
     return value is True or (isinstance(value, str) and value.strip().lower() == "true")
 
 
+def _invokes_user_invoked(ref_type: str, target_frontmatter: dict) -> bool:
+    """True when a cross-reference calls a user-invoked skill (schema §3.1 violation).
+
+    ROUTER_INDEX rows are indexing, not calling, so they never violate.
+    """
+    return ref_type == "INVOCATION" and _is_dmi(target_frontmatter)
+
+
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_description_register(skill_dir):
     """Description obeys its register: user-invoked (DMI) plain <=120 with no trigger
@@ -276,14 +344,47 @@ def test_has_section_and_body(skill_dir):
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_referenced_supporting_files_exist(skill_dir):
-    """Every references/scripts/templates/agents pointer resolves (skill-local or repo-root)."""
+    """Every references/scripts/templates/agents pointer resolves.
+
+    Legacy skills may still resolve against the repo root; v6 skills may not
+    (schema §5.3 + §7 gap 2, closed in P3). A v6 skill is a closed unit, so a
+    pointer that only resolves at the repo root is reaching outside itself —
+    exactly what the repo-root fallback used to let through.
+    """
+    local_only = not _is_legacy(skill_dir.name)
     missing = []
     for match in _SUPPORTING_FILE_PATTERN.finditer(_read(skill_dir)):
         rel = match.group(0)
-        if not (skill_dir / rel).exists() and not (PROJECT_ROOT / rel).exists():
-            missing.append(rel)
+        if (skill_dir / rel).exists():
+            continue
+        if not local_only and (PROJECT_ROOT / rel).exists():
+            continue
+        missing.append(rel)
     assert not missing, (
-        f"{skill_dir.name} references supporting files that do not exist: {sorted(set(missing))}"
+        f"{skill_dir.name} references supporting files that do not resolve"
+        f"{' inside the skill directory' if local_only else ''}: {sorted(set(missing))}"
+    )
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
+def test_no_cross_skill_deep_links(skill_dir):
+    """No markdown in a v6 skill links into another skill's directory (schema §5.2).
+
+    Scans every markdown file under the skill, not just SKILL.md: a deep link is
+    most likely to appear in a `references/*.md`, so a SKILL.md-only guard would
+    have a hole exactly where the risk lives.
+    """
+    if _is_legacy(skill_dir.name):
+        pytest.skip("grandfathered via docs/plans/v6/legacy-skills.json")
+
+    offenders = {}
+    for md in _markdown_files(skill_dir):
+        found = _deep_link_violations(md.read_text(encoding="utf-8"), skill_dir.name)
+        if found:
+            offenders[str(md.relative_to(skill_dir))] = found
+    assert not offenders, (
+        f"{skill_dir.name} deep-links into another skill's directory: {offenders} — "
+        f"wanting another skill's files means wanting that skill; invoke it with `/name`"
     )
 
 
@@ -315,6 +416,28 @@ def test_cross_reference_resolves(source, ref_type, target):
     assert target in SKILL_NAMES, (
         f"{source} has {ref_type} reference to '{target}' "
         f"but no skills/{target}/SKILL.md exists"
+    )
+
+
+@pytest.mark.parametrize(
+    "source,ref_type,target",
+    CROSS_REFS,
+    ids=[f"{s}->{t}" for s, _, t in CROSS_REFS],
+)
+def test_user_invoked_skills_are_not_prose_invoked(source, ref_type, target):
+    """A user-invoked skill is an explicit-intent entry point (schema §3.1).
+
+    Another skill's prose calling `/name` on it routes around the gate the flag
+    exists to create. The router's Skill Map is exempt (ROUTER_INDEX): that table
+    indexes the skill set, it does not call into it.
+    """
+    if ref_type != "INVOCATION" or target not in SKILL_NAMES:
+        pytest.skip("not a v6 prose invocation of a shipped skill")
+
+    assert not _invokes_user_invoked(ref_type, _load_frontmatter(_read(SKILLS_DIR / target))), (
+        f"{source} prose-invokes /{target}, which is user-invoked "
+        f"(disable-model-invocation) — a user-invoked skill is reached by the user "
+        f"typing its slash command, never by another skill's text"
     )
 
 
@@ -413,6 +536,71 @@ def test_slash_invocations_ignore_path_shaped_slashes():
         "The schema is <delta><reason>x</reason></delta>.\n"
     )
     assert _slash_invocations(noise) == []
+
+
+def _router_doc(rows: list[str], tail: str = "") -> str:
+    """A minimal router document with a Skill Map table, for classifier fixtures."""
+    header = ["# R", "", SKILL_MAP_HEADING, "", "| Skill | Use when |", "| --- | --- |"]
+    return "\n".join([*header, *rows, "", tail])
+
+
+def test_router_index_rows_are_not_invocations():
+    """A Skill Map row indexes a skill; it does not invoke it (schema §3.1 exemption)."""
+    doc = _router_doc(["| `/writing-skills` | authoring a skill (user-invoked) |"])
+    assert _classify_slash_targets(ROUTER_SKILL, doc) == [
+        (ROUTER_SKILL, "ROUTER_INDEX", "writing-skills")
+    ]
+
+
+def test_router_exemption_stops_at_the_skill_map():
+    """Outside the Skill Map section the router's own slash calls stay invocations."""
+    doc = _router_doc(["| `/tdd` | tests |"], tail="## Notes\n\nThen run /writing-skills.\n")
+    assert _classify_slash_targets(ROUTER_SKILL, doc) == [
+        (ROUTER_SKILL, "ROUTER_INDEX", "tdd"),
+        (ROUTER_SKILL, "INVOCATION", "writing-skills"),
+    ]
+
+
+def test_router_exemption_covers_only_the_leading_cell():
+    """A slash target in a row's later cell is a call, not an index entry."""
+    doc = _router_doc(["| `/tdd` | after /writing-skills lands |"])
+    assert _classify_slash_targets(ROUTER_SKILL, doc) == [
+        (ROUTER_SKILL, "ROUTER_INDEX", "tdd"),
+        (ROUTER_SKILL, "INVOCATION", "writing-skills"),
+    ]
+
+
+def test_router_exemption_does_not_leak_to_other_skills():
+    """The same table shape in a non-router skill earns no exemption."""
+    doc = _router_doc(["| `/writing-skills` | authoring |"])
+    assert _classify_slash_targets("tdd", doc) == [("tdd", "INVOCATION", "writing-skills")]
+
+
+def test_invokes_user_invoked_discriminates():
+    """§3.1 fires on an invocation of a user-invoked target and nothing else."""
+    user_invoked = {"name": "writing-skills", "disable-model-invocation": True}
+    model_invoked = {"name": "tdd"}
+    assert _invokes_user_invoked("INVOCATION", user_invoked) is True
+    assert _invokes_user_invoked("INVOCATION", model_invoked) is False
+    assert _invokes_user_invoked("ROUTER_INDEX", user_invoked) is False
+    # The flag is legal as the YAML string "true" (schema §2), so it must count.
+    assert _invokes_user_invoked("INVOCATION", {"disable-model-invocation": "true"}) is True
+
+
+def test_deep_link_violations_flag_other_skill_paths():
+    """Both spellings the schema names are caught, by skill name (schema §5.2)."""
+    text = "Read skills/tdd/references/examples.md and ../finishing/SKILL.md."
+    assert _deep_link_violations(text, "writing-skills") == ["../finishing/", "skills/tdd/"]
+
+
+def test_deep_link_violations_allow_self_and_local_paths():
+    """A skill's own directory, its local references, and unrelated paths are fine."""
+    text = (
+        "See references/examples.md and scripts/run.sh.\n"
+        "This file lives at skills/tdd/SKILL.md; siblings are ../references/x.md.\n"
+        "Unrelated: src/parser/index.js, docs/guide/eval-system.md.\n"
+    )
+    assert _deep_link_violations(text, "tdd") == []
 
 
 def test_builtin_slash_commands_are_not_cross_references():

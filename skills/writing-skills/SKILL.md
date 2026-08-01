@@ -27,6 +27,10 @@ model-invoked. **Context load** is what a skill costs once loaded; **cognitive l
 what it costs the agent to decide whether to load it — charged on every unrelated turn,
 even when nothing loads.
 
+A user-invoked skill is an entry point, not a callable. No other skill's prose invokes
+it, because that routes around the deliberate start it exists to require. It still gets
+its router row: that table indexes the skill set, it does not call into it.
+
 ## Writing the description
 
 The description is the only part always in context. It is a trigger index, not a
@@ -37,13 +41,14 @@ summary.
 | Front-load the leading word | The first word carries retrieval weight; lead with identity, never a hedge |
 | One trigger phrase per branch | Three real situations mean three named triggers; one abstract phrase loses all three |
 | Synonyms are duplication | "review, critique, assess" is one trigger written three times — it dilutes, it does not widen |
-| Never summarize the workflow | A description listing the steps becomes a shortcut the agent takes *instead of* reading the body |
+| Never summarize the workflow | Check it: could an agent act on the description alone? If it could, it will, and the body goes unread |
 | User-invoked strips the triggers | The user already decided; state plainly what the skill is |
 
 ## Information hierarchy
 
-A skill body is one of two shapes. Pick before writing; mixing them yields prose nobody
-can execute.
+A skill body has one shape as its spine — pick it before writing. Alternating between the
+two yields prose nobody can execute; a spine of one shape carrying subordinate lookup
+blocks of the other does not.
 
 - **Steps** — an ordered procedure where every step carries a completion criterion the
   agent can check off. "Read the diff" is not a step; "read the full diff before writing
@@ -63,9 +68,8 @@ A skill directory is a closed unit.
   cross-skill vocabulary. Never link into another skill's internals; wanting their files
   means you want their skill, so invoke it.
 - Executable files stay inside the skill directory and load nothing outside it.
-- Engine functionality is reached one way: run the `arcforge` CLI as a subprocess. The
-  plugin's `bin/` is on PATH, so the bare command works — a skill never encodes where
-  the engine lives on disk.
+- Engine functionality is reached one way: run the bare `arcforge` CLI as a subprocess.
+  The plugin puts its `bin/` on PATH, so a skill never encodes where the engine lives.
 
 ## Baseline first
 
@@ -77,8 +81,9 @@ rationalizations are the specification.
 
 Shipping is a measurement question, not an authoring one. Where A/B eval tooling exists
 (`arcforge eval ab`), it decides whether a version ships. Without it, a wording
-micro-test plus one pressure scenario is the floor — never zero evidence. Both
-protocols: `references/wording-tests.md`.
+micro-test plus one pressure scenario is the floor — never zero evidence. A number that
+moved the wrong way indicts the instrument as often as the text. Both protocols and that
+diagnosis: `references/wording-tests.md`.
 
 ## Match the form to the failure
 
@@ -107,8 +112,11 @@ landed; restructure so the rule cannot reach the exempt part.
 Split by **invocation** when two halves fire in different situations — one skill cannot
 have two descriptions. Split by **sequence** when a later stage is only reachable after
 an earlier one completes and its detail is dead weight until then. Length alone is not a
-reason to split; it is a reason to prune. Before committing to a shape, check it against
-the designs eval has already ruled out: `references/design-anti-patterns.md`.
+reason to split; it is a reason to prune. The body carries a hard line cap enforced in
+CI: over it, prune first, then move whatever survives into `references/` or into a CLI
+command that owns the procedure — an exception to the cap is never the answer. Before
+committing to a shape, check it against the designs eval has already ruled out:
+`references/design-anti-patterns.md`.
 
 ## Pruning
 

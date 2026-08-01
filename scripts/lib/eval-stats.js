@@ -72,6 +72,19 @@ const T_CRITICAL_95 = {
 };
 
 /**
+ * Drop trials that never produced a score. A trial whose grader failed, or whose
+ * runner failed to capture output, carries `score: 0` as a storage placeholder —
+ * counting it as a zero-scoring trial attributes an infrastructure failure to the
+ * agent's behavior and inflates variance. The rows stay in the JSONL and are still
+ * reported as GRADE/INFRA ERROR; they are excluded from statistics only.
+ * @param {import('./eval').TrialResult[]} results - Trial results
+ * @returns {import('./eval').TrialResult[]} Results that carry a real score
+ */
+function scorableResults(results) {
+  return results.filter((r) => !r.gradeError && !r.infraError);
+}
+
+/**
  * Compute pass@k metric: at least 1 success in k trials
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @returns {boolean} Whether pass@k is satisfied
@@ -181,7 +194,8 @@ function defaultK(scenario, isAb = false) {
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @returns {{ count: number, avg: number, stddev: number, min: number, max: number, ci95: Object, passRate: number }}
  */
-function statsFromResults(results) {
+function statsFromResults(rawResults) {
+  const results = scorableResults(rawResults);
   if (results.length === 0) {
     return { count: 0, avg: 0, stddev: 0, min: 0, max: 0, ci95: ci95([]), passRate: 0 };
   }
@@ -204,7 +218,8 @@ function statsFromResults(results) {
  * @param {import('./eval').TrialResult[]} results - Trial results
  * @returns {string|null} Warning message, or null if sample is adequate
  */
-function confidenceWarning(results) {
+function confidenceWarning(rawResults) {
+  const results = scorableResults(rawResults);
   if (results.length < 2) return 'WARNING: k=1, no variance information';
   if (results.length < 5) return `NOTE: k=${results.length}, confidence intervals are wide`;
   return null;
@@ -216,7 +231,9 @@ function confidenceWarning(results) {
  * @param {import('./eval').TrialResult[]} treatment - Treatment results
  * @returns {number} Delta (treatment avg score - baseline avg score)
  */
-function computeDelta(baseline, treatment) {
+function computeDelta(rawBaseline, rawTreatment) {
+  const baseline = scorableResults(rawBaseline);
+  const treatment = scorableResults(rawTreatment);
   if (baseline.length === 0 || treatment.length === 0) {
     return 0;
   }
@@ -288,7 +305,9 @@ function verdictFromDelta(delta, thresholds = {}) {
  * @param {import('./eval').TrialResult[]} treatment - Treatment trial results
  * @returns {{ lower: number, upper: number, width: number }} CI bounds for delta
  */
-function ciForDelta(baseline, treatment) {
+function ciForDelta(rawBaseline, rawTreatment) {
+  const baseline = scorableResults(rawBaseline);
+  const treatment = scorableResults(rawTreatment);
   if (baseline.length < 2 || treatment.length < 2) {
     return { lower: 0, upper: 0, width: 0 };
   }
@@ -330,12 +349,13 @@ function ciForDelta(baseline, treatment) {
  * @param {number} [threshold] - CV threshold (default: CV_THRESHOLD)
  * @returns {string|null} Warning message, or null if variance is acceptable
  */
-function baselineVarianceWarning(results, precomputed, threshold) {
+function baselineVarianceWarning(rawResults, precomputed, threshold) {
   // Support old 2-arg call: baselineVarianceWarning(results, threshold)
   if (typeof precomputed === 'number') {
     threshold = precomputed;
     precomputed = undefined;
   }
+  const results = scorableResults(rawResults);
   if (results.length < 2) return null;
   const mean = precomputed?.avg ?? avgScore(results);
   if (mean <= 0.01) return null;
@@ -359,7 +379,9 @@ function baselineVarianceWarning(results, precomputed, threshold) {
  * @param {Object} [fallbackThresholds] - Unused (reserved for forward compatibility)
  * @returns {'IMPROVED' | 'INCONCLUSIVE' | 'REGRESSED' | 'INSUFFICIENT_DATA'} Verdict
  */
-function verdictFromDeltaCI(baseline, treatment, _fallbackThresholds) {
+function verdictFromDeltaCI(rawBaseline, rawTreatment, _fallbackThresholds) {
+  const baseline = scorableResults(rawBaseline);
+  const treatment = scorableResults(rawTreatment);
   // Early return: k<5 in either condition means the verdict is not defensible.
   // This guard must precede all CI and delta computation.
   if (baseline.length < 5 || treatment.length < 5) {
@@ -383,7 +405,7 @@ function verdictFromDeltaCI(baseline, treatment, _fallbackThresholds) {
  */
 function verdictFromAbPolicy(baseline, treatment, policy) {
   if (policy === 'non-regression') {
-    return passAllK(treatment) ? 'PASS' : 'REGRESSED';
+    return passAllK(scorableResults(treatment)) ? 'PASS' : 'REGRESSED';
   }
   return verdictFromDeltaCI(baseline, treatment);
 }
@@ -458,6 +480,7 @@ function computeMetricDeltas(baseline, treatment) {
 }
 
 module.exports = {
+  scorableResults,
   passAtK,
   passAllK,
   avgScore,
