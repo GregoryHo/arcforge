@@ -36,6 +36,7 @@
 | `code-review` | model-invoked | P4 重新推導維持預填值：觸發條件是「有一份改動已經寫完、要交出去」，這是任務中途的狀態，agent 比使用者更早看見。要求使用者記得喊 `/code-review` 的失敗模式是不對稱的——記得喊的那次通常本來就會被審，忘記喊的那次正是最該被審的那次（趕時間、覺得改動很小、對自己的實作有信心）。回饋回來要處理的那半同理：回饋抵達時 agent 正在讀它，此刻才是紀律要生效的時點。 |
 | `completion-evidence` | **不是 skill（P4 裁決）** | 判準問「agent 該不該自己伸手去拿」，但這支的內容是「宣稱完成前要有證據」——一個會在它最該生效時被略過的 agent，同樣不會伸手去載入它；一個會伸手的 agent 已經在遵守它了。獨立成 skill 的結構是自我否證的。改以 `skills/code-review/references/completion-evidence.md` 承載（查表面），並由各 skill 在自己的完成判準內就地內聯。**無 router 列、無 invocation 類別**——reference 檔兩者皆不需要，schema §5.3 的 supporting-file 存在性守衛即為其把關。 |
 | `sessions` | model-invoked | P4 重新推導維持預填值：觸發條件是「工作要停在半途、之後要被別人或明天的自己接手」。使用者說「我先走了」時已經在離場，此刻要求他先想起打 `/sessions` 正好落在最不可能發生的時點；agent 該自己伸手。resume 方向同理——使用者說「昨天做到哪」時要的是狀態，不是先學會一個指令名。 |
+| `evaluating` | model-invoked | P5 重新推導維持預填值，但理由換成**不對稱失敗**（預填只寫「條件在任務中途成立」，那對 user-invoked 也成立，不構成判準）：觸發條件是「有一組數字回來了、有人正要從它讀出一個結論」。記得喊 `/evaluating` 的那次，通常本來就會謹慎看區間；忘記喊的那次正是最該被攔的那次——delta 是正的、期限在逼、treatment 綠了。**考慮過並否決 user-invoked**：`learning` 與 `looping` 之所以是 user-invoked，是因為它們動使用者的環境或花使用者的錢，agent 自行啟動等於自我授權。`evaluating` 兩者皆非——它只判斷一個**已經在場**的主張，不寫入任何使用者狀態、不啟動無人值守迴圈；沒有需要被 gate 的授權，就沒有理由要求使用者先知道答案。 |
 
 ## 預填（P4–P6，**非約束**）
 
@@ -47,7 +48,6 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 |---|---|---|---|
 | `compacting` | P4 | model-invoked | 條件是「context 快用完」，agent 比使用者更早看得到；使用者能打的 `/compact` 是 Claude Code builtin，與本 skill 不同物。 |
 | `learning` | P5 | **user-invoked** | 學習子系統是控制面：啟用、審查候選、啟用 instinct 都是使用者對自己環境的決定，agent 自行伸手等於自我授權。 |
-| `evaluating` | P5 | model-invoked | 條件是「出現一個關於行為的主張、而它需要被量測」，這個條件在任務中途成立。 |
 | `maintaining-obsidian` | P5 | model-invoked | 條件是「有東西要進 vault 或要查 vault」，隨任務出現。 |
 | `diagramming-obsidian` | P5 | model-invoked | 同上，條件是「需要一張關係圖」。 |
 | `brainstorming` | P6 | model-invoked | 條件是「使用者帶著還沒收斂的構想來」，從第一句話就看得出來。 |
