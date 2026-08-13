@@ -191,28 +191,45 @@ pass "candidate queued: ${CANDIDATE_ID}"
 step "4. Approve → materialize → activate (the canonical review gate)"
 # handleDashboardAction is the same entry point the dashboard HTTP layer calls;
 # driving it directly exercises the real gate without starting a browser.
+#
+# THE SAFETY ACK IS NOT A FORMALITY. `activate` is the only step that changes
+# future behavior, so learning-dashboard.js:399-404 refuses it unless the caller
+# asserts the reviewer saw both warnings — in the UI those are the checkboxes a
+# human ticks. Here the probe stands in for that human, so it sends the same two
+# flags the dashboard sends. Sending `safety_ack: true` (a bare boolean) is NOT
+# equivalent: the gate reads named properties off the object, so a boolean means
+# both flags are undefined and the action is refused with `missing_safety_ack`.
+# That refusal is the gate working, not a defect — `deactivate` requires only the
+# first flag, and `reviewer_ack` is synthesized internally at :498, not by us.
 node -e "
   const { handleDashboardAction } = require('${REPO_ROOT}/scripts/lib/learning-dashboard');
   const id = process.argv[1];
+  const SAFETY_ACK = {
+    reviewer_saw_behavior_change_warning: true,
+    reviewer_saw_target_path_summary: true,
+  };
   const out = [];
-  for (const [action, expected] of [
-    ['approve', 'pending_review'],
-    ['materialize', 'approved'],
-    ['activate', 'materialized'],
+  let failed = null;
+  // Only activate carries the ack — mirroring the dashboard, which shows the
+  // confirmation checkboxes on that action alone.
+  for (const [action, expected, ack] of [
+    ['approve', 'pending_review', undefined],
+    ['materialize', 'approved', undefined],
+    ['activate', 'materialized', SAFETY_ACK],
   ]) {
     const res = handleDashboardAction({
       action,
       candidate_id: id,
       expected_current_status: expected,
-      safety_ack: true,
+      safety_ack: ack,
     });
     out.push({ action, accepted: res.accepted, reason: res.reason || null });
-    if (!res.accepted) {
-      console.error(JSON.stringify(out, null, 2));
-      process.exit(1);
-    }
+    if (!res.accepted) { failed = action; break; }
   }
+  // Always write the transcript to stdout — a rejected transition is exactly the
+  // evidence worth keeping, and routing it to stderr would discard it.
   console.log(JSON.stringify(out, null, 2));
+  if (failed) process.exit(1);
 " "${CANDIDATE_ID}" > "${EVIDENCE_DIR}/04-lifecycle.json" \
   || fail "lifecycle transition rejected (see ${EVIDENCE_DIR}/04-lifecycle.json)"
 pass "approve → materialize → activate accepted"

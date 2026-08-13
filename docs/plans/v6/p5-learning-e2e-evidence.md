@@ -773,3 +773,62 @@ prompt 措辭效果仍無法單元測試證明；能證明的是渲染面與契�
 - **不在表上** → 稽核有遺漏，回頭補表。
 
 依 orchestrator 指示，換 lever 是其裁定點，本 worker 不自行動手。
+
+---
+
+## 14. 第四跑：步 3 PASS，步 4 卡在活化閘（設計行為，非缺陷）
+
+四跑結果：
+
+- **步 3 PASS** —— `cand_instinct_20260813T075145Z_0430570b273e` 入列。
+  §13 的契約稽核一次生效，三個引擎缺陷（§11 證據縫、§12 id 保真、§13 契約缺口）
+  的修正鏈全部兌現：curator 有東西可讀 → 提得出案 → 提案通得過驗證器。
+- 步 4：`approve` ✓、`materialize` ✓、**`activate` ✗ `missing_safety_ack`**。
+
+### 14.1 這不是缺陷，是活化閘正確運作
+
+`learning-dashboard.js:399-404`：
+
+```js
+if (action === LIFECYCLE_ACTION.ACTIVATE) {
+  const ack = safetyAck || {};
+  if (!ack.reviewer_saw_behavior_change_warning || !ack.reviewer_saw_target_path_summary) {
+    return reject('missing_safety_ack');
+  }
+}
+```
+
+`activate` 是整條鏈上**唯一會改變未來行為**的動作，因此閘門要求呼叫端聲明
+審查者看過兩則警告——在 UI 上那是人要親手勾的兩個確認框。語料庫的
+`dashboard-safety-ack-required.md` scenario 守的正是這條。
+
+probe 原本送 `safety_ack: true`（裸布林）。閘門讀的是物件上的**具名屬性**，
+布林值使兩個旗標皆為 `undefined`，於是拒絕。**拒絕是對的**——一個沒有真正
+確認過的呼叫端本來就不該通過。
+
+### 14.2 修法：probe 送出人類在 dashboard 會送的東西
+
+**probe 在此模擬的是人類在 dashboard 勾選確認框。** 因此送出與 UI 相同的兩個
+旗標，而不是放寬閘門：
+
+```js
+const SAFETY_ACK = {
+  reviewer_saw_behavior_change_warning: true,
+  reviewer_saw_target_path_summary: true,
+};
+```
+
+且**只有 `activate` 帶 ack**，`approve` / `materialize` 不帶——鏡射 dashboard
+的實際行為（確認框只出現在 activate 那一步）。`deactivate` 只需第一個旗標；
+`reviewer_ack`（`:498`）由 dashboard 內部合成，呼叫端不提供，probe 亦不偽造。
+
+**閘門邏輯一行未改。**
+
+### 14.3 順帶修掉的證據流失
+
+原本失敗時把 JSON 寫到 **stderr** 再 `exit 1`，而該 node 呼叫的 stdout 被重導到
+`04-lifecycle.json`——於是**退件詳情整個丟失**，四跑的 `04-lifecycle.json` 是空的。
+改為無論成敗都把逐步 transcript 寫到 stdout，再依 `failed` 決定退出碼。
+
+被拒的那筆記錄正是**最值得留存的證據**：它是 fail-closed 活化閘正確運作的一手
+證明。這個修正讓下一次任何退件都會留下可覆核的紀錄。
