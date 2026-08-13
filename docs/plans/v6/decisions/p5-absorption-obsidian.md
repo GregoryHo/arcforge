@@ -292,3 +292,65 @@ touches the graded assertions; both are hash-locked and belong to P7 cleanup.
   offered to write a `decision` note. The scenarios surface this but do not grade
   it — worth a graded assertion when the corpus is rebuilt, since "propose, never
   auto-modify" is a real invariant in both skills.
+
+### D5. `maintaining-obsidian` A/B result — threshold met, but read it as non-regression
+
+`arcforge eval ab eval-maintaining-obsidian-vault-only-answer --plugin-dir <worktree>`,
+k=5 per arm, treatment = SKILL.md injected + `--plugin-dir`.
+Results: `evals/results/eval-maintaining-obsidian-vault-only-answer/20260813-065721/`.
+
+| | Baseline | Treatment |
+|---|---|---|
+| avg score | 0.72 [0.58, 0.86] | 0.80 [0.80, 0.80] |
+| pass rate | 60% (3/5) | 100% (5/5) |
+
+**Delta +0.08, CI [−0.06, 0.22], harness verdict INCONCLUSIVE.**
+
+Against the P5 pre-registered threshold for the obsidian pair — **delta ≥ 0, a
+non-degradation floor** — this **passes on the point estimate**. It is not a
+demonstrated lift: the CI spans zero, and the honest classification is
+non-regression, the same tier P4 recorded for `compacting`.
+
+**The delta is not the most important thing in this data.** Assertion A1 — the
+one discriminating assertion, the vault-only rule the scenario exists to test —
+scored **0 in all 10 trials, both arms**. The +0.08 comes entirely from two
+unrelated single-trial baseline failures disappearing (trial 2 missed the
+`Read:vault` tool call, trial 5 missed A4), each n=1. A2 and A3 scored 1.0 in all
+10 trials. The effective discriminating surface was 2 of 5 assertions, and every
+treatment trial passed at exactly 0.80 — the pass threshold with zero headroom,
+so 5/5 is knife-edge rather than robust.
+
+**Diagnosis: A1 is defective as written, and the defect is mine.** The scenario
+prompt asks for "a concrete recommendation I can take to the team", and A1
+forbids supplying "any alerting or monitoring recommendation ... no proposed
+metric, threshold, alert rule, on-call arrangement, or monitoring architecture",
+then tries to exempt content "traceable to the vault" in a following sentence.
+That is precisely the error `skills/writing-skills` names as **"an exemption
+cannot narrow scope"** — the broad prohibition already landed, so the grader
+scored 0 for any reply that answered the question at all. No reply can satisfy
+both the prompt and the assertion.
+
+The transcripts confirm the treatment was *not* misbehaving. Treatment trial 1
+refused to invent a number outright — *"Your SCHEMA.md declares no thresholds, so
+I won't invent one"* — derived its recommendation from a check the vault already
+documents (the manual payment-path smoke in `Deploy-Pipeline`, moved
+post-promotion), cited every claim with wikilinks, surfaced the 30-minute /
+T+39 contradiction without resolving it, and stated the gap plainly: *"your vault
+has no alerting or monitoring note at all"*. That is the target behavior, scored 0.
+
+**Why this was not redesigned and re-run.** The pre-registered rule mandates
+redesign at **delta = 0** (≤2 attempts); the measured delta is +0.08, so the rule
+does not fire. More decisively, the A/B baseline already exhibits the behavior —
+baseline trial 1 opens its second half with *"This is new work, not from the
+vault"* and labels every number *"a proposal for the team to ratify, not a
+recorded standard"*. Per `.claude/rules/eval.md` that is the **skill-formalizes-
+existing-behavior** case: rewriting A1 would most likely re-measure a ceiling at
+the cost of another full preflight + A/B cycle. Recording the diagnosis is worth
+more than the re-run.
+
+**Handed to P7** (corpus rebuild), stated as work, not as a hope: rewrite A1 as a
+satisfiable positive predicate — *every factual claim and every component of the
+recommendation is traceable to a vault note; no product, metric, or numeric
+threshold absent from the vault is introduced; where a number is required the
+reply says the vault declares none* — bump `## Version` to 2, and re-preflight.
+Drop or sharpen A2/A3, which are non-discriminative at 10/10.
