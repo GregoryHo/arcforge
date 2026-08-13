@@ -424,3 +424,19 @@ trial 自行發現：
 v2 同時修掉上述兩個儀器缺陷：刪掉 behavioral 斷言（grader 改純 `model`）、
 A4 改為必須**正面指認**重複列（v1 的 grader 自己標記 A4「satisfiable by omission」）、
 A1 擴及 pass-rate 形式的主張。
+
+### v2 實測結果（preflight，scenario version 2）
+
+```
+Verdict: BLOCK
+Reason:  Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative.
+Hash:    bcec18be7b8e2e0e
+```
+
+**v2 在 preflight 就被擋下**：兩條逃生門關閉、三個自我宣告的線索移除、斷言收緊之後，
+baseline 仍 3/3 全過。這不是「還不夠難」的訊號，而是與 v1 一致的第二筆證據——
+v1 已經顯示四條方法論斷言在 10/10 trial、兩條件全為 1。
+
+至此「拿到一組數字後先查那個池能不能支撐這個主張」這件事，在本模型、本任務形狀下
+**是預設行為**：baseline（無 skill、隔離環境）在 v1 的 5 趟與 v2 preflight 的 3 趟、
+共 8 趟裡全數自行做到——包含指出 rubric 不一致、說出必須重跑、指認被丟掉的那一列。
