@@ -99,6 +99,15 @@ describe('observe → batch-assembler → curator prompt (no stub)', () => {
       tool_name: 'Grep',
       tool_input: { pattern: 'handleRequest', path: 'src/' },
     });
+    // A tool outside the Layer 2 allowlist: recorded, but with its evidence
+    // omitted. It stays in the batch and the ingestor rejects any proposal that
+    // cites it (`evidence_ref_omitted_upstream`), so the batch has to say so.
+    observe('pre', home, projectDir, {
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Task',
+      tool_input: { prompt: 'spawn a subagent' },
+    });
 
     const obsPath = path.join(home, 'observations', project, 'observations.jsonl');
     observations = fs
@@ -169,6 +178,23 @@ describe('observe → batch-assembler → curator prompt (no stub)', () => {
 
   it('the prompt still carries the post-phase outcome', () => {
     expect(prompt).toMatch(/\*\*outcome\*\*: \w+/);
+  });
+
+  it('marks evidence that was omitted upstream as uncitable', () => {
+    // The ingestor rejects proposals citing a non-`present` item. The curator
+    // can only obey that if the batch tells it which items those are.
+    const omitted = observations.find((o) => o.tool === 'Task');
+    expect(omitted.evidence_status).not.toBe('present');
+    expect(prompt).toContain('**evidence_status**: omitted_unsupported_tool — DO NOT CITE');
+  });
+
+  it('does not clutter citable items with a status line', () => {
+    // Only the exceptions are annotated; marking every present item would bury
+    // the signal it exists to carry.
+    const bashBlock = prompt
+      .split('---')
+      .find((b) => b.includes('**tool**: Bash') && b.includes('tool_start'));
+    expect(bashBlock).not.toContain('evidence_status');
   });
 
   it('an observation evidence item is not reduced to name and timestamp', () => {
