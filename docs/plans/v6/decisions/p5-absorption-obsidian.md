@@ -327,8 +327,11 @@ metric, threshold, alert rule, on-call arrangement, or monitoring architecture",
 then tries to exempt content "traceable to the vault" in a following sentence.
 That is precisely the error `skills/writing-skills` names as **"an exemption
 cannot narrow scope"** — the broad prohibition already landed, so the grader
-scored 0 for any reply that answered the question at all. No reply can satisfy
-both the prompt and the assertion.
+scored 0 for any reply that answered the question at all. Stated precisely: A1
+and the prompt are in tension such that any *responsive* reply fails A1, and
+10/10 across both arms is the measurement of that. (A reply that named the gap
+and recommended nothing would satisfy A1 while failing the user's request — so
+this is a scenario-design flaw, not a logical impossibility.)
 
 The transcripts confirm the treatment was *not* misbehaving. Treatment trial 1
 refused to invent a number outright — *"Your SCHEMA.md declares no thresholds, so
@@ -338,15 +341,22 @@ post-promotion), cited every claim with wikilinks, surfaced the 30-minute /
 T+39 contradiction without resolving it, and stated the gap plainly: *"your vault
 has no alerting or monitoring note at all"*. That is the target behavior, scored 0.
 
-**Why this was not redesigned and re-run.** The pre-registered rule mandates
-redesign at **delta = 0** (≤2 attempts); the measured delta is +0.08, so the rule
-does not fire. More decisively, the A/B baseline already exhibits the behavior —
-baseline trial 1 opens its second half with *"This is new work, not from the
-vault"* and labels every number *"a proposal for the team to ratify, not a
-recorded standard"*. Per `.claude/rules/eval.md` that is the **skill-formalizes-
-existing-behavior** case: rewriting A1 would most likely re-measure a ceiling at
-the cost of another full preflight + A/B cycle. Recording the diagnosis is worth
-more than the re-run.
+It also **wrote a line to `vault/log.md`** on a read-only query. That is the
+skill's own Close-every-operation rule firing as written, not model drift — but
+it is a mutation the user did not ask for, and it belongs next to the D4 note
+about unprompted vault writes. Whether the log line should be conditional on the
+mode mutating is a real open question for P7.
+
+**Why this was not redesigned and re-run.** The decisive reason is that **the A/B
+baseline already exhibits the behavior**: baseline trial 1 opens its second half
+with *"This is new work, not from the vault"* and labels every number *"a
+proposal for the team to ratify, not a recorded standard"*. Per
+`.claude/rules/eval.md` that is the **skill-formalizes-existing-behavior** case —
+rewriting A1 would most likely re-measure a ceiling at the cost of another full
+preflight + A/B cycle. Secondarily, the pre-registered rule mandates redesign at
+**delta = 0** and the measured delta is +0.08, so it does not fire; that is the
+weaker argument and is not what the decision rests on, since +0.08 arising from
+two n=1 assertion flips is materially delta ≈ 0.
 
 **Handed to P7** (corpus rebuild), stated as work, not as a hope: rewrite A1 as a
 satisfiable positive predicate — *every factual claim and every component of the
