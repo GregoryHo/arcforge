@@ -77,26 +77,77 @@ grep -q '"enabled": true' "${EVIDENCE_DIR}/01-learn-enable.json" \
   || fail "learning was not enabled"
 pass "learning enabled in the probe home"
 
-step "2. Observe — drive the PostToolUse hook to produce observations"
-# The daemon needs MIN_OBSERVATIONS (10) before it will call the curator. Each
-# call is the hook's real entry point reading a real hook payload on stdin.
+step "2. Observe — drive the hook to produce a repeated workflow shape"
+# The daemon needs MIN_OBSERVATIONS (10) before it calls the curator, and the
+# curator needs a REPEATED SHAPE to have anything to propose (prompt rule 5:
+# weak evidence → `proposals: []`). So this fixture replays one recognisable
+# workflow four times: a failing check, the read+edit that addresses it, then
+# the passing re-check.
+#
+# TWO THINGS THIS GETS RIGHT THAT A NAIVE FIXTURE DOES NOT:
+#
+#   1. The phase argument. `hooks/observe/main.js` takes the phase from
+#      `process.argv[2]` ('pre' | 'post'), NOT from `hook_event_name` — see
+#      hooks/hooks.json, which registers `main.js pre` and `main.js post` as two
+#      separate entries. Invoked with no argv the hook records NEITHER the
+#      pre-phase evidence patch NOR the post-phase outcome, so every record is
+#      content-free. Always pass the phase.
+#   2. Both phases per tool call, as a real session produces. `pre` carries the
+#      evidence (command / path / pattern), `post` carries the outcome.
 OBS_HOOK="${REPO_ROOT}/hooks/observe/main.js"
-for i in $(seq 1 12); do
+
+# observe_call <tool> <tool_input_json> <tool_response_json>
+observe_call() {
+  local tool="$1" input="$2" response="$3"
+  printf '%s' "{
+    \"session_id\": \"probe-session\",
+    \"hook_event_name\": \"PreToolUse\",
+    \"cwd\": \"${PROJECT_DIR}\",
+    \"tool_name\": \"${tool}\",
+    \"tool_input\": ${input}
+  }" | CLAUDE_SESSION_ID=probe-session node "${OBS_HOOK}" pre >/dev/null 2>&1 || true
   printf '%s' "{
     \"session_id\": \"probe-session\",
     \"hook_event_name\": \"PostToolUse\",
     \"cwd\": \"${PROJECT_DIR}\",
-    \"tool_name\": \"Grep\",
-    \"tool_input\": {\"pattern\": \"handleRequest\", \"path\": \"src/\"},
-    \"tool_response\": {\"matches\": ${i}}
-  }" | CLAUDE_SESSION_ID=probe-session node "${OBS_HOOK}" >/dev/null 2>&1 || true
+    \"tool_name\": \"${tool}\",
+    \"tool_input\": ${input},
+    \"tool_response\": ${response}
+  }" | CLAUDE_SESSION_ID=probe-session node "${OBS_HOOK}" post >/dev/null 2>&1 || true
+}
+
+# Four rounds of the same shape, over four different modules. The repetition is
+# what makes it proposable; the varying file names keep it from looking like one
+# operation retried.
+for mod in parser validator cache webhook; do
+  observe_call Bash \
+    "{\"command\": \"npm test -- ${mod}\"}" \
+    '{"stdout": "1 failing", "exit_code": 1}'
+  observe_call Read \
+    "{\"file_path\": \"src/${mod}.js\"}" \
+    '{"type": "text", "file": {"numLines": 120}}'
+  observe_call Edit \
+    "{\"file_path\": \"src/${mod}.js\", \"old_string\": \"a\", \"new_string\": \"b\"}" \
+    '{"type": "update", "filePath": "src/'"${mod}"'.js"}'
+  observe_call Bash \
+    "{\"command\": \"npm test -- ${mod}\"}" \
+    '{"stdout": "all passing", "exit_code": 0}'
 done
+
 OBS_FILE="${ARCFORGE_HOME}/observations/${PROJECT_NAME}/observations.jsonl"
 [ -f "${OBS_FILE}" ] || fail "no observations.jsonl at ${OBS_FILE}"
 OBS_COUNT=$(wc -l < "${OBS_FILE}" | tr -d ' ')
 [ "${OBS_COUNT}" -ge 10 ] || fail "only ${OBS_COUNT} observations (need >= 10)"
 cp "${OBS_FILE}" "${EVIDENCE_DIR}/02-observations.jsonl"
 pass "${OBS_COUNT} observations captured inside the probe home"
+
+# The records must actually carry evidence, or step 3 is guaranteed to come back
+# with `proposals: []` and the run tells you nothing about the chain.
+grep -q '"evidence_status":"present"' "${OBS_FILE}" \
+  || fail "no observation carries evidence — check the phase argument (argv[2])"
+grep -q '"input":"npm test' "${OBS_FILE}" \
+  || fail "Bash commands were not captured into the observation records"
+pass "observation records carry tool input and outcome"
 
 step "3. Daemon → curator → queue (invokes the real Haiku curator once)"
 # Source the daemon and call its own analyze_project — same code path the daemon
