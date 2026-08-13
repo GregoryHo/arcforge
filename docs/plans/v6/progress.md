@@ -95,6 +95,42 @@
 - **掛帳 P7（儀器）**：缺陷 A（SIGTERM trial 不標 infraError；修法約束＝killed 且最終輸出未完成，見 absorption-map 附錄）；duration_ms 低報（eval.js:228 優先採 stream-json 值）；finishing description no-summarize 違規（**明確改派 P7**，前提「動它需自帶 baseline」不變）；sessions 的 scenario 結構守衛等價物；range-fidelity/answering-feedback 兩 scenario 無實測池。
 - P3 掛帳的 §3.1/§5.2 mutation 重跑：P4 無新 user-invoked skill，N/A，順延至下一支 user-invoked 落地時。
 
+## P5 任務（進行中，開跑 2026-08-13，分支 v6-p5-retained，三路 worker）
+
+**預登記行為門檻**（開跑前寫死，禁事後定義）：
+
+1. **learning e2e（旗艦 AC，binary）**：以 `--plugin-dir <本樹>` 在隔離環境走完
+   observe→daemon→curator→queue，佇列新增 ≥1 條源自 probe session 的候選；再走
+   approve→materialize→activate 產出 active instinct，SessionStart 注入可見。
+   證據一律檔案面（queue.jsonl／drafts／instincts／注入輸出），不採信 agent 自述。
+   不得汙染使用者真實 `~/.arcforge` 的 learning 狀態（隔離或事後可證清理）。
+2. **eval scenario**：`learning`、`evaluating` 各 ≥1 scenario delta > 0（CI 下界 ≥0）；
+   `maintaining-obsidian`、`diagramming-obsidian` 各 ≥1 scenario delta ≥ 0（非退化底線）。
+   delta=0 → redesign（≤2 次）仍 0 → 如實記錄，不得宣告有效。
+3. **回歸**：P3/P4 既有 scenario 全數非退化。
+
+任務：
+
+- [ ] Track A — `learning`（L，loop，四支合一）：skill-local scripts（diary/reflect/instinct/recall.js）
+  邏輯上收 `scripts/lib`，CLI `learn` 新增 diary/reflect/instinct/recall 子群（cli-manifest 同 commit）；
+  `hooks/session-tracker/end.js` 改 require canonical lib → **D8 allowlist 歸零**（測試翻轉為
+  `toEqual([])`）；inject-context nudge 改指新 skill；jest 四支測試改指 lib/CLI；
+  `skills/learning/SKILL.md`（≤250 行+refs，invocation 以判準重推導，預填 user-invoked）；
+  刪 4 legacy dirs + legacy-skills.json 同 commit 剪 4 條；router 列；invocation-table 更新已落地；
+  instinct/diary/operation-record schema 測試（壞樣本紅）；+1 scenario；e2e probe
+- [ ] Track B — `evaluating`（M）：方法論 prose only（機制已在 `arcforge eval ...`）；刪
+  arc-evaluating + json 剪 1 條；9 支 eval-arc-evaluating-* scenario 的 Target retarget 或除役
+  （check:eval-targets 綠）；router 列；+1 scenario
+- [ ] Track C — obsidian 兩支（M）：`maintaining-obsidian`（registry 操作走 `arcforge obsidian ...`）、
+  `diagramming-obsidian`（Python 工具留 skill 內自足，`npm pack` 無 .venv）；刪 2 legacy dirs +
+  json 剪 2 條；router 兩列；各 +1 scenario
+- [ ] 機械 AC（gate step 1）：npm test 5 runner + 5 check 全綠；D8 歸零斷言；schema 測試 ×3；
+  `npm pack --dry-run | grep -c .venv`==0；test:observer-daemon 綠；4 支新 skill 過 pytest 全規則；
+  router bijection；legacy json 16→9（ratchet 同 commit）；`git grep` 四支 learning 舊名於
+  hooks/、scripts/ 歸零
+- [ ] §3.1/§5.2 mutation 重跑（若 `learning` 落地為 user-invoked——即第二支 user-invoked，清 P3 掛帳）
+- [ ] gate 五步（機械→行為→verifier→進度/tag `gate-p5`→使用者確認）
+
 ## 偏離紀錄
 
 | 日期 | 偏離 | 理由 |
