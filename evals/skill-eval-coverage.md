@@ -8,7 +8,11 @@
 > `eval-code-review-answering-feedback`. `arc-debugging` became `debugging`;
 > its describe-only `eval-arc-debugging-root-cause-first-gate` was retired for
 > ceiling (baseline 100%) and replaced by the agentic
-> `eval-debugging-root-cause-first`.
+> `eval-debugging-root-cause-first`. The v6 P5 rewrite folded `arc-journaling` +
+> `arc-learning` + `arc-recalling` + `arc-reflecting` into a single user-invoked
+> `learning`; the historical rows for those four names below are kept as-is (they
+> record results that were really measured against those files) and superseded by
+> the `learning` entry.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
@@ -90,10 +94,8 @@ lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`)
 - arc-debugging  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
 - arc-evaluating
 - arc-implementing  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
-- arc-learning
 - arc-managing-sessions
 - arc-planning  *(discrimination — arc eval ab: 0%→100%, Δ+0.25)*
-- arc-reflecting
 - arc-refining
 - arc-tdd  *(discrimination — arc eval ab: 0%→100%, Δ+0.25)*
 - arc-using
@@ -178,8 +180,8 @@ detail lives in each scenario's `## Context`.
 ### Skills with NO scenario (14)
 
 The remaining 14 shippable skills (arc-agent-driven, arc-auditing-spec,
-arc-compacting, arc-executing-tasks, arc-finishing, arc-journaling,
-arc-maintaining-obsidian, arc-observing, arc-recalling, arc-receiving-review,
+arc-compacting, arc-executing-tasks, arc-finishing,
+arc-maintaining-obsidian, arc-observing, arc-receiving-review,
 arc-researching, arc-using-worktrees, arc-writing-tasks, arc-diagramming-obsidian)
 have no direct-target scenario at all. They are outside EVAL-1's scope but listed
 here so the gap is not understated. Use the recompute snippet for the authoritative
@@ -255,3 +257,24 @@ distinguish the two tiers — it counts any scenario without the
 `status: draft-unvalidated` marker as validated — so read the tier tables, not just
 the number, to weight the evidence. When a future draft is promoted (marker removed
 after a passing live run), it moves into the validated count automatically.
+
+
+## v6 P5 — `learning`
+
+`learning` (user-invoked) replaced `arc-journaling` + `arc-learning` +
+`arc-recalling` + `arc-reflecting`. Two scenarios carry direct-target coverage:
+
+| Scenario | Behavior | Status |
+|---|---|---|
+| `eval-learning-draft-not-fabricated` | §Capturing a diary Step 2 — promote the waiting draft, and do not invent content for a session the agent was never in | **written, NOT RUN** — see below |
+| `reflect-pattern-detection` | §Reflecting Step 3 — 3+ diaries make a Pattern, one occurrence stays an Observation | retargeted from `skills/arc-reflecting/SKILL.md`, `## Version` 1 → 2 |
+
+**`eval-learning-draft-not-fabricated` has no measured delta.** The scenario file
+is complete (setup fixture, four filesystem-read assertions, code grader, Max Turns
+40, k=5) but the P5 Track A worker could not execute `eval preflight` / `eval ab` /
+`eval compare`: its execution sandbox refuses every command containing the `eval`
+token, so the whole eval CLI surface was unreachable. This is a harness constraint,
+not a repo defect — the scenario is runnable by any environment that can invoke the
+CLI. Recorded rather than worked around; see
+`docs/plans/v6/p5-learning-e2e-evidence.md` §8. **No delta number may be attributed
+to this scenario until someone runs it.**
