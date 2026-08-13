@@ -382,3 +382,220 @@ active instinct、SessionStart 輸出），照原要求轉錄回本檔即完成 
 
 **在有人真的跑完之前，AC #1 仍為未驗證。** 本節證明的是「阻塞已解除」，
 不是「probe 已通過」。
+
+---
+
+## 10. 第一次執行的結果：兩個獨立缺陷，其一在引擎
+
+orchestrator 於主 session 執行 `bash tests/e2e/learning-probe.sh`：步 0–2 PASS，
+**步 3 FAIL**，`parse_status: "empty"`（合法 JSON、`proposals: []`）。
+
+orchestrator 的初判是「引擎無缺陷，是 fixture 訊號太弱」。**一手查證顯示這個
+判斷不完整**：fixture 確實有缺陷（§10.1），但另有一個**引擎接縫斷裂**
+（§10.2），後者是任何 fixture 都繞不過去的。
+
+### 10.1 缺陷一（腳本面，本次已修）：phase 參數沒傳
+
+`hooks/observe/main.js:422` —— **phase 取自 `process.argv[2]`，不是
+`hook_event_name`**：
+
+```js
+const phase = process.argv[2];              // 'pre' | 'post'
+const event = phase === 'pre' ? 'tool_start' : 'tool_end';
+...
+if (phase === 'pre')  { Object.assign(observation, buildObservedEvidence(...)); }
+if (phase === 'post') { observation.outcome = classifyOutcome(...); }
+```
+
+`hooks/hooks.json:60,85` 也印證：註冊的是 `main.js pre` 與 `main.js post` 兩條。
+
+原 fixture 呼叫 `node "${OBS_HOOK}"` **不帶任何 argv**，於是 `phase` 為
+`undefined`，兩個 `if` 都不成立——記錄既沒有 pre 的證據 patch，也沒有 post 的
+outcome。實際落盤內容（`evidence/02-observations.jsonl`）：
+
+```json
+{"schema_version":1,"ts":"...","event":"tool_end","tool":"Grep",
+ "session":"session-probe-session","project":"probe-app","project_id":"...",
+ "source":{"collector":"hooks/observe/main.js"}}
+```
+
+**已修**：fixture 改為每個工具呼叫依序送 `pre` 與 `post`，並改成四輪重複的
+工作流形狀（`npm test` 失敗 → Read → Edit → `npm test` 通過，跨 parser /
+validator / cache / webhook 四個模組）。步 2 另加兩條斷言，讓「記錄為空」
+不可能再靜默通過：
+
+```
+grep -q '"evidence_status":"present"'   → 否則 fail「檢查 phase 參數 (argv[2])」
+grep -q '"input":"npm test'             → 否則 fail「Bash 指令沒被捕捉」
+```
+
+### 10.2 缺陷二（引擎面，**未修，待裁決**）：observe → batch-assembler 欄位名不接
+
+hook 寫入的欄位名與 batch-assembler 讀取的欄位名**從來沒有對上**。
+
+| 層 | 位置 | 欄位 |
+|---|---|---|
+| 寫入 | `hooks/observe/main.js:241-252,262-270`（`buildObservedEvidence`） | `input`（Bash 指令）、`path`（Read/Edit 檔案）、`pattern`（Grep）、`operation_kind`、`evidence_status` |
+| 讀取 | `scripts/lib/learning-curator/batch-assembler.js:260-271` | `rec.input_summary`、`rec.path_summary`、`rec.pattern_summary` |
+| 渲染 | `batch-assembler.js:381-383` | 只印上面那三個 `*_summary`（外加 `skill`、`outcome`） |
+
+三個 `*_summary` 因此**恆為 `undefined`**。`operation_kind` 更微妙：
+`:311` 有把它掛到 item 上，但 `:381-383` 的 renderer 從不印它——掛了等於沒掛。
+
+**重現（一手，非推論）。** 用 `pre` 正確呼叫 hook、輸入一個真實 Bash 指令：
+
+落盤記錄（**帶著 `input`**）：
+
+```json
+{"ts":"2026-08-13T07:19:44.487Z","event":"tool_start","tool":"Bash",
+ "session":"session-s1","project":"proj",
+ "source":{"collector":"hooks/observe/main.js","phase":"pre"},
+ "evidence_status":"present","input":"npm test","operation_kind":"shell"}
+```
+
+同一筆記錄組出的 prompt evidence item（**`input` 消失**）：
+
+```
+**evidence_id**: ev_obs_0000_0ffe500e
+**evidence_type**: observation
+**ts**: 2026-08-13T07:19:44.487Z
+**tool**: Bash
+**event**: tool_start
+**session**: session-s1
+**project**: proj
+```
+
+curator 看得到「執行過 Bash」，看不到執行了**什麼**。
+
+### 10.3 影響範圍：不只 probe
+
+這不是測試環境問題。**任何啟用 learning 的真實使用者 session 都走同一條路**，
+所以 Layer 4 curator 一直是在「只有工具名、時間戳、outcome」的批次上做提案。
+步 3 的 `parse_status: "empty"` 因此應重新定性為：
+
+> **curator 面對空內容輸入時的正確行為**，而不是 fixture 太弱。
+
+Haiku 依 prompt 規則 5（證據弱→回空陣列）做了對的事。
+
+### 10.4 為何既有測試全綠卻沒抓到
+
+`tests/observer-daemon/run-tests.sh` 的 E2E-G3 斷言「分析後 queue.jsonl 至少
+一條候選」且長期通過——因為它用**樁掉的 `claude`**（`:396-454`）：樁會讀 batch
+manifest 取得真實的 `batch_hash` 與 `evidence_ids`，然後吐出一份**寫死的**
+`structured_output` 提案。樁從不依賴 evidence 的**內容**，所以 prompt 裡有沒有
+行為訊號，這條測試都會綠。
+
+接縫兩側的欄位名**從未一致過**（非改名回歸）：`git log -S` 顯示
+`batch-assembler.js` 的 `input_summary` 與 `main.js` 的 `input`/`operation_kind`
+都由同一個 commit `5f8c8b5`（v3.1.0 curator pivot）引入，且
+`git log -S "input_summary" -- hooks/observe/main.js` **無任何結果**——hook 端
+從來沒用過那個名字。這是接上去就沒接好的整合，不是後來改壞的。
+
+### 10.5 修法選項（orchestrator 已裁定 A 案，落地見 §10.7）
+
+兩個方向都只動一側，二選一即可：
+
+- **A. 對齊 assembler**：`:260-271` 改讀 `rec.input` / `rec.path` / `rec.pattern`。
+  改動最小，且不動已落盤的觀察資料格式。
+- **B. 對齊 hook**：`buildObservedEvidence` 改寫出 `*_summary` 名稱。會使既有
+  observations.jsonl 的舊記錄仍讀不到（歷史資料留在舊欄位名）。
+
+**兩個方向都還要補 renderer**：`:381-383` 需一併印 `operation_kind`，否則
+curator 仍分不出一筆 `path` 是 read 還是 edit——而「讀了再改」正是最有價值的
+workflow 訊號。
+
+修完應加一條**不用樁**的接縫測試（斷言 prompt 內含觀察的 input/path），否則
+下一次仍會以同樣方式靜默退化。
+
+### 10.6 本次 fixture 修正後的預期
+
+修掉 §10.1 後，curator 會看到工具序列與 outcome（`outcome` 是少數有被 renderer
+印出的欄位，`:385`），也就是
+`Bash(tool_start) → Bash(tool_end, success) → Read → Edit → Bash(success)` 這個
+形狀重複四輪。**這比原本 12 筆完全相同、連 outcome 都沒有的記錄強得多，步 3 有
+機會通過。** 但 §10.2 的 `input`/`path` 仍然到不了 curator，所以：
+
+- 若步 3 通過：候選會是基於工具序列的提案，不是基於指令或檔案內容。
+- 若步 3 仍回 `proposals: []`：那就是 §10.2 的直接後果，**不要再調 fixture**。
+
+無論哪種結果，§10.2 都是獨立於本 probe 的真實缺陷，值得單獨修。
+
+---
+
+## 11. §10.2 已修（A 案：assembler 對齊 hook 實際欄位名）
+
+orchestrator 裁定採 A 案——理由：B 案會讓既有磁碟記錄變成孤兒，A 案零遷移成本；
+redaction 不受影響（欄位在捕捉時已經過 `sanitize-observation` 處理，assembler
+讀哪個名字不改變資料本身）。判定為引擎缺陷修正，與 home-resolver 同類，
+P5 範圍內，不開新 D 編號。
+
+### 11.1 改了什麼
+
+`scripts/lib/learning-curator/batch-assembler.js` 兩處，都只動觀察記錄那一側：
+
+| 位置 | 原本 | 現在 |
+|---|---|---|
+| 讀取層 `:260-271` | `rec.input_summary` / `rec.path_summary` / `rec.pattern_summary` | `rec.input` / `rec.path` / `rec.pattern` |
+| 渲染層 `:381-386` | 未印 `operation_kind` | 補印 `**operation_kind**: <value>` |
+
+**刻意不改 item 端的欄位名**（`input_summary` / `path_summary` /
+`pattern_summary` 保留）。三個理由：(1) 它們描述的正是「經過 sanitize 的摘要」，
+名副其實；(2) 那是 prompt 實際渲染的標籤，改了會改變 curator 讀到的文字，
+等於偷偷變更 Layer 4 輸入；(3) **`pattern_summary` 是與 reflect 證據共用的**
+——`EVIDENCE_KIND_CONFIG.reflect.buildExtra`（`:170-174`）本來就正確填它，
+renderer 是四種證據型別共用的。把 item 端一併改名會**打壞 reflect 這條沒壞的路**。
+
+`git grep -n "_summary" -- scripts/ hooks/` 全掃結果：觀察記錄這一側的讀者
+**只有** batch-assembler 這一處。其餘命中皆為無關的同名欄位（`activate.js` 的
+`active_path_summary`、`materialize.js` 的 `target_path_summary`、eval dashboard
+的 `artifact_summary`、`schema.js` 的 `session_summary` 證據型別列舉等），逐一
+確認後不動。
+
+### 11.2 縫測試（不用樁）：`tests/scripts/curator-evidence-seam.test.js`
+
+8 tests，全綠。走**真實**路徑：以 `execFileSync` 呼叫
+`hooks/observe/main.js <phase>`（與 `hooks.json` 同形，phase 走 argv[2]、
+payload 走 stdin）產生記錄 → 真實 `assembleBatch()` 組批 → **對 prompt 原文**
+斷言。無任何 stub。
+
+上游半段確認 hook 真的寫了證據（`input` = 指令、`path` + `operation_kind`
+= read/edit）；下游半段確認它**活著抵達 prompt**：指令字串、檔案路徑、Grep
+pattern、三種 `operation_kind`、post 階段 outcome，以及一條把回歸形狀正面
+陳述的斷言——「Bash 證據項不得被縮減成只有名字與時間戳」。
+
+**mutation 驗證（兩次，皆確認會抓到）：**
+
+```
+mutation 1 — 讀取層改回 rec.*_summary
+  ✕ the prompt carries the Bash command, not just the tool name
+  ✕ the prompt carries the file path a Read/Edit touched
+  ✕ the prompt carries the Grep pattern
+  ✕ an observation evidence item is not reduced to name and timestamp
+  Tests: 4 failed, 4 passed
+
+mutation 2 — 刪掉 renderer 的 operation_kind 那行
+  ✕ the prompt distinguishes a read from an edit of the same file
+  Tests: 1 failed, 7 passed
+```
+
+還原後皆 8 passed。兩次 mutation 分別命中兩個改動點，證明這支測試不是靠沉默過關。
+
+### 11.3 E2E-G3 的綠色假象（記錄，stub 本身不動）
+
+`tests/observer-daemon/run-tests.sh:396-454` 的 E2E-G3 用**樁掉的 `claude`**：
+樁會讀 batch manifest 取真實 `batch_hash` / `evidence_ids`，再吐一份**寫死的**
+`structured_output` 提案。它從不依賴 evidence 的**內容**，所以 prompt 就算完全
+沒有行為訊號，該測試依然全綠——這正是這道縫從 `5f8c8b5` 一路活到 P5 的原因。
+
+**stub 不重寫**：它測的是 daemon 的協調行為（batch → claude → ingest → queue），
+那個目的用樁是對的。真正的縫現在由 §11.2 的非樁測試看守，兩者分工明確。
+
+### 11.4 對 probe 的影響
+
+修正後 curator 會看到指令字串、檔案路徑、Grep pattern 與 `operation_kind`，
+再加上 §10.1 fixture 修正帶來的四輪重複工作流形狀。步 3 的訊號從「只有工具名
+與時間戳」變成「完整的 test→read→edit→test 循環，含檔名與指令」。
+
+**這仍不是保證。** curator 是保守的（prompt 規則 5），提不提案由它判斷；
+但這次它至少有東西可讀。若步 3 再回 `proposals: []`，那是模型判斷而非管線
+缺陷——**屆時不要再調 fixture 或引擎，如實記錄即可**。
