@@ -2,9 +2,9 @@
  * instinct-feedback.js — instinct status view and confirm/contradict feedback.
  *
  * Canonical owner of the instinct-feedback half of the learning workflow, which
- * the `learn instinct` CLI subgroup exposes. Before v6/P5 this lived in
- * `skills/arc-learning/scripts/instinct.js` and reached back into
- * `scripts/lib/` — engine code sitting inside a skill directory (D1/D8).
+ * the `learn instinct` CLI subgroup exposes. Before v6/P5 this lived in a
+ * skill-local script that reached back into `scripts/lib/` — engine code sitting
+ * inside a skill directory (D1/D8).
  *
  * Data collection and rendering are separate so `--json` and the human view
  * come from one source: `collectInstinctStatus()` produces the facts,

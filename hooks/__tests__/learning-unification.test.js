@@ -70,37 +70,45 @@ describe('instinct-writer creates correct frontmatter', () => {
 });
 
 // ─────────────────────────────────────────────
-// 2. recall.js save delegates to instinct-writer
+// 2. `learn instinct save` delegates to instinct-writer
 // ─────────────────────────────────────────────
+//
+// Was "recall.js save delegates to instinct-writer". That skill-local script was
+// deleted in v6/P5; the manual-save path is now `learn instinct save` with the
+// default `--source manual`, so the same delegation is asserted through the CLI
+// handler that replaced it.
 
-describe('recall.js save delegates to instinct-writer', () => {
-  it('should export cmdSave function', () => {
-    const recall = require('../../skills/arc-recalling/scripts/recall');
-    assert.ok(typeof recall.cmdSave === 'function', 'cmdSave should be exported');
+describe('learn instinct save delegates to instinct-writer', () => {
+  const handlerPath = path.join(__dirname, '../../scripts/cli/learn-workflow-command.js');
+
+  it('routes the instinct group through instinct-writer', () => {
+    const source = fs.readFileSync(handlerPath, 'utf-8');
+    assert.ok(
+      source.includes('instinct-writer'),
+      'the learn workflow handler should reach saveInstinct through instinct-writer',
+    );
   });
 
-  it('should import saveInstinct from instinct-writer', () => {
-    // Read the source to verify it uses instinct-writer with source: manual
-    const recallSource = fs.readFileSync(
-      path.join(__dirname, '../../skills/arc-recalling/scripts/recall.js'),
-      'utf-8',
-    );
+  it("defaults --source to 'manual' so an unqualified save keeps the manual cap", () => {
+    const source = fs.readFileSync(handlerPath, 'utf-8');
     assert.ok(
-      recallSource.includes("source: 'manual'"),
-      'recall.js should pass source: manual to saveInstinct',
+      source.includes("args.options.source || 'manual'"),
+      "the handler should default source to 'manual'",
     );
-    assert.ok(
-      recallSource.includes('instinct-writer'),
-      'recall.js should import from instinct-writer',
-    );
+  });
+
+  it('exposes the instinct group on the learn command', () => {
+    const { WORKFLOW_GROUPS } = require('../../scripts/cli/learn-workflow-command');
+    assert.ok(WORKFLOW_GROUPS.has('instinct'), 'instinct should be a learn workflow group');
+    assert.ok(WORKFLOW_GROUPS.has('recall'), 'recall should be a learn workflow group');
   });
 });
 
 // ─────────────────────────────────────────────
-// 3. reflect.js save-instinct uses 0.85 cap
+// 3. reflection-sourced instincts use the 0.85 cap
 // ─────────────────────────────────────────────
 
-describe('reflect.js save-instinct uses 0.85 cap', () => {
+describe('reflection-sourced instincts use the 0.85 cap', () => {
   it('should export REFLECT_MAX_CONFIDENCE as 0.85', () => {
     const { REFLECT_MAX_CONFIDENCE } = require('../../scripts/lib/confidence');
     assert.strictEqual(REFLECT_MAX_CONFIDENCE, 0.85, 'REFLECT_MAX_CONFIDENCE should be 0.85');

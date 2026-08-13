@@ -9,7 +9,6 @@
  */
 
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
 const {
   readStdinSync,
   parseStdinJson,
@@ -28,6 +27,7 @@ const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { parseTranscript } = require('../../scripts/lib/transcript');
+const { checkReflectReady: reflectReady } = require('../../scripts/lib/learning-workflow');
 
 /**
  * Calculate duration in minutes between two ISO timestamps
@@ -70,18 +70,17 @@ function saveSessionJson(session) {
 
 /**
  * Check if reflection is ready.
+ *
+ * Reads the canonical engine directly (hooks → scripts/lib is the legal
+ * direction). This used to shell out to a script that lived inside a skill
+ * directory, which was the last D8 reverse reference — the engine reaching back
+ * into a skill, which made that skill undeletable.
+ *
  * Returns { ready, strategy, count } or null on failure.
  */
 function checkReflectReady(project) {
   try {
-    const reflectPath = path.join(__dirname, '../../skills/arc-reflecting/scripts/reflect.js');
-    const result = execFileSync('node', [reflectPath, 'auto-check', '--project', project], {
-      encoding: 'utf-8',
-      timeout: 5000,
-    }).trim();
-
-    const [status, strategy, count] = result.split('|');
-    return { ready: status === 'ready', strategy, count: parseInt(count, 10) || 0 };
+    return reflectReady(project);
   } catch {
     return null;
   }
