@@ -491,7 +491,7 @@ manifest 取得真實的 `batch_hash` 與 `evidence_ids`，然後吐出一份**�
 `git log -S "input_summary" -- hooks/observe/main.js` **無任何結果**——hook 端
 從來沒用過那個名字。這是接上去就沒接好的整合，不是後來改壞的。
 
-### 10.5 修法選項（不代為裁決）
+### 10.5 修法選項（orchestrator 已裁定 A 案，落地見 §10.7）
 
 兩個方向都只動一側，二選一即可：
 
@@ -519,3 +519,83 @@ workflow 訊號。
 - 若步 3 仍回 `proposals: []`：那就是 §10.2 的直接後果，**不要再調 fixture**。
 
 無論哪種結果，§10.2 都是獨立於本 probe 的真實缺陷，值得單獨修。
+
+---
+
+## 11. §10.2 已修（A 案：assembler 對齊 hook 實際欄位名）
+
+orchestrator 裁定採 A 案——理由：B 案會讓既有磁碟記錄變成孤兒，A 案零遷移成本；
+redaction 不受影響（欄位在捕捉時已經過 `sanitize-observation` 處理，assembler
+讀哪個名字不改變資料本身）。判定為引擎缺陷修正，與 home-resolver 同類，
+P5 範圍內，不開新 D 編號。
+
+### 11.1 改了什麼
+
+`scripts/lib/learning-curator/batch-assembler.js` 兩處，都只動觀察記錄那一側：
+
+| 位置 | 原本 | 現在 |
+|---|---|---|
+| 讀取層 `:260-271` | `rec.input_summary` / `rec.path_summary` / `rec.pattern_summary` | `rec.input` / `rec.path` / `rec.pattern` |
+| 渲染層 `:381-386` | 未印 `operation_kind` | 補印 `**operation_kind**: <value>` |
+
+**刻意不改 item 端的欄位名**（`input_summary` / `path_summary` /
+`pattern_summary` 保留）。三個理由：(1) 它們描述的正是「經過 sanitize 的摘要」，
+名副其實；(2) 那是 prompt 實際渲染的標籤，改了會改變 curator 讀到的文字，
+等於偷偷變更 Layer 4 輸入；(3) **`pattern_summary` 是與 reflect 證據共用的**
+——`EVIDENCE_KIND_CONFIG.reflect.buildExtra`（`:170-174`）本來就正確填它，
+renderer 是四種證據型別共用的。把 item 端一併改名會**打壞 reflect 這條沒壞的路**。
+
+`git grep -n "_summary" -- scripts/ hooks/` 全掃結果：觀察記錄這一側的讀者
+**只有** batch-assembler 這一處。其餘命中皆為無關的同名欄位（`activate.js` 的
+`active_path_summary`、`materialize.js` 的 `target_path_summary`、eval dashboard
+的 `artifact_summary`、`schema.js` 的 `session_summary` 證據型別列舉等），逐一
+確認後不動。
+
+### 11.2 縫測試（不用樁）：`tests/scripts/curator-evidence-seam.test.js`
+
+8 tests，全綠。走**真實**路徑：以 `execFileSync` 呼叫
+`hooks/observe/main.js <phase>`（與 `hooks.json` 同形，phase 走 argv[2]、
+payload 走 stdin）產生記錄 → 真實 `assembleBatch()` 組批 → **對 prompt 原文**
+斷言。無任何 stub。
+
+上游半段確認 hook 真的寫了證據（`input` = 指令、`path` + `operation_kind`
+= read/edit）；下游半段確認它**活著抵達 prompt**：指令字串、檔案路徑、Grep
+pattern、三種 `operation_kind`、post 階段 outcome，以及一條把回歸形狀正面
+陳述的斷言——「Bash 證據項不得被縮減成只有名字與時間戳」。
+
+**mutation 驗證（兩次，皆確認會抓到）：**
+
+```
+mutation 1 — 讀取層改回 rec.*_summary
+  ✕ the prompt carries the Bash command, not just the tool name
+  ✕ the prompt carries the file path a Read/Edit touched
+  ✕ the prompt carries the Grep pattern
+  ✕ an observation evidence item is not reduced to name and timestamp
+  Tests: 4 failed, 4 passed
+
+mutation 2 — 刪掉 renderer 的 operation_kind 那行
+  ✕ the prompt distinguishes a read from an edit of the same file
+  Tests: 1 failed, 7 passed
+```
+
+還原後皆 8 passed。兩次 mutation 分別命中兩個改動點，證明這支測試不是靠沉默過關。
+
+### 11.3 E2E-G3 的綠色假象（記錄，stub 本身不動）
+
+`tests/observer-daemon/run-tests.sh:396-454` 的 E2E-G3 用**樁掉的 `claude`**：
+樁會讀 batch manifest 取真實 `batch_hash` / `evidence_ids`，再吐一份**寫死的**
+`structured_output` 提案。它從不依賴 evidence 的**內容**，所以 prompt 就算完全
+沒有行為訊號，該測試依然全綠——這正是這道縫從 `5f8c8b5` 一路活到 P5 的原因。
+
+**stub 不重寫**：它測的是 daemon 的協調行為（batch → claude → ingest → queue），
+那個目的用樁是對的。真正的縫現在由 §11.2 的非樁測試看守，兩者分工明確。
+
+### 11.4 對 probe 的影響
+
+修正後 curator 會看到指令字串、檔案路徑、Grep pattern 與 `operation_kind`，
+再加上 §10.1 fixture 修正帶來的四輪重複工作流形狀。步 3 的訊號從「只有工具名
+與時間戳」變成「完整的 test→read→edit→test 循環，含檔名與指令」。
+
+**這仍不是保證。** curator 是保守的（prompt 規則 5），提不提案由它判斷；
+但這次它至少有東西可讀。若步 3 再回 `proposals: []`，那是模型判斷而非管線
+缺陷——**屆時不要再調 fixture 或引擎，如實記錄即可**。

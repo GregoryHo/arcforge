@@ -256,19 +256,26 @@ function buildEvidenceItems(records, projectName, projectId) {
   for (let i = 0; i < candidates.length; i++) {
     const rec = candidates[i];
 
-    // Build sanitized summary fields
+    // Build sanitized summary fields from the names the observe hook actually
+    // writes. `buildObservedEvidence` (hooks/observe/main.js) emits `input`
+    // (Bash command), `path` (Read/Edit/Write file) and `pattern` (Grep/Glob) —
+    // it has never written `*_summary`. Reading the `*_summary` names here left
+    // all three permanently undefined, so every batch reached the curator with
+    // tool names and timestamps only and Layer 4 had nothing to reason about.
+    // Fixed in v6/P5; `tests/scripts/curator-evidence-seam.test.js` is the lock.
+    //
+    // The ITEM-side names below stay `*_summary` on purpose: they describe what
+    // the value is (a sanitized summary), they are what the prompt renders, and
+    // `pattern_summary` is shared with reflect evidence, which populates it
+    // through EVIDENCE_KIND_CONFIG.
     const inputSummary =
-      typeof rec.input_summary === 'string'
-        ? sanitizeObservationPayload(rec.input_summary, MAX_CHARS_PER_ITEM)
+      typeof rec.input === 'string'
+        ? sanitizeObservationPayload(rec.input, MAX_CHARS_PER_ITEM)
         : undefined;
     const pathSummary =
-      typeof rec.path_summary === 'string'
-        ? sanitizeObservationPayload(rec.path_summary, 300)
-        : undefined;
+      typeof rec.path === 'string' ? sanitizeObservationPayload(rec.path, 300) : undefined;
     const patternSummary =
-      typeof rec.pattern_summary === 'string'
-        ? sanitizeObservationPayload(rec.pattern_summary, 300)
-        : undefined;
+      typeof rec.pattern === 'string' ? sanitizeObservationPayload(rec.pattern, 300) : undefined;
 
     // Char budget check
     const itemChars =
@@ -381,6 +388,10 @@ function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryIte
       if (item.input_summary) lines.push(`**input_summary**: ${item.input_summary}`);
       if (item.path_summary) lines.push(`**path_summary**: ${item.path_summary}`);
       if (item.pattern_summary) lines.push(`**pattern_summary**: ${item.pattern_summary}`);
+      // operation_kind distinguishes a read from an edit on the same path — the
+      // single most useful workflow signal in the batch. It was attached to the
+      // item but never rendered, so the curator could not tell them apart.
+      if (item.operation_kind) lines.push(`**operation_kind**: ${item.operation_kind}`);
       if (item.skill) lines.push(`**skill**: ${item.skill}`);
       if (item.outcome) lines.push(`**outcome**: ${item.outcome}`);
       return lines.join('\n');
