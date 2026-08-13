@@ -103,7 +103,11 @@ function loadAutoInstincts(project) {
     lines.push(`- **${inst.id}** (${pctStr}%): ${inst.trigger || inst.action || ''}`);
   }
 
-  lines.push('\nInvoke /arcforge:arc-learning to confirm/contradict these patterns.');
+  // `learning` is user-invoked, so this tells the user what is available rather
+  // than instructing the model to reach for the skill itself.
+  lines.push(
+    '\nTo confirm or contradict a pattern, tell the user they can run /arcforge:learning.',
+  );
 
   return { text: lines.join('\n'), count: top.length };
 }
@@ -196,7 +200,9 @@ function loadPendingActions(project) {
     const otherActions = actions.filter((a) => !DEDICATED_TYPES.includes(a.type));
 
     if (diaryActions.length > 0) {
-      lines.push('**📝 Diary draft ready — use /arcforge:arc-journaling to review and finalize.**');
+      lines.push(
+        '**📝 Diary draft ready.** Tell the user they can run /arcforge:learning to review and finalize it.',
+      );
       summaryParts.push('diary draft ready');
     }
 
@@ -204,7 +210,7 @@ function loadPendingActions(project) {
       const latest = reflectActions[reflectActions.length - 1];
       const count = latest.payload?.count || reflectActions.length;
       lines.push(
-        `**${count} unprocessed diaries ready for reflection.** Run /arcforge:arc-reflecting to analyze patterns.`,
+        `**${count} unprocessed diaries ready for reflection.** Tell the user they can run /arcforge:learning to analyze patterns.`,
       );
       summaryParts.push(`${count} diaries pending reflection`);
     }

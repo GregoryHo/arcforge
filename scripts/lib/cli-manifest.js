@@ -92,8 +92,37 @@ const CLI_MANIFEST = {
   },
 
   // Reads global ~/.arcforge learning state → not deterministic here.
+  //
+  // Two flag families share this command. The lifecycle subcommands take
+  // `--project`/`--global` as bare SCOPE selectors; the diary/reflect/instinct/
+  // recall workflow subgroups take `--project <name>` as a VALUE. The two
+  // subcommand sets are disjoint, so the overload never has to be disambiguated.
   learn: {
-    flags: ['--project', '--global', '--json', '--port'],
+    flags: [
+      '--project',
+      '--global',
+      '--json',
+      '--port',
+      // diary
+      '--date',
+      '--session',
+      '--content',
+      '--draft',
+      // reflect
+      '--diaries',
+      '--reflection',
+      '--summary',
+      // instinct
+      '--trigger',
+      '--action',
+      '--domain',
+      '--evidence',
+      '--evidence-count',
+      '--source',
+      // recall
+      '--query',
+      '--instinct-ids',
+    ],
     output: null,
   },
 

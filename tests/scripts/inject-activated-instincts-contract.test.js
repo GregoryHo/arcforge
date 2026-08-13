@@ -102,8 +102,8 @@ describe('ICL-4 content contract: materialize → activate → loadInstinctFiles
     expect(typeof match.confidence).toBe('number');
     expect(Number.isFinite(match.confidence)).toBe(true);
 
-    // 3c. instinct.js status reader must list it (visibility contract).
-    const instinctCli = require('../../skills/arc-learning/scripts/instinct');
+    // 3c. the instinct status reader must list it (visibility contract).
+    const instinctCli = require('../../scripts/lib/instinct-feedback');
     const statusLoaded = instinctCli.loadInstincts(dir);
     const statusMatch = statusLoaded.find((i) => i.id === candidate.candidate_id);
     expect(statusMatch).toBeDefined();

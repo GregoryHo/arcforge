@@ -63,14 +63,24 @@ const PATH_SHAPE_RE = /(?<![\w-])(?<!\.claude\/)skills\/([a-z0-9][a-z0-9-]*)(?![
 // shape above. A variable segment (…, 'skills', name) is generic and not matched.
 const SEGMENT_SHAPE_RE = /['"]skills['"]\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"]/g;
 
-// file + skill → number of references. Empty by the P5 gate.
+// file + skill → number of references. EMPTY as of the P5 gate.
 //
 // P2 burned every `scripts/**` entry down to zero by relocating the files the
 // engine was reaching for: observer-daemon.sh + observer-prompt.md →
 // scripts/lib/learning-curator/, auto-diary.js → scripts/lib/, the three eval
 // agent prompts → scripts/lib/prompts/, the eval dashboard →
-// scripts/lib/eval-dashboard/. What survives is `hooks/**` only.
-const ALLOWLIST = [{ file: 'hooks/session-tracker/end.js', skill: 'arc-reflecting', count: 1 }];
+// scripts/lib/eval-dashboard/. What survived was `hooks/**` only.
+//
+// P5 burned the last entry: hooks/session-tracker/end.js used to shell out to
+// `skills/arc-reflecting/scripts/reflect.js auto-check`. That logic moved into
+// scripts/lib/learning-workflow.js (`checkReflectReady`) and the hook now
+// requires the canonical engine directly, which is the legal direction.
+//
+// THE LIST IS NOW CLOSED. It may never grow again: an addition is a maintainer
+// decision about the D8 boundary, not a test edit. Both the constant and the
+// live scan are asserted empty below, so neither a new coupling nor a
+// re-introduced allowlist entry can pass.
+const ALLOWLIST = [];
 
 function isExcluded(name) {
   return name.startsWith('.') || name === 'node_modules' || name === '__tests__';
@@ -157,12 +167,21 @@ describe('D8 engine/skill boundary', () => {
     expect(hits.length).toBe(ALLOWLIST.reduce((n, e) => n + e.count, 0));
   });
 
-  it('is empty by the P5 gate (tracking assertion)', () => {
-    // Not yet enforceable — P5 flips this to expect(ALLOWLIST).toEqual([]).
-    // Until then it pins the direction: the list must only shrink. Ratcheted
-    // 7 → 1 in P2; every remaining entry lives under hooks/.
-    expect(ALLOWLIST.length).toBeLessThanOrEqual(1);
-    expect(ALLOWLIST.every((e) => e.file.startsWith('hooks/'))).toBe(true);
+  it('has an empty allowlist — the P5 gate assertion', () => {
+    // The formal machine proof that D8 landed: the engine holds ZERO references
+    // to a concrete skill directory. Ratcheted 7 → 1 in P2 → 0 in P5.
+    //
+    // This asserts the CONSTANT, not just the scan result. The scan assertion
+    // above compares against ALLOWLIST, so it would keep passing if someone
+    // re-added a coupling together with its allowlist entry. Pinning the
+    // constant closes that door: no entry can be added without turning this red.
+    expect(ALLOWLIST).toEqual([]);
+  });
+
+  it('finds no reverse reference anywhere in the engine surface', () => {
+    // Stated independently of ALLOWLIST so the zero is readable on its own.
+    expect(entries).toEqual([]);
+    expect(hits).toEqual([]);
   });
 });
 

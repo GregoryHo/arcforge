@@ -87,6 +87,36 @@ COMMANDS:
                                      (default port: 3334). User-friendly alternative to the
                                      inbox/inspect/accept/activate CLI flow.
 
+  The workflow subgroups below take the entity id POSITIONALLY; everything else
+  is a flag. --project defaults to the current project directory name, --date to
+  today, and --session to $CLAUDE_SESSION_ID.
+
+  learn diary path [--draft] [--project P] [--date D] [--session S]
+                                     Print the diary path (or its draft path) for that session.
+  learn diary save --content "..." [--project P] [--date D] [--session S]
+                                     Write a diary entry.
+  learn diary finalize [--project P] [--date D] [--session S]
+                                     Promote an auto-generated draft to the final diary (rename,
+                                     not a merge — edit the draft first).
+  learn reflect scan [--project P] [--json]
+                                     Pick the reflection strategy and list the diaries it covers.
+  learn reflect record <reflect-id> [--diaries "a,b"] [--reflection FILE] [--summary "..."]
+                                     Mark those diaries processed AND write the curator's
+                                     reflection evidence record. Id must start with 'reflect-'.
+  learn instinct status [--project P] [--json]
+                                     Show instincts with confidence bars, grouped by domain.
+  learn instinct check <id> [--project P]
+                                     Report whether that instinct id already exists.
+  learn instinct save <id> --trigger "..." --action "..." [--source manual|reflection]
+                       [--domain D] [--evidence "..."] [--evidence-count N]
+                                     Write an instinct. --source selects the confidence cap.
+  learn instinct confirm|contradict <id> [--project P] [--json]
+                                     Record agreement/disagreement with a detected pattern;
+                                     a contradiction below the archive threshold archives it.
+  learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
+                                     Write the curator's evidence record for a manual recall.
+                                     Id must start with 'recall-'.
+
   obsidian register --path <p> --name <n> [--default] [--preset <p>] [--scope "..."]
                           [--search-preferred filesystem|qmd|obsidian-cli] [--qmd-collection <name>]
                                      Add a vault to the registry at ~/.arcforge/obsidian-vaults.json.
