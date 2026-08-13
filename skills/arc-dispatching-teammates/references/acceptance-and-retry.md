@@ -8,7 +8,7 @@ logic; everything procedural and example-heavy lives here.
 A naive lead will implicitly accept on the teammate's completion message
 by mapping test names to acceptance criteria ("the test is named 'handles
 per-collection breakdown' → AC covered → pass"), deferring any genuine
-"is this right?" check to a single aggregate `arc-verifying` after the
+"is this right?" check to a single aggregate verification pass after the
 whole dispatch. This fails in **three** ways:
 
 1. **Inline checks encode the lead's prior context as bias.** The lead
@@ -19,7 +19,7 @@ whole dispatch. This fails in **three** ways:
    `"returns originalQuery, expansion, preRerank, postRerank"` meant
    the code actually returns those fields. It did not verify by
    reading the code.
-2. **Aggregate `arc-verifying` only catches what tests cover.** If the
+2. **Aggregate verification only catches what tests cover.** If the
    teammate's own tests were incomplete (e.g., forgot to test a
    required acceptance criterion), both the teammate's own verify AND
    the aggregate verify will pass while the epic silently fails the
@@ -256,7 +256,7 @@ cycle which is more expensive.
 
 ## Fresh-eyes verification — why it's not redundant
 
-The teammate ran `arc-verifying` / project tests in their own context
+The teammate ran the project tests in their own context
 and reported green. The lead runs the same command in a fresh context.
 Why is this valuable?
 

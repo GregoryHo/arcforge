@@ -59,7 +59,7 @@ Cleanup performed:
 Next actions you may consider:
   - Inspect dev branch HEAD: git log --oneline <branch-name>
   - Promote successful work: merge/cherry-pick to main
-  - Debug the failed epic: /arc-debugging on epic-history
+  - Debug the failed epic: /debugging on epic-history
   - Discard the session: git branch -D <branch-name>
 ```
 

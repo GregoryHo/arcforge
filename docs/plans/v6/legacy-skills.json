@@ -3,8 +3,6 @@
   "legacy": [
     "arc-agent-driven",
     "arc-brainstorming",
-    "arc-compacting",
-    "arc-debugging",
     "arc-diagramming-obsidian",
     "arc-dispatching-parallel",
     "arc-dispatching-teammates",
@@ -14,13 +12,10 @@
     "arc-learning",
     "arc-looping",
     "arc-maintaining-obsidian",
-    "arc-managing-sessions",
     "arc-recalling",
     "arc-reflecting",
-    "arc-reviewing",
     "arc-using-worktrees",
     "arc-using",
-    "arc-verifying",
     "arc-writing-tasks"
   ]
 }

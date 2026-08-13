@@ -145,7 +145,7 @@ Both reuse the same `.arcforge-loop.json`; the difference is whether prior histo
 
 Hand off in order:
 
-1. **arc-verifying** — confirm all requirements are met and tests pass across the completed work.
+1. **`/code-review`** — confirm all requirements are met and tests pass across the completed work.
 2. **arc-finishing** — the single finishing handoff; there is no separate epic-finishing skill.
 
 ## Red Flags
@@ -164,5 +164,5 @@ log (commits landing?).
 ## Integration
 
 - **Before:** arc-writing-tasks creates the task list the loop executes.
-- **Works with:** arc-evaluating (evals between iterations). arc-compacting is not needed — each iteration is a fresh session.
-- **After:** arc-verifying, then arc-finishing (see After the Loop).
+- **Works with:** arc-evaluating (evals between iterations). compaction is not needed — each iteration is a fresh session.
+- **After:** `/code-review`, then arc-finishing (see After the Loop).

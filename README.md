@@ -59,7 +59,7 @@ Check that commands appear:
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
-Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
+Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
 
 ## Quick Start: Common Commands
 
@@ -86,7 +86,7 @@ These are the most frequently used commands:
 | Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
 | Large multi-epic initiative | using-worktrees, dispatching-teammates | `arc-dispatching-teammates` |
 | Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
-| Bug or regression | debugging, tdd, verifying | `arc-debugging` |
+| Bug or regression | debugging, tdd, verifying | `/debugging` |
 | End of session | journaling | `arc-journaling` |
 
 **Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
@@ -122,9 +122,8 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 ### Discipline (quality gates)
 
 - **tdd** - Test-first implementation (RED → GREEN → REFACTOR)
-- **arc-debugging** - Systematic root-cause investigation before any fix
-- **arc-verifying** - Fresh evidence before completion claims
-- **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
+- **debugging** - Systematic root-cause investigation before any fix
+- **code-review** - Two-axis review of a finished change, then answering the feedback on evidence
 
 ### Memory (session continuity + learning; default-off module)
 
@@ -132,8 +131,8 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 - **arc-reflecting** - Analyze accumulated diaries for patterns and preferences
 - **arc-learning** - Opt-in observe → curate → review → activate instinct lifecycle
 - **arc-recalling** _(user-invoked)_ - Manually save a session pattern as a reusable instinct
-- **arc-managing-sessions** - Hand off, save, or resume session state across turns
-- **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
+- **sessions** - Write a handover when work stops mid-task, and read one when it restarts
+- **compacting** - Decide when to compact, and what has to reach disk before it
 
 The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
 
