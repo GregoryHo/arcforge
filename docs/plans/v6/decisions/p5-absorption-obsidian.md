@@ -209,3 +209,81 @@ diagramming）。C1 先落地時 `/diagramming-obsidian` 還不存在，pytest
 全綠**，C1 內 5 處委派先以人話指稱（「the Excalidraw diagramming skill」），由 C2
 的同一個 commit 升級為 `/diagramming-obsidian`——即「打破引用的 commit 負責修
 引用」。兩支各自仍是一個 commit，刪除與 json 剪條目仍然成對。
+
+## D. Eval — instrument notes and fixture disclosures (Track C)
+
+Recorded here because the scenario files are **hash-locked** by the preflight gate
+(`checkPreflightGate` hashes the file; editing it invalidates the PASS), so these
+belong in a document rather than in the scenarios' own Design Notes until P7
+rebuilds the corpus.
+
+### D1. Preflight grader errors are transient, and cost one re-run
+
+The first `preflight` on `eval-maintaining-obsidian-vault-only-answer` returned
+**BLOCK — but not for ceiling**: `1/3 preflight trials errored (infraError or
+gradeError) — no discriminability signal`. Trial 3's transcript is complete and
+substantive; only its grading file is missing, so the failure is grader-side.
+
+Size-dependence was checked and ruled out before re-running: trial-1 (5,661 B,
+graded fine) and trial-3 (5,711 B, errored) are within 1% of each other. A
+comparable delayed-grading case on the diagramming scenario resolved itself —
+`trial-2.json` appeared several minutes after `trial-2.txt`, so a missing grading
+file is not immediately an error.
+
+Handling follows the P5 rule (**error trials do not count; re-run when fewer than
+the intended number are valid**): the preflight was re-run once on an unmodified
+scenario file, so the hash is unchanged. **Standing rule for this track:** if the
+grader error reproduces on the re-run, stop — do not re-run a third time. Record
+the scenario as blocked-by-instrument with the valid trials' numbers, which is a
+legitimate outcome under the pre-registered threshold and honest about what was
+measured.
+
+### D2. Both scenarios discriminate — baseline fails with the intended failure mode
+
+Preflight is baseline-only, so these are no-skill numbers:
+
+| Scenario | Valid baseline trials | Passed | Scores |
+|---|---|---|---|
+| `eval-maintaining-obsidian-vault-only-answer` | 2 (1 grader error) | 0 | 0.75, 0.50 |
+| `eval-diagramming-obsidian-unverified-save-claim` | 2 of 3 at time of writing | 0 | 0.75, 0.75 |
+
+The failures are the designed ones, not incidental. Baseline trial 2 of the
+maintaining scenario produced a fully-formed general-knowledge alerting
+recommendation — *"Page on-call when checkout 5xx exceeds baseline for 2 minutes
+straight. Route to a pager, not to email"*, with a 2-minute sustained window and a
+synthetic-probe architecture, none of which appears anywhere in the vault. It even
+labelled the thresholds as its own proposal and delivered them anyway. That is
+exactly the leak A1 exists to catch, and it confirms the scenario is not at
+ceiling.
+
+### D3. `[tool_not_called] Write:.excalidraw.md` — verified live, with a caveat
+
+The risk with this assertion is that a baseline which fabricates the file through
+a **Bash heredoc** rather than the `Write` tool scores 1 while fabricating, which
+would silently understate the delta. Checked against baseline trial 1: the write
+went through `[Tool: Write]` on
+`vault/Diagrams/Checkout-Flow.excalidraw.md`, so the assertion does fire on the
+fabrication path.
+
+**This is verified for one trial only.** Whoever reports the diagramming delta must
+grep every baseline transcript for `excalidraw.md` and record the `Write` vs `Bash`
+split; any baseline trial that heredoc'd the file scored 1 on the sharpest
+assertion while doing the thing the scenario is about, and the headline number is
+understated by that much. Report the split, not just the delta.
+
+### D4. Fixture defects and ungraded behaviors — disclosed, not fixed
+
+Both are visible in the transcripts and a fresh reviewer will find them. Neither
+touches the graded assertions; both are hash-locked and belong to P7 cleanup.
+
+- **Maintaining fixture carries an internal inconsistency.**
+  `Incident-2026-03-Checkout.md` says "502 for **41** minutes" in prose while its
+  own timeline (14:02 → 14:41) and Analysis section say **39**. Two of three
+  baseline trials spent effort reconciling it, and one earned a "caught the
+  inconsistency" quality credit for it. It hands both arms a free signal that has
+  nothing to do with the vault-only claim under test.
+- **Both baselines mutate the vault unprompted.** The diagramming baseline edited
+  `vault/index.md` to add a wikilink nobody asked for; the maintaining baseline
+  offered to write a `decision` note. The scenarios surface this but do not grade
+  it — worth a graded assertion when the corpus is rebuilt, since "propose, never
+  auto-modify" is a real invariant in both skills.
