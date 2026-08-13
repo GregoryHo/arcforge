@@ -684,3 +684,92 @@ prompt 措辭對 LLM 的效果**無法用單元測試證明**。已確認的是�
 **真正的驗證是第三次 probe。** 若步 3 仍因 `evidence_ref_missing` 被退，下一步
 應該是換方向而不是繼續加措辭——例如在 batch 內把 id 縮短到不易截短的形狀
 （那會動到 `batch-assembler` 的 id 生成，屬另一次裁決）。
+
+---
+
+## 13. 第三跑 + prompt↔validator 契約稽核
+
+三跑結果：**id 硬化生效**——`evidence_ref_missing` 歸零，Haiku 這次 id 全對。
+新退件：
+
+```
+{"code":"too_many_evidence_refs","field_path":"evidence",
+ "detail":"evidence must have at most 5 entries (got 11)"}
+proposal: test-driven-module-verification-cycle
+```
+
+prompt 只寫了「Minimum 2 evidence refs」，**從未告訴模型 validator 強制的上限
+5**。這是同一類缺陷的第三例，所以這輪不再逐發修補，改做**全面契約稽核**。
+
+### 13.1 稽核方法
+
+枚舉 ingest 驗證鏈強制的每一條約束，來源三處：
+
+- `schema.js` `validateCandidateV1()`（欄位長度、enum、refs 數量、必填）
+- `proposal-ingestor.js` 的三道 batch 交叉檢查（`:445-504`）
+- `buildCandidateRecord()`（`:112-172`）——**用來區分哪些欄位是 LLM 寫的、
+  哪些是 Layer 5 自己填的**。後者不必寫進 prompt，寫了反而誤導模型去猜。
+
+只有「**LLM 作者欄位 × validator 會擋**」的交集才算契約缺口。
+
+### 13.2 對照表
+
+| # | 約束 | validator 位置 | 誰寫 | prompt 原本有講？ | 處置 |
+|---|---|---|---|---|---|
+| 1 | `evidence_refs` **2–5 條** | `schema.js:312-324` | LLM | ❌ **只寫了 min 2** | ✅ 規則 2 改寫為 2–5，明說超過直接退、不截斷，並教「引用最強的五條、其餘寫進 rationale」 |
+| 2 | `evidence_type` 須與 batch 實際型別相符 | `ingestor:485-504` | LLM | ❌ 無 | ✅ 新規則 3（型別就印在 item 的 `**evidence_type**` 行，照抄即可） |
+| 3 | 不得引用 `evidence_status != present` 的項目 | `ingestor:464-483` | LLM | ❌ 無，**且 batch 根本沒印 status** | ✅ 新規則 4 **＋ renderer 補印**（見 13.3） |
+| 4 | `evidence_refs[].relevance` 必填非空 | `schema.js:341-343` | LLM | ⚠️ 範例有欄位但沒說必填 | ✅ 新規則 5 + 範例註記改為 `<required, non-empty: …>` |
+| 5 | `name` ≤ 120 字元 | `schema.js:57,274-280` | LLM | ❌ 無 | ✅ 規則 12 + 範例註記 `max 120 chars` |
+| 6 | `trigger` ≤ 600（選填） | `schema.js:61,284-289` | LLM | ❌ **欄位連範例都沒有** | ✅ 規則 12 + 範例新增該鍵並標「選填、不用就省略」 |
+| 7 | `summary` ≤600 / `rationale` ≤2000 / `body` ≤6000 | `schema.js:58-62` | LLM | ✅ 範例已註明 | 併入規則 12 集中重述（超過是退件不是截斷） |
+| 8 | `domain` 七選一 | `schema.js:28-36,300-304` | LLM | ⚠️ 只在範例的 union 型別出現 | ✅ 升為規則 11 明列 |
+| 9 | `proposed_scope.project_id` 必填非空 | `schema.js:240-246` | LLM | ⚠️ 範例寫 `<project_id from evidence items>` | ✅ 併入規則 10 明說必須非空 |
+| 10 | `scope.kind` = project | `schema.js:214-220` | LLM | ✅ 規則 7（現 10） | 保留 |
+| 11 | `body_source` = `llm_curator` | `schema.js:293-297` | LLM | ✅ 規則 6（現 9） | 保留 |
+| 12 | `artifact_type` 本輪限 `instinct` | `schema.js:196-204` + 政策 | LLM | ✅ Policy Constraints + 規則 | 保留 |
+| 13 | `evidence_id` 須存在於 batch | `ingestor:445-461` | LLM | ✅ §12 已硬化 | 保留 |
+| 14 | `evidence_quality` ∈ high/medium/low | `schema.js:351-358` | **Layer 5** | — | **不寫進 prompt**：由 `computeEvidenceQuality()` 算（`ingestor:142`），模型猜了也會被覆寫 |
+| 15 | `source.source_type` ∈ 6 值 | `schema.js:258-264` | **Layer 5** | — | 同上，`ingestor:152` 寫死 `layer4_llm_curator` |
+| 16 | `evidence[].summary` 必填 | `schema.js:344-346` | **Layer 5** | — | 同上，`ingestor:135` 由 `relevance` 衍生——所以**真正要求模型的是 `relevance`**（第 4 條） |
+| 17 | `candidate_id` / `lifecycle` / `scope.project` | `ingestor:118,121-125` | **Layer 5** | — | prompt 已明令不得自行指派，保留 |
+| 18 | `scope` 不得含 `promoted_from_*` | `schema.js:222-235` | **Layer 5** | — | 模型不會產生，不加噪音 |
+
+**結論**：LLM 作者側共 13 條約束，原本**完整陳述的只有 6 條**——2 條缺漏
+（#1、#2、#3、#5、#6 中的多數）、3 條只在範例裡隱含。已全數補齊。
+
+`evidence_type` enum 值得一提：validator 允許 5 種（含 `session_summary`），
+prompt 只列 4 種。**刻意不補第 5 種**——batch 目前不產生該型別，列出來只會誘導
+模型猜一個不存在的型別，反而觸發第 2 條的型別不符。列表是安全子集。
+
+### 13.3 renderer 補印 `evidence_status`（規則 4 的前提）
+
+第 3 條缺口不是純措辭問題：被 omit 的項目**確實在 batch 裡**
+（`batch-assembler.js:308` 帶著 status，`:630` 寫進 manifest 供 ingestor 比對），
+但 renderer 從不印它。等於要求模型避開它看不見的東西。
+
+故補上（只印例外，不印 `present`，避免把訊號淹掉）：
+
+```
+**evidence_status**: omitted_unsupported_tool — DO NOT CITE
+```
+
+這是**渲染層**改動，不是驗證邏輯改動——與 §11 補印 `operation_kind` 同性質。
+
+### 13.4 測試
+
+`curator-evidence-seam.test.js` 8 → **10 tests**，新增兩條：被 omit 的項目必須
+帶 `DO NOT CITE` 標記；`present` 的項目**不得**被加上 status 行（只標例外）。
+
+mutation 驗證：刪掉 renderer 那行 → `✕ marks evidence that was omitted upstream
+as uncitable`，1 failed / 9 passed；還原後 10 passed。
+
+### 13.5 驗證邊界（同 §12.5）
+
+prompt 措辭效果仍無法單元測試證明；能證明的是渲染面與契約覆蓋。若第四跑仍被
+退件，**退件原因是否在上表** 是關鍵判準：
+
+- **在表上** → 措辭沒生效，該換 lever（例如縮短 assembler 生成的 id 形狀）。
+- **不在表上** → 稽核有遺漏，回頭補表。
+
+依 orchestrator 指示，換 lever 是其裁定點，本 worker 不自行動手。

@@ -394,6 +394,14 @@ function renderPrompt({ projectName, batchId, batchHash, evidenceItems, diaryIte
       if (item.operation_kind) lines.push(`**operation_kind**: ${item.operation_kind}`);
       if (item.skill) lines.push(`**skill**: ${item.skill}`);
       if (item.outcome) lines.push(`**outcome**: ${item.outcome}`);
+      // Items whose evidence was omitted upstream stay in the batch for
+      // completeness, but the ingestor rejects any proposal citing one
+      // (`evidence_ref_omitted_upstream`). Rendering the status is what makes
+      // that rule followable — without it the curator cannot tell which items
+      // are citable, and the prompt rule would be unactionable advice.
+      if (item.evidence_status && item.evidence_status !== 'present') {
+        lines.push(`**evidence_status**: ${item.evidence_status} — DO NOT CITE`);
+      }
       return lines.join('\n');
     })
     .join('\n\n---\n\n');
