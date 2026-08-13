@@ -35,7 +35,8 @@ in the user's vault if the user explicitly defers. Default: ask.
 
 Every preset's AGENTS.md ships the same `## Schema Authority` section —
 the 6 rules that define how agents treat SCHEMA.md as authority. These
-are byte-identical across presets (locked by test) so agent behavior
-stays consistent regardless of which preset bootstrapped the vault.
+are byte-identical across presets by convention, so agent behavior stays
+consistent regardless of which preset bootstrapped the vault. Keep them
+identical when editing any one preset.
 Domain-specific operational policy (taxonomy, audit thresholds, language
 policy) varies per preset and per vault.

@@ -38,8 +38,10 @@ be aborted. The choice is sticky for the session unless `--vault` overrides it.
 Obsidian not running: skip to the session/default/ask steps and warn once that
 LINK resolution and live search degrade. Filesystem read and write still work.
 
-Registry empty: stop and offer `init-vault` or `arcforge obsidian register`.
-Never fall through to ad-hoc writes outside a registered vault.
+Registry empty and the mode would write: stop, and offer `init-vault` or
+`arcforge obsidian register` — never fall through to ad-hoc writes outside a
+registered vault. A read-only query against a vault path the user has named
+proceeds without registration; registering is not a toll gate on reading.
 
 - [ ] Done when one vault is resolved and named back to the user.
 

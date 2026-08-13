@@ -547,7 +547,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Platform:** All platforms. Requires an Obsidian vault; `obsidian-cli` is preferred for vault operations but the skill falls back to direct file writes when the CLI is unavailable.
 
-**Purpose:** Vault interface — resolves which registered Obsidian vault to operate on (via `--vault=<name>`, cwd match, or the single-vault default), then dispatches one of three universal actions (ingest, query, audit) against that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema). Vaults are domain-agnostic; `init-vault` bootstraps a new vault from a preset (minimal, llm-wiki, news, project-tracker).
+**Purpose:** Vault interface — resolves which registered Obsidian vault to operate on (via `--vault=<name>`, the vault Obsidian currently has open, a session-sticky choice, or the registry default), then dispatches one of three universal actions (ingest, query, audit) against that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema). Vaults are domain-agnostic; `init-vault` bootstraps a new vault from a preset (minimal, llm-wiki, news, project-tracker).
 
 **When to use:** When saving notes/ideas/URLs, querying vault knowledge, auditing vault health, or initializing/registering a vault. Not for diagrams — use `/diagramming-obsidian`.
 
