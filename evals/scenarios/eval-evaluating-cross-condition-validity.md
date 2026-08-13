@@ -109,6 +109,26 @@ conclusion is that this skill is a non-regression guard rather than a lift —
 recorded as such, not re-tuned until a number appears. That is the pre-registered
 stop condition, and v2 is the last attempt it permits.
 
+### Outcome: the stop condition fired
+
+**v2 preflight = BLOCK, baseline pass rate 100% (3/3)** (hash
+`bcec18be7b8e2e0e`, computed before this note was appended; annotating Design
+Notes changes the file hash but no graded content). v1 before it: baseline 5/5
+pass, and the four methodology assertions scored 1 in **10/10 trials across both
+arms** — its −0.16 delta was a `Read`-vs-`Bash cat` artifact, not behavior.
+
+Across two independent designs, the second materially harder, eight baseline
+trials with no skill in an isolated environment all found the criterion swap,
+named the re-run as the repair, and surfaced the dropped row. The behavior this
+scenario was written to measure is **already default at this task shape**.
+
+Per the stop condition this scenario is therefore **retained as a non-regression
+guard, not a lift**, and is deliberately left at its BLOCK state. Do not tune it
+to produce a number. The honest next question is not "how do I make baseline
+fail" but whether this claim needs a skill at all — booked to P7 with the four
+ceilinged legacy `eval-arc-evaluating-*` scenarios. Full record:
+`docs/plans/v6/decisions/p5-absorption-evaluating.md`.
+
 ## Setup
 mkdir -p bench/cases bench/runs
 
