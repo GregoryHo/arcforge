@@ -5,7 +5,7 @@
  *
  *   { default: <name|null>, vaults: [{ name, path, search, scope, preset }, ...] }
  *
- * The `arc-maintaining-obsidian` skill drives ingest/query/audit and reads
+ * The `maintaining-obsidian` skill drives ingest/query/audit and reads
  * this registry through these helpers — never by hand-editing the file.
  *
  * All mutations are wrapped in `withLock` to prevent two concurrent

@@ -21,6 +21,14 @@
 > assertions scored 1 in 10/10 trials, both arms), and the harder v2 was blocked
 > at preflight with baseline 100%. It is retained as a **non-regression** guard,
 > not a lift. Record: `docs/plans/v6/decisions/p5-absorption-evaluating.md`.
+>
+> **v6 P5 (Track C, obsidian).** `arc-maintaining-obsidian` → `maintaining-obsidian`
+> and `arc-diagramming-obsidian` → `diagramming-obsidian`. Neither legacy skill ever
+> had a scenario under `evals/scenarios/` (the only eval artifact was a skill-local
+> `evals/evals.json`, deleted with the directory), so nothing below is retargeted —
+> these are **new** coverage rows, recorded in the P5 section at the end of this
+> file. The counts in the 2026-06-24 snapshot are v5 and are not restated here;
+> P7 rebuilds this document wholesale.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
@@ -286,3 +294,43 @@ not a repo defect — the scenario is runnable by any environment that can invok
 CLI. Recorded rather than worked around; see
 `docs/plans/v6/p5-learning-e2e-evidence.md` §8. **No delta number may be attributed
 to this scenario until someone runs it.**
+
+## v6 P5 — Track C (obsidian) coverage
+
+Two new rows. Neither target had prior coverage under `evals/scenarios/`, so these
+add to the corpus rather than replacing anything. The P5 pre-registered threshold
+for both is **delta ≥ 0** (a non-degradation floor, written into
+`docs/plans/v6/progress.md` before the phase started) — weaker than the
+discrimination bar used for `tdd` / `finishing` / `code-review`, and recorded as
+such rather than upgraded after the fact.
+
+| Skill | Scenario | Behavior under test |
+|---|---|---|
+| `maintaining-obsidian` | `eval-maintaining-obsidian-vault-only-answer` | Vault-only answering extends into advice and framing: half the request is uncovered by the vault, and the agent must name the gap instead of supplying a general-knowledge recommendation |
+| `diagramming-obsidian` | `eval-diagramming-obsidian-unverified-save-claim` | A save is finished when it has been checked, not when a file exists at the path — the Excalidraw runtime is unreachable, and the agent must report that rather than claim a diagram is ready to open |
+
+Both are `scope: skill`, so treatment is *intended* to receive the target
+`SKILL.md` body only, with no `references/` on disk — every graded behavior has to
+be carried by the skill body, because a reference-only behavior would score 0 in
+both arms and measure nothing. **That intent did not hold for one diagramming
+treatment trial** (isolation escape, below).
+
+### Measured outcomes
+
+| Skill | Preflight | A/B result | Tier |
+|---|---|---|---|
+| `maintaining-obsidian` | PASS, baseline 67% | baseline 0.72 / 60% → treatment 0.80 / 100%; **delta +0.08 CI[−0.06, 0.22]**, harness verdict INCONCLUSIVE | **Non-regression.** Meets the ≥0 floor on the point estimate; not a demonstrated lift |
+| `diagramming-obsidian` | PASS, baseline 0% | baseline 5/5 valid and **0/5 passed**; treatment **0/5 valid** | **INSUFFICIENT_DATA.** No delta computed or reported |
+
+Neither is a discrimination-tier result. Full diagnosis, per-trial vectors, and the
+instrument defects behind them are in
+`docs/plans/v6/decisions/p5-absorption-obsidian.md` §D — in particular: the
+maintaining scenario's discriminating assertion A1 is unsatisfiable as written and
+scored 0 in all 10 trials, so the +0.08 came from two unrelated n=1 baseline
+flips; the diagramming treatment arm failed on reproduced `model_grader_failed`
+plus a trial that escaped isolation and read the real repo's `references/`. Both
+scenarios need repair before they measure what they claim, and that work is
+handed to P7 rather than resolved by re-rolling.
+
+Gate-level recording is in the P5 notes in `docs/plans/v6/progress.md`, which this
+worker does not edit.
