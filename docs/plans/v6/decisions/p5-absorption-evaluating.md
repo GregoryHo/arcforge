@@ -324,8 +324,17 @@ trial 4 列與 git 歷史，逼出的是判斷而非欄位閱讀。
 
 `scope: skill` 的 `eval ab` 會把 `## Target` 檔內容注入 treatment prompt；本次又依
 任務卡加了 `--plugin-dir <本 worktree>`，於是 treatment 相對 baseline 多出的是
-**注入的 SKILL.md 文字 + 整個 plugin（其餘 23 支 skill、hooks、SessionStart 注入、
-磁碟上可讀的 `references/`）**，baseline 則是隔離環境。
+**注入的 SKILL.md 文字 + 整個 plugin**，baseline 則是隔離環境。plugin 那一半逐項為：
+
+| 多出的東西 | 具體內容 |
+|---|---|
+| skill 集 | `skills/` 底下全部 24 支（15 支 legacy `arc-*` + 9 支 v6），含 `using` 的 Skill Map（本次剛加入 `/evaluating` 一列） |
+| `references/` | `skills/evaluating/references/*.md` 兩支在磁碟上可讀——注入的只有 SKILL.md 本體，但 plugin 載入後 reference 檔變成可達 |
+| hooks | 6 個事件全部生效：SessionStart（`inject-context` + session-tracker `start`）、UserPromptSubmit、PreToolUse、PostToolUse、Stop、PreCompact |
+| PATH | `bin/arcforge` 進 PATH（D9），即 treatment 可實際呼叫引擎 |
+
+`--plugin-dir` 走的是 semi-isolation（`excludeClaudeMd: false`），baseline 走完整
+隔離（停用全部 plugin、排除 CLAUDE.md 與 rules、關 auto-memory、`--strict-mcp-config`）。
 
 因此該 delta 是**含 toolkit 的**，不是 SKILL.md 單獨的效果。這正是新 skill Phase 1
 點名的混淆（「什麼在變」與主張不對齊）。任何只報 delta 而不說變動項的陳述都視為誤導。
