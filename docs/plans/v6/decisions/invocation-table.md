@@ -24,7 +24,7 @@
 判準只有一句（`skills/writing-skills/` 的教學面）：**agent 該不該自己伸手去拿？**
 使用頻率不是判準——每天都用的 skill，只要自行載入會打斷無關工作，仍是 user-invoked。
 
-## 已落地（P3，類別由 frontmatter 讀出）
+## 已落地（P3–P4，類別由 frontmatter 讀出）
 
 | Skill | 類別 | 理由 |
 |---|---|---|
@@ -32,6 +32,10 @@
 | `writing-skills` | **user-invoked** | 撰寫方法論是人刻意開始的工作；在無關任務中途自行載入只會把 authoring 規則套到不是 authoring 的事情上。 |
 | `tdd` | model-invoked | 觸發條件（要動實作碼、修 bug、發現沒測試的碼）出現在任務中途，等使用者想起來喊就已經來不及——碼已經寫下去了。 |
 | `finishing` | model-invoked | 觸發條件（實作完成、分支待處理）同樣是任務中途的狀態；這支存在的目的正是攔下「順手合併」，靠使用者主動呼叫就攔不到。 |
+| `debugging` | model-invoked | P4 重新推導維持預填值：觸發條件是「有個失敗還解釋不了」，它在任務中途冒出來，而且第一個動作就決定了結果——等使用者想起來打 `/debugging`，那個要被攔下的猜測式修補通常已經送出去了。壓力最大的時點（趕發版、使用者直接遞來一個 patch）正是最不可能有人記得呼叫的時點。 |
+| `code-review` | model-invoked | P4 重新推導維持預填值：觸發條件是「有一份改動已經寫完、要交出去」，這是任務中途的狀態，agent 比使用者更早看見。要求使用者記得喊 `/code-review` 的失敗模式是不對稱的——記得喊的那次通常本來就會被審，忘記喊的那次正是最該被審的那次（趕時間、覺得改動很小、對自己的實作有信心）。回饋回來要處理的那半同理：回饋抵達時 agent 正在讀它，此刻才是紀律要生效的時點。 |
+| `completion-evidence` | **不是 skill（P4 裁決）** | 判準問「agent 該不該自己伸手去拿」，但這支的內容是「宣稱完成前要有證據」——一個會在它最該生效時被略過的 agent，同樣不會伸手去載入它；一個會伸手的 agent 已經在遵守它了。獨立成 skill 的結構是自我否證的。改以 `skills/code-review/references/completion-evidence.md` 承載（查表面），並由各 skill 在自己的完成判準內就地內聯。**無 router 列、無 invocation 類別**——reference 檔兩者皆不需要，schema §5.3 的 supporting-file 存在性守衛即為其把關。 |
+| `sessions` | model-invoked | P4 重新推導維持預填值：觸發條件是「工作要停在半途、之後要被別人或明天的自己接手」。使用者說「我先走了」時已經在離場，此刻要求他先想起打 `/sessions` 正好落在最不可能發生的時點；agent 該自己伸手。resume 方向同理——使用者說「昨天做到哪」時要的是狀態，不是先學會一個指令名。 |
 
 ## 預填（P4–P6，**非約束**）
 
@@ -41,11 +45,7 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 
 | Skill | Phase | 預測類別 | 依據 |
 |---|---|---|---|
-| `debugging` | P4 | model-invoked | 條件是「出現不明失敗」，在任務中途冒出來，必須當場改變行為。 |
-| `code-review` | P4 | model-invoked | 條件是「有一份改動待交付」；審查若要靠使用者記得要求，最該被審的那次就會漏掉。 |
-| `completion-evidence` | P4 | **未定** | `PLAN.md` 寫作 `completion-evidence`（reference），字面在「獨立 skill」與「`code-review` 內的 reference 檔」之間有歧義，而兩種讀法後果不同：skill 需要 router 列與 invocation 類別，reference 檔兩者皆不需要。**由 P4 裁決，不在此代決。** |
 | `compacting` | P4 | model-invoked | 條件是「context 快用完」，agent 比使用者更早看得到；使用者能打的 `/compact` 是 Claude Code builtin，與本 skill 不同物。 |
-| `sessions` | P4 | model-invoked | 條件是「工作要跨 session 交接」，出現在收尾當下。 |
 | `learning` | P5 | **user-invoked** | 學習子系統是控制面：啟用、審查候選、啟用 instinct 都是使用者對自己環境的決定，agent 自行伸手等於自我授權。 |
 | `evaluating` | P5 | model-invoked | 條件是「出現一個關於行為的主張、而它需要被量測」，這個條件在任務中途成立。 |
 | `maintaining-obsidian` | P5 | model-invoked | 條件是「有東西要進 vault 或要查 vault」，隨任務出現。 |
@@ -59,7 +59,7 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 
 ## 已知張力（P6 收斂時必須處理）
 
-- **數量對不上**：本表列名 18 支（`completion-evidence` 懸而未決則 19），`PLAN.md`
+- **數量對不上**：本表列名 18 支（P4 裁定 `completion-evidence` 不是 skill，故不計），`PLAN.md`
   P6 的 AC 卻是 `ls -d skills/*/ | wc -l` ≤15、正文寫「總數 ≈14」。缺口只能靠 P4–P6
   進一步合併補上；本表**不代為發明合併**，只把差額標出來。哪幾支合併是 P6 的裁決。
 - **預測集中在 model-invoked**：15 支預填只有 2 支 user-invoked。這可能是對的

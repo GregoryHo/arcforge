@@ -151,7 +151,17 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
     .replace(/\{REGRESSED_THRESHOLD\}/g, String(DELTA_REGRESSED_THRESHOLD));
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
-    results.map((r) => `Trial ${r.trial}: score=${r.score}, passed=${r.passed}`).join('\n');
+    results
+      .map((r) => {
+        // Ship per-assertion scores when the row carries them — without these
+        // the analyzer's "Weak Assertions" section is inference, and it has
+        // guessed wrong on verified cases (P4: debugging, sessions).
+        const per = Array.isArray(r.assertionScores)
+          ? `, assertions=[${r.assertionScores.join(',')}]`
+          : '';
+        return `Trial ${r.trial}: score=${r.score}, passed=${r.passed}${per}`;
+      })
+      .join('\n');
 
   const prompt = [
     agentDef,

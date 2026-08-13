@@ -9,7 +9,7 @@ status: promoted
 
 ## Overview
 
-Capture session reflections as structured diary entries for the **learning cycle** (diary → reflect → instincts). This is for deliberate reflection and pattern extraction — NOT for session continuity. For saving/resuming work across sessions, use `/arc-managing-sessions save` and `/arc-managing-sessions resume` instead.
+Capture session reflections as structured diary entries for the **learning cycle** (diary → reflect → instincts). This is for deliberate reflection and pattern extraction — NOT for session continuity. For saving/resuming work across sessions, use `/sessions` instead.
 
 ## Quick Reference
 

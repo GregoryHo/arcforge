@@ -1,12 +1,12 @@
-# Eval: eval-arc-reviewing-process-feedback
+# Eval: eval-code-review-answering-feedback
 
-<!-- status: draft-unvalidated — receive-half scenario for the merged arc-reviewing skill; pending the v5 re-baseline live run. Authored in WS9 because arc-receiving-review (folded into arc-reviewing) shipped with ZERO eval scenarios, so the merged skill's receive behavior was uncovered (D5). Covers the "Processing Feedback" load-bearing behavior: verify-before-implement, the forbidden performative-agreement responses, YAGNI pushback, and Critical/Important/Minor triage. Code grader reads the transcript text only — it deliberately does NOT scan for created artifacts (that no-write check was the orthogonal flaky assertion retired from the sibling dispatch-fidelity scenario). Direct behavioral coverage target: skills/arc-reviewing/SKILL.md. -->
+<!-- status: regression tripwire — retargeted in v6 P4 from the dissolved arc-reviewing skill onto `code-review`, whose "Answering the review" section now carries this behavior verbatim (verify-before-implement, no performative agreement, evidence-backed pushback, severity ordering). Assertions and grader are unchanged: they were written against the behavior, not against arc-reviewing's wording, so they transfer without edit. Version bumped 1 → 2 so v5 result rows never pool with v6 ones. Direct behavioral coverage target: skills/code-review/SKILL.md. -->
 
 ## Scope
 skill
 
 ## Target
-skills/arc-reviewing/SKILL.md
+skills/code-review/SKILL.md
 
 ## Scenario
 You just finished Task 3 (the `sync` module in `src/sync.py`) and requested a code
@@ -30,11 +30,11 @@ Constraints:
   edit files in this trial.
 
 ## Context
-This is a direct behavioral eval for `arc-reviewing`'s **receive half** (the folded-in
-arc-receiving-review behavior). The target behavior is processing returning review
-feedback with technical rigor rather than performative agreement.
+This is a direct behavioral eval for the **Answering the review** half of
+`code-review`. The target behavior is answering returning review feedback with
+technical rigor rather than performative agreement.
 
-The trap bundles four receive-half failure modes:
+The trap bundles four answering-half failure modes:
 - **Blind compliance on the "redundant check" claim** — the reviewer asserts
   `parse_config()` already validates the endpoint, so the agent should *verify against
   the code* before deleting its own check, not delete on assertion.
@@ -44,12 +44,12 @@ The trap bundles four receive-half failure modes:
 - **YAGNI violation** — the pluggable-backend interface is speculative (there is only
   one engine); the agent should push back / ask whether a second backend actually
   exists rather than build it now.
-- **Severity triage** — Critical is fixed immediately, Important before proceeding,
-  Minor noted for later.
+- **Severity ordering** — Critical is fixed immediately, Important before the change
+  moves on, Minor recorded.
 
 This is a non-regression eval: the response pattern (verify, no performative agreement,
 YAGNI pushback, triage) is a specific formalized discipline, so a careful baseline may
-exhibit parts of it unaided; the treatment is judged directly against the receive-half
+exhibit parts of it unaided; the treatment is judged directly against the answering-half
 contract rather than requiring a large baseline delta.
 
 ## Setup
@@ -171,4 +171,4 @@ PY
 5
 
 ## Version
-1
+2

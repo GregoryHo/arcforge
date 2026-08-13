@@ -25,7 +25,7 @@ Execute a plan by dispatching a fresh subagent per task, with one task-reviewer 
 3. Dispatch one task-reviewer that returns both verdicts (spec compliance + task quality) from a single read of the change.
 4. If issues: one fix pass addresses spec gaps and quality findings together, then re-review covers both verdicts. Fan out to `arc-dispatching-parallel` only when findings are genuinely independent; otherwise a single batch-fix dispatch is the default.
 5. Both verdicts clean → mark the task complete; move to the next.
-6. After all tasks: dispatch a final whole-branch code reviewer, then run the completion pipeline — arc-verifying (confirm requirements met and tests pass), then arc-finishing (Step 0 discriminates on `.arcforge-epic`).
+6. After all tasks: dispatch a final whole-branch code reviewer, then run the completion pipeline — `/code-review` (confirm requirements met and tests pass), then arc-finishing (Step 0 discriminates on `.arcforge-epic`).
 
 **Max review cycles: 3 per task.** If not converging, escalate to a human with a summary of unresolved issues.
 
@@ -127,7 +127,7 @@ verdicts — is identical however the subagent is launched (Codex or Claude Code
 
 - **arc-using-worktrees** — REQUIRED: set up an isolated workspace before starting
 - **arc-writing-tasks** — creates the task list this skill executes
-- **arc-reviewing** — code-review template for reviewer subagents
+- **`/code-review`** — review gate: reviewer prompt for reviewer subagents, plus answering the returning feedback
 - **arc-finishing** (Step 0 discriminates on `.arcforge-epic`) — complete development after all tasks
 
 **Subagents should use `/tdd`** for TDD on each task.

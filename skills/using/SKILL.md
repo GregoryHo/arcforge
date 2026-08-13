@@ -15,7 +15,11 @@ If nothing matches, no arcforge skill applies — just do the work.
 | --- | --- |
 | `/writing-skills` | you are authoring or revising an arcforge skill (user-invoked) |
 | `/tdd` | you are about to write implementation code, fix a bug, or found code with no test |
+| `/debugging` | a test fails, a bug is reported, behavior surprises you, a build breaks, or a fix you tried did not hold |
+| `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
+| `/compacting` | context is filling up and you are deciding whether to compact now |
+| `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
 
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.

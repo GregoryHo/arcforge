@@ -492,7 +492,7 @@ def test_permanent_budget_is_legacy_only():
 
 def test_is_legacy_discriminates():
     """The grandfather predicate reads the manifest, not the shipped skill set."""
-    assert _is_legacy("arc-debugging") is True
+    assert _is_legacy("arc-brainstorming") is True
     assert _is_legacy("tdd") is False
 
 

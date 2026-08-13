@@ -2,8 +2,13 @@
 
 > **v5 rename mapping (historical entries below are unchanged):**
 > `arc-requesting-review` + `arc-receiving-review` → `arc-reviewing`;
-> `arc-observing` → `arc-learning`. The `arc-requesting-review-dispatch-fidelity`
-> scenario is now `eval-arc-reviewing-dispatch-fidelity`.
+> `arc-observing` → `arc-learning`. The v6 P4 rewrite folded `arc-reviewing` and
+> `arc-verifying` into `code-review`; its dispatch-fidelity and process-feedback
+> scenarios are now `eval-code-review-range-fidelity` and
+> `eval-code-review-answering-feedback`. `arc-debugging` became `debugging`;
+> its describe-only `eval-arc-debugging-root-cause-first-gate` was retired for
+> ceiling (baseline 100%) and replaced by the agentic
+> `eval-debugging-root-cause-first`.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.

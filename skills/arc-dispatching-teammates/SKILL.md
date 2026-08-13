@@ -136,5 +136,5 @@ Each accepted epic MUST show subagent evidence (both acceptance subagents PASS).
 ## After This Skill
 
 - **Each teammate** hands off to `/finishing` when its epic is done.
-- **Lead session** dispatches the two acceptance subagents per Step 6 on each completion; does NOT run `arc-verifying` inline.
-- **Blocked teammates** → route to `arc-debugging` on the specific epics. Do not auto-retry.
+- **Lead session** dispatches the two acceptance subagents per Step 6 on each completion; does NOT run verification inline.
+- **Blocked teammates** → route to `/debugging` on the specific epics. Do not auto-retry.
