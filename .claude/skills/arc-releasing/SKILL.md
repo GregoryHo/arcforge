@@ -99,7 +99,7 @@ A release that changes skill behavior must ship a benchmark that reflects *this*
 
 > **Regenerating the benchmark is a live-eval step.** The grading is done by LLM graders, not by code in this skill or in CI's `npm test`. You (or a dedicated CI live-eval job) must run the regeneration manually before tagging; the skill cannot run it for you. Treat this section as the **gate you must clear**, not a command the skill executes.
 
-1. **Regenerate the benchmark** against the release branch (manual/CI live-eval run — see `skills/arc-evaluating/SKILL.md` for the regeneration procedure). This refreshes `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json`.
+1. **Regenerate the benchmark** against the release branch (manual/CI live-eval run — see `skills/evaluating/SKILL.md` for the regeneration procedure). This refreshes `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json`.
 
    > Path note: the canonical report location is `evals/benchmarks/` (`latest.json` + `raw/latest.json`), each carrying a top-level `generated` ISO-8601 timestamp. Older notes that say `evals/reports/latest.json` are referring to this same artifact under its prior name.
 
