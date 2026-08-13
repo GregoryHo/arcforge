@@ -36,6 +36,7 @@
 | `code-review` | model-invoked | P4 重新推導維持預填值：觸發條件是「有一份改動已經寫完、要交出去」，這是任務中途的狀態，agent 比使用者更早看見。要求使用者記得喊 `/code-review` 的失敗模式是不對稱的——記得喊的那次通常本來就會被審，忘記喊的那次正是最該被審的那次（趕時間、覺得改動很小、對自己的實作有信心）。回饋回來要處理的那半同理：回饋抵達時 agent 正在讀它，此刻才是紀律要生效的時點。 |
 | `completion-evidence` | **不是 skill（P4 裁決）** | 判準問「agent 該不該自己伸手去拿」，但這支的內容是「宣稱完成前要有證據」——一個會在它最該生效時被略過的 agent，同樣不會伸手去載入它；一個會伸手的 agent 已經在遵守它了。獨立成 skill 的結構是自我否證的。改以 `skills/code-review/references/completion-evidence.md` 承載（查表面），並由各 skill 在自己的完成判準內就地內聯。**無 router 列、無 invocation 類別**——reference 檔兩者皆不需要，schema §5.3 的 supporting-file 存在性守衛即為其把關。 |
 | `sessions` | model-invoked | P4 重新推導維持預填值：觸發條件是「工作要停在半途、之後要被別人或明天的自己接手」。使用者說「我先走了」時已經在離場，此刻要求他先想起打 `/sessions` 正好落在最不可能發生的時點；agent 該自己伸手。resume 方向同理——使用者說「昨天做到哪」時要的是狀態，不是先學會一個指令名。 |
+| `learning` | **user-invoked** | P5 重新推導維持預填值，但依據與預填不同。預填說的是「控制面＝使用者的決定」；重推導後真正的依據是**自動化已經不在 skill 這一層**：diary 草稿由 PreCompact/Stop hook 自動產生，observation→candidate 由 daemon＋curator 自動跑完。skill 手上只剩下**人要拍板的那一半**——要不要留這篇 diary、三篇算不算 pattern、這條 instinct 該不該存、要不要啟用。這半邊照定義不該由 agent 自己伸手。<br><br>第二個依據：這個子系統**預設關閉**。做成 model-invoked，等於在每一輪無關對話上收 cognitive load，去評估一個多數使用者根本沒開的功能——成本天天付，觸發條件多半不成立。<br><br>反向檢查（推翻預填的機會）：hook 確實會在 diary 草稿就緒／反思到期時發 nudge，看似「條件在任務中途出現、agent 該自己接手」。但 nudge 的存在正好是 user-invoked 的證據而非反證——系統已經把這件事建模成「提示人、等人決定」。既然如此，nudge 措辭本次一併從「叫模型去 invoke」改為「告訴使用者可以執行」（`hooks/session-tracker/inject-context.js`），讓載體與類別一致。<br><br>連帶效果：這是第二支 user-invoked skill，清掉 P3 掛帳的 §3.1／§5.2 mutation 重跑（見 `p5-absorption-learning.md` §5）。 |
 
 ## 預填（P4–P6，**非約束**）
 
@@ -46,7 +47,6 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 | Skill | Phase | 預測類別 | 依據 |
 |---|---|---|---|
 | `compacting` | P4 | model-invoked | 條件是「context 快用完」，agent 比使用者更早看得到；使用者能打的 `/compact` 是 Claude Code builtin，與本 skill 不同物。 |
-| `learning` | P5 | **user-invoked** | 學習子系統是控制面：啟用、審查候選、啟用 instinct 都是使用者對自己環境的決定，agent 自行伸手等於自我授權。 |
 | `evaluating` | P5 | model-invoked | 條件是「出現一個關於行為的主張、而它需要被量測」，這個條件在任務中途成立。 |
 | `maintaining-obsidian` | P5 | model-invoked | 條件是「有東西要進 vault 或要查 vault」，隨任務出現。 |
 | `diagramming-obsidian` | P5 | model-invoked | 同上，條件是「需要一張關係圖」。 |

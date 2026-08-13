@@ -71,8 +71,7 @@ These are the most frequently used commands:
 | `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
 | `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
 | `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
-| `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
-| `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
+| `/arcforge:learning` | Diaries, patterns, instincts | At end of session, or to review what the learning module proposes |
 
 ## How Skills Compose
 
@@ -87,7 +86,7 @@ These are the most frequently used commands:
 | Large multi-epic initiative | using-worktrees, dispatching-teammates | `arc-dispatching-teammates` |
 | Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
 | Bug or regression | debugging, tdd, verifying | `/debugging` |
-| End of session | journaling | `arc-journaling` |
+| End of session | learning | `/learning` |
 
 **Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
 
@@ -127,10 +126,7 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 
 ### Memory (session continuity + learning; default-off module)
 
-- **arc-journaling** - Capture session reflections into a durable diary before compaction
-- **arc-reflecting** - Analyze accumulated diaries for patterns and preferences
-- **arc-learning** - Opt-in observe → curate → review → activate instinct lifecycle
-- **arc-recalling** _(user-invoked)_ - Manually save a session pattern as a reusable instinct
+- **learning** _(user-invoked)_ - Session diaries, pattern extraction from them, manual instincts, and review of the opt-in observe → curate → activate lifecycle
 - **sessions** - Write a handover when work stops mid-task, and read one when it restarts
 - **compacting** - Decide when to compact, and what has to reach disk before it
 

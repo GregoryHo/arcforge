@@ -6,7 +6,7 @@
 learning
 
 ## Target
-scripts/lib/learning-curator/schema.js, skills/arc-learning/SKILL.md
+scripts/lib/learning-curator/schema.js, skills/learning/SKILL.md
 
 ## Scenario
 Three candidates exist in `queue.jsonl` with lifecycle statuses `pending_review`,

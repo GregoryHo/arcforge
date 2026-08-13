@@ -66,7 +66,7 @@ existence check is the blessed pattern.
 ## Skill-local scripts: SKILL_ROOT
 
 Some skills ship their own `scripts/` directory (e.g.
-`skills/arc-journaling/scripts/`). **Any skill that ships its own
+`skills/<name>/scripts/`). **Any skill that ships its own
 `scripts/` directory** may anchor those scripts with a `SKILL_ROOT`
 fallback header — this is an attribute-based rule, not an enumerated
 allowlist of skill names:

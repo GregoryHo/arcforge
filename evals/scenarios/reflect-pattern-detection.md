@@ -1,12 +1,12 @@
 # Eval: reflect-pattern-detection
 
-**Status**: Active — /reflect pattern detection accuracy gate.
+**Status**: Active — reflection pattern-detection accuracy gate.
 
 ## Scope
 learning
 
 ## Target
-skills/arc-reflecting/SKILL.md
+skills/learning/SKILL.md
 
 ## Scenario
 A project's diary directory contains 4 diary entries that share a clear repeating pattern:
@@ -16,7 +16,7 @@ A project's diary directory contains 4 diary entries that share a clear repeatin
 There is also one diary that mentions a one-off issue (missed a `npm run lint` step once),
 which does NOT recur and should NOT be identified as a pattern.
 
-Run `/reflect` (or invoke arc-reflecting) against the diary directory. The output should:
+Analyze the diary directory and report what recurs. The output should:
 1. Identify the `FORGOT_TO_REFACTOR` / "skipped REFACTOR step" as a repeating pattern
 2. NOT invent patterns that are not evidenced by multiple diaries
 3. NOT dump the raw diary contents verbatim into the response
@@ -29,15 +29,15 @@ Constraints:
 - Keep your summary under 20 lines.
 
 ## Context
-Layer 4 (LLM curator) depends on the quality of patterns surfaced by `/reflect`. If the
-reflect skill misses clearly-repeated patterns, no useful candidates will be generated.
+Layer 4 (LLM curator) depends on the quality of the patterns surfaced. If the reflection
+step misses clearly-repeated patterns, no useful candidates will be generated.
 This eval gates the basic detection accuracy:
 
 - True positive: `FORGOT_TO_REFACTOR` appears in 4 of 4 diaries — must be identified as pattern
 - True negative: the one-off lint miss in diary-4 appears only once — must stay as observation, not be promoted to pattern
 - Verbosity guard: raw diary dumps would pollute candidate bodies with unprocessed content
 
-This tests the arc-reflecting skill's core duty: extract signal from repetition, not noise.
+This tests the reflection duty of `learning`: extract signal from repetition, not noise.
 
 ## Preflight
 skip
@@ -225,4 +225,4 @@ PY
 5
 
 ## Version
-1
+2

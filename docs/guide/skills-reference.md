@@ -10,7 +10,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
   - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-finishing](#arc-finishing)
   - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
-  - Memory: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
+  - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
   - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [arc-evaluating](#arc-evaluating)
 - [Workflow Patterns](#workflow-patterns)
@@ -21,7 +21,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 
 arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, and `arc-learning`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, and `learning`.
 
 **Core skills every user should learn first:**
 
@@ -49,7 +49,7 @@ What are you trying to do?
 |   +-- arc-using (when routing help is useful)
 |
 +-- Improve workflow?
-    +-- arc-journaling --> arc-reflecting
+    +-- learning (user-invoked)
 ```
 
 ---
@@ -69,7 +69,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | **SDD** | arc-brainstorming, arc-writing-tasks, arc-executing-tasks, arc-finishing | Explore, specify, build, integrate |
 | **Orchestration** | arc-agent-driven, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
-| **Memory** | arc-journaling, arc-reflecting, arc-learning, arc-recalling _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
+| **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
 | **Meta** | arc-using, writing-skills _(user-invoked)_, arc-evaluating | Route, evaluate, and maintain the catalog itself |
 
@@ -410,91 +410,28 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-journaling
-
-**Purpose:** Capture session reflections as structured diary entries for future pattern extraction.
-
-**When to use:** When a significant work session ends, the user asks to journal, or the PreCompact hook fires before context is compacted.
-
-**Key workflow:**
-1. Pre-diary check — verify session had non-trivial decisions or challenges
-2. Reflect on conversation from memory (do NOT read files)
-3. Fill template: decisions, preferences, challenges, solutions
-4. Save to `~/.arcforge/diaries/{project}/{date}/diary-{sessionId}.md`
-5. Offer follow-up: "run `/arcforge:arc-reflecting` to extract patterns"
-
-**Artifacts:**
-- Output: `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
-
-**Related:** **arc-journaling** --> arc-reflecting (after 5+ entries)
-
----
-
-### arc-reflecting
-
-**Purpose:** Analyze multiple diary entries to identify recurring patterns and save insights.
-
-**When to use:** When 5+ diaries have accumulated, the user asks to summarize learnings from past sessions, or inject-context flags reflection is due.
-
-**Key workflow:**
-1. Smart filter selection (unprocessed, project_focused, or recent_window)
-2. Read CLAUDE.md rules to detect violations
-3. Read and analyze diary entries for patterns
-4. Identify patterns (3+ occurrences) vs observations (1-2)
-5. Save reflection + instincts, update processed.log
-
-**Artifacts:**
-- Input: `~/.arcforge/diaries/{project}/*/diary-*.md`
-- Output: `~/.arcforge/diaryed/{project}/YYYY-MM-reflection-N.md`, instinct files
-
-**Related:** arc-journaling (5+ entries) --> **arc-reflecting** --> arc-learning (dashboard review)
-
----
-
-### arc-learning
+### learning
 
 **Platform:** Claude Code only — reads Claude Code tool-call observations from `~/.arcforge/observations/`, populated by Claude Code PostToolUse hooks.
 
-**Purpose:** Turn repeated project observations into reviewable learning candidates and activated artifacts through the dashboard — the full observe → curate → review → activate lifecycle.
+**Purpose:** The whole opt-in learning loop in one user-invoked skill: capture a session diary, extract recurring patterns from accumulated diaries, save a single insight as an instinct by hand, and review what the subsystem proposes to activate.
 
-**When to use:** When the default-off learning module is enabled and observations should become reviewable candidates, inactive drafts, then activated instincts.
+**When to use:** User-invoked only (`disable-model-invocation`). The user types `/learning`; hooks nudge them toward it when a diary draft or a reflection is pending.
 
 **Key workflow:**
-1. Enable learning: `arcforge learn enable --project`
-2. Capture: hooks record every tool call to observations.jsonl (skip filter honored); the background daemon assembles sanitized batches and an LLM curator proposes candidates
-3. Open the dashboard: `arcforge learn dashboard` (port 3334)
-4. Review queued candidates (`pending_review` → `approved` → `materialized` → `activated`)
-5. Authorize through three gates: Approve → Materialize → Activate (no candidate changes behavior without explicit action)
-6. Promote / Evolve / Deactivate as needed (Promote and Evolve mint new candidates; silent auto-promotion is not supported)
+1. Diary — noise-gate the session, finalize an existing draft rather than writing a duplicate, otherwise reconstruct from memory and save after the user agrees
+2. Reflection — `arcforge learn reflect scan`, read the listed diaries, separate patterns (3+ citing diaries) from observations, record the result so the same diaries are not re-analyzed
+3. Manual instinct — infer the fields, check for a duplicate, preview, save
+4. Lifecycle review — `arcforge learn status` / `enable --project` / `dashboard`; nothing changes behavior until someone activates it
 
 **Artifacts:**
-- Input: `~/.arcforge/observations/{project}/observations.jsonl` → `~/.arcforge/learning/candidates/queue.jsonl` (Layer 5 candidate queue)
-- Output: `~/.arcforge/learning/drafts/` (Layer 7 inactive drafts) → `~/.arcforge/instincts/<scope>/` (Layer 8 activation)
+- Diaries: `~/.arcforge/diaries/{project}/{YYYY-MM-DD}/diary-{sessionId}.md`
+- Reflections: `~/.arcforge/diaryed/{project}/`, instinct files under `~/.arcforge/instincts/{project}/`
+- Candidate lifecycle: `~/.arcforge/observations/{project}/observations.jsonl` → `~/.arcforge/learning/candidates/queue.jsonl` → `~/.arcforge/learning/drafts/` → `~/.arcforge/instincts/<scope>/`
 
-**Related:** background daemon --> **arc-learning** (capture → dashboard review → activation)
+**Related:** background daemon --> **learning** (capture → dashboard review → activation)
 
 > The pre-pivot `arcforge learn analyze` statistical clustering (Jaccard, confidence thresholds) was retired in v3.1 — see [learning-dashboard.md](learning-dashboard.md).
-
----
-
-### arc-recalling
-
-**Purpose:** Manually save patterns and insights as instincts from the current session context.
-
-**When to use:** When you want to manually save a pattern or insight from the current session as a reusable instinct. User-invoked only (disable-model-invocation).
-
-**Key workflow:**
-1. Receive user's natural language description
-2. Infer structured fields: id, trigger, action, domain, evidence
-3. Preview instinct for user confirmation
-4. Check for duplicates
-5. Save with source: manual, confidence: 0.50
-
-**Artifacts:**
-- Input: user-described pattern or insight
-- Output: `~/.arcforge/instincts/{project}/<id>.md`
-
-**Related:** user insight --> **arc-recalling** --> instinct saved for arc-learning lifecycle
 
 ---
 
@@ -526,7 +463,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Key workflow:**
 1. Check phase transition — compact between phases (when state is persisted to files), not during
-2. Pre-compact: save decisions to files/memory, invoke `arc-journaling` if session was substantial
+2. Pre-compact: save decisions to files/memory; a substantial session leaves a diary draft for `/learning` to finalize
 3. Check for un-committed work — ensure valuable changes are committed
 4. Compact with focused seed text: `/compact Focus on implementing [next task]`
 5. Post-compact: run `arcforge reboot`, re-read needed files
@@ -702,10 +639,10 @@ Systematic debugging first (no guessing), TDD to fix (failing test proves the bu
 ### 4. Learning Loop
 
 ```
-arc-journaling --> arc-reflecting --> arc-learning
-     |                  |                 |
-     v                  v                 v
-  diary entry      patterns found    instincts clustered
+learning: diary --> reflection --> instinct --> activation
+   |            |             |            |
+   v            v             v            v
+ diary entry  patterns    instinct saved  injected at SessionStart
 ```
 
 Capture session insights in diaries, extract patterns after 5+ entries, and cluster related instincts. ArcForge maintainers may separately use `/writing-skills` when a proven pattern should become an ArcForge skill.
