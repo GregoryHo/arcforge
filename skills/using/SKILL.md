@@ -20,6 +20,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
 | `/compacting` | context is filling up and you are deciding whether to compact now |
 | `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
+| `/maintaining-obsidian` | something should be filed into the user's Obsidian vault, a question should be answered from it, or it needs auditing or bootstrapping |
 
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.

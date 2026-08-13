@@ -30,7 +30,7 @@ This vault follows Andrej Karpathy's 3-layer LLM Wiki pattern. The LLM owns the 
 
 This preset adopts the Raw Source pattern. Immutable originals live under `Raw/<topic>/` and format-specific folders such as `Excalidraw/<topic>/`. The Wiki layer extracts and summarizes these; originals stay untouched so you can re-extract or diff against future updates.
 
-Re-ingest behavior is mechanical and documented in `arc-maintaining-obsidian` `references/page-templates.md`: same body `sha256` → skip; different `sha256` → drift detected; empty legacy `sha256` → backfill via audit.
+Re-ingest behavior is mechanical and documented in `/maintaining-obsidian` `references/raw-sources.md`: same body `sha256` → skip; different `sha256` → drift detected; empty legacy `sha256` → backfill via audit.
 
 ## Layer 2 — Wiki
 
@@ -70,11 +70,11 @@ Read `SCHEMA.md` for domain-specific rules: tag taxonomy, Source / Entity / Synt
 - Search baseline: filesystem search/read over Markdown files.
 - Optional QMD: not required. If enabled in the registry, use it as semantic/hybrid acceleration and sync it after ingest/audit LINK.
 - Obsidian runtime: optional. Use `obsidian-cli` for active vault detection, Daily Notes append, plugin state, and live search when available; ordinary Markdown maintenance must work with Obsidian closed.
-- Excalidraw: delegate to `arc-diagramming-obsidian` only after user approval.
+- Excalidraw: delegate to the Excalidraw diagramming skill only after user approval.
 
 ## Maintenance Workflows
 
-Use the `arc-maintaining-obsidian` skill (arcforge) for ingest, query, and audit. Bare invocation runs Domain Contract Orientation and reports name / scope / types / last activity.
+Use the `/maintaining-obsidian` skill (arcforge) for ingest, query, and audit. Bare invocation runs Domain Contract Orientation and reports name / scope / types / last activity.
 
 | Mode | When | Pipeline |
 |---|---|---|

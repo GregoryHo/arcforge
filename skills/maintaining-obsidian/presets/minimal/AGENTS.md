@@ -56,7 +56,7 @@ Read `SCHEMA.md` for all domain-specific rules: allowed note types, tag taxonomy
 
 ## Maintenance Workflows
 
-Use the `arc-maintaining-obsidian` skill (arcforge) for ingest, query, and audit. Bare invocation runs Domain Contract Orientation and reports name / scope / types / last activity.
+Use the `/maintaining-obsidian` skill (arcforge) for ingest, query, and audit. Bare invocation runs Domain Contract Orientation and reports name / scope / types / last activity.
 
 | Mode | When | Pipeline |
 |---|---|---|

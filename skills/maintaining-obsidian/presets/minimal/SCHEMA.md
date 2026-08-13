@@ -9,9 +9,9 @@ preset: minimal
 
 This file declares this vault's **data shape and domain policy**: note types, frontmatter, body structure, tag taxonomy, thresholds, and type-specific validation rules. The companion `AGENTS.md` declares the thin runtime contract: scope, paths, language policy, integration capabilities, and schema authority.
 
-The skill `arc-maintaining-obsidian` reads both files at Domain Contract
+The skill `/maintaining-obsidian` reads both files at Domain Contract
 Orientation. Generic Raw Source primitives (sha256 hashing, extraction
-methods) live in the skill's `references/page-templates.md` and are
+methods) live in the skill's `references/raw-sources.md` and are
 referenced from preset SCHEMAs that adopt the Raw Source pattern.
 
 This is the **minimal** preset — no types are declared. Author each type
@@ -65,7 +65,7 @@ aliases: []
 - **Embed:** when to embed images.
 - **Mermaid:** when to add a relationship diagram.
 - **Canvas:** when to use Obsidian Canvas.
-- **Excalidraw:** when to delegate to arc-diagramming-obsidian.
+- **Excalidraw:** when to delegate to the Excalidraw diagramming skill.
 ```
 
 When you've added at least one type, ingest mode can classify and create
@@ -114,6 +114,6 @@ English. Frontmatter values stay canonical (English).>
 ## Audit Report (vault extension, optional)
 
 The skill ships a generic audit-report shell in
-`references/page-templates.md`. If you want to add vault-specific
+`references/raw-sources.md`. If you want to add vault-specific
 sections (e.g., paper-claim conflicts, sprint retrospectives), declare
 the extended `audit-report` type here.

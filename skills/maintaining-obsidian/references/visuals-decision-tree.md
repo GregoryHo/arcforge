@@ -30,7 +30,7 @@ Q4: Is the spatial/architectural layout complex enough to warrant manual positio
 | **Embed** (Markdown) | `![[image.png]]` in note body | Raw source has image/diagram | No — deterministic |
 | **Mermaid** | Fenced `mermaid` block | 3+ entities with relationships | Yes — conservative |
 | **Canvas** | Separate `.canvas` file | MOC with 8+ notes in scope | Yes — suggest to user |
-| **Excalidraw** | Delegate to `arc-diagramming-obsidian` | Complex spatial/architectural content | Yes — suggest to user |
+| **Excalidraw** | Delegate to the Excalidraw diagramming skill | Complex spatial/architectural content | Yes — suggest to user |
 
 ## Conservative defaults
 

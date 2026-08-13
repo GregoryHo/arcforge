@@ -350,7 +350,7 @@ tags: [audit]
 ---
 ```
 
-Standard sections per `references/audit-checks.md`. Project-tracker
+Standard sections per `references/audit.md`. Project-tracker
 findings to highlight:
 - Stale `in-progress` tasks
 - Overdue tasks (due_date past, status != done)

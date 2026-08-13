@@ -52,7 +52,7 @@ Do these in order. Each step depends on the previous one being correct.
 
 ### 1. Ingest the release into the Obsidian vault
 
-Invoke `/arcforge:arc-maintaining-obsidian` in **ingest** mode. Scope depends on the release shape — always propose scope before bulk-processing, because ingest is the most expensive step in the workflow:
+Invoke `/arcforge:maintaining-obsidian` in **ingest** mode. Scope depends on the release shape — always propose scope before bulk-processing, because ingest is the most expensive step in the workflow:
 
 | Release shape | Ingest scope |
 |---|---|

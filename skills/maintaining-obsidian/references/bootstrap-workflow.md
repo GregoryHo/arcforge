@@ -7,7 +7,7 @@ Read this file when the user invokes `init-vault <path> --name <name>` (with or 
 ### 1. Validate path
 
 Confirm `<path>` exists and is a directory. Refuse if:
-- It's already in the registry (`~/.arcforge/obsidian-vaults.json`).
+- It's already registered — check with `arcforge obsidian list-vaults --json`.
 - It already contains `AGENTS.md` (would overwrite).
 
 In either case, direct the user to `register` instead.
@@ -64,12 +64,12 @@ A one-paragraph redirect:
 ```markdown
 # CLAUDE.md
 
-This vault uses `arc-maintaining-obsidian` (arcforge plugin). See:
+This vault is maintained through arcforge's `/maintaining-obsidian` skill. See:
 
 - `AGENTS.md` — thin runtime contract (scope, paths, integration capabilities, language policy, schema authority)
 - `SCHEMA.md` — domain schema and policy (note types, frontmatter, body templates, tag taxonomy, thresholds)
 
-When working in this vault, run `arc-maintaining-obsidian` for ingest / query / audit.
+When working in this vault, use that skill for ingest / query / audit.
 ```
 
 ### 7. Seed `<path>/index.md`
@@ -108,12 +108,12 @@ arcforge obsidian register \
 ```
 
 The CLI:
-- writes a fully-formed entry into `~/.arcforge/obsidian-vaults.json` (default `search` config: filesystem baseline, no QMD collection, fallbacks `[filesystem, obsidian-cli]`)
+- writes a fully-formed registry entry (default `search` config: filesystem baseline, no QMD collection, fallbacks `[filesystem, obsidian-cli]`)
 - promotes the first-registered vault to `default` automatically
 - holds a file lock for the duration of the write
 - atomically replaces the registry file
 
-Print the JSON result to the user (it includes `becameDefault: true|false`). Do NOT hand-edit `obsidian-vaults.json` — there is no scenario in this workflow where the LLM should construct that file directly. If step 10 enables QMD, run a follow-up `obsidian set-default` only if the user explicitly asked to switch defaults; otherwise leave the registry alone.
+Print the JSON result to the user (it includes `becameDefault: true|false`). Never write the registry file yourself — there is no step in this workflow where constructing it by hand is correct. If step 10 enables QMD, run a follow-up `arcforge obsidian set-default` only when the user explicitly asked to switch defaults; otherwise leave the registry alone.
 
 ### 10. Optional QMD collection
 

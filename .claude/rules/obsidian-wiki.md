@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Obsidian vault is arcforge's knowledge base. Use `arc-maintaining-obsidian` for all wiki operations (ingest, query, audit).
+The Obsidian vault is arcforge's knowledge base. Use `/maintaining-obsidian` for all wiki operations (ingest, query, audit).
 
 ## Scope — What Goes in the Wiki
 

@@ -29,7 +29,7 @@ A news pipeline vault: agents ingest articles into immutable Raw Sources + typed
 
 ## Layer 1 — Raw Sources
 
-This preset adopts the Raw Source pattern. Captured article content lives under `Raw/<YYYY-MM-DD>/<source-slug>.md`, exactly as extracted. The `sha256` drift mechanism is defined by `arc-maintaining-obsidian` `references/page-templates.md`; news-specific drift meaning and source-validation policy are in `SCHEMA.md`.
+This preset adopts the Raw Source pattern. Captured article content lives under `Raw/<YYYY-MM-DD>/<source-slug>.md`, exactly as extracted. The `sha256` drift mechanism is defined by `/maintaining-obsidian` `references/raw-sources.md`; news-specific drift meaning and source-validation policy are in `SCHEMA.md`.
 
 Layout:
 

@@ -27,7 +27,7 @@ If the vault's AGENTS.md declares Raw Source adoption, ingest of a URL / file / 
 1. **Save the raw content** to `Raw/` (or leave it if already in the vault). Immutable original.
 2. **Create the typed wiki note** with `source_url` pointing back, plus `sha256` of the body bytes after frontmatter.
 
-Skipping step 1 conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `page-templates.md` for the schema, hashing rule, re-ingest behavior, and per-file-type extraction methods.
+Skipping step 1 conflates "what the source said" with "what I understood" — and you lose the ability to re-extract or verify later. See `raw-sources.md` for the schema, hashing rule, re-ingest behavior, and per-file-type extraction methods.
 
 If the vault does NOT adopt the Raw Source pattern (e.g., project-tracker), Create writes only the typed note.
 

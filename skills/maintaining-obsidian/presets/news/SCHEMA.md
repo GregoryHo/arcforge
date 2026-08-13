@@ -194,7 +194,7 @@ aliases: []
 
 This vault adopts the Raw Source pattern (per AGENTS.md). Articles are
 captured to `Raw/<YYYY-MM-DD>/<slug>.md` via defuddle. The skill's
-`references/page-templates.md` defines the generic Raw Source frontmatter:
+`references/raw-sources.md` defines the generic Raw Source frontmatter:
 
 ```yaml
 ---
@@ -271,7 +271,7 @@ tags: [audit]
 ---
 ```
 
-Standard sections per `references/audit-checks.md`. News-specific
+Standard sections per `references/audit.md`. News-specific
 findings to highlight:
 - Stale Topics (no movement in N days)
 - DailyAggregate gaps (days with articles but no aggregate)

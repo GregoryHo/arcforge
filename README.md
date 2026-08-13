@@ -138,7 +138,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 ### Knowledge (Obsidian vault)
 
-- **arc-maintaining-obsidian** - Ingest, query, audit, or initialize an Obsidian vault (Karpathy LLM Wiki pattern)
+- **maintaining-obsidian** - Ingest, query, audit, or bootstrap an Obsidian vault
 - **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
 
 ### Meta (operates on the catalog itself)

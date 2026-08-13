@@ -404,7 +404,7 @@ break chronological flow.
 This vault adopts the Raw Source pattern (per AGENTS.md). Raw Sources
 are immutable originals (PDFs, screenshots, Excalidraw, HTML, articles)
 under `Raw/<topic>/` or `Excalidraw/<topic>/`. The skill's
-`references/page-templates.md` defines the generic Raw Source frontmatter
+`references/raw-sources.md` defines the generic Raw Source frontmatter
 (including `sha256` for drift detection):
 
 ```yaml
@@ -420,7 +420,7 @@ sha256: ""
 Body is hashed AFTER frontmatter (UTF-8, line endings normalized to
 `\n`). On re-ingest, skill compares new sha256 to stored value: skip
 (unchanged) or flag drift (changed) per
-`references/page-templates.md`. Audit's Source Drift Check re-applies
+`references/raw-sources.md`. Audit's Source Drift Check re-applies
 this rule across the vault.
 
 ## Tag Taxonomy
@@ -482,5 +482,5 @@ tags: [audit]
 
 Standard sections: LINK Results, LINT Results (Schema, Source Drift,
 Orphans, Tag, Schema Evolution), GROW Suggestions (Internal, External,
-Open Questions). The skill `references/audit-checks.md` documents the
+Open Questions). The skill `references/audit.md` documents the
 generic shell.
