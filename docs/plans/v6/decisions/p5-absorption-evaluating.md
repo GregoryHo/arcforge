@@ -297,3 +297,37 @@ baseline ≥97%，屬**天花板**，對新 skill 同樣沒有鑑別力。九支
 所以 ceiling 檢查從未對它們生效（C9 的裁決理由即出自此觀察）。它們作為
 non-regression 底線仍有價值，但**不得**被當作 `evaluating` 有 lift 的證據——
 P5 的 delta 門檻由新增的 `eval-evaluating-cross-condition-validity` 單獨承擔。
+
+---
+
+## 新 scenario 的讀數規則（**看到數字之前**寫下，禁事後定義）
+
+`eval-evaluating-cross-condition-validity`，preflight **PASS**（baseline 2/3 = 67%
+< 0.8 天花板，hash `cfb8e8347e738d71`）。baseline 已經偏強，所以 CI 下界能否清零
+本身就不確定——以下三分在跑 `ab` 前定案：
+
+| 結果 | 判定 | 動作 |
+|---|---|---|
+| delta > 0 **且** CI 下界 ≥ 0 | 門檻**達成**（P5 預登記門檻原文） | 如實記錄，並同時記錄 baseline 本來就強這件事 |
+| delta > 0 但 CI 下界 < 0 | 門檻**未達成** | 觸發 redesign（≤2 次），不得以「方向是對的」代替 |
+| delta ≈ 0 或 < 0 | 門檻**未達成** | 觸發 redesign（≤2 次） |
+
+兩次誠實 redesign 後仍為零 → 如實記為 non-regression guard，不得再調到出現數字為止
+（此條與 scenario 檔 `## Design Notes` 末段的預先承諾一致）。
+
+redesign 方向若被觸發，先動的是**自我宣告的線索**：`rubric_version` 欄與
+`excluded` / `exclude_reason` 兩個鍵等於把答案寫在資料裡（preflight 有一趟 baseline
+甚至用「0.5 不可能是 3 條 assertion 的分數」直接反推）。拿掉它們、只留重複的
+trial 4 列與 git 歷史，逼出的是判斷而非欄位閱讀。
+
+### 兩條件之間實際變動了什麼（**必須連同 delta 一起報**）
+
+`scope: skill` 的 `eval ab` 會把 `## Target` 檔內容注入 treatment prompt；本次又依
+任務卡加了 `--plugin-dir <本 worktree>`，於是 treatment 相對 baseline 多出的是
+**注入的 SKILL.md 文字 + 整個 plugin（其餘 23 支 skill、hooks、SessionStart 注入、
+磁碟上可讀的 `references/`）**，baseline 則是隔離環境。
+
+因此該 delta 是**含 toolkit 的**，不是 SKILL.md 單獨的效果。這正是新 skill Phase 1
+點名的混淆（「什麼在變」與主張不對齊）。為此另跑一次**不帶** `--plugin-dir` 的
+`eval ab`（Target 仍供給 `--skill-file`，preflight 快取共用），兩組數字分開報，
+各自標明變動項；任何只報 delta 而不說變動項的陳述都視為誤導。
