@@ -14,7 +14,7 @@
 - [x] P1 強制層可用化 + 契約凍結 — gate: PASS (2026-07-31, PR #136, tag gate-p1)
 - [x] P2 引擎瘦身 + 反向耦合翻正 — gate: PASS (2026-07-31, PR #137, tag gate-p2)
 - [x] P3 meta skill + 2 pilots + 最小 eval 迴路 — gate: PASS (2026-08-01, PR #138, tag gate-p3)
-- [ ] P4 紀律叢集
+- [x] P4 紀律叢集 — gate: PASS (2026-08-13, PR #139, tag gate-p4；首次 FAIL→補救→再驗)
 - [ ] P5 保留系統叢集（D1/D8 驗證場）
 - [ ] P6 workflow 叢集 + router 收斂
 - [ ] P6.5 bucket 落地（spike PASS → 執行）
@@ -78,6 +78,22 @@
 - **掛帳 P4**：finishing description 違反 no-summarize 規則（動它需自帶 baseline）；第二支 user-invoked skill 落地時重跑 §3.1/§5.2 mutation。
 - **掛帳 P6**：router `/tdd` 與 `/finishing` 列在「實作完成但無測試」狀態上重疊、表無優先序；ROUTER_SKILL 在 pytest/jest 雙處硬編。
 - **掛帳 P7**：rubric 編輯→Version bump 的 lint（防靜默混池）；eval report 與 compare 的 trial 數不一致；parseActions 只留 Bash 首行；d1 scenario 穩定性；Design Notes 改引 --disable-slash-commands。
+
+## P4 任務（全數完成，PR #139，四路 worker + p4-finisher 稽核）
+
+- [x] debugging（127 行+2 refs）：IMPROVED +0.16 CI[0.05,0.27]
+- [x] code-review（155 行+completion-evidence ref）：two-axis IMPROVED **+0.40 CI[0.4,0.4]**（treatment 5/5 滿分）
+- [x] compacting（66 行）：non-regression PASS（天花板誠實記錄，不宣稱 lift）
+- [x] sessions（純 prose + `.handovers/` 慣例）：IMPROVED +0.17 CI[0.17,0.17]
+- [x] 5 支 legacy 刪除（debugging/reviewing/verifying/compacting/managing-sessions），json 21→16；router 7 列
+- [x] 落點對照表 73 條：`decisions/p4-absorption-map.md`（52+6 落地/14 捨棄/1 冗餘；6 條刻意反轉）
+- [x] 儀器修正：eval trial timeout 300s→600s、analyzer 接收 assertionScores、two-axis 汙染池隔離（附錄存檔）
+
+### P4 gate 備註
+- **首次 verifier FAIL→補救→再驗**：FAIL 原因是 AC3 落點表只存在於 agent 訊息（不可覆核載體）+ 漏標 agents/verifier.md。補救 = 73 條全表持久化 + F 節 + 排除紀錄存檔。教訓：**gate 交付物必須落在 repo 內的耐久載體，agent 訊息不算證據**。
+- two-axis 的 +0.40 證明的是「報告形狀」（兩軸不合併 + plan-mandated 缺陷仍報），非 dispatch 機制本身（1/5 trial 內聯自審仍滿分）——如實定位。
+- **掛帳 P7（儀器）**：缺陷 A（SIGTERM trial 不標 infraError；修法約束＝killed 且最終輸出未完成，見 absorption-map 附錄）；duration_ms 低報（eval.js:228 優先採 stream-json 值）；finishing description no-summarize 違規（**明確改派 P7**，前提「動它需自帶 baseline」不變）；sessions 的 scenario 結構守衛等價物；range-fidelity/answering-feedback 兩 scenario 無實測池。
+- P3 掛帳的 §3.1/§5.2 mutation 重跑：P4 無新 user-invoked skill，N/A，順延至下一支 user-invoked 落地時。
 
 ## 偏離紀錄
 

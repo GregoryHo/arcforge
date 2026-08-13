@@ -26,8 +26,9 @@ name, with no `arc-` prefix (D7).
 
 A skill directory is a closed unit: nothing under `skills/<name>/` may
 require / import / source outside that directory, and skill prose must not name
-engine internals (`scripts/lib/...`) or `ARCFORGE_ROOT`. Engine functionality is
-reached only by a subprocess call to the CLI via `${CLAUDE_PLUGIN_ROOT}`.
+engine internals (`scripts/lib/...`), `ARCFORGE_ROOT`, or `CLAUDE_PLUGIN_ROOT`
+(hooks-only, unset in skill Bash). Engine functionality is reached only by a
+subprocess call to the bare `arcforge` CLI — the plugin's `bin/` is on PATH (D9).
 Rationale and the matching D8 rule for engine code: `.claude/rules/architecture.md`.
 
 ## Legacy skills are grandfathered, not exempt
