@@ -1,13 +1,23 @@
 # P5 learning 行為證據
 
-> Track A 兩項行為面 AC 的交付物：**§1–§7** 是旗艦 e2e probe
+> Track A 兩項行為面 AC 的交付物：**§1–§7、§9–§15** 是旗艦 e2e probe
 > （`progress.md` P5 預登記門檻 #1），**§8** 是 +1 eval scenario 的 A/B
 > （門檻 #2）。
 >
-> **§9 是本檔最新狀態，請先讀。** §1–§7 記錄的是**原始阻塞診斷**（寫於修正之前）：
-> 引擎有兩套 home 解析器，使 probe 的兩條約束互斥。orchestrator 裁定該缺陷為
-> P5 範圍內的引擎修正（不開新 D 編號），修正已落地——§9 記錄修正內容、驗證輸出，
-> 以及 probe 的當前狀態。§1–§7 保留原文不改寫，因為它是缺陷存在的一手證據。
+> ## 現況（先讀這裡）
+>
+> | AC | 狀態 |
+> |---|---|
+> | #1 e2e probe | ✅ **PASS**（第五跑全鏈路綠）——結論與證據在 **§15** |
+> | #2 eval A/B | ⬜ **未執行**——scenario 檔已就緒，見 §8 |
+>
+> 本檔**按時序累積、不改寫歷史**：§1–§7 是修正前的阻塞診斷，§10–§14 是五次
+> 執行逐次逼出的四個缺陷。它們保留原文，因為那是缺陷曾經存在的一手證據；
+> 任何一節單獨讀都可能過時，**§15 是最終狀態**。
+>
+> 過程中查出並修掉的**三個真實引擎缺陷**（皆非 probe 專屬，真實使用者同樣踩到）：
+> 兩套 home 解析器（§2/§9）、curator 證據縫斷裂（§10/§11）、
+> prompt↔validator 契約缺口（§12/§13）。收斂軌跡總表在 §15.5。
 > **結論：probe 未執行。** 不是「跑了但沒過」，也不是「時間不夠」——
 > 是在設計隔離環境時查出引擎有一個**真實的汙染缺陷**，使得該 AC 所要求的
 > 「不得汙染使用者真實 `~/.arcforge`」與「走完 curator→queue」兩條約束
@@ -380,8 +390,8 @@ bash tests/e2e/learning-probe.sh
 跑完後 `<work-dir>/evidence/` 內有六步的原始檔案（queue.jsonl、draft 路徑、
 active instinct、SessionStart 輸出），照原要求轉錄回本檔即完成 AC #1。
 
-**在有人真的跑完之前，AC #1 仍為未驗證。** 本節證明的是「阻塞已解除」，
-不是「probe 已通過」。
+**（本節寫於執行之前）** 當時本節證明的只是「阻塞已解除」，不是「probe 已通過」。
+orchestrator 其後執行五次，逐次逼出四個缺陷——見 §10–§14；最終 **PASS 見 §15**。
 
 ---
 
@@ -832,3 +842,172 @@ const SAFETY_ACK = {
 
 被拒的那筆記錄正是**最值得留存的證據**：它是 fail-closed 活化閘正確運作的一手
 證明。這個修正讓下一次任何退件都會留下可覆核的紀錄。
+
+---
+
+## 15. 第五跑：全鏈路 PASS —— AC #1 達成
+
+**旗艦 AC（`progress.md` P5 預登記門檻 #1）通過。** 步 0–6 全綠。
+以下為 run-5 證據的謄錄（原始檔在 scratchpad，會被清掉；**本節是耐久載體**）。
+
+候選：`cand_instinct_20260813T075744Z_9b98a333db41`
+
+## 15.1 步 3 — observe → daemon → curator → queue
+
+`03-observer.log`：
+
+```
+[15:56:44] Analyzing probe-app: 32 observations
+[15:57:44] Claude analysis completed successfully
+[15:57:44] Ingest result: {"run_id":"curator_run_20260813T075744Z_6bdaddff6723",
+                           "parse_status":"parsed","accepted":1,"rejected":0}
+[15:57:44] Analysis complete for probe-app (batch batch_20260813T075644Z_7e2dfc898d42)
+[15:57:44] Archived observations for probe-app
+```
+
+`accepted: 1, rejected: 0` —— 對照 §12 的 `accepted:0 rejected:1`（id 截短）與
+§13 的 `too_many_evidence_refs`。
+
+`03-queue.jsonl` 候選行（節錄，`event_type: candidate.created`）：
+
+```json
+{"schema_version":1,"event_id":"evt_1786607864149_04da2f4bec66",
+ "ts":"2026-08-13T07:57:44.149Z",
+ "candidate_id":"cand_instinct_20260813T075744Z_9b98a333db41",
+ "event_type":"candidate.created",
+ "actor":{"layer":5,"actor_type":"validator"},
+ "record":{
+   "artifact_type":"instinct",
+   "scope":{"kind":"project","project":"probe-app","project_id":"probe-app"},
+   "source":{"source_type":"layer4_llm_curator",
+             "batch_id":"batch_20260813T075644Z_7e2dfc898d42",
+             "batch_hash":"584ca1e7fd21","prompt_policy_version":"v1"},
+   "name":"test-read-edit-verify-cycle",
+   "domain":"workflow","body_source":"llm_curator","evidence_quality":"low",
+   "lifecycle":{"status":"pending_review","status_changed_at":"2026-08-13T07:57:44.145Z"}}}
+```
+
+`rationale`（curator 自撰，證明它真的讀懂了 fixture 的形狀）：
+
+> The observed session shows a consistent workflow applied across four independent
+> modules (parser, validator, cache, webhook). Each follows the same pattern: run
+> module-level test to establish baseline → read source to understand context →
+> make targeted edit → run test again to verify. … The repetition across unrelated
+> modules indicates this is a deliberate workflow, not coincidence.
+
+**evidence refs —— 恰好 5 條，id 全長完整：**
+
+```
+ev_obs_0000_7aef3c19 | observation
+ev_obs_0002_df5130cf | observation
+ev_obs_0004_c51ae577 | observation
+ev_obs_0006_dac093ab | observation
+ev_obs_0008_bfa95ddd | observation
+```
+
+這五行同時是 §12 與 §13 兩個修正的直接證據：從「11 條被截短的 id」變成
+「恰好 5 條、每條含完整 hash 尾段」。引用的仍是偶數索引（帶證據的
+`tool_start` 記錄）——選擇邏輯從第二跑起就一直是對的。
+
+註：`evidence_quality: "low"` 不是缺陷——`computeEvidenceQuality()` 的 v1 公式以
+`project_obs_count` 為準（≥1000 高、≥100 中），probe 只有 32 筆觀察，落在 low
+是正確結果。
+
+## 15.2 步 4 — approve → materialize → activate
+
+`04-lifecycle.json`（§14 修正後，逐步 transcript 完整留存）：
+
+```json
+[ {"action":"approve","accepted":true,"reason":null},
+  {"action":"materialize","accepted":true,"reason":null},
+  {"action":"activate","accepted":true,"reason":null} ]
+```
+
+`04-draft-files.txt` —— materialize 產出的 inactive draft：
+
+```
+<probe>/.arcforge/learning/drafts/cand_instinct_20260813T075744Z_9b98a333db41/
+  mat_1786607924840_470cbe7573c8/instincts/test-read-edit-verify-cycle.md
+  mat_1786607924840_470cbe7573c8/materialization.json
+```
+
+`04-active-instinct.md` —— activate 產出的 **active** instinct（節錄）：
+
+```markdown
+---
+id: cand_instinct_20260813T075744Z_9b98a333db41
+trigger: "When making targeted fixes to specific modules, establish test baseline
+          first, read the implementation, make focused edits, then immediately
+          verify with module-level tests."
+domain: workflow
+source: curator
+confidence: 0.50
+extracted: 2026-08-13
+---
+
+# test-read-edit-verify-cycle
+
+## Action
+
+When making changes to a specific module, follow this workflow: First, run the
+module-level test suite to establish the current baseline … Finally, run the
+module-level test suite again to verify your changes work correctly.
+```
+
+draft 與 active 是**兩個不同路徑的檔案**——materialize 只寫 draft，activate 才
+複製到 `instincts/`。這正是「未經明確 activate 不改變行為」那條保證的檔案面體現。
+
+## 15.3 步 5 — SessionStart 注入
+
+`05-sessionstart-output.json` 原文：
+
+```json
+{"systemMessage":"1 active instinct",
+ "hookSpecificOutput":{"hookEventName":"SessionStart",
+  "additionalContext":"## Active Behavioral Instincts\n\nThese patterns were activated for this project. Apply them where relevant:\n\n- **cand_instinct_20260813T075744Z_9b98a333db41** (50%): When making targeted fixes to specific modules, establish test baseline first, read the implementation, make focused edits, then immediately verify with module-level tests.\n\nTo confirm or contradict a pattern, tell the user they can run /arcforge:learning."}}
+```
+
+含 candidate id、`Active Behavioral Instincts` 區塊，以及 §P5 改過的 nudge
+措辭（「告訴使用者可以執行 /arcforge:learning」，配合 user-invoked 類別）。
+
+## 15.4 步 6 — 真實 home 零寫入
+
+腳本內的斷言掃 `~/.arcforge` 的 `learning/candidates`、`instincts`、
+`observations`、`reflections`、`recalls` 五個子樹，任何比 probe 起始更新的檔案
+即 fail；orchestrator 回報該步 PASS。
+
+**本 worker 另做一次獨立覆核**（唯讀）：
+
+```
+$ find ~/.arcforge -newermt "2026-08-13 15:50" ! -newermt "2026-08-13 16:10" -type f
+  14 個檔案，全部 mtime = Aug 13 15:55 —— 早於 probe 起始（15:56），
+  且全屬無關活動（loop-d3-* session 的 pending-actions.json、demo 專案的 diary 草稿）
+
+$ find ~/.arcforge -iname "*probe-app*"        → 無
+$ find ~/.arcforge -iname "*9b98a333db41*"     → 無
+$ ls -l ~/.arcforge/learning/candidates/queue.jsonl
+  -rw-r--r-- 896248  Jul 29 15:28   ← 未被觸碰，仍是 7/29 的 mtime
+```
+
+真實 queue 的 mtime 停在 7/29，probe 全程五跑一次都沒寫進去。§2 記錄的汙染
+風險自此關閉。
+
+## 15.5 五跑收斂軌跡
+
+| 跑次 | 卡點 | 根因 | 修正 |
+|---|---|---|---|
+| 1 | 步 3 `parse_status: empty` | **證據縫斷裂**：hook 寫 `input`/`path`/`pattern`，assembler 讀 `*_summary`，三者恆 undefined；curator 只看得到工具名與時間戳。另加 probe 未傳 `phase` argv | §10 診斷 → §11 修（A 案）＋ fixture 補 pre/post 與四輪工作流形狀 |
+| 2 | `accepted:0 rejected:1`，10 × `evidence_ref_missing` | **id 保真度**：Haiku 把 `ev_obs_0000_d5a4b8cc` 截成 `ev_obs_0000` | §12 prompt 四處硬化（緊貼 id 的正反例、完整形狀範例、規則 1 前置加粗、收尾自查） |
+| 3 | `too_many_evidence_refs`（got 11） | **契約缺口**：prompt 只寫 min 2，從未講 validator 的上限 5 | §13 全面契約稽核：18 條逐條對照，LLM 作者側 13 條一次補齊；renderer 補印 `evidence_status` |
+| 4 | 步 4 `missing_safety_ack` | **非缺陷**：活化閘要求兩個具名旗標，probe 送裸布林 | §14 probe 送出人類在 dashboard 勾的兩個旗標；順帶修好退件證據流失 |
+| 5 | — | — | **全鏈路 PASS** |
+
+四個修正裡**三個是真實引擎缺陷**（§11 證據縫、§12 id 保真、§13 契約缺口），
+第四個是 probe 保真度。三個引擎缺陷都**不是 probe 專屬**——任何啟用 learning
+的真實使用者都在踩：縫斷裂使 curator 全盲，id 與契約缺口使提案被靜默退回
+`rejections.jsonl`（dashboard 不顯示）。**probe 的價值正在於此**：它是第一個
+真的把八層走完一遍的東西，於是把三道長期靜默的缺陷逐層逼了出來。
+
+值得記一筆的是每一跑的**分析品質都是對的**——curator 從第二跑起就正確識別出
+test→read→edit→verify 的形狀，卡的一直是契約層而非理解層。若當初順著
+「fixture 訊號太弱」的初判去加強 fixture，這三個缺陷會全部留在原地。
