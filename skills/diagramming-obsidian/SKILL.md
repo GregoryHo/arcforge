@@ -18,12 +18,12 @@ drawing.
 ## Running the helpers
 
 The Python helpers ship inside this skill's own `references/` directory and every
-command below runs from there. Its absolute path is the base directory named
-where this skill was loaded — resolve `references/` against that, never against
-the user's working directory.
+command below runs from there. Its absolute path came with this skill when it
+loaded, on the line reading `Base directory for this skill` — resolve
+`references/` against that path, never against the user's working directory.
 
 ```bash
-BASE=<the base directory named where this skill loaded>
+BASE=<the path from that line>
 cd "$BASE/references" && uv run python <helper> ...
 # a missing dependency is first-run setup, not a defect:
 cd "$BASE/references" && uv sync && uv run playwright install chromium
