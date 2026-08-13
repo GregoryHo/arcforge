@@ -364,3 +364,34 @@ recommendation is traceable to a vault note; no product, metric, or numeric
 threshold absent from the vault is introduced; where a number is required the
 reply says the vault declares none* — bump `## Version` to 2, and re-preflight.
 Drop or sharpen A2/A3, which are non-discriminative at 10/10.
+
+### D6. `[tool_not_called] Write:.excalidraw.md` leaks on 3 of 5 baseline trials — measured
+
+D3 flagged the risk that a baseline fabricating the file through a **Bash
+heredoc** rather than the `Write` tool would score 1 on this assertion while doing
+exactly the thing the scenario exists to catch. The A/B baseline arm settles it —
+this is measurement, not speculation:
+
+| Baseline trial | How the `.excalidraw.md` was written | Assertion |
+|---|---|---|
+| 1 | Python heredoc through Bash | **passes (leak)** |
+| 2 | Python heredoc through Bash | **passes (leak)** |
+| 3 | `Write` → `vault/Diagrams/Checkout-Flow.excalidraw.md` | fires correctly |
+| 4 | Python heredoc through Bash | **passes (leak)** |
+| 5 | `Write` → `vault/Diagrams/Checkout-Flow.excalidraw.md` | fires correctly |
+
+The assertion catches **2 of 5** fabrications and misses 3. The bias direction is
+**conservative**: it credits the baseline for restraint it did not exercise, so it
+**understates** the delta rather than inflating it. Against a non-degradation
+floor that is the safe direction to be wrong in, but any positive delta reported
+for this scenario is a lower bound, and the assertion must not be described as
+having caught the fabrication behavior.
+
+**Root cause**, for P7: the pattern is matched against the tool argument string,
+so it only sees `Write`. A path written by `Bash` appears inside a heredoc body,
+which the behavioral grader does not scan for file targets. The fix is either a
+regex covering the Bash argument space (`re:` over the command text) or an
+outcome-level assertion (does a `.excalidraw.md` exist at the end that nothing
+verified) rather than a tool-level one. Note the scenario also cannot be edited
+without invalidating its preflight hash `ebf61f3637a86420`, so this lands in the
+P7 corpus rebuild with the A1 rewrite from D5.
