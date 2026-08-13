@@ -43,12 +43,36 @@ that leaves two diaries for one session: a duplicate final entry and an orphaned
 draft nobody reads.
 
 Its `## Session Metrics` section is already correct — preserve it verbatim.
-Sections still marked `<!-- TO BE ENRICHED -->` may or may not have been filled;
-check rather than assume. Fill the remaining ones **only if you were in that
-session**. If the draft is from a session you have no memory of, leave the
-placeholders exactly as they are — invented content is worse than a gap.
 
-- [ ] Done when the draft has been read and edited in place, or its absence is confirmed.
+Then take the enrichable sections one at a time. Which shape you write depends on
+one thing: **were you in that session?**
+
+**You were** — replace the `<!-- TO BE ENRICHED -->` line with what happened.
+
+**You were not** — the finished section keeps the marker and gains a note under
+it:
+
+```markdown
+## Decisions Made
+
+<!-- TO BE ENRICHED -->
+
+_Not recorded — this session is not in this conversation's history._
+```
+
+Keep the marker byte-for-byte, comment delimiters and all. It is not decoration:
+the pipeline reads that exact string to tell a diary that is still missing
+content from one that is finished. A diary that loses it counts as complete, so
+an empty entry quietly joins the evidence later reflections draw on. Rewording
+it, folding it into a sentence, or moving it into prose all break that — only the
+untouched line works.
+
+When the user asks for a real entry rather than a stub full of placeholder
+comments, the note above is the answer: it states the gap in plain language for
+the reader while the marker underneath keeps the machinery honest. Writing those
+sections from imagination is never the answer, however finished it would look.
+
+- [ ] Done when every enrichable section either holds what you remember, or holds the untouched marker plus a note.
 
 ### Step 3 — Write it
 
@@ -159,7 +183,8 @@ user both directions — an auto-detected pattern is a proposal, not a fact.
 | About to | Instead |
 | --- | --- |
 | Write a fresh diary while a draft exists for that session | Read the draft, edit it in place, finalize it |
-| Fill `<!-- TO BE ENRICHED -->` for a session you do not remember | Leave the placeholders; a gap beats invention |
+| Fill `<!-- TO BE ENRICHED -->` for a session you do not remember | Keep the marker and add a note under it; a stated gap beats invention |
+| Reword or delete the marker so the entry stops looking unfinished | Keep the line byte-for-byte — the pipeline reads it to know the diary is incomplete |
 | Read files to reconstruct what the session decided | Reconstruct from memory — the reasoning was never in the files |
 | Save a diary or instinct and tell the user afterwards | Show it first, save after they agree |
 | Call two diaries showing the same thing a pattern | Label it an Observation until a third appears |
