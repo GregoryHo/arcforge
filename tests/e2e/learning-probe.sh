@@ -16,10 +16,16 @@
 # `tests/scripts/arcforge-home-isolation.test.js` is the regression lock.
 #
 # COST: step 3 invokes the real LLM curator (`claude --model haiku`) exactly once
-# via the daemon's own `analyze_project`. Everything else is local.
+# via the daemon's own `analyze_project`. Everything else is local. That cost is
+# why this script is deliberately NOT wired into `npm test` — the five runners
+# must stay free and offline. Run it by hand at a phase gate.
 #
 # USAGE:
 #   bash tests/e2e/learning-probe.sh [work-dir]
+#
+# Always run it whole, into a FRESH work dir. Step 3 ends with the daemon's
+# `archive_observations`, which MOVES observations.jsonl into archive/ — so
+# re-running step 3 against an already-analyzed tree finds nothing to analyze.
 #
 # Exits non-zero on the first failed assertion. Evidence for every step is left
 # under <work-dir>/evidence/ for transcription into
@@ -93,14 +99,32 @@ cp "${OBS_FILE}" "${EVIDENCE_DIR}/02-observations.jsonl"
 pass "${OBS_COUNT} observations captured inside the probe home"
 
 step "3. Daemon → curator → queue (invokes the real Haiku curator once)"
-# Source the daemon and call its own analyze_project, exactly as the repo's
-# observer-daemon suite does — same code path, without the 5-minute poll loop.
-# shellcheck source=/dev/null
-source "${DAEMON}"
-analyze_project "${PROJECT_NAME}" || fail "analyze_project returned non-zero"
+# Source the daemon and call its own analyze_project — same code path the daemon
+# runs, without the 5-minute poll loop.
+#
+# The subshell + `set +e` is the pattern tests/observer-daemon/run-tests.sh uses,
+# and it is load-bearing here: analyze_project carries `trap ... RETURN` and bare
+# `return`s in its error paths, so under the caller's `set -e` an internal
+# `return 1` would abort this script with a confusing message instead of reaching
+# the assertion below. Errors are absorbed and the FILESYSTEM is the verdict.
+#
+# Several of analyze_project's early exits (too few observations, circuit
+# breaker, missing prompt file) `return` cleanly after only writing to the
+# daemon log — so a zero exit here does NOT mean a candidate was produced. The
+# queue assertion below is the real check, which is why it is not `|| true`.
+DAEMON_EXIT=$(
+  set +e
+  # shellcheck source=/dev/null
+  source "${DAEMON}" 2>/dev/null
+  mkdir -p "${INSTINCTS_DIR}"
+  analyze_project "${PROJECT_NAME}"
+  echo "EXIT_CODE:$?"
+)
+printf '%s\n' "${DAEMON_EXIT}" > "${EVIDENCE_DIR}/03-daemon-exit.txt"
+cp "${ARCFORGE_HOME}/instincts/observer.log" "${EVIDENCE_DIR}/03-observer.log" 2>/dev/null || true
 
 QUEUE="${ARCFORGE_HOME}/learning/candidates/queue.jsonl"
-[ -f "${QUEUE}" ] || fail "curator produced no queue.jsonl (see ${ARCFORGE_HOME}/instincts/observer.log)"
+[ -f "${QUEUE}" ] || fail "curator produced no queue.jsonl (see ${EVIDENCE_DIR}/03-observer.log)"
 cp "${QUEUE}" "${EVIDENCE_DIR}/03-queue.jsonl"
 cp -R "${ARCFORGE_HOME}/learning/curator-batches" "${EVIDENCE_DIR}/03-curator-batches" 2>/dev/null || true
 cp -R "${ARCFORGE_HOME}/learning/curator-runs" "${EVIDENCE_DIR}/03-curator-runs" 2>/dev/null || true
