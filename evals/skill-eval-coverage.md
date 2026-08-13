@@ -282,18 +282,30 @@ after a passing live run), it moves into the validated count automatically.
 
 | Scenario | Behavior | Status |
 |---|---|---|
-| `eval-learning-draft-not-fabricated` | §Capturing a diary Step 2 — promote the waiting draft, and do not invent content for a session the agent was never in | **written, NOT RUN** — see below |
+| `eval-learning-draft-not-fabricated` | §Capturing a diary Step 2 — promote the waiting draft, and do not invent content for a session the agent was never in | **measured: IMPROVED +0.25 CI[0.25, 0.25]** — see below |
 | `reflect-pattern-detection` | §Reflecting Step 3 — 3+ diaries make a Pattern, one occurrence stays an Observation | retargeted from `skills/arc-reflecting/SKILL.md`, `## Version` 1 → 2 |
 
-**`eval-learning-draft-not-fabricated` has no measured delta.** The scenario file
-is complete (setup fixture, four filesystem-read assertions, code grader, Max Turns
-40, k=5) but the P5 Track A worker could not execute `eval preflight` / `eval ab` /
-`eval compare`: its execution sandbox refuses every command containing the `eval`
-token, so the whole eval CLI surface was unreachable. This is a harness constraint,
-not a repo defect — the scenario is runnable by any environment that can invoke the
-CLI. Recorded rather than worked around; see
-`docs/plans/v6/p5-learning-e2e-evidence.md` §8. **No delta number may be attributed
-to this scenario until someone runs it.**
+**Measured result (orchestrator-run; the Track A worker's sandbox refused every
+command containing the `eval` token, recorded in
+`docs/plans/v6/p5-learning-e2e-evidence.md` §8).** Preflight PASS (baseline 0%,
+hash `0e91921d011ee8bf`). Two A/B runs:
+
+- **v1 (pre-iteration skill): +0.05 CI[−0.09, 0.19] INCONCLUSIVE.** Baseline
+  0.75×5, treatment avg 0.80 (one 4/4 trial). Transcript diagnosis: **no trial in
+  either arm fabricated content** — the anti-fabrication behavior (assertions
+  A1–A3) is at ceiling in both arms. The discriminating assertion A4 actually
+  measures literal retention of the `<!-- TO BE ENRICHED -->` marker (the
+  pipeline's machine-readable "incomplete" flag), which agents reworded into
+  human prose. The run dir was quarantined before re-measuring (same-day pool
+  mixing across two different treatments).
+- **v2 (after skill iteration `8be5739`, positive recipe + mechanical reason for
+  the marker; scenario and rubric untouched): IMPROVED +0.25 CI[0.25, 0.25]** —
+  baseline 0.75×5 / pass 0%, treatment 1.00×5 / pass 100%. Isolation-escape grep
+  over all 10 trials: clean (0 hits).
+
+**Read the +0.25 as "preserves the machine-readable marker under pressure", not
+as the anti-fabrication behavior the scenario is named for** — that behavior is
+at ceiling in both arms. Scenario rename is booked to P7.
 
 ## v6 P5 — Track C (obsidian) coverage
 
@@ -312,15 +324,16 @@ such rather than upgraded after the fact.
 Both are `scope: skill`, so treatment is *intended* to receive the target
 `SKILL.md` body only, with no `references/` on disk — every graded behavior has to
 be carried by the skill body, because a reference-only behavior would score 0 in
-both arms and measure nothing. **That intent did not hold for one diagramming
-treatment trial** (isolation escape, below).
+both arms and measure nothing. **That intent did not hold for the diagramming
+treatment arm** — one escaped trial in the worker's run, then 5/5 in the final
+re-run (see the F2 section below).
 
 ### Measured outcomes
 
 | Skill | Preflight | A/B result | Tier |
 |---|---|---|---|
 | `maintaining-obsidian` | PASS, baseline 67% | baseline 0.72 / 60% → treatment 0.80 / 100%; **delta +0.08 CI[−0.06, 0.22]**, harness verdict INCONCLUSIVE | **Non-regression.** Meets the ≥0 floor on the point estimate; not a demonstrated lift |
-| `diagramming-obsidian` | PASS, baseline 0% | baseline 5/5 valid and **0/5 passed**; treatment **0/5 valid** | **INSUFFICIENT_DATA.** No delta computed or reported |
+| `diagramming-obsidian` | PASS, baseline 0% | worker run: treatment 0/5 valid → INSUFFICIENT_DATA. Orchestrator re-run `20260813-120453`: baseline 0.55 / treatment 0.85 at k=4 (trial 2 lost to a grader fault in **both** arms), point delta +0.30 | **NO VALID MEASUREMENT — unmet-but-covered.** The re-run's +0.30 is invalidated by a full-arm isolation escape (below); recorded under the pre-registered stop clause (如實記錄), not passed |
 
 Neither is a discrimination-tier result. Full diagnosis, per-trial vectors, and the
 instrument defects behind them are in
@@ -331,6 +344,30 @@ flips; the diagramming treatment arm failed on reproduced `model_grader_failed`
 plus a trial that escaped isolation and read the real repo's `references/`. Both
 scenarios need repair before they measure what they claim, and that work is
 handed to P7 rather than resolved by re-rolling.
+
+### Diagramming final run — why +0.30 is not a result (P5 gate F2)
+
+The orchestrator's clean-pool re-run (`20260813-120453`, main repo) produced
+baseline 0.55 / treatment 0.85 / point delta +0.30 at k=4 — and the P5 gate
+verifier's per-trial audit invalidated it: **all 5 treatment trials escaped
+isolation and read the real repo's `references/`** (baseline 0/5; treatment
+trial 3 ran `find /Users/gregho/GitHub/AI/arcforge … -name "diagramming-obsidian"`,
+an active search outside the trial directory). The entire +0.30 sits on
+assertions A0 (no hand-written `.excalidraw.md`) and A3 (palette must be
+declared) — the two whose validity premise, written in the scenario's own Design
+Notes, is that `references/` is **absent** from the trial; the escaped trials
+read `save-format.md`, `element-templates.md`, `color-palette.md`. The
+assertions untouched by the escape (A1/A2/A4) net to exactly 0. One escaped
+trial also **edited the shipped tree** (`render_template.html`, an unreviewed
+esm.sh version pin — discarded) and left a `.venv` (removed).
+
+Conclusion: no valid diagramming measurement exists in the corpus. Recorded as
+**unmet-but-covered** under the pre-registered stop clause. Preconditions for a
+valid measurement, booked to P7: enforced trial isolation (a real sandbox, not
+prose instruction — the harness's "do not access files outside this directory"
+is advisory) and the position-correlated `model_grader_failed` fault. The raw
+run dirs were workspace-ephemeral; the numbers above were independently
+recomputed from the raw JSONLs by the gate verifier before cleanup.
 
 Gate-level recording is in the P5 notes in `docs/plans/v6/progress.md`, which this
 worker does not edit.
