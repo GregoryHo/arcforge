@@ -88,7 +88,7 @@ Flow elements at x=50 (left), evidence at x=400 (right). They share Y-ranges but
 **Use `plan_layout.py` to compute coordinates automatically:**
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/skills/arc-diagramming-obsidian/references && \
+cd "$BASE/references" && \
   uv run python plan_layout.py /tmp/diagram-spec.json --output /tmp/layout.json --ea-script
 ```
 

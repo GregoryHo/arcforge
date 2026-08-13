@@ -36,6 +36,7 @@
 | `code-review` | model-invoked | P4 重新推導維持預填值：觸發條件是「有一份改動已經寫完、要交出去」，這是任務中途的狀態，agent 比使用者更早看見。要求使用者記得喊 `/code-review` 的失敗模式是不對稱的——記得喊的那次通常本來就會被審，忘記喊的那次正是最該被審的那次（趕時間、覺得改動很小、對自己的實作有信心）。回饋回來要處理的那半同理：回饋抵達時 agent 正在讀它，此刻才是紀律要生效的時點。 |
 | `completion-evidence` | **不是 skill（P4 裁決）** | 判準問「agent 該不該自己伸手去拿」，但這支的內容是「宣稱完成前要有證據」——一個會在它最該生效時被略過的 agent，同樣不會伸手去載入它；一個會伸手的 agent 已經在遵守它了。獨立成 skill 的結構是自我否證的。改以 `skills/code-review/references/completion-evidence.md` 承載（查表面），並由各 skill 在自己的完成判準內就地內聯。**無 router 列、無 invocation 類別**——reference 檔兩者皆不需要，schema §5.3 的 supporting-file 存在性守衛即為其把關。 |
 | `sessions` | model-invoked | P4 重新推導維持預填值：觸發條件是「工作要停在半途、之後要被別人或明天的自己接手」。使用者說「我先走了」時已經在離場，此刻要求他先想起打 `/sessions` 正好落在最不可能發生的時點；agent 該自己伸手。resume 方向同理——使用者說「昨天做到哪」時要的是狀態，不是先學會一個指令名。 |
+| `diagramming-obsidian` | model-invoked | P5 重新推導維持預填值：觸發條件是「這件事講不清楚，需要一張圖」——它在解釋途中冒出來，而且最常由 agent 先察覺（`maintaining-obsidian` 的 Visuals 步驟走到 Q4 就是這個時點）。要求使用者先打 `/diagramming-obsidian` 等於要求他在還沒看到解釋之前就決定需要圖。**另有結構性約束**：本支是 `maintaining-obsidian` 的 prose 委派 target，依 schema §3.1，user-invoked 不可被 prose-invoke——落地為 user-invoked 會使那條委派非法，只能改成叫使用者手動轉場，而委派發生的時點（ingest 途中）使用者不在場。判準與守衛在此指向同一結論。 |
 | `maintaining-obsidian` | model-invoked | P5 重新推導維持預填值：觸發語句是「這個存一下」「我筆記裡對 X 有寫什麼」——說出這句話的人腦中沒有任何指令名，他甚至不必知道 vault 系統存在。要求先打 `/maintaining-obsidian` 等於要求使用者先知道答案（與 `using` 同構的失敗）。反向也成立：query 模式存在的目的是攔下「用通識回答一個該由 vault 回答的問題」，而那個誤答正是 agent 自己在任務中途做出的選擇，使用者看不到、無從呼叫。**附帶約束**：本支的 Visuals 步驟以 prose 呼叫 `/diagramming-obsidian`，依 schema §3.1 該 target 必須是 model-invoked——兩支同為 model-invoked 才使這條委派合法。 |
 
 ## 預填（P4–P6，**非約束**）

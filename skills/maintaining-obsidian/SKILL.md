@@ -112,8 +112,8 @@ is running, `obsidian:defuddle` for URL extraction. Full routing table:
 `references/delegation.md`; the CLI's traps (`file=` vs `path=`, SIGPIPE on
 piped reads, Daily Notes detection): `references/obsidian-cli-quirks.md`.
 
-Excalidraw diagrams are not this skill's work — hand them to the Excalidraw
-diagramming skill, and only after the user approves the diagram.
+Excalidraw diagrams are not this skill's work — invoke `/diagramming-obsidian`,
+and only after the user has approved the diagram.
 
 ## Close every operation
 

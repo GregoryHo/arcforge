@@ -1,7 +1,7 @@
 """Detect overlapping elements in Excalidraw JSON and suggest fixes.
 
 Usage:
-    cd skills/arc-diagramming-obsidian/references
+    cd <this skill's references/ directory>
     uv run python check_overlaps.py <path-to-file.excalidraw> [--min-overlap 100] [--padding 10]
 
 Detects:

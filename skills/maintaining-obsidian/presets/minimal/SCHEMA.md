@@ -65,7 +65,7 @@ aliases: []
 - **Embed:** when to embed images.
 - **Mermaid:** when to add a relationship diagram.
 - **Canvas:** when to use Obsidian Canvas.
-- **Excalidraw:** when to delegate to the Excalidraw diagramming skill.
+- **Excalidraw:** when to delegate to `/diagramming-obsidian`.
 ```
 
 When you've added at least one type, ingest mode can classify and create

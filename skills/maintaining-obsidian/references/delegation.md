@@ -14,7 +14,7 @@ edge cases.
 | Active vault detection / Daily Notes append / plugin state | `obsidian:obsidian-cli` | Best-effort runtime side effects. See `obsidian-cli-quirks.md`. |
 | Markdown formatting / wikilink-aware edits | `obsidian:obsidian-markdown` if available; otherwise ordinary file edits | Plugin tools optional. |
 | Canvas (`.canvas` JSON file) creation | `obsidian:json-canvas` | MOC visualizations, etc. |
-| Excalidraw diagrams | the Excalidraw diagramming skill | User must approve. Never auto-create. |
+| Excalidraw diagrams | `/diagramming-obsidian` | User must approve. Never auto-create. |
 | URL content extraction | `obsidian:defuddle` | Defuddle first; WebFetch only for raw text / API endpoints. See `raw-sources.md` Paper URL chain. |
 
 ## Search-route selection

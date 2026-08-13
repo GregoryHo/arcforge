@@ -70,7 +70,7 @@ Read `SCHEMA.md` for domain-specific rules: tag taxonomy, Source / Entity / Synt
 - Search baseline: filesystem search/read over Markdown files.
 - Optional QMD: not required. If enabled in the registry, use it as semantic/hybrid acceleration and sync it after ingest/audit LINK.
 - Obsidian runtime: optional. Use `obsidian-cli` for active vault detection, Daily Notes append, plugin state, and live search when available; ordinary Markdown maintenance must work with Obsidian closed.
-- Excalidraw: delegate to the Excalidraw diagramming skill only after user approval.
+- Excalidraw: delegate to `/diagramming-obsidian` only after user approval.
 
 ## Maintenance Workflows
 

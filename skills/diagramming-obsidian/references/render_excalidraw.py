@@ -1,11 +1,11 @@
 """Render Excalidraw JSON to PNG using Playwright + headless Chromium.
 
 Usage:
-    cd skills/arc-diagramming-obsidian/references
+    cd <this skill's references/ directory>
     uv run python render_excalidraw.py <path-to-file.excalidraw> [--output path.png] [--scale 2] [--width 1920]
 
 First-time setup:
-    cd skills/arc-diagramming-obsidian/references
+    cd <this skill's references/ directory>
     uv sync
     uv run playwright install chromium
 """
@@ -81,7 +81,7 @@ def render(
         from playwright.sync_api import sync_playwright
     except ImportError:
         print("ERROR: playwright not installed.", file=sys.stderr)
-        print("Run: cd skills/arc-diagramming-obsidian/references && uv sync && uv run playwright install chromium", file=sys.stderr)
+        print("Run: cd this skill's references/ directory, then uv sync && uv run playwright install chromium", file=sys.stderr)
         sys.exit(1)
 
     # Read and validate

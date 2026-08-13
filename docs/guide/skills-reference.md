@@ -11,7 +11,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
   - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [arc-journaling](#arc-journaling) · [arc-reflecting](#arc-reflecting) · [arc-learning](#arc-learning) · [arc-recalling](#arc-recalling) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
-  - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
+  - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
   - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [arc-evaluating](#arc-evaluating)
 - [Workflow Patterns](#workflow-patterns)
 - [Comparison Tables](#comparison-tables)
@@ -549,7 +549,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 **Purpose:** Vault interface — resolves which registered Obsidian vault to operate on (via `--vault=<name>`, cwd match, or the single-vault default), then dispatches one of three universal actions (ingest, query, audit) against that vault's paired contract (`AGENTS.md` runtime contract + `SCHEMA.md` domain schema). Vaults are domain-agnostic; `init-vault` bootstraps a new vault from a preset (minimal, llm-wiki, news, project-tracker).
 
-**When to use:** When saving notes/ideas/URLs, querying vault knowledge, auditing vault health, or initializing/registering a vault. Not for diagrams — use the Excalidraw diagramming skill.
+**When to use:** When saving notes/ideas/URLs, querying vault knowledge, auditing vault health, or initializing/registering a vault. Not for diagrams — use `/diagramming-obsidian`.
 
 **Key workflow:**
 - **Registry-level** (vault-agnostic): `init-vault <path> --name <name> [--preset=<minimal|llm-wiki|news|project-tracker>]` runs an 11-step bootstrap that authors `AGENTS.md` + `SCHEMA.md` from the chosen preset and registers the vault; `register` / `unregister` / `set-default` / `list-vaults` manage the vault registry through `arcforge obsidian`.
@@ -561,11 +561,11 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: URLs, files, text descriptions, natural-language queries
 - Output: typed notes per the vault's `SCHEMA.md`; language format (e.g. bilingual `[!multi-lang-{code}]` callouts under the llm-wiki/minimal presets, vs single-language body text under news/project-tracker) is declared in that vault's `AGENTS.md` Language Policy; audit reports under `_audits/audit-YYYY-MM-DD-<scope>.md`, rolling `index.md` and `log.md`
 
-**Related:** user input --> **maintaining-obsidian** (three modes) --> vault state updated. Delegates Excalidraw creation to **arc-diagramming-obsidian** via the Visuals decision tree.
+**Related:** user input --> **maintaining-obsidian** (three modes) --> vault state updated. Delegates Excalidraw creation to **diagramming-obsidian** via the Visuals decision tree.
 
 ---
 
-### arc-diagramming-obsidian
+### diagramming-obsidian
 
 **Platform:** All platforms. Requires an Obsidian vault with the Excalidraw community plugin installed.
 
@@ -584,7 +584,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: concept description, existing vault note to visualize, or relationship graph
 - Output: `.excalidraw.md` file in the vault's Excalidraw folder, ready for embedding via `![[filename]]`
 
-**Related:** `/maintaining-obsidian` (Visuals step, Q4 spatial complexity) --> **arc-diagramming-obsidian** --> diagram embedded in the originating note
+**Related:** `/maintaining-obsidian` (Visuals step, Q4 spatial complexity) --> **diagramming-obsidian** --> diagram embedded in the originating note
 
 ---
 
