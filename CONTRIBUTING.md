@@ -168,7 +168,7 @@ description: Use when [specific triggering conditions and symptoms]
 
 ### Test File
 
-No per-skill test file is needed. A single generic checker, `tests/skills/test_skill_structure.py`, discovers every `skills/*/SKILL.md` dynamically and validates frontmatter, `name` == directory, a non-empty description, at least one `## ` section, resolvable cross-references, referenced supporting files, and the line budget. Make sure `npm run test:skills` passes; behavioral protection lives in the eval layer (see `arc-evaluating`), not in pytest.
+No per-skill test file is needed. A single generic checker, `tests/skills/test_skill_structure.py`, discovers every `skills/*/SKILL.md` dynamically and validates frontmatter, `name` == directory, a non-empty description, at least one `## ` section, resolvable cross-references, referenced supporting files, and the line budget. Make sure `npm run test:skills` passes; behavioral protection lives in the eval layer (see `/evaluating`), not in pytest.
 
 ### Quick Checklist
 

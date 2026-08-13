@@ -34,10 +34,19 @@ The following evidence items are the ONLY evidence you may cite. Each item has a
 Evidence comes in four types:
 - **observation** — individual tool call events captured from Claude Code sessions
 - **diary** — bounded session diary summaries
-- **reflect** — cross-session reflection patterns from past `arc-reflecting` operations
-- **recall** — manually captured insights from past `arc-recalling` operations
+- **reflect** — cross-session reflection patterns from past reflection operations
+- **recall** — manually captured insights from past manual-recall operations
 
 Every item in the batch below has an `evidence_id`. You MUST use those IDs when citing evidence in `evidence_refs`.
+
+**Copy each `evidence_id` character-for-character, including the trailing hash segment.** An `evidence_id` is one opaque token — it only looks structured. The trailing hex is part of the identity, not a checksum you may drop:
+
+- `ev_obs_0007_d5a4b8cc` ✅ — the whole token
+- `ev_obs_0007` ❌ — trailing hash removed; this ID does not exist and the proposal is rejected
+- `evd-diary-1a2b3c4d5e6f` ✅ — diary/reflect/recall IDs use hyphens and a longer hash; same rule
+- `evd-diary` ❌
+
+A proposal citing a shortened ID is discarded whole, however good the analysis is. Prefer copy-paste over retyping.
 
 {{EVIDENCE_ITEMS}}
 
@@ -72,17 +81,23 @@ Respond with a single JSON object matching the `CandidateProposalPayload` schema
         "kind": "project",
         "project_id": "<project_id from evidence items>"
       },
-      "name": "<kebab-case-name>",
+      "name": "<kebab-case-name, max 120 chars>",
       "summary": "<one sentence, max 600 chars>",
       "rationale": "<explain why this pattern is worth learning, max 2000 chars>",
       "domain": "<workflow|tool-preference|error-handling|code-style|verification|privacy-safety|other>",
+      "trigger": "<optional: when this instinct applies, max 600 chars — omit the key if unused>",
       "body": "<the instinct body text that would guide future behavior, max 6000 chars>",
       "body_source": "llm_curator",
       "evidence_refs": [
         {
-          "evidence_id": "<must be one of the evidence_ids in the batch above — all 4 evidence types are citable>",
-          "evidence_type": "<observation|diary|reflect|recall>",
-          "relevance": "<brief reason why this evidence supports the proposal>"
+          "evidence_id": "ev_obs_0007_d5a4b8cc",
+          "evidence_type": "observation",
+          "relevance": "<required, non-empty: why this item supports the proposal>"
+        },
+        {
+          "evidence_id": "evd-diary-1a2b3c4d5e6f",
+          "evidence_type": "diary",
+          "relevance": "<required, non-empty: why this item supports the proposal>"
         }
       ],
       "llm_confidence": "<low|medium|high>",
@@ -96,16 +111,21 @@ Respond with a single JSON object matching the `CandidateProposalPayload` schema
 
 ## Proposal Rules
 
-1. **Only cite existing evidence_ids** — every `evidence_id` in `evidence_refs` must exactly match an `evidence_id` from the evidence batch above.
-2. **Minimum 2 evidence refs per proposal** — do not create a proposal from a single observation.
-3. **Maximum 5 proposals** — prefer fewer, higher-confidence proposals over many weak ones.
-4. **Only `artifact_type: "instinct"`** — no other artifact types are permitted in this run.
-5. **If evidence is weak**, output `recommended_review_action: "needs_more_evidence"` or return `proposals: []`.
-6. **`body_source` must be `"llm_curator"`** — exactly this string, no variation.
-7. **`proposed_scope.kind` must be `"project"`** — global promotion happens through the dashboard.
-8. **Do not assign `candidate_id`** — that is assigned by Layer 5.
-9. Each proposal's `body` should be a concise instinct statement that would guide Claude Code behavior if activated. Write it as a direct behavioral guideline.
-10. `run_id` must match the pattern `curator_run_<compact UTC timestamp>_<12 hex chars>`.
+1. **Every `evidence_id` must match a batch ID exactly, character for character** — including the trailing hash segment (`ev_obs_0007_d5a4b8cc`, not `ev_obs_0007`). Comparison is exact and fail-closed: one shortened ID discards the entire proposal. Cite only IDs that appear in the batch above.
+2. **Between 2 and 5 evidence refs per proposal — never more than 5.** One observation is not a pattern, and more than five is rejected outright rather than truncated. When a pattern shows up in ten places, cite the **five strongest** and say "recurring across the batch" in `rationale`; do not list them all.
+3. **Every `evidence_type` must match what the batch says that item is.** Copy it from the item's `**evidence_type**` line — claiming `diary` for an item the batch lists as `observation` discards the proposal.
+4. **Cite only items whose `evidence_status` is `present`.** Items marked `omitted_no_input`, `omitted_safety` or `omitted_unsupported_tool` appear in the batch for completeness but carry no usable content; citing one discards the proposal.
+5. **Every evidence ref needs a non-empty `relevance`** — one clause on why that item supports this proposal. It is a required field, not decoration.
+6. **Maximum 5 proposals** — prefer fewer, higher-confidence proposals over many weak ones.
+7. **Only `artifact_type: "instinct"`** — no other artifact types are permitted in this run.
+8. **If evidence is weak**, output `recommended_review_action: "needs_more_evidence"` or return `proposals: []`.
+9. **`body_source` must be `"llm_curator"`** — exactly this string, no variation.
+10. **`proposed_scope.kind` must be `"project"`**, and `proposed_scope.project_id` must be non-empty — copy the `project_id` from the evidence items. Global promotion happens through the dashboard.
+11. **`domain` must be one of** `workflow` · `tool-preference` · `error-handling` · `code-style` · `verification` · `privacy-safety` · `other`. No other value is accepted.
+12. **Length limits, enforced — over the limit is rejected, not truncated**: `name` ≤ 120, `summary` ≤ 600, `rationale` ≤ 2000, `body` ≤ 6000, `trigger` ≤ 600. All character counts.
+13. **Do not assign `candidate_id`** — that is assigned by Layer 5.
+14. Each proposal's `body` should be a concise instinct statement that would guide Claude Code behavior if activated. Write it as a direct behavioral guideline.
+15. `run_id` must match the pattern `curator_run_<compact UTC timestamp>_<12 hex chars>`.
 
 ## If No Patterns Found
 
@@ -127,3 +147,7 @@ If the evidence does not contain enough signal for a reliable proposal, return:
   "proposals": []
 }
 ```
+
+## Before You Emit
+
+Check each `evidence_id` you wrote against the batch above and confirm the whole token matches — the trailing hash included. This is the single most common way a sound proposal is thrown away: the analysis is right, an ID was shortened, and the fail-closed validator discards everything. Fix any mismatch before responding.

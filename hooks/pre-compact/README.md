@@ -40,7 +40,7 @@ This ensures diary capture only happens for meaningful sessions.
 
 When the threshold is met, the hook calls `addPendingAction(project, 'diary-ready', …)`.
 The next `SessionStart(source: "compact")` surfaces it via inject-context.js as
-"📝 Diary draft ready — use /arcforge:arc-journaling …".
+"📝 Diary draft ready …" pointing at /arcforge:learning.
 
 ## Session File Format
 

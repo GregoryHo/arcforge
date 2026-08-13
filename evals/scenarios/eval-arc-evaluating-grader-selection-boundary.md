@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing an eval plan for a skill release. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on grader choice and the release claim.
 
 ## Context
-This checks whether `arc-evaluating` separates structural/code grading from semantic quality grading. The expected behavior is to use code graders for deterministic structure and model/human grading for qualitative eval-design judgment, not to treat schema validity as proof of behavioral quality.
+This checks whether `evaluating` separates structural/code grading from semantic quality grading. The expected behavior is to use code graders for deterministic structure and model/human grading for qualitative eval-design judgment, not to treat schema validity as proof of behavioral quality.
 
 ## Preflight
 skip

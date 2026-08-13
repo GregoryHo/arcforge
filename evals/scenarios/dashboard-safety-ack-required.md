@@ -6,7 +6,7 @@
 skill
 
 ## Target
-skills/arc-learning/SKILL.md
+scripts/lib/learning-dashboard.js
 
 ## Scenario
 A reviewer loads the dashboard and sees candidate `cand_safety_ack_001`

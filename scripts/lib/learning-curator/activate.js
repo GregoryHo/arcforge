@@ -9,7 +9,6 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const crypto = require('node:crypto');
 
 const {
@@ -17,6 +16,7 @@ const {
   sha256Truncated,
   sanitizeProjectName,
   getProjectName,
+  getArcforgeHome,
 } = require('../utils');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
@@ -189,7 +189,7 @@ function getActivationLockPath(arcforgeRoot) {
  * @returns {object} ActivationPolicy
  */
 function defaultActivationPolicy(arcforgeRoot) {
-  const root = arcforgeRoot || path.join(os.homedir(), '.arcforge');
+  const root = arcforgeRoot || getArcforgeHome();
   return {
     policy_version: 'v1',
     allowed_target_kinds: FIRST_SLICE_TARGET_KINDS,
@@ -350,7 +350,7 @@ function activate({
   activationPolicy,
   arcforgeRoot,
 }) {
-  const effectiveRoot = arcforgeRoot || path.join(os.homedir(), '.arcforge');
+  const effectiveRoot = arcforgeRoot || getArcforgeHome();
   const effectivePolicy = activationPolicy || defaultActivationPolicy(effectiveRoot);
   const actor = { layer: 8, actor_type: 'activation_gate' };
 
@@ -579,7 +579,7 @@ function deactivate({
   activationPolicy,
   arcforgeRoot,
 }) {
-  const effectiveRoot = arcforgeRoot || path.join(os.homedir(), '.arcforge');
+  const effectiveRoot = arcforgeRoot || getArcforgeHome();
   const effectivePolicy = activationPolicy || defaultActivationPolicy(effectiveRoot);
   const actor = { layer: 8, actor_type: 'activation_gate' };
 

@@ -6,7 +6,7 @@
 skill
 
 ## Target
-skills/arc-learning/SKILL.md
+scripts/lib/learning-dashboard.js
 
 ## Scenario
 A project-scoped instinct candidate with status `pending_review` exists in

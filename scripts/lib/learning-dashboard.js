@@ -18,9 +18,10 @@
  */
 
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+
+const { getArcforgeHome } = require('./utils');
 
 const { readCurrentCandidates, appendCandidate } = require('./learning-curator/queue-writer');
 const {
@@ -48,7 +49,7 @@ const {
 // ---------------------------------------------------------------------------
 
 function getArcforgeRoot() {
-  return path.join(os.homedir(), '.arcforge');
+  return getArcforgeHome();
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +285,7 @@ function createDashboardModel() {
 // ---------------------------------------------------------------------------
 
 function getAuditLogPath() {
-  return path.join(os.homedir(), '.arcforge', 'learning', 'dashboard', 'actions.jsonl');
+  return path.join(getArcforgeHome(), 'learning', 'dashboard', 'actions.jsonl');
 }
 
 function writeAuditEntry(entry) {

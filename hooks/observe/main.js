@@ -26,6 +26,10 @@ function learningDefinitelyDisabled() {
   if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return true;
   if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return true;
   const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  // Deliberately NOT getArcforgeHome() from utils: this runs before the heavy
+  // requires below, and importing utils here would defeat the fast path. This
+  // must stay byte-equivalent to utils.getArcforgeHome() — same env var, same
+  // fallback. It is the one sanctioned copy of that resolution.
   const override = process.env.ARCFORGE_HOME;
   const arcforgeHome = override?.trim() ? override : path.join(os.homedir(), '.arcforge');
   const projectConfig = path.join(projectRoot, '.arcforge', 'learning', 'config.json');

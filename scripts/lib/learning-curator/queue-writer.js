@@ -6,7 +6,10 @@
  *   rejectProposal(reasons, source)   — append rejection record to rejections.jsonl
  *   readCurrentCandidates()           — replay queue.jsonl, return current candidate map
  *
- * Paths are derived at call time from HOME so tests can redirect via process.env.HOME.
+ * Paths are derived at call time through getArcforgeHome(), so ARCFORGE_HOME
+ * redirects the whole candidate store (eval trials, e2e probes) and tests can
+ * still redirect HOME. Before v6/P5 this resolved os.homedir() directly, which
+ * meant an "isolated" trial wrote candidates into the real user home.
  *
  * All writes acquire ~/.arcforge/learning/candidates/store.lock (exclusive).
  * Sanitizer (scripts/lib/sanitize-observation.js) runs on body and every
@@ -15,18 +18,18 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const crypto = require('node:crypto');
 
 const { validateCandidateV1 } = require('./schema');
 const { redactObservationText } = require('../sanitize-observation');
+const { getArcforgeHome } = require('../utils');
 
 // ---------------------------------------------------------------------------
-// Path helpers — evaluated lazily so tests can redirect HOME
+// Path helpers — evaluated lazily so ARCFORGE_HOME/HOME can be redirected
 // ---------------------------------------------------------------------------
 
 function getCandidatesDir() {
-  return path.join(os.homedir(), '.arcforge', 'learning', 'candidates');
+  return path.join(getArcforgeHome(), 'learning', 'candidates');
 }
 
 function getQueuePath() {

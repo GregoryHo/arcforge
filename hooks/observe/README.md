@@ -1,6 +1,6 @@
 # Observe Hook
 
-Captures tool calls for behavioral pattern observation (arc-learning).
+Captures tool calls for behavioral pattern observation.
 
 ## Trigger
 
@@ -18,5 +18,5 @@ capped in size (`MAX_INPUT_LENGTH`, `MAX_FILE_SIZE`) before being written.
 
 ## Related
 
-See `skills/arc-learning/SKILL.md` for the full observation → instinct
+See `docs/guide/learning-dashboard.md` for the full observation → instinct
 pipeline this hook feeds into.

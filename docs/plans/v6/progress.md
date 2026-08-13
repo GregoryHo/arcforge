@@ -15,7 +15,7 @@
 - [x] P2 引擎瘦身 + 反向耦合翻正 — gate: PASS (2026-07-31, PR #137, tag gate-p2)
 - [x] P3 meta skill + 2 pilots + 最小 eval 迴路 — gate: PASS (2026-08-01, PR #138, tag gate-p3)
 - [x] P4 紀律叢集 — gate: PASS (2026-08-13, PR #139, tag gate-p4；首次 FAIL→補救→再驗)
-- [ ] P5 保留系統叢集（D1/D8 驗證場）
+- [x] P5 保留系統叢集（D1/D8 驗證場）— gate: PASS (2026-08-14, PR #140, tag gate-p5；首驗 FAIL→補救→再驗 PASS)
 - [ ] P6 workflow 叢集 + router 收斂
 - [ ] P6.5 bucket 落地（spike PASS → 執行）
 - [ ] P7 eval 語料庫重建 + 全量 benchmark
@@ -94,6 +94,59 @@
 - two-axis 的 +0.40 證明的是「報告形狀」（兩軸不合併 + plan-mandated 缺陷仍報），非 dispatch 機制本身（1/5 trial 內聯自審仍滿分）——如實定位。
 - **掛帳 P7（儀器）**：缺陷 A（SIGTERM trial 不標 infraError；修法約束＝killed 且最終輸出未完成，見 absorption-map 附錄）；duration_ms 低報（eval.js:228 優先採 stream-json 值）；finishing description no-summarize 違規（**明確改派 P7**，前提「動它需自帶 baseline」不變）；sessions 的 scenario 結構守衛等價物；range-fidelity/answering-feedback 兩 scenario 無實測池。
 - P3 掛帳的 §3.1/§5.2 mutation 重跑：P4 無新 user-invoked skill，N/A，順延至下一支 user-invoked 落地時。
+
+## P5 任務（全數完成，PR #140，三路 worker + orchestrator 接手量測）
+
+**預登記行為門檻**（開跑前寫死，禁事後定義）：
+
+1. **learning e2e（旗艦 AC，binary）**：以 `--plugin-dir <本樹>` 在隔離環境走完
+   observe→daemon→curator→queue，佇列新增 ≥1 條源自 probe session 的候選；再走
+   approve→materialize→activate 產出 active instinct，SessionStart 注入可見。
+   證據一律檔案面（queue.jsonl／drafts／instincts／注入輸出），不採信 agent 自述。
+   不得汙染使用者真實 `~/.arcforge` 的 learning 狀態（隔離或事後可證清理）。
+2. **eval scenario**：`learning`、`evaluating` 各 ≥1 scenario delta > 0（CI 下界 ≥0）；
+   `maintaining-obsidian`、`diagramming-obsidian` 各 ≥1 scenario delta ≥ 0（非退化底線）。
+   delta=0 → redesign（≤2 次）仍 0 → 如實記錄，不得宣告有效。
+3. **回歸**：P3/P4 既有 scenario 全數非退化。
+
+任務：
+
+- [x] Track A — `learning`（L，loop，四支合一）：skill-local scripts（diary/reflect/instinct/recall.js）
+  邏輯上收 `scripts/lib`，CLI `learn` 新增 diary/reflect/instinct/recall 子群（cli-manifest 同 commit）；
+  `hooks/session-tracker/end.js` 改 require canonical lib → **D8 allowlist 歸零**（測試翻轉為
+  `toEqual([])`）；inject-context nudge 改指新 skill；jest 四支測試改指 lib/CLI；
+  `skills/learning/SKILL.md`（≤250 行+refs，invocation 以判準重推導，預填 user-invoked）；
+  刪 4 legacy dirs + legacy-skills.json 同 commit 剪 4 條；router 列；invocation-table 更新已落地；
+  instinct/diary/operation-record schema 測試（壞樣本紅）；+1 scenario；e2e probe
+- [x] Track B — `evaluating`（M）：方法論 prose only（機制已在 `arcforge eval ...`）；刪
+  arc-evaluating + json 剪 1 條；9 支 eval-arc-evaluating-* scenario 的 Target retarget 或除役
+  （check:eval-targets 綠）；router 列；+1 scenario
+- [x] Track C — obsidian 兩支（M）：`maintaining-obsidian`（registry 操作走 `arcforge obsidian ...`）、
+  `diagramming-obsidian`（Python 工具留 skill 內自足，`npm pack` 無 .venv）；刪 2 legacy dirs +
+  json 剪 2 條；router 兩列；各 +1 scenario
+- [x] 機械 AC（gate step 1）：npm test 5 runner + 5 check 全綠；D8 歸零斷言；schema 測試 ×3；
+  `npm pack --dry-run 2>&1 | grep -c .venv`==0（Track C 發現原式空洞：清單走 stderr，
+  `2>/dev/null` 版恆為 0；修正版經 mutation 驗證可證偽）；test:observer-daemon 綠；4 支新 skill 過 pytest 全規則；
+  router bijection；legacy json 16→9（ratchet 同 commit）；`git grep` 四支 learning 舊名於
+  hooks/、scripts/ 歸零
+- [x] §3.1/§5.2 mutation 重跑（若 `learning` 落地為 user-invoked——即第二支 user-invoked，清 P3 掛帳）
+- [x] gate 五步（機械→行為→verifier→進度/tag `gate-p5`→使用者確認）
+
+### P5 gate 備註
+
+- **首驗 FAIL→補救（ac7c696）→再驗 PASS**。FAIL 兩因：(F2) diagramming 最終 run 的 +0.30 無效——treatment 5/5 逃逸隔離讀走真 repo references（baseline 0/5；一 trial 主動 `find` 外搜），全額 delta 落在效力前提「references 不在磁碟」被摧毀的 A0/A3；(F1) 耐久紀錄與 gate 主張矛盾（coverage 檔仍寫 NOT RUN／舊 INSUFFICIENT_DATA）——**P4 教訓（gate 交付物必須落耐久載體）第二次觸發**。診斷全文：`evals/skill-eval-coverage.md` F2 節。
+- **行為門檻結果（約束性措辭，per verifier）**：
+  - `learning`：e2e 旗艦 AC **PASS**（五輪收斂：空證據→id 截短→refs 上限→safety ack→全鏈路，證據 `p5-learning-e2e-evidence.md` §15）；scenario v2 IMPROVED **+0.25 CI[0.25,0.25]**——讀作「機器可讀標記保留」，**不得讀作**名稱宣稱的「反捏造」（該行為兩臂天花板；改名掛 P7）。
+  - `evaluating`：**unmet-but-covered**（−0.16 全額為工具形狀 artifact，方法論斷言 10/10 兩臂天花板；v2 preflight BLOCK；依預登逃生條款如實記錄，非達成）。
+  - `maintaining-obsidian`：**+0.08** 達 ≥0 底線（點估計；A1 斷言缺陷 10/10 全 0 如實記錄，掛 P7）。
+  - `diagramming-obsidian`：**unmet-but-covered，且「非退化」本身未經檢查**——無任何有效量測，不是通過，是未檢查；P7 不得寫成底線已驗。
+  - 回歸（門檻 3）：以不變性成立（9 支 P3/P4 scenario diff 全空；7 skill 目錄僅 `using` +4 純新增列）；引擎有動（偏離 a），P7 全量 benchmark 為必要收口。
+- **偏離裁定**：a 引擎缺陷修正接受——home resolver 統一／curator evidence 縫接通／渲染補 operation_kind／observer-prompt 契約補齊，mutation 回歸鎖 **3/4**（prompt 硬化無單元測試，僅 live probe，邊界已標註）；b npm pack 檢查式修正（`2>&1`）接受；c、d 依逃生條款；e 接受附殘留風險；f 接受附讀法約束；g 池隔離接受（第二次逃逸未被揭露係 orchestrator 接手量測後未做逃逸稽核，缺口實存、非隱瞞）。
+- **e2e AC 的實質產出**：三個影響真實使用者的靜默引擎缺陷被挖出並修復（daemon 記成功、退件只進 dashboard 不顯示的 rejections.jsonl）：curator 一直在空證據上提案（欄位縫自 5f8c8b5 未接通）、隔離依賴雙 home resolver、Haiku 提案被 prompt↔validator 契約缺口系統性退件。
+- **事實更正（verifier）**：evaluating／maintaining 的 run dir 位於 agent worktree（數字經 verifier 從原始 JSONL 重算後才清除 worktree）；P3/P4 回歸清單為 9 支 scenario 非 8。
+- **掛帳 P7（儀器，本 gate 產出）**：harness 強制隔離（`--append-system-prompt` 是勸告不是沙箱）；位置相關 `model_grader_failed`（兩環境重現）；learning scenario 改名；maintaining A1 重寫；evaluating skill 存廢重估（天花板證據在案）；**subagent 背景 eval 程序隨 agent 睡眠被回收——長時量測必須由常駐 session 執行**（本 phase 兩次死池的根因）。
+- **掛帳 P7/P8（出貨面缺陷，來自被捨棄的逃逸 diff 的真發現）**：`diagramming-obsidian/references/render_template.html` 未 pin 的 esm.sh import 在 runtime 因傳遞相依 `@braintree/sanitize-url@6.0.2` 404 而掛住 module load；`@excalidraw/excalidraw@0.18.0` 經該 trial 實測可載入。不採納未審查寫入；修復須自帶驗證重做。
+- **掛帳 P6/P7**：dashboard 不呈現 `rejections.jsonl`（curator 提案被退對使用者不可見）。
 
 ## 偏離紀錄
 

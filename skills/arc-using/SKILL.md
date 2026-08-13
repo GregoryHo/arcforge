@@ -74,19 +74,17 @@ These skills activate during a workflow when the condition is present. They are 
 | About to write implementation code | `/tdd` | Failing test before production code |
 | Test fails or unexpected behavior appears | `/debugging` | Root cause before fixes |
 | Task or feature complete, or review feedback received | `/code-review` | Two-axis review of the change, then answer the feedback on evidence |
-| User asks about vault health, missing links, or orphan notes | `arc-maintaining-obsidian` audit mode | Propose changes, never auto-modify without approval |
-| About to ship, merge, or mark complete a skill, agent, or workflow | `arc-evaluating` | Eval evidence that does not return `INSUFFICIENT_DATA` |
+| User asks about vault health, missing links, or orphan notes | `/maintaining-obsidian` audit mode | Propose changes, never auto-modify without approval |
+| About to ship, merge, or mark complete a skill, agent, or workflow | `/evaluating` | Eval evidence whose confidence interval actually supports the claim |
 
 ## Instinct & Learning Routes
 
-Four skills touch the diary/instinct system. Route by the concrete trigger, not by the word "remember" — they are distinct entry points, not interchangeable:
+The diary/instinct system is one skill, and it is user-invoked — the user types
+it, nothing routes into it:
 
 | User intent | Skill |
 |-------------|-------|
-| Capture THIS session's reflections as a diary entry | `arc-journaling` |
-| Extract recurring patterns from 5+ accumulated diaries | `arc-reflecting` |
-| Manually save ONE insight as an instinct right now | `arc-recalling` |
-| Review the learning-candidate queue, or confirm/contradict auto-detected instincts (when optional learning is enabled) | `arc-learning` |
+| Capture this session's reflections as a diary entry, extract recurring patterns from accumulated diaries, save one insight as an instinct, or review the learning-candidate queue | `learning` (user-invoked) |
 
 ## When Not to Route
 

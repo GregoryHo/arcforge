@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing an eval plan before using it as release evidence. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on model/human grader calibration and the release claim.
 
 ## Context
-This checks whether `arc-evaluating` treats model/human grading as noisy semantic judgment that needs calibration, anchored rubrics, blind comparison or human spot-checks, and repeated evidence before being used as a release gate. The expected behavior is not to treat one vague model-grader preference as deterministic proof of improvement.
+This checks whether `evaluating` treats model/human grading as noisy semantic judgment that needs calibration, anchored rubrics, blind comparison or human spot-checks, and repeated evidence before being used as a release gate. The expected behavior is not to treat one vague model-grader preference as deterministic proof of improvement.
 
 ## Preflight
 skip

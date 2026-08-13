@@ -20,6 +20,10 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
 | `/compacting` | context is filling up and you are deciding whether to compact now |
 | `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
+| `/learning` | you are capturing a session diary, mining diaries for patterns, or reviewing what the opt-in learning subsystem wants to activate (user-invoked) |
+| `/evaluating` | a claim about agent behavior needs evidence — you are designing or auditing an eval scenario, or reading a verdict out of eval numbers |
+| `/maintaining-obsidian` | something should be filed into the user's Obsidian vault, a question should be answered from it, or it needs auditing or bootstrapping |
+| `/diagramming-obsidian` | the user wants something shown visually — an architecture, a flow, a mind map — as an Excalidraw diagram in their vault |
 
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.

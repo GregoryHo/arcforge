@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 function getInstinct() {
-  return require('../../skills/arc-learning/scripts/instinct');
+  return require('../../scripts/lib/instinct-feedback');
 }
 
 function getWriter() {
@@ -188,7 +188,7 @@ describe('ICL-6: contradiction-archive deactivates a curator-activated candidate
     seedActivatedCandidate();
     writeCuratorInstinct(CANDIDATE_ID, { confidence: 0.5 });
 
-    const { cmdContradict } = getInstinct();
+    const { contradictInstinct: cmdContradict } = getInstinct();
     // 0.50 → 0.40 → 0.30 → 0.20 → 0.10 (< ARCHIVE_THRESHOLD 0.15)
     for (let i = 0; i < 4; i++) {
       cmdContradict(CANDIDATE_ID, PROJECT);
@@ -216,7 +216,7 @@ describe('ICL-6: contradiction-archive deactivates a curator-activated candidate
     seedActivatedCandidate();
     writeCuratorInstinct(CANDIDATE_ID, { confidence: 0.5 });
 
-    const { cmdContradict } = getInstinct();
+    const { contradictInstinct: cmdContradict } = getInstinct();
     for (let i = 0; i < 4; i++) {
       cmdContradict(CANDIDATE_ID, PROJECT);
     }
@@ -235,7 +235,7 @@ describe('ICL-6: contradiction-archive deactivates a curator-activated candidate
     seedActivatedCandidate();
     writeCuratorInstinct(CANDIDATE_ID, { confidence: 0.5 });
 
-    const { cmdContradict } = getInstinct();
+    const { contradictInstinct: cmdContradict } = getInstinct();
     cmdContradict(CANDIDATE_ID, PROJECT); // 0.50 → 0.40, no archive
 
     const deactivateEvents = readQueueEvents().filter(
@@ -253,7 +253,7 @@ describe('ICL-6: non-curator instinct → no event, no crash', () => {
     // No candidate seeded in the store — only a plain (non-curator) instinct file.
     writeCuratorInstinct('orphan-pattern', { confidence: 0.5 });
 
-    const { cmdContradict } = getInstinct();
+    const { contradictInstinct: cmdContradict } = getInstinct();
     expect(() => {
       for (let i = 0; i < 4; i++) {
         cmdContradict('orphan-pattern', PROJECT);
@@ -265,7 +265,7 @@ describe('ICL-6: non-curator instinct → no event, no crash', () => {
 
   it('confirming an instinct with no matching candidate does not throw', () => {
     writeCuratorInstinct('orphan-pattern', { confidence: 0.5 });
-    const { cmdConfirm } = getInstinct();
+    const { confirmInstinct: cmdConfirm } = getInstinct();
     expect(() => cmdConfirm('orphan-pattern', PROJECT)).not.toThrow();
     expect(readQueueEvents()).toEqual([]);
   });
@@ -276,7 +276,7 @@ describe('ICL-6: dashboard card feedback matches instinct frontmatter', () => {
     seedActivatedCandidate();
     writeCuratorInstinct(CANDIDATE_ID, { confidence: 0.5, confirmations: 2, contradictions: 1 });
 
-    const { cmdConfirm } = getInstinct();
+    const { confirmInstinct: cmdConfirm } = getInstinct();
     cmdConfirm(CANDIDATE_ID, PROJECT); // confirmations 2 → 3
 
     // Read the running counts from the on-disk instinct frontmatter.
@@ -299,7 +299,7 @@ describe('ICL-6: dashboard card feedback matches instinct frontmatter', () => {
     seedActivatedCandidate();
     writeCuratorInstinct(CANDIDATE_ID, { confidence: 0.8, confirmations: 4, contradictions: 0 });
 
-    const { cmdContradict } = getInstinct();
+    const { contradictInstinct: cmdContradict } = getInstinct();
     cmdContradict(CANDIDATE_ID, PROJECT); // contradictions 0 → 1, confidence 0.8 → 0.7 (no archive)
 
     const { createDashboardModel } = getDashboard();

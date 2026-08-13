@@ -6,7 +6,7 @@
 skill
 
 ## Target
-skills/arc-learning/SKILL.md
+scripts/lib/learning-dashboard.js
 
 ## Scenario
 Two reviewers load the dashboard simultaneously. Both see candidate `cand_concurrency_001`

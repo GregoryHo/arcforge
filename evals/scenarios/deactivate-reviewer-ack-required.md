@@ -6,7 +6,7 @@
 skill
 
 ## Target
-skills/arc-learning/SKILL.md
+scripts/lib/learning-curator/activate.js
 
 ## Scenario
 An automation script attempts to deactivate an active instinct artifact via

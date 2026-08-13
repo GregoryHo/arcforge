@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing a proposed skill eval before release. The user says:
@@ -20,7 +20,7 @@ Constraints:
 - Do not claim discriminative lift when the baseline is at ceiling.
 
 ## Context
-This checks whether `arc-evaluating` handles preflight ceiling correctly. The expected behavior is to block or redesign a non-discriminative scenario instead of bypassing preflight because treatment passed.
+This checks whether `evaluating` handles preflight ceiling correctly. The expected behavior is to block or redesign a non-discriminative scenario instead of bypassing preflight because treatment passed.
 
 ## Preflight
 skip
