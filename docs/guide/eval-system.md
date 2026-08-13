@@ -2,7 +2,7 @@
 
 ## Core Mechanism
 
-arc-evaluating measures whether skills, agents, and workflows actually change AI agent behavior. The fundamental problem: AI agents are stochastic — same input, different output each time. You can't run once and conclude. The solution is controlled experimentation.
+The `evaluating` skill measures whether skills, agents, and workflows actually change AI agent behavior. The fundamental problem: AI agents are stochastic — same input, different output each time. You can't run once and conclude. The solution is controlled experimentation.
 
 The mechanism is an **A/B experiment**:
 
@@ -150,7 +150,7 @@ evals/
 | Testing infrastructure not behavior | "File exists" passes trivially | Ask "does this measure Claude's behavior or a side-effect?" |
 | `--skill-file` for workflow eval | Varies prompt instead of environment | Workflow A/B: no `--skill-file` |
 
-Full catalog (23 entries): `skills/arc-evaluating/references/common-mistakes-catalog.md`
+Full catalog: `skills/evaluating/references/scenario-design.md`
 
 ## Agents
 

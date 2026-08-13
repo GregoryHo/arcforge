@@ -140,7 +140,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 ### Meta (operates on the catalog itself)
 
 - **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
-- **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
+- **evaluating** - Measure whether an instruction, skill, or workflow changes agent behavior
 - **writing-skills** _(user-invoked)_ - Author an arcforge skill: invocation, description, guidance form, evidence
 
 ### Hooks

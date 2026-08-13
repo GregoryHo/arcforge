@@ -21,6 +21,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/compacting` | context is filling up and you are deciding whether to compact now |
 | `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
 | `/learning` | you are capturing a session diary, mining diaries for patterns, or reviewing what the opt-in learning subsystem wants to activate (user-invoked) |
+| `/evaluating` | a claim about agent behavior needs evidence — you are designing or auditing an eval scenario, or reading a verdict out of eval numbers |
 
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.

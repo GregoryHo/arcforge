@@ -164,5 +164,5 @@ log (commits landing?).
 ## Integration
 
 - **Before:** arc-writing-tasks creates the task list the loop executes.
-- **Works with:** arc-evaluating (evals between iterations). compaction is not needed — each iteration is a fresh session.
+- **Works with:** `/evaluating` (evals between iterations). compaction is not needed — each iteration is a fresh session.
 - **After:** `/code-review`, then arc-finishing (see After the Loop).

@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing a treatment that passes all behavioral assertions. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on metric regression versus behavioral correctness.
 
 ## Context
-This checks whether `arc-evaluating` reports duration/token regressions separately from behavioral pass/fail. The expected behavior is to preserve the green correctness result but flag cost/latency regression as a separate release risk or gate.
+This checks whether `evaluating` reports duration/token regressions separately from behavioral pass/fail. The expected behavior is to preserve the green correctness result but flag cost/latency regression as a separate release risk or gate.
 
 ## Preflight
 skip

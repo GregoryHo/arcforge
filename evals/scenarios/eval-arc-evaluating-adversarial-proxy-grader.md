@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing a proposed eval before release. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on adversarial/proxy grader risk and whether the release claim is supported.
 
 ## Context
-This checks whether `arc-evaluating` rejects keyword/proxy graders that can be gamed by vacuous text. The expected behavior is to classify the result as weak or invalid release evidence, redesign the assertion/grader to measure the semantic claim directly, and avoid claiming improvement even when the A/B delta looks strong.
+This checks whether `evaluating` rejects keyword/proxy graders that can be gamed by vacuous text. The expected behavior is to classify the result as weak or invalid release evidence, redesign the assertion/grader to measure the semantic claim directly, and avoid claiming improvement even when the A/B delta looks strong.
 
 ## Preflight
 skip

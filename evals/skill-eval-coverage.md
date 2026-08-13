@@ -12,7 +12,15 @@
 > `arc-learning` + `arc-recalling` + `arc-reflecting` into a single user-invoked
 > `learning`; the historical rows for those four names below are kept as-is (they
 > record results that were really measured against those files) and superseded by
-> the `learning` entry.
+> the `learning` entry. P5 also renamed `arc-evaluating` to `evaluating`; all nine
+> `eval-arc-evaluating-*` scenarios were retargeted onto
+> `skills/evaluating/SKILL.md` in place (filenames retained — P7 rebuilds the
+> corpus wholesale). `eval-evaluating-cross-condition-validity` was added as a
+> new scenario but **did not become a discriminating gate**: v1 measured delta
+> -0.16 whose entire magnitude was a tool-choice artifact (all four methodology
+> assertions scored 1 in 10/10 trials, both arms), and the harder v2 was blocked
+> at preflight with baseline 100%. It is retained as a **non-regression** guard,
+> not a lift. Record: `docs/plans/v6/decisions/p5-absorption-evaluating.md`.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
@@ -92,7 +100,7 @@ lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`)
 - arc-brainstorming
 - arc-coordinating  *(discrimination — arc eval ab: 40%→100%, Δ+0.15)*
 - arc-debugging  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
-- arc-evaluating
+- evaluating  *(non-regression — cross-condition-validity ceilinged at baseline; no lift claimed)*
 - arc-implementing  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
 - arc-managing-sessions
 - arc-planning  *(discrimination — arc eval ab: 0%→100%, Δ+0.25)*
@@ -194,7 +202,7 @@ in WT-6.)
 ## RV-9 adjudications (behavioral vs exempt)
 
 Recorded rulings on whether a skill edit needs its own eval, per
-`skills/arc-evaluating/SKILL.md` ("the line is behavioral footprint, not edit size").
+`skills/evaluating/SKILL.md` ("the line is behavioral footprint, not edit size").
 
 ### arc-agent-driven — AF-12 edit (commit 5444e6d) — 2026-06-23
 

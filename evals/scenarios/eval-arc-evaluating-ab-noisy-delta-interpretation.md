@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing A/B eval results for a proposed skill release. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on interpreting the A/B result and release claim.
 
 ## Context
-This checks whether `arc-evaluating` avoids overclaiming tiny/noisy deltas. The expected behavior is to distinguish non-regression from discriminative lift and to require more data, better scenario design, or a stricter decision policy before claiming improvement.
+This checks whether `evaluating` avoids overclaiming tiny/noisy deltas. The expected behavior is to distinguish non-regression from discriminative lift and to require more data, better scenario design, or a stricter decision policy before claiming improvement.
 
 ## Preflight
 skip

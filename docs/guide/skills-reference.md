@@ -12,7 +12,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [arc-maintaining-obsidian](#arc-maintaining-obsidian) · [arc-diagramming-obsidian](#arc-diagramming-obsidian)
-  - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [arc-evaluating](#arc-evaluating)
+  - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [evaluating](#evaluating)
 - [Workflow Patterns](#workflow-patterns)
 - [Comparison Tables](#comparison-tables)
 - [Operating Principles](#operating-principles)
@@ -21,7 +21,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 
 arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `arc-evaluating`, and `learning`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `evaluating`, and `learning`.
 
 **Core skills every user should learn first:**
 
@@ -31,7 +31,7 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 4. **tdd** — Test-driven implementation discipline
 5. **arc-debugging** — Systematic root cause investigation
 6. **arc-verifying** — Fresh evidence before completion claims
-7. **arc-evaluating** — Measure whether skills and workflows change behavior
+7. **evaluating** — Measure whether skills and workflows change behavior
 
 **What are you trying to do?**
 
@@ -71,7 +71,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | arc-maintaining-obsidian, arc-diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-using, writing-skills _(user-invoked)_, arc-evaluating | Route, evaluate, and maintain the catalog itself |
+| **Meta** | arc-using, writing-skills _(user-invoked)_, evaluating | Route, evaluate, and maintain the catalog itself |
 
 **How skills flow through a project:**
 
@@ -571,7 +571,7 @@ Rule in `skills/arc-using/SKILL.md`.
 
 ---
 
-### arc-evaluating
+### evaluating
 
 **Platform:** Claude Code only — eval harness invokes `claude` subprocess to execute scenario trials.
 
@@ -591,7 +591,7 @@ Rule in `skills/arc-using/SKILL.md`.
 - Input: scenario files in `evals/scenarios/`
 - Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
 
-**Related:** arc-brainstorming --> **arc-evaluating** --> writing-skills (for shipping)
+**Related:** arc-brainstorming --> **evaluating** --> writing-skills (for shipping)
 
 ---
 
