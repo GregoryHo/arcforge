@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing an eval plan. The user says:
@@ -19,7 +19,7 @@ Constraints:
 - Focus on eval scope and what should vary between baseline and treatment.
 
 ## Context
-This checks whether `arc-evaluating` distinguishes skill-prompt evals from workflow/plugin/environment evals. The expected behavior is to say workflow/plugin behavior should vary the environment/tooling/plugin directory, not merely inject a skill file into the prompt.
+This checks whether `evaluating` distinguishes skill-prompt evals from workflow/plugin/environment evals. The expected behavior is to say workflow/plugin behavior should vary the environment/tooling/plugin directory, not merely inject a skill file into the prompt.
 
 ## Preflight
 skip

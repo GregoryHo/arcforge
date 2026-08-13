@@ -8,7 +8,11 @@
 > `eval-code-review-answering-feedback`. `arc-debugging` became `debugging`;
 > its describe-only `eval-arc-debugging-root-cause-first-gate` was retired for
 > ceiling (baseline 100%) and replaced by the agentic
-> `eval-debugging-root-cause-first`.
+> `eval-debugging-root-cause-first`. The v6 P5 rewrite renamed `arc-evaluating`
+> to `evaluating`; all nine `eval-arc-evaluating-*` scenarios were retargeted
+> onto `skills/evaluating/SKILL.md` in place (filenames retained — P7 rebuilds
+> the corpus wholesale), and `eval-evaluating-cross-condition-validity` was added
+> as the discriminating A/B gate.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
@@ -88,7 +92,7 @@ lives in `evals/workspaces/` (out of scope per `.claude/rules/obsidian-wiki.md`)
 - arc-brainstorming
 - arc-coordinating  *(discrimination — arc eval ab: 40%→100%, Δ+0.15)*
 - arc-debugging  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
-- arc-evaluating
+- evaluating
 - arc-implementing  *(non-regression — arc eval ab v2: 100%=100%, Δ0.00; baseline also passes)*
 - arc-learning
 - arc-managing-sessions
@@ -192,7 +196,7 @@ in WT-6.)
 ## RV-9 adjudications (behavioral vs exempt)
 
 Recorded rulings on whether a skill edit needs its own eval, per
-`skills/arc-evaluating/SKILL.md` ("the line is behavioral footprint, not edit size").
+`skills/evaluating/SKILL.md` ("the line is behavioral footprint, not edit size").
 
 ### arc-agent-driven — AF-12 edit (commit 5444e6d) — 2026-06-23
 

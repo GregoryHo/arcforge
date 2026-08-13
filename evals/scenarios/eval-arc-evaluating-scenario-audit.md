@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-evaluating/SKILL.md
+skills/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing a proposed eval gate before a skill release. The user says:
@@ -20,7 +20,7 @@ Constraints:
 - Do not claim SHIP unless the provided eval evidence is sufficient under the eval policy.
 
 ## Context
-This is a direct behavioral eval for `arc-evaluating`. The target behavior is auditing eval design quality rather than rubber-stamping weak evidence.
+This is a direct behavioral eval for `evaluating`. The target behavior is auditing eval design quality rather than rubber-stamping weak evidence.
 
 The trap combines several known eval-design failures: baseline likely already passes, assertions measure infrastructure or generic output rather than skill-specific behavior, and `k=1` cannot support a release verdict. The expected response identifies the eval target/question/scope, flags weak or non-discriminative assertions, recommends unit/integration tests for infrastructure checks, requires behavioral assertions and enough trials (`k >= 5`), and treats the current result as `INSUFFICIENT_DATA`/not SHIP.
 

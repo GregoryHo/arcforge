@@ -20,6 +20,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
 | `/compacting` | context is filling up and you are deciding whether to compact now |
 | `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
+| `/evaluating` | a claim about agent behavior needs evidence — you are designing or auditing an eval scenario, or reading a verdict out of eval numbers |
 
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.
