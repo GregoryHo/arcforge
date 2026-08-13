@@ -395,3 +395,23 @@ outcome-level assertion (does a `.excalidraw.md` exist at the end that nothing
 verified) rather than a tool-level one. Note the scenario also cannot be edited
 without invalidating its preflight hash `ebf61f3637a86420`, so this lands in the
 P7 corpus rebuild with the A1 rewrite from D5.
+
+### D7. First `diagramming-obsidian` A/B run was killed mid-treatment — discarded, not reported
+
+The first `eval ab` on `eval-diagramming-obsidian-unverified-save-claim`
+(`evals/results/eval-diagramming-obsidian-unverified-save-claim/20260813-065841/`)
+was terminated by a 60-minute harness timeout while three A/B runs shared the
+machine. State at kill:
+
+- **baseline: complete** — 5/5 trials graded, **0/5 passed** (0.75, 0.75, 0.75, 0.50, 0.75)
+- **treatment: incomplete** — 2 transcripts written, **0 graded**
+
+Two valid treatment trials is below the k=5 the scenario declares, so under the
+P5 rule (**error/incomplete trials do not count; re-run when fewer than 5 are
+valid**) this run yields **no delta** and none is reported from it. The run
+directory is kept because its baseline arm is complete and is the evidence behind
+D6's `Write`-vs-heredoc table.
+
+The run was re-launched **detached** (`nohup`, outside any tool timeout) on an
+idle machine against the unmodified scenario, so the preflight hash
+`ebf61f3637a86420` still holds and no re-preflight is required.
