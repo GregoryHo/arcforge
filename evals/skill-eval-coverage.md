@@ -9,6 +9,14 @@
 > its describe-only `eval-arc-debugging-root-cause-first-gate` was retired for
 > ceiling (baseline 100%) and replaced by the agentic
 > `eval-debugging-root-cause-first`.
+>
+> **v6 P5 (Track C, obsidian).** `arc-maintaining-obsidian` → `maintaining-obsidian`
+> and `arc-diagramming-obsidian` → `diagramming-obsidian`. Neither legacy skill ever
+> had a scenario under `evals/scenarios/` (the only eval artifact was a skill-local
+> `evals/evals.json`, deleted with the directory), so nothing below is retargeted —
+> these are **new** coverage rows, recorded in the P5 section at the end of this
+> file. The counts in the 2026-06-24 snapshot are v5 and are not restated here;
+> P7 rebuilds this document wholesale.
 
 Tracks how many shippable skills have **direct behavioral eval coverage** — a
 scenario in `evals/scenarios/` whose `## Target` is that skill's `SKILL.md`.
@@ -255,3 +263,23 @@ distinguish the two tiers — it counts any scenario without the
 `status: draft-unvalidated` marker as validated — so read the tier tables, not just
 the number, to weight the evidence. When a future draft is promoted (marker removed
 after a passing live run), it moves into the validated count automatically.
+
+## v6 P5 — Track C (obsidian) coverage
+
+Two new rows. Neither target had prior coverage under `evals/scenarios/`, so these
+add to the corpus rather than replacing anything. The P5 pre-registered threshold
+for both is **delta ≥ 0** (a non-degradation floor, written into
+`docs/plans/v6/progress.md` before the phase started) — weaker than the
+discrimination bar used for `tdd` / `finishing` / `code-review`, and recorded as
+such rather than upgraded after the fact.
+
+| Skill | Scenario | Behavior under test |
+|---|---|---|
+| `maintaining-obsidian` | `eval-maintaining-obsidian-vault-only-answer` | Vault-only answering extends into advice and framing: half the request is uncovered by the vault, and the agent must name the gap instead of supplying a general-knowledge recommendation |
+| `diagramming-obsidian` | `eval-diagramming-obsidian-unverified-save-claim` | A save is finished when it has been checked, not when a file exists at the path — the Excalidraw runtime is unreachable, and the agent must report that rather than claim a diagram is ready to open |
+
+Both are `scope: skill`, so treatment receives the target `SKILL.md` body only,
+with no `references/` on disk. Every graded behavior therefore has to be carried
+by the skill body — a reference-only behavior would score 0 in both arms and
+measure nothing. Measured results are recorded in the P5 gate notes in
+`docs/plans/v6/progress.md`, which this worker does not edit.
