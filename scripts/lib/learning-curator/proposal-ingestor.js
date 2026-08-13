@@ -26,7 +26,6 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const { appendCandidate, rejectProposal, readCurrentCandidates } = require('./queue-writer');
 const {
@@ -36,7 +35,7 @@ const {
 } = require('./schema');
 const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
-const { atomicWriteFile, sha256Truncated } = require('../utils');
+const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -50,7 +49,11 @@ const SCHEMA_VERSION = 1;
 // ---------------------------------------------------------------------------
 
 function getArcforgeDir(homeDir) {
-  return path.join(homeDir, '.arcforge');
+  // An explicit homeDir (tests) keeps the historical <home>/.arcforge shape;
+  // otherwise resolve through the shared resolver so ARCFORGE_HOME redirects the
+  // whole tree. Before v6/P5 this fell back to os.homedir(), so an "isolated"
+  // eval trial or probe still wrote into the real user home.
+  return homeDir ? path.join(homeDir, '.arcforge') : getArcforgeHome();
 }
 
 function getBatchesDir(homeDir) {
@@ -241,7 +244,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
     throw new Error(`ingestProposal: responseFile does not exist: ${responseFile}`);
   }
 
-  const homeDir = homeOverride || os.homedir();
+  const homeDir = homeOverride;
   const now = new Date();
   const createdAt = now.toISOString();
   const ts = compactUtc(now);
@@ -406,7 +409,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   // (accepted) or writes to rejections.jsonl (rejected via validateCandidateV1).
   // We compute total accepted = (queue size after loop) - (queue size before).
   // Avoids the O(N × queue size) full-replay cost of reading the queue per proposal.
-  const queuePath = path.join(homeDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+  const queuePath = path.join(getArcforgeDir(homeDir), 'learning', 'candidates', 'queue.jsonl');
   const countQueueLines = () => {
     if (!fs.existsSync(queuePath)) return 0;
     return fs
@@ -580,7 +583,7 @@ function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride 
     throw new Error('recordRunFailure: parseStatus must be a non-empty string');
   }
 
-  const homeDir = homeOverride || os.homedir();
+  const homeDir = homeOverride;
   const now = new Date();
   const createdAt = now.toISOString();
   const ts = compactUtc(now);

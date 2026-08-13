@@ -12,9 +12,8 @@
  */
 
 const crypto = require('node:crypto');
-const os = require('node:os');
 const path = require('node:path');
-const { sanitizeProjectName } = require('./utils');
+const { sanitizeProjectName, getArcforgeHome } = require('./utils');
 
 const ARCFORGE_HOME_NAME = '.arcforge';
 const WORKTREE_SUBDIR = 'worktrees';
@@ -31,7 +30,11 @@ const WORKTREE_NAME_RE = new RegExp(`^(.+)-([0-9a-f]{${HASH_LENGTH}})-(.+)$`);
  * @returns {string}
  */
 function getWorktreeRoot(homeDir) {
-  return path.join(homeDir || os.homedir(), ARCFORGE_HOME_NAME, WORKTREE_SUBDIR);
+  // An explicit homeDir (tests) keeps the historical <home>/.arcforge shape;
+  // otherwise resolve through the shared resolver so ARCFORGE_HOME redirects.
+  // Byte-identical to ~/.arcforge when ARCFORGE_HOME is unset.
+  const root = homeDir ? path.join(homeDir, ARCFORGE_HOME_NAME) : getArcforgeHome();
+  return path.join(root, WORKTREE_SUBDIR);
 }
 
 /**

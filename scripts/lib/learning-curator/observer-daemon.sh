@@ -8,7 +8,12 @@
 
 set -euo pipefail
 
-ARCFORGE_DIR="${HOME}/.arcforge"
+# Shell-side equivalent of utils.js getArcforgeHome(): ARCFORGE_HOME wins,
+# otherwise ~/.arcforge. Keeps the daemon in the same tree as every Node module
+# it shells out to — before v6/P5 this read $HOME directly, so a run with
+# ARCFORGE_HOME set had the daemon and the curator CLI pointing at different
+# trees. Byte-identical to the old value when ARCFORGE_HOME is unset.
+ARCFORGE_DIR="${ARCFORGE_HOME:-${HOME}/.arcforge}"
 INSTINCTS_DIR="${ARCFORGE_DIR}/instincts"
 OBS_DIR="${ARCFORGE_DIR}/observations"
 LOCK_DIR="${INSTINCTS_DIR}/.observer.lock"
