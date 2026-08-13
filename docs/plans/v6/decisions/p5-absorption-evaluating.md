@@ -351,3 +351,76 @@ trial 4 列與 git 歷史，逼出的是判斷而非欄位閱讀。
 故本次**只跑一次 ab**（任務卡指定的 `--plugin-dir` 版本），`eval compare` 讀到的是
 單一乾淨 run。skill 單獨效果改列**後續項**：需在別的日期跑，或先為 scenario bump
 `## Version` 分隔 epoch——兩者都不該為了湊一個數字而在本次混進同一個池。
+
+### v1 實測結果（run `20260813-064059`，scenario version 1）
+
+```
+Baseline:  5 trials, avg 0.96 [0.85, 1], pass 100%
+Treatment: 5 trials, avg 0.80 [0.8, 0.8], pass 100%
+Delta:     -0.16 CI[-0.27, -0.05]
+Verdict:   REGRESSED
+```
+
+依預登記三分表：delta < 0 → **門檻未達成 → 觸發 redesign**（第 1 次，上限 2 次）。
+
+**但這個 -0.16 不是行為退步，是儀器假訊號。**逐 trial 的 `assertionScores` 釘死：
+
+| 條件 | trial 1–5 的 assertion 向量 | mean |
+|---|---|---|
+| baseline | `[1,1,1,1,1]` ×4、`[0,1,1,1,1]` ×1 | 0.96 |
+| treatment | `[0,1,1,1,1]` ×5 | 0.80 |
+
+index 0 是 `[tool_called] Read:re:(baseline|treatment)\.jsonl`；index 1–4 是四條
+方法論 model 斷言。**index 1–4 在 10/10 trial、兩條件全為 1**——scenario 要量的行為
+根本沒有動。唯一的變異來源是 agent 恰好用 `Read` 還是 `Bash cat` 去看那兩個 .jsonl。
+
+`eval-analyzer`（引擎側，非本 worker）獨立得出同一結論，原文摘錄：
+
+> The entire -0.16 score delta comes from one assertion — the `[tool_called] Read`
+> check, which baseline satisfied in 4/5 trials and treatment satisfied in 0/5.
+> Every substantive assertion (A1-A4) scored 1.0 in all 10 trials in both
+> conditions, so the behavior the scenario was written to measure did not move at all.
+>
+> A1, A2, A3, A4 each scored 1.0 in 10/10 trials across both conditions — fully
+> non-discriminative here. […] An eval whose signal lives entirely in a
+> tool-invocation pattern match is measuring instrumentation compliance, not the
+> integrity behaviors A1-A4 describe.
+
+兩條可覆核的事實據此成立，且各自獨立於 delta 的正負：
+
+1. **該 behavioral 斷言是 format proxy**（本 skill P3 與 SD 設計錯誤表第 7、8 列點名的
+   形狀）。它量的是工具選擇，不是行為；而且**兩條件都會讀那兩個檔**，所以它從一開始
+   就沒有鑑別力，只是在對「用了哪個工具」抽樣。treatment 之所以全滅，實測原因是
+   plugin 載入後 agent 傾向走 Bash 探索（transcript 可見它還跑了 `arcforge eval list`
+   與 `arcforge eval --help`）。
+2. **v1 的四條方法論斷言全部觸頂**。baseline 5/5 都拒絕了主張、指出 rubric 不一致、
+   說出修法、處理了被丟掉的那列。此即 STOP 段所述「instruction 可能只是把 agent
+   已經會做的事形式化」的實測形狀。
+
+附帶儀器紀錄：`Blind comparator skipped: scenario mixes code-graded and
+model-graded assertions.`——mixed grader 讓 blind comparator 整個不跑，這是拿掉
+behavioral 斷言的第三個獨立理由。
+
+### v1 的兩個逃生門（redesign 的真正理由）
+
+比「太簡單」更嚴重的是：v1 有**兩條在邏輯上成立**的路徑可以合理地寫出一個數字，
+而 A1/A2 的措辭會把走那條路的 agent 判為通過或不當地判為失敗。兩條都被 baseline
+trial 自行發現：
+
+- v1 的 rubric 編輯是**新增**第四條 assertion，於是新 rubric 是舊 rubric 的**嚴格
+  超集**。trial 「4/4 蘊含在舊的三條上也是 3/3」——因此 cross-rubric 反對意見是
+  **可救的**，寫出數字有正當理由。
+- 另一 trial 用單調性反向論證：在 all-pass 門檻下，過不了小集合必然過不了大集合，
+  所以 baseline 的 0-of-5 pass rate 不需重跑即可沿用——它據此寫了一個**pass-rate**
+  形式的改善主張，而 v1 的 A1 措辭把那judged 為「拒絕」（判 1）。
+
+兩個論證都是對的。**錯的是 scenario，不是 agent**：加法式的 rubric 變動留下了一條
+站得住腳的路。v2 因此改為**替換**第三條 assertion（`no more than two sentences`
+→ `names the migration step when one is required`），兩個 rubric 交疊但互不包含，
+單調性論證兩個方向都不成立，只有重跑能修復比較。副作用是兩條件都以三分計分，
+順帶消掉 v1「baseline 三分制、treatment 四分制」的分母線索——那正是有 trial 用
+「0.5 不可能是三條 assertion 的分數」反推出整件事的入口。
+
+v2 同時修掉上述兩個儀器缺陷：刪掉 behavioral 斷言（grader 改純 `model`）、
+A4 改為必須**正面指認**重複列（v1 的 grader 自己標記 A4「satisfiable by omission」）、
+A1 擴及 pass-rate 形式的主張。
