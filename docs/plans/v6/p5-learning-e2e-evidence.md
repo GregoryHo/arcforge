@@ -1,8 +1,13 @@
-# P5 learning 行為證據 — 兩項 AC 未執行，附阻塞證據
+# P5 learning 行為證據
 
 > Track A 兩項行為面 AC 的交付物：**§1–§7** 是旗艦 e2e probe
 > （`progress.md` P5 預登記門檻 #1），**§8** 是 +1 eval scenario 的 A/B
-> （門檻 #2）。兩項都**未執行**，阻塞原因不同，逐項附一手證據。
+> （門檻 #2）。
+>
+> **§9 是本檔最新狀態，請先讀。** §1–§7 記錄的是**原始阻塞診斷**（寫於修正之前）：
+> 引擎有兩套 home 解析器，使 probe 的兩條約束互斥。orchestrator 裁定該缺陷為
+> P5 範圍內的引擎修正（不開新 D 編號），修正已落地——§9 記錄修正內容、驗證輸出，
+> 以及 probe 的當前狀態。§1–§7 保留原文不改寫，因為它是缺陷存在的一手證據。
 > **結論：probe 未執行。** 不是「跑了但沒過」，也不是「時間不夠」——
 > 是在設計隔離環境時查出引擎有一個**真實的汙染缺陷**，使得該 AC 所要求的
 > 「不得汙染使用者真實 `~/.arcforge`」與「走完 curator→queue」兩條約束
@@ -259,3 +264,121 @@ node scripts/cli.js eval compare eval-learning-draft-not-fabricated
 要求，會替一個它沒參與過的 session 捏造 Decisions／Challenges 內容，因而 A4 紅；
 帶 skill 的一側應保留佔位並 promote 草稿。**在有人真的跑完之前，本檔與
 `evals/skill-eval-coverage.md` 都不得被引用為「已驗證」。**
+
+---
+
+## 9. 修正落地 — 兩套 home 解析器已統一（orchestrator 裁定：P5 範圍內）
+
+orchestrator 裁定 §2 的缺陷是**引擎缺陷修正**而非新設計，不開 D 編號：它不動
+8 層 learning 設計，只統一路徑解析；且它同時是 §4 那條既有 eval 隔離洩漏的修法。
+
+### 9.1 改動點（逐一）
+
+全數改走 `getArcforgeHome()`；shell 側走 `${ARCFORGE_HOME:-$HOME/.arcforge}`。
+
+| 檔案 | 原本 | 現在 |
+|---|---|---|
+| `learning-curator/queue-writer.js` | `path.join(os.homedir(), '.arcforge', …)` | `path.join(getArcforgeHome(), …)` |
+| `learning-curator/dashboard-events.js` | 同上 | 同上（與 queue-writer 必須同解析，兩者寫同一個檔） |
+| `learning-curator/materialize.js` ×2 | `arcforgeRoot \|\| path.join(os.homedir(), '.arcforge')` | `arcforgeRoot \|\| getArcforgeHome()` |
+| `learning-curator/activate.js` ×3 | 同上 | 同上 |
+| `learning-curator/batch-assembler.js` | `getArcforgeDir(homeDir)` + `homeOverride \|\| os.homedir()` | `homeDir ? join(homeDir,'.arcforge') : getArcforgeHome()` |
+| `learning-curator/proposal-ingestor.js` | 同上（含一處 inline join） | 同上 |
+| `learning-curator/observer-daemon.sh:11` | `ARCFORGE_DIR="${HOME}/.arcforge"` | `ARCFORGE_DIR="${ARCFORGE_HOME:-${HOME}/.arcforge}"` |
+| `learning-dashboard.js` ×2 | `path.join(os.homedir(), '.arcforge', …)` | `getArcforgeHome()` |
+| `learning.js` | `homePath()` = `homeDir \|\| os.homedir()`，三處 join | `arcforgeRoot(homeDir)`，三處改用 |
+| `operation-record-writer.js` | `homeOverride \|\| os.homedir()` | `homeOverride ? join(homeOverride,'.arcforge') : getArcforgeHome()` |
+| `worktree-paths.js` | `homeDir \|\| os.homedir()` | 同上 shape |
+
+**刻意不動的兩處**（掃描時逐一判定，非遺漏）：
+
+- `scripts/lib/utils.js:545` —— `getArcforgeHome()` 的定義本身。
+- `hooks/observe/main.js` 的 D4 fast-path —— 它在重型 require **之前**執行，
+  引入 `utils` 會抵銷該快取路徑存在的目的（每個工具呼叫都付模組載入成本）。
+  它本來就已正確認 `ARCFORGE_HOME`，本次只把它明文標註為**唯一獲准的複本**。
+- `scripts/lib/package-manager.js:144` 指的是 `~/.claude/`（Claude Code 自己的
+  目錄），不是 arcforge 根，不在本次範圍。
+
+**向後相容**：`ARCFORGE_HOME` 未設時每一條都仍解析為 `~/.arcforge/...`；顯式
+`homeDir` 參數仍最優先（既有測試依賴該語意）。真實 session 行為零變化。
+
+### 9.2 回歸鎖：`tests/scripts/arcforge-home-isolation.test.js`（16 tests，全綠）
+
+前半段設 `ARCFORGE_HOME=<tmp>` 後逐模組驗證落點；後半段驗證未設時形狀不變、
+以及顯式 `homeDir` 覆寫仍最優先。**末條是全樹掃描**——新模組若重新引入
+`os.homedir()` + `.arcforge` 的組合，即使沒被逐條點名也會轉紅。
+
+**mutation 驗證**（證明鎖會動）：把 `operation-record-writer.js` 改回
+`os.homedir()` →
+
+```
+✕ operation-record-writer writes reflect and recall records under it
+Tests: 1 failed, 15 passed, 16 total
+```
+
+該次 mutation 確實把 `reflect-lock.md` / `recall-lock.md` 寫進了**真實**
+`~/.arcforge/reflections|recalls/proj/`——即 §2 描述的汙染，實地重現一次。
+已即時清除（含兩個空目錄），並在測試中補上 `finally` 清理與一條顯式
+「真實 home 不得出現這些路徑」斷言，使這支測試自己不會再留下髒東西。
+
+### 9.3 隔離實測（`ARCFORGE_HOME` 單獨即足，不需重導 `HOME`）
+
+```
+ARCFORGE_HOME=<probe>/.arcforge
+  IN    getArcforgeHome          -> <probe>/.arcforge
+  IN    global learning config   -> <probe>/.arcforge/learning/config.json
+  IN    CANONICAL curator queue  -> <probe>/.arcforge/learning/candidates/queue.jsonl
+  IN    observations             -> <probe>/.arcforge/observations/probe-app/observations.jsonl
+  IN    instincts dir            -> <probe>/.arcforge/instincts/probe-app
+ALL INSIDE PROBE HOME
+```
+
+第三行是關鍵：**canonical curator queue** 正是 §2 那條讓 probe 不可能成立的路徑。
+
+daemon shell 側雙向實測：
+
+```
+$ ARCFORGE_HOME=<probe>/.arcforge  → ARCFORGE_DIR=<probe>/.arcforge
+$ (unset)                          → ARCFORGE_DIR=/Users/gregho/.arcforge
+```
+
+**§2 的互斥消失了**：現在可以在隔離環境走完 curator 鏈，而 `claude` CLI 仍從
+真實 `HOME` 取得認證（因為不再需要動 `HOME`）。
+
+### 9.4 probe 本身：腳本已就緒，未由本 worker 執行
+
+`tests/e2e/learning-probe.sh`（可執行，`bash -n` 通過）。走完六步並**逐步從檔案
+系統斷言**：
+
+| 步 | 內容 | 斷言 |
+|---|---|---|
+| 0 | 隔離自檢 | `getArcforgeHome()` 與 canonical queue 都在 probe home 內，否則立刻退出 |
+| 1 | 啟用學習（global） | config 寫入且 `enabled: true` |
+| 2 | observe | 以真實 hook 入口灌 12 筆 → `observations.jsonl` ≥10 行 |
+| 3 | daemon→curator→queue | `source` daemon 後呼叫其自身的 `analyze_project`（與 repo 既有 daemon 測試同手法，同一段程式碼，省掉 5 分鐘輪詢）；斷言 `queue.jsonl` 至少一條候選 |
+| 4 | approve→materialize→activate | 走 `handleDashboardAction`——**HTTP 層呼叫的同一個函式**，即真正的閘門，不是後門；斷言 draft 與 active instinct 檔存在 |
+| 5 | SessionStart 注入 | 跑 `inject-context.js`，斷言輸出含該 candidate_id 與 `Active Behavioral Instincts` |
+| 6 | 真實 home 未被寫入 | 掃 `~/.arcforge` 五個子樹，任何比 probe 起始還新的檔案即失敗 |
+
+腳本**絕不設定 `HOME`**，並在開頭硬性拒絕 `ARCFORGE_HOME` 等於真實家目錄。
+
+**為何仍由本 worker 未執行**：沙箱除了拒絕含 `eval` 的指令（§8），也拒絕含
+`enable` 的指令——
+
+```
+$ ARCFORGE_HOME=<probe>/.arcforge node scripts/cli.js learn enable --global --json
+Refusing to run it — this command runs a string through enable, ...
+```
+
+同一類 token 誤判。把腳本包起來執行等於刻意繞過已被拒絕的指令，與 §5 拒絕的
+第 2 條後門同形，**故不採用**。依 orchestrator 指示交付腳本，由主 session 執行：
+
+```bash
+bash tests/e2e/learning-probe.sh
+```
+
+跑完後 `<work-dir>/evidence/` 內有六步的原始檔案（queue.jsonl、draft 路徑、
+active instinct、SessionStart 輸出），照原要求轉錄回本檔即完成 AC #1。
+
+**在有人真的跑完之前，AC #1 仍為未驗證。** 本節證明的是「阻塞已解除」，
+不是「probe 已通過」。

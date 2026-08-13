@@ -5,7 +5,8 @@
  *   assembleBatch({ project, homeDir? })
  *     → { batch_id, batch_hash, manifest_path, prompt_path, project }
  *
- * Paths derive from homeDir (or os.homedir() at call time) so tests can redirect HOME.
+ * Paths derive from homeDir when given, else from getArcforgeHome() at call time,
+ * so ARCFORGE_HOME redirects the whole tree and tests can still redirect HOME.
  *
  * PR #31 reconcile 1.9: all evidence strings pass through sanitize-observation.js before
  * they enter the prompt or manifest.
@@ -20,10 +21,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const { sanitizeObservationPayload, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
-const { atomicWriteFile, sha256Truncated } = require('../utils');
+const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
 const { draftIsStale } = require('../diary-capture');
 
 // ---------------------------------------------------------------------------
@@ -44,7 +44,11 @@ const SELECTION_POLICY_VERSION = 'v1';
 // ---------------------------------------------------------------------------
 
 function getArcforgeDir(homeDir) {
-  return path.join(homeDir, '.arcforge');
+  // An explicit homeDir (tests) keeps the historical <home>/.arcforge shape;
+  // otherwise resolve through the shared resolver so ARCFORGE_HOME redirects the
+  // whole tree. Before v6/P5 this fell back to os.homedir(), so an "isolated"
+  // eval trial or probe still wrote into the real user home.
+  return homeDir ? path.join(homeDir, '.arcforge') : getArcforgeHome();
 }
 
 function getObsDir(homeDir) {
@@ -448,7 +452,7 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
     throw new Error('assembleBatch: project must be a non-empty string');
   }
 
-  const homeDir = homeOverride || os.homedir();
+  const homeDir = homeOverride;
   const now = new Date();
   const createdAt = now.toISOString();
 
@@ -643,7 +647,7 @@ function assembleBatch({ project, homeDir: homeOverride } = {}) {
  * @returns {object} manifest JSON
  */
 function readBatchManifest(batchId, homeDir) {
-  const h = homeDir || os.homedir();
+  const h = homeDir;
   const manifestPath = path.join(getBatchesDir(h), `${batchId}.manifest.json`);
   if (!fs.existsSync(manifestPath)) {
     throw new Error(`Batch manifest not found: ${manifestPath}`);

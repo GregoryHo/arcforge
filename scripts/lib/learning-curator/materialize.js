@@ -9,10 +9,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const crypto = require('node:crypto');
 
-const { sanitizeFilename, atomicWriteFile, sha256Truncated } = require('../utils');
+const { sanitizeFilename, atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
 const { redactObservationText, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 
@@ -77,7 +76,7 @@ function defaultRenderPolicy() {
   return {
     policy_version: 'v1',
     allowed_artifact_types: FIRST_SLICE_SUPPORTED_TYPES,
-    draft_root: path.join(os.homedir(), '.arcforge', 'learning', 'drafts'),
+    draft_root: path.join(getArcforgeHome(), 'learning', 'drafts'),
     active_roots_forbidden: true,
     overwrite_existing_draft: false,
     atomic_write_required: true,
@@ -307,7 +306,7 @@ function materialize({
   renderPolicy,
   arcforgeRoot,
 }) {
-  const effectiveRoot = arcforgeRoot || path.join(os.homedir(), '.arcforge');
+  const effectiveRoot = arcforgeRoot || getArcforgeHome();
   const effectivePolicy = renderPolicy || defaultRenderPolicy();
   const actor = { layer: 7, actor_type: 'materializer' };
 
