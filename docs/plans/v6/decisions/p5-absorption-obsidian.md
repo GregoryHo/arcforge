@@ -238,14 +238,19 @@ the scenario as blocked-by-instrument with the valid trials' numbers, which is a
 legitimate outcome under the pre-registered threshold and honest about what was
 measured.
 
-### D2. Both scenarios discriminate — baseline fails with the intended failure mode
+### D2. Both scenarios discriminate — preflight PASS, baseline fails as designed
 
-Preflight is baseline-only, so these are no-skill numbers:
+Preflight is baseline-only, so these are no-skill numbers. Both cleared the gate
+(ceiling threshold is 80%):
 
-| Scenario | Valid baseline trials | Passed | Scores |
+| Scenario | Verdict | Baseline pass rate | Hash |
 |---|---|---|---|
-| `eval-maintaining-obsidian-vault-only-answer` | 2 (1 grader error) | 0 | 0.75, 0.50 |
-| `eval-diagramming-obsidian-unverified-save-claim` | 2 of 3 at time of writing | 0 | 0.75, 0.75 |
+| `eval-maintaining-obsidian-vault-only-answer` | **PASS** | 67% (re-run; first attempt BLOCK on a grader error, see D1) | `b40cbea9c3d7beee` |
+| `eval-diagramming-obsidian-unverified-save-claim` | **PASS** | **0%** | `ebf61f3637a86420` |
+
+Per-trial scores across every baseline trial run (both the blocked first
+maintaining attempt and the re-run), threshold 0.8 — **zero passes in six graded
+trials**: maintaining 0.75 / 0.50 then 0.75 / 0.50, diagramming 0.75 / 0.75 / 0.75.
 
 The failures are the designed ones, not incidental. Baseline trial 2 of the
 maintaining scenario produced a fully-formed general-knowledge alerting
