@@ -328,6 +328,17 @@ trial 4 列與 git 歷史，逼出的是判斷而非欄位閱讀。
 磁碟上可讀的 `references/`）**，baseline 則是隔離環境。
 
 因此該 delta 是**含 toolkit 的**，不是 SKILL.md 單獨的效果。這正是新 skill Phase 1
-點名的混淆（「什麼在變」與主張不對齊）。為此另跑一次**不帶** `--plugin-dir` 的
-`eval ab`（Target 仍供給 `--skill-file`，preflight 快取共用），兩組數字分開報，
-各自標明變動項；任何只報 delta 而不說變動項的陳述都視為誤導。
+點名的混淆（「什麼在變」與主張不對齊）。任何只報 delta 而不說變動項的陳述都視為誤導。
+
+**原本打算補跑一次不帶 `--plugin-dir` 的 ab 以取得 skill 單獨效果，撤回**——
+理由是它會汙染 result pool，而不是因為看到了任何數字（撤回時 ab 尚未跑完，
+見本節 commit 時序）。機制實查：`eval compare` 的 `loadResults()` 會把
+`evals/results/<scenario>/` **底下所有 run 目錄**的同名 condition 檔全部併入，
+唯一的過濾是 `--since`，而它的粒度是**日**（`runId.slice(0,8)`，YYYYMMDD）。
+同一天的第二次 ab 因此無法與第一次分離，兩種 treatment 組態會被永久併成一個池——
+正是本 skill POOL 第 4 條與 RR `## Pool validity` 的 **Provenance** 段禁止的形狀
+（P4 也已為同類原因隔離過一個汙染 run）。
+
+故本次**只跑一次 ab**（任務卡指定的 `--plugin-dir` 版本），`eval compare` 讀到的是
+單一乾淨 run。skill 單獨效果改列**後續項**：需在別的日期跑，或先為 scenario bump
+`## Version` 分隔 epoch——兩者都不該為了湊一個數字而在本次混進同一個池。
