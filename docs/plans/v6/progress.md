@@ -125,7 +125,8 @@
   `diagramming-obsidian`（Python 工具留 skill 內自足，`npm pack` 無 .venv）；刪 2 legacy dirs +
   json 剪 2 條；router 兩列；各 +1 scenario
 - [ ] 機械 AC（gate step 1）：npm test 5 runner + 5 check 全綠；D8 歸零斷言；schema 測試 ×3；
-  `npm pack --dry-run | grep -c .venv`==0；test:observer-daemon 綠；4 支新 skill 過 pytest 全規則；
+  `npm pack --dry-run 2>&1 | grep -c .venv`==0（Track C 發現原式空洞：清單走 stderr，
+  `2>/dev/null` 版恆為 0；修正版經 mutation 驗證可證偽）；test:observer-daemon 綠；4 支新 skill 過 pytest 全規則；
   router bijection；legacy json 16→9（ratchet 同 commit）；`git grep` 四支 learning 舊名於
   hooks/、scripts/ 歸零
 - [ ] §3.1/§5.2 mutation 重跑（若 `learning` 落地為 user-invoked——即第二支 user-invoked，清 P3 掛帳）
