@@ -176,4 +176,6 @@ scenario 的 `## Target` 懸空。逐支裁定（`node scripts/check-eval-target
 |---|---|---|
 | operation record 走 `os.homedir()`，不認 `ARCFORGE_HOME` | `learn reflect record` / `learn recall record` 在隔離環境下仍寫真實 home | 修它等於動 `operation-record-writer.js` 的預設解析器，屬「P5 引擎不動」邊界外。完整證據與影響範圍見 `docs/plans/v6/p5-learning-e2e-evidence.md` §2、§4 |
 | CLI 未暴露 `--home-dir` / `--project-id` | 兩者留在 lib 參數層 | 它們是測試注入縫，不是使用者旗標；lib 測試直接用 `homeDir`，CLI 面不必背這兩個旗標 |
-| e2e probe 未執行 | 見 `p5-learning-e2e-evidence.md` | 旗艦 AC，阻塞原因與拒絕的三條後門逐條記錄在該檔 |
+| e2e probe 未執行 | 見 `p5-learning-e2e-evidence.md` §1–§7 | 旗艦 AC，阻塞原因與拒絕的三條後門逐條記錄在該檔 |
+| +1 scenario 的 A/B 未執行 | 見 `p5-learning-e2e-evidence.md` §8 | 沙箱拒絕含 `eval` token 的指令；scenario 檔已就緒，Setup 與 grader 已離線驗證（含負向樣本），但**沒有 delta 數字** |
+| `skills/arc-using` 的 `learning` 表格列 | pytest 綠 | 它是 legacy skill（在 `legacy-skills.json` 內），§3.1 對它不生效；且該列寫的是 backtick 包住的 `learning` 而非 `/learning`，兩層都不觸發。**但若某個 phase 在刪掉 `arc-using` 之前先把它移出 legacy 清單，這列就會變成 §3.1 違規**——它 prose-invoke 了一支 user-invoked skill。移出清單與刪除必須是同一步 |

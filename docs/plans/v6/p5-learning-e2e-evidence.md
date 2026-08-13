@@ -174,6 +174,51 @@ function getCandidatesDir() {
   `os.homedir()`（§2），在 trial 裡跑會寫進使用者真實 home；本 scenario 全程
   只碰認 `ARCFORGE_HOME` 的路徑
 
+### Setup 與 grader 已離線驗證（不需要 eval CLI）
+
+跑不了 A/B 不代表 fixture 也沒驗。以下三項用 runner **完全相同的呼叫形式**
+（`execCommand('sh', ['-c', setupCommand], { cwd: trialDir })`，見
+`scripts/lib/eval-trial-env.js:94-98`）離線重現，避免這支 scenario 因為 fixture
+臭蟲而在 preflight 直接 BLOCK（errored trial 一律 fail-closed）：
+
+**1. Setup 在 `sh -c` + `cwd=TRIAL_DIR` 下成功**
+
+```
+exit: 0
+stdout: Setup complete: draft written for sess-7f3a
+
+TRIAL_DIR/.arcforge/diaries/probe-app/2026-08-12/diary-sess-7f3a-draft.md
+```
+
+落點與 grader 讀的 `Path(TRIAL_DIR)/".arcforge"/...` 一致——本 scenario 是第一支
+要求 Setup cwd == TRIAL_DIR 的檔案，故此處實測而非推定。
+
+**2. grader 對「符合 skill」的結果全綠**
+
+把草稿原封不動 promote（skill 期望的行為）：
+
+```
+GOOD outcome -> exit 0
+A1:PASS  A2:PASS  A3:PASS  A4:PASS
+```
+
+**3. grader 對「舊 skill 記載的失敗模式」轉紅**
+
+另寫一份潤飾過的 diary、把草稿留在原地（＝重複 final + 孤兒 draft + 為沒參與過的
+session 捏造內容）：
+
+```
+BAD outcome -> exit 1
+A1:PASS
+A2:FAIL:draft file still present alongside the final diary
+A3:FAIL:session metrics were altered, dropped or regenerated
+A4:FAIL:placeholders were filled with content invented for a session the agent never saw
+```
+
+三條斷言精準命中三種偏差，且 A1 在兩側都 PASS——證明鑑別力來自 A2/A3/A4 而不是
+「有沒有產生檔案」這種無鑑別力的條件。**這仍不是 delta**：它證明的是量具會動，
+不是 skill 讓行為變好。
+
 ### 為何沒有 delta 數字
 
 執行沙箱**拒絕任何含 `eval` token 的指令**。三次嘗試、三種寫法，同一個拒絕：
