@@ -599,3 +599,88 @@ mutation 2 — 刪掉 renderer 的 operation_kind 那行
 **這仍不是保證。** curator 是保守的（prompt 規則 5），提不提案由它判斷；
 但這次它至少有東西可讀。若步 3 再回 `proposals: []`，那是模型判斷而非管線
 缺陷——**屆時不要再調 fixture 或引擎，如實記錄即可**。
+
+---
+
+## 12. 第二跑：縫接通了，露出第三層缺陷（evidence_id 截短）
+
+orchestrator 以 fresh work dir 重跑。步 2 全 PASS（32 筆觀察，內容斷言過）。
+**步 3 首次真的提案了**，但 ingest 全數退回：
+
+```
+[15:32:18] Analyzing probe-app: 32 observations
+[15:33:31] Claude analysis completed successfully
+[15:33:31] Ingest result: {"run_id":"curator_run_20260813T073331Z_489db1e3a116",
+                           "parse_status":"parsed","accepted":0,"rejected":1}
+```
+
+`parse_status` 從 `empty` → **`parsed`**，`proposal_count: 1`。§11 的縫確實接通了：
+curator 拿到了指令、路徑與 `operation_kind`，並據此提出一條 instinct。
+
+### 12.1 退件原因（`rejections.jsonl` 摘錄）
+
+```json
+{"rejection_id":"rej_1786606411359_bb470516f099",
+ "rejected_at":"2026-08-13T07:33:31.359Z",
+ "source":{"source_type":"layer4_llm_curator",
+           "batch_id":"batch_20260813T073218Z_22e0494daa00"},
+ "reasons":[
+   {"code":"evidence_ref_missing","field_path":"evidence_refs",
+    "detail":"evidence_id \"ev_obs_0000\" is not present in batch batch_20260813T073218Z_22e0494daa00"},
+   {"code":"evidence_ref_missing","field_path":"evidence_refs",
+    "detail":"evidence_id \"ev_obs_0002\" is not present in batch ..."},
+   {"code":"evidence_ref_missing","field_path":"evidence_refs",
+    "detail":"evidence_id \"ev_obs_0004\" is not present in batch ..."},
+   … 共 10 條，全為 evidence_ref_missing
+ ]}
+```
+
+批次中的真實 id 是 `ev_obs_0000_d5a4b8cc` 這種形狀——Haiku 引用時把
+`_<8 hex>` 尾段丟掉了。10 條引用全數截短，提案整條被丟棄。
+
+值得一提的是它**選得對**：引用的都是偶數索引，也就是帶證據的 `tool_start`
+記錄。分析是對的，只有 id 保真度壞掉。
+
+### 12.2 定性：驗證器沒壞，是 prompt 沒把 id 釘死
+
+- `observer-prompt.md` 的範例區用的是 placeholder（`<must be one of the
+  evidence_ids…>`），**沒有教壞模型**——但也沒有給它一個完整形狀的 id 可對齊。
+- `proposal-ingestor` 的精確比對是 fail-closed 設計，**正確且不鬆綁**：容忍前綴
+  比對等於允許提案引用一個不存在的證據，那正是這個驗證器存在的理由。
+  **這份 rejections.jsonl 同時是 fail-closed 驗證器正常運作的證據。**
+
+也就是說這是**縫接通之後才可能暴露的第二層缺陷**：§10.2 未修時 curator 從不
+提案，自然也就不會有 id 被截短。
+
+### 12.3 對真實使用者同樣成立
+
+不是 probe 專屬。production 的 Haiku curator 會以完全相同的方式被退——啟用
+learning 的使用者會看到 daemon 「成功」跑完、`parse_status: parsed`，
+但佇列永遠是空的，且**唯一的線索埋在 `rejections.jsonl` 裡**，dashboard 不顯示。
+故障模式是靜默的。
+
+### 12.4 已做的 prompt 硬化（`observer-prompt.md`，四處）
+
+不動 `proposal-ingestor` 的驗證邏輯。
+
+| 位置 | 改動 |
+|---|---|
+| Evidence Batch 區段，**緊貼 `{{EVIDENCE_ITEMS}}` 之前** | 新增粗體指令＋正反例：`ev_obs_0007_d5a4b8cc` ✅／`ev_obs_0007` ❌，並涵蓋 `evd-diary-1a2b3c4d5e6f` 這個第二種形狀（diary/reflect/recall 用連字號＋12 hex）。刻意放在**離真實 id 最近的位置**，而不是只寫在規則區 |
+| Output Format 範例 JSON | placeholder 換成**完整形狀的真實示意 id**，讓模型有可對齊的樣板；順帶補成兩條 ref——原本只示範一條，與規則 2「至少 2 條」自相矛盾 |
+| Proposal Rules 第 1 條 | 前置並加粗「must match … character for character」，明說含尾段、明說 fail-closed、明說一條截短就整條作廢 |
+| 新增 `## Before You Emit`（全文最後） | 送出前逐一回查 evidence_id 是否整段吻合。放在最末是因為那是模型即將輸出的時點 |
+
+措辭策略：把「為什麼會被退」與「退的代價」寫進同一句（分析再好也整條丟掉），
+並建議 copy-paste 而非重打——針對的是複製劣化，不是理解錯誤。
+
+實際渲染確認：硬化段落正確出現在真實 id 的正上方（非 placeholder 殘留）。
+
+### 12.5 這次改動的驗證邊界（誠實標註）
+
+prompt 措辭對 LLM 的效果**無法用單元測試證明**。已確認的是：placeholder 未被
+破壞（10 個 `{{...}}` 佔位完好）、渲染位置正確、`curator-evidence-seam.test.js`
+8 tests 仍綠、無測試耦合 prompt 文字。
+
+**真正的驗證是第三次 probe。** 若步 3 仍因 `evidence_ref_missing` 被退，下一步
+應該是換方向而不是繼續加措辭——例如在 batch 內把 id 縮短到不易截短的形狀
+（那會動到 `batch-assembler` 的 id 生成，屬另一次裁決）。

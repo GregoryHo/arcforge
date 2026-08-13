@@ -39,6 +39,15 @@ Evidence comes in four types:
 
 Every item in the batch below has an `evidence_id`. You MUST use those IDs when citing evidence in `evidence_refs`.
 
+**Copy each `evidence_id` character-for-character, including the trailing hash segment.** An `evidence_id` is one opaque token — it only looks structured. The trailing hex is part of the identity, not a checksum you may drop:
+
+- `ev_obs_0007_d5a4b8cc` ✅ — the whole token
+- `ev_obs_0007` ❌ — trailing hash removed; this ID does not exist and the proposal is rejected
+- `evd-diary-1a2b3c4d5e6f` ✅ — diary/reflect/recall IDs use hyphens and a longer hash; same rule
+- `evd-diary` ❌
+
+A proposal citing a shortened ID is discarded whole, however good the analysis is. Prefer copy-paste over retyping.
+
 {{EVIDENCE_ITEMS}}
 
 ## Recent Diary Reflections
@@ -80,8 +89,13 @@ Respond with a single JSON object matching the `CandidateProposalPayload` schema
       "body_source": "llm_curator",
       "evidence_refs": [
         {
-          "evidence_id": "<must be one of the evidence_ids in the batch above — all 4 evidence types are citable>",
-          "evidence_type": "<observation|diary|reflect|recall>",
+          "evidence_id": "ev_obs_0007_d5a4b8cc",
+          "evidence_type": "observation",
+          "relevance": "<brief reason why this evidence supports the proposal>"
+        },
+        {
+          "evidence_id": "evd-diary-1a2b3c4d5e6f",
+          "evidence_type": "diary",
           "relevance": "<brief reason why this evidence supports the proposal>"
         }
       ],
@@ -96,7 +110,7 @@ Respond with a single JSON object matching the `CandidateProposalPayload` schema
 
 ## Proposal Rules
 
-1. **Only cite existing evidence_ids** — every `evidence_id` in `evidence_refs` must exactly match an `evidence_id` from the evidence batch above.
+1. **Every `evidence_id` must match a batch ID exactly, character for character** — including the trailing hash segment (`ev_obs_0007_d5a4b8cc`, not `ev_obs_0007`). Comparison is exact and fail-closed: one shortened ID discards the entire proposal. Cite only IDs that appear in the batch above.
 2. **Minimum 2 evidence refs per proposal** — do not create a proposal from a single observation.
 3. **Maximum 5 proposals** — prefer fewer, higher-confidence proposals over many weak ones.
 4. **Only `artifact_type: "instinct"`** — no other artifact types are permitted in this run.
@@ -127,3 +141,7 @@ If the evidence does not contain enough signal for a reliable proposal, return:
   "proposals": []
 }
 ```
+
+## Before You Emit
+
+Check each `evidence_id` you wrote against the batch above and confirm the whole token matches — the trailing hash included. This is the single most common way a sound proposal is thrown away: the analysis is right, an ID was shortened, and the fail-closed validator discards everything. Fix any mismatch before responding.
