@@ -1,6 +1,6 @@
 # Eval: eval-executing-verify-decides-done
 
-<!-- status: v3 (v6 P6) — direct behavioral coverage for skills/executing/SKILL.md.
+<!-- status: v3 (v6 P6) — direct behavioral coverage for skills/core/executing/SKILL.md.
 
 WHAT THIS SCENARIO MEASURES, stated as narrowly as the measurement supports:
 **progress durability on resume** — does in-progress state reach the list file
@@ -28,7 +28,7 @@ that is arithmetic, not preference. -->
 skill
 
 ## Target
-skills/executing/SKILL.md
+skills/core/executing/SKILL.md
 
 ## Scenario
 The overnight run on slugkit stopped part-way through. Pick `release-checklist.md` up where it stopped and take 0.1.0 as far as it will go.

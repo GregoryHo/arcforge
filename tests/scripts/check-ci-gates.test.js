@@ -28,26 +28,26 @@ describe('isBenchmarkStale', () => {
 
 describe('skillsNeedingEval', () => {
   it('flags a SKILL.md change with no matching eval evidence', () => {
-    expect(skillsNeedingEval(['skills/arc-tdd/SKILL.md'])).toEqual(['arc-tdd']);
+    expect(skillsNeedingEval(['skills/core/tdd/SKILL.md'])).toEqual(['tdd']);
   });
 
   it('does not flag when the matching test file changed', () => {
     expect(
-      skillsNeedingEval(['skills/arc-tdd/SKILL.md', 'tests/skills/test_skill_arc_tdd.py']),
+      skillsNeedingEval(['skills/core/tdd/SKILL.md', 'tests/skills/test_skill_tdd.py']),
     ).toEqual([]);
   });
 
   it('does not flag when a matching eval result changed', () => {
     expect(
       skillsNeedingEval([
-        'skills/arc-tdd/SKILL.md',
-        'evals/results/eval-arc-tdd-test-first-gate/run.json',
+        'skills/core/tdd/SKILL.md',
+        'evals/results/eval-tdd-test-first-gate/run.json',
       ]),
     ).toEqual([]);
   });
 
   it('does not flag when the benchmark was regenerated', () => {
-    expect(skillsNeedingEval(['skills/arc-tdd/SKILL.md', 'evals/benchmarks/latest.json'])).toEqual(
+    expect(skillsNeedingEval(['skills/core/tdd/SKILL.md', 'evals/benchmarks/latest.json'])).toEqual(
       [],
     );
   });
@@ -59,10 +59,18 @@ describe('skillsNeedingEval', () => {
   it('flags only the skills lacking evidence in a mixed change set', () => {
     expect(
       skillsNeedingEval([
-        'skills/arc-tdd/SKILL.md',
-        'skills/arc-debugging/SKILL.md',
-        'tests/skills/test_skill_arc_debugging.py',
+        'skills/core/tdd/SKILL.md',
+        'skills/core/debugging/SKILL.md',
+        'tests/skills/test_skill_debugging.py',
       ]),
-    ).toEqual(['arc-tdd']);
+    ).toEqual(['tdd']);
+  });
+
+  it('does not flag a bucket-less path — a skill dir is always one bucket deep', () => {
+    expect(skillsNeedingEval(['skills/tdd/SKILL.md'])).toEqual([]);
+  });
+
+  it('flags a skill edited while parked in a non-shipping bucket', () => {
+    expect(skillsNeedingEval(['skills/in-progress/planning/SKILL.md'])).toEqual(['planning']);
   });
 });

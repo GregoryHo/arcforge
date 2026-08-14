@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/looping/SKILL.md
+skills/core/looping/SKILL.md
 
 ## Context
 A Node service being migrated off a deprecated HTTP client. `tasks.md` is the

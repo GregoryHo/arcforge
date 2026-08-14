@@ -14,7 +14,10 @@ const path = require('node:path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LEGACY_JSON = path.join(REPO_ROOT, 'docs', 'plans', 'v6', 'legacy-skills.json');
-const SKILLS_DIR = path.join(REPO_ROOT, 'skills');
+// Shipped skills live in the `core` lifecycle bucket (P6.5) — the one bucket
+// `.claude-plugin/plugin.json` whitelists. `in-progress/` and `deprecated/` are
+// on-disk holding areas that never load, so no lint governs them.
+const SKILLS_DIR = path.join(REPO_ROOT, 'skills', 'core');
 
 /** @returns {string[]} skill dir names grandfathered out of v6 enforcement. */
 function legacySkills() {

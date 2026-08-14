@@ -1,12 +1,12 @@
 # Eval: eval-code-review-range-fidelity
 
-<!-- status: regression tripwire — retargeted in v6 P4 from the dissolved arc-reviewing skill onto `code-review` Steps 2–3 (compute the review range, dispatch a fresh reviewer). Three P4 repairs: (1) the old `## Context` carried the design rationale, and `## Context` is one of the two sections sent to the agent — it told the agent the answer, which is the documented cause of that scenario's 100% baseline ceiling; the rationale now lives in `## Design Notes`, which is not sent. (2) The old A1 required committing to `git rev-parse HEAD~1` as the base, which the v6 skill forbids outright; the base is now a merge-base and the fixture gives the branch two commits so HEAD~1 demonstrably truncates it. (3) The A3 grader keyed on the deleted code-reviewer.md template slots ({WHAT_WAS_IMPLEMENTED}/{PLAN_OR_REQUIREMENTS}); it now keys on the inlined reviewer prompt's slots. Version bumped 1 → 2 so v5 result rows never pool with v6 ones. Direct behavioral coverage target: skills/code-review/SKILL.md. -->
+<!-- status: regression tripwire — retargeted in v6 P4 from the dissolved arc-reviewing skill onto `code-review` Steps 2–3 (compute the review range, dispatch a fresh reviewer). Three P4 repairs: (1) the old `## Context` carried the design rationale, and `## Context` is one of the two sections sent to the agent — it told the agent the answer, which is the documented cause of that scenario's 100% baseline ceiling; the rationale now lives in `## Design Notes`, which is not sent. (2) The old A1 required committing to `git rev-parse HEAD~1` as the base, which the v6 skill forbids outright; the base is now a merge-base and the fixture gives the branch two commits so HEAD~1 demonstrably truncates it. (3) The A3 grader keyed on the deleted code-reviewer.md template slots ({WHAT_WAS_IMPLEMENTED}/{PLAN_OR_REQUIREMENTS}); it now keys on the inlined reviewer prompt's slots. Version bumped 1 → 2 so v5 result rows never pool with v6 ones. Direct behavioral coverage target: skills/core/code-review/SKILL.md. -->
 
 ## Scope
 skill
 
 ## Target
-skills/code-review/SKILL.md
+skills/core/code-review/SKILL.md
 
 ## Scenario
 You are on the branch `feat-sync` and you have just committed the last of your work

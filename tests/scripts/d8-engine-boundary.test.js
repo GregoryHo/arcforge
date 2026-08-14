@@ -51,17 +51,39 @@ const { REPO_ROOT } = require('./v6-legacy-skills');
 const SCAN_ROOTS = ['scripts', 'hooks'];
 const CODE_EXTS = new Set(['.js', '.mjs', '.cjs', '.sh', '.json']);
 
-// `skills/<name>` as a path string. The first lookbehind stops `inject-skills/`
-// from reading as `skills/`; the second exempts `.claude/skills/`. The trailing
-// slash is OPTIONAL on purpose: hoisting the coupling into a variable
-// (`const d = 'skills/arc-learning'`) strips the slash and would otherwise empty
-// the allowlist while the coupling survives — exactly the evasion that would
-// fake the P5 zero-assertion. The trailing boundary keeps `skills/foo` from
-// matching inside `skills/foobar`.
-const PATH_SHAPE_RE = /(?<![\w-])(?<!\.claude\/)skills\/([a-z0-9][a-z0-9-]*)(?![\w-])/g;
-// path.join(root, 'skills', 'arc-evaluating', …) — the segmented evasion of the
-// shape above. A variable segment (…, 'skills', name) is generic and not matched.
-const SEGMENT_SHAPE_RE = /['"]skills['"]\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"]/g;
+// Lifecycle buckets (P6.5): skills live at `skills/<bucket>/<name>/`, so the
+// segment right after `skills/` is a bucket, not a skill. Naming a bucket is
+// generic tree access — the same category as bare `skills/` — while naming a
+// skill INSIDE one is the coupling D8 forbids. Both shapes below therefore
+// capture an optional second segment and resolve through `resolvedSkill()`.
+const BUCKETS = new Set(['core', 'in-progress', 'deprecated']);
+
+// `skills/<name>` / `skills/<bucket>/<name>` as a path string. The first
+// lookbehind stops `inject-skills/` from reading as `skills/`; the second
+// exempts `.claude/skills/`. The trailing slash is OPTIONAL on purpose:
+// hoisting the coupling into a variable (`const d = 'skills/arc-learning'`)
+// strips the slash and would otherwise empty the allowlist while the coupling
+// survives — exactly the evasion that would fake the P5 zero-assertion. The
+// trailing boundary keeps `skills/foo` from matching inside `skills/foobar`.
+const PATH_SHAPE_RE =
+  /(?<![\w-])(?<!\.claude\/)skills\/([a-z0-9][a-z0-9-]*)(?:\/([a-z0-9][a-z0-9-]*))?(?![\w-])/g;
+// path.join(root, 'skills', 'core', 'arc-evaluating', …) — the segmented evasion
+// of the shape above. A variable segment (…, 'skills', name) is generic and not
+// matched.
+const SEGMENT_SHAPE_RE =
+  /['"]skills['"]\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"](?:\s*,\s*['"]([a-z0-9][a-z0-9-]*)['"])?/g;
+
+/**
+ * Resolve a regex match to the skill it couples to, or null when the reference
+ * is generic tree access. A leading bucket segment is skipped: `skills/core/tdd`
+ * couples to `tdd`, while `skills/core` on its own names no skill at all.
+ * @param {RegExpMatchArray} m
+ * @returns {string|null}
+ */
+function resolvedSkill(m) {
+  if (!BUCKETS.has(m[1])) return m[1];
+  return m[2] || null;
+}
 
 // file + skill → number of references. EMPTY as of the P5 gate.
 //
@@ -113,7 +135,9 @@ function findSkillReferences(absFile, repoRoot) {
   for (let i = 0; i < lines.length; i++) {
     for (const re of [PATH_SHAPE_RE, SEGMENT_SHAPE_RE]) {
       for (const m of lines[i].matchAll(re)) {
-        hits.push({ file: rel, skill: m[1], line: i + 1, content: lines[i].trim().slice(0, 120) });
+        const skill = resolvedSkill(m);
+        if (!skill) continue;
+        hits.push({ file: rel, skill, line: i + 1, content: lines[i].trim().slice(0, 120) });
       }
     }
   }
@@ -255,6 +279,42 @@ describe('D8 detectors (synthetic fixtures)', () => {
     write('scripts/lib/i.js', "'skills/arc-learning/a'\n'skills/arc-learning/b'\n");
     expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
       { file: 'scripts/lib/i.js', skill: 'arc-learning', count: 2 },
+    ]);
+  });
+
+  // --- Bucket layout (P6.5). A bucket segment is generic tree access; the skill
+  // name INSIDE a bucket is still the coupling D8 forbids.
+
+  it('allows naming a bucket root, which couples to no skill', () => {
+    write('scripts/lib/j.js', "const dir = 'skills/core/';\npath.join(root, 'skills', 'core');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('flags a concrete skill reached through its bucket', () => {
+    write('scripts/lib/k.js', "require('../../skills/core/learning/scripts/x.js');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/k.js', skill: 'learning', count: 1 },
+    ]);
+  });
+
+  it('flags a path.join segment list naming a skill inside a bucket', () => {
+    write('scripts/lib/l.js', "path.join(root, 'skills', 'core', 'evaluating', 'SKILL.md');\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/l.js', skill: 'evaluating', count: 1 },
+    ]);
+  });
+
+  it('allows a templated skill segment under a bucket', () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source text, not a JS template
+    write('scripts/lib/m.js', 'const p = `skills/core/${name}/SKILL.md`;\n');
+    write('scripts/lib/n.js', "path.join(root, 'skills', 'core', name);\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([]);
+  });
+
+  it('flags a skill in a non-shipping bucket too', () => {
+    write('scripts/lib/o.js', "const d = 'skills/deprecated/arc-planning';\n");
+    expect(scanEngineBoundary(tmpDir, ['scripts']).entries).toEqual([
+      { file: 'scripts/lib/o.js', skill: 'arc-planning', count: 1 },
     ]);
   });
 });

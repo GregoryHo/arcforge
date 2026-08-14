@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/using/SKILL.md
+skills/core/using/SKILL.md
 
 ## Scenario
 You are in a small ArcForge documentation fixture.

@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/maintaining-obsidian/SKILL.md
+skills/core/maintaining-obsidian/SKILL.md
 
 ## Context
 A personal Obsidian vault lives at `./vault` in this directory. It holds plain

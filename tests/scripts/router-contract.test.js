@@ -7,7 +7,7 @@ const { SKILLS_DIR, governedSkills } = require('./v6-legacy-skills');
 // Router bijection contract (v6).
 // ---------------------------------------------------------------------------
 //
-// `skills/using/` is the router: a table mapping a slash invocation to the
+// `skills/core/using/` is the router: a table mapping a slash invocation to the
 // situation it serves. The failure mode it guards against is drift in BOTH
 // directions — a shipped skill nobody can find, and a row that routes to a
 // skill that no longer exists. So the contract is a bijection, checked both

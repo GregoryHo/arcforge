@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/evaluating/SKILL.md
+skills/core/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing a proposed eval gate before a skill release. The user says:

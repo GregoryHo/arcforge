@@ -55,6 +55,10 @@ function pathExists(relPath, docDir) {
   return false;
 }
 
+// Lifecycle buckets a skill dir can sit in (P6.5). Only `core` ships, but a doc
+// may legitimately name a skill parked elsewhere, so all three resolve.
+const SKILL_BUCKETS = ['core', 'in-progress', 'deprecated'];
+
 /**
  * Existence probe for a backticked arc-<name> reference. Resolves against all
  * three component trees a doc may legitimately name: a skill dir, a hook dir,
@@ -62,7 +66,7 @@ function pathExists(relPath, docDir) {
  */
 function skillExists(name) {
   return (
-    fs.existsSync(path.join(repoRoot, 'skills', name)) ||
+    SKILL_BUCKETS.some((bucket) => fs.existsSync(path.join(repoRoot, 'skills', bucket, name))) ||
     fs.existsSync(path.join(repoRoot, 'hooks', name)) ||
     fs.existsSync(path.join(repoRoot, 'agents', `${name}.md`))
   );

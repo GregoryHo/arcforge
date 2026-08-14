@@ -16,7 +16,7 @@ contributor-side conventions only; it is not the authoring methodology.
 | What frontmatter is legal | `docs/plans/v6/decisions/skill-schema.md` (**frozen** — do not redefine, restate, or extend it elsewhere) |
 | Is my skill structurally valid | `tests/skills/test_skill_structure.py` (the mechanical form of the schema) |
 | Which skills exist and when | `docs/plans/v6/PLAN.md` (phase table) |
-| How to write a good skill | `skills/writing-skills/` (v6 meta skill, landed in P3) — the authoring methodology. The schema doc stays authoritative for the fields themselves. |
+| How to write a good skill | `skills/core/writing-skills/` (v6 meta skill, landed in P3) — the authoring methodology. The schema doc stays authoritative for the fields themselves. |
 
 Required frontmatter is `name` + `description`; the optional field set is
 enumerated in the schema doc and nowhere else. `name` must equal the directory
@@ -24,7 +24,7 @@ name, with no `arc-` prefix (D7).
 
 ## Self-containment (D1)
 
-A skill directory is a closed unit: nothing under `skills/<name>/` may
+A skill directory is a closed unit: nothing under `skills/<bucket>/<name>/` may
 require / import / source outside that directory, and skill prose must not name
 engine internals (`scripts/lib/...`), `ARCFORGE_ROOT`, or `CLAUDE_PLUGIN_ROOT`
 (hooks-only, unset in skill Bash). Engine functionality is reached only by a
@@ -35,15 +35,17 @@ Rationale and the matching D8 rule for engine code: `.claude/rules/architecture.
 
 `docs/plans/v6/legacy-skills.json` is the single source of truth for which v5
 skills the new assertions skip. Anything not listed gets the full rule set. The
-ratchet: every entry must still exist as `skills/<name>/`, so deleting or
+ratchet: every entry must still exist as `skills/core/<name>/`, so deleting or
 rewriting a legacy skill means pruning its entry in the **same commit**. Never
 add an entry.
 
 ## Test file convention
 
 - Single generic checker: `tests/skills/test_skill_structure.py` (no per-skill file)
-- Runner: pytest — discovers every `skills/*/SKILL.md` dynamically, so merges,
-  renames, and new skills need zero test edits
+- Runner: pytest — discovers every `skills/core/*/SKILL.md` dynamically, so
+  merges, renames, and new skills need zero test edits. Adding or removing a
+  skill does need one edit: `EXPECTED_SKILL_COUNT`, which pins the scan against
+  a glob that half-breaks
 - Validates frontmatter against the frozen schema, `name` == dirname, the
   description register, section/body structure, referenced supporting files,
   and the line budget

@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/evaluating/SKILL.md
+skills/core/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing an eval plan. The user says:

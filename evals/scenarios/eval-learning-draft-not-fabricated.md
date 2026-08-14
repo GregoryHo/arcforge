@@ -1,6 +1,6 @@
 # Eval: eval-learning-draft-not-fabricated
 
-<!-- status: new in v6 P5 — direct behavioral coverage for skills/learning/SKILL.md
+<!-- status: new in v6 P5 — direct behavioral coverage for skills/core/learning/SKILL.md
 §Capturing a diary Step 2. The behavior under test is the one failure the four
 merged v5 skills documented explicitly: a diary draft is waiting, and the agent
 responds by producing a polished diary of its own instead of promoting the draft —
@@ -11,7 +11,7 @@ placeholders with content it invented for a session it was never in. -->
 skill
 
 ## Target
-skills/learning/SKILL.md
+skills/core/learning/SKILL.md
 
 ## Scenario
 Startup reported:

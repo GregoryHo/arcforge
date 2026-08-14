@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/evaluating/SKILL.md
+skills/core/evaluating/SKILL.md
 
 ## Scenario
 You are reviewing an eval audit result for a skill release. The user says:

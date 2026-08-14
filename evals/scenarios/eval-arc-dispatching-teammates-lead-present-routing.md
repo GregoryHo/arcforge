@@ -3,7 +3,7 @@
 <!-- status: draft-unvalidated 2026-06-24 — A4-flawed for this describe-style scenario; rework pending. HONEST VARIANCE CORRECTION (supersedes the 2026-06-23 validated-nonregression record): the earlier single-rep k=5 5/5 SHIP was FAVORABLE VARIANCE. A fresh k=5 on main (all fixes merged, effect-based A4 = fixture sha256 + artifact scan) gave 0/5 BLOCKED — every trial A1✓ A2✓ A3✓ A4✗ (0.75). A4✗ means the agent ACTUALLY CREATED ARTIFACTS this run; A4 (no-artifact) is FLAKY. A1–A3 (the teammates-routing discriminators — the real signal) pass CONSISTENTLY across both reps, so the routing behavior is non-regressing; but A4 tests no-write instruction-following, ORTHOGONAL to the routing skill, and the agent does it inconsistently, flipping the overall verdict. A4 needs rework/removal for this describe-style scenario (follow-up tracked). Measured baseline preserved: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash 0def1773) — the routing behavior is baseline-competent. Marked draft-unvalidated so the recompute snippet stops counting this as clean-validated: the per-scenario verdict is VARIANT, not a clean SHIP. A1/A2/A3 and the grader code are unchanged. Direct behavioral coverage target: skills/arc-dispatching-teammates/SKILL.md. -->
 
 <!-- RETARGETED 2026-08-14 (v6 P6 Track B), Version 1->2. arc-dispatching-teammates
-merged into skills/dispatching/ together with arc-dispatching-parallel and
+merged into skills/core/dispatching/ together with arc-dispatching-parallel and
 arc-using-worktrees. The behavior under test survives the merge intact — the
 attendance-not-risk boundary is now the SKILL's `Choosing the substrate` section —
 so this is a retarget, not a rewrite. Three wording edits, no assertion-logic edits:
@@ -19,7 +19,7 @@ The A4 flakiness recorded above is pre-existing and unaddressed here. -->
 skill
 
 ## Target
-skills/dispatching/SKILL.md
+skills/core/dispatching/SKILL.md
 
 ## Scenario
 You are in a project that has a committed `specs/demo/dag.yaml` listing three independent, ready pieces of work. The user says:

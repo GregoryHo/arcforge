@@ -67,7 +67,7 @@ describe('R4 slash track (/<name>)', () => {
 
   it('parses a router table row as a slash reference', () => {
     const doc = '| Skill | Use when |\n|---|---|\n| `/finishing` | wrapping up |\n';
-    const { stats } = lintDoc('skills/using/SKILL.md', doc, PROBE_ALL);
+    const { stats } = lintDoc('skills/core/using/SKILL.md', doc, PROBE_ALL);
     expect(stats.r4.slash).toBe(1);
   });
 

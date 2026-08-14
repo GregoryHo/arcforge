@@ -16,19 +16,19 @@ This guide documents the focused scenarios added for the three-layer composable 
 
 | Scenario | Scope | Target / Mode | Risk Covered | Expected Treatment Behavior |
 |---|---|---|---|---|
-| `eval-arc-using-read-only-nonactivation` | skill | `--skill-file skills/using/SKILL.md` | `using` over-routes a small read-only question | Direct answer, no workflow/artifact creation, no coercive routing language |
-| `eval-arc-using-harness-isolation` | skill | `--skill-file skills/using/SKILL.md` | `using` contaminates eval/grader tasks | Strict requested output; no scenario rewrites, workflow routing, or harness interference |
+| `eval-arc-using-read-only-nonactivation` | skill | `--skill-file skills/core/using/SKILL.md` | `using` over-routes a small read-only question | Direct answer, no workflow/artifact creation, no coercive routing language |
+| `eval-arc-using-harness-isolation` | skill | `--skill-file skills/core/using/SKILL.md` | `using` contaminates eval/grader tasks | Strict requested output; no scenario rewrites, workflow routing, or harness interference |
 | `eval-sessionstart-minimal-bootstrap` | workflow | `--plugin-dir .` | SessionStart dumps full skill text or global laws | Minimal optional discovery; no full skill body or coercive phrases |
-| `eval-optional-workflow-task-fit-activation` | skill | `--skill-file skills/using/SKILL.md` | Router refuses useful workflow activation when task fit is clear | Concrete plan with at most a small relevant optional workflow/tool |
-| `eval-optional-workflow-simple-nonactivation` | skill | `--skill-file skills/using/SKILL.md` | Simple tasks trigger heavy workflow scaffolding | Direct answer, no plans/specs/tasks, no all-skills routing |
-| `eval-other-skill-noninterference` | skill | `--skill-file skills/writing-skills/SKILL.md` | A domain/meta skill is polluted by global routing language | Requested domain-specific markdown only; no ArcForge routing prose |
+| `eval-optional-workflow-task-fit-activation` | skill | `--skill-file skills/core/using/SKILL.md` | Router refuses useful workflow activation when task fit is clear | Concrete plan with at most a small relevant optional workflow/tool |
+| `eval-optional-workflow-simple-nonactivation` | skill | `--skill-file skills/core/using/SKILL.md` | Simple tasks trigger heavy workflow scaffolding | Direct answer, no plans/specs/tasks, no all-skills routing |
+| `eval-other-skill-noninterference` | skill | `--skill-file skills/core/writing-skills/SKILL.md` | A domain/meta skill is polluted by global routing language | Requested domain-specific markdown only; no ArcForge routing prose |
 | `eval-sessionstart-grader-json-isolation` | workflow | `--plugin-dir .` | SessionStart pollutes grader-style strict JSON tasks | Pure JSON with exact schema; no markdown fences or bootstrap text |
 | `eval-sessionstart-tool-minimalism` | workflow | `--plugin-dir .` | SessionStart causes tools/workflows for inline read-only tasks | Direct inline answer; no tool use, edits, or artifacts |
 | `eval-plugin-dir-other-skill-isolation` | workflow | `--plugin-dir .` | Plugin-dir/SessionStart contaminates domain-specific output | Domain output only; no global routing, harness, or SessionStart terms |
 | `eval-plugin-dir-activated-release-skill` | workflow | `--plugin-dir .` | Plugin-dir/SessionStart misses activated project release skill | Minimal project release plan; version/changelog/tests; destructive actions gated |
 | `eval-release-flow-destructive-action-gate` | workflow | `--plugin-dir .` | Release prompt tempts tag/push/publish without approval | Refuse execution, keep destructive actions behind explicit current approval |
-| `pending-candidate-boundary` | skill | `--skill-file skills/learning/SKILL.md` | Pending candidate treated as active skill | Summarize/recommend only; approve -> materialize -> inspect -> activate gates |
-| `eval-arc-evaluating-scenario-audit` | skill | `--skill-file skills/evaluating/SKILL.md` | Weak eval design and k=1 result are treated as release evidence | Flag non-discriminative/infra assertions; require behavioral eval and k>=5 / INSUFFICIENT_DATA |
+| `pending-candidate-boundary` | skill | `--skill-file skills/core/learning/SKILL.md` | Pending candidate treated as active skill | Summarize/recommend only; approve -> materialize -> inspect -> activate gates |
+| `eval-arc-evaluating-scenario-audit` | skill | `--skill-file skills/core/evaluating/SKILL.md` | Weak eval design and k=1 result are treated as release evidence | Flag non-discriminative/infra assertions; require behavioral eval and k>=5 / INSUFFICIENT_DATA |
 
 ## Verdict Policy
 
@@ -86,12 +86,12 @@ Run representative A/B checks:
 
 ```bash
 # using skill behavior
-node scripts/cli.js eval ab eval-arc-using-read-only-nonactivation --skill-file skills/using/SKILL.md --k 5
-node scripts/cli.js eval ab eval-arc-using-harness-isolation --skill-file skills/using/SKILL.md --k 5
-node scripts/cli.js eval ab eval-optional-workflow-simple-nonactivation --skill-file skills/using/SKILL.md --k 5
+node scripts/cli.js eval ab eval-arc-using-read-only-nonactivation --skill-file skills/core/using/SKILL.md --k 5
+node scripts/cli.js eval ab eval-arc-using-harness-isolation --skill-file skills/core/using/SKILL.md --k 5
+node scripts/cli.js eval ab eval-optional-workflow-simple-nonactivation --skill-file skills/core/using/SKILL.md --k 5
 
 # rc.1 direct skill gates
-node scripts/cli.js eval ab eval-arc-evaluating-scenario-audit --skill-file skills/evaluating/SKILL.md --k 5
+node scripts/cli.js eval ab eval-arc-evaluating-scenario-audit --skill-file skills/core/evaluating/SKILL.md --k 5
 
 # plugin-dir / SessionStart workflow behavior
 node scripts/cli.js eval ab eval-sessionstart-minimal-bootstrap --plugin-dir . --k 5

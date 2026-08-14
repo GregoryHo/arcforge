@@ -4,7 +4,7 @@
 workflow
 
 ## Target
-skills/finishing/SKILL.md
+skills/core/finishing/SKILL.md
 
 ## Context
 A small JavaScript package. The base checkout is on `main` and the suite runs with `npm test`. The repository has no remote.

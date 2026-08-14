@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/dispatching/SKILL.md
+skills/core/dispatching/SKILL.md
 
 ## Context
 A small Node project. Three branches are waiting to go onto `main`, each written
