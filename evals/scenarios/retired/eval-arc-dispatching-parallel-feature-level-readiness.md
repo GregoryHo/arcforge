@@ -2,6 +2,18 @@
 
 <!-- status: draft-unvalidated 2026-06-24 — A4-flawed for this describe-style scenario; rework pending. HONEST VARIANCE CORRECTION (supersedes the 2026-06-23 validated-nonregression record): the earlier single-rep k=5 5/5 SHIP was FAVORABLE VARIANCE. A fresh k=5 on main (all fixes merged, effect-based A4 = fixture sha256 + artifact scan) reproduced the same pattern as its sibling autonomy scenarios — A1✓ A2✓ A3✓ but A4✗ (agent created artifacts), flipping trials to BLOCKED. A1–A3 (the engine-readiness + parallelize discriminators — the real signal) pass CONSISTENTLY, so the feature-level parallel-readiness behavior is non-regressing; but A4 (no-artifact) is FLAKY. A4 tests no-write instruction-following, ORTHOGONAL to the parallel-dispatch skill, and the agent does it inconsistently, flipping the overall verdict. A4 needs rework/removal for this describe-style scenario (follow-up tracked). Measured baseline preserved: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash 695c6f5e) — the behavior is baseline-competent. Marked draft-unvalidated so the recompute snippet stops counting this as clean-validated: the per-scenario verdict is VARIANT, not a clean SHIP. A1/A2/A3 and the grader code are unchanged. Direct behavioral coverage target: skills/arc-dispatching-parallel/SKILL.md. -->
 
+<!-- RETIRED 2026-08-14 (v6 P6 Track B). Reason: the discriminating assertion's
+subject no longer exists. A1 requires the response to reach for `parallel --features`
+/ `cli.js parallel` to compute readiness — that command was removed in P2 with the
+coordinator engine and is absent from cli-manifest.js; the Setup fixture is a
+`specs/demo/dag.yaml`, also removed in P2. Retargeting to skills/dispatching/SKILL.md
+would have shipped a scenario whose signal is structurally impossible, so it is
+retired rather than retargeted. Pre-existing defects, unchanged: A4 flaky across two
+k=5 reps (see the draft-unvalidated note below), and preflight recorded baseline at
+100% ceiling -> BLOCK. The surviving behavior (independence gate before parallel
+dispatch) is covered by eval-dispatching-report-not-evidence and by the retargeted
+eval-arc-dispatching-teammates-lead-present-routing. -->
+
 ## Scope
 skill
 

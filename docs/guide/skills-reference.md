@@ -8,7 +8,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
   - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-finishing](#arc-finishing)
-  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
+  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [dispatching](#dispatching) · [arc-looping](#arc-looping)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
@@ -21,7 +21,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 
 arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `evaluating`, and `learning`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `evaluating`, and `learning`.
 
 **Core skills every user should learn first:**
 
@@ -67,7 +67,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **SDD** | arc-brainstorming, arc-writing-tasks, arc-executing-tasks, arc-finishing | Explore, specify, build, integrate |
-| **Orchestration** | arc-agent-driven, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
+| **Orchestration** | arc-agent-driven, dispatching, arc-looping | Dispatch subagents; manage worktrees and loop state |
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
@@ -214,51 +214,34 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 ---
 
-### arc-dispatching-parallel
+### dispatching
 
-**Purpose:** Dispatch multiple agents for independent tasks in parallel.
+**Purpose:** Discipline for work that can run in parallel — proving the pieces
+are independent, isolating each writer in its own worktree, writing a brief a
+fresh agent can run on, and accepting what comes back on evidence rather than on
+the report.
 
-**When to use:** When fanning out multiple independent features to parallel subagents you drive yourself within one worktree. For epic-level teammates you monitor as a present lead, use arc-dispatching-teammates.
-
-**Key workflow:**
-1. Identify independent tasks (no shared dependencies or files)
-2. Create focused prompts with specific scope and constraints
-3. Dispatch agents in parallel via Task tool
-4. Review and integrate — verify no conflicts, run full test suite
-5. If conflicts found: tasks were not truly independent — resolve manually
-
-**Artifacts:**
-- Input: `specs/<spec-id>/dag.yaml` (DAG-based) or list of independent failures (without DAG)
-- Output: parallel fixes integrated, test suite passing
-
-**Related:** arc-writing-tasks --> **arc-dispatching-parallel** --> arc-finishing
-
----
-
-### arc-dispatching-teammates
-
-**Platform:** Claude Code only — requires the agent teammates feature (Claude Code 2.1.32+) and the Agent tool's `team_name`/`name` parameters. Other platforms have no equivalent multi-worker coordination substrate.
-
-**Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between single-epic interactive work and `arc-looping` (multi-epic unattended).
-
-**When to use:** When 2+ epics are ready and you stay present to monitor a live team. For walk-away loops use arc-looping; for feature fan-out use arc-dispatching-parallel.
+**When to use:** When several pieces of work could run at once, when work needs
+an isolated workspace, when writing a dispatch brief, or when dispatched work
+reports back and has to be accepted.
 
 **Key workflow:**
-1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
-2. Cap team size at 5 — if more ready epics, queue the rest for continuous dispatch
-3. `TeamCreate` before any Agent dispatch (passing `team_name` to Agent does NOT auto-create)
-4. Per epic: `arcforge expand --epic <id>` → read canonical worktree path → spawn teammate with spawn prompt template (parallel dispatch, sequential retry on GH #40168 timing race)
-5. Monitor via SendMessage — dispatch queued epics into freed slots as teammates complete (continuous, not waves)
-6. **Acceptance check** per teammate completion: dispatch `arcforge:spec-reviewer` + `arcforge:verifier` subagents with fresh context. Both PASS = accept and shut down teammate; either FAIL = Step 7. Lead reads reports and decides — does NOT run checks inline
-7. **Retry loop** on rejection: up to 3 retries per epic with cumulative feedback. Fresh worktree from dev HEAD (fix-forward), dispatch retry teammate. Spec-defect overrides (spec references wrong file/path) skip retry via override-accept protocol
-8. **Wrap up** when all epics reach terminal state: emit Final Report with per-epic subagent evidence, cleanup accepted worktrees, shut down remaining teammates, `TeamDelete`
+1. Prove the pieces are independent — no shared dependency, no shared file, each readable alone
+2. `arcforge worktree add <name> --json` per writer; read the `path` field, never construct it
+3. Write the dispatch card — absolute paths, verbatim acceptance criteria, return format, authority to finish
+4. Accept on evidence: a fresh-context compliance check plus a fresh-context test run, never the author's own report
+5. Merge accepted pieces one at a time onto a branch, checks after each; the branch is the deliverable
+
+**Substrate:** subagents for pieces you drive yourself; agent teammates when you
+stay present to answer questions (cap 5); an unattended loop when you are leaving.
+The line between the last two is attendance, not risk.
 
 **Artifacts:**
-- Input: `specs/<spec-id>/dag.yaml` (required), `skills/arc-dispatching-teammates/SKILL.md`
-- Output: per-epic worktrees at `~/.arcforge/worktrees/...`, one agent teammate per ready epic, merged epics via each teammate's own finishing step, Final Report with subagent evidence
-- Progressive-loading references: `acceptance-and-retry.md`, `spawn-prompt-template.md`, `tmux-timing-race.md`, `wrap-up-sequence.md`
+- Input: the set of work units and their acceptance criteria
+- Output: one worktree per writer (`kind: generic`), one branch carrying the accepted pieces, per-piece acceptance evidence
+- Progressive-loading references: `dispatch-card.md`, `acceptance.md`
 
-**Related:** arc-writing-tasks → **arc-dispatching-teammates** → (per completion: two acceptance subagents); each teammate runs arc-agent-driven → arc-finishing on its own
+**Related:** the task list --> **dispatching** --> `/finishing`
 
 ---
 
@@ -268,7 +251,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 **Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
 
-**When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
+**When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring parallel work, use dispatching.
 
 **Key workflow:**
 1. Verify the task list exists (from arc-writing-tasks) and baseline tests pass
@@ -282,38 +265,6 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
 **Related:** arc-writing-tasks --> **arc-looping** --> arc-finishing
-
----
-
-### arc-using-worktrees
-
-**Purpose:** Isolated git worktrees for **any** repo, in two tiers. A
-**generic tier** (`arcforge worktree add|list|remove`) handles a parallel
-branch, an experiment, or a review checkout in any project; a **composition
-tier** hands single-epic work to the coordinator. Both derive the canonical
-path at runtime — you never invent one.
-
-**When to use:** When work needs an isolated workspace — a parallel branch, experiment, or review checkout — in any git repo, even if the user never says "worktree".
-
-**Key workflow (top-down, first match wins):**
-1. `.arcforge-epic` exists in cwd → already inside a marked worktree; never
-   nest. Integration → arc-finishing.
-2. Anything else (a branch, experiment, or review checkout) → generic tier:
-   `arcforge worktree add <name>`, then read the absolute `path` from the
-   JSON output and `cd` there.
-
-**Artifacts:**
-- Generic: a managed worktree at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`
-  with **no** marker (`kind: generic`)
-- Epic (composition tier): worktree + `.arcforge-epic` marker authored by the
-  coordinator, `dag.yaml` epic status updated
-
-For the full derivation rules — including the generic null-spec path, kind
-annotation, and the sync/merge invisibility guarantee — see
-[`docs/guide/worktree-workflow.md`](worktree-workflow.md) and the Worktree
-Rule in `skills/using/SKILL.md`.
-
-**Related:** arc-writing-tasks --> **arc-using-worktrees** --> arc-agent-driven or arc-executing-tasks
 
 ---
 
@@ -610,13 +561,10 @@ Best for single features with clear requirements. Use arc-writing-tasks to break
 ### 2. Large Epic
 
 ```
-arc-brainstorming --> arc-writing-tasks --> arc-using-worktrees
+arc-brainstorming --> arc-writing-tasks --> dispatching
      |                                            |
      v                                            v
-  design.md                          arc-dispatching-teammates
-                                                  |
-                                                  v
-                                          arc-agent-driven
+  design.md                              arc-agent-driven
                                                   |
                                                   v
                                             /finishing

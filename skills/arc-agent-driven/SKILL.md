@@ -23,7 +23,7 @@ Execute a plan by dispatching a fresh subagent per task, with one task-reviewer 
 1. Read tasks, create a task list.
 2. Per task: dispatch an implementer subagent (answer its questions before and during work); it implements, tests, commits, self-reviews.
 3. Dispatch one task-reviewer that returns both verdicts (spec compliance + task quality) from a single read of the change.
-4. If issues: one fix pass addresses spec gaps and quality findings together, then re-review covers both verdicts. Fan out to `arc-dispatching-parallel` only when findings are genuinely independent; otherwise a single batch-fix dispatch is the default.
+4. If issues: one fix pass addresses spec gaps and quality findings together, then re-review covers both verdicts. Fan out to `/dispatching` only when findings are genuinely independent; otherwise a single batch-fix dispatch is the default.
 5. Both verdicts clean → mark the task complete; move to the next.
 6. After all tasks: dispatch a final whole-branch code reviewer, then run the completion pipeline — `/code-review` (confirm requirements met and tests pass), then arc-finishing (Step 0 discriminates on `.arcforge-epic`).
 

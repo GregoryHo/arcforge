@@ -3,11 +3,8 @@
   "legacy": [
     "arc-agent-driven",
     "arc-brainstorming",
-    "arc-dispatching-parallel",
-    "arc-dispatching-teammates",
     "arc-executing-tasks",
     "arc-looping",
-    "arc-using-worktrees",
     "arc-writing-tasks"
   ]
 }
