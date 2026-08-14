@@ -620,7 +620,7 @@ deletion. Same for `eval-sessionstart-minimal-bootstrap`.
 | Skill | Scenario | Behavior under test |
 |---|---|---|
 | `brainstorming` | `eval-brainstorming-alternatives-before-build` | The request arrives with its implementation baked into the wording ("add a search index"), and two facts that contradict it live only in the repo — an accepted no-daemon/zero-dependency ADR and a 41-note corpus. Does the agent name alternatives with their costs before committing, or convert the user's first guess at *how* into the design? |
-| `executing` | `eval-executing-verify-decides-done` | **v3 — two measured redesigns, see below.** Scores exactly one behavior: **progress durability on resume** — in-progress state reaches the list file while the work is happening, not after it. Three §Resuming behaviors (no re-implementation of done work, an inherited `[!]` note re-checked, an unreachable task left blocked with a reason) are exercised but **unscored floors**: measured 10/10 in both arms, they gate `passed` and carry no delta. |
+| `executing` | `eval-executing-verify-decides-done` | **unmet-but-covered (P6 gate) — v3 k=10: +0.10 CI[−0.13,0.33] INCONCLUSIVE; treatment 20/20 perfect across all runs; discriminator baseline nonstationary (40%→90%). See FINAL verdict below.** Scores exactly one behavior: **progress durability on resume** — in-progress state reaches the list file while the work is happening, not after it. Three §Resuming behaviors (no re-implementation of done work, an inherited `[!]` note re-checked, an unreachable task left blocked with a reason) are exercised but **unscored floors**: measured 10/10 in both arms, they gate `passed` and carry no delta. |
 
 Both are `scope: skill` with a `code` grader — every assertion is either a
 filesystem fact in the trial directory or a tool call in the transcript, so
@@ -650,6 +650,23 @@ every assertion from trial files or the transcript, and its one unreachable-host
 task (A4) is scored from the marker and its `note:`, not from a tool call.
 Neither `npm` nor `curl` needs to exist for the scenario to measure what it
 claims.
+
+### `eval-executing-verify-decides-done` — FINAL P6 verdict: unmet-but-covered
+
+**v3 measured at k=10 (2026-08-15, run after the redesign below): baseline avg
+0.90 / pass 90%, treatment 1.00×10 / 100% → delta +0.10 CI[−0.13, 0.33]
+INCONCLUSIVE.** Redesign quota (2/2) is spent; the pre-registered escape clause
+applies. The decisive fact is **nonstationarity of the sole discriminator**: the
+same instrument measured baseline `[~]`-mid-run at 2/5 (v2, 08-14), 3/3 (v3
+preflight roll 1), then 9/10 (v3 ab) — a 40%→90% drift across samples with the
+trial content byte-identical. Treatment scored **1.00 in every measured trial
+across all runs (20/20)**. Honest reading: the behavior is baseline-default with
+high sampling variance, not a stable skill lift — same family as `dispatching`'s
+and `evaluating`'s ceilings, booked to P7 with them. Two procedural notes for the
+record: the preflight gate is k=3 fixed (the "defaultK honors ## Trials for
+preflight" claim in the v3 design notes is falsified by the run — it ran 3), and
+one preflight BLOCK (roll 1, 3/3 at a then-believed p≈0.4) was re-rolled once
+with this documented rationale before the ab ran.
 
 ### `eval-executing-verify-decides-done` v2 → v3 (measured, redesign 2 of 2)
 
@@ -896,7 +913,7 @@ the orchestrator against its own runs.
 
 | Scenario | Target | Behavior | Status |
 |---|---|---|---|
-| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Step 1 + §The verifier gate — the acceptance floor gating the *unfinished* tasks already passes in the un-done state, so an unattended relaunch marks them complete without evidence. **v1 measured at baseline ceiling and was redesigned; `## Version` 1 → 2, v2 unmeasured** — see below | redesigned; measurement by the orchestrator |
+| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Step 1 + §The verifier gate — the acceptance floor gating the *unfinished* tasks already passes in the un-done state, so an unattended relaunch marks them complete without evidence. **v2 MEASURED — IMPROVED +0.19 CI[0.07, 0.31]** (pooled two same-day k=5 ab runs, same instrument/version: baseline 9 valid — one run-1 trial voided — avg 0.78 / pass 67%; treatment 10/10 avg 0.97 / pass 90%). Delta carried by A4 (relaunch command completeness: cost ceiling + pre-authorization/detach, 1/9 → 10/10, near-deterministic within each arm); A1 non-discriminative (baseline already spots the broken check 9/9); tool_not_called floors 19/19 both arms. v1 history: preflight BLOCKed at 3/3 baseline ceiling → redesigned, `## Version` 1 → 2 | redesigned; measurement by the orchestrator |
 | `eval-arc-looping-bounded-unattended-loop-gate` | — | bounded unattended launch | **retired (file deleted)** — see below |
 | `eval-compacting-persist-before-compact` | `skills/sessions/SKILL.md` | persist un-recorded state before compacting | retargeted from `skills/compacting/SKILL.md`, `## Version` 2 → 3 |
 | `eval-sessions-handover-completeness` | `skills/sessions/SKILL.md` | handover records what is proven, not what is claimed | unchanged — target already correct; re-run against the merged skill as the P6 gate's non-degradation check |
