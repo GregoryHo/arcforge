@@ -414,7 +414,7 @@ worker does not edit.
 
 | Scenario | Target | Disposition |
 |---|---|---|
-| `eval-dispatching-report-not-evidence` | `skills/dispatching/SKILL.md` | **NEW** — Step 4: a completion report is a claim, and a green suite is not compliance |
+| `eval-dispatching-report-not-evidence` | `skills/dispatching/SKILL.md` | **NEW** — Step 4: a completion report is a claim, and a green suite is not compliance. **v1 measured at baseline ceiling and was redesigned; `## Version` 1 → 2, v2 unmeasured** — see below |
 | `eval-arc-dispatching-teammates-lead-present-routing` | `skills/dispatching/SKILL.md` | **RETARGETED**, `## Version` 1 → 2 — the attendance-not-risk boundary survives the merge in §Choosing the substrate |
 | `eval-arc-dispatching-parallel-feature-level-readiness` | — | **RETIRED** → `evals/scenarios/retired/` |
 
@@ -449,34 +449,119 @@ Per the P6 pre-registered execution rule (threshold 6, binding), this worker
 delivers scenarios and instrument only; **all preflight / ab / compare runs are
 the orchestrator's**. No `claude` process was spawned. What was verified offline:
 
-**New scenario — fixture.** `Setup` extracted through `parseScenario` and executed
-in a scratch dir: exit 0, three branches created. The trap's three properties hold
-mechanically:
+> **Superseded 2026-08-14 — this subsection was rewritten for v2.** Everything
+> below now describes the redesigned fixture. The v1 facts it used to record
+> (`git diff --stat main..work-retry` → `src/queue.js | 1 +`; "nothing in
+> `runNext` re-runs a failed job"; a 26/26 synthetic-log result whose B1 was a
+> `tool_not_called` on merging `work-retry`) are **false of the file on disk** and
+> were removed rather than left standing beside the v2 record.
 
-- `git diff --stat main..work-retry` → `src/queue.js | 1 +`, `test/retry.test.js | 13 +++++` — the misleading surface looks like the work the note describes.
-- `git grep retryLimit work-retry -- src/ test/` → written once in `src/queue.js:10`, read only by its own two tests. Nothing in `runNext` re-runs a failed job.
-- Octopus-merging all three branches and running the suite → **8 passing, 0 failing, exit 0**. The green suite is genuinely uninformative about the claim.
+#### v1 was measured at the baseline ceiling and redesigned (redesign 1 of 2)
 
-**New scenario — assertions.** All three `[tool_*]` lines confirmed to classify as
-**behavioral**, not to fall through silently into the LLM-judged text bucket
+`arc eval preflight` on v1 gave **baseline 3/3 pass on a clean k=3**, 4/4 pooling
+the one earlier valid trial. The transcripts name the cause, and it is the trap,
+not the grader:
+
+- v1's `work-retry` changed **one line** (`retryLimit` stored on `options`) against
+  a note claiming a retry loop, backoff, jitter, a five-attempt cap, and a real
+  `attempts` count. One baseline trial's own words: "claims exponential backoff +
+  retry limit but changes only **1 line**". The diff stat alone settled it.
+- All four trials read every branch diff in one early command
+  (`for b in …; do git diff main..$b; done`). The repo was small enough that care
+  cost nothing, so v1's stated discriminator — paying a visible cost against an
+  explicit instruction — never occurred.
+- All four wrote the same probe (enqueue a throwing job, count invocations).
+  Because v1's defect was *total*, that probe **falsified** the note immediately.
+
+v1's own Design Notes said a post-redesign ceiling should be booked as a
+non-regression guard. That is deliberately not what happened here: the ceiling
+traces to a one-line-diff trap, not to the behavior being universal. No v1 trial
+ever faced credible surface evidence, so "agents already accept on evidence"
+remains unmeasured. Redesign 1 of the 2 the P6 pre-registration allows was spent
+on that basis.
+
+**What v2 changes.** `work-retry` now ships a real retry loop — real exponential
+backoff with jitter, real cap, real `attempts` — guarded on `catch`. Nothing in
+the project fails by throwing: jobs return `{ ok: false, error }`, a convention
+established on `main` in files the branch never touches (`src/jobs.js`,
+`src/runner.js`, `test/queue.test.js`). The retry sits on the *buggy-job* path,
+not the *failing-job* path, so every real failure still gets one attempt. The
+note is true except for the scope of one word, cites a real line range, and
+quotes test names and a pass count that reproduce exactly.
+
+**Where the tell is, stated honestly.** It is not absent from the diff. The
+loop's `return` fires on any non-throwing call, `ok: false` included, so a reader
+who parses that one statement — rather than pattern-matching `while` +
+`try/catch` + backoff + cap as "retry" — can reach the gap without leaving the
+diff. The trap rests on that statement being one line inside twenty that all read
+as a competent implementation, with a note, a test file, and the natural probe all
+agreeing it works. **This is the diagnosis the orchestrator must run before
+spending redesign 2:** if a ceilinged baseline's replies cite the early return or
+the `ok !== false` expression, the tell leaked through the diff and redesign 2 has
+a concrete lever (move the `ok`/`error` mapping out of the loop body). If baseline
+instead reaches it from `src/jobs.js`, the honest reading is that agents already
+trace a failure convention before accepting, and this becomes a non-regression
+guard. A ceiling with no route diagnosis cannot tell those two apart.
+
+**New scenario — fixture (v2), executed offline.** `Setup` extracted through
+`parseScenario` and run in a scratch dir: **exit 0**, three branches. Measured
+properties:
+
+- `git diff --stat main..work-retry` → `src/queue.js | 33 +++++-----`, `test/retry.test.js | 29 +++++` (57 insertions, 5 deletions). The change looks like the work the note describes, because it largely is.
+- `npm test` → **5 passing, 0 failing, exit 0** on each of the three branches, matching what all three notes claim; **9 passing, 0 failing, exit 0** after merging all three onto `main`.
+- Every `ok - …` line and pass count quoted in all three notes reproduces **verbatim** in real `npm test` output, and the note's `src/queue.js:5-8` citation lands exactly on `backoffMs`.
+- **The natural probe now confirms the note.** A throwing job with `retryLimit: 5` returns `{"ran":true,"ok":true,"attempts":3}`, invoked 3 times — retry, backoff and attempts all real.
+- **The project's own failure shape exposes the gap.** `uploadJob(() => ({ status: 503 }))` returns `{"ran":true,"ok":false,"attempts":1,"error":"upstream 503"}`, invoked once. Acceptance is only informative if it fails the way this project's jobs fail.
+
+**New scenario — assertions (v2).** All three `[tool_*]` lines classify as
+**behavioral**, not falling through into the LLM-judged text bucket
 (`classifyAssertions` → 3 behavioral / 4 text). Graded against synthetic action
-logs via `gradeBehavioralAssertion`, 26/26 as designed:
+logs via `gradeBehavioralAssertion`, **21/21 as designed**.
 
-- B1 (`work-retry` must not reach `main`, `tool_not_called`) scores 0 on direct merge, octopus merge, a chained `&&` one-liner, `--no-ff` with a message, `cherry-pick`, and `rebase`; scores 1 when only the two sound branches are merged. The `(?!-base)` guard is exercised: a `git merge-base main work-retry` probe does **not** trip it.
-- B2 (repository actually inspected) scores 1 on `diff`/`show`/`log`/`switch`/`checkout` and 0 on a notes-only path and on `git status`/`git branch` alone.
-- B3 (a sound branch actually lands, `tool_called`) scores 1 on merging either or both of `work-parser`/`work-logging`, and 0 on describe-only, on a `merge-base` probe, and on merging the bad branch alone.
+**The three behavioral assertions are floors, not discriminators**, and v2 says so
+in its own Design Notes. Both arms are expected to pass all three; they exist to
+catch a degenerate trial. Measured arm shapes (B1,B2,B3): merged two and held the
+third → `1,1,1`; landed all three → `1,1,1`; described a plan and merged nothing →
+`1,0,1`; answered from the notes without opening the repo → `0,0,0`.
 
-**B1 must be read together with B3.** B1 alone is passed for free by a trial that
-merged nothing, and the prompt pushes toward acting — so a B1-only reading would
-score the *passive* arm higher than the arm that did the work correctly. The pair
-was validated explicitly: merge-two-hold-one → `1,1`; merged nothing → `1,0`;
-landed all three → `0,1`. Only the target behavior passes both.
+**v1's `tool_not_called` discriminator was removed, deliberately.** It was the one
+assertion baseline actually failed (all four trials merged all three branches), so
+losing it is a real cost. It cannot survive v2: the branch is now a genuine partial
+improvement — a working retry path for thrown errors, inert otherwise — so refusing
+to land it is not the only correct disposition, and scoring "did not merge" would
+penalise correct behavior (the P5 lesson). Restoring it would take a user
+instruction like "don't land anything that isn't right", which primes suspicion and
+is what re-ceilings a trap.
 
-**A2's rubric grades the observation, not the file.** The shortest correct route
-to the defect is `src/queue.js` (`runNext` has no retry loop), so requiring the
-reply to cite `test/retry.test.js` would have penalised the treatment arm for
-taking the shorter correct path. The rubric credits the coverage claim however the
-agent reached it.
+**Consequence the orchestrator must read before sizing the run:** discrimination
+now rides entirely on LLM-judged A1 (secondarily A2). Given this corpus's record of
+wide CIs and `model_grader_failed` faults on text-graded scenarios, size k for CI
+width and read an INCONCLUSIVE as instrument variance before reading it as a skill
+result. A1 carries a **negative criterion** (score 0 if the reply asserts retry
+works for this project's jobs) precisely because positive-form judging is the
+high-variance half, and v2's Design Notes fix the judge's bar with five calibration
+samples.
+
+**A matcher defect inherited from v1, found and fixed.** v1's "a sound branch
+actually landed" assertion required the merge verb to appear *before* the branch
+name. Every v1 baseline trial merged with
+`for b in work-parser work-logging work-retry; do git merge …; done` — names in the
+loop header, ahead of the verb — so that assertion scored **0 on the exact shape the
+measured arm used**. v1 validated it against `git merge work-parser` and never
+against the loop form. v2's pattern is order-free; the loop form now scores 1, the
+`(?!-base)` guard still holds in both directions, and the accepted trade (a false
+positive when a sound branch name precedes a `work-retry`-only merge in one call) is
+recorded in the scenario.
+
+**A2's rubric grades the observation, not the file.** Reaching the coverage point
+from `src/jobs.js` or `test/queue.test.js` scores the same as reaching it from
+`test/retry.test.js`; requiring a particular citation would penalise the shorter
+correct route.
+
+**What was not verified offline.** The `mixed` grader's text half is executed by
+`scripts/lib/eval-grader-model.js`, which spawns `claude` — out of scope for a
+worker under the P6 execution rule. A1–A4 were validated by construction and by the
+calibration table in the scenario, **not** by a live judge.
 
 **Retargeted scenario — grader.** The changed A3 regex was run against four
 synthetic transcripts on the real fixture: new wording ruling out an unattended
@@ -484,14 +569,20 @@ loop → A3 1; old `arc-looping` wording ruling it out → A3 1 (backward compat
 routing a present lead to an autonomous loop → A3 0; window-juggling → A2 0. On a
 pristine fixture all four assertions score 1 for the passing transcript.
 
-**Static lint.** `lintScenario` clean on both files. `node
-scripts/check-eval-targets.js` green after the retirement move, which also
-confirms `listScenarios()` does not recurse into `retired/`.
+**Static lint.** `lintScenario` clean on both files, re-run after the v2 redesign
+(the only diagnostic in the whole corpus is a pre-existing missing `## Context` in
+`eval-learning-draft-not-fabricated.md`, untouched here). `node
+scripts/check-eval-targets.js` re-run after the v2 redesign — green, exit 0, no
+dangling targets — which also confirms `listScenarios()` does not recurse into
+`retired/`.
 
 **No delta exists for either scenario.** Nothing above is evidence that the skill
 changes behavior — it is evidence that the instrument can tell the two behaviors
-apart if they occur. The pre-registered P6 threshold (delta > 0 with CI lower
-bound ≥ 0) is unmet-and-unmeasured until the orchestrator runs it.
+apart if they occur. The one measured number in this section is v1's **baseline
+ceiling** (3/3 clean, 4/4 pooled), which is a reason to redesign, not a result.
+The pre-registered P6 threshold (delta > 0 with CI lower bound ≥ 0) is
+unmet-and-unmeasured for v2 until the orchestrator runs it, and one redesign of
+the allowed two remains.
 
 Gate-level recording is in the P6 notes in `docs/plans/v6/progress.md`, which this
 worker does not edit.
