@@ -219,6 +219,29 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
   「subagent 長時量測必由常駐 session 執行」✅（門檻 6 全程遵守，trialDir 全在主 repo）；
   dashboard rejections.jsonl 呈現 → 續掛 P7。
 
+## P6.5 任務（進行中，開跑 2026-08-15，分支 v6-p6.5-bucket，單一 worker + orchestrator probe）
+
+**預登記 AC**（開跑前寫死；stop condition = 任一守衛改不乾淨 → 回滾 flat，tag gate-p6 為回滾點）：
+
+1. **載入 probe（binary，orchestrator 執行）**：`claude --plugin-dir .` 載入名單 == 15 支 core
+   名單；臨時 `skills/deprecated/` 樣本 skill **不被載入**（負向）；載入識別碼**不含** bucket 段
+   （spike 三判定點 + 「目錄項載入整個 bucket」重驗）。
+2. **搬移純度**：15 支全為 git R100 純 rename（內容零變更）；任何內容改動需逐筆理由。
+3. **pytest 掃到數 == 15 且 floor >10**（防 glob 改壞靜默全過）；jest 全綠（SKILLS_DIR 單點）；
+   npm test 5 runner + 5 check 全綠。
+4. **skill-eval-annotation 負向驗證**：bucket 內改動仍發 annotation。
+5. **benchmark-freshness EVAL_BACKED_PREFIXES 仍成立**。
+
+任務：
+
+- [ ] Worker — 原子搬移：15 支 `skills/<name>/` → `skills/core/<name>/`（git mv）；plugin.json 加
+  `"skills": ["./skills/core/"]`；守衛同步（pytest SKILLS_DIR、jest `v6-legacy-skills.js` 單點、
+  doc-refs 路徑、check-skill-eval-annotation、check-benchmark-freshness、e2e probe 腳本 glob）；
+  38 支 scenario `## Target` + 30 份文件路徑 sweep；`.claude/rules/plugin.md`/`architecture.md`
+  落地敘述更新
+- [ ] Orchestrator — 載入 probe（含 deprecated 負向樣本）；R100 純度驗證
+- [ ] gate 五步（機械→probe→verifier→進度/tag `gate-p6.5`→使用者確認）
+
 ## 偏離紀錄
 
 | 日期 | 偏離 | 理由 |
