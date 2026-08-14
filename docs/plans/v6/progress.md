@@ -17,7 +17,7 @@
 - [x] P4 紀律叢集 — gate: PASS (2026-08-13, PR #139, tag gate-p4；首次 FAIL→補救→再驗)
 - [x] P5 保留系統叢集（D1/D8 驗證場）— gate: PASS (2026-08-14, PR #140, tag gate-p5；首驗 FAIL→補救→再驗 PASS)
 - [x] P6 workflow 叢集 + router 收斂 — gate: PASS (2026-08-15, PR #141, tag gate-p6；verifier PASS 附 6 項補救全兌現)
-- [ ] P6.5 bucket 落地（spike PASS → 執行）
+- [x] P6.5 bucket 落地 — gate: PASS (2026-08-15, PR #142, tag gate-p6.5；verifier 一次過)
 - [ ] P7 eval 語料庫重建 + 全量 benchmark
 - [ ] P8 文件、規範、發版 → v6.0.0-rc
 
@@ -219,7 +219,7 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
   「subagent 長時量測必由常駐 session 執行」✅（門檻 6 全程遵守，trialDir 全在主 repo）；
   dashboard rejections.jsonl 呈現 → 續掛 P7。
 
-## P6.5 任務（進行中，開跑 2026-08-15，分支 v6-p6.5-bucket，單一 worker + orchestrator probe）
+## P6.5 任務（全數完成，PR #142，單一 worker + orchestrator probe）
 
 **預登記 AC**（開跑前寫死；stop condition = 任一守衛改不乾淨 → 回滾 flat，tag gate-p6 為回滾點）：
 
@@ -234,13 +234,30 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
 
 任務：
 
-- [ ] Worker — 原子搬移：15 支 `skills/<name>/` → `skills/core/<name>/`（git mv）；plugin.json 加
+- [x] Worker — 原子搬移：15 支 `skills/<name>/` → `skills/core/<name>/`（git mv）；plugin.json 加
   `"skills": ["./skills/core/"]`；守衛同步（pytest SKILLS_DIR、jest `v6-legacy-skills.js` 單點、
   doc-refs 路徑、check-skill-eval-annotation、check-benchmark-freshness、e2e probe 腳本 glob）；
   38 支 scenario `## Target` + 30 份文件路徑 sweep；`.claude/rules/plugin.md`/`architecture.md`
   落地敘述更新
-- [ ] Orchestrator — 載入 probe（含 deprecated 負向樣本）；R100 純度驗證
-- [ ] gate 五步（機械→probe→verifier→進度/tag `gate-p6.5`→使用者確認）
+- [x] Orchestrator — 載入 probe（含 deprecated 負向樣本）；R100 純度驗證
+- [x] gate 五步（機械→probe→verifier→進度/tag `gate-p6.5`→使用者確認）
+
+### P6.5 gate 備註
+
+- **verifier 一次過 PASS**：R100 純度 63/63（雙端 ls-tree 對帳）、pytest floor 雙層 mutation 驗證
+  （==15 抓到 14 的 case、floor 抓到 0 的 case）、annotation 15 筆 warning 實跑、D8 mutation 矩陣
+  4 case 證明 bucket-aware 化未弱化（allowlist 仍 []）、載入 probe 證據經數量閉合稽核（3 支
+  user-invoked 與缺席集完全相同，零筆無法解釋）。
+- **兩項裁定成立**：scenario Target sweep 不 bump Version（Version 只管 pooling；hash 隨全文變，
+  bump 與否不改 re-preflight 後果）；docs/plans 刻意不 sweep（provenance 保全，且本就不在
+  check:docs 掃描範圍——機械結案）。
+- **操作後果（verifier D2，約束性）**：37 支 scenario 全檔 hash 已變 → **preflight cache 全失效，
+  P7 全量 benchmark 前需 re-preflight**。
+- **掛帳 P7/P8**：bucket 清單 ['core','in-progress','deprecated'] 三處三種編碼硬編
+  （check-doc-refs array／d8 Set／pytest regex）——新增第四 bucket 會在 pytest deep-link 產生
+  靜默漏檢，收斂為單一來源（verifier D1）；`evals/scenarios/retired/` 不在 eval-targets 掃描
+  範圍（5 筆 flat legacy target 不可見，P7 刪除標的）；`package.json` files 含整個 skills/
+  （未來 in-progress/deprecated 會被打包但不載入——P8 出貨面複審）。
 
 ## 偏離紀錄
 
