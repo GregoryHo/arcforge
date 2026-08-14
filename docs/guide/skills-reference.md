@@ -8,7 +8,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
   - SDD: [brainstorming](#brainstorming) · [executing](#executing) · [arc-finishing](#arc-finishing)
-  - Orchestration: [dispatching](#dispatching) · [arc-looping](#arc-looping)
+  - Orchestration: [dispatching](#dispatching) · [looping](#looping)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
@@ -67,7 +67,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **SDD** | brainstorming, executing, arc-finishing | Explore, specify, build, integrate |
-| **Orchestration** | dispatching, arc-looping | Dispatch subagents; manage worktrees and loop state |
+| **Orchestration** | dispatching, looping | Dispatch subagents; manage worktrees and loop state |
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
@@ -198,26 +198,28 @@ The line between the last two is attendance, not risk.
 
 ---
 
-### arc-looping
+### looping
+
+_(user-invoked — run `/looping`; the model never loads it on its own.)_
 
 **Platform:** Claude Code only — spawns fresh sessions via `claude -p` subprocess. Other platforms have no equivalent invocation mechanism (yet).
 
-**Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
+**Purpose:** Work a markdown checkbox task list unattended — one task per iteration, each in a fresh session, with the list and git carrying every bit of state between them.
 
-**When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring parallel work, use dispatching.
+**When to use:** When you are handing a verified task list to a loop and walking away. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
 
 **Key workflow:**
-1. Verify the task list exists (from executing) and baseline tests pass
-2. Set bounds: `--max-runs` and optional `--max-cost`
-3. Start loop: `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 20`
-4. Each iteration: read the task list, spawn fresh Claude session, execute task, mark it done
-6. Stop on: all complete, max-runs hit, cost limit, stall detected, or retry storm
+1. Verify the task list parses, every task carries a `verify:` line (or the run supplies `--verify-cmd`), and the suite is green now
+2. Set both ceilings: `--max-runs` and `--max-cost`
+3. Pre-authorize and detach: `arcforge loop --tasks tasks.md --max-runs 20 --max-cost 15 --permission-mode acceptEdits --allowed-tools "Bash,Edit,Write,Read"`
+4. Each iteration: read the list, spawn a fresh session, run the acceptance floor, mark the task done or blocked
+5. Stop on: all complete, max-runs hit, cost limit, stall detected, retry storm, or a task failing after its retry
 
 **Artifacts:**
-- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
+- Input: a markdown checkbox task list (`--tasks`, required — the loop's only task source)
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
-**Related:** executing --> **arc-looping** --> arc-finishing
+**Related:** a task list --> **looping** --> `/code-review` --> `/finishing`
 
 ---
 

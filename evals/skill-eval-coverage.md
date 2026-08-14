@@ -168,7 +168,18 @@ baseline backing the classification — the EVAL-1 pair via `arc eval ab` v2
 > `sdd-v2-arc-implementing-delegation` (prose `## Target`, so not counted by the
 > strict-Target metric); the new scenario targets a different facet to avoid duplication.
 
-### Skills with a DRAFT (unvalidated) scenario — A4-flawed, rework pending (4)
+### Skills with a DRAFT (unvalidated) scenario — A4-flawed, rework pending (4 as recorded; 2 still on disk)
+
+> **Reconciled 2026-08-14 (v6 P6).** Two of the four are gone. `arc-looping`'s
+> scenario was **retired** when the skill was rewritten as `looping` — its
+> `--pattern dag` / `specs/…/dag.yaml` premise died with the SDD pipeline in P2,
+> so there was nothing to retarget; see the `## v6 P6` section for the full
+> reasoning and its replacement. `arc-requesting-review`'s scenario is likewise no
+> longer on disk (removed by an earlier v6 phase). The prose below is preserved as
+> the 2026-06-24 record of why all four were reverted; only
+> `arc-dispatching-parallel` and `arc-dispatching-teammates` are live subjects of
+> it today. Run the recompute snippet for the authoritative list — it now reports
+> `draft-only skills: arc-dispatching-parallel, arc-dispatching-teammates`.
 
 The four Wave 6 scenarios (AF-14 autonomy package + RV-9 review-gates) — for
 arc-dispatching-teammates, arc-dispatching-parallel, arc-looping, and
@@ -206,6 +217,13 @@ added under AF-14 and arc-requesting-review under RV-9; all four DO have a
 direct-target scenario but currently sit in the A4-flawed DRAFT section above — they
 are not in this no-scenario list. arc-finishing-epic was merged into arc-finishing
 in WT-6.)
+
+> **Stale as of 2026-08-14 (v6 P6).** This whole `## Current coverage` block is a
+> frozen 2026-06-24 v5 snapshot. Since then the rewrite has deleted or rewritten
+> most of the skills it names — `arc-compacting` and `arc-looping` among them — so
+> its counts and its lists do not describe the tree. It is kept for provenance.
+> The authoritative live numbers come from the recompute snippet below; per-phase
+> changes are recorded in the `## v6 P5` / `## v6 P6` sections after it.
 
 ## RV-9 adjudications (behavioral vs exempt)
 
@@ -261,9 +279,26 @@ console.log("draft-only skills:", [...draft].sort().join(", "));
 '
 ```
 
-Expected today: `validated: 14/32`, with four draft-only skills —
-`arc-dispatching-parallel`, `arc-dispatching-teammates`, `arc-looping` (the AF-14
-autonomy-package scenarios) and `arc-requesting-review` (the RV-9 scenario). These
+**Live run, 2026-08-14 (v6 P6, Track C branch):**
+
+```
+validated: 15/20
+validated skills: arc-agent-driven, arc-brainstorming, arc-using, code-review,
+  debugging, diagramming-obsidian, evaluating, finishing, learning, looping,
+  maintaining-obsidian, sessions, tdd, using, writing-skills
+draft-only skills: arc-dispatching-parallel, arc-dispatching-teammates
+```
+
+Read that, not the frozen 2026-06-24 paragraph below it: the v6 rewrite has since
+deleted, merged, and retargeted both skills and scenarios, and the denominator
+moves every phase. `looping` enters the validated set with
+`eval-looping-stale-state-relaunch` (new in P6, awaiting its first measurement);
+`sessions` now covers the compaction half too, after `compacting` merged into it.
+
+The original expectation, kept for provenance: `validated: 14/32`, with four
+draft-only skills — `arc-dispatching-parallel`, `arc-dispatching-teammates`,
+`arc-looping` (the AF-14 autonomy-package scenarios) and `arc-requesting-review`
+(the RV-9 scenario). These
 four were briefly promoted on 2026-06-23 but reverted to `status: draft-unvalidated`
 on 2026-06-24 after a fresh k=5 exposed their 5/5 SHIP as favorable variance (A4 is
 flaky for the describe-style scenarios — see the A4 note and DRAFT section above).
@@ -548,3 +583,75 @@ pattern would have scored A2 zero in **both** arms and measured nothing.
 **No delta, CI, or verdict is claimed here.** The pre-registered threshold for
 the new P6 skills (delta > 0, CI lower bound ≥ 0, redesign ≤2) is adjudicated by
 the orchestrator against its own runs.
+## v6 P6 — Track C (`looping`, `sessions`⊕`compacting`)
+
+`looping` (user-invoked) replaced `arc-looping`; `compacting` merged into
+`sessions`. Three rows change.
+
+| Scenario | Target | Behavior | Status |
+|---|---|---|---|
+| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Picking it back up — a killed run's state file still reads `running`, and `--max-runs` is compared against the carried-over `iteration`, so the user's "another 10 runs" on a resume would run nothing | **new**, `## Version` 1; measurement by the orchestrator |
+| `eval-arc-looping-bounded-unattended-loop-gate` | — | bounded unattended launch | **retired (file deleted)** — see below |
+| `eval-compacting-persist-before-compact` | `skills/sessions/SKILL.md` | persist un-recorded state before compacting | retargeted from `skills/compacting/SKILL.md`, `## Version` 2 → 3 |
+| `eval-sessions-handover-completeness` | `skills/sessions/SKILL.md` | handover records what is proven, not what is claimed | unchanged — target already correct; re-run against the merged skill as the P6 gate's non-degradation check |
+
+### Why `eval-arc-looping-bounded-unattended-loop-gate` was retired, not retargeted
+
+Its premise died in P2. The trap is `loop --pattern dag`, the fixture is
+`specs/demo/dag.yaml`, and assertion A1 requires the agent to confirm a *verified
+DAG* exists — the SDD pipeline, the DAG engine, and the `--pattern` flag are all
+gone, so there is nothing left to retarget onto. It was also never a clean
+result: the file's own status note records a measured baseline of 100%
+(hash `2e6fc32c`, no headroom) and a persistently flaky A4 that flipped the
+verdict on artifact writes orthogonal to the skill. It carried
+`draft-unvalidated`.
+
+`eval-looping-stale-state-relaunch` replaces it, and is deliberately built on the
+opposite kind of trap. The retired scenario asked the agent to resist a *tone*
+("no run cap, don't overthink it") — something a careful agent already does,
+which is why it ceilinged. The new one asks the agent to resist a *number* the
+user supplied that is wrong only in light of state sitting in a file: `iteration:
+10` on record versus "another 10 runs" requested. Repeating the user's number is
+the cheap answer and it looks right; the loop would spawn zero sessions and
+report `max_runs`. Nothing in the prompt connects the two facts.
+
+### Two findings the orchestrator has to read before the merge re-verification
+
+**1. There is no prior `compacting` PASS to maintain.** The P6 gate pre-registers
+threshold #4 as "compacting non-reg PASS 維持", with a fallback that reverts the
+merge if either side degrades. That comparison has no left-hand side. The
+scenario's own header records that the non-regression A/B **was never run**: two
+attempts on 2026-08-01 aborted before a single trial executed (every trial
+returned `model_grader_failed` with the transcript reading "You're out of usage
+credits", and the printed `REGRESSED` came from an empty treatment arm). It
+carries a **baseline record only** — preflight BLOCK at 8/8 baseline, a documented
+ceiling.
+
+So the post-merge run **establishes** that scenario's first real record; it cannot
+demonstrate non-degradation, and the "任一退化 → 維持兩支分立" fallback cannot
+fire on a comparison with nothing to compare against. Recorded here in the P5
+`unmet-but-covered` idiom rather than resolved by re-scoping the threshold — the
+merge's non-degradation evidence has to come from `eval-sessions-handover-
+completeness` (which does have a prior record) plus the fact that every graded
+compaction instruction was carried over unchanged, itemized in
+`docs/plans/v6/decisions/p6-absorption-looping-sessions.md` §3.
+
+**2. `eval-looping-stale-state-relaunch` is grader-bound.** Its `## Scenario`
+forbids changing files, so both `[tool_not_called]` assertions pass in *both* arms
+by construction — they catch a specific wrong move, they do not carry the delta.
+The entire delta rides on the mixed grader scoring A1–A4. Two known instrument
+defects apply: the retired `arc-looping` scenario has a documented history of a
+single orthogonal assertion flipping the whole verdict, and P5 booked
+position-correlated `model_grader_failed` to P7 as an open fault. Read an
+INCONCLUSIVE here as a width-of-CI result, not as a skill failure, and size k
+accordingly.
+
+### Offline verification (worker side; measurement is the orchestrator's)
+
+- `lintScenario` clean, no diagnostics.
+- Both `[tool_not_called]` assertions parse and discriminate against synthetic
+  action logs: a clean read-only log scores 1/1, an `Edit` on either fixture file
+  scores 0 on the first, and `rm`/`sed -i` on either scores 0 on the second.
+- No `[tool_called] Skill:*` assertion (headless trials carry
+  `--disable-slash-commands`, so the Skill tool never exists), `## Max Turns` 40,
+  and the required `re:` form is used on both behavioral assertions.

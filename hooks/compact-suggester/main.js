@@ -15,7 +15,7 @@
  * suggestion) AND a model-visible additionalContext one-liner (the compaction
  * indicator) via the RV-1 merged helper outputPostToolUseFeedback. The user line
  * is a notification; the model line is a routing indicator pointing at the
- * /compacting skill — never a silent model directive.
+ * /sessions skill — never a silent model directive.
  *
  * State: a SINGLE session-scoped JSON file (getSuggesterStatePath) holds the
  * tool counter, the rolling phase window, and the suggestion snapshots — 1 read
@@ -131,8 +131,8 @@ function shouldSuppressReminder(count, window) {
  *
  * Slimmed to a phase indicator (ICL-10): it names the current phase and the tool
  * count, then defers the actual compact/no-compact timing call to the
- * /compacting skill rather than inlining the decision guide. The model-visible
- * companion line (buildModelIndicator) carries the same /compacting pointer.
+ * /sessions skill rather than inlining the decision guide. The model-visible
+ * companion line (buildModelIndicator) carries the same /sessions pointer.
  */
 function buildMessage(count, window) {
   const phase = phaseFromWindow(window);
@@ -142,19 +142,19 @@ function buildMessage(count, window) {
       : phase === 'write-heavy'
         ? 'active implementation'
         : 'mixed work';
-  return `\n📊 ${count} tool calls (${label}) — possible compaction boundary. See /compacting for whether to compact now.\n`;
+  return `\n📊 ${count} tool calls (${label}) — possible compaction boundary. /sessions covers what has to reach disk first.\n`;
 }
 
 /**
  * Build the model-visible compaction-prep indicator (additionalContext channel).
  *
  * This is the ICL-10 capability: a one-line routing indicator that reaches the
- * MODEL (not just the user), pointing at the /compacting skill so the model
+ * MODEL (not just the user), pointing at the /sessions skill so the model
  * can make the phase-boundary timing call. It states the phase as evidence; it
- * never issues a compaction directive — the decision stays with /compacting.
+ * never issues a compaction directive — the decision stays with /sessions.
  */
 function buildModelIndicator(count, window) {
-  return `compaction indicator: ${count} tool calls (${phaseFromWindow(window)} phase) — at a possible compaction boundary. Consult /compacting to decide whether to compact at this phase boundary.`;
+  return `compaction indicator: ${count} tool calls (${phaseFromWindow(window)} phase) — at a possible compaction boundary. Consult /sessions to decide whether to compact at this phase boundary.`;
 }
 
 /**

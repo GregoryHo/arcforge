@@ -27,6 +27,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_DIR = PROJECT_ROOT / "skills"
 LEGACY_MANIFEST = PROJECT_ROOT / "docs" / "plans" / "v6" / "legacy-skills.json"
+ROUTER_MANIFEST = PROJECT_ROOT / "tests" / "router-skill.json"
 
 # Line budget: soft cap warns, hard cap fails.
 SOFT_LINE_CAP = 150
@@ -102,8 +103,24 @@ _SLASH_INVOCATION_PATTERN = re.compile(
 # of a table row inside the Skill Map section. Any other slash token — elsewhere in
 # the router, later cells of a Skill Map row, or any other skill's prose — is a
 # normal INVOCATION and gets the full §3.1 check.
-ROUTER_SKILL = "using"
-SKILL_MAP_HEADING = "## Skill Map"
+#
+# Router identity is NOT spelled out here. `tests/router-skill.json` is the single
+# source this file and tests/scripts/router-contract.test.js (jest) both read —
+# P3 hardcoded `"using"` in both, so a rename could leave this side exempting a
+# table the bijection side no longer treated as the router, with both suites green.
+def _load_router_manifest():
+    """Read the shared router manifest, failing loudly on a malformed field."""
+    data = json.loads(ROUTER_MANIFEST.read_text())
+    for key in ("router_skill", "skill_map_heading"):
+        value = data.get(key)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{ROUTER_MANIFEST}: '{key}' must be a non-empty string")
+    return data
+
+
+_ROUTER_MANIFEST_DATA = _load_router_manifest()
+ROUTER_SKILL = _ROUTER_MANIFEST_DATA["router_skill"]
+SKILL_MAP_HEADING = _ROUTER_MANIFEST_DATA["skill_map_heading"]
 # The leading cell of a Skill Map row: `| /finishing | ... |` (backticks optional).
 _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 

@@ -24,9 +24,28 @@ const { SKILLS_DIR, governedSkills } = require('./v6-legacy-skills');
 // below). Each later phase adds skills and rows together, and this test starts
 // biting the moment they disagree.
 
-const ROUTER_SKILL = 'using';
+// Router identity comes from tests/router-skill.json — the single source both
+// this suite and tests/skills/test_skill_structure.py read. Hardcoding it here
+// (as P3 did) meant the pytest side could keep exempting a Skill Map that this
+// side no longer recognized as the router, and neither suite would notice.
+const ROUTER_MANIFEST = path.join(__dirname, '..', 'router-skill.json');
+const { router_skill: ROUTER_SKILL, skill_map_heading: SKILL_MAP_HEADING } = readRouterManifest();
 const ROUTER_PATH = path.join(SKILLS_DIR, ROUTER_SKILL, 'SKILL.md');
-const SKILL_MAP_HEADING = '## Skill Map';
+
+/**
+ * Load the router manifest, failing loudly on a missing or malformed field —
+ * a silently-undefined router name would make every assertion below vacuous.
+ * @returns {{router_skill: string, skill_map_heading: string}}
+ */
+function readRouterManifest() {
+  const data = JSON.parse(fs.readFileSync(ROUTER_MANIFEST, 'utf8'));
+  for (const key of ['router_skill', 'skill_map_heading']) {
+    if (typeof data[key] !== 'string' || !data[key]) {
+      throw new Error(`${ROUTER_MANIFEST}: "${key}" must be a non-empty string`);
+    }
+  }
+  return data;
+}
 
 // A table row whose first cell is a slash invocation, with or without backticks:
 //   | `/finishing` | wrapping up work |

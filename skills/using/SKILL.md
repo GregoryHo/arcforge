@@ -21,9 +21,9 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |
 | `/dispatching` | work could run in parallel — splitting it across agents, giving each an isolated worktree, briefing them, or accepting what comes back |
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
-| `/compacting` | context is filling up and you are deciding whether to compact now |
-| `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
+| `/sessions` | context is about to be lost — work is stopping mid-task and the next session or another person has to pick it up, you are starting from an earlier handover, or a long session is filling up and you are deciding whether to compact |
 | `/learning` | you are capturing a session diary, mining diaries for patterns, or reviewing what the opt-in learning subsystem wants to activate (user-invoked) |
+| `/looping` | you are handing a task list to an unattended loop that will keep working after you walk away (user-invoked) |
 | `/evaluating` | a claim about agent behavior needs evidence — you are designing or auditing an eval scenario, or reading a verdict out of eval numbers |
 | `/maintaining-obsidian` | something should be filed into the user's Obsidian vault, a question should be answered from it, or it needs auditing or bootstrapping |
 | `/diagramming-obsidian` | the user wants something shown visually — an architecture, a flow, a mind map — as an Excalidraw diagram in their vault |
