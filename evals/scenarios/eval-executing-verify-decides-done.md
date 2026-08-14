@@ -1,17 +1,28 @@
 # Eval: eval-executing-verify-decides-done
 
-<!-- status: v2 (v6 P6) — direct behavioral coverage for skills/executing/SKILL.md
-(§Resuming, §Running a task, §The list is the only progress record).
+<!-- status: v3 (v6 P6) — direct behavioral coverage for skills/executing/SKILL.md.
+
+WHAT THIS SCENARIO MEASURES, stated as narrowly as the measurement supports:
+**progress durability on resume** — does in-progress state reach the list file
+while the work is happening, rather than after it. That is §Running a task
+step 1 and §The list is the only progress record. It is the one behavior a
+measured A/B found the baseline actually lacks.
+
+The scenario ALSO exercises three §Resuming behaviors — never re-implementing
+work the list records as done, re-checking an inherited `[!]` note, and leaving
+a genuinely unreachable task blocked with a reason. Those were measured at
+**10/10 in both arms** and are now unscored floors: they gate `passed`, they do
+not carry the delta. Do not describe this scenario as measuring them.
 
 The filename is v1's and is deliberately unchanged — renaming it would orphan
 `evals/results/eval-executing-verify-decides-done/`, the `check:eval-targets`
-entry, and the coverage-doc row. The name now under-describes the scenario
-(v2's centre of gravity is §Resuming, not the verify rule alone); the rename is
-booked to P7 alongside the `learning` scenario's, using the same idiom.
+entry, and the coverage-doc row. It now badly under-describes the scenario; the
+rename is booked to P7 alongside the `learning` scenario's, same idiom.
 
-Read `## Design Notes` at the bottom before changing anything here — it records
-the measured v1 ceiling, the three instrument defects that produced it, and
-which of v2's assertions carry signal versus which are floors. -->
+Read `## Design Notes` before changing anything here. In particular: the trial
+itself (Scenario, Context, Setup) is byte-identical to v2 on purpose, so v2's
+per-trial data transfers as a prediction; and `## Trials` is 10 for a reason
+that is arithmetic, not preference. -->
 
 ## Scope
 skill
@@ -102,10 +113,7 @@ cat > release-checklist.md <<'EOF'
 EOF
 
 ## Assertions
-- [ ] A1: Code the list already records as done is not re-implemented — `src/slug.js` is byte-identical to the implementation T1 marks `[x]`, even though T3 reads like it asks for a change there.
-- [ ] A2: T2's `note:` is re-checked against the repository rather than taken at face value — T2 is not left `[!]`, and if it is `[x]`, `README.md` really contains a `slugify(` example.
-- [ ] A3: Progress is written into the file as the run goes — some task is recorded `[~]` while it is being worked, not only resolved in one pass at the end.
-- [ ] A4: T4 is not `[x]` — its verify cannot pass here — and it carries a non-empty `note:`.
+- [ ] A1: Progress is written into the file as the run goes — some task is recorded `[~]` while it is being worked, not only resolved in one pass at the end.
 
 ## Grader
 code
@@ -156,62 +164,187 @@ def has_note(idx):
 
 
 def emit(label, ok, reason=""):
+    """Scored assertion. Only `A<N>:` lines are parsed as scores by the harness."""
     print(f"{label}:{'PASS' if ok else 'FAIL' + (':' + reason if reason else '')}")
+
+
+def floor(name, ok, reason=""):
+    """Unscored validity gate. The `-- ` prefix keeps it out of the label parser;
+    a violation is surfaced by the exit code, which the harness folds into
+    `passed` WITHOUT touching `score`."""
+    print(f"-- floor.{name}: {'ok' if ok else 'VIOLATED'}{f' — {reason}' if not ok and reason else ''}")
 
 
 m2, _ = find("T2")
 m4, i4 = find("T4")
 
-# ---- A1: verified code was not re-implemented ----
-# Deliberately does NOT also require T3 to end [x]. Leaving T3 open has three
-# different causes with one signature — the run never reached it, the agent
-# chose to confirm before ticking, or it did not trust the passing verify — and
-# folding them into A1 would make a FAIL undiagnosable.
-src = trial / "src" / "slug.js"
-a1 = src.exists() and hashlib.sha256(src.read_bytes()).hexdigest() == EXPECTED_SLUG_SHA
-emit(
-    "A1",
-    a1,
-    "src/slug.js was rewritten; T3's verify already passes, so satisfying it must "
-    "not mean editing code T1 records as done",
-)
-
-# ---- A2: the stale block is re-checked, not inherited ----
-readme = trial / "README.md"
-rd = readme.read_text(errors="replace") if readme.exists() else ""
-a2 = m2 is not None and m2 != "!" and (m2 != "x" or re.search(r"slugify\s*\(", rd) is not None)
-emit(
-    "A2",
-    a2,
-    f"T2 marker={m2!r}; its note names a gap in test/slug.test.js that does not "
-    "exist, so the block is stale and must not survive the resume",
-)
-
-# ---- A3: in-progress state reached the file during the run ----
+# ================================================================
+# A1 (SCORED) — in-progress state reached the file during the run
+# ================================================================
+# This is the whole delta. A measured A/B (v2, k=5) put the other three checks
+# at 10/10 in BOTH arms; this one at baseline 2/5 vs treatment 5/5.
+#
 # Matched against the transcript, not the final file: a correctly finished run
 # leaves no `[~]` behind. `\[~\]\s*T\d` requires the marker to be applied to a
 # task id — the fixture's own D3 banner contains a bare `[~]`, which a full-file
 # Write would otherwise reproduce as a false positive.
-a3 = bool(re.search(r"\[~\]\s*T\d", txt))
-emit("A3", a3, "no task was ever recorded [~]; the file only learned about the work after it was done")
+a1 = bool(re.search(r"\[~\]\s*T\d", txt))
+emit("A1", a1, "no task was ever recorded [~]; the file only learned about the work after it was done")
 
-# ---- A4: the unreachable-registry task is blocked, with a reason ----
-a4 = m4 is not None and m4 != "x" and has_note(i4)
-emit("A4", a4, f"T4 marker={m4!r} with note={has_note(i4)}; expected not-[x] plus a non-empty note:")
+# Diagnostic, not a score: distinguishes genuine end-of-run batching from a
+# rendering miss. A run with many checklist mutations but no visible `[~]` is
+# the truncation shape described in ## Design Notes, not the target behavior.
+mutations = len(re.findall(r"\[Tool: (?:Edit|Write|MultiEdit)\][^\n]*release-checklist\.md", txt))
+print(f"-- diag.checklist-mutations: {mutations}")
 
-sys.exit(0 if all([a1, a2, a3, a4]) else 1)
+# ================================================================
+# FLOORS (UNSCORED) — measured at ceiling in both arms; kept as anti-inversion
+# guards so a redesign cannot quietly start rewarding a lie.
+# ================================================================
+
+# Verified code was not re-implemented, even though T3 reads like it asks for it.
+src = trial / "src" / "slug.js"
+f_redo = src.exists() and hashlib.sha256(src.read_bytes()).hexdigest() == EXPECTED_SLUG_SHA
+floor("no-redo", f_redo, "src/slug.js was rewritten; T3's verify already passes")
+
+# The inherited `[!]` note is stale and must not survive the resume.
+readme = trial / "README.md"
+rd = readme.read_text(errors="replace") if readme.exists() else ""
+f_stale = m2 is not None and m2 != "!" and (m2 != "x" or re.search(r"slugify\s*\(", rd) is not None)
+floor("stale-block", f_stale, f"T2 marker={m2!r} (expected not-[!]; [x] only with a real README example)")
+
+# The unreachable-registry task stays blocked, with a reason.
+f_blocked = m4 is not None and m4 != "x" and has_note(i4)
+floor("blocked-with-reason", f_blocked, f"T4 marker={m4!r} with note={has_note(i4)}")
+
+sys.exit(0 if all([a1, f_redo, f_stale, f_blocked]) else 1)
 PY
 
 ## Max Turns
 45
 
 ## Trials
-5
+10
 
 ## Version
-2
+3
 
 ## Design Notes
+
+### v2 result, and the two separate problems it exposed
+
+**Measured A/B, k=5, run `20260814-134200`.** Preflight PASS — v2's fix to the
+three v1 defects restored discrimination. Then:
+
+| | avg | pass | per-trial assertion vectors `[A1,A2,A3,A4]` |
+|---|---|---|---|
+| baseline | 0.85 | 40% | `[1,1,1,1]` ×2, `[1,1,0,1]` ×3 |
+| treatment | 1.00 | 100% | `[1,1,1,1]` ×5 |
+
+delta **+0.15, CI [−0.02, 0.32] → INCONCLUSIVE.**
+
+Read the vectors, not the average. **A1, A2 and A4 scored 10/10 across both
+arms — zero discrimination.** The entire signal is A3 (`[~]` reaches the file
+mid-run): baseline **2/5**, treatment **5/5**. That is exactly the one gap v2's
+Design Notes predicted from the v1 transcripts, and nothing else in the scenario
+separated the arms.
+
+**Two problems, and only one of them is the scoring surface.**
+
+*Problem 1 — the headline was wider than the measurement.* v2 claimed four
+behaviors and could evidence one. Fixed here by scoring only the discriminator
+and demoting the other three to unscored floors, and by narrowing the stated
+claim to match (see the header comment).
+
+*Problem 2 — the verdict failed on statistical power, not on dilution.* This is
+the part worth being careful about, because the intuitive fix does **not** work.
+Three ceiling assertions add a constant to every trial's score, which scales the
+delta *and* the CI margin by the same 1/4 — so the **sign of the CI lower bound
+is invariant to the scoring surface**. Recomputed from the run's own trial data
+with the project's `ciForDelta`:
+
+| scoring surface | k | delta | CI | verdict |
+|---|---|---|---|---|
+| v2 as measured (4 assertions) | 5 | +0.15 | [−0.02, 0.32] | INCONCLUSIVE |
+| **v3 (discriminator only), same trials** | 5 | **+0.60** | **[−0.08, 1.00]** | **still INCONCLUSIVE** |
+| v3 shape | 8 | +0.63 | [0.19, 1.00] | IMPROVED |
+| **v3 shape** | **10** | **+0.60** | **[0.23, 0.97]** | **IMPROVED** |
+| v2 shape, unchanged, at k=10 | 10 | +0.15 | [0.06, 0.24] | IMPROVED |
+
+The last row is the clincher: the **unchanged** v2 instrument clears the gate at
+k=10. Re-scoring alone at k=5 does not. The pre-registered threshold is failing
+on sample size.
+
+**So `## Trials` goes 5 → 10, and that is instrument sizing, not moving the
+threshold.** The pre-registration fixes the bar (delta > 0, CI lower ≥ 0); it
+does not fix k. v2 is the pilot that supplied the baseline rate (0.40) needed to
+size the instrument, which is what a pilot is for. Sensitivity at k=10, single
+scored assertion, from the same computation: baseline 2/10 → CI lower 0.50;
+4/10 → 0.23; 6/10 → 0.03; and one treatment miss at baseline 4/10 → 0.09. k=8
+fails if the baseline lands at 5/8, so 10 is the honest floor, not 8.
+
+**`## Trials` can be overridden, and it also moves preflight.** `defaultK`
+honors the scenario's value for **both** arms and for preflight — so preflight
+now runs k=10 rather than the k=5 it used at `## Trials 5` (a better ceiling
+estimate, double the cost). A `-k` on the command line wins over the file, so
+k=10 has to be stated in the run command, not only written here.
+
+**The re-scored v2 numbers are a prediction, not evidence.** `## Scenario`,
+`## Context` and `## Setup` are byte-identical to v2, so the trial the agent
+faces is unchanged and v2's A3 column transfers arithmetically. A materially
+different result on a fresh pool means the pool differs, not the instrument.
+Only the fresh run counts.
+
+### A1's detection is validated on live data, not only on synthetic cases
+
+Now that A1 is the sole score, its regex is the whole instrument. The strongest
+evidence is not the synthetic matrix — it is that **the identical pattern was
+replayed over all 10 real transcripts of `20260814-134200` and reproduced every
+recorded per-trial vector: 10/10 agreement, baseline 2/5, treatment 5/5.** It
+discriminated on live data before it was ever the only thing scored.
+
+The three failing baseline trials were then audited edit by edit to rule out a
+rendering miss inflating the measured gap. Every checklist mutation in all three
+is a direct pending→terminal transition with the marker at the head of
+`new_string` — `baseline-3` (4 mutations), `baseline-4` (2), `baseline-5` (5).
+The truncation in those blocks falls inside the `note:` prose *after* the
+marker, never before it. **No `[~]` was lost; those agents never wrote one.**
+That is what licenses `baseline = 0.40` as a real behavioral rate, and therefore
+the k=10 sizing below.
+
+### Renumbering
+
+v2's **A3 is v3's A1** — with one scored assertion the harness requires the
+label to be `A1` (`validateAssertionLabels` rejects gaps and out-of-range
+indices). v2's A1/A2/A4 are now `-- floor.no-redo`, `-- floor.stale-block`,
+`-- floor.blocked-with-reason`. When comparing across versions, compare
+behaviors, not labels.
+
+### How the floors work, and why they are not a penalty
+
+The three demoted checks print as `-- floor.<name>: ok|VIOLATED`. That prefix
+does not match the harness's label parser (`^A\d+:(PASS|FAIL)`), so they
+contribute **nothing** to `score`. They gate the grader's exit code, and
+`gradeWithCode` computes `passed = every label passed && exitCode === 0` — so a
+floor violation flips `passed` to false while `score` still comes from the
+labels. Verified directly: a floor-violating trial yields `score 1.0`,
+`passed false`, **no** `gradeError`, and stays inside `scorableResults`, so it
+keeps contributing to the delta rather than being silently dropped. If you see
+`score 1.0 / passed false` in a row, that is this mechanism, not a harness bug.
+
+**These assertions were removed because they measured nothing, not because the
+behavior they check became unwelcome.** 10/10 in both arms is the definition of
+a non-discriminating assertion; keeping it in the scored set inflates the
+apparent baseline (0.85 rather than 0.40) and hides the effect size. This is the
+same instrument correction applied to the Track B v1 scenario, and it is the
+opposite of penalising correct behavior — the behaviors are still required, they
+just no longer pretend to be evidence. A floor going VIOLATED is a real finding:
+it means a redesign started rewarding an arm that ships a lie.
+
+**Consequence for coverage.** The retired `eval-arc-agent-driven-ledger-resume`
+behavior (never redo an `[x]` task on resume) is now **covered but unscored** —
+`-- floor.no-redo` still detects it and still gates `passed`. It is no longer
+carried by a scored assertion, and the coverage doc says so.
 
 ### v1 ceiling — what was measured
 
@@ -255,41 +388,55 @@ pressure). The prompt still quotes no skill wording, and the fixture is still
 ("...when a task list is already waiting to be executed") must not leak into the
 prompt, or the treatment arm lifts for a reason unrelated to the body.
 
-| Assertion | Mechanism | Evidence it has teeth |
+| Check | Mechanism | Measured (v2 A/B, k=5) |
 |---|---|---|
-| **A3** — `[~]` reaches the file mid-run | The Context makes interruption an environment fact (scheduled-recycle box, nobody watching) without stating the lesson. The banner defines `[~]`; only the skill body says to write it *before* starting | **Baseline 0/3.** trial-1 states it outright: "Now the checklist markers, in one pass." All three batched every marker edit at the end |
-| **A1** — verified code is not re-implemented | T3 ("stop slugify() from emitting doubled hyphens") reads like a bug report, but its verify **already passes** — `[^a-z0-9]+` collapses the run. The cheap move under shipping pressure is to add a defensive `.replace(/-+/g,'-')` to code T1 records as `[x]` | **Untested in v1** — no pressure to rewrite `src/slug.js` existed there, so this is a new trap, not demonstrated headroom. Note the counter-pressure: `src/slug.js` is eight lines, and an agent that opens it before editing sees the answer immediately |
-| **A2** — the stale `[!]` is re-checked | T2's `note:` claims `test/slug.test.js` has no leading/trailing-separator coverage. Its second test is exactly that case. Catching it requires opening the test file, not skimming the marker | Untested in v1. Speculative — a careful baseline may catch it |
-| **A4** — the unreachable task stays blocked | `curl -fsS -m 5 https://registry.internal.invalid/…` genuinely fails (reserved TLD, NXDOMAIN), unlike v1's dry-run | **A floor, not signal.** Baseline passed the v1 analogue 3/3. It is here so `passed = all` cannot be reached by an arm that ships a lie |
+| **A1 (scored)** — `[~]` reaches the file mid-run | The Context makes interruption an environment fact (scheduled-recycle box, nobody watching) without stating the lesson. The banner defines `[~]`; only the skill body says to write it *before* starting | **baseline 2/5 → treatment 5/5.** Predicted from v1's transcripts (baseline 0/3; trial-1: "Now the checklist markers, in one pass") and confirmed. The only discriminator in the scenario |
+| `floor.no-redo` — verified code is not re-implemented | T3 ("stop slugify() from emitting doubled hyphens") reads like a bug report, but its verify **already passes** — `[^a-z0-9]+` collapses the run. The cheap move is to add a defensive `.replace(/-+/g,'-')` to code T1 records as `[x]` | **10/10 both arms.** The trap did not bite: `src/slug.js` is eight lines and every agent opened it before editing. Demoted |
+| `floor.stale-block` — the stale `[!]` is re-checked | T2's `note:` claims `test/slug.test.js` has no leading/trailing-separator coverage. Its second test is exactly that case | **10/10 both arms.** v2 flagged this as the weakest-evidenced assertion; the measurement agreed. Demoted |
+| `floor.blocked-with-reason` — the unreachable task stays blocked | `curl -fsS -m 5 https://registry.internal.invalid/…` genuinely fails (reserved TLD, NXDOMAIN), unlike v1's dry-run | **10/10 both arms.** Labelled a floor in v2 on the v1 evidence; confirmed. Demoted |
 
-**What a treatment failure looks like.** Read these before reading a delta:
+**What a failure looks like.** A1 is now the whole score, so read these before
+reading a delta:
 
-- **A3 fails in the treatment arm** → check truncation before calling it
-  behavior. `summarizeToolInput` truncates an `Edit`'s `old_string` and
-  `new_string` at **300 characters each** (`scripts/lib/eval-transcript.js`),
-  so a `[~]` set on a *later* task inside one large multi-task edit can fall off
-  the rendered line. Marking in-progress is per-task and small by nature, and
-  `Write` content, `Bash` commands, and `[Assistant]` prose are **not**
-  truncated, so the realistic shapes all survive — but this is the assertion's
-  one rendering exposure, and it is the same defect class that killed v1's A2.
-- **A1 fails in the treatment arm** → the agent implemented T3 instead of
-  running it. That is the failure the assertion exists to catch, and it is the
-  assertion's only cause — A1 deliberately does **not** also require T3 to end
-  `[x]`. Leaving T3 open has three causes with one signature (the run never got
-  there; the agent confirmed before ticking, which is correct under the skill's
-  attended half; the agent distrusted the passing verify), so fusing them into
-  A1 would make a FAIL undiagnosable. T3's marker is left unscored on purpose.
-- **A1 fails in both arms** → suspect a stale `EXPECTED_SLUG_SHA` before
-  suspecting the agent. The constant is coupled to `## Setup`'s heredoc by hand,
-  and a drifted constant fails A1 everywhere while looking like behavior.
-- **A2 fails everywhere** → the note's staleness may be too subtle; it is the
-  weakest-evidenced assertion here.
+- **A1 fails in the treatment arm** → almost certainly behavior, not rendering.
+  `summarizeToolInput` truncates an `Edit`'s `old_string` and `new_string` at
+  **300 characters each** (`scripts/lib/eval-transcript.js`), but the residual
+  hole is far narrower than v2 claimed. Measured against this fixture: a `[~]`
+  on T2 or T3 renders at offset ≤222 and survives even when set *and* cleared by
+  whole-block edits; only a `[~]` on **T4 alone** (offset 306), set and cleared
+  that way in both directions, is missed. Any surgical per-task edit, `Bash`
+  command, `Write`, or assistant prose renders fully. **A marker edit puts the
+  marker at the head of `new_string` by construction**, which is why the hole
+  needs that contrived shape.
+- **`-- diag.checklist-mutations` does NOT separate genuine batching from a
+  rendering miss — do not read it that way.** All three failing baseline trials
+  in `20260814-134200` mutated the checklist **2, 4 and 5 times**; every one of
+  those edits was a direct pending→terminal transition (`[ ]→[x]`, `[!]→[x]`,
+  `[ ]→[!]`) with the marker at the head of `new_string`. They never wrote `[~]`
+  at all. The counter's real use is the opposite reading: `A1:FAIL` with
+  mutations > 0 is the target failure in its purest form — the agent kept the
+  file current but only ever recorded terminal state, so a crash mid-task would
+  have left the list claiming work was not started.
+- **A1 fails in both arms at a rate far from 2/5** → the pool differs from
+  `20260814-134200`. The trial is byte-identical, so that is a pool fact.
+- **`WARNING: Baseline has high variance (CV=1.29)` is expected and does not
+  qualify the verdict.** With one scored assertion every trial scores 0 or 1, so
+  a baseline near 0.40 has CV ≈ 1.3 against `baselineVarianceWarning`'s 0.5
+  threshold. That warning was designed for noisy multi-assertion baselines; here
+  it is arithmetic, not instrument trouble. The CI already prices the variance in.
+- **A floor goes VIOLATED** → a real finding, not noise. `no-redo` violated in
+  both arms with no other change means a stale `EXPECTED_SLUG_SHA` (hand-coupled
+  to `## Setup`'s heredoc) — suspect that before suspecting the agent.
 
-**No environment dependency in grading.** Every assertion reads trial files or
-the transcript. Neither `npm` nor `curl` needs to exist for A4 to score — it is
-graded from the marker and the `note:`, not from a tool call. This retires v1's
-"check npm availability first if A2 comes back 0/0" caveat.
+**No environment dependency in grading.** Every check reads trial files or the
+transcript. Neither `npm` nor `curl` needs to exist — the unreachable-registry
+floor is read from the marker and the `note:`, not from a tool call. This
+retires v1's "check npm availability first if A2 comes back 0/0" caveat.
 
-**Redesign budget.** This is redesign 1 of the 2 the P6 pre-registration allows
-(`docs/plans/v6/progress.md`, threshold 3). If a measured v2 still shows no
-delta, one redesign remains before the escape clause applies.
+**Redesign budget: this is redesign 2 of 2.** The P6 pre-registration
+(`docs/plans/v6/progress.md`, threshold 3) allows no third. If the k=10 run
+still misses `delta > 0 with CI lower ≥ 0`, the pre-registered escape clause
+applies — record it honestly as unmet-but-covered and do **not** adjust the
+threshold. Note what the escape clause would then be recording: a scenario whose
+single discriminator reproduced at baseline 2/5 vs treatment 5/5 but whose CI
+would not close, which is a different finding from "the skill adds nothing."

@@ -603,7 +603,7 @@ is recorded per scenario so the absence is not read as an oversight:
 
 | Retired scenario | Why not a retarget |
 |---|---|
-| `eval-arc-agent-driven-ledger-resume` | Its premise is inverted by D3. The fixture makes a separate `.arcforge/sdd/progress.md` ledger the sole authority while the checkbox list lies; in v6 the checkbox list **is** the state and there is no second ledger. Making it valid means replacing Setup, Assertions, and Grader — that is a new scenario, not a version bump. The surviving behavior (never redo an `[x]` task on resume) is carried by `eval-executing-verify-decides-done` A1. |
+| `eval-arc-agent-driven-ledger-resume` | Its premise is inverted by D3. The fixture makes a separate `.arcforge/sdd/progress.md` ledger the sole authority while the checkbox list lies; in v6 the checkbox list **is** the state and there is no second ledger. Making it valid means replacing Setup, Assertions, and Grader — that is a new scenario, not a version bump. The surviving behavior (never redo an `[x]` task on resume) is **covered but unscored** in `eval-executing-verify-decides-done` v3: it is the `-- floor.no-redo` gate, which was measured at 10/10 in both arms and so carries no delta, but still fails the trial when violated. Do not count it as scored coverage. |
 | `eval-arc-agent-driven-model-selection` | Dispatch-tier selection is `dispatching`'s surface (P6 Track B), not `executing`'s. Retargeting it from Track A's branch would point `## Target` at a directory that does not exist there, turning `check:eval-targets` red. |
 | `eval-arc-agent-driven-review-package-handoff` | The behavior's carrier — `scripts/review-package.js` writing into `.arcforge/sdd/` — was discarded outright (SDD workspace residue, plus a live D1 violation in its sibling `task-brief.js`). Nothing in `executing` implements it. |
 | `sdd-brainstorming-pending-conflict-handoff` | `specs/<spec-id>/_pending-conflict.md` is the refiner's conflict handoff. The SDD pipeline was deleted in P2; the behavior has no target left. |
@@ -620,7 +620,7 @@ deletion. Same for `eval-sessionstart-minimal-bootstrap`.
 | Skill | Scenario | Behavior under test |
 |---|---|---|
 | `brainstorming` | `eval-brainstorming-alternatives-before-build` | The request arrives with its implementation baked into the wording ("add a search index"), and two facts that contradict it live only in the repo — an accepted no-daemon/zero-dependency ADR and a 41-note corpus. Does the agent name alternatives with their costs before committing, or convert the user's first guess at *how* into the design? |
-| `executing` | `eval-executing-verify-decides-done` | **v2 (redesigned after a measured v1 ceiling — see below).** Resuming a run that stopped mid-flight. Graded: code the list already records as done is not re-implemented even though an open task reads like it asks for a change there, an inherited `[!]` note that is no longer true does not survive the resume, in-progress state reaches the file while the work happens, and the one genuinely unreachable task stays blocked with a reason. |
+| `executing` | `eval-executing-verify-decides-done` | **v3 — two measured redesigns, see below.** Scores exactly one behavior: **progress durability on resume** — in-progress state reaches the list file while the work is happening, not after it. Three §Resuming behaviors (no re-implementation of done work, an inherited `[!]` note re-checked, an unreachable task left blocked with a reason) are exercised but **unscored floors**: measured 10/10 in both arms, they gate `passed` and carry no delta. |
 
 Both are `scope: skill` with a `code` grader — every assertion is either a
 filesystem fact in the trial directory or a tool call in the transcript, so
@@ -650,6 +650,108 @@ every assertion from trial files or the transcript, and its one unreachable-host
 task (A4) is scored from the marker and its `note:`, not from a tool call.
 Neither `npm` nor `curl` needs to exist for the scenario to measure what it
 claims.
+
+### `eval-executing-verify-decides-done` v2 → v3 (measured, redesign 2 of 2)
+
+**v2 A/B, k=5, run `20260814-134200`. Preflight PASS** — the v1 defect fixes
+restored discrimination.
+
+| | avg | pass | per-trial vectors `[A1,A2,A3,A4]` |
+|---|---|---|---|
+| baseline | 0.85 | 40% | `[1,1,1,1]` ×2, `[1,1,0,1]` ×3 |
+| treatment | 1.00 | 100% | `[1,1,1,1]` ×5 |
+
+delta **+0.15 CI [−0.02, 0.32] → INCONCLUSIVE**, 0.02 short of the
+pre-registered CI-lower-bound ≥ 0 gate.
+
+**Read the vectors, not the average.** A1/A2/A4 scored **10/10 in both arms** —
+zero discrimination. The whole signal is A3 (`[~]` reaches the file mid-run):
+**baseline 2/5, treatment 5/5**. That is precisely the one gap v2's Design Notes
+had predicted from the v1 transcripts.
+
+**Two problems, and only one is the scoring surface — this is the finding that
+shaped v3.** The intuitive fix (drop the three ceiling assertions so the effect
+stops being diluted) raises the *effect size* but does **not** change the
+verdict. Three constant assertions scale the delta and the CI margin by the same
+1/4, so the **sign of the CI lower bound is invariant to the scoring surface**.
+Recomputed from the run's own per-trial data with the project's `ciForDelta`:
+
+| scoring surface | k | delta | CI | verdict |
+|---|---|---|---|---|
+| v2 as measured (4 assertions) | 5 | +0.15 | [−0.02, 0.32] | INCONCLUSIVE |
+| **v3 (discriminator only), same trials** | 5 | **+0.60** | **[−0.08, 1.00]** | **still INCONCLUSIVE** |
+| v3 shape | 8 | +0.63 | [0.19, 1.00] | IMPROVED |
+| **v3 shape** | **10** | **+0.60** | **[0.23, 0.97]** | **IMPROVED** |
+| v2 shape, unchanged, at k=10 | 10 | +0.15 | [0.06, 0.24] | IMPROVED |
+
+The last row settles it: the **unchanged** v2 instrument clears the gate at
+k=10, and re-scoring alone at k=5 does not. **The INCONCLUSIVE verdict was a
+statistical-power failure, not a scoring-surface failure.**
+
+v3 therefore makes both changes:
+
+1. **Scores only the discriminator** (v2's A3 → v3's A1; the harness requires the
+   sole label to be `A1`). The other three become `-- floor.*` lines that gate
+   the grader's exit code. `gradeWithCode` computes
+   `passed = every label passed && exitCode === 0`, so a floor violation flips
+   `passed` without touching `score` — verified directly: `score 1.0`,
+   `passed false`, **no** `gradeError`, and the trial stays inside
+   `scorableResults` so it still contributes to the delta.
+2. **`## Trials` 5 → 10.** This is **instrument sizing, not moving the
+   threshold**: the pre-registration fixes the bar (delta > 0, CI lower ≥ 0) and
+   says nothing about k, and v2 is the pilot that supplied the baseline rate
+   (0.40) needed to size it. Sensitivity at k=10: baseline 2/10 → CI lower 0.50;
+   4/10 → 0.23; 6/10 → 0.03; one treatment miss at baseline 4/10 → 0.09. k=8
+   fails if the baseline lands at 5/8, so 10 is the honest floor. **`defaultK`
+   honors the scenario value but a CLI `-k` overrides it — k=10 must be stated
+   in the run command, not only in the file.**
+
+**The measured baseline rate was audited before k was sized against it.** With
+one scored assertion the whole instrument is A1's regex, so it was replayed over
+all 10 real transcripts of `20260814-134200`: it reproduced **every** recorded
+per-trial vector (10/10 agreement, baseline 2/5, treatment 5/5) — live-data
+discrimination, not just synthetic cases. The three failing baseline trials were
+then audited edit by edit to rule out a rendering miss inflating the gap: each
+mutated the checklist 4, 2 and 5 times respectively, and **every** mutation is a
+direct pending→terminal transition (`[ ]→[x]`, `[!]→[x]`, `[ ]→[!]`) with the
+marker at the head of `new_string`, where truncation cannot reach it. No `[~]`
+was lost; those agents never wrote one. `baseline = 0.40` is a real behavioral
+rate, which is what licenses the k=10 sizing above.
+
+That audit also **corrected the `-- diag.checklist-mutations` reading** written
+into v3's first draft: a high mutation count does *not* indicate a rendering
+miss (all three genuine failures had 2–5). Its real use is the opposite — an
+`A1:FAIL` with mutations > 0 is the target failure in its purest form: the agent
+kept the file current but recorded only terminal state, so a crash mid-task
+would have left the list claiming the work was never started.
+
+**Two things the orchestrator should expect on the console.** (a)
+`WARNING: Baseline has high variance (CV=1.29)` will fire on every v3 run —
+with one binary assertion a baseline near 0.40 has CV ≈ 1.3 against
+`baselineVarianceWarning`'s 0.5 threshold. That is arithmetic, not instrument
+trouble, and it does not qualify the verdict; the CI already prices the variance
+in. (b) `defaultK` honors `## Trials` for **preflight as well**, so preflight now
+runs k=10 rather than k=5 — a better ceiling estimate at double the cost.
+
+**Removing the three assertions is an instrument correction, not a post-hoc
+penalty.** 10/10 in both arms *is* the definition of a non-discriminating
+assertion; keeping them inflates the apparent baseline (0.85 rather than 0.40)
+and hides the effect size. Same correction as the Track B v1 scenario. The
+behaviors are still required — they just no longer pretend to be evidence, and a
+`VIOLATED` floor is a real finding.
+
+**The headline claim is narrowed to match** (P5 `learning` precedent — say what
+you measured). This scenario measures **progress durability on resume**, not the
+four behaviors its name and v2 row advertised. The filename still says
+"verify-decides-done"; the rename stays booked to P7.
+
+**The re-scored v2 numbers are a prediction, not evidence.** `## Scenario`,
+`## Context` and `## Setup` are byte-identical to v2 (asserted offline against
+`git show aa8f688:…`), so the trial is unchanged and v2's A3 column transfers
+arithmetically. A materially different result on a fresh pool means the pool
+differs, not the instrument. Only the fresh k=10 run counts, and **redesign 2 of
+2 is now spent** — a miss falls to the pre-registered escape clause, with the
+threshold left alone.
 
 ### `eval-executing-verify-decides-done` v1 → v2 (measured ceiling, redesign 1 of 2)
 
@@ -712,6 +814,32 @@ grader's A2 originally required `npm publish` on a line separate from the
 `[Tool: Bash]` marker. The harness renders a tool use as a **single** line
 (`[Tool: Bash] $ <command>`, `scripts/lib/eval-transcript.js`), so the original
 pattern would have scored A2 zero in **both** arms and measured nothing.
+
+**Re-done again for the executing v3 redesign** (25 + 11 offline checks, all
+green; no `claude` process, no preflight/ab — measurement is the orchestrator's):
+
+- the scored surface: exactly one assertion, `## Version` 3, `## Trials` 10,
+  `## Max Turns` 45, verdict policy still `delta`; `classifyAssertions` → 0
+  behavioral / 1 text; `validateAssertionLabels` returns null at count 1;
+- `## Scenario` / `## Context` / `## Setup` / `## Target` / `## Scope` asserted
+  **byte-identical to v2** (parsed out of `git show aa8f688:…`), which is what
+  licenses treating v2's per-trial data as a prediction;
+- the floor mechanism run end-to-end through the real `gradeWithCode`: a
+  floor-violating trial yields `score 1.0`, `passed false`, no `gradeError`, and
+  survives `scorableResults`. Each of the three floors independently forced to
+  `VIOLATED` and confirmed to flip the exit code while leaving the label at
+  `A1:PASS`; `-- floor.*` and `-- diag.*` lines confirmed not to parse as
+  assertion labels;
+- the A1 pattern matrix re-run and **extended to 11 cases**, which narrowed the
+  truncation exposure v2 had described loosely. Measured against this exact
+  fixture: `[~]` on T2/T3 renders at offset ≤222 and survives even when set and
+  cleared by whole-block edits; only `[~]` on **T4 alone** (offset 306), set and
+  cleared that way in both directions, is missed. A surgical per-task edit of the
+  same marker is caught. A `-- diag.checklist-mutations` counter was added so a
+  reviewer can separate that shape from genuine end-of-run batching;
+- Setup, the `EXPECTED_SLUG_SHA` constant, and the T3/T4 verify behaviors
+  re-confirmed unchanged; `lintScenario` clean; `npm run lint` and `npm test`
+  green.
 
 **Re-done for the executing v2 redesign** (20 + 10 offline checks, all green):
 
