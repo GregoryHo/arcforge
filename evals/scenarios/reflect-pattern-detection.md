@@ -6,7 +6,7 @@
 learning
 
 ## Target
-skills/learning/SKILL.md
+skills/core/learning/SKILL.md
 
 ## Scenario
 A project's diary directory contains 4 diary entries that share a clear repeating pattern:

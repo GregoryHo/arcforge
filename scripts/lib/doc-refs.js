@@ -521,7 +521,7 @@ function scanR4Skills(file, spans, skillExists) {
         R4_SEVERITY,
         file,
         line,
-        `${display} does not resolve to skills/${name}/, hooks/${name}/, or agents/${name}.md`,
+        `${display} does not resolve to skills/<bucket>/${name}/, hooks/${name}/, or agents/${name}.md`,
       ),
     );
   };
@@ -533,7 +533,7 @@ function scanR4Skills(file, spans, skillExists) {
       const name = m[0];
       const before = m.index > 0 ? text[m.index - 1] : '';
       const after = text[m.index + name.length] || '';
-      // Skip arc-<name> embedded in a path (`skills/<name>/SKILL.md`): that is a
+      // Skip arc-<name> embedded in a path (`skills/<bucket>/<name>/SKILL.md`): that is a
       // path component, owned by R1, not a standalone skill reference.
       if (before === '/' || after === '/') continue;
       // Skip eval-scenario identifiers (`eval-arc-using-harness-isolation`):

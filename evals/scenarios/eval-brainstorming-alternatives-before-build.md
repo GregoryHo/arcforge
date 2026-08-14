@@ -1,6 +1,6 @@
 # Eval: eval-brainstorming-alternatives-before-build
 
-<!-- status: new in v6 P6 — direct behavioral coverage for skills/brainstorming/SKILL.md
+<!-- status: new in v6 P6 — direct behavioral coverage for skills/core/brainstorming/SKILL.md
 (§The law, §2 Name at least two real approaches, §3 YAGNI, §Red flags).
 
 Behavior under test: the request arrives with its implementation already baked
@@ -23,7 +23,7 @@ not exploration, it is a decision with a sunk cost attached. -->
 skill
 
 ## Target
-skills/brainstorming/SKILL.md
+skills/core/brainstorming/SKILL.md
 
 ## Scenario
 Searching my notes is painful. Add a search index so lookups stay fast, and set it up in the repo.

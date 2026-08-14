@@ -6,7 +6,7 @@
 learning
 
 ## Target
-scripts/lib/learning-curator/activate.js, skills/learning/SKILL.md
+scripts/lib/learning-curator/activate.js, skills/core/learning/SKILL.md
 
 ## Scenario
 An activated skill has been written to `skills/activated-test-skill/SKILL.md` in the

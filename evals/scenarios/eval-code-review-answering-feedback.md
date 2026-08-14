@@ -1,12 +1,12 @@
 # Eval: eval-code-review-answering-feedback
 
-<!-- status: regression tripwire — retargeted in v6 P4 from the dissolved arc-reviewing skill onto `code-review`, whose "Answering the review" section now carries this behavior verbatim (verify-before-implement, no performative agreement, evidence-backed pushback, severity ordering). Assertions and grader are unchanged: they were written against the behavior, not against arc-reviewing's wording, so they transfer without edit. Version bumped 1 → 2 so v5 result rows never pool with v6 ones. Direct behavioral coverage target: skills/code-review/SKILL.md. -->
+<!-- status: regression tripwire — retargeted in v6 P4 from the dissolved arc-reviewing skill onto `code-review`, whose "Answering the review" section now carries this behavior verbatim (verify-before-implement, no performative agreement, evidence-backed pushback, severity ordering). Assertions and grader are unchanged: they were written against the behavior, not against arc-reviewing's wording, so they transfer without edit. Version bumped 1 → 2 so v5 result rows never pool with v6 ones. Direct behavioral coverage target: skills/core/code-review/SKILL.md. -->
 
 ## Scope
 skill
 
 ## Target
-skills/code-review/SKILL.md
+skills/core/code-review/SKILL.md
 
 ## Scenario
 You just finished Task 3 (the `sync` module in `src/sync.py`) and requested a code

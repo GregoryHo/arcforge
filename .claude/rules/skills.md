@@ -16,7 +16,7 @@ contributor-side conventions only; it is not the authoring methodology.
 | What frontmatter is legal | `docs/plans/v6/decisions/skill-schema.md` (**frozen** — do not redefine, restate, or extend it elsewhere) |
 | Is my skill structurally valid | `tests/skills/test_skill_structure.py` (the mechanical form of the schema) |
 | Which skills exist and when | `docs/plans/v6/PLAN.md` (phase table) |
-| How to write a good skill | `skills/writing-skills/` (v6 meta skill, landed in P3) — the authoring methodology. The schema doc stays authoritative for the fields themselves. |
+| How to write a good skill | `skills/core/writing-skills/` (v6 meta skill, landed in P3) — the authoring methodology. The schema doc stays authoritative for the fields themselves. |
 
 Required frontmatter is `name` + `description`; the optional field set is
 enumerated in the schema doc and nowhere else. `name` must equal the directory

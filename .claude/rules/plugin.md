@@ -12,8 +12,13 @@ sync — see `docs/plans/v6/PLAN.md`.
 
 ## Skill Discovery and the `skills` Whitelist
 
-**Today**: `plugin.json` has no `skills` field, so Claude Code auto-discovers
-`skills/*/SKILL.md` — one level only, flat.
+Skills live in **lifecycle buckets** — `skills/core/<name>/`, plus
+`in-progress/` and `deprecated/` as needed — and `plugin.json` carries a single
+directory entry:
+
+```json
+"skills": ["./skills/core/"]
+```
 
 **Verified mechanics** (spike: `docs/plans/v6/spikes/plugin-skills-whitelist.md`):
 
@@ -23,11 +28,20 @@ sync — see `docs/plans/v6/PLAN.md`.
 - The whitelist accepts **directory entries**: `"skills": ["./skills/core/"]`
   loads every skill under that directory in one entry.
 - The loaded identifier is the skill's `name` (== dirname); the bucket segment
-  does not appear in it.
+  does not appear in it, so a move between buckets never changes an invocation.
 
-**P6.5** moves skills into `core/` / `in-progress/` / `deprecated/` buckets with
-a single directory entry for `core/`. Until that lands, keep the layout flat and
-do not add a `skills` field.
+Consequences to work with, not around:
+
+- Only `core/` ships. `in-progress/` and `deprecated/` are on-disk holding areas
+  that never load, so they need no manifest edit and no exclusion rule.
+- Promoting or retiring a skill is a **`git mv` between buckets** — the manifest
+  does not change.
+- The buckets are not tracked when empty; create one at the moment a skill moves
+  into it rather than keeping a placeholder.
+- Guards resolve skills through the bucket. `skills/core` is the single point in
+  `tests/scripts/v6-legacy-skills.js` (jest) and `tests/skills/test_skill_structure.py`
+  (pytest); the D8 lint treats a bucket segment as generic tree access and keys
+  on the skill name inside it.
 
 ## Versioning
 
@@ -69,8 +83,9 @@ is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 ## Plugin Directory Layout
 
 - `.claude-plugin/` — only `plugin.json` + `marketplace.json` go here
-- Component dirs at plugin root: `skills/`, `hooks/`
-- Skills become namespaced when installed: `/arcforge:<skill-name>`
+- Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/`
+- Skills become namespaced when installed: `/arcforge:<skill-name>` — the bucket
+  is a layout detail, never part of the name
 - `agents/` and `templates/` still exist on disk but are removed in P2 — don't
   add to them
 

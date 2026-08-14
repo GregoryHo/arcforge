@@ -150,7 +150,7 @@ evals/
 | Testing infrastructure not behavior | "File exists" passes trivially | Ask "does this measure Claude's behavior or a side-effect?" |
 | `--skill-file` for workflow eval | Varies prompt instead of environment | Workflow A/B: no `--skill-file` |
 
-Full catalog: `skills/evaluating/references/scenario-design.md`
+Full catalog: `skills/core/evaluating/references/scenario-design.md`
 
 ## Agents
 

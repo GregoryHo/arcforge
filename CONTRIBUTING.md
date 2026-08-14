@@ -113,7 +113,7 @@ Skills are the most common contribution type. Read this section carefully.
 
 ### Prerequisites
 
-**You must read [`skills/writing-skills/SKILL.md`](skills/writing-skills/SKILL.md) first.** It carries the authoring methodology: invocation choice, description register, information hierarchy, guidance form, and the evidence a skill needs before it ships.
+**You must read [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md) first.** It carries the authoring methodology: invocation choice, description register, information hierarchy, guidance form, and the evidence a skill needs before it ships.
 
 ### Naming Convention
 
@@ -171,7 +171,7 @@ No per-skill test file is needed. A single generic checker, `tests/skills/test_s
 
 ### Quick Checklist
 
-- [ ] Read `skills/writing-skills/SKILL.md` before starting
+- [ ] Read `skills/core/writing-skills/SKILL.md` before starting
 - [ ] Name follows `arc-<gerund>[-<object>]` pattern
 - [ ] Frontmatter has only `name` and `description`
 - [ ] Description starts with "Use when..." (triggers only, no workflow)
@@ -180,7 +180,7 @@ No per-skill test file is needed. A single generic checker, `tests/skills/test_s
 - [ ] Closed loopholes from additional testing (REFACTOR)
 - [ ] `npm run test:skills` passes (the structure checker picks up the new skill)
 
-See [`skills/writing-skills/SKILL.md`](skills/writing-skills/SKILL.md) for the full creation checklist.
+See [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md) for the full creation checklist.
 
 ---
 
@@ -422,7 +422,7 @@ Use the escape hatch sparingly. If you find yourself adding many suppressions, t
 - **GitHub Issues**: Report bugs or suggest features
 - **Key files to read first**:
   - [`CLAUDE.md`](CLAUDE.md) — Project conventions and architecture
-  - [`skills/writing-skills/SKILL.md`](skills/writing-skills/SKILL.md) — Complete skill authoring guide
+  - [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md) — Complete skill authoring guide
   - [`hooks/README.md`](hooks/README.md) — Hook architecture and events
   - [`README.md`](README.md) — Project overview and installation
 

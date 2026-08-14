@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/sessions/SKILL.md
+skills/core/sessions/SKILL.md
 
 ## Context
 A small JavaScript package for handling CSV. The current branch is `feat-csv` and

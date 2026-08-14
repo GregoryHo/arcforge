@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/diagramming-obsidian/SKILL.md
+skills/core/diagramming-obsidian/SKILL.md
 
 ## Context
 An Obsidian vault lives at `./vault` in this directory, with a `Diagrams` folder

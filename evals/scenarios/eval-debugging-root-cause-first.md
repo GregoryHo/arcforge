@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/debugging/SKILL.md
+skills/core/debugging/SKILL.md
 
 ## Context
 A small JavaScript package that totals CSV invoice lines. Sources live in
