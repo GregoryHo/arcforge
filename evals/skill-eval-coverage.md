@@ -411,6 +411,31 @@ Both are `scope: skill` with a `code` grader — every assertion is either a
 filesystem fact in the trial directory or a tool call in the transcript, so
 nothing here depends on an LLM judge.
 
+**What these two measure, and what they do not.** `scope: skill` A/B injects the
+target `SKILL.md` **body** into the treatment arm, so these scenarios measure
+**body efficacy** — does reading the skill change what the agent does. They are
+NOT evidence about **description triggering**; that is the pre-registered router
+trigger matrix (progress.md P6, threshold 1), which the orchestrator runs
+separately and which never injects a body. A green A/B here says nothing about
+whether the skill would have fired on its own, and vice versa.
+
+Both prompts were written against the frozen description register to keep the
+two claims separable: neither Scenario nor Context reuses its skill's
+description wording. `executing`'s fixture is deliberately named
+`release-checklist.md` rather than `tasks.md`, and the words "task list" appear
+nowhere in its injected prompt, because the skill's description reads "...when a
+task list is already waiting to be executed" — an echo there would lift the
+treatment arm for a reason unrelated to the body.
+
+**One environment dependency to check before reading a result.**
+`eval-executing-verify-decides-done` A2 asserts that T2's `verify:` command was
+actually executed, matched as a `[Tool: Bash]` call containing `npm publish` or
+`registry.internal.invalid`. That requires npm to exist in the trial sandbox. If
+it does not, A2 scores 0 in **both** arms and measures nothing — the same class
+of dead assertion the offline exercise already caught once in this scenario. If
+A2 comes back 0/0, check npm availability first rather than reading it as a
+behavioral result.
+
 ### Instrument verification performed by the worker (offline only)
 
 Per the P5 lesson written into the P6 pre-registration, **all** measurement

@@ -207,6 +207,11 @@ retarget、檔名保留）相反，理由逐支如下——不是忘了處理：
 - `docs/guide/skills-reference.md` 本次只做懸空指標的機械改名與三個小節的合併
   （`arc-writing-tasks` + `arc-executing-tasks` + `arc-agent-driven` → 單一
   `### executing`）。整份文件仍是 v5 結構（SDD／Orchestration 分類），P7 重建。
+  該機械改名有一處副作用，**不是 Track A 對 `dispatching` 行為的主張**：
+  `skills-reference.md` 的 arc-dispatching-teammates Related 列現在讀作
+  「each teammate runs executing → arc-finishing on its own」（原文是
+  `arc-agent-driven`）。teammate 的執行語義屬 Track B，本 Track 不代為裁定；
+  留著是因為它 linter 綠、且該檔 P7 全量重建。Track B 落地時可自行改寫。
 - `tests/skills/test_skill_structure.py::test_is_legacy_discriminates` 原本硬編
   `arc-brainstorming` 作正向樣本。已改為讀 manifest：硬編一個名字，等於每個
   phase 重寫到那支 skill 時都轉紅一次，那是噪音不是發現。
