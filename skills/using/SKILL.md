@@ -14,6 +14,8 @@ If nothing matches, no arcforge skill applies — just do the work.
 | Skill | Use when |
 | --- | --- |
 | `/writing-skills` | you are authoring or revising an arcforge skill (user-invoked) |
+| `/brainstorming` | a request is underspecified, several designs are plausible, or the user is thinking out loud rather than asking for code |
+| `/executing` | work needs more than one step, a task list is waiting to be run, or you are choosing between attended and unattended execution |
 | `/tdd` | you are about to write implementation code, fix a bug, or found code with no test |
 | `/debugging` | a test fails, a bug is reported, behavior surprises you, a build breaks, or a fix you tried did not hold |
 | `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |

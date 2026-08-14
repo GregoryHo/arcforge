@@ -39,6 +39,8 @@
 | `learning` | **user-invoked** | P5 重新推導維持預填值，但依據與預填不同。預填說的是「控制面＝使用者的決定」；重推導後真正的依據是**自動化已經不在 skill 這一層**：diary 草稿由 PreCompact/Stop hook 自動產生，observation→candidate 由 daemon＋curator 自動跑完。skill 手上只剩下**人要拍板的那一半**——要不要留這篇 diary、三篇算不算 pattern、這條 instinct 該不該存、要不要啟用。這半邊照定義不該由 agent 自己伸手。<br><br>第二個依據：這個子系統**預設關閉**。做成 model-invoked，等於在每一輪無關對話上收 cognitive load，去評估一個多數使用者根本沒開的功能——成本天天付，觸發條件多半不成立。<br><br>反向檢查（推翻預填的機會）：hook 確實會在 diary 草稿就緒／反思到期時發 nudge，看似「條件在任務中途出現、agent 該自己接手」。但 nudge 的存在正好是 user-invoked 的證據而非反證——系統已經把這件事建模成「提示人、等人決定」。既然如此，nudge 措辭本次一併從「叫模型去 invoke」改為「告訴使用者可以執行」（`hooks/session-tracker/inject-context.js`），讓載體與類別一致。<br><br>連帶效果：這是第二支 user-invoked skill，清掉 P3 掛帳的 §3.1／§5.2 mutation 重跑（見 `p5-absorption-learning.md` §5）。 |
 | `evaluating` | model-invoked | P5 重新推導維持預填值，但理由換成**不對稱失敗**（預填只寫「條件在任務中途成立」，那對 user-invoked 也成立，不構成判準）：觸發條件是「有一組數字回來了、有人正要從它讀出一個結論」。記得喊 `/evaluating` 的那次，通常本來就會謹慎看區間；忘記喊的那次正是最該被攔的那次——delta 是正的、期限在逼、treatment 綠了。**考慮過並否決 user-invoked**：`learning` 與 `looping` 之所以是 user-invoked，是因為它們動使用者的環境或花使用者的錢，agent 自行啟動等於自我授權。`evaluating` 兩者皆非——它只判斷一個**已經在場**的主張，不寫入任何使用者狀態、不啟動無人值守迴圈；沒有需要被 gate 的授權，就沒有理由要求使用者先知道答案。 |
 | `diagramming-obsidian` | model-invoked | P5 重新推導維持預填值：觸發條件是「這件事講不清楚，需要一張圖」——它在解釋途中冒出來，而且最常由 agent 先察覺（`maintaining-obsidian` 的 Visuals 步驟走到 Q4 就是這個時點）。要求使用者先打 `/diagramming-obsidian` 等於要求他在還沒看到解釋之前就決定需要圖。**另有結構性約束**：本支是 `maintaining-obsidian` 的 prose 委派 target，依 schema §3.1，user-invoked 不可被 prose-invoke——落地為 user-invoked 會使那條委派非法，只能改成叫使用者手動轉場，而委派發生的時點（ingest 途中）使用者不在場。判準與守衛在此指向同一結論。 |
+| `brainstorming` | model-invoked | P6 重新推導維持預填值，但依據比預填強：預填寫「從第一句話就看得出來」——那對 user-invoked 也成立。真正的依據是**這個條件使用者看不見**：請求之所以未收斂，正是因為提出的人覺得它已經夠清楚（「clarity is what an assumption feels like from the inside」，寫進 skill 本文）。要求先打 `/brainstorming` 等於要求使用者先察覺自己的請求含糊——與 `using` 同構的失敗。<br><br>反向檢查（推翻預填的機會）：`learning`／`looping` 是 user-invoked，因為它們動使用者的環境或在無人監督下花錢，agent 自行啟動等於自我授權。`brainstorming` 兩者皆非——它只是一段對話，不寫入任何使用者狀態、不啟動任何無人值守流程。沒有需要被 gate 的授權，就沒有理由把入口綁在使用者的記憶上。 |
+| `executing` | model-invoked | P6 重新推導維持預填值，但預填的依據（「已有一份清單待執行」）在合併後不足以涵蓋本支——它同時包含**寫清單**與**走開模式開關**，兩者都不在預填的射程內。<br><br>依據一（不對稱失敗）：本支要攔的失敗——進度只留在 context 裡、沒跑 `verify:` 就打 `[x]`、重做一個已 `[x]` 的任務——全部發生在執行途中，而且發生時使用者正好不在看。等使用者想起來喊，狀態早已遺失。<br><br>依據二（走開開關**不是**授權面，明確處理）：合併帶進 arc-agent-driven 的走開模式後，必須回答「這是否讓本支變成像 `looping` 一樣的授權入口」。答案是否：`looping` 之所以 user-invoked，是因為啟動一個無人值守迴圈會在使用者離席時持續花錢與改碼，agent 自行啟動＝自我批准。`executing` 只做**模式選擇**，並要求在走開前先向使用者說明；真正把迴圈跑起來的入口仍在使用者手上（`looping`，user-invoked，本支只中性提及、不得 prose-invoke）。寫清單與在場執行都落在使用者已經委託的工作範圍內，沒有新的授權被自我授予。 |
 | `maintaining-obsidian` | model-invoked | P5 重新推導維持預填值：觸發語句是「這個存一下」「我筆記裡對 X 有寫什麼」——說出這句話的人腦中沒有任何指令名，他甚至不必知道 vault 系統存在。要求先打 `/maintaining-obsidian` 等於要求使用者先知道答案（與 `using` 同構的失敗）。反向也成立：query 模式存在的目的是攔下「用通識回答一個該由 vault 回答的問題」，而那個誤答正是 agent 自己在任務中途做出的選擇，使用者看不到、無從呼叫。**附帶約束**：本支的 Visuals 步驟以 prose 呼叫 `/diagramming-obsidian`，依 schema §3.1 該 target 必須是 model-invoked——兩支同為 model-invoked 才使這條委派合法。 |
 
 ## 預填（P4–P6，**非約束**）
@@ -50,10 +52,9 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 | Skill | Phase | 預測類別 | 依據 |
 |---|---|---|---|
 | `compacting` | P4 | model-invoked | 條件是「context 快用完」，agent 比使用者更早看得到；使用者能打的 `/compact` 是 Claude Code builtin，與本 skill 不同物。 |
-（`learning`、`evaluating`、`maintaining-obsidian`、`diagramming-obsidian` 已於 P5 落地，移入上表。）
-| `brainstorming` | P6 | model-invoked | 條件是「使用者帶著還沒收斂的構想來」，從第一句話就看得出來。 |
-| `task-list` | P6 | model-invoked | 條件是「工作大到需要一份清單」，在拆解當下成立。 |
-| `executing` | P6 | model-invoked | 條件是「已有一份清單待執行」。 |
+（`learning`、`evaluating`、`maintaining-obsidian`、`diagramming-obsidian` 已於 P5 落地，移入上表。
+`brainstorming`、`executing` 已於 P6 落地，移入上表。）
+| `task-list` | P6 | model-invoked | 條件是「工作大到需要一份清單」，在拆解當下成立。**P6 合併裁決已把這一面併入 `executing`（progress.md P6 節），不會有 `skills/task-list/`**——本列因此是一支永不存在的 skill 的預填。Track A 不代為刪除非自己落地的列，留給 orchestrator 在 router 最終收斂時一併關閉。 |
 | `dispatching` | P6 | model-invoked | 條件是「工作可平行且已具備平行前提」。 |
 | `looping` | P6 | **user-invoked** | 無人值守迴圈會在使用者離席時持續花錢與改碼；自行啟動等於自己批准自己不受監督。 |
 | `worktrees` | P6 | model-invoked | 條件是「需要隔離的工作區」，在動手前成立。 |
