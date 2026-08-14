@@ -38,6 +38,25 @@ MATRIX: PASS   — 90/90 trials
 （row1-A-t1、row6-A-t2、row14-B-t3、row15-A-t1、row8-B-t2），全部為**單一
 token 回答**（如 `/tdd`），無多名並列。
 
+### 1b. 優先序註記後的重量測（verifier 缺陷 3 補救）— **PASS 16/16**
+
+verifier 指出 P5 掛帳的 `/tdd`↔`/finishing` 重疊優先序註記缺席。補救採「補註記
+＋重量測」而非再掛帳：`skills/using/SKILL.md` 增 Precedence 段（紀律列優先於
+收尾列；`/debugging` 未解釋 vs `/tdd` 已知要改什麼），`router-matrix.tsv` 增第
+16 列**重疊態情境**（「功能被描述為已完成，但有回報 bug 且無測試」→ 期望
+`/tdd`），全矩陣重跑：
+
+```
+surface A (router map, gate): 16/16 = 100%  (threshold 80%)  ← 含 row16 3/3
+surface B (descriptions, diagnostic): 15/16 = 93%
+```
+
+出貨物與量測物重新對齊：A 面在含優先序註記的 router 上 100%，重疊態列本身
+3/3。B 面唯一失分列為 `/debugging`（1/3）：「CI 測試昨天開始紅、原因未明」在
+**只看 descriptions** 時 2/3 被 `/tdd` 吸走（其 description 的 "fix a bug"
+外溢）；router 表在場時 3/3 正確。此為 description register 的 tdd/debugging
+邊界問題，掛帳 P7，不影響 gate（B 面為診斷面，且 93% 仍逾 80%）。
+
 ## 2. loop e2e（預登門檻 2，binary）— **PASS**
 
 `tests/e2e/loop-probe.sh`，隔離：`CLAUDE_PROJECT_DIR` + `ARCFORGE_HOME` 指向
