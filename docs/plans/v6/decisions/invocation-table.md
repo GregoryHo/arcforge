@@ -63,9 +63,9 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 - **數量對不上**：本表原列名 18 支（P4 裁定 `completion-evidence` 不是 skill，故不計），`PLAN.md`
   P6 的 AC 卻是 `ls -d skills/*/ | wc -l` ≤15、正文寫「總數 ≈14」。缺口只能靠 P4–P6
   進一步合併補上；本表**不代為發明合併**，只把差額標出來。哪幾支合併是 P6 的裁決。
-  **P6 收斂進行中**：`worktrees` 併入 `dispatching`（本 phase Track B 已落地，−1）；
-  `compacting` 併入 `sessions`（Track C，−1）。兩者兌現後本表 18 → 16，其餘缺口由
-  P6 其他 track 的合併裁決收束（進度見 `progress.md` P6 節）。
+  **P6 已收束（gate-p6）**：`worktrees` 併入 `dispatching`（−1）、`compacting` 併入
+  `sessions`（−1）、`task-list` 併入 `executing`（−1）——18 → **15**，與磁碟
+  `ls -d skills/*/ | wc -l` == 15 一致，PLAN 的 ≤15 AC 兌現。本張力關閉。
 - **預測集中在 model-invoked**：15 支預填只有 2 支 user-invoked。這可能是對的
   （多數紀律型 skill 的觸發條件確實在任務中途），也可能是預填時偷懶的預設值。
   每個 phase 落地時重新推導，就是為了讓這個偏斜有機會被推翻。

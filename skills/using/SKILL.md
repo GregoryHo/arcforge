@@ -28,6 +28,12 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/maintaining-obsidian` | something should be filed into the user's Obsidian vault, a question should be answered from it, or it needs auditing or bootstrapping |
 | `/diagramming-obsidian` | the user wants something shown visually — an architecture, a flow, a mind map — as an Excalidraw diagram in their vault |
 
+**Precedence when rows overlap.** Discipline rows outrank wrap-up rows: if a
+defect is reported or code is untested, `/tdd` or `/debugging` applies even when
+the work is described as finished — `/finishing` presumes nothing is known to be
+wrong. Between the two disciplines: `/debugging` when a failure is not yet
+explained, `/tdd` once you know what to change.
+
 v6 rebuilds the skill set from zero; each skill adds its own row in the same
 change that creates it, so the table grows as the rewrite lands.
 
