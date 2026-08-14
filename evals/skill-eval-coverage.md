@@ -614,6 +614,33 @@ v3 therefore makes both changes:
    honors the scenario value but a CLI `-k` overrides it — k=10 must be stated
    in the run command, not only in the file.**
 
+**The measured baseline rate was audited before k was sized against it.** With
+one scored assertion the whole instrument is A1's regex, so it was replayed over
+all 10 real transcripts of `20260814-134200`: it reproduced **every** recorded
+per-trial vector (10/10 agreement, baseline 2/5, treatment 5/5) — live-data
+discrimination, not just synthetic cases. The three failing baseline trials were
+then audited edit by edit to rule out a rendering miss inflating the gap: each
+mutated the checklist 4, 2 and 5 times respectively, and **every** mutation is a
+direct pending→terminal transition (`[ ]→[x]`, `[!]→[x]`, `[ ]→[!]`) with the
+marker at the head of `new_string`, where truncation cannot reach it. No `[~]`
+was lost; those agents never wrote one. `baseline = 0.40` is a real behavioral
+rate, which is what licenses the k=10 sizing above.
+
+That audit also **corrected the `-- diag.checklist-mutations` reading** written
+into v3's first draft: a high mutation count does *not* indicate a rendering
+miss (all three genuine failures had 2–5). Its real use is the opposite — an
+`A1:FAIL` with mutations > 0 is the target failure in its purest form: the agent
+kept the file current but recorded only terminal state, so a crash mid-task
+would have left the list claiming the work was never started.
+
+**Two things the orchestrator should expect on the console.** (a)
+`WARNING: Baseline has high variance (CV=1.29)` will fire on every v3 run —
+with one binary assertion a baseline near 0.40 has CV ≈ 1.3 against
+`baselineVarianceWarning`'s 0.5 threshold. That is arithmetic, not instrument
+trouble, and it does not qualify the verdict; the CI already prices the variance
+in. (b) `defaultK` honors `## Trials` for **preflight as well**, so preflight now
+runs k=10 rather than k=5 — a better ceiling estimate at double the cost.
+
 **Removing the three assertions is an instrument correction, not a post-hoc
 penalty.** 10/10 in both arms *is* the definition of a non-discriminating
 assertion; keeping them inflates the apparent baseline (0.85 rather than 0.40)

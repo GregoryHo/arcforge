@@ -283,15 +283,34 @@ scored assertion, from the same computation: baseline 2/10 → CI lower 0.50;
 4/10 → 0.23; 6/10 → 0.03; and one treatment miss at baseline 4/10 → 0.09. k=8
 fails if the baseline lands at 5/8, so 10 is the honest floor, not 8.
 
-**`## Trials` can be overridden.** `defaultK` honors the scenario's value, but a
-`-k` on the command line wins. k=10 has to be stated in the handoff, not only
-written here.
+**`## Trials` can be overridden, and it also moves preflight.** `defaultK`
+honors the scenario's value for **both** arms and for preflight — so preflight
+now runs k=10 rather than the k=5 it used at `## Trials 5` (a better ceiling
+estimate, double the cost). A `-k` on the command line wins over the file, so
+k=10 has to be stated in the run command, not only written here.
 
 **The re-scored v2 numbers are a prediction, not evidence.** `## Scenario`,
 `## Context` and `## Setup` are byte-identical to v2, so the trial the agent
 faces is unchanged and v2's A3 column transfers arithmetically. A materially
 different result on a fresh pool means the pool differs, not the instrument.
 Only the fresh run counts.
+
+### A1's detection is validated on live data, not only on synthetic cases
+
+Now that A1 is the sole score, its regex is the whole instrument. The strongest
+evidence is not the synthetic matrix — it is that **the identical pattern was
+replayed over all 10 real transcripts of `20260814-134200` and reproduced every
+recorded per-trial vector: 10/10 agreement, baseline 2/5, treatment 5/5.** It
+discriminated on live data before it was ever the only thing scored.
+
+The three failing baseline trials were then audited edit by edit to rule out a
+rendering miss inflating the measured gap. Every checklist mutation in all three
+is a direct pending→terminal transition with the marker at the head of
+`new_string` — `baseline-3` (4 mutations), `baseline-4` (2), `baseline-5` (5).
+The truncation in those blocks falls inside the `note:` prose *after* the
+marker, never before it. **No `[~]` was lost; those agents never wrote one.**
+That is what licenses `baseline = 0.40` as a real behavioral rate, and therefore
+the k=10 sizing below.
 
 ### Renumbering
 
@@ -379,19 +398,32 @@ prompt, or the treatment arm lifts for a reason unrelated to the body.
 **What a failure looks like.** A1 is now the whole score, so read these before
 reading a delta:
 
-- **A1 fails in the treatment arm** → check rendering before calling it
-  behavior, and check `-- diag.checklist-mutations` first. `summarizeToolInput`
-  truncates an `Edit`'s `old_string` and `new_string` at **300 characters each**
-  (`scripts/lib/eval-transcript.js`). The residual hole is **narrower than v2
-  claimed** — it was measured directly against this fixture: `[~]` on T2 or T3
-  renders at offset ≤222 and always survives; only a `[~]` on **T4 alone**
-  (offset 306) set *and* cleared by whole-block edits in both directions is
-  missed. Any surgical per-task edit, any `Bash` command, any `Write`, any
-  assistant prose, and any run that marks more than the last task all render
-  fully. A treatment trial with several checklist mutations and `A1:FAIL` is the
-  shape to suspect; one mutation and `A1:FAIL` is genuine end-of-run batching.
+- **A1 fails in the treatment arm** → almost certainly behavior, not rendering.
+  `summarizeToolInput` truncates an `Edit`'s `old_string` and `new_string` at
+  **300 characters each** (`scripts/lib/eval-transcript.js`), but the residual
+  hole is far narrower than v2 claimed. Measured against this fixture: a `[~]`
+  on T2 or T3 renders at offset ≤222 and survives even when set *and* cleared by
+  whole-block edits; only a `[~]` on **T4 alone** (offset 306), set and cleared
+  that way in both directions, is missed. Any surgical per-task edit, `Bash`
+  command, `Write`, or assistant prose renders fully. **A marker edit puts the
+  marker at the head of `new_string` by construction**, which is why the hole
+  needs that contrived shape.
+- **`-- diag.checklist-mutations` does NOT separate genuine batching from a
+  rendering miss — do not read it that way.** All three failing baseline trials
+  in `20260814-134200` mutated the checklist **2, 4 and 5 times**; every one of
+  those edits was a direct pending→terminal transition (`[ ]→[x]`, `[!]→[x]`,
+  `[ ]→[!]`) with the marker at the head of `new_string`. They never wrote `[~]`
+  at all. The counter's real use is the opposite reading: `A1:FAIL` with
+  mutations > 0 is the target failure in its purest form — the agent kept the
+  file current but only ever recorded terminal state, so a crash mid-task would
+  have left the list claiming work was not started.
 - **A1 fails in both arms at a rate far from 2/5** → the pool differs from
   `20260814-134200`. The trial is byte-identical, so that is a pool fact.
+- **`WARNING: Baseline has high variance (CV=1.29)` is expected and does not
+  qualify the verdict.** With one scored assertion every trial scores 0 or 1, so
+  a baseline near 0.40 has CV ≈ 1.3 against `baselineVarianceWarning`'s 0.5
+  threshold. That warning was designed for noisy multi-assertion baselines; here
+  it is arithmetic, not instrument trouble. The CI already prices the variance in.
 - **A floor goes VIOLATED** → a real finding, not noise. `no-redo` violated in
   both arms with no other change means a stale `EXPECTED_SLUG_SHA` (hand-coupled
   to `## Setup`'s heredoc) — suspect that before suspecting the agent.
