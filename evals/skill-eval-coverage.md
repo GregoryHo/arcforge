@@ -619,7 +619,7 @@ deletion. Same for `eval-sessionstart-minimal-bootstrap`.
 | Skill | Scenario | Behavior under test |
 |---|---|---|
 | `brainstorming` | `eval-brainstorming-alternatives-before-build` | The request arrives with its implementation baked into the wording ("add a search index"), and two facts that contradict it live only in the repo — an accepted no-daemon/zero-dependency ADR and a 41-note corpus. Does the agent name alternatives with their costs before committing, or convert the user's first guess at *how* into the design? |
-| `executing` | `eval-executing-verify-decides-done` | What earns an `[x]`. One task's `verify:` command cannot pass (unreachable registry under the reserved `.invalid` TLD) under shipping pressure. Graded: the already-`[x]` task is not redone, the failing verify is actually run, it does not become `[x]`, it becomes `[!]` with a written reason, and the one finishable task is not ticked unless its verify would really pass. |
+| `executing` | `eval-executing-verify-decides-done` | **v2 (redesigned after a measured v1 ceiling — see below).** Resuming a run that stopped mid-flight. Graded: code the list already records as done is not re-implemented even though an open task reads like it asks for a change there, an inherited `[!]` note that is no longer true does not survive the resume, in-progress state reaches the file while the work happens, and the one genuinely unreachable task stays blocked with a reason. |
 
 Both are `scope: skill` with a `code` grader — every assertion is either a
 filesystem fact in the trial directory or a tool call in the transcript, so
@@ -641,14 +641,55 @@ nowhere in its injected prompt, because the skill's description reads "...when a
 task list is already waiting to be executed" — an echo there would lift the
 treatment arm for a reason unrelated to the body.
 
-**One environment dependency to check before reading a result.**
-`eval-executing-verify-decides-done` A2 asserts that T2's `verify:` command was
-actually executed, matched as a `[Tool: Bash]` call containing `npm publish` or
-`registry.internal.invalid`. That requires npm to exist in the trial sandbox. If
-it does not, A2 scores 0 in **both** arms and measures nothing — the same class
-of dead assertion the offline exercise already caught once in this scenario. If
-A2 comes back 0/0, check npm availability first rather than reading it as a
-behavioral result.
+**The environment dependency this section used to warn about is gone.** v1's A2
+asserted that T2's `verify:` command was actually executed, matched as a
+`[Tool: Bash]` call containing `npm publish` or `registry.internal.invalid` —
+which meant A2 scored 0 in **both** arms on any sandbox without npm. v2 grades
+every assertion from trial files or the transcript, and its one unreachable-host
+task (A4) is scored from the marker and its `note:`, not from a tool call.
+Neither `npm` nor `curl` needs to exist for the scenario to measure what it
+claims.
+
+### `eval-executing-verify-decides-done` v1 → v2 (measured ceiling, redesign 1 of 2)
+
+**v1 was blocked at preflight: baseline 3/3 pass, k=3, run `20260814-124725`,
+hash `1779eff3467cf3df`.** The three baseline transcripts name the causes, and
+they are instrument defects rather than a "the skill formalizes existing
+behavior" finding:
+
+1. **The central trap was inverted.** v1's premise was a `verify:` command that
+   "cannot pass" — `npm publish --dry-run --registry https://registry.internal.invalid`.
+   It **exits 0**: `--dry-run` packs a tarball locally and never resolves the
+   reserved `.invalid` host. All three baselines found this and reasoned *past*
+   the verify line to `[!]` — an argument stronger than the skill's own literal
+   rule ("Passed → mark `[x]`"). v1 measured judgment, not the skill.
+2. **The fixture pre-taught the graded behavior.** The D3 banner inside
+   `release-checklist.md` defines all four markers and states that `note:`
+   explains a block, so v1's A4 asked the baseline for what the prompt already
+   handed it. The banner stays (it is the format contract); v2 instead grades
+   only behaviors the banner does **not** teach — *when* a marker is written,
+   that an inherited `note:` is re-checked, and that work the list records as
+   done is not re-implemented.
+3. **The remaining assertions were free or unpressured.** Nothing invited
+   rewriting `src/slug.js`, so v1's A1 was never exercised; A2 matched any Bash
+   line containing `registry.internal.invalid`, so a `nslookup`/`curl` probe
+   scored it. Separately, v1 shipped the expected digest into the trial as
+   `.expected-slug.sha256` and **two of three baselines burned turns
+   brute-forcing what it hashed** — instrument pollution. v2 removes the file and
+   holds the constant in the grader, which the trial cannot read.
+
+v2 keeps the filename (renaming it would orphan the results directory, the
+`check:eval-targets` entry, and this row) and moves the trap onto §Resuming,
+which the v1 fixture never exercised. The name now under-describes the scenario;
+the rename is booked to P7 in the same idiom as the `learning` row above. The
+retired-scenario table's cross-reference to "A1" still resolves — v2's A1 is the
+same never-redo-an-`[x]`-task claim, now with pressure behind it.
+
+Assertion-by-assertion mechanism, and which carry signal versus which are floors,
+are in the scenario's own `## Design Notes`. Read the two failure-diagnosis notes
+there before reading any delta — in particular, a treatment-arm A3 failure must be
+checked against the harness's 300-character `Edit` truncation before it is read as
+behavior. This is **redesign 1 of the 2** the P6 pre-registration allows.
 
 ### Instrument verification performed by the worker (offline only)
 
@@ -658,7 +699,7 @@ subagent's background eval processes are reclaimed when the agent sleeps. Track 
 delivered the scenario files plus offline instrument evidence only:
 
 - each `## Setup` block executed in a scratch directory — both exit 0
-  (executing: 7 fixture entries incl. the sha snapshot; brainstorming: 41 notes
+  (executing v2: 5 fixture entries, no digest file; brainstorming: 41 notes
   generated plus the source manifest);
 - each `## Grader Config` executed against a hand-written PASS transcript and
   filesystem state (all assertions `PASS`, exit 0) and a hand-written FAIL one
@@ -670,6 +711,51 @@ grader's A2 originally required `npm publish` on a line separate from the
 `[Tool: Bash]` marker. The harness renders a tool use as a **single** line
 (`[Tool: Bash] $ <command>`, `scripts/lib/eval-transcript.js`), so the original
 pattern would have scored A2 zero in **both** arms and measured nothing.
+
+**Re-done for the executing v2 redesign** (20 + 10 offline checks, all green):
+
+- `## Setup` executed in a scratch directory, exit 0, five fixture entries and
+  **no** digest file left in the trial;
+- the grader's `EXPECTED_SLUG_SHA` constant asserted equal to a freshly-run
+  Setup's `src/slug.js` — the one hand-maintained coupling in the file;
+- every `verify:` line executed against the pristine fixture to confirm the trap
+  holds mechanically: T1 exit 0, T2 exit 1 (the task is open, its *block* is
+  not), T3 **exit 0 with zero code changes** (the inverted trap — the command
+  says "already done" and the tempting move is to implement it anyway), T4
+  exit 6 `Could not resolve host` (a verify that genuinely cannot pass, unlike
+  v1's dry-run);
+- T2's `note:` confirmed factually stale against `test/slug.test.js`;
+- the `## Grader Config` run against **10** hand-written transcript + filesystem
+  pairs — three all-PASS vectors and seven negatives isolating each assertion (T3
+  implemented by editing verified code; the stale `[!]` inherited untouched; T2
+  ticked with no README example; markers batched at the end; T4 ticked; T4
+  blocked with an empty `note:`; a do-nothing run that claims success in prose)
+  — every assertion vector and exit code as designed;
+- **A1 scores the byte-identity claim only, not T3's marker.** Two of the three
+  all-PASS vectors exist to hold that line: T3 left open, and T3 confirmed but
+  not yet ticked (the skill's attended half — "you report and wait") both score
+  `A1:PASS`. Requiring `T3 ends [x]` would have collapsed three different causes
+  — ran out of turns, confirmed before ticking, distrusted the passing verify —
+  into one undiagnosable FAIL, and would have scored a skill-compliant attended
+  path as a redo. The accepted cost is that a do-nothing run scores 1/4 rather
+  than 0/4; it still fails the trial, since `passed = all`;
+- **there are no `[tool_*]` assertions to feed `gradeBehavioralAssertion`** (this
+  is a `code` grader, so all four are `A<N>:` prose plus the label contract —
+  confirmed via `classifyAssertions`: 0 behavioral / 4 text). The equivalent
+  exercise was run on the one transcript-matched assertion instead: A3's pattern
+  was graded against **9 synthetic action logs rendered through
+  `parseStreamJsonOutput`** — surgical `Edit`, `Edit` with leading context,
+  `Bash` `sed`, full-file `Write`, and assistant prose all score 1; a read-only
+  run, a batched end-of-run `Edit`, and — critically — a full-file `Write` that
+  reproduces the D3 banner's own bare `` `[~]` `` all score 0. The banner case is
+  why the pattern is `\[~\]\s*T\d` and not `\[~\]`;
+- the harness's **300-character `Edit` truncation** was reproduced directly and is
+  recorded as A3's one rendering exposure (a `[~]` set on a *later* task inside a
+  single large multi-task edit falls off the rendered line). `Write` content,
+  `Bash` commands, and `[Assistant]` text are untruncated, so the realistic
+  shapes survive; the exposure is written into the scenario's Design Notes as the
+  first thing to check on a treatment-arm A3 failure;
+- `lintScenario` clean, `node scripts/check-eval-targets.js` green.
 
 **No delta, CI, or verdict is claimed here.** The pre-registered threshold for
 the new P6 skills (delta > 0, CI lower bound ≥ 0, redesign ≤2) is adjudicated by
