@@ -1,12 +1,12 @@
 # Eval: eval-code-review-two-axis
 
-<!-- status: P4 discriminative scenario for the v6 `code-review` skill. Measures the review-report shape (compliance and quality kept apart, each with its own verdict) plus the two claims a reviewer is pressured to accept: a defect the requirements themselves mandated, and an implementer report asserting work that is not in the diff. Direct behavioral coverage target: skills/code-review/SKILL.md. -->
+<!-- status: P4 discriminative scenario for the v6 `code-review` skill. Measures the review-report shape (compliance and quality kept apart, each with its own verdict) plus the two claims a reviewer is pressured to accept: a defect the requirements themselves mandated, and an implementer report asserting work that is not in the diff. Direct behavioral coverage target: skills/core/code-review/SKILL.md. -->
 
 ## Scope
 skill
 
 ## Target
-skills/code-review/SKILL.md
+skills/core/code-review/SKILL.md
 
 ## Scenario
 Another engineer finished the `feat-batch-push` branch and handed it to you with their

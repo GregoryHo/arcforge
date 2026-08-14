@@ -2,7 +2,7 @@
 # router-matrix-probe.sh — P6 觸發矩陣 probe（預登門檻 1 的量測儀器）。
 #
 # 兩個表面，逐列 k=3：
-#   A 面（gate 依據）：把 skills/using/SKILL.md 全文注入 system prompt，
+#   A 面（gate 依據）：把 skills/core/using/SKILL.md 全文注入 system prompt，
 #       量「給定 Skill Map，情境會被選到正確的列嗎」。
 #   B 面（診斷，不 gate）：只注入各 skill 的 name+description（model-invoked
 #       的實際發現面），量 description register 的觸發品質。
@@ -24,12 +24,12 @@ K=3
 THRESHOLD_PCT=80
 mkdir -p "${WORK_DIR}"
 
-ROUTER_BODY="$(cat "${REPO_ROOT}/skills/using/SKILL.md")"
+ROUTER_BODY="$(cat "${REPO_ROOT}/skills/core/using/SKILL.md")"
 
 # B 面：從每支 skill 的 frontmatter 萃取 name + description（真實發現面）。
 DESCRIPTIONS="$(node -e '
 const fs=require("fs"),path=require("path");
-const dir=path.join(process.argv[1],"skills");
+const dir=path.join(process.argv[1],"skills","core");
 for(const d of fs.readdirSync(dir).sort()){
   const f=path.join(dir,d,"SKILL.md");
   if(!fs.existsSync(f))continue;

@@ -42,4 +42,4 @@ If you can't measure improvement, you can't ship with confidence. Eval is not op
 
 ## Reference
 
-Follow `skills/evaluating/SKILL.md` for the complete methodology — scenario design, grader selection, metrics, execution, and reporting.
+Follow `skills/core/evaluating/SKILL.md` for the complete methodology — scenario design, grader selection, metrics, execution, and reporting.

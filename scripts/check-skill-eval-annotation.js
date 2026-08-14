@@ -29,6 +29,11 @@ function hasEvidence(name, changed) {
   );
 }
 
+// Shipped skills live one bucket deep: `skills/<bucket>/<name>/SKILL.md` (P6.5).
+// The bucket is matched generically rather than pinned to `core`, so a skill
+// edited while parked in another bucket still gets the nudge.
+const SKILL_SPEC_RE = /^skills\/[^/]+\/([^/]+)\/SKILL\.md$/;
+
 /**
  * Pure core: from a changed-file list, return the skill names whose SKILL.md
  * changed without any matching eval/test/benchmark evidence in the same diff.
@@ -37,8 +42,9 @@ function hasEvidence(name, changed) {
  */
 function skillsNeedingEval(changed) {
   const names = changed
-    .filter((f) => /^skills\/[^/]+\/SKILL\.md$/.test(f))
-    .map((f) => f.split('/')[1]);
+    .map((f) => f.match(SKILL_SPEC_RE))
+    .filter(Boolean)
+    .map((m) => m[1]);
   return names.filter((name) => !hasEvidence(name, changed));
 }
 
@@ -58,9 +64,13 @@ function main() {
   }
 
   const flagged = skillsNeedingEval(changed);
+  // Annotate the file that actually changed — the bucket segment is part of the
+  // path GitHub needs to anchor the warning.
+  const specPath = (name) =>
+    changed.find((f) => (f.match(SKILL_SPEC_RE) || [])[1] === name) || `${name}/SKILL.md`;
   for (const name of flagged) {
     console.log(
-      `::warning file=skills/${name}/SKILL.md::SKILL.md changed without a matching eval/benchmark ` +
+      `::warning file=${specPath(name)}::SKILL.md changed without a matching eval/benchmark ` +
         `update. If this was a behavioral change, re-run the eval before shipping. ` +
         `Ignore for typo/metadata-only edits.`,
     );

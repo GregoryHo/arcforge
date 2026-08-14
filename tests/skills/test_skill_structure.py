@@ -25,7 +25,10 @@ import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SKILLS_DIR = PROJECT_ROOT / "skills"
+# Shipped skills live in the `core` lifecycle bucket (P6.5) — the one bucket
+# `.claude-plugin/plugin.json` whitelists. `in-progress/` and `deprecated/` are
+# on-disk holding areas that never load, so this schema does not govern them.
+SKILLS_DIR = PROJECT_ROOT / "skills" / "core"
 LEGACY_MANIFEST = PROJECT_ROOT / "docs" / "plans" / "v6" / "legacy-skills.json"
 ROUTER_MANIFEST = PROJECT_ROOT / "tests" / "router-skill.json"
 
@@ -54,6 +57,12 @@ LEGACY_BASELINE = 30
 
 # Sanity floor: guards against a broken glob silently passing the whole suite.
 MIN_SKILL_COUNT = 10
+
+# Exact expected count, pre-registered at the P6.5 bucket move. The floor above
+# catches a glob that broke to zero; this catches one that broke to "some". A
+# real change to the shipped skill set is a deliberate edit here, not a mystery
+# failure — update it in the same commit that adds or removes a skill.
+EXPECTED_SKILL_COUNT = 15
 
 # Permanent exceptions — per-skill overrides of the hard cap, keyed by skill name
 # and measured in BODY lines (frontmatter excluded). The table is EMPTY and is
@@ -127,9 +136,13 @@ _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 # Cross-skill deep links (schema §5.2): a path reaching into ANOTHER skill's
 # directory. Wanting another skill's files means wanting that skill, so the only
 # sanctioned pointer is a `/name` invocation. Matches both spellings the schema
-# names — `skills/<other>/...` and `../<other>/...` — and resolves the offender by
-# skill name, so a pointer at the skill's OWN directory is not a boundary crossing.
-_DEEP_LINK_PATTERN = re.compile(r"(?:\.\./|skills/)([a-z][a-z0-9-]*)/")
+# names — `skills/<bucket>/<other>/...` and `../<other>/...` — and resolves the
+# offender by skill name, so a pointer at the skill's OWN directory is not a
+# boundary crossing. The bucket segment (P6.5) is optional so the pre-bucket
+# spelling `skills/<other>/` is still caught rather than silently ignored.
+_DEEP_LINK_PATTERN = re.compile(
+    r"(?:\.\./|skills/(?:core/|in-progress/|deprecated/)?)([a-z][a-z0-9-]*)/"
+)
 
 # Claude Code builtin slash commands. Skill prose legitimately names these
 # (`/compact`, `/review`), and they are not skills. Filtered only when the token
@@ -432,7 +445,7 @@ def test_cross_reference_resolves(source, ref_type, target):
     """Every cross-skill pointer (legacy REQUIRED marker or v6 `/name`) resolves."""
     assert target in SKILL_NAMES, (
         f"{source} has {ref_type} reference to '{target}' "
-        f"but no skills/{target}/SKILL.md exists"
+        f"but no {SKILLS_DIR.name}/{target}/SKILL.md exists under {SKILLS_DIR}"
     )
 
 
@@ -490,6 +503,16 @@ def test_skill_scan_floor():
     assert len(SKILL_DIRS) > MIN_SKILL_COUNT, (
         f"discovered only {len(SKILL_DIRS)} skills under {SKILLS_DIR} "
         f"(floor {MIN_SKILL_COUNT}) — the discovery glob is probably broken"
+    )
+
+
+def test_skill_scan_matches_expected_count():
+    """The scan sees the whole shipped set — a glob that half-broke is still broken."""
+    assert len(SKILL_DIRS) == EXPECTED_SKILL_COUNT, (
+        f"discovered {len(SKILL_DIRS)} skills under {SKILLS_DIR}, expected "
+        f"{EXPECTED_SKILL_COUNT}: {sorted(d.name for d in SKILL_DIRS)} — either the "
+        f"discovery glob broke or the shipped skill set changed without updating "
+        f"EXPECTED_SKILL_COUNT in the same commit"
     )
 
 
@@ -615,6 +638,14 @@ def test_deep_link_violations_flag_other_skill_paths():
     """Both spellings the schema names are caught, by skill name (schema §5.2)."""
     text = "Read skills/tdd/references/examples.md and ../finishing/SKILL.md."
     assert _deep_link_violations(text, "writing-skills") == ["../finishing/", "skills/tdd/"]
+
+
+def test_deep_link_violations_see_through_the_bucket_segment():
+    """The canonical P6.5 spelling resolves to the skill, not to the bucket."""
+    text = "Read skills/core/tdd/references/examples.md."
+    assert _deep_link_violations(text, "writing-skills") == ["skills/core/tdd/"]
+    # ...and a pointer at the skill's OWN dir is still not a boundary crossing.
+    assert _deep_link_violations(text, "tdd") == []
 
 
 def test_deep_link_violations_allow_self_and_local_paths():

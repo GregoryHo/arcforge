@@ -16,7 +16,7 @@
 > record only.
 >
 > **Retargeted (P6, `## Version` 2 → 3): `skills/compacting/SKILL.md` →
-> `skills/sessions/SKILL.md`.** The two skills merged — one context-loss
+> `skills/core/sessions/SKILL.md`.** The two skills merged — one context-loss
 > lifecycle, one skill — and the compaction half now lives under
 > `## Compacting mid-session` in `sessions`. Nothing the scenario grades moved:
 > the persist-first ordering, the timing table, and the focus-line requirement
@@ -28,7 +28,7 @@
 skill
 
 ## Target
-skills/sessions/SKILL.md
+skills/core/sessions/SKILL.md
 
 ## Context
 A Node parser library. `TASKS.md` is the project's task list and the only place

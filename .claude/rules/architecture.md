@@ -37,8 +37,9 @@ layer. Never duplicate logic — import from the canonical location.
 
 A skill directory is a closed unit:
 
-- No file under `skills/<name>/` may `require` / `import` / `source` anything
-  outside its own skill directory. Not `scripts/lib/`, not a sibling skill.
+- No file under `skills/<bucket>/<name>/` may `require` / `import` / `source`
+  anything outside its own skill directory. Not `scripts/lib/`, not a sibling
+  skill.
 - Engine functionality is reached exactly one way: a **subprocess call to the
   bare `arcforge` CLI** (D9). Claude Code puts every loaded plugin's `bin/` on
   PATH, and `bin/arcforge` is the shim. That is the black-box boundary.
@@ -107,7 +108,7 @@ split to maintain, and no second packaging target.
 ```
 scripts/          # CLI (scripts/cli.js) and core engine (scripts/lib/)
 hooks/            # Claude Code event hooks
-skills/           # Self-contained skill definitions
+skills/core/      # Self-contained skill definitions (the one bucket that ships)
 tests/            # Contributor test suites
 evals/            # Behavioral eval corpus
 docs/             # Guides, design docs, plans
@@ -130,8 +131,8 @@ Treat anything here as read-only legacy; do not extend it.
 **Grandfather list — `docs/plans/v6/legacy-skills.json` is the single source of
 truth.** New enforcement (frozen frontmatter schema, D1 self-containment, naming)
 exempts the skills listed there and applies in full to every skill not listed.
-A **ratchet** test asserts each entry still exists as `skills/<name>/`: when a
-legacy skill is deleted or rewritten, prune its entry in the **same commit**.
+A **ratchet** test asserts each entry still exists as `skills/core/<name>/`: when
+a legacy skill is deleted or rewritten, prune its entry in the **same commit**.
 The list must be empty by the end of P6. Never add an entry to it.
 
 Plan: `docs/plans/v6/PLAN.md`. Progress: `docs/plans/v6/progress.md`.

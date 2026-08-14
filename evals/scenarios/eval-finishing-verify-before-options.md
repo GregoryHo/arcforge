@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/finishing/SKILL.md
+skills/core/finishing/SKILL.md
 
 ## Context
 A small JavaScript package. The current branch is `feat-slugify`, the base branch is `main`, and the suite runs with `npm test`. The repository has no remote.

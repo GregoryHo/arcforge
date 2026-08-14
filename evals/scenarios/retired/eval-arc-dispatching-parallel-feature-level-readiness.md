@@ -6,7 +6,7 @@
 subject no longer exists. A1 requires the response to reach for `parallel --features`
 / `cli.js parallel` to compute readiness — that command was removed in P2 with the
 coordinator engine and is absent from cli-manifest.js; the Setup fixture is a
-`specs/demo/dag.yaml`, also removed in P2. Retargeting to skills/dispatching/SKILL.md
+`specs/demo/dag.yaml`, also removed in P2. Retargeting to skills/core/dispatching/SKILL.md
 would have shipped a scenario whose signal is structurally impossible, so it is
 retired rather than retargeted. Pre-existing defects, unchanged: A4 flaky across two
 k=5 reps (see the draft-unvalidated note below), and preflight recorded baseline at

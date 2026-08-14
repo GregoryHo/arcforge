@@ -40,11 +40,11 @@ here as a design violation, not a broken test:
 
 | Guard | Runner |
 |---|---|
-| **D1** — no file under `skills/<name>/` requires/imports/sources outside its own directory; skill prose doesn't name `scripts/lib/` or `ARCFORGE_ROOT` | jest (`tests/scripts/`) |
-| **D8** — `scripts/**` and `hooks/**` don't reference `skills/`, except an explicit allowlist that must only ever shrink | jest (`tests/scripts/`) |
+| **D1** — no file under `skills/<bucket>/<name>/` requires/imports/sources outside its own directory; skill prose doesn't name `scripts/lib/` or `ARCFORGE_ROOT` | jest (`tests/scripts/`) |
+| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`, except an explicit allowlist that must only ever shrink. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
 | **Router bijection** — every shipped skill appears in the router table and every router row resolves to a shipped skill | jest (`tests/scripts/`) |
 | **Task-list schema (D3)** — the markdown checkbox format parses; malformed samples are rejected | jest (`tests/scripts/`) |
-| **Frozen frontmatter schema** + **legacy ratchet** — every entry in `docs/plans/v6/legacy-skills.json` still exists as `skills/<name>/` | pytest (`tests/skills/`) |
+| **Frozen frontmatter schema** + **legacy ratchet** — every entry in `docs/plans/v6/legacy-skills.json` still exists as `skills/core/<name>/` | pytest (`tests/skills/`) |
 
 New enforcement exempts the skills listed in `legacy-skills.json` and applies in
 full to everything else. When you delete or rewrite a legacy skill, prune its
@@ -73,7 +73,8 @@ commit. Lowering the floor requires a written reason in the same commit.
 ## pytest Tests (`tests/skills/`)
 
 - Requires Python 3 + `pip install pytest pyyaml`
-- Generic checker: `test_skill_structure.py` iterates every `skills/*/SKILL.md`
+- Generic checker: `test_skill_structure.py` iterates every `skills/core/*/SKILL.md`
+  and asserts an exact count, so a half-broken glob fails instead of passing quietly
 - Validates the frozen frontmatter schema, `name` == dirname, sections,
   references, and the line budget
 

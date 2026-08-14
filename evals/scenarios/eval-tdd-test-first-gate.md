@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/tdd/SKILL.md
+skills/core/tdd/SKILL.md
 
 ## Context
 A small JavaScript package. Tests live in `test/` and the suite runs with `npm test`.

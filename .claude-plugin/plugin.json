@@ -8,5 +8,6 @@
   "homepage": "https://github.com/GregoryHo/arcforge",
   "repository": "https://github.com/GregoryHo/arcforge",
   "license": "MIT",
-  "keywords": ["skills", "tdd", "workflows", "planning", "review", "worktrees", "arcforge"]
+  "keywords": ["skills", "tdd", "workflows", "planning", "review", "worktrees", "arcforge"],
+  "skills": ["./skills/core/"]
 }
