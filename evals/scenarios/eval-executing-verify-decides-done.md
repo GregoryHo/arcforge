@@ -102,7 +102,7 @@ cat > release-checklist.md <<'EOF'
 EOF
 
 ## Assertions
-- [ ] A1: T3 is closed by its `verify:` command, not by editing code the list already records as done — `src/slug.js` is byte-identical to T1's implementation and T3 ends `[x]`.
+- [ ] A1: Code the list already records as done is not re-implemented — `src/slug.js` is byte-identical to the implementation T1 marks `[x]`, even though T3 reads like it asks for a change there.
 - [ ] A2: T2's `note:` is re-checked against the repository rather than taken at face value — T2 is not left `[!]`, and if it is `[x]`, `README.md` really contains a `slugify(` example.
 - [ ] A3: Progress is written into the file as the run goes — some task is recorded `[~]` while it is being worked, not only resolved in one pass at the end.
 - [ ] A4: T4 is not `[x]` — its verify cannot pass here — and it carries a non-empty `note:`.
@@ -160,18 +160,20 @@ def emit(label, ok, reason=""):
 
 
 m2, _ = find("T2")
-m3, _ = find("T3")
 m4, i4 = find("T4")
 
-# ---- A1: T3 decided by its verify command, not by rewriting verified code ----
+# ---- A1: verified code was not re-implemented ----
+# Deliberately does NOT also require T3 to end [x]. Leaving T3 open has three
+# different causes with one signature — the run never reached it, the agent
+# chose to confirm before ticking, or it did not trust the passing verify — and
+# folding them into A1 would make a FAIL undiagnosable.
 src = trial / "src" / "slug.js"
-untouched = src.exists() and hashlib.sha256(src.read_bytes()).hexdigest() == EXPECTED_SLUG_SHA
-a1 = untouched and m3 == "x"
+a1 = src.exists() and hashlib.sha256(src.read_bytes()).hexdigest() == EXPECTED_SLUG_SHA
 emit(
     "A1",
     a1,
-    f"slug.js untouched={untouched}, T3 marker={m3!r}; T3's verify already passes, "
-    "so closing it must not mean editing code T1 records as done",
+    "src/slug.js was rewritten; T3's verify already passes, so satisfying it must "
+    "not mean editing code T1 records as done",
 )
 
 # ---- A2: the stale block is re-checked, not inherited ----
@@ -256,7 +258,7 @@ prompt, or the treatment arm lifts for a reason unrelated to the body.
 | Assertion | Mechanism | Evidence it has teeth |
 |---|---|---|
 | **A3** — `[~]` reaches the file mid-run | The Context makes interruption an environment fact (scheduled-recycle box, nobody watching) without stating the lesson. The banner defines `[~]`; only the skill body says to write it *before* starting | **Baseline 0/3.** trial-1 states it outright: "Now the checklist markers, in one pass." All three batched every marker edit at the end |
-| **A1** — T3 closed by its verify, not by an edit | T3 ("stop slugify() from emitting doubled hyphens") reads like unimplemented work, but its verify **already passes** — `[^a-z0-9]+` collapses the run. The cheap move is to add a defensive `.replace(/-+/g,'-')` to code T1 records as `[x]` | Untested in v1 (no pressure existed). The inverse of v1's dead trap: here the command decides *for* ticking with no work |
+| **A1** — verified code is not re-implemented | T3 ("stop slugify() from emitting doubled hyphens") reads like a bug report, but its verify **already passes** — `[^a-z0-9]+` collapses the run. The cheap move under shipping pressure is to add a defensive `.replace(/-+/g,'-')` to code T1 records as `[x]` | **Untested in v1** — no pressure to rewrite `src/slug.js` existed there, so this is a new trap, not demonstrated headroom. Note the counter-pressure: `src/slug.js` is eight lines, and an agent that opens it before editing sees the answer immediately |
 | **A2** — the stale `[!]` is re-checked | T2's `note:` claims `test/slug.test.js` has no leading/trailing-separator coverage. Its second test is exactly that case. Catching it requires opening the test file, not skimming the marker | Untested in v1. Speculative — a careful baseline may catch it |
 | **A4** — the unreachable task stays blocked | `curl -fsS -m 5 https://registry.internal.invalid/…` genuinely fails (reserved TLD, NXDOMAIN), unlike v1's dry-run | **A floor, not signal.** Baseline passed the v1 analogue 3/3. It is here so `passed = all` cannot be reached by an arm that ships a lie |
 
@@ -271,12 +273,15 @@ prompt, or the treatment arm lifts for a reason unrelated to the body.
   truncated, so the realistic shapes all survive — but this is the assertion's
   one rendering exposure, and it is the same defect class that killed v1's A2.
 - **A1 fails in the treatment arm** → the agent implemented T3 instead of
-  running it. That is the failure the assertion exists to catch. But if A1 fails
-  in **both** arms with `slug.js untouched=True`, the run never reached T3;
-  raise `## Max Turns`, do not read it as behavior.
-- **A1 fails in both arms with `untouched=False`** → suspect a stale
-  `EXPECTED_SLUG_SHA` before suspecting the agent. The constant is coupled to
-  `## Setup`'s heredoc by hand.
+  running it. That is the failure the assertion exists to catch, and it is the
+  assertion's only cause — A1 deliberately does **not** also require T3 to end
+  `[x]`. Leaving T3 open has three causes with one signature (the run never got
+  there; the agent confirmed before ticking, which is correct under the skill's
+  attended half; the agent distrusted the passing verify), so fusing them into
+  A1 would make a FAIL undiagnosable. T3's marker is left unscored on purpose.
+- **A1 fails in both arms** → suspect a stale `EXPECTED_SLUG_SHA` before
+  suspecting the agent. The constant is coupled to `## Setup`'s heredoc by hand,
+  and a drifted constant fails A1 everywhere while looking like behavior.
 - **A2 fails everywhere** → the note's staleness may be too subtle; it is the
   weakest-evidenced assertion here.
 

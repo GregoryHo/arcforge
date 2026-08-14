@@ -528,7 +528,7 @@ deletion. Same for `eval-sessionstart-minimal-bootstrap`.
 | Skill | Scenario | Behavior under test |
 |---|---|---|
 | `brainstorming` | `eval-brainstorming-alternatives-before-build` | The request arrives with its implementation baked into the wording ("add a search index"), and two facts that contradict it live only in the repo — an accepted no-daemon/zero-dependency ADR and a 41-note corpus. Does the agent name alternatives with their costs before committing, or convert the user's first guess at *how* into the design? |
-| `executing` | `eval-executing-verify-decides-done` | **v2 (redesigned after a measured v1 ceiling — see below).** Resuming a run that stopped mid-flight. Graded: a task whose `verify:` already passes is closed by running it rather than by editing code the list records as done, an inherited `[!]` note that is no longer true does not survive the resume, in-progress state reaches the file while the work happens, and the one genuinely unreachable task stays blocked with a reason. |
+| `executing` | `eval-executing-verify-decides-done` | **v2 (redesigned after a measured v1 ceiling — see below).** Resuming a run that stopped mid-flight. Graded: code the list already records as done is not re-implemented even though an open task reads like it asks for a change there, an inherited `[!]` note that is no longer true does not survive the resume, in-progress state reaches the file while the work happens, and the one genuinely unreachable task stays blocked with a reason. |
 
 Both are `scope: skill` with a `code` grader — every assertion is either a
 filesystem fact in the trial directory or a tool call in the transcript, so
@@ -621,7 +621,7 @@ grader's A2 originally required `npm publish` on a line separate from the
 (`[Tool: Bash] $ <command>`, `scripts/lib/eval-transcript.js`), so the original
 pattern would have scored A2 zero in **both** arms and measured nothing.
 
-**Re-done for the executing v2 redesign** (19 + 10 offline checks, all green):
+**Re-done for the executing v2 redesign** (20 + 10 offline checks, all green):
 
 - `## Setup` executed in a scratch directory, exit 0, five fixture entries and
   **no** digest file left in the trial;
@@ -634,12 +634,20 @@ pattern would have scored A2 zero in **both** arms and measured nothing.
   exit 6 `Could not resolve host` (a verify that genuinely cannot pass, unlike
   v1's dry-run);
 - T2's `note:` confirmed factually stale against `test/slug.test.js`;
-- the `## Grader Config` run against **9** hand-written transcript + filesystem
-  pairs — one all-PASS and eight negatives isolating each assertion (T3
-  implemented by editing verified code; T3 left open; the stale `[!]` inherited
-  untouched; T2 ticked with no README example; markers batched at the end; T4
-  ticked; T4 blocked with an empty `note:`; a do-nothing run that claims success
-  in prose) — every assertion vector and exit code as designed;
+- the `## Grader Config` run against **10** hand-written transcript + filesystem
+  pairs — three all-PASS vectors and seven negatives isolating each assertion (T3
+  implemented by editing verified code; the stale `[!]` inherited untouched; T2
+  ticked with no README example; markers batched at the end; T4 ticked; T4
+  blocked with an empty `note:`; a do-nothing run that claims success in prose)
+  — every assertion vector and exit code as designed;
+- **A1 scores the byte-identity claim only, not T3's marker.** Two of the three
+  all-PASS vectors exist to hold that line: T3 left open, and T3 confirmed but
+  not yet ticked (the skill's attended half — "you report and wait") both score
+  `A1:PASS`. Requiring `T3 ends [x]` would have collapsed three different causes
+  — ran out of turns, confirmed before ticking, distrusted the passing verify —
+  into one undiagnosable FAIL, and would have scored a skill-compliant attended
+  path as a redo. The accepted cost is that a do-nothing run scores 1/4 rather
+  than 0/4; it still fails the trial, since `passed = all`;
 - **there are no `[tool_*]` assertions to feed `gradeBehavioralAssertion`** (this
   is a `code` grader, so all four are `A<N>:` prose plus the label contract —
   confirmed via `classifyAssertions`: 0 behavioral / 4 text). The equivalent
