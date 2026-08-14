@@ -1,6 +1,6 @@
 ---
 name: arc-dispatching-teammates
-description: Run epic-level parallel work via agent teammates while staying present to monitor. Use when 2+ epics are ready and you want a live team; for walk-away loops use arc-looping, for feature fan-out use arc-dispatching-parallel.
+description: Run epic-level parallel work via agent teammates while staying present to monitor. Use when 2+ epics are ready and you want a live team; for walk-away loops use looping, for feature fan-out use arc-dispatching-parallel.
 category: orchestration
 status: promoted
 ---
@@ -13,18 +13,18 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 
 **Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't pre-identify conflicts — let runtime handle runtime.
 
-**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `arc-looping` (walk-away) or `arc-executing-tasks` (attended) for multi-epic work instead.
+**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `looping` (walk-away) or `arc-executing-tasks` (attended) for multi-epic work instead.
 
 ## When to Use
 
 | Condition | Route to |
 |---|---|
 | 2+ ready epics, lead staying present ("I'll watch", "step in if needed") | **arc-dispatching-teammates** (this skill) |
-| 2+ ready epics, lead walking away ("overnight", "going to bed") | arc-looping |
+| 2+ ready epics, lead walking away ("overnight", "going to bed") | looping |
 | 1 ready epic | arc-using-worktrees + arc-executing-tasks |
 | Feature-level parallelism inside one worktree | arc-dispatching-parallel |
 
-**The boundary vs arc-looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still arc-looping.
+**The boundary vs looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still looping.
 
 **REQUIRED BACKGROUND:** arc-using — call it if routing context is needed.
 
@@ -36,7 +36,7 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 4. **Lead is in project root**, not a worktree. Move to base worktree if `.arcforge-epic` is in cwd.
 5. **On a dev branch, not `main`/`master`.** Teammates merge back to the lead's branch. If on `main`/`master`, create one first: `git switch -c dispatch/<spec-id>-$(date +%Y-%m-%d)`. If the user named a branch, or the lead is already off the default, use that — never override an explicit choice.
 
-Precondition failure = hard fail. Do not silently fall back to arc-looping or manual juggling.
+Precondition failure = hard fail. Do not silently fall back to looping or manual juggling.
 
 ## Core Workflow
 
@@ -91,7 +91,7 @@ Rationalizations observed in baseline testing. If you catch yourself saying any 
 
 - **"You become the coordinator, just open N Claude windows and tab between them."** Papering over the gap. With this skill, the lead session *is* the coordinator via teammates — the user does not juggle windows.
 - **"Agent teammates are a generic Claude Code feature, not an arcforge pattern."** They are an arcforge pattern now. Don't bucket them as external.
-- **"I'll use arc-looping since it handles dag parallelism."** arc-looping is walk-away. Re-read the user's attendance signal.
+- **"I'll use looping since it handles dag parallelism."** looping is walk-away. Re-read the user's attendance signal.
 - **"`arc-dispatching-parallel` already covers this."** No — that skill is feature-level inside one worktree. This is epic-level across worktrees.
 - **"Let me spawn 8 teammates since there are 8 ready epics."** Cap at 5. Queue the rest. Continuous dispatch.
 - **"Worktrees already exist, so I'll just dispatch."** Fine — skip the expand step for epics whose worktree is non-null. Do not re-expand.
@@ -130,7 +130,7 @@ Each accepted epic MUST show subagent evidence (both acceptance subagents PASS).
 ⚠️ Teammate dispatch: blocked
 - Issue: <precondition that failed, e.g. only 1 ready epic, Agent team_name unsupported>
 - Checked: <exact command or tool invocation>
-- Action: <remediation — e.g. enable teammates, or fall back to arc-looping>
+- Action: <remediation — e.g. enable teammates, or fall back to looping>
 ```
 
 ## After This Skill

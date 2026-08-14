@@ -39,6 +39,7 @@
 | `learning` | **user-invoked** | P5 重新推導維持預填值，但依據與預填不同。預填說的是「控制面＝使用者的決定」；重推導後真正的依據是**自動化已經不在 skill 這一層**：diary 草稿由 PreCompact/Stop hook 自動產生，observation→candidate 由 daemon＋curator 自動跑完。skill 手上只剩下**人要拍板的那一半**——要不要留這篇 diary、三篇算不算 pattern、這條 instinct 該不該存、要不要啟用。這半邊照定義不該由 agent 自己伸手。<br><br>第二個依據：這個子系統**預設關閉**。做成 model-invoked，等於在每一輪無關對話上收 cognitive load，去評估一個多數使用者根本沒開的功能——成本天天付，觸發條件多半不成立。<br><br>反向檢查（推翻預填的機會）：hook 確實會在 diary 草稿就緒／反思到期時發 nudge，看似「條件在任務中途出現、agent 該自己接手」。但 nudge 的存在正好是 user-invoked 的證據而非反證——系統已經把這件事建模成「提示人、等人決定」。既然如此，nudge 措辭本次一併從「叫模型去 invoke」改為「告訴使用者可以執行」（`hooks/session-tracker/inject-context.js`），讓載體與類別一致。<br><br>連帶效果：這是第二支 user-invoked skill，清掉 P3 掛帳的 §3.1／§5.2 mutation 重跑（見 `p5-absorption-learning.md` §5）。 |
 | `evaluating` | model-invoked | P5 重新推導維持預填值，但理由換成**不對稱失敗**（預填只寫「條件在任務中途成立」，那對 user-invoked 也成立，不構成判準）：觸發條件是「有一組數字回來了、有人正要從它讀出一個結論」。記得喊 `/evaluating` 的那次，通常本來就會謹慎看區間；忘記喊的那次正是最該被攔的那次——delta 是正的、期限在逼、treatment 綠了。**考慮過並否決 user-invoked**：`learning` 與 `looping` 之所以是 user-invoked，是因為它們動使用者的環境或花使用者的錢，agent 自行啟動等於自我授權。`evaluating` 兩者皆非——它只判斷一個**已經在場**的主張，不寫入任何使用者狀態、不啟動無人值守迴圈；沒有需要被 gate 的授權，就沒有理由要求使用者先知道答案。 |
 | `diagramming-obsidian` | model-invoked | P5 重新推導維持預填值：觸發條件是「這件事講不清楚，需要一張圖」——它在解釋途中冒出來，而且最常由 agent 先察覺（`maintaining-obsidian` 的 Visuals 步驟走到 Q4 就是這個時點）。要求使用者先打 `/diagramming-obsidian` 等於要求他在還沒看到解釋之前就決定需要圖。**另有結構性約束**：本支是 `maintaining-obsidian` 的 prose 委派 target，依 schema §3.1，user-invoked 不可被 prose-invoke——落地為 user-invoked 會使那條委派非法，只能改成叫使用者手動轉場，而委派發生的時點（ingest 途中）使用者不在場。判準與守衛在此指向同一結論。 |
+| `looping` | **user-invoked** | P6 重新推導維持預填值。判準問「agent 該不該自己伸手去拿」，本支是 v6 少數兩件事同時成立的 skill：它**花使用者的錢**（每輪一個 `claude -p` session，`--max-cost` 預設無上限），並且**在沒有人看的情況下改碼與 commit**。agent 自行啟動無人值守迴圈＝自己批准自己不受監督。這條界線 P5 的 `evaluating` 已經畫過——那支之所以是 model-invoked，正是因為它兩者皆非。<br><br>反向檢查（推翻預填的機會）：觸發條件「使用者要走開、手上有一份清單」確實在任務中途成立，這在別處是 model-invoked 的理由。但失敗方向不對稱：忘記啟動的代價是使用者隔天再打一次；自行啟動的代價是一夜無監督的花費與 commit。預填值成立。<br><br>連帶效果：第三支 user-invoked skill；`/looping` 只出現在 router 的 Skill Map 索引列（標注 `(user-invoked)`），依 §3.1 任何其他 skill 的內文都不得寫它。吸收對照：`p6-absorption-looping-sessions.md`。 |
 | `maintaining-obsidian` | model-invoked | P5 重新推導維持預填值：觸發語句是「這個存一下」「我筆記裡對 X 有寫什麼」——說出這句話的人腦中沒有任何指令名，他甚至不必知道 vault 系統存在。要求先打 `/maintaining-obsidian` 等於要求使用者先知道答案（與 `using` 同構的失敗）。反向也成立：query 模式存在的目的是攔下「用通識回答一個該由 vault 回答的問題」，而那個誤答正是 agent 自己在任務中途做出的選擇，使用者看不到、無從呼叫。**附帶約束**：本支的 Visuals 步驟以 prose 呼叫 `/diagramming-obsidian`，依 schema §3.1 該 target 必須是 model-invoked——兩支同為 model-invoked 才使這條委派合法。 |
 
 ## 預填（P4–P6，**非約束**）
@@ -55,7 +56,6 @@ phase 必須用同一句判準重新推導一次，並在該 phase 的 PR 更新
 | `task-list` | P6 | model-invoked | 條件是「工作大到需要一份清單」，在拆解當下成立。 |
 | `executing` | P6 | model-invoked | 條件是「已有一份清單待執行」。 |
 | `dispatching` | P6 | model-invoked | 條件是「工作可平行且已具備平行前提」。 |
-| `looping` | P6 | **user-invoked** | 無人值守迴圈會在使用者離席時持續花錢與改碼；自行啟動等於自己批准自己不受監督。 |
 | `worktrees` | P6 | model-invoked | 條件是「需要隔離的工作區」，在動手前成立。 |
 
 ## 已知張力（P6 收斂時必須處理）

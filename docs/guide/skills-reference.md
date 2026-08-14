@@ -8,7 +8,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
   - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-finishing](#arc-finishing)
-  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [arc-looping](#arc-looping) · [arc-using-worktrees](#arc-using-worktrees)
+  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [arc-dispatching-parallel](#arc-dispatching-parallel) · [arc-dispatching-teammates](#arc-dispatching-teammates) · [looping](#looping) · [arc-using-worktrees](#arc-using-worktrees)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
@@ -21,7 +21,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 
 arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `arc-dispatching-teammates`, `evaluating`, and `learning`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `looping`, `arc-dispatching-teammates`, `evaluating`, and `learning`.
 
 **Core skills every user should learn first:**
 
@@ -67,7 +67,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | Category | Skills | Purpose |
 |----------|--------|---------|
 | **SDD** | arc-brainstorming, arc-writing-tasks, arc-executing-tasks, arc-finishing | Explore, specify, build, integrate |
-| **Orchestration** | arc-agent-driven, arc-dispatching-parallel, arc-dispatching-teammates, arc-looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
+| **Orchestration** | arc-agent-driven, arc-dispatching-parallel, arc-dispatching-teammates, looping, arc-using-worktrees | Dispatch subagents; manage worktrees and loop state |
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
@@ -239,9 +239,9 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 **Platform:** Claude Code only — requires the agent teammates feature (Claude Code 2.1.32+) and the Agent tool's `team_name`/`name` parameters. Other platforms have no equivalent multi-worker coordination substrate.
 
-**Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between single-epic interactive work and `arc-looping` (multi-epic unattended).
+**Purpose:** Dispatch one Claude Code agent teammate per ready epic so the lead session stays in control while multiple epics progress in parallel. Fills the gap between single-epic interactive work and `looping` (multi-epic unattended).
 
-**When to use:** When 2+ epics are ready and you stay present to monitor a live team. For walk-away loops use arc-looping; for feature fan-out use arc-dispatching-parallel.
+**When to use:** When 2+ epics are ready and you stay present to monitor a live team. For walk-away loops use looping; for feature fan-out use arc-dispatching-parallel.
 
 **Key workflow:**
 1. Verify preconditions: 2+ ready epics, Agent tool supports `team_name`, lead in project root (not inside a worktree)
@@ -262,26 +262,28 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 ---
 
-### arc-looping
+### looping
+
+_(user-invoked — run `/looping`; the model never loads it on its own.)_
 
 **Platform:** Claude Code only — spawns fresh sessions via `claude -p` subprocess. Other platforms have no equivalent invocation mechanism (yet).
 
-**Purpose:** Run arcforge workflows autonomously across sessions — each iteration spawns a fresh Claude session while DAG and git persist state.
+**Purpose:** Work a markdown checkbox task list unattended — one task per iteration, each in a fresh session, with the list and git carrying every bit of state between them.
 
-**When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
+**When to use:** When you are handing a verified task list to a loop and walking away. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
 
 **Key workflow:**
-1. Verify the task list exists (from arc-writing-tasks) and baseline tests pass
-2. Set bounds: `--max-runs` and optional `--max-cost`
-3. Start loop: `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 20`
-4. Each iteration: read the task list, spawn fresh Claude session, execute task, mark it done
-6. Stop on: all complete, max-runs hit, cost limit, stall detected, or retry storm
+1. Verify the task list parses, every task carries a `verify:` line (or the run supplies `--verify-cmd`), and the suite is green now
+2. Set both ceilings: `--max-runs` and `--max-cost`
+3. Pre-authorize and detach: `arcforge loop --tasks tasks.md --max-runs 20 --max-cost 15 --permission-mode acceptEdits --allowed-tools "Bash,Edit,Write,Read"`
+4. Each iteration: read the list, spawn a fresh session, run the acceptance floor, mark the task done or blocked
+5. Stop on: all complete, max-runs hit, cost limit, stall detected, retry storm, or a task failing after its retry
 
 **Artifacts:**
-- Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
+- Input: a markdown checkbox task list (`--tasks`, required — the loop's only task source)
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
-**Related:** arc-writing-tasks --> **arc-looping** --> arc-finishing
+**Related:** a task list --> **looping** --> `/code-review` --> `/finishing`
 
 ---
 

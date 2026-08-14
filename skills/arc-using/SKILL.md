@@ -44,7 +44,7 @@ When multiple skills could apply, choose the smallest useful one:
 
 1. **Clarify intent** — `arc-brainstorming` when requirements or decisions are unclear.
 2. **Write down the work** — `arc-writing-tasks` when the change is clear enough to break into tasks.
-3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `arc-dispatching-teammates`, or `arc-looping` based on task-list/worktree context.
+3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `arc-dispatching-teammates`, or `looping` based on task-list/worktree context.
 4. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
 
 Examples:

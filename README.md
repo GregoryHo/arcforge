@@ -115,7 +115,7 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 - **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
 - **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
 - **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
-- **arc-looping** - Autonomous unattended cross-session task-list execution
+- **looping** _(user-invoked)_ - Hand a task list to an unattended loop that keeps working across fresh sessions (`/looping`)
 - **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout)
 
 ### Discipline (quality gates)

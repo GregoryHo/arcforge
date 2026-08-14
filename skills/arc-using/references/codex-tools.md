@@ -20,7 +20,7 @@ multi_agent = true
 
 This enables `spawn_agent`, `wait_agent`, and `close_agent` — the mechanism the
 skills that dispatch subagents rely on (`arc-agent-driven`,
-`arc-dispatching-parallel`, `arc-executing-tasks`, `arc-looping`). When a skill
+`arc-dispatching-parallel`, `arc-executing-tasks`, `looping`). When a skill
 says "dispatch one implementer/reviewer per task", spawn one agent per role and
 close each agent once it has finished all its work. If `multi_agent` is not
 enabled, do not fabricate agent calls — execute the roles sequentially in the
