@@ -16,7 +16,7 @@
 - [x] P3 meta skill + 2 pilots + 最小 eval 迴路 — gate: PASS (2026-08-01, PR #138, tag gate-p3)
 - [x] P4 紀律叢集 — gate: PASS (2026-08-13, PR #139, tag gate-p4；首次 FAIL→補救→再驗)
 - [x] P5 保留系統叢集（D1/D8 驗證場）— gate: PASS (2026-08-14, PR #140, tag gate-p5；首驗 FAIL→補救→再驗 PASS)
-- [ ] P6 workflow 叢集 + router 收斂
+- [x] P6 workflow 叢集 + router 收斂 — gate: PASS (2026-08-15, PR #141, tag gate-p6；verifier PASS 附 6 項補救全兌現)
 - [ ] P6.5 bucket 落地（spike PASS → 執行）
 - [ ] P7 eval 語料庫重建 + 全量 benchmark
 - [ ] P8 文件、規範、發版 → v6.0.0-rc
@@ -147,6 +147,77 @@
 - **掛帳 P7（儀器，本 gate 產出）**：harness 強制隔離（`--append-system-prompt` 是勸告不是沙箱）；位置相關 `model_grader_failed`（兩環境重現）；learning scenario 改名；maintaining A1 重寫；evaluating skill 存廢重估（天花板證據在案）；**subagent 背景 eval 程序隨 agent 睡眠被回收——長時量測必須由常駐 session 執行**（本 phase 兩次死池的根因）。
 - **掛帳 P7/P8（出貨面缺陷，來自被捨棄的逃逸 diff 的真發現）**：`diagramming-obsidian/references/render_template.html` 未 pin 的 esm.sh import 在 runtime 因傳遞相依 `@braintree/sanitize-url@6.0.2` 404 而掛住 module load；`@excalidraw/excalidraw@0.18.0` 經該 trial 實測可載入。不採納未審查寫入；修復須自帶驗證重做。
 - **掛帳 P6/P7**：dashboard 不呈現 `rejections.jsonl`（curator 提案被退對使用者不可見）。
+
+## P6 任務（全數完成，PR #141，三路 worker + 3 redesign worker + orchestrator 量測）
+
+**合併裁決（P6 權限，invocation-table 18 支 vs AC ≤15 的缺口收束）**：P6 落 4 支——
+`brainstorming`、`executing`（吸收 arc-writing-tasks 的 D3 使用面 + arc-executing-tasks +
+arc-agent-driven，含在場/走開開關）、`dispatching`（吸收 parallel + teammates +
+arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（user-invoked）；
+另 `compacting` 併入 `sessions`（context 生命週期同域，−1）。終局出貨 = **15 dirs**。
+
+**預登記行為門檻**（開跑前寫死，禁事後定義）：
+
+1. **router 觸發矩陣**：全部 14 支非 router skill 各 ≥1 情境列（prompt 不得引用 skill 名稱
+   或 description 措辭）；headless 無 Skill tool → 文字斷言（回應指名正確 skill）；
+   每列 k=3、列命中 = ≥2/3；**總命中率 ≥ 80%**。低於門檻 → 不進 P7，回 description 調整。
+2. **looping e2e（binary）**：`arcforge loop --tasks <fixture>` 對 D3 清單完成 ≥2 輪迭代並在
+   stop condition 正確停止；檔案面證據（loop state / 任務勾選）。
+3. **新四支 scenario**：各 ≥1，delta > 0 且 CI 下界 ≥ 0；redesign ≤2 仍不達 → 依 P5 逃生條款
+   如實記錄，不得調門檻。
+4. **sessions⊕compacting 合併再驗**：兩支既有 scenario 對合併後 skill 重跑——compacting
+   non-reg PASS 維持、sessions delta ≥ 0（非退化）。合併失敗（任一退化）→ fallback 維持
+   兩支分立並如實記 16 dirs 偏離。
+5. **回歸**：P3–P5 未動 skill 以不變性論證；動到的（sessions/compacting/using）以實測覆蓋。
+6. **量測執行紀律（P5 教訓，約束性）**：所有 preflight/ab/compare 與 e2e probe 由 orchestrator
+   主 session 執行；worker 只交付 scenario 與 instrument（subagent 背景 eval 程序隨 agent
+   睡眠被回收）。
+
+任務：
+
+- [x] Track A — `brainstorming` + `executing`（L）：吸收 arc-brainstorming(242)/arc-writing-tasks(109)/
+  arc-executing-tasks(137)/arc-agent-driven(135+agents)；SDD 殘影（specs/、dag、refiner 鏈）不得帶入；
+  刪 4 legacy dirs + json 同 commit 剪 4；router 兩列；+2 scenario；吸收對照檔
+- [x] Track B — `dispatching`（M）：吸收 dispatching-parallel(107)/teammates(140)/using-worktrees(103)；
+  worktree 操作一律 bare `arcforge worktree ...`；刪 3 + 剪 3；router 一列；+1 scenario；吸收對照檔
+- [x] Track C — `looping`（M，user-invoked）+ sessions⊕compacting 合併：looping 接 loop CLI 殼層、
+  loop e2e fixture+probe 腳本（orchestrator 執行）；compacting(66) 併入 sessions 後刪 skills/compacting；
+  ROUTER_SKILL 單一來源（jest+pytest 雙處硬編收斂）；刪 arc-looping + 剪 1；router 列調整；+1 scenario
+- [x] Orchestrator — arc-using 刪除 + json 剪 1（同 commit）；router 最終收斂（14 列 + tdd/finishing/
+  debugging 重疊優先序註記）；eval-arc-using-* 兩支 scenario 處置；觸發矩陣 probe 撰寫與執行；
+  全部量測執行；11 支 legacy-targeting scenario 處置後 check:eval-targets 綠
+- [x] 機械 AC（gate step 1）：`ls -d skills/*/ | wc -l` == 15；legacy-skills.json == []（P6 清空承諾
+  兌現）；router bijection 14 列 ↔ 15 支；npm test 5 runner + 5 check 全綠；arc-finishing dangling
+  隨 legacy 刪除消滅（`git grep arc-finishing -- skills/` 歸零）
+- [x] gate 五步（機械→行為→verifier→進度/tag `gate-p6`→使用者確認）
+
+### P6 gate 備註
+
+- **verifier PASS（一次過），附 6 項 tag 前補救——全數兌現**：coverage 檔不實宣稱更正（sessions 的
+  「首次成功 A/B」為假——`20260813-023618` 是乾淨的 pre-merge run，更正為「前後數字全同 0.96→1.00」
+  的更強非退化論證）；invocation-table 張力節結案（18→15）；**router 優先序註記補上並重量測**
+  （P5 掛帳兌現：`skills/using` 增 Precedence 段 + 矩陣加重疊態第 16 列 → A 面 **16/16 = 100%**，
+  出貨物與量測物重新對齊）；讀法校正（looping 合池為達標必要條件、sessions 以 post-merge
+  +0.234 CI[0.13,0.34] 為主述）；verifier 報告入庫（`p6-gate-verifier-report.md`）。
+- **行為門檻結果（約束性措辭）**：矩陣 A 面 100%（verifier 自寫腳本全額重跑 45 trial，嚴格計分同值；
+  註記後重量測 16/16）；loop e2e PASS（verifier 親跑 ×2）；`brainstorming` **+0.50 CI[0.24,0.76]**、
+  `looping` **+0.19 CI[0.07,0.31]**（合池承重）、`sessions` **+0.234 CI[0.13,0.34]**（post-merge 單看）、
+  `compacting` non-reg PASS；`dispatching`、`executing` **unmet-but-covered**——各經兩次量測 + redesign
+  （dispatching 1/2 依預登診斷止步、executing 2/2 用罄且鑑別器 baseline 非平穩 40%→90%），treatment
+  合計 20/20 滿分但無穩定區分，與 `evaluating` 同族（天花板家族），skill 價值重估掛 P7。
+- **偏離 a–h 八項全獲接受**，其中兩項結果決定性經時序覆核：dispatching 止步（診斷早於量測 10 分鐘）、
+  looping 合池（兩 run 之間無 commit 觸及 skill/scenario）。executing 的 preflight 重擲獲個案接受但
+  **通則須寫死**（對 gate 的 optional stopping 風險）。
+- **儀器修正（本 phase）**：trial timeout 600→900s（brainstorming 2/5 baseline 遭削斷仍計分——
+  P4 缺陷 A 同類第三例）；preflight 實測為 k=3 固定（worker 的 defaultK 宣稱被證偽）。
+- **掛帳 P7（verifier 覆核後定版）**：preflight 重擲政策寫死（k=3 隨機閘 + optional stopping）；
+  grader void 根因（looping 1 筆、sessions 舊 run 5 筆 gradeError）；900s 天花板複審（300→600→900
+  連抬兩次本身是訊號）；天花板家族（dispatching/executing/evaluating）skill 價值重估；
+  description register 的 tdd/debugging 邊界（矩陣 B 面 `/debugging` 1/3 被 `/tdd` 吸走，A 面 3/3）；
+  scenario 檔名帶舊 skill 名的整體重建。
+- **P5 移交事項處置**：router 重疊優先序 ✅（本 gate 補救）；ROUTER_SKILL 單一來源 ✅（mutation ×4 驗證）；
+  「subagent 長時量測必由常駐 session 執行」✅（門檻 6 全程遵守，trialDir 全在主 repo）；
+  dashboard rejections.jsonl 呈現 → 續掛 P7。
 
 ## 偏離紀錄
 

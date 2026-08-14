@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-using/SKILL.md
+skills/using/SKILL.md
 
 ## Scenario
 You are in a tiny npm package. ArcForge skills and workflows such as planning, TDD, implementation, and SDD may be available, but this is a simple question.
@@ -129,4 +129,4 @@ PY
 5
 
 ## Version
-1
+2

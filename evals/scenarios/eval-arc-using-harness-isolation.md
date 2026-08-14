@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-using/SKILL.md
+skills/using/SKILL.md
 
 ## Scenario
 You are acting as an eval grader inside an isolated harness.
@@ -160,4 +160,4 @@ PY
 5
 
 ## Version
-1
+2

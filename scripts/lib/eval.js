@@ -198,12 +198,14 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
     cwd: trialDir,
-    // 600s: skills whose process dispatches a fresh subagent (code-review,
-    // dispatching successors) structurally exceed the old 300s ceiling — four
-    // of five P4 two-axis treatment trials were SIGTERM'd mid-report and their
-    // half transcripts scored as real behavior. Raising the ceiling is an
+    // 900s: same instrument-fix lineage as the 300s→600s raise below. P6's
+    // brainstorming scenario (a design conversation, baseline avg 472s) had
+    // 2/5 baseline trials ETIMEDOUT at the 600s ceiling and their partial
+    // transcripts scored as real behavior — the exact defect class P4 recorded
+    // (killed AND incomplete must not score). Raising the ceiling is an
     // instrument fix, not a rubric change (scenario hashes unaffected).
-    timeout: 600000,
+    // P4 history: 300s clipped four of five two-axis treatment trials.
+    timeout: 900000,
     maxBuffer: CLAUDE_MAX_BUFFER,
     // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
     // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to

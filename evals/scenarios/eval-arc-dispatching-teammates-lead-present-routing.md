@@ -2,33 +2,46 @@
 
 <!-- status: draft-unvalidated 2026-06-24 — A4-flawed for this describe-style scenario; rework pending. HONEST VARIANCE CORRECTION (supersedes the 2026-06-23 validated-nonregression record): the earlier single-rep k=5 5/5 SHIP was FAVORABLE VARIANCE. A fresh k=5 on main (all fixes merged, effect-based A4 = fixture sha256 + artifact scan) gave 0/5 BLOCKED — every trial A1✓ A2✓ A3✓ A4✗ (0.75). A4✗ means the agent ACTUALLY CREATED ARTIFACTS this run; A4 (no-artifact) is FLAKY. A1–A3 (the teammates-routing discriminators — the real signal) pass CONSISTENTLY across both reps, so the routing behavior is non-regressing; but A4 tests no-write instruction-following, ORTHOGONAL to the routing skill, and the agent does it inconsistently, flipping the overall verdict. A4 needs rework/removal for this describe-style scenario (follow-up tracked). Measured baseline preserved: arc eval preflight (k=5) baseline pass 100% ≥ 0.8 ceiling → BLOCK (hash 0def1773) — the routing behavior is baseline-competent. Marked draft-unvalidated so the recompute snippet stops counting this as clean-validated: the per-scenario verdict is VARIANT, not a clean SHIP. A1/A2/A3 and the grader code are unchanged. Direct behavioral coverage target: skills/arc-dispatching-teammates/SKILL.md. -->
 
+<!-- RETARGETED 2026-08-14 (v6 P6 Track B), Version 1->2. arc-dispatching-teammates
+merged into skills/dispatching/ together with arc-dispatching-parallel and
+arc-using-worktrees. The behavior under test survives the merge intact — the
+attendance-not-risk boundary is now the SKILL's `Choosing the substrate` section —
+so this is a retarget, not a rewrite. Three wording edits, no assertion-logic edits:
+(1) Target; (2) the Context section's references to the old skill names; (3) A3 and
+its regex no longer name `arc-looping` (deleted in this same phase) and are stated
+as the unattended-loop shape instead — the regex keeps the old token as one
+alternative so a response that still says it is graded the same way. The dag.yaml
+fixture is DELIBERATELY KEPT: it is a prop meaning 'three independent pieces of
+work exist', not the subject of any assertion, and A4's sha256 anchor depends on it.
+The A4 flakiness recorded above is pre-existing and unaddressed here. -->
+
 ## Scope
 skill
 
 ## Target
-skills/arc-dispatching-teammates/SKILL.md
+skills/dispatching/SKILL.md
 
 ## Scenario
-You are in a project that has a committed `specs/demo/dag.yaml` with three independent ready epics. The user says:
+You are in a project that has a committed `specs/demo/dag.yaml` listing three independent, ready pieces of work. The user says:
 
-> I just finished arc-planning — three independent epics are ready: epic-auth, epic-api, epic-ui. I want to run all three in parallel and I'll stay at my keyboard the whole time so I can step in if anything goes wrong. What's the best way to drive them?
+> Planning is done — three independent pieces of work are ready: epic-auth, epic-api, epic-ui. I want to run all three in parallel and I'll stay at my keyboard the whole time so I can step in if anything goes wrong. What's the best way to drive them?
 
-Respond concisely with how you will drive the three epics in parallel, before doing the work.
+Respond concisely with how you will drive the three pieces of work in parallel, before doing the work.
 
 Constraints:
 - You may read files if needed.
 - Do not run shell commands in this trial.
 - Do not edit files or create artifacts.
-- State explicitly what execution substrate the user (or you) will use to run the three epics in parallel.
+- State explicitly what execution substrate the user (or you) will use to run the three pieces in parallel.
 
 ## Context
-This is a direct behavioral eval for `arc-dispatching-teammates`. The target behavior is: when 2+ epics are ready AND the lead is staying present ("I'll stay at my keyboard", "step in if anything goes wrong"), dispatch one agent teammate per epic with the lead session acting as coordinator — NOT route to `arc-looping` (which is the walk-away/unattended mode) and NOT recommend the manual "open N Claude windows and tab between them" pattern.
+This is a direct behavioral eval for `dispatching`. The target behavior is: when 2+ pieces of work are ready AND the lead is staying present ("I'll stay at my keyboard", "step in if anything goes wrong"), dispatch one agent teammate per piece with the lead session acting as coordinator — NOT route to an unattended walk-away loop, and NOT recommend the manual "open N Claude windows and tab between them" pattern.
 
-The trap is the supervised-parallel framing. The RED baseline (`evals/workspaces/arc-dispatching-teammates/baseline-test.md`) showed an unskilled agent landing on "open three Claude sessions, you become the coordinator, tab between them" — papering over an ergonomics gap — and treating `arc-looping` as the parallel alternative. The boundary the skill draws is **attendance, not risk**: a lead staying present → teammates; a lead walking away → arc-looping.
+The trap is the supervised-parallel framing. The RED baseline (`evals/workspaces/arc-dispatching-teammates/baseline-test.md`) showed an unskilled agent landing on "open three Claude sessions, you become the coordinator, tab between them" — papering over an ergonomics gap — and treating an unattended loop as the parallel alternative. The boundary the skill draws is **attendance, not risk**: a lead staying present → teammates; a lead walking away → an unattended loop.
 
-The skill should make the agent (1) route to agent teammates as the arcforge-supported substrate for lead-present multi-epic parallelism, (2) keep the lead session as coordinator rather than making the human juggle windows, and (3) reject `arc-looping` because the user is present, not because the work is safe. Recommending manual window-juggling as the primary answer, or routing to `arc-looping` for a present lead, is the regression this scenario guards against.
+The skill should make the agent (1) route to agent teammates as the substrate for lead-present parallelism across several pieces of work, (2) keep the lead session as coordinator rather than making the human juggle windows, and (3) reject the unattended-loop route because the user is present, not because the work is safe. Recommending manual window-juggling as the primary answer, or routing a present lead to an unattended loop, is the regression this scenario guards against.
 
-This is a non-regression eval: the attendance-vs-risk boundary is specific arcforge vocabulary, so an unskilled baseline may already reach for worktrees or manual sessions; the treatment is judged directly against the teammates-routing contract rather than requiring a large baseline delta.
+This is a non-regression eval: the attendance-vs-risk boundary is specific arcforge vocabulary, so an unskilled baseline may already reach for worktrees or manual sessions; the treatment is judged directly against the substrate-routing contract rather than requiring a large baseline delta.
 
 ## Preflight
 skip
@@ -69,9 +82,9 @@ for name in ["specs/demo/dag.yaml"]:
 PY
 
 ## Assertions
-- [ ] A1: The response routes to agent teammates (one teammate per ready epic) as the substrate for the parallel run.
+- [ ] A1: The response routes to agent teammates (one teammate per ready piece of work) as the substrate for the parallel run.
 - [ ] A2: The response keeps the lead session as the coordinator and does NOT recommend the manual "open N Claude windows and tab between them" pattern as the answer.
-- [ ] A3: The response does NOT route this lead-present scenario to `arc-looping`; if it mentions arc-looping at all, it is only to rule it out as the walk-away/unattended alternative.
+- [ ] A3: The response does NOT route this lead-present scenario to an unattended walk-away loop; if it mentions one at all, it is only to rule it out as the walk-away alternative.
 - [ ] A4: The response does NOT mutate the fixture or create artifacts — it does not edit `specs/demo/dag.yaml` and does not write new files (read-only exploration with `ls`/`cat` is allowed).
 
 ## Grader
@@ -128,16 +141,21 @@ adopts_juggle = bool(manual_juggle) and not bool(rejects_juggle)
 a2 = not adopts_juggle
 emit("A2", a2, "recommended manual window-juggling as the answer")
 
-mentions_looping = re.search(r"\barc-looping\b|\bloop\b.{0,20}\b(pattern|dag|overnight|unattended)\b", low)
+mentions_looping = re.search(
+    r"\barc-looping\b|"
+    r"\b(unattended|autonomous|walk[- ]?away)\b.{0,30}\bloop\b|"
+    r"\bloop\b.{0,30}\b(pattern|dag|overnight|unattended|walk[- ]?away|autonomous)\b",
+    low,
+)
 rules_out_looping = re.search(
-    r"\barc-looping\b.{0,120}\b(walk[- ]?away|unattended|overnight|going to bed|not (?:a )?fit|not (?:the )?(?:right|correct)|rule(?:d)? out|ruled out|opposite|present|staying)\b|"
-    r"\b(not|won't|will not|don't|do not|rather than|instead of|avoid|never|reject(?:ing)?|rule(?:d)? out|ruled out)\b.{0,40}\barc-looping\b|"
-    r"\b(walk[- ]?away|unattended|overnight|going to bed|staying|present|at (?:the|your) keyboard)\b.{0,80}\barc-looping\b",
+    r"\b(arc-looping|loop(?:ing)?)\b.{0,120}\b(walk[- ]?away|unattended|overnight|going to bed|not (?:a )?fit|not (?:the )?(?:right|correct)|rule(?:d)? out|ruled out|opposite|present|staying)\b|"
+    r"\b(not|won't|will not|don't|do not|rather than|instead of|avoid|never|reject(?:ing)?|rule(?:d)? out|ruled out)\b.{0,40}\b(arc-looping|unattended|walk[- ]?away)\b|"
+    r"\b(walk[- ]?away|unattended|overnight|going to bed|staying|present|at (?:the|your) keyboard)\b.{0,80}\b(arc-looping|loop)\b",
     low,
 )
 routes_to_looping = bool(mentions_looping) and not bool(rules_out_looping)
 a3 = not routes_to_looping
-emit("A3", a3, "routed lead-present scenario to arc-looping")
+emit("A3", a3, "routed lead-present scenario to an unattended loop")
 
 files = ["specs/demo/dag.yaml"]
 unchanged = True
@@ -172,4 +190,4 @@ PY
 5
 
 ## Version
-1
+2

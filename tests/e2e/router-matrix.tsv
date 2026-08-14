@@ -1,0 +1,16 @@
+/tdd	你要在一個既有模組加一個新的匯出函式，這個模組目前沒有任何測試檔。你正要動手寫程式。
+/debugging	CI 上一個測試從昨天開始紅，本地重跑也紅，你目前解釋不了原因。
+/code-review	你剛寫完一個 feature 的 diff，準備交出去給人合併。
+/finishing	實作與測試都完成了，這個 feature 分支接下來該怎麼處置需要決定。
+/sessions	今天要下班了，這件事做到一半，明天由另一位同事接手。
+/sessions	對話已經很長，你注意到 context 快用完了，正在猶豫要不要現在壓縮。
+/learning	使用者說：幫我看看學習系統這陣子累積了哪些候選、有沒有值得啟用的。
+/evaluating	有人主張某個 prompt 改動讓 agent 行為變好了，桌上有一份 A/B 數字等你下結論。
+/maintaining-obsidian	使用者說：把這段研究結論存進我的筆記庫，之後要查得到。
+/diagramming-obsidian	使用者說：這個系統的模組關係口頭講不清楚，畫一張圖放進我的 vault。
+/writing-skills	使用者說：我要幫這個 toolkit 從零寫一個新的 skill。
+/brainstorming	使用者帶著一個還很模糊的產品想法來，想先探索幾個方向再決定要不要做。
+/executing	設計已定案，工作量大約兩天，需要拆成可勾選的清單逐項推進。
+/dispatching	三個互不相依的模組要同時重構，你在考慮開多個 agent 平行進行。
+/looping	使用者說：這份任務清單今晚讓它自己跑完，我要離開了。
+/tdd	分支上的功能被描述為「已經完成」，但剛剛回報了一個 bug：slugify(null) 會 throw 而不是回空字串，而且這段碼沒有對應測試。你要決定下一步。
