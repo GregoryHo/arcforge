@@ -7,10 +7,10 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Quick Start](#quick-start)
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
-  - SDD: [brainstorming](#brainstorming) · [executing](#executing) · [arc-finishing](#arc-finishing)
+  - SDD: [brainstorming](#brainstorming) · [executing](#executing) · [finishing](#finishing)
   - Orchestration: [dispatching](#dispatching) · [looping](#looping)
-  - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
-  - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
+  - Discipline: [tdd](#tdd) · [debugging](#debugging) · [code-review](#code-review) · [code-review](#code-review)
+  - Memory: [learning](#learning) · [sessions](#sessions) · [sessions](#sessions)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
   - Meta: [using](#using) · [writing-skills](#writing-skills) · [evaluating](#evaluating)
 - [Workflow Patterns](#workflow-patterns)
@@ -21,7 +21,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 
 arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skills are structured workflow guides that add discipline when useful while preserving direct answers, read-only inspection, and harness/eval isolation when workflow would be overhead.
 
-> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `arc-looping`, `evaluating`, and `learning`.
+> **Platform support**: Core workflow, worktree, and quality skills work on both platforms. A handful of skills are currently Claude Code-only because they integrate with platform-specific features (session transcripts, subprocess spawning, tool-call logs, agent teammates). Look for **Platform:** markers in each skill's entry below. Today the Claude Code-only skills are: `looping`, `evaluating`, and `learning`.
 
 **Core skills every user should learn first:**
 
@@ -29,8 +29,8 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 2. **brainstorming** — Design exploration when intent is unclear
 3. **executing** — Break approved work into an executable task list
 4. **tdd** — Test-driven implementation discipline
-5. **arc-debugging** — Systematic root cause investigation
-6. **arc-verifying** — Fresh evidence before completion claims
+5. **debugging** — Systematic root cause investigation
+6. **code-review** — Fresh evidence before completion claims
 7. **evaluating** — Measure whether skills and workflows change behavior
 
 **What are you trying to do?**
@@ -66,10 +66,10 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
-| **SDD** | brainstorming, executing, arc-finishing | Explore, specify, build, integrate |
+| **SDD** | brainstorming, executing, finishing | Explore, specify, build, integrate |
 | **Orchestration** | dispatching, looping | Dispatch subagents; manage worktrees and loop state |
-| **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
-| **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
+| **Discipline** | tdd, debugging, code-review, code-review | Condition-triggered quality gates |
+| **Memory** | learning _(user-invoked)_, sessions, sessions | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
 | **Meta** | using, writing-skills _(user-invoked)_, evaluating | Route, evaluate, and maintain the catalog itself |
 
@@ -139,11 +139,11 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 **Artifacts:**
 - Input/output: the task list file (markdown checkboxes) — no second ledger
 
-**Related:** brainstorming --> **executing** --> arc-finishing
+**Related:** brainstorming --> **executing** --> finishing
 
 ---
 
-### arc-finishing
+### finishing
 
 **Purpose:** Guide completion of development work with structured options. One skill, two paths — Step 0 discriminates on `.arcforge-epic`: an **epic path** (coordinator integration + DAG updates for marker'd worktrees) and a **non-epic path** (plain git for regular branches and generic worktrees).
 
@@ -160,7 +160,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 - Input: completed branch or worktree with passing tests
 - Output: merged code/epic, PR, preserved branch, or discarded work
 
-**Related:** executing --> **arc-finishing** --> done
+**Related:** executing --> **finishing** --> done
 
 ---
 
@@ -206,7 +206,7 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 
 **Purpose:** Work a markdown checkbox task list unattended — one task per iteration, each in a fresh session, with the list and git carrying every bit of state between them.
 
-**When to use:** When you are handing a verified task list to a loop and walking away. For a present lead monitoring epic teammates, use arc-dispatching-teammates.
+**When to use:** When you are handing a verified task list to a loop and walking away. For a present lead monitoring epic teammates, use dispatching.
 
 **Key workflow:**
 1. Verify the task list parses, every task carries a `verify:` line (or the run supplies `--verify-cmd`), and the suite is green now
@@ -245,11 +245,11 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: feature spec or bug report
 - Output: test file + implementation, both committed
 
-**Related:** executing --> **tdd** (during execution) --> arc-verifying
+**Related:** executing --> **tdd** (during execution) --> code-review
 
 ---
 
-### arc-debugging
+### debugging
 
 **Purpose:** Systematic root cause investigation using a four-phase scientific method.
 
@@ -266,11 +266,11 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: bug report, test failure, or unexpected behavior
 - Output: root cause identified, failing test, verified fix
 
-**Related:** any failure --> **arc-debugging** --> tdd --> arc-verifying
+**Related:** any failure --> **debugging** --> tdd --> code-review
 
 ---
 
-### arc-verifying
+### code-review
 
 **Purpose:** Evidence-first verification mindset — no completion claims without fresh verification evidence.
 
@@ -287,11 +287,11 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: any completion claim
 - Output: verified status with evidence (test output, build output, etc.)
 
-**Related:** embedded in all skills as a mindset, especially arc-finishing, tdd
+**Related:** embedded in all skills as a mindset, especially finishing, tdd
 
 ---
 
-### arc-reviewing
+### code-review
 
 **Purpose:** Request code review with faithful context, then process the feedback with technical rigor — one request→receive loop.
 
@@ -308,7 +308,7 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: completed task with commits, review feedback
 - Output: verified fixes or reasoned pushback
 
-**Related:** executing --> **arc-reviewing** --> continue or arc-verifying
+**Related:** executing --> **code-review** --> continue or code-review
 
 ---
 
@@ -341,7 +341,7 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 
 ---
 
-### arc-managing-sessions
+### sessions
 
 **Platform:** Claude Code only — uses Claude Code's session IDs, transcript format, and the `~/.arcforge/sessions/` directory layout.
 
@@ -357,11 +357,11 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: current session data from `~/.arcforge/sessions/{project}/{date}/{sessionId}.json`
 - Output: handovers print inline by default (optional `handover-{slug}.md` if asked); archive snapshots write `~/.arcforge/sessions/{project}/{date}/session-{alias}.md`, `aliases.json`
 
-**Related:** any skill --> **arc-managing-sessions** (when continuity is needed)
+**Related:** any skill --> **sessions** (when continuity is needed)
 
 ---
 
-### arc-compacting
+### sessions
 
 **Purpose:** Guide compaction decisions at logical workflow boundaries instead of letting auto-compaction fire mid-task.
 
@@ -378,7 +378,7 @@ _(user-invoked — run `/looping`; the model never loads it on its own.)_
 - Input: session context, rule files, memory files
 - Output: compacted context focused on next phase
 
-**Related:** compact-suggester hook --> **arc-compacting** --> executing
+**Related:** compact-suggester hook --> **sessions** --> executing
 
 ---
 
@@ -580,7 +580,7 @@ These principles keep ArcForge disciplined without making every task follow the 
 1. **Smallest Useful Workflow** — use direct answers for simple/read-only tasks; route only when a skill adds leverage
 2. **Explore Before Committing to Design** — brainstorming: research existing patterns before proposing new
 3. **No Guidance Without an Observed Failure** — writing-skills: a no-guidance control comes before any behavior-shaping text
-4. **No Fix Without Hypothesis** — arc-debugging: Observe, Hypothesize, Test, Fix cycle
-5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
-6. **Verify Before Implementing Review Feedback** — arc-reviewing: technical rigor, not performative agreement
+4. **No Fix Without Hypothesis** — debugging: Observe, Hypothesize, Test, Fix cycle
+5. **No Completion Claim Without Evidence** — code-review: evidence-first verification
+6. **Verify Before Implementing Review Feedback** — code-review: technical rigor, not performative agreement
 7. **File Artifacts = Truth** — Don't rely on session memory; resume from file artifacts

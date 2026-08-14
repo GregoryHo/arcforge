@@ -58,7 +58,7 @@ Check that commands appear:
 # /arcforge:executing - Write a checkbox task list and run it
 ```
 
-Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:using` for routing help.
+Every skill is directly invocable by name — `/arcforge:<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:using` for routing help.
 
 ## Quick Start: Common Commands
 
@@ -132,7 +132,7 @@ The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and
 
 ### Meta (operates on the catalog itself)
 
-- **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
+- **using** - Bounded router: maps task conditions to the smallest useful skill or workflow
 - **evaluating** - Measure whether an instruction, skill, or workflow changes agent behavior
 - **writing-skills** _(user-invoked)_ - Author an arcforge skill: invocation, description, guidance form, evidence
 
