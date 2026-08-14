@@ -1,6 +1,6 @@
 # arcforge Skills Reference
 
-This is the offline reference for all 24 arcforge skills. In a live session, **`arc-using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
+This is the offline reference for all 24 arcforge skills. In a live session, **`using` is the canonical router** — invoke it when you want arcforge to map your situation to a skill; use this document when you want to read about skills in depth.
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
-  - Meta: [arc-using](#arc-using) · [writing-skills](#writing-skills) · [evaluating](#evaluating)
+  - Meta: [using](#using) · [writing-skills](#writing-skills) · [evaluating](#evaluating)
 - [Workflow Patterns](#workflow-patterns)
 - [Comparison Tables](#comparison-tables)
 - [Operating Principles](#operating-principles)
@@ -25,7 +25,7 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 
 **Core skills every user should learn first:**
 
-1. **arc-using** — Bounded router and skill index for ArcForge tasks
+1. **using** — Bounded router and skill index for ArcForge tasks
 2. **arc-brainstorming** — Design exploration when intent is unclear
 3. **arc-writing-tasks** — Break approved work into an executable task list
 4. **tdd** — Test-driven implementation discipline
@@ -46,7 +46,7 @@ What are you trying to do?
 |   +-- debugging --> tdd --> /code-review
 |
 +-- Understand the system?
-|   +-- arc-using (when routing help is useful)
+|   +-- using (when routing help is useful)
 |
 +-- Improve workflow?
     +-- learning (user-invoked)
@@ -71,7 +71,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
-| **Meta** | arc-using, writing-skills _(user-invoked)_, evaluating | Route, evaluate, and maintain the catalog itself |
+| **Meta** | using, writing-skills _(user-invoked)_, evaluating | Route, evaluate, and maintain the catalog itself |
 
 **How skills flow through a project:**
 
@@ -529,7 +529,7 @@ Rule in `skills/using/SKILL.md`.
 
 ---
 
-### arc-using
+### using
 
 **Purpose:** Bounded router and skill index for ArcForge tasks — helps choose the smallest useful workflow without becoming a global policy layer.
 
@@ -546,7 +546,7 @@ Rule in `skills/using/SKILL.md`.
 - Input: user request that benefits from routing
 - Output: selected skill(s) or direct continuation when routing is unnecessary
 
-**Related:** optional session bootstrap --> **arc-using** --> any applicable skill, or direct task execution
+**Related:** optional session bootstrap --> **using** --> any applicable skill, or direct task execution
 
 ---
 
