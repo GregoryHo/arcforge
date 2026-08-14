@@ -371,3 +371,80 @@ recomputed from the raw JSONLs by the gate verifier before cleanup.
 
 Gate-level recording is in the P5 notes in `docs/plans/v6/progress.md`, which this
 worker does not edit.
+
+## v6 P6 — Track B (`dispatching`)
+
+`dispatching` replaced `arc-dispatching-parallel` + `arc-dispatching-teammates` +
+`arc-using-worktrees`. Three rows change.
+
+| Scenario | Target | Disposition |
+|---|---|---|
+| `eval-dispatching-report-not-evidence` | `skills/dispatching/SKILL.md` | **NEW** — Step 4: a completion report is a claim, and a green suite is not compliance |
+| `eval-arc-dispatching-teammates-lead-present-routing` | `skills/dispatching/SKILL.md` | **RETARGETED**, `## Version` 1 → 2 — the attendance-not-risk boundary survives the merge in §Choosing the substrate |
+| `eval-arc-dispatching-parallel-feature-level-readiness` | — | **RETIRED** → `evals/scenarios/retired/` |
+
+### Why the parallel scenario was retired rather than retargeted
+
+Its discriminating assertion A1 requires the response to compute readiness with
+`parallel --features` / `cli.js parallel`. That command was removed in P2 with the
+coordinator engine and is absent from `cli-manifest.js`; the fixture it grades
+against is a `specs/demo/dag.yaml`, removed in the same phase. Retargeting would
+have shipped a scenario whose signal is structurally impossible to produce, which
+is worse than having no scenario — it reads as coverage in the recompute snippet
+while measuring nothing. Its pre-existing defects (A4 flaky across two k=5 reps,
+preflight baseline at 100% ceiling → BLOCK) are recorded in the file's own header
+and were not the deciding factor. The behavior it aimed at — the independence gate
+before parallel dispatch — is carried by the two rows above.
+
+### Retarget scope (teammates scenario)
+
+Wording only; no assertion logic changed. Target line; the Context section's
+references to the old skill names; the prompt's mention of a deleted v5 skill; and
+A3, which no longer names `arc-looping` (deleted in this same phase) but states the
+unattended-loop shape instead. **The A3 regex keeps `arc-looping` as one
+alternative**, so a response that still uses the old token grades identically. The
+`dag.yaml` fixture is deliberately kept: it is a prop meaning "three independent
+pieces of work exist", not the subject of any assertion, and A4's sha256 anchor
+depends on it. The A4 flakiness documented in that file's header is pre-existing
+and untouched here.
+
+### Offline instrument validation (no measurement)
+
+Per the P6 pre-registered execution rule (threshold 6, binding), this worker
+delivers scenarios and instrument only; **all preflight / ab / compare runs are
+the orchestrator's**. No `claude` process was spawned. What was verified offline:
+
+**New scenario — fixture.** `Setup` extracted through `parseScenario` and executed
+in a scratch dir: exit 0, three branches created. The trap's three properties hold
+mechanically:
+
+- `git diff --stat main..work-retry` → `src/queue.js | 1 +`, `test/retry.test.js | 13 +++++` — the misleading surface looks like the work the note describes.
+- `git grep retryLimit work-retry -- src/ test/` → written once in `src/queue.js:10`, read only by its own two tests. Nothing in `runNext` re-runs a failed job.
+- Octopus-merging all three branches and running the suite → **8 passing, 0 failing, exit 0**. The green suite is genuinely uninformative about the claim.
+
+**New scenario — assertions.** Both `[tool_*]` lines confirmed to classify as
+**behavioral**, not to fall through silently into the LLM-judged text bucket
+(`classifyAssertions` → 2 behavioral / 4 text; operators `tool_not_called` and
+`tool_called`). Graded against synthetic action logs via
+`gradeBehavioralAssertion`, 15/15 as designed:
+
+- B1 (`work-retry` must not reach `main`) scores 0 on direct merge, octopus merge, a chained `&&` one-liner, `--no-ff` with a message, `cherry-pick`, and `rebase`; scores 1 when only the two sound branches are merged. The `(?!-base)` guard is exercised: a `git merge-base main work-retry` probe does **not** trip it.
+- B2 (repository actually inspected) scores 1 on `diff`/`show`/`log`/`switch`/`checkout` and 0 on a notes-only path and on `git status`/`git branch` alone.
+
+**Retargeted scenario — grader.** The changed A3 regex was run against four
+synthetic transcripts on the real fixture: new wording ruling out an unattended
+loop → A3 1; old `arc-looping` wording ruling it out → A3 1 (backward compatible);
+routing a present lead to an autonomous loop → A3 0; window-juggling → A2 0. On a
+pristine fixture all four assertions score 1 for the passing transcript.
+
+**Static lint.** `lintScenario` clean on both files. `node
+scripts/check-eval-targets.js` green after the retirement move, which also
+confirms `listScenarios()` does not recurse into `retired/`.
+
+**No delta exists for either scenario.** Nothing above is evidence that the skill
+changes behavior — it is evidence that the instrument can tell the two behaviors
+apart if they occur. The pre-registered P6 threshold (delta > 0 with CI lower
+bound ≥ 0) is unmet-and-unmeasured until the orchestrator runs it.
+
+Gate-level recording is in the P6 notes in `docs/plans/v6/progress.md`, which this
+worker does not edit.
