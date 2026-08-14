@@ -35,7 +35,7 @@ The structural fix is to delegate the two checks to subagents with
 no prior conversation history has no way to rationalize — it reads
 the spec, locates the code, runs the test, and reports. The lead's
 job is to READ the reports and decide, not execute the checks. This
-matches arcforge's existing pattern in `arc-agent-driven`, which
+matches arcforge's existing per-task review pattern, which
 delegates every task's review to a fresh task-reviewer subagent
 precisely because inline review produces rationalizations.
 

@@ -5,7 +5,7 @@ SKILL.md references this file — do not duplicate the template there.
 
 ## Why the Authority section exists
 
-A terse spawn prompt (`"cd to X, invoke /arc-agent-driven, SendMessage on
+A terse spawn prompt (`"cd to X, invoke /executing, SendMessage on
 completion"`) is not enough: without an explicit grant of autonomous
 end-to-end execution authority, a teammate can stop after an early phase
 and wait for the lead to dispatch the next one.
@@ -41,7 +41,7 @@ You are teammate worker-<epic-id> implementing epic <epic-id> from spec <spec-id
 You are the sole implementer of epic <epic-id>. You have full authority
 to execute all phases of this epic autonomously (from Phase 0 through
 finishing) without per-phase approval from the lead. Run the arcforge
-execution workflow end-to-end via `/arc-agent-driven`. Work through TDD
+execution workflow end-to-end via `/executing`. Work through TDD
 red/green/refactor cycles, verify, and finish the epic yourself.
 
 You do NOT need the lead to dispatch individual features or phases, and
@@ -66,7 +66,7 @@ lead does not need or want them.
 ## Your Workspace
 
 1. cd to <absolute-worktree-path>
-2. Invoke `/arc-agent-driven` to execute epic <epic-id> end-to-end.
+2. Invoke `/executing` to execute epic <epic-id> end-to-end.
 
 ## Coordination
 

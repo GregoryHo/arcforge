@@ -492,8 +492,15 @@ def test_permanent_budget_is_legacy_only():
 
 def test_is_legacy_discriminates():
     """The grandfather predicate reads the manifest, not the shipped skill set."""
-    assert _is_legacy("arc-brainstorming") is True
+    # Read the positive case out of the manifest rather than naming a skill:
+    # a hardcoded name turns this test red the phase that skill is rewritten,
+    # which is noise, not a finding. The manifest empties by the end of P6.
+    for name in LEGACY_SKILLS:
+        assert _is_legacy(name) is True
+    # `tdd` ships and is absent from the manifest — the predicate must not
+    # infer legacy status from a directory merely existing.
     assert _is_legacy("tdd") is False
+    assert _is_legacy("not-a-shipped-skill") is False
 
 
 def test_schema_violations_rejects_v5_fields():

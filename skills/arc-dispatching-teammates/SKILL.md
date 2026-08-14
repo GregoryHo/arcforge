@@ -13,7 +13,7 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 
 **Core principle:** Teammates are the arcforge-supported substrate for lead-present multi-epic parallelism. Manual "open N Claude windows" is a fallback, not the default. Don't pre-identify conflicts — let runtime handle runtime.
 
-**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `arc-looping` (walk-away) or `arc-executing-tasks` (attended) for multi-epic work instead.
+**Platform note:** This skill targets Claude Code's agent-teammates feature (SendMessage, `team_name`); other harnesses have no teammate substrate — use `arc-looping` (walk-away) or `executing` (attended) for multi-epic work instead.
 
 ## When to Use
 
@@ -21,7 +21,7 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 |---|---|
 | 2+ ready epics, lead staying present ("I'll watch", "step in if needed") | **arc-dispatching-teammates** (this skill) |
 | 2+ ready epics, lead walking away ("overnight", "going to bed") | arc-looping |
-| 1 ready epic | arc-using-worktrees + arc-executing-tasks |
+| 1 ready epic | arc-using-worktrees + executing |
 | Feature-level parallelism inside one worktree | arc-dispatching-parallel |
 
 **The boundary vs arc-looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still arc-looping.

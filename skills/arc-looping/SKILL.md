@@ -15,11 +15,11 @@ Run arcforge workflows overnight without human intervention. Each iteration spaw
 
 You have a verified task list whose tasks can run unattended (no per-task human judgment).
 
-**vs. arc-agent-driven:** that skill runs subagents within ONE session (shared
+**vs. in-session execution:** `executing` runs its tasks within ONE session (shared
 context, human available); arc-looping spawns a fresh session per task
 (cross-session, unattended). Need human judgment per task within a session →
-arc-agent-driven; need a human checkpoint → arc-executing-tasks; no task list yet →
-arc-writing-tasks first.
+executing (unattended mode); need a human checkpoint → executing (attended mode);
+no task list yet → executing writes one first.
 
 ## Loop Patterns
 
@@ -34,7 +34,7 @@ Add `--reset` to archive prior state and start fresh (see Resume vs Reset).
 
 ## Before Starting
 
-1. **Task list must exist** — run `arc-writing-tasks` first to produce the markdown checkbox task list the loop consumes.
+1. **Task list must exist** — run `executing` first to produce the markdown checkbox task list the loop consumes.
 2. **Verify baseline** — `npm test` to confirm a clean state.
 3. **Set limits** — `--max-runs` and `--max-cost` to bound execution.
 
@@ -163,6 +163,6 @@ log (commits landing?).
 
 ## Integration
 
-- **Before:** arc-writing-tasks creates the task list the loop executes.
+- **Before:** executing creates the task list the loop executes.
 - **Works with:** `/evaluating` (evals between iterations). compaction is not needed — each iteration is a fresh session.
 - **After:** `/code-review`, then arc-finishing (see After the Loop).

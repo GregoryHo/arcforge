@@ -54,9 +54,8 @@ Check that commands appear:
 
 ```
 # Should see:
-# /arcforge:arc-brainstorming - Design exploration
-# /arcforge:arc-writing-tasks - Break features into executable tasks
-# /arcforge:arc-executing-tasks - Execute tasks with checkpoints
+# /arcforge:brainstorming - Structured exploration before a design is settled
+# /arcforge:executing - Write a checkbox task list and run it
 ```
 
 Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
@@ -68,9 +67,8 @@ These are the most frequently used commands:
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
 | `/arcforge:arc-using` | Routing help + skill index | When unsure which skill or workflow applies |
-| `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
-| `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
-| `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
+| `/arcforge:brainstorming` | Structured exploration | When a request is underspecified or several designs are plausible |
+| `/arcforge:executing` | Task list, then execution | When work needs more than one step, or a list is waiting to be run |
 | `/arcforge:learning` | Diaries, patterns, instincts | At end of session, or to review what the learning module proposes |
 
 ## How Skills Compose
@@ -81,10 +79,10 @@ These are the most frequently used commands:
 
 | Context | Recommended skills | Entry point |
 |---------|-------------------|-------------|
-| Vague idea, new requirement | brainstorming | `arc-brainstorming` |
-| Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
+| Vague idea, new requirement | brainstorming | `brainstorming` |
+| Clear goal, ready to plan | executing | `executing` |
 | Large multi-epic initiative | using-worktrees, dispatching-teammates | `arc-dispatching-teammates` |
-| Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
+| Tasks already defined | executing (attended or unattended) | `executing` |
 | Bug or regression | debugging, tdd, verifying | `/debugging` |
 | End of session | learning | `/learning` |
 
@@ -96,8 +94,8 @@ These are the most frequently used commands:
 
 - **epic** - A large initiative that may require parallel worktrees and multiple features.
 - **feature** - A scoped deliverable inside an epic.
-- **task** - A small, executable step produced by `arc-writing-tasks`.
-- **design** - The design document from `arc-brainstorming`.
+- **task** - A small, executable step in a checkbox task list, written by `executing`.
+- **design** - The design narrative converged on in `brainstorming`.
 
 ## What's Inside
 
@@ -105,14 +103,12 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 
 ### Task workflow (idea → tasks → integration)
 
-- **arc-brainstorming** - Explore and shape a design before implementation
-- **arc-writing-tasks** - Break a feature into small executable tasks with exact code
-- **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
+- **brainstorming** - Structured exploration before a design is settled
+- **executing** - Break work into a checkbox task list and run it, attended or unattended
 - **finishing** - Integrate finished work (`/finishing`)
 
 ### Orchestration (subagents, worktrees, loops)
 
-- **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
 - **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
 - **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
 - **arc-looping** - Autonomous unattended cross-session task-list execution

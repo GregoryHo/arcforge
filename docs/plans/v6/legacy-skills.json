@@ -1,14 +1,10 @@
 {
   "_comment": "v5 legacy skills grandfathered during the v6 rewrite. New enforcement (frozen frontmatter schema, D1 self-containment) exempts these dirs. Ratchet: every entry MUST still exist as skills/<name>/ — when a skill is deleted or rewritten, prune it here in the same commit. Must be empty by end of P6.",
   "legacy": [
-    "arc-agent-driven",
-    "arc-brainstorming",
     "arc-dispatching-parallel",
     "arc-dispatching-teammates",
-    "arc-executing-tasks",
     "arc-looping",
     "arc-using-worktrees",
-    "arc-using",
-    "arc-writing-tasks"
+    "arc-using"
   ]
 }

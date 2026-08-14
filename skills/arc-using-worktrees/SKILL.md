@@ -99,5 +99,5 @@ conflict, or a marker'd tree that belongs to another lifecycle.
 
 ## Related Skills
 
-- **Called by:** `arc-agent-driven`, `arc-executing-tasks`
+- **Called by:** `executing`
 - **After this skill:** Work in the created worktree, then `/finishing` to integrate

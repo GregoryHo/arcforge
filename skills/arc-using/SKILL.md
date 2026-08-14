@@ -42,14 +42,14 @@ For derivation rules, marker schema, and cleanup semantics, see `docs/guide/work
 
 When multiple skills could apply, choose the smallest useful one:
 
-1. **Clarify intent** — `arc-brainstorming` when requirements or decisions are unclear.
-2. **Write down the work** — `arc-writing-tasks` when the change is clear enough to break into tasks.
-3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `arc-dispatching-teammates`, or `arc-looping` based on task-list/worktree context.
+1. **Clarify intent** — `brainstorming` when requirements or decisions are unclear.
+2. **Write down the work** — `executing` when the change is clear enough to break into tasks.
+3. **Execute work** — `executing`, `arc-dispatching-teammates`, or `arc-looping` based on task-list/worktree context.
 4. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
 
 Examples:
 
-- "Let's build X" → `arc-brainstorming` if design is unclear; `arc-writing-tasks` if it is already clear.
+- "Let's build X" → `brainstorming` if design is unclear; `executing` if it is already clear.
 - "Fix this bug" → `/debugging` if cause is unknown; `/tdd` if cause and expected behavior are clear.
 
 ## Execution & Finishing Choosers
@@ -58,7 +58,7 @@ When two skills cover the same step, pick by the concrete condition:
 
 | Decision | Pick |
 |----------|------|
-| Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + single task-reviewer, both verdicts) |
+| Run a prepared task list | `executing` — attended (checkpoint per batch) or unattended (subagents / a loop nobody is watching) |
 | Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-worktree, lead present) |
 | Set up an isolated workspace | `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo) |
 | Finish work | `/finishing` (4-option gate on the current worktree) |

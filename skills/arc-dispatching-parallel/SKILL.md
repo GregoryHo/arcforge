@@ -34,7 +34,7 @@ with unrelated failures, different subsystems with no shared code paths.
 
 Each agent gets a specific scope (one problem), a clear goal, constraints (don't
 change other code), an expected output (summary of changes), and a **named model**
-(never inherit — see arc-agent-driven's Model Selection ladder for the tier map).
+(never inherit — name the tier explicitly on every dispatch).
 
 ```
 Fix <problem-domain> in <file-or-subsystem>.
@@ -103,5 +103,5 @@ this skill parallelizes independent tasks within one worktree.
 
 ## Related Skills
 
-- **Before:** `/arc-writing-tasks` produces the task list
+- **Before:** `/executing` produces the task list
 - **After:** `/finishing` wraps up the integrated result
