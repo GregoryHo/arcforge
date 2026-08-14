@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-using/SKILL.md
+skills/using/SKILL.md
 
 ## Scenario
 You are in a small ArcForge documentation fixture.
@@ -131,4 +131,4 @@ PY
 5
 
 ## Version
-1
+2

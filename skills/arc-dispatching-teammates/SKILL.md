@@ -26,7 +26,7 @@ Dispatch one Claude Code **agent teammate** per ready epic. Lead stays present, 
 
 **The boundary vs arc-looping is attendance, not risk.** A risky epic with the lead watching is still teammates; a safe epic with the lead walking away is still arc-looping.
 
-**REQUIRED BACKGROUND:** arc-using — call it if routing context is needed.
+**REQUIRED BACKGROUND:** using — call it if routing context is needed.
 
 ## Preconditions
 

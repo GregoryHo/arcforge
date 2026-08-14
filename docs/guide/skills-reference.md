@@ -311,7 +311,7 @@ path at runtime — you never invent one.
 For the full derivation rules — including the generic null-spec path, kind
 annotation, and the sync/merge invisibility guarantee — see
 [`docs/guide/worktree-workflow.md`](worktree-workflow.md) and the Worktree
-Rule in `skills/arc-using/SKILL.md`.
+Rule in `skills/using/SKILL.md`.
 
 **Related:** arc-writing-tasks --> **arc-using-worktrees** --> arc-agent-driven or arc-executing-tasks
 
@@ -600,7 +600,7 @@ Rule in `skills/arc-using/SKILL.md`.
 ### 1. Small Feature
 
 ```
-arc-using --> arc-writing-tasks --> arc-executing-tasks --> /finishing
+using --> arc-writing-tasks --> arc-executing-tasks --> /finishing
                                         |
                                    (if bugs) --> debugging --> tdd
 ```

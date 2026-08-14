@@ -4,7 +4,7 @@
 skill
 
 ## Target
-skills/arc-using/SKILL.md
+skills/using/SKILL.md
 
 ## Scenario
 You are in a small JavaScript package with a failing price calculation test.
@@ -176,4 +176,4 @@ PY
 5
 
 ## Version
-1
+2

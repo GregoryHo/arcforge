@@ -26,7 +26,7 @@ When your coding agent starts a session, arcforge's hooks inject a minimal boots
 
 Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a single per-task reviewer that returns both verdicts in one pass (spec compliance and task quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
 
-Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
+Skills are tools, not laws. You can enter through `using` for routing help or call any skill directly when you already know the needed workflow.
 
 ## Installation
 
@@ -59,7 +59,7 @@ Check that commands appear:
 # /arcforge:arc-executing-tasks - Execute tasks with checkpoints
 ```
 
-Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
+Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:tdd`, `/arcforge:debugging`). Unsure where to start? Invoke `/arcforge:using` for routing help.
 
 ## Quick Start: Common Commands
 
@@ -67,7 +67,7 @@ These are the most frequently used commands:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `/arcforge:arc-using` | Routing help + skill index | When unsure which skill or workflow applies |
+| `/arcforge:using` | Routing help + skill index | When unsure which skill or workflow applies |
 | `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
 | `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
 | `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
@@ -77,7 +77,7 @@ These are the most frequently used commands:
 
 ![ArcForge Overview](assets/arcforge-overview.png)
 
-**`arc-using` is the canonical in-session router.** When you're unsure which skill applies, invoke it — it maps concrete conditions to the smallest useful workflow. It is a bounded router and index, not an always-on policy engine: you can also enter at any skill directly. The **[Skills Reference](docs/guide/skills-reference.md)** is the offline companion with full per-skill detail.
+**`using` is the canonical in-session router.** When you're unsure which skill applies, invoke it — it maps concrete conditions to the smallest useful workflow. It is a bounded router and index, not an always-on policy engine: you can also enter at any skill directly. The **[Skills Reference](docs/guide/skills-reference.md)** is the offline companion with full per-skill detail.
 
 | Context | Recommended skills | Entry point |
 |---------|-------------------|-------------|
