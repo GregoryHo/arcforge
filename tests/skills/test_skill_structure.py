@@ -445,7 +445,7 @@ def test_cross_reference_resolves(source, ref_type, target):
     """Every cross-skill pointer (legacy REQUIRED marker or v6 `/name`) resolves."""
     assert target in SKILL_NAMES, (
         f"{source} has {ref_type} reference to '{target}' "
-        f"but no skills/{target}/SKILL.md exists"
+        f"but no {SKILLS_DIR.name}/{target}/SKILL.md exists under {SKILLS_DIR}"
     )
 
 
