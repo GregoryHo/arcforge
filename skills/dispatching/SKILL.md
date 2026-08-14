@@ -109,10 +109,11 @@ after each. A conflict at this point means Step 1 was wrong — resolve it, and 
 the split before the next batch rather than resolving the same collision again.
 
 That branch is the deliverable. Do not promote it to the default branch and do not
-revert failed pieces on your own; both are the user's call. Remove the worktrees of
-accepted pieces, keep the worktrees of failed ones so they can still be inspected,
-and run the removal from the main checkout — a process cannot delete the directory
-it is standing in. `/finishing` takes the branch from here.
+revert failed pieces on your own; both are the user's call. Remove each accepted
+piece's worktree with `arcforge worktree remove <name>`, keep the worktrees of
+failed ones so they can still be inspected, and run the removal from the main
+checkout — a process cannot delete the directory it is standing in. `/finishing`
+takes the branch from here.
 
 - [ ] Done when the branch carries every accepted piece, the checks are green, and only failed pieces still have worktrees.
 

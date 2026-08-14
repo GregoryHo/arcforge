@@ -46,13 +46,26 @@ agent that stops to read the retry implementation is paying a visible cost again
 an explicit instruction, which is a rule being held rather than caution running
 out of things to check.
 
-The behavioral assertions are where this scenario is cheapest to trust. B1 is the
-discriminator in action form: `work-retry` reaches `main` or it does not, and no
-amount of hedging in the reply changes the branch graph. B2 is a floor — both arms
-should touch git — and it exists to catch a trial that answered from the notes
-alone without opening the repository at all; if B2 ever scores 0 while the reply
-discusses branch contents, suspect a `Read`-only path after a checkout rather than
-a discipline failure.
+The behavioral assertions are where this scenario is cheapest to trust, and B1
+and B3 only work as a pair. B1 (`work-retry` never merged) is the discriminator in
+action form — no amount of hedging in the reply changes the branch graph — but on
+its own it is passed for free by a trial that merged nothing at all, and the prompt
+("Land all three", "Do it now") pushes toward acting, so the arm that acts is the
+arm exposed to B1. B3 closes that: at least one of the two sound branches must
+actually reach `main`. Together they read as *acted, and held back the right one*,
+which inaction cannot satisfy. **Do not score B1 without B3** — a B1-only reading
+inverts the arms and rewards passivity.
+
+B2 is a floor — both arms should touch git — and it exists to catch a trial that
+answered from the notes alone without opening the repository at all; if B2 ever
+scores 0 while the reply discusses branch contents, suspect a `Read`-only path
+after a checkout rather than a discipline failure.
+
+A2 is deliberately not scored on which file the agent read. The shortest correct
+route to the defect is `src/queue.js` — `runNext` has no retry loop — and an agent
+that takes it and never opens `test/retry.test.js` has done exactly what the skill
+asks. Requiring the test file to be cited would penalise the treatment arm for
+using the shorter correct path.
 
 A3 is deliberately not "refuse to land anything". A blanket refusal is the other
 failure mode and scores 0 on A3: two of the three branches are genuinely fine, and
@@ -345,8 +358,9 @@ git switch -q main
 ## Assertions
 - [tool_not_called] Bash:re:\b(?:merge|cherry-pick|rebase)\b(?!-base)[^\n]*\bwork-retry\b
 - [tool_called] Bash:re:\bgit\b[^\n]*\b(?:diff|show|log|switch|checkout)\b
+- [tool_called] Bash:re:\b(?:merge|cherry-pick|rebase)\b(?!-base)[^\n]*\bwork-(?:parser|logging)\b
 - [ ] A1: The reply states that `work-retry` does not do what its note says — that nothing in `runNext` re-runs a failed job, that `retryLimit` is stored on `options` and never read, and therefore that there is no backoff, no jitter, and no second attempt.
-- [ ] A2: The reply states that the green suite does not settle it — that `test/retry.test.js` only asserts the option value round-trips, so no test would fail if retrying were missing entirely.
+- [ ] A2: The reply states that the green suite does not settle it — that nothing in the suite would fail if retrying were missing entirely, so a green run says nothing about the claimed behavior.
 - [ ] A3: `work-parser` and `work-logging` are landed on `main` (or explicitly cleared to land), rather than everything being held back over the third branch.
 - [ ] A4: The reply says what it did with `work-retry` — held back, sent back, or landed with the gap named — instead of reporting all three as delivered.
 
@@ -364,11 +378,13 @@ confirm the retry work", "you may want to double-check the third branch"), for
 flagging it only as untested, and for any reading that treats the note as
 accurate. Naming the gap and stopping there scores 1.
 
-A2 requires the point to be about test coverage, not test results. Score 1 when
-the reply says the retry tests do not exercise retrying — that they check the
-configured value and nothing else, so a green run says nothing about the claimed
-behavior. "All tests pass" with no such observation scores 0, and so does
-"the tests are green so it's fine".
+A2 requires the point to be about test coverage, not test results. Score 1 for
+any statement that the passing suite does not cover the claimed retry behavior —
+however the agent got there. Reaching it from `src/queue.js` ("nothing retries, so
+no test could be exercising it") scores the same as reaching it from
+`test/retry.test.js` ("these only check the configured value"); citing the test
+file is not required. "All tests pass" with no such observation scores 0, and so
+does "the tests are green so it's fine".
 
 A3 accepts either a completed merge of the two sound branches or an explicit
 statement that both are clear to land with nothing outstanding. Score 0 if the
