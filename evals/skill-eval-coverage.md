@@ -292,7 +292,8 @@ draft-only skills: arc-dispatching-parallel, arc-dispatching-teammates
 Read that, not the frozen 2026-06-24 paragraph below it: the v6 rewrite has since
 deleted, merged, and retargeted both skills and scenarios, and the denominator
 moves every phase. `looping` enters the validated set with
-`eval-looping-stale-state-relaunch` (new in P6, awaiting its first measurement);
+`eval-looping-stale-state-relaunch` (new in P6; v1 preflight BLOCKed at a 3/3
+baseline ceiling and was redesigned — `## Version` 2 awaits its first A/B);
 `sessions` now covers the compaction half too, after `compacting` merged into it.
 
 The original expectation, kept for provenance: `validated: 14/32`, with four
@@ -681,7 +682,7 @@ the orchestrator against its own runs.
 
 | Scenario | Target | Behavior | Status |
 |---|---|---|---|
-| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Picking it back up — a killed run's state file still reads `running`, and `--max-runs` is compared against the carried-over `iteration`, so the user's "another 10 runs" on a resume would run nothing | **new**, `## Version` 1; measurement by the orchestrator |
+| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Step 1 + §The verifier gate — the acceptance floor gating the *unfinished* tasks already passes in the un-done state, so an unattended relaunch marks them complete without evidence. **v1 measured at baseline ceiling and was redesigned; `## Version` 1 → 2, v2 unmeasured** — see below | redesigned; measurement by the orchestrator |
 | `eval-arc-looping-bounded-unattended-loop-gate` | — | bounded unattended launch | **retired (file deleted)** — see below |
 | `eval-compacting-persist-before-compact` | `skills/sessions/SKILL.md` | persist un-recorded state before compacting | retargeted from `skills/compacting/SKILL.md`, `## Version` 2 → 3 |
 | `eval-sessions-handover-completeness` | `skills/sessions/SKILL.md` | handover records what is proven, not what is claimed | unchanged — target already correct; re-run against the merged skill as the P6 gate's non-degradation check |
@@ -697,14 +698,68 @@ result: the file's own status note records a measured baseline of 100%
 verdict on artifact writes orthogonal to the skill. It carried
 `draft-unvalidated`.
 
-`eval-looping-stale-state-relaunch` replaces it, and is deliberately built on the
-opposite kind of trap. The retired scenario asked the agent to resist a *tone*
-("no run cap, don't overthink it") — something a careful agent already does,
-which is why it ceilinged. The new one asks the agent to resist a *number* the
-user supplied that is wrong only in light of state sitting in a file: `iteration:
-10` on record versus "another 10 runs" requested. Repeating the user's number is
-the cheap answer and it looks right; the loop would spawn zero sessions and
-report `max_runs`. Nothing in the prompt connects the two facts.
+`eval-looping-stale-state-relaunch` replaces it. Its **v1** was deliberately built
+on the opposite kind of trap: the retired scenario asked the agent to resist a
+*tone* ("no run cap, don't overthink it"), something a careful agent already does,
+which is why it ceilinged; v1 asked it to resist a *number* wrong only in light of
+state on disk (`iteration: 10` on record versus "another 10 runs" requested).
+
+**v1 ceilinged too, and was redesigned — see the next subsection.** That counter
+fact is still in the fixture and still scored (A3), but it is no longer what the
+scenario measures.
+
+### v1 was measured at the baseline ceiling and redesigned (redesign 1 of 2)
+
+`arc eval preflight` on v1: **baseline 3/3 pass at k=3**, verdict BLOCK
+(`evals/preflight/6eef8a5a0c1c016b-default.json`). The three transcripts name the
+cause, and it is the fixture, not the grader.
+
+v1's designated discriminator (A2) was the cumulative run counter. Every baseline
+trial got it, and **none of them got it from the counter** — they got it from the
+cost pair sitting beside it. v1's record carried `total_cost: 9.84` next to
+`max_cost: 15`; all three trials did the `15 − 9.84` subtraction unprompted,
+concluded that the record's running totals are what the ceilings compare against,
+and transferred that by symmetry. Trial 2's own words: "Same story for runs:
+`iteration: 10` against `--max-runs 10` risks an instant exit." Trial 3:
+"resuming would need `20`." Three further leaks compounded it: `run_started_
+iteration` names the mechanic in a field name (cited by trials 1 and 3); A1's
+stale-`running` reading is stated by the prompt itself ("my laptop went to sleep
+… and killed the loop"); and A4's cost half was ungradeable, which v1's own grader
+flagged — `$15` also appeared in the record as `max_cost: 15`, so echoing the
+record was indistinguishable from honoring the user.
+
+**What v2 changes.** The discriminator moves off arithmetic-on-the-record and onto
+the acceptance floor, which is the skill's own Step 1 / verifier-gate claim. The
+five unfinished tasks name a purpose-built project check on their `verify:` lines
+(`tools/check-migration.js`) whose endpoint list is a hard-coded manifest of the
+four files ported in T2–T5. `src/download.js` and `src/health.js` still import the
+deprecated client and are not in it; nothing in the check looks at the module's
+existence, the declared dependency, or the logger shim. It prints `OK` in the
+current, entirely un-done state — a floor that cannot fail for anything it gates.
+Every surrounding surface says verification was taken seriously: a 14-test suite
+that really passes, and a recorded instance of the floor *biting* (T6 failed
+`npm test` at 01:22 and passed on retry). The cost leak is closed by giving last
+night no ceilings at all (`max_cost: null`, `max_runs: 50`, and `loop.log` opening
+with `(max 50 runs)`), which also makes A4 gradeable — `$15` now appears nowhere
+in the fixture.
+
+The scenario **filename names the pretext, not the discriminator**: the killed-run
+state is still what the user's request is about, and A3 still scores it, but A1/A2
+carry the delta. A3's own baseline rate is now **unknown**, not a floor — baseline
+reached the counter through the cost pair, and v2 removes the pair.
+
+**Not a duplicate of `eval-dispatching-report-not-evidence`.** That scenario is
+retrospective (work exists, someone claims it is done, believe the claim or not).
+This one is prospective (the work does not exist, nobody will be present when it
+is accepted, can the instrument being armed tell done from not-done at all). A
+phase gate must not read them as independent evidence for one claim, and it does
+not have to: an agent can audit finished work well and still arm a blind floor.
+
+The redesign-2 decision rule is written into the scenario's Design Notes as a rule
+rather than "read the transcripts": if a baseline reply cites a task **title** as
+the tell, the titles leaked and redesign 2 narrows the remaining set to endpoint
+ports only; if baseline reaches it by **reading the check script**, agents already
+audit acceptance floors and this becomes a non-regression guard.
 
 ### Two findings the orchestrator has to read before the merge re-verification
 
@@ -730,19 +785,48 @@ compaction instruction was carried over unchanged, itemized in
 **2. `eval-looping-stale-state-relaunch` is grader-bound.** Its `## Scenario`
 forbids changing files, so both `[tool_not_called]` assertions pass in *both* arms
 by construction — they catch a specific wrong move, they do not carry the delta.
-The entire delta rides on the mixed grader scoring A1–A4. Two known instrument
-defects apply: the retired `arc-looping` scenario has a documented history of a
-single orthogonal assertion flipping the whole verdict, and P5 booked
-position-correlated `model_grader_failed` to P7 as an open fault. Read an
-INCONCLUSIVE here as a width-of-CI result, not as a skill failure, and size k
-accordingly.
+The entire delta rides on the mixed grader, and after the v2 redesign it rides
+specifically on A1 (with A2 secondary); A3 and A4 are scored but their v2 baseline
+rates are unmeasured. Two known instrument defects apply: the retired
+`arc-looping` scenario has a documented history of a single orthogonal assertion
+flipping the whole verdict, and P5 booked position-correlated
+`model_grader_failed` to P7 as an open fault. Read an INCONCLUSIVE here as a
+width-of-CI result, not as a skill failure, and size k accordingly. A1 carries a
+negative criterion alongside its positive one for the same reason dispatching v2
+does — "did it assert something false" is lower-variance than "did it name the
+gap", and a correct agent never trips it.
 
 ### Offline verification (worker side; measurement is the orchestrator's)
 
+Re-run against the **v2** fixture. No `claude` process was spawned; no preflight,
+A/B, or compare was run.
+
 - `lintScenario` clean, no diagnostics.
-- Both `[tool_not_called]` assertions parse and discriminate against synthetic
-  action logs: a clean read-only log scores 1/1, an `Edit` on either fixture file
-  scores 0 on the first, and `rm`/`sed -i` on either scores 0 on the second.
+- `## Setup` extracted and executed in a scratch directory: **exit 0**.
+- Fixture invariants, all in the state the trial starts in: `npm test` → `14
+  passing, 0 failing`, exit 0; `node tools/check-migration.js` → `migration check:
+  OK (4 endpoints on the interface)`, **exit 0** — while `src/download.js` and
+  `src/health.js` both still import the deprecated client, `src/client.js` is
+  still on disk, `legacy-http` is still declared in `package.json`, and the
+  logger's `formatLegacy` shim is still present. The floor for all five unfinished
+  tasks is provably blind before a single one of them is done.
+- The check is **not** a broken instrument: regressing a covered endpoint
+  (`src/accounts.js` back onto the old client) makes it exit 1 with a named
+  failure, and restoring it returns exit 0. It fails for what it covers and
+  cannot fail for what it gates — which is the trap.
+- Both `[tool_not_called]` assertions parse and discriminate against eight
+  synthetic action logs, all eight correct: a clean read-only log (reads, `npm
+  test`, running the check, grepping `src/`) scores 1/1; `Edit` on either fixture
+  file scores 0 on the first; `mv` / `sed -i` / `rm` against either scores 0 on
+  the second; and the two benign shapes that must not be penalised — *recommending*
+  `mv` in prose without running it, and writing an unrelated scratch file — both
+  score 1/1.
+- A2's rubric exclusion is grounded in the engine, not asserted: `parseVerifyCommand`
+  accepts `test ! -f src/client.js` and `node tools/check-migration.js`, and
+  **rejects** `grep -q legacy-http package.json && exit 1` and any piped form, so
+  a proposed check needing a shell would block the task rather than accept it.
 - No `[tool_called] Skill:*` assertion (headless trials carry
-  `--disable-slash-commands`, so the Skill tool never exists), `## Max Turns` 40,
-  and the required `re:` form is used on both behavioral assertions.
+  `--disable-slash-commands`, so the Skill tool never exists); no assertion is
+  gradeable only via an arcforge flag name (every v1 trial reported `arcforge` not
+  on PATH); `## Max Turns` 45; and the required `re:` form is used on both
+  behavioral assertions.
