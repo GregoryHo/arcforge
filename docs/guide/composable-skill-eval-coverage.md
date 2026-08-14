@@ -6,21 +6,21 @@ This guide documents the focused scenarios added for the three-layer composable 
 
 ## Behavior Contract
 
-- `arc-using` is a bounded router/index, not a mandatory global workflow.
+- `using` is a bounded router/index, not a mandatory global workflow.
 - SessionStart injects only a minimal bootstrap: skill availability, precedence, smallest-useful-workflow guidance, and `ARCFORGE_ROOT`.
 - Optional workflows activate only when task fit is clear.
 - Read-only, simple, eval/grading, harness, and explicitly scoped tasks should not be routed into heavyweight workflows.
-- A loaded domain skill should not be overridden by `arc-using`, SessionStart bootstrap, or harness language.
+- A loaded domain skill should not be overridden by `using`, SessionStart bootstrap, or harness language.
 
 ## Scenario Matrix
 
 | Scenario | Scope | Target / Mode | Risk Covered | Expected Treatment Behavior |
 |---|---|---|---|---|
-| `eval-arc-using-read-only-nonactivation` | skill | `--skill-file skills/arc-using/SKILL.md` | `arc-using` over-routes a small read-only question | Direct answer, no workflow/artifact creation, no coercive routing language |
-| `eval-arc-using-harness-isolation` | skill | `--skill-file skills/arc-using/SKILL.md` | `arc-using` contaminates eval/grader tasks | Strict requested output; no scenario rewrites, workflow routing, or harness interference |
+| `eval-arc-using-read-only-nonactivation` | skill | `--skill-file skills/using/SKILL.md` | `using` over-routes a small read-only question | Direct answer, no workflow/artifact creation, no coercive routing language |
+| `eval-arc-using-harness-isolation` | skill | `--skill-file skills/using/SKILL.md` | `using` contaminates eval/grader tasks | Strict requested output; no scenario rewrites, workflow routing, or harness interference |
 | `eval-sessionstart-minimal-bootstrap` | workflow | `--plugin-dir .` | SessionStart dumps full skill text or global laws | Minimal optional discovery; no full skill body or coercive phrases |
-| `eval-optional-workflow-task-fit-activation` | skill | `--skill-file skills/arc-using/SKILL.md` | Router refuses useful workflow activation when task fit is clear | Concrete plan with at most a small relevant optional workflow/tool |
-| `eval-optional-workflow-simple-nonactivation` | skill | `--skill-file skills/arc-using/SKILL.md` | Simple tasks trigger heavy workflow scaffolding | Direct answer, no plans/specs/tasks, no all-skills routing |
+| `eval-optional-workflow-task-fit-activation` | skill | `--skill-file skills/using/SKILL.md` | Router refuses useful workflow activation when task fit is clear | Concrete plan with at most a small relevant optional workflow/tool |
+| `eval-optional-workflow-simple-nonactivation` | skill | `--skill-file skills/using/SKILL.md` | Simple tasks trigger heavy workflow scaffolding | Direct answer, no plans/specs/tasks, no all-skills routing |
 | `eval-other-skill-noninterference` | skill | `--skill-file skills/writing-skills/SKILL.md` | A domain/meta skill is polluted by global routing language | Requested domain-specific markdown only; no ArcForge routing prose |
 | `eval-sessionstart-grader-json-isolation` | workflow | `--plugin-dir .` | SessionStart pollutes grader-style strict JSON tasks | Pure JSON with exact schema; no markdown fences or bootstrap text |
 | `eval-sessionstart-tool-minimalism` | workflow | `--plugin-dir .` | SessionStart causes tools/workflows for inline read-only tasks | Direct inline answer; no tool use, edits, or artifacts |
@@ -85,10 +85,10 @@ node scripts/cli.js eval lint eval-arc-evaluating-scenario-audit
 Run representative A/B checks:
 
 ```bash
-# arc-using skill behavior
-node scripts/cli.js eval ab eval-arc-using-read-only-nonactivation --skill-file skills/arc-using/SKILL.md --k 5
-node scripts/cli.js eval ab eval-arc-using-harness-isolation --skill-file skills/arc-using/SKILL.md --k 5
-node scripts/cli.js eval ab eval-optional-workflow-simple-nonactivation --skill-file skills/arc-using/SKILL.md --k 5
+# using skill behavior
+node scripts/cli.js eval ab eval-arc-using-read-only-nonactivation --skill-file skills/using/SKILL.md --k 5
+node scripts/cli.js eval ab eval-arc-using-harness-isolation --skill-file skills/using/SKILL.md --k 5
+node scripts/cli.js eval ab eval-optional-workflow-simple-nonactivation --skill-file skills/using/SKILL.md --k 5
 
 # rc.1 direct skill gates
 node scripts/cli.js eval ab eval-arc-evaluating-scenario-audit --skill-file skills/evaluating/SKILL.md --k 5
