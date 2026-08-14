@@ -32,7 +32,7 @@ ArcForge worktrees live at `~/.arcforge/worktrees/<project>-<hash>-<slug>/`, com
 When touching worktrees:
 
 - Don't hardcode paths in output. Use abstract language like "the worktree" or fill paths from CLI output.
-- Don't create worktrees manually — delegate to `arc-using-worktrees` so path derivation stays valid.
+- Don't create worktrees manually — delegate to `/dispatching` so path derivation stays valid.
 - Locating a worktree: read its `path` from `arcforge worktree list --json` — do not reconstruct paths from memory.
 - Direct file-editing belongs in a worktree; base sessions coordinate, worktree sessions implement.
 
@@ -44,7 +44,7 @@ When multiple skills could apply, choose the smallest useful one:
 
 1. **Clarify intent** — `arc-brainstorming` when requirements or decisions are unclear.
 2. **Write down the work** — `arc-writing-tasks` when the change is clear enough to break into tasks.
-3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `arc-dispatching-teammates`, or `arc-looping` based on task-list/worktree context.
+3. **Execute work** — `arc-executing-tasks`, `arc-agent-driven`, `/dispatching`, or `arc-looping` based on task-list/worktree context.
 4. **Cross-cutting quality** — use discipline skills only when their trigger is actually present.
 
 Examples:
@@ -59,8 +59,8 @@ When two skills cover the same step, pick by the concrete condition:
 | Decision | Pick |
 |----------|------|
 | Run a prepared task list | `arc-executing-tasks` (human checkpoints per batch) vs `arc-agent-driven` (fresh subagent per task + single task-reviewer, both verdicts) |
-| Dispatch parallel work | `arc-dispatching-parallel` (independent features, one worktree) vs `arc-dispatching-teammates` (multi-worktree, lead present) |
-| Set up an isolated workspace | `arc-using-worktrees` for a generic worktree (experiment, hotfix, review checkout — any repo) |
+| Dispatch parallel work | `/dispatching` (independence gate, one worktree per writer, evidence-based acceptance) |
+| Set up an isolated workspace | `/dispatching` for a generic worktree (experiment, hotfix, review checkout — any repo) |
 | Finish work | `/finishing` (4-option gate on the current worktree) |
 
 Full skill catalog: README "What's Inside" or `docs/guide/skills-reference.md`.

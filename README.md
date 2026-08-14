@@ -83,7 +83,7 @@ These are the most frequently used commands:
 |---------|-------------------|-------------|
 | Vague idea, new requirement | brainstorming | `arc-brainstorming` |
 | Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
-| Large multi-epic initiative | using-worktrees, dispatching-teammates | `arc-dispatching-teammates` |
+| Work that can run in parallel | dispatching | `/dispatching` |
 | Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
 | Bug or regression | debugging, tdd, verifying | `/debugging` |
 | End of session | learning | `/learning` |
@@ -113,10 +113,8 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 ### Orchestration (subagents, worktrees, loops)
 
 - **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
-- **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
-- **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
+- **dispatching** - Split work across agents, isolate each writer in its own worktree, accept on evidence (`/dispatching`)
 - **arc-looping** - Autonomous unattended cross-session task-list execution
-- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout)
 
 ### Discipline (quality gates)
 

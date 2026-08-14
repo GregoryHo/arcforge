@@ -17,6 +17,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/tdd` | you are about to write implementation code, fix a bug, or found code with no test |
 | `/debugging` | a test fails, a bug is reported, behavior surprises you, a build breaks, or a fix you tried did not hold |
 | `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |
+| `/dispatching` | work could run in parallel — splitting it across agents, giving each an isolated worktree, briefing them, or accepting what comes back |
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
 | `/compacting` | context is filling up and you are deciding whether to compact now |
 | `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |

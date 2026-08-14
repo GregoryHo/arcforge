@@ -129,7 +129,6 @@ All skills follow the pattern `arc-<action>[-<object>[-<scope>]]`:
 **Good names:**
 - `arc-brainstorming` — single action, gerund
 - `arc-writing-tasks` — action + target
-- `arc-using-worktrees` — tool usage
 
 **Bad names:**
 - `arc-coordinator` — agent-noun, use `arc-coordinating`
