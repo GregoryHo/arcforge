@@ -371,3 +371,45 @@ recomputed from the raw JSONLs by the gate verifier before cleanup.
 
 Gate-level recording is in the P5 notes in `docs/plans/v6/progress.md`, which this
 worker does not edit.
+
+## v6 P6 — Track C (`looping`, `sessions`⊕`compacting`)
+
+`looping` (user-invoked) replaced `arc-looping`; `compacting` merged into
+`sessions`. Three rows change.
+
+| Scenario | Target | Behavior | Status |
+|---|---|---|---|
+| `eval-looping-stale-state-relaunch` | `skills/looping/SKILL.md` | §Picking it back up — a killed run's state file still reads `running`, and `--max-runs` is compared against the carried-over `iteration`, so the user's "another 10 runs" on a resume would run nothing | **new**, `## Version` 1; measurement by the orchestrator |
+| `eval-arc-looping-bounded-unattended-loop-gate` | — | bounded unattended launch | **retired (file deleted)** — see below |
+| `eval-compacting-persist-before-compact` | `skills/sessions/SKILL.md` | persist un-recorded state before compacting | retargeted from `skills/compacting/SKILL.md`, `## Version` 2 → 3 |
+| `eval-sessions-handover-completeness` | `skills/sessions/SKILL.md` | handover records what is proven, not what is claimed | unchanged — target already correct; re-run against the merged skill as the P6 gate's non-degradation check |
+
+### Why `eval-arc-looping-bounded-unattended-loop-gate` was retired, not retargeted
+
+Its premise died in P2. The trap is `loop --pattern dag`, the fixture is
+`specs/demo/dag.yaml`, and assertion A1 requires the agent to confirm a *verified
+DAG* exists — the SDD pipeline, the DAG engine, and the `--pattern` flag are all
+gone, so there is nothing left to retarget onto. It was also never a clean
+result: the file's own status note records a measured baseline of 100%
+(hash `2e6fc32c`, no headroom) and a persistently flaky A4 that flipped the
+verdict on artifact writes orthogonal to the skill. It carried
+`draft-unvalidated`.
+
+`eval-looping-stale-state-relaunch` replaces it, and is deliberately built on the
+opposite kind of trap. The retired scenario asked the agent to resist a *tone*
+("no run cap, don't overthink it") — something a careful agent already does,
+which is why it ceilinged. The new one asks the agent to resist a *number* the
+user supplied that is wrong only in light of state sitting in a file: `iteration:
+10` on record versus "another 10 runs" requested. Repeating the user's number is
+the cheap answer and it looks right; the loop would spawn zero sessions and
+report `max_runs`. Nothing in the prompt connects the two facts.
+
+### Offline verification (worker side; measurement is the orchestrator's)
+
+- `lintScenario` clean, no diagnostics.
+- Both `[tool_not_called]` assertions parse and discriminate against synthetic
+  action logs: a clean read-only log scores 1/1, an `Edit` on either fixture file
+  scores 0 on the first, and `rm`/`sed -i` on either scores 0 on the second.
+- No `[tool_called] Skill:*` assertion (headless trials carry
+  `--disable-slash-commands`, so the Skill tool never exists), `## Max Turns` 40,
+  and the required `re:` form is used on both behavioral assertions.

@@ -31,11 +31,10 @@ context can act on it. Its `verify:` line is that task's acceptance floor: the
 loop runs it after the session exits and refuses to mark the task done when it
 fails. A task without one falls back to the run-wide `--verify-cmd`; a task with
 neither is accepted on the session's exit code alone, which only says the session
-ended, not that the work happened.
-
-Run the project's own suite before launching. The loop cannot tell a baseline
-that was already broken from a task that broke it, so it will spend a session,
-fail the floor, retry, and block a task that was never the problem.
+ended, not that the work happened. Run the project's own suite before launching
+too: the loop cannot tell a baseline that was already broken from a task that
+broke it, so it will spend a session, fail the floor, retry, and block a task that
+was never the problem.
 
 - [ ] Done when the list exists and parses, every task carries a `verify:` line or the run supplies `--verify-cmd`, and the suite has been run here and is green.
 
@@ -100,7 +99,6 @@ a script you point it at.
 the task was done rather than merely made to pass. On FAIL its feedback goes back
 verbatim into a retry, up to `--max-retries` (default 2), after which the task is
 blocked; a verdict that cannot be parsed blocks too, and is never read as a pass.
-
 Turn it on when the floor cannot see the thing that matters: a task whose test the
 same session wrote, a refactor whose suite passes unchanged either way, anything
 where "the suite is green" and "the task is done" are two different claims. Leave
@@ -123,16 +121,18 @@ task and do it twice.
 Resume and reset share that same state file; the difference is whether the
 previous run's history carries forward.
 
-**Resume** is the default — re-run the same command with no `--reset`. `iteration`
-keeps climbing, completed tasks are not re-run, and a fresh run id zeroes this
-run's stall and retry-storm counters, so an earlier run's failures do not stop the
-new one on entry.
+**Resume** is the default — re-run the same command with no `--reset`. Completed
+tasks are not re-run, and a fresh run id zeroes this run's stall and retry-storm
+counters, so an earlier run's failures do not stop the new one on entry. But
+`iteration` keeps climbing, and `--max-runs` is compared against that running
+total, not against zero: resuming a loop that reached iteration 10 with
+`--max-runs 10` runs nothing at all and reports `max_runs`.
 
 **`--reset`** archives the current state and starts from zero — a deliberate
-pre-run action, never a mid-run one. A loop that was killed rather than finished
-(terminal closed, machine asleep, process reaped) leaves `status` at `running`
-with no `finished_at`; that record is stale, not a live loop, so the next run
-needs `--reset`.
+pre-run action, never a mid-run one. A loop killed rather than finished (terminal
+closed, machine asleep, process reaped) leaves `status` at `running` with no
+`finished_at`; that record is stale, not a live loop, so the next run needs
+`--reset`.
 
 ## When it stops
 
