@@ -81,3 +81,41 @@ stop reasons：max_runs（A）→ complete（B）（兩種 stop condition 皆正
 
 全部 preflight／ab／compare／probe 由 orchestrator 主 session 執行；worker 僅
 交付 scenario 與 instrument（離線驗證）。無任何量測掛在 subagent 背景程序上。
+
+---
+
+# P6.5 gate — 載入 probe 證據（AC 1，orchestrator 執行）
+
+儀器：spike 同法（`claude --plugin-dir <repo> --model haiku -p`，**中性 cwd**——repo 內
+cwd 會讓 probe 讀到 `.claude/settings.json` 的 dev 停用設定並自行推理回空集，第一輪
+實測踩到，改中性 cwd 後排除）。
+
+## 模態 1 — model-invoked 可見面
+
+```
+SKILLS=arcforge:brainstorming,arcforge:code-review,arcforge:debugging,
+arcforge:diagramming-obsidian,arcforge:dispatching,arcforge:evaluating,
+arcforge:executing,arcforge:finishing,arcforge:maintaining-obsidian,
+arcforge:sessions,arcforge:tdd,arcforge:using
+```
+
+12/12 model-invoked 全載入；識別字 `arcforge:<name>`，**零 bucket 段**（判定點 3 重驗）。
+
+## 模態 2 — user-invoked 以 slash 呼叫實載
+
+user-invoked（`disable-model-invocation: true`）不注入描述，模態 1 天然不可見——
+以直接呼叫驗證：
+
+```
+/arcforge:writing-skills → LOADED=writing-skills
+/arcforge:learning       → LOADED=arcforge:learning
+/arcforge:looping        → LOADED=arcforge:looping
+```
+
+3/3 載入（LOADED 回應由注入的 skill 內容產生）。合計 **15/15 == 白名單**。
+
+## 負向 — deprecated 不載入
+
+臨時樣本 `skills/deprecated/probe-zzz/`（**model-invoked 描述**——若載入必出現在
+模態 1）：未出現於任何 probe 輸出 → deprecated bucket 不載入（判定點 2 重驗 +
+「目錄項載入整個 bucket」在 15 支下重驗成立）。樣本已移除。
