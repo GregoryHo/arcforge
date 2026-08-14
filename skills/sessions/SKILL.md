@@ -1,6 +1,6 @@
 ---
 name: sessions
-description: Continuity across a break in context. Use when a session is ending or being handed to someone else, when you are stopping mid-task for the day, when picking work back up from an earlier handover note, or when a long session is filling up and you are deciding whether to compact.
+description: Continuity across a break in context. Use when a session is ending or being handed over, when you are stopping mid-task for the day, when picking work back up from an earlier handover note, or when a long session is filling up and you are deciding whether to compact.
 ---
 
 # Sessions
