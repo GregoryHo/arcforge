@@ -414,7 +414,7 @@ worker does not edit.
 
 | Scenario | Target | Disposition |
 |---|---|---|
-| `eval-dispatching-report-not-evidence` | `skills/dispatching/SKILL.md` | **NEW** — Step 4: a completion report is a claim, and a green suite is not compliance. **v1 measured at baseline ceiling and was redesigned; `## Version` 1 → 2, v2 unmeasured** — see below |
+| `eval-dispatching-report-not-evidence` | `skills/dispatching/SKILL.md` | **NEW — unmet-but-covered (P6 gate)**. v1 baseline ceiling (3/3 + 1 valid from the aborted first run); v2 redesign closed all three diagnosed escape routes, then **ceilinged again at 3/3** (hash `4a8c8c7c0856e565`). v2's own pre-registered diagnostic adjudicated the repeat: all 3 baseline trials found the flaw by reading `src/jobs.js`/`runner.js` and the `ok:false` convention — the *legitimate* route, not a diff leak — so the second redesign lever (moving the mapping out of the loop) has no target. Recorded as a **non-regression guard**: "a report is a claim, verify empirically" is baseline-default at this task shape (`.claude/rules/eval.md`: skill formalizes existing behavior). Skill-value question booked to P7 alongside `evaluating`'s. Trigger coverage exists separately: router matrix row `/dispatching` 3/3 both surfaces |
 | `eval-arc-dispatching-teammates-lead-present-routing` | `skills/dispatching/SKILL.md` | **RETARGETED**, `## Version` 1 → 2 — the attendance-not-risk boundary survives the merge in §Choosing the substrate |
 | `eval-arc-dispatching-parallel-feature-level-readiness` | — | **RETIRED** → `evals/scenarios/retired/` |
 
