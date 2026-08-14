@@ -18,8 +18,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/debugging` | a test fails, a bug is reported, behavior surprises you, a build breaks, or a fix you tried did not hold |
 | `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |
 | `/finishing` | implementation is done and the branch or worktree needs merging, a PR, keeping, or discarding |
-| `/compacting` | context is filling up and you are deciding whether to compact now |
-| `/sessions` | work is stopping mid-task and the next session or another person has to pick it up, or you are starting from an earlier handover |
+| `/sessions` | context is about to be lost — work is stopping mid-task and the next session or another person has to pick it up, you are starting from an earlier handover, or a long session is filling up and you are deciding whether to compact |
 | `/learning` | you are capturing a session diary, mining diaries for patterns, or reviewing what the opt-in learning subsystem wants to activate (user-invoked) |
 | `/looping` | you are handing a task list to an unattended loop that will keep working after you walk away (user-invoked) |
 | `/evaluating` | a claim about agent behavior needs evidence — you are designing or auditing an eval scenario, or reading a verdict out of eval numbers |

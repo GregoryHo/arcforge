@@ -14,12 +14,21 @@
 > `arcforge eval ab eval-compacting-persist-before-compact --k 5` once credits are
 > available; until it returns a real verdict this scenario carries a baseline
 > record only.
+>
+> **Retargeted (P6, `## Version` 2 → 3): `skills/compacting/SKILL.md` →
+> `skills/sessions/SKILL.md`.** The two skills merged — one context-loss
+> lifecycle, one skill — and the compaction half now lives under
+> `## Compacting mid-session` in `sessions`. Nothing the scenario grades moved:
+> the persist-first ordering, the timing table, and the focus-line requirement
+> are carried over unchanged, which is what the P6 gate re-runs this scenario to
+> confirm. The assertions, the fixture, and the rubric are untouched, so a
+> comparison against the pre-merge record is like for like.
 
 ## Scope
 skill
 
 ## Target
-skills/compacting/SKILL.md
+skills/sessions/SKILL.md
 
 ## Context
 A Node parser library. `TASKS.md` is the project's task list and the only place
@@ -201,4 +210,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-2
+3

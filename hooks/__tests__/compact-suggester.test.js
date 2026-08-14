@@ -140,7 +140,7 @@ describe('rolling-window phase detection', () => {
     assert.strictEqual(mod.phaseFromWindow(win), 'read-heavy');
     const msg = mod.buildMessage(50, win);
     assert.ok(msg.includes('mostly reads'));
-    assert.ok(msg.includes('/compacting'));
+    assert.ok(msg.includes('/sessions'));
   });
 
   it('detects write-heavy phase from window', () => {
@@ -148,19 +148,19 @@ describe('rolling-window phase detection', () => {
     assert.strictEqual(mod.phaseFromWindow(win), 'write-heavy');
     const msg = mod.buildMessage(50, win);
     assert.ok(msg.includes('active implementation'));
-    assert.ok(msg.includes('/compacting'));
+    assert.ok(msg.includes('/sessions'));
   });
 
   it('neutral when no phase dominates', () => {
     const win = windowOf(6, 6);
     assert.strictEqual(mod.phaseFromWindow(win), 'neutral');
-    assert.ok(mod.buildMessage(50, win).includes('/compacting'));
+    assert.ok(mod.buildMessage(50, win).includes('/sessions'));
   });
 
   it('neutral when too few samples', () => {
     const win = windowOf(5, 0);
     assert.strictEqual(mod.phaseFromWindow(win), 'neutral');
-    assert.ok(mod.buildMessage(50, win).includes('/compacting'));
+    assert.ok(mod.buildMessage(50, win).includes('/sessions'));
   });
 
   it('window is bounded to 20 most-recent entries', () => {
@@ -317,11 +317,11 @@ describe('compact-suggester e2e (ICL-9 acceptance)', () => {
     // Both channels present in the SAME object: user-visible systemMessage
     // AND model-visible additionalContext (the compaction indicator).
     assert.ok(parsed.systemMessage, 'user-visible systemMessage present');
-    assert.ok(parsed.systemMessage.includes('/compacting'), 'user line points at /compacting');
+    assert.ok(parsed.systemMessage.includes('/sessions'), 'user line points at /sessions');
     assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'PostToolUse');
     const modelLine = parsed.hookSpecificOutput.additionalContext;
     assert.ok(modelLine, 'model-visible additionalContext present');
-    assert.ok(modelLine.includes('/compacting'), 'model line is the /compacting indicator');
+    assert.ok(modelLine.includes('/sessions'), 'model line is the /sessions indicator');
   });
 
   it('records suggestions[] into the live session JSON', () => {

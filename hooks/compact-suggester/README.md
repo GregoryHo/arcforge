@@ -57,7 +57,7 @@ correlated against compaction events.
 Every threshold hit (50, 75, 100, 125...) uses the same single format,
 naming the current phase:
 ```
-📊 50 tool calls (mixed work) — possible compaction boundary. See /compacting for whether to compact now.
+📊 50 tool calls (mixed work) — possible compaction boundary. /sessions covers what has to reach disk first.
 ```
 
 **Dual-channel delivery (ICL-10):** on a threshold hit the hook emits exactly
@@ -65,10 +65,10 @@ one merged JSON object carrying both channels at once — the `systemMessage`
 above (user-visible) and a companion `additionalContext` compaction
 indicator (model-visible):
 ```
-compaction indicator: 50 tool calls (neutral phase) — at a possible compaction boundary. Consult /compacting to decide whether to compact at this phase boundary.
+compaction indicator: 50 tool calls (neutral phase) — at a possible compaction boundary. Consult /sessions to decide whether to compact at this phase boundary.
 ```
 Neither line issues a compaction directive — the actual compact-or-not
-timing call is deferred to the `/compacting` skill.
+timing call is deferred to the `/sessions` skill.
 
 ## Why This Matters
 

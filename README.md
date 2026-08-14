@@ -127,8 +127,7 @@ Skills grouped by category. Within each category, model-invoked skills auto-trig
 ### Memory (session continuity + learning; default-off module)
 
 - **learning** _(user-invoked)_ - Session diaries, pattern extraction from them, manual instincts, and review of the opt-in observe → curate → activate lifecycle
-- **sessions** - Write a handover when work stops mid-task, and read one when it restarts
-- **compacting** - Decide when to compact, and what has to reach disk before it
+- **sessions** - Continuity across a break in context: write a handover when work stops mid-task, read one when it restarts, and decide what has to reach disk before a compaction
 
 The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
 

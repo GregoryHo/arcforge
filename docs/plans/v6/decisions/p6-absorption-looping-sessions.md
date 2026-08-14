@@ -64,6 +64,46 @@ skill 的內文都不得寫它。
 | `eval-arc-looping-bounded-unattended-loop-gate` | **除役（刪檔）** | 前提整個死在 P2：它的 trap 是 `loop --pattern dag`，fixture 是 `specs/demo/dag.yaml`，斷言 A1 要求 agent 確認「verified DAG 存在」——SDD pipeline 與 DAG 引擎已於 P2 移除，`--pattern` 旗標不存在。retarget 等於重寫。第二個理由：它的 baseline 已實測 100%（hash `2e6fc32c`），A4 又長期 flaky（見檔內 status 註記），本來就是 draft-unvalidated。以新 scenario 取代 |
 | `eval-looping-killed-run-reset`（新增） | **+1** | 見 `evals/skill-eval-coverage.md` P6 節 |
 
-## 3. 待補（C2 sessions⊕compacting）
+## 3. compacting（71 行）→ `skills/sessions/`
 
-本節於 sessions⊕compacting 合併 commit 補齊。
+合併理由：兩支同屬**同一個生命週期**。session 結束與 compaction 丟掉的是同一樣
+東西——只存在於對話裡的內容——處理方式也是同一個：先落到檔案。分成兩支 skill 等於
+把同一條規則寫兩次，然後指望 agent 在兩個觸發時點各載入正確的那一支。
+
+**保守合併（任務約束）**：`sessions` 既有 prose 與 `.handovers/` 慣例**一字未改**，
+compacting 的行為指令**逐節原樣搬入**。下表的「原樣」是字面意思——兩支各自的既有
+scenario（`eval-compacting-persist-before-compact`、
+`eval-sessions-handover-completeness`）會對合併後 skill 重跑，任何改寫都會讓那次
+再驗量到的不是合併本身。
+
+| 行為面 | 落點 | 說明 |
+|---|---|---|
+| 開場（「問題不是 context 大不大，是我會後悔失去的東西上檔了沒」） | **S** §Compacting mid-session 開場 | 原樣 |
+| Persist first 三步 + 各步完成判準 | **S** §Compacting mid-session → Persist first | 原樣。這三步正是 compacting scenario 的 A1／A2／A4 所測 |
+| 「un-persisted decision 是唯一真正的 blocker；步驟 1/2 做不完就不要 compact」 | **S** 同節 | 原樣 |
+| When to compact 七列表 | **S** §When to compact | 原樣（scenario A3 所測） |
+| What survives 四列表 + 「右欄要的東西先搬到左欄」 | **S** §What survives | 原樣；末句的「that is what Persist first does」隨標題層級調整用詞，語意不變 |
+| The compaction indicator（hook 只報邊界、不做決定） | **S** §The compaction indicator | 原樣 |
+| Red flags 五條 | **S** §Red flags 前五列 | 原樣併入 sessions 既有的八列表，成為單一 13 列表。**合併紅旗表而非並列兩張**是本次唯一的結構性調整，理由是讀者在任一觸發下都會讀到全部 13 條 |
+| `## Step 1 —` / `## Step 2 —` 編號標題 | **S**（改回無編號 `###`） | sessions 開場宣告「Every step below carries a completion criterion」，而 When to compact 是查表不是步驟，硬編號會逼出一條假的完成判準。維持 compacting 原本的無編號標題形狀 |
+| description（compaction 觸發） | **S** frontmatter | sessions description 擴寫涵蓋兩觸發：handover 寫／讀 + 「long session is filling up and you are deciding whether to compact」 |
+
+### 連帶調整（同 commit，bijection 與指標不得中斷）
+
+| 位置 | 調整 |
+|---|---|
+| `skills/using` Skill Map | 刪 `/compacting` 列；`/sessions` 列改寫為「context is about to be lost」涵蓋三種情形 |
+| `hooks/compact-suggester/main.js` | 兩條指標訊息（systemMessage + additionalContext）與四處註解由 `/compacting` 改指 `/sessions`。使用者可見那行順帶改寫措辭——「See /compacting for whether to compact now」直接換名會讀不通，改為「/sessions covers what has to reach disk first」，與新 skill 的重點一致 |
+| `hooks/compact-suggester/README.md` | 兩個 Output Example 與收尾句同步 |
+| `hooks/__tests__/compact-suggester.test.js` | 五處 `/compacting` 斷言同步（同 commit，否則刪除與測試脫節） |
+| `evals/scenarios/eval-compacting-persist-before-compact.md` | `## Target` → `skills/sessions/SKILL.md`；`## Version` 2 → 3；標頭補 retarget 說明。assertions／fixture／rubric **未動**，所以與合併前紀錄可逐條比對 |
+| `README.md` | 刪 compacting 條目，sessions 條目改寫涵蓋三種情形 |
+
+### line budget：155 行（soft cap 150），刻意不砍
+
+合併後 body 155 行 = sessions 原 90 + compacting 原 66，扣掉合併紅旗表省下的行數，
+再加 3 行開場。要壓進 150 只能刪 5 行行為指令，而任務對本次合併的約束正是
+**不得弱化任何一邊**，兩支既有 scenario 的再驗也依賴指令原樣保留。soft cap 是
+warning 而非 fail，現存 `learning`(189)、`diagramming-obsidian`(176)、
+`evaluating`(171) 皆在其上。真要瘦身的正解是拆 `references/`，那屬於 P7 的
+corpus 重建，不在本次保守合併的範圍。
