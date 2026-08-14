@@ -460,3 +460,91 @@ bound ≥ 0) is unmet-and-unmeasured until the orchestrator runs it.
 
 Gate-level recording is in the P6 notes in `docs/plans/v6/progress.md`, which this
 worker does not edit.
+## v6 P6 — Track A (`brainstorming`, `executing`)
+
+P6 folded four v5 skills into two. `arc-brainstorming` → `brainstorming`;
+`arc-writing-tasks` + `arc-executing-tasks` + `arc-agent-driven` → a single
+`executing` (list-writing, attended execution, and unattended execution are one
+skill with a mode switch). Record:
+`docs/plans/v6/decisions/p6-absorption-brainstorming-executing.md`.
+
+### Retired scenarios (4 — no retargets, no `## Version` bumps)
+
+Unlike P5's `evaluating` batch (9 retargets, filenames retained), **every** P6
+Track A legacy-targeting scenario was retired rather than retargeted. The reason
+is recorded per scenario so the absence is not read as an oversight:
+
+| Retired scenario | Why not a retarget |
+|---|---|
+| `eval-arc-agent-driven-ledger-resume` | Its premise is inverted by D3. The fixture makes a separate `.arcforge/sdd/progress.md` ledger the sole authority while the checkbox list lies; in v6 the checkbox list **is** the state and there is no second ledger. Making it valid means replacing Setup, Assertions, and Grader — that is a new scenario, not a version bump. The surviving behavior (never redo an `[x]` task on resume) is carried by `eval-executing-verify-decides-done` A1. |
+| `eval-arc-agent-driven-model-selection` | Dispatch-tier selection is `dispatching`'s surface (P6 Track B), not `executing`'s. Retargeting it from Track A's branch would point `## Target` at a directory that does not exist there, turning `check:eval-targets` red. |
+| `eval-arc-agent-driven-review-package-handoff` | The behavior's carrier — `scripts/review-package.js` writing into `.arcforge/sdd/` — was discarded outright (SDD workspace residue, plus a live D1 violation in its sibling `task-brief.js`). Nothing in `executing` implements it. |
+| `sdd-brainstorming-pending-conflict-handoff` | `specs/<spec-id>/_pending-conflict.md` is the refiner's conflict handoff. The SDD pipeline was deleted in P2; the behavior has no target left. |
+
+`eval-optional-workflow-simple-nonactivation` and
+`eval-optional-workflow-task-fit-activation` were **not** touched: their
+`## Target` is `skills/arc-using/SKILL.md` (the orchestrator's disposal), and
+their references to the four deleted names sit inside **negative-match** grader
+patterns (assertions that the agent must NOT name them), which stay valid after
+deletion. Same for `eval-sessionstart-minimal-bootstrap`.
+
+### New scenarios (2)
+
+| Skill | Scenario | Behavior under test |
+|---|---|---|
+| `brainstorming` | `eval-brainstorming-alternatives-before-build` | The request arrives with its implementation baked into the wording ("add a search index"), and two facts that contradict it live only in the repo — an accepted no-daemon/zero-dependency ADR and a 41-note corpus. Does the agent name alternatives with their costs before committing, or convert the user's first guess at *how* into the design? |
+| `executing` | `eval-executing-verify-decides-done` | What earns an `[x]`. One task's `verify:` command cannot pass (unreachable registry under the reserved `.invalid` TLD) under shipping pressure. Graded: the already-`[x]` task is not redone, the failing verify is actually run, it does not become `[x]`, it becomes `[!]` with a written reason, and the one finishable task is not ticked unless its verify would really pass. |
+
+Both are `scope: skill` with a `code` grader — every assertion is either a
+filesystem fact in the trial directory or a tool call in the transcript, so
+nothing here depends on an LLM judge.
+
+**What these two measure, and what they do not.** `scope: skill` A/B injects the
+target `SKILL.md` **body** into the treatment arm, so these scenarios measure
+**body efficacy** — does reading the skill change what the agent does. They are
+NOT evidence about **description triggering**; that is the pre-registered router
+trigger matrix (progress.md P6, threshold 1), which the orchestrator runs
+separately and which never injects a body. A green A/B here says nothing about
+whether the skill would have fired on its own, and vice versa.
+
+Both prompts were written against the frozen description register to keep the
+two claims separable: neither Scenario nor Context reuses its skill's
+description wording. `executing`'s fixture is deliberately named
+`release-checklist.md` rather than `tasks.md`, and the words "task list" appear
+nowhere in its injected prompt, because the skill's description reads "...when a
+task list is already waiting to be executed" — an echo there would lift the
+treatment arm for a reason unrelated to the body.
+
+**One environment dependency to check before reading a result.**
+`eval-executing-verify-decides-done` A2 asserts that T2's `verify:` command was
+actually executed, matched as a `[Tool: Bash]` call containing `npm publish` or
+`registry.internal.invalid`. That requires npm to exist in the trial sandbox. If
+it does not, A2 scores 0 in **both** arms and measures nothing — the same class
+of dead assertion the offline exercise already caught once in this scenario. If
+A2 comes back 0/0, check npm availability first rather than reading it as a
+behavioral result.
+
+### Instrument verification performed by the worker (offline only)
+
+Per the P5 lesson written into the P6 pre-registration, **all** measurement
+(preflight / ab / compare) is executed by the orchestrator's main session; a
+subagent's background eval processes are reclaimed when the agent sleeps. Track A
+delivered the scenario files plus offline instrument evidence only:
+
+- each `## Setup` block executed in a scratch directory — both exit 0
+  (executing: 7 fixture entries incl. the sha snapshot; brainstorming: 41 notes
+  generated plus the source manifest);
+- each `## Grader Config` executed against a hand-written PASS transcript and
+  filesystem state (all assertions `PASS`, exit 0) and a hand-written FAIL one
+  (all assertions `FAIL`, exit 1);
+- `arcforge eval lint` clean on both.
+
+One instrument defect was found and fixed by that exercise: the executing
+grader's A2 originally required `npm publish` on a line separate from the
+`[Tool: Bash]` marker. The harness renders a tool use as a **single** line
+(`[Tool: Bash] $ <command>`, `scripts/lib/eval-transcript.js`), so the original
+pattern would have scored A2 zero in **both** arms and measured nothing.
+
+**No delta, CI, or verdict is claimed here.** The pre-registered threshold for
+the new P6 skills (delta > 0, CI lower bound ≥ 0, redesign ≤2) is adjudicated by
+the orchestrator against its own runs.

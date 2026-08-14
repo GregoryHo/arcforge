@@ -7,8 +7,8 @@ This is the offline reference for all 24 arcforge skills. In a live session, **`
 - [Quick Start](#quick-start)
 - [Skill Categories](#skill-categories)
 - [Complete Skill Catalog](#complete-skill-catalog)
-  - SDD: [arc-brainstorming](#arc-brainstorming) · [arc-writing-tasks](#arc-writing-tasks) · [arc-executing-tasks](#arc-executing-tasks) · [arc-finishing](#arc-finishing)
-  - Orchestration: [arc-agent-driven](#arc-agent-driven) · [dispatching](#dispatching) · [arc-looping](#arc-looping)
+  - SDD: [brainstorming](#brainstorming) · [executing](#executing) · [arc-finishing](#arc-finishing)
+  - Orchestration: [dispatching](#dispatching) · [arc-looping](#arc-looping)
   - Discipline: [tdd](#tdd) · [arc-debugging](#arc-debugging) · [arc-verifying](#arc-verifying) · [arc-reviewing](#arc-reviewing)
   - Memory: [learning](#learning) · [arc-managing-sessions](#arc-managing-sessions) · [arc-compacting](#arc-compacting)
   - Knowledge: [maintaining-obsidian](#maintaining-obsidian) · [diagramming-obsidian](#diagramming-obsidian)
@@ -26,8 +26,8 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 **Core skills every user should learn first:**
 
 1. **using** — Bounded router and skill index for ArcForge tasks
-2. **arc-brainstorming** — Design exploration when intent is unclear
-3. **arc-writing-tasks** — Break approved work into an executable task list
+2. **brainstorming** — Design exploration when intent is unclear
+3. **executing** — Break approved work into an executable task list
 4. **tdd** — Test-driven implementation discipline
 5. **arc-debugging** — Systematic root cause investigation
 6. **arc-verifying** — Fresh evidence before completion claims
@@ -39,8 +39,8 @@ arcforge is a minimal, composable skill toolkit for Claude Code and Codex. Skill
 What are you trying to do?
 |
 +-- Build something new?
-|   +-- Have a spec? --> arc-writing-tasks
-|   +-- Need to explore? --> arc-brainstorming
+|   +-- Have a spec? --> executing
+|   +-- Need to explore? --> brainstorming
 |
 +-- Fix a bug?
 |   +-- debugging --> tdd --> /code-review
@@ -66,8 +66,8 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 | Category | Skills | Purpose |
 |----------|--------|---------|
-| **SDD** | arc-brainstorming, arc-writing-tasks, arc-executing-tasks, arc-finishing | Explore, specify, build, integrate |
-| **Orchestration** | arc-agent-driven, dispatching, arc-looping | Dispatch subagents; manage worktrees and loop state |
+| **SDD** | brainstorming, executing, arc-finishing | Explore, specify, build, integrate |
+| **Orchestration** | dispatching, arc-looping | Dispatch subagents; manage worktrees and loop state |
 | **Discipline** | tdd, arc-debugging, arc-verifying, arc-reviewing | Condition-triggered quality gates |
 | **Memory** | learning _(user-invoked)_, arc-managing-sessions, arc-compacting | Session continuity + learning (default-off module) |
 | **Knowledge** | maintaining-obsidian, diagramming-obsidian | Ingest, query, audit, and visualize an Obsidian vault |
@@ -78,12 +78,12 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 ```
   PLANNING          EXECUTION         COORDINATION
   --------          ---------         ------------
-  brainstorming --> writing-tasks --> executing-tasks --> finishing
-                    |                 |
-                    v                 v
-                    agent-driven      dispatching-parallel
-                    |
-                    +--- using-worktrees, dispatching-teammates
+  brainstorming --> executing (write the list) --> executing (run it) --> finishing
+                                                   |
+                                                   v
+                                                   dispatching-parallel
+                                                   |
+                                                   +--- using-worktrees, dispatching-teammates
 
   DISCIPLINE                MEMORY                META
   ----------                ------                ----
@@ -103,68 +103,43 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 ---
 
-### arc-brainstorming
+### brainstorming
 
-**Purpose:** Explore ideas before implementation through structured discovery and design.
+**Purpose:** Structured exploration before a design is settled.
 
-**When to use:** When intent is vague, a new feature needs design, or an existing spec needs another iteration — the front door to the SDD pipeline.
+**When to use:** When a request is underspecified, when several designs are plausible and one is about to be chosen silently, or when the user is thinking out loud rather than asking for code.
 
 **Key workflow:**
-1. Phase 0 Scan and Route — list `specs/<spec-id>/` directories; user confirms new topic vs. iterating on existing spec-id
-2. Understand context — check project state, ask questions one at a time
-3. Explore approaches — propose 2-3 options with trade-offs, apply YAGNI
-4. Present design — 200-300 word sections, confirm each with user
-5. Write design doc to `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md` (prose for new topic; Context + Change Intent for iteration). Design doc MUST NOT carry a pre-authored delta — refiner is the delta authority.
-6. Route to next skill (refining → planning → coordinating)
+1. Read the repo first, then ask only what it cannot answer — one question per message
+2. Name at least two approaches you could actually defend, each with its cost and what it forecloses
+3. Recommend one and say why
+4. Cut with YAGNI against the measured scale of the problem, not the imagined one
+5. Converge on four elements: problem, approach, what it must do, scope in/out
 
 **Artifacts:**
-- Output: `docs/plans/<spec-id>/<YYYY-MM-DD>/design.md`
-- Intermediate: `docs/research/<topic>.md` (2-Action Rule saves)
+- Output: a design narrative — written to a file only when the user names one; there is no directory convention
 
-**Related:** nothing required --> **arc-brainstorming** --> arc-writing-tasks
+**Related:** nothing required --> **brainstorming** --> executing
 
 ---
 
-### arc-writing-tasks
+### executing
 
-**Purpose:** Break features into bite-sized (2-5 minute) tasks with exact code and commands.
+**Purpose:** Break work into a checkbox task list and run it to completion. The list file is the only progress record.
 
-**When to use:** When a spec or feature is ready and you need concrete, executable implementation steps with exact code before coding.
-
-**Key workflow:**
-1. Read feature spec or design document
-2. Identify files needed
-3. Break into 2-5 minute tasks with exact code (not "add validation")
-4. Add test commands with expected output per task
-5. Output task list in TDD order (test first, then implementation)
-
-**Artifacts:**
-- Input: design doc, feature spec, or epic.md
-- Output: `docs/tasks/<feature-name>-tasks.md`
-
-**Related:** arc-brainstorming --> **arc-writing-tasks** --> arc-executing-tasks or arc-agent-driven
-
----
-
-### arc-executing-tasks
-
-**Purpose:** Human-in-the-loop task execution with batch checkpoints and verification.
-
-**When to use:** When tasks are already broken down and you implement them in-session with human-in-the-loop checkpoints. For isolated subagent-per-task execution, use arc-agent-driven.
+**When to use:** When a change needs more than one step, when a task list is already waiting to be run, or when choosing between attended and unattended execution.
 
 **Key workflow:**
-1. Load and review task file from `docs/tasks/`
-2. Execute in batches (default 3 tasks per batch)
-3. Follow TDD steps exactly for each task
-4. Present checkpoint report after each batch — wait for feedback
-5. Continue or adjust based on feedback
-6. Use arc-finishing when all tasks complete
+1. Write the list in the v1 checkbox format — stable ids, four markers, a `verify:` command per task
+2. Pick a mode with the user: attended (batch, then report and wait) or unattended
+3. Per task: mark `[~]`, do the work through tdd, run `verify:`, mark `[x]` only on a run you read
+4. Blocked is `[!]` plus a `note:` a stranger could act on — never a guess
+5. On resume, trust the file over memory; never redo an `[x]` task
 
 **Artifacts:**
-- Input: `docs/tasks/<name>-tasks.md`
-- Output: committed code, checkpoint reports
+- Input/output: the task list file (markdown checkboxes) — no second ledger
 
-**Related:** arc-writing-tasks --> **arc-executing-tasks** --> arc-finishing
+**Related:** brainstorming --> **executing** --> arc-finishing
 
 ---
 
@@ -185,7 +160,7 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 - Input: completed branch or worktree with passing tests
 - Output: merged code/epic, PR, preserved branch, or discarded work
 
-**Related:** arc-executing-tasks / arc-agent-driven --> **arc-finishing** --> done
+**Related:** executing --> **arc-finishing** --> done
 
 ---
 
@@ -193,28 +168,6 @@ The complete catalog is grouped by `category` frontmatter. Within each category,
 
 ---
 
-### arc-agent-driven
-
-**Purpose:** Fully autonomous task execution with fresh subagent per task and a single task-reviewer returning both verdicts (spec compliance + task quality).
-
-**When to use:** When tasks need isolated contexts (one fresh subagent + task-reviewer per task) to avoid cross-task pollution. For in-session human-checkpoint execution, use arc-executing-tasks.
-
-**Key workflow:**
-1. Read task list, create TodoWrite tracking
-2. Per task: dispatch implementer subagent with full task text
-3. Dispatch task-reviewer — returns both verdicts (spec compliance + task quality) in one pass
-4. Max 3 review cycles per task — escalate to human if not converging
-5. After all tasks: dispatch final code reviewer, then arc-finishing
-
-**Artifacts:**
-- Input: `docs/tasks/<name>-tasks.md`
-- Output: committed code per task, review reports
-
-**Related:** arc-writing-tasks --> **arc-agent-driven** --> arc-finishing
-
----
-
-### dispatching
 
 **Purpose:** Discipline for work that can run in parallel — proving the pieces
 are independent, isolating each writer in its own worktree, writing a brief a
@@ -254,7 +207,7 @@ The line between the last two is attendance, not risk.
 **When to use:** When walk-away unattended execution across sessions is needed with no human judgment per task. For a present lead monitoring parallel work, use dispatching.
 
 **Key workflow:**
-1. Verify the task list exists (from arc-writing-tasks) and baseline tests pass
+1. Verify the task list exists (from executing) and baseline tests pass
 2. Set bounds: `--max-runs` and optional `--max-cost`
 3. Start loop: `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 20`
 4. Each iteration: read the task list, spawn fresh Claude session, execute task, mark it done
@@ -264,7 +217,7 @@ The line between the last two is attendance, not risk.
 - Input: `specs/<spec-id>/dag.yaml` (required, must be committed)
 - Output: `.arcforge-loop.json` (loop state tracking), committed code per completed task
 
-**Related:** arc-writing-tasks --> **arc-looping** --> arc-finishing
+**Related:** executing --> **arc-looping** --> arc-finishing
 
 ---
 
@@ -290,7 +243,7 @@ The line between the last two is attendance, not risk.
 - Input: feature spec or bug report
 - Output: test file + implementation, both committed
 
-**Related:** arc-writing-tasks --> **tdd** (during execution) --> arc-verifying
+**Related:** executing --> **tdd** (during execution) --> arc-verifying
 
 ---
 
@@ -353,7 +306,7 @@ The line between the last two is attendance, not risk.
 - Input: completed task with commits, review feedback
 - Output: verified fixes or reasoned pushback
 
-**Related:** arc-agent-driven --> **arc-reviewing** --> continue or arc-verifying
+**Related:** executing --> **arc-reviewing** --> continue or arc-verifying
 
 ---
 
@@ -423,7 +376,7 @@ The line between the last two is attendance, not risk.
 - Input: session context, rule files, memory files
 - Output: compacted context focused on next phase
 
-**Related:** compact-suggester hook --> **arc-compacting** --> arc-agent-driven, arc-writing-tasks
+**Related:** compact-suggester hook --> **arc-compacting** --> executing
 
 ---
 
@@ -542,7 +495,7 @@ The line between the last two is attendance, not risk.
 - Input: scenario files in `evals/scenarios/`
 - Output: benchmark results in `evals/benchmarks/latest.json`, eval reports
 
-**Related:** arc-brainstorming --> **evaluating** --> writing-skills (for shipping)
+**Related:** brainstorming --> **evaluating** --> writing-skills (for shipping)
 
 ---
 
@@ -551,23 +504,19 @@ The line between the last two is attendance, not risk.
 ### 1. Small Feature
 
 ```
-using --> arc-writing-tasks --> arc-executing-tasks --> /finishing
+using --> executing --> /finishing
                                         |
                                    (if bugs) --> debugging --> tdd
 ```
 
-Best for single features with clear requirements. Use arc-writing-tasks to break down, execute with human checkpoints, finish when done.
+Best for single features with clear requirements. Use executing to write the list, run it with checkpoints, and finish when done.
 
 ### 2. Large Epic
 
 ```
-arc-brainstorming --> arc-writing-tasks --> dispatching
-     |                                            |
-     v                                            v
-  design.md                              arc-agent-driven
-                                                  |
-                                                  v
-                                            /finishing
+brainstorming --> executing --> dispatching
+     |               (write the list)              |
+     v
 ```
 
 Full workflow for complex projects. Explore design, break it into tasks, isolate in worktrees, dispatch parallel work, implement with subagents.
@@ -599,23 +548,26 @@ Capture session insights in diaries, extract patterns after 5+ entries, and clus
 
 ## Comparison Tables
 
-### arc-executing-tasks vs arc-agent-driven
+### executing: attended vs unattended
 
-| | arc-executing-tasks | arc-agent-driven |
+Both modes live in one skill; the switch is chosen with the user before the
+first task.
+
+| | Attended | Unattended |
 |---|---|---|
-| **Model** | Human-in-the-loop batches | Fully autonomous subagents |
-| **Review** | Human reviews each batch | Single task-reviewer (spec + quality) |
-| **Best for** | Tasks needing judgment | Mechanical tasks with clear specs |
-| **Risk** | Slower (human bottleneck) | May diverge without oversight |
+| **Who runs tasks** | you, in this session | subagents, or a loop with nobody watching |
+| **Between tasks** | report and wait | continue on the file's evidence alone |
+| **Best for** | judgment calls, shifting design, wide blast radius | mechanical, well-scoped, independently verifiable tasks |
+| **Risk** | slower (human bottleneck) | spends tokens and commits unobserved |
 
-### arc-brainstorming vs arc-writing-tasks
+### brainstorming vs executing
 
-| | arc-brainstorming | arc-writing-tasks |
+| | brainstorming | executing |
 |---|---|---|
-| **Input** | Rough idea | Approved design/spec |
-| **Output** | design.md | tasks.md with exact code |
-| **Mode** | Exploratory, Socratic | Prescriptive, detailed |
-| **Requires** | Nothing | Design document |
+| **Input** | Rough idea | Settled design |
+| **Output** | A design narrative | A checkbox task list, then the work |
+| **Mode** | Exploratory, one question at a time | Prescriptive, verify-driven |
+| **Requires** | Nothing | A goal that is no longer in question |
 
 ---
 
@@ -624,7 +576,7 @@ Capture session insights in diaries, extract patterns after 5+ entries, and clus
 These principles keep ArcForge disciplined without making every task follow the same workflow:
 
 1. **Smallest Useful Workflow** — use direct answers for simple/read-only tasks; route only when a skill adds leverage
-2. **Explore Before Committing to Design** — arc-brainstorming: research existing patterns before proposing new
+2. **Explore Before Committing to Design** — brainstorming: research existing patterns before proposing new
 3. **No Guidance Without an Observed Failure** — writing-skills: a no-guidance control comes before any behavior-shaping text
 4. **No Fix Without Hypothesis** — arc-debugging: Observe, Hypothesize, Test, Fix cycle
 5. **No Completion Claim Without Evidence** — arc-verifying: evidence-first verification
