@@ -1,9 +1,9 @@
 export const meta = {
-  name: 'arc-release-audit',
+  name: 'release-audit',
   description:
     'Read-only release audit engine for arcforge: verify pre-flight gates, fan out per-commit CHANGELOG narrative, adversarially audit shipped doc surface. Produces a release report; performs NO mutations and runs NO live evals.',
   whenToUse:
-    'Run during an arc-releasing bump (after the benchmark is fresh) to generate a reference-grade CHANGELOG draft + a verified doc-audit before the human applies the version bump, commit, and tag. args: { version, prevTag, prevVersion, date }.',
+    'Run during a `releasing` bump (after the benchmark is fresh) to generate a reference-grade CHANGELOG draft + a verified doc-audit before the human applies the version bump, commit, and tag. args: { version, prevTag, prevVersion, date }.',
   phases: [
     { title: 'Preflight', detail: 'gates: range/tag, benchmark freshness, version-sync — verify, never execute' },
     { title: 'Narrative', detail: 'one reader per commit → synthesize CHANGELOG section' },

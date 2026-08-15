@@ -3,7 +3,7 @@
 /**
  * check-benchmark-freshness.js — fail a release if its eval benchmark is stale.
  *
- * arc-releasing's Iron Law: any release that touched eval-backed surface must
+ * The releasing skill's Iron Law: any release that touched eval-backed surface must
  * regenerate a fresh benchmark before tagging. `release.yml` already enforces
  * version-sync and tag-match, but nothing checked benchmark freshness — it was a
  * hand-run step in the skill. This wires it.
