@@ -874,6 +874,94 @@ Do something.
       expect(fs.readFileSync(result.transcript, 'utf8')).toContain('"type":"assistant"');
     });
 
+    // ── killed-trial classification (P4 defect A) ──────────────
+    // A trial killed at the timeout ceiling emits no result event; whether its
+    // half transcript is a measurement depends on the agent having finished.
+    const killedExec = (rawStream) => ({
+      stdout: rawStream,
+      stderr: '',
+      exitCode: 143,
+      error: Object.assign(new Error('ETIMEDOUT'), {
+        code: 'ETIMEDOUT',
+        signal: null,
+        status: 143,
+      }),
+    });
+    const streamOf = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
+    const agentText = (text) => ({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text }] },
+    });
+    const agentTool = (name, input) => ({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name, input }] },
+    });
+    const killScenario = (name) => ({
+      name,
+      scenario: 'Produce a two-axis report.',
+      context: '',
+      assertions: ['A'],
+      grader: 'model',
+      graderConfig: 'Score it.',
+    });
+
+    it('should flag a killed trial whose agent never finished its turn as infraError', () => {
+      mockUtils.execCommand.mockReturnValueOnce(
+        killedExec(
+          streamOf(
+            agentText('Let me look at the diff'),
+            agentTool('Bash', { command: 'git diff' }),
+          ),
+        ),
+      );
+
+      const result = runTrial(killScenario('killed-incomplete'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('trial_killed_incomplete');
+      // The half transcript is still written — excluded from scoring, not lost.
+      expect(fs.readFileSync(result.transcript, 'utf8')).toContain('git diff');
+    });
+
+    it('should score a killed trial that had already delivered its answer', () => {
+      mockUtils.execCommand.mockReturnValueOnce(
+        killedExec(
+          streamOf(
+            agentTool('Bash', { command: 'git diff' }),
+            agentText('Axis 1: ... Axis 2: ...'),
+          ),
+        ),
+      );
+
+      const result = runTrial(killScenario('killed-complete'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBeUndefined();
+      expect(result.errorType).toBeUndefined();
+      expect(result.output).toContain('Axis 1');
+    });
+
+    it('should not flag an unkilled trial that ends on a tool call', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: streamOf(agentText('Checking'), agentTool('Bash', { command: 'npm test' })),
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = runTrial(killScenario('unkilled-tool-last'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBeUndefined();
+      expect(result.errorType).toBeUndefined();
+    });
+
     it('should time a trial by wall clock and keep the CLI-reported duration separately', () => {
       const scenario = {
         name: 'duration-both-clocks',

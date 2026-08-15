@@ -31,6 +31,7 @@ const {
   buildIsolationSettings,
 } = require('./eval-trial-env');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
+const { isTrialKilled, isOutputComplete } = require('./eval-trial-outcome');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -261,6 +262,23 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     ...(model ? { model } : {}),
     ...(runId ? { runId } : {}),
   };
+  // A trial the runner killed before the agent finished its turn is an
+  // instrument failure, not behaviour: its half transcript otherwise grades as
+  // if the agent had chosen to stop there (P4 defect A — four of five two-axis
+  // treatment trials clipped at the 300s ceiling scored 0.2 with no error flag,
+  // so scorableResults() kept them and the delta moved against the treatment).
+  // Killed AND incomplete, both: a killed trial that had already delivered its
+  // answer is a valid measurement (the same P4 pool has one, scored 1.0).
+  if (isTrialKilled(result) && !isOutputComplete({ textResult, actions })) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: 'Trial killed before the agent finished its turn (runner timeout)',
+      errorType: 'trial_killed_incomplete',
+      infraError: true,
+    };
+  }
+
   if (result.exitCode !== 0 && !parsedOutput) {
     // Only treat as error if no usable output was captured
     return { ...base, error: result.stderr };
