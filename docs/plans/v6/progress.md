@@ -290,6 +290,10 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
 **AC（行為，全量 benchmark）**：
 - 量測協定：現役語料庫全數 **re-preflight**（P6.5 verifier D2 約束：bucket sweep 已使 hash 全失效）
   k=3；之後 scenario 檔凍結，任何再編輯 = 該支重新 preflight。
+  - **量測前釐清（2026-08-15，先於任何量測數字）**：4 支帶明示 `## Preflight: skip` 政策的
+    scenario（code-review answering-feedback / range-fidelity、compacting-persist、d1-bare-cli）
+    依其自身政策免 preflight——D2 約束的機理是 hash cache 失效，skip 政策 scenario 本無 cache
+    可失效。re-preflight 全量 = 全部非 skip 政策的現役 + 新增/重寫支。
 - benchmark = 每支現役 scenario 新鮮 treatment pool（A/B campaign 產出的 treatment 臂，或
   `eval run` k=5）；error trial 剔除，有效 <4 補跑；`eval report --since <P7 量測窗起點>` →
   latest.json + 日期版。
