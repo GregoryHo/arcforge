@@ -1741,6 +1741,7 @@ Do something.
           passed: true,
           score: 1,
           duration_ms: 321,
+          api_duration_ms: 200,
           runId: '20260317-100000',
         }),
         tempDir,
@@ -1754,8 +1755,15 @@ Do something.
       expect(fs.existsSync(rawLatestPath)).toBe(true);
       expect(fs.existsSync(rawSnapshotPath)).toBe(true);
       const raw = JSON.parse(fs.readFileSync(rawLatestPath, 'utf8'));
+      // Both clocks reach the raw snapshot — it is the artifact duration
+      // distributions (timeout-ceiling review) are read from.
       expect(raw.rows).toEqual([
-        expect.objectContaining({ scenario: 'raw-file', condition: 'results', duration_ms: 321 }),
+        expect.objectContaining({
+          scenario: 'raw-file',
+          condition: 'results',
+          duration_ms: 321,
+          api_duration_ms: 200,
+        }),
       ]);
     });
 

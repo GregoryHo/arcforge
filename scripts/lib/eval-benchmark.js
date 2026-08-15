@@ -129,6 +129,7 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
     for (const result of results) {
       const { assertion_count, assertion_passed_count } = assertionSummary(result);
       const durationMs = resultMetricValue(result, 'duration_ms');
+      const apiDurationMs = resultMetricValue(result, 'api_duration_ms');
       const inputTokens = resultMetricValue(result, 'input_tokens');
       const outputTokens = resultMetricValue(result, 'output_tokens');
       const totalTokens = resultMetricValue(result, 'total_tokens');
@@ -147,6 +148,7 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,
+        api_duration_ms: apiDurationMs,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: totalTokens,
