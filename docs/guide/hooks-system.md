@@ -1,267 +1,128 @@
-# Hooks System Guide
+# Hooks
 
-## Overview
+arcforge ships six hooks and wires them into Claude Code across six session
+events. They load automatically when the plugin is installed — there is nothing
+to configure, and nothing to add to your `settings.json`.
 
-Arcforge hooks extend Claude Code sessions with automated behaviors — tracking tool usage, injecting context, suggesting compaction, and logging session activity. Hooks fire on lifecycle events (session start, tool use, stop, etc.) and run as child processes that communicate via stdin/stdout/stderr.
+Hooks run around the events of a session: it starts, you send a message, a tool
+is about to run, a tool just ran, the context is about to be compacted, the
+session stops. What follows is what each one actually does to your session.
 
-This guide covers the hook I/O system: what hooks receive, how to output, and who sees what.
+## What runs, and when
 
-## How Hooks Work
+| Event | Registration | What you notice |
+|-------|--------------|-----------------|
+| SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, recent sessions |
+| SessionStart | `session-start` | Nothing; it creates this session's record in the background |
+| UserPromptSubmit | `user-message-counter` | Nothing; it counts your messages |
+| PreToolUse | `secrets-guard` | A warning if an edit or a commit looks like it contains a credential |
+| PreToolUse | `observe-pre` | Nothing, unless you have enabled learning |
+| PostToolUse | `compact-suggester` | A suggestion to `/compact` once the session gets long |
+| PostToolUse | `observe-post` | Nothing, unless you have enabled learning |
+| PreCompact | `pre-compact` | Nothing; it saves what would otherwise be lost to compaction |
+| Stop | `session-end` | Nothing; it finalizes the session record |
 
-```
-Claude Code Event (e.g., PostToolUse)
-  │
-  ├─ Match hook registration (hooks.json matcher)
-  ├─ Spawn hook process
-  │   ├─ stdin:  JSON with event data
-  │   ├─ stdout: JSON response (systemMessage, additionalContext, or passthrough)
-  │   ├─ stderr: Debug logs (visible in verbose mode only)
-  │   └─ exit:   0 = success, 2 = block (specific events only)
-  │
-  └─ Claude Code processes hook output
-```
+Nine registrations, six hooks: session tracking accounts for three of them
+(`inject-context`, `session-start`, `session-end`) and observation for two
+(`observe-pre`, `observe-post`).
 
-Each hook invocation is a **fresh process** — no in-memory state persists between calls. Use file-based counters (`createSessionCounter`) for persistent state.
+## The ones you will actually see
 
-## Hook Input (stdin)
+### `secrets-guard` — a warning, never a block
 
-All hooks receive JSON via stdin with these common fields:
+Before an `Edit` or `Write` lands, and before a `git commit` runs, this hook
+scans the content for credential shapes: AWS access keys, private-key headers,
+Slack and GitHub tokens, and hardcoded assignments like `api_key = "…"`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `session_id` | string | Session UUID |
-| `transcript_path` | string | Full path to session transcript JSONL |
-| `cwd` | string | Project working directory |
-| `hook_event_name` | string | Event type (e.g., `"PostToolUse"`) |
+On a hit you get a warning that names the *category* of finding. It never echoes
+the matched string, so the warning itself cannot leak the secret, and it never
+denies the tool call — you stay in control of what happens next.
 
-### Event-Specific Fields
+Lines and paths that look like tests, examples, or fixtures are exempt, so the
+usual false positives stay quiet.
 
-**SessionStart**
+### `compact-suggester` — a nudge when the session gets long
 
-| Field | Values | Description |
-|-------|--------|-------------|
-| `source` | `startup`, `resume`, `clear`, `compact` | What triggered the session start |
+Counting tool calls, it suggests `/compact` at 50 and then every 25 after that.
+The wording adapts to what you have been doing: during a heavy writing stretch it
+stays out of the way, and in a read-heavy stretch it speaks up sooner, because
+that is when compacting costs you least.
 
-> **Note**: The field is `source`, not `trigger`. This was confirmed against the official Claude Code schema.
+It is a suggestion. Nothing compacts unless you say so.
 
-**UserPromptSubmit**
+### `inject-context` — what carries into a new session
 
-| Field | Description |
-|-------|-------------|
-| `permission_mode` | Current permission mode (e.g., `"default"`) |
-| `prompt` | The user's submitted prompt text |
+At the start of a session — and again after a compaction rebuilds the context —
+this hook injects a short summary: which instincts are active, whether anything
+is waiting for your review, and where the previous session left off.
 
-**PreToolUse / PostToolUse**
+If you have never enabled learning, there are no instincts and this is close to
+silent.
 
-| Field | Description |
-|-------|-------------|
-| `permission_mode` | Current permission mode |
-| `tool_name` | Tool being called (e.g., `"Bash"`, `"Edit"`, `"Write"`) |
-| `tool_input` | Tool parameters (e.g., `{file_path, content}` for Write) |
-| `tool_use_id` | Unique ID for this tool invocation |
-| `tool_response` | (PostToolUse only) Tool execution result |
+## The quiet ones
 
-**Stop**
+`user-message-counter`, `session-start`, and `session-end` maintain the record of
+the session itself: how long it ran, how much happened in it. That record is what
+the learning loop reads later, and what a diary is built from.
 
-| Field | Description |
-|-------|-------------|
-| `permission_mode` | Current permission mode |
-| `stop_hook_active` | Whether a stop hook is currently running |
-| `last_assistant_message` | Claude's final response text |
+`pre-compact` runs just before compaction and captures what is about to be
+dropped, so the part of a long session worth keeping survives the boundary.
 
-**SessionEnd**
+The two `observe` registrations record tool calls for pattern detection — **but
+only if you have turned learning on**. With learning disabled, the default, each
+checks one
+file, finds no configuration, and exits before doing any work. Nothing about your
+session is recorded until you opt in:
 
-| Field | Description |
-|-------|-------------|
-| `reason` | Why the session ended (e.g., `"other"`) |
-
-### Reading Input in Hooks
-
-```js
-const { readStdinSync, parseStdinJson, setSessionIdFromInput } = require('../../scripts/lib/utils');
-
-const stdin = readStdinSync();
-const input = parseStdinJson(stdin);
-setSessionIdFromInput(input);  // Cache session ID for counter operations
+```bash
+arcforge learn status
 ```
 
-## Hook Output — Who Sees What
+See the [learning guide](learning-dashboard.md) for what happens after you do.
 
-This is the most important section. Different output mechanisms reach different audiences:
+## How hooks behave when something goes wrong
 
-### Output Visibility Matrix
+Every arcforge hook is **fail-open**. If one throws — a corrupt state file, a
+full disk, a permissions problem — it exits quietly and your session continues
+exactly as it would have. A hook can decline to do its own job; it can never
+take the session down with it.
 
-| Mechanism | Audience | Visible? | Use For |
-|-----------|----------|----------|---------|
-| **stderr** | **Nobody** | **NO** — condensed, invisible even in Ctrl+O | Internal diagnostics only |
-| **systemMessage** (stdout JSON) | **User (always)** | **YES** — shown as "HookEvent:Tool says:" | Suggestions, warnings |
-| **additionalContext** (stdout JSON) | **Claude** | YES — injected into context | Context injection |
-| **Exit code 2** | Claude Code engine | N/A — blocks event | Blocking actions |
+This is why you will not see hook stack traces. Internal diagnostics go to
+stderr, where Claude Code discards them, and only deliberate user-facing messages
+(the credential warning, the compact suggestion, the session summary) reach you.
 
-### stderr — Invisible (DO NOT rely on)
+## Blocking versus advisory
 
-```js
-const { log } = require('../../scripts/lib/utils');
-log('Processing tool call...');  // Goes to stderr — NOBODY SEES THIS
+Of the events arcforge registers on, only `PreToolUse` is able to stop a tool
+call. Everything else is advisory by construction: `PostToolUse` fires after the
+work is done, and `SessionStart`, `PreCompact`, and `Stop` are not decision
+points at all.
+
+**No arcforge hook denies anything.** `secrets-guard` is the only one that could,
+and it is deliberately warn-only. The toolkit's position is that a false positive
+should cost you a sentence to read, not a blocked edit.
+
+## Blocking the session, and how arcforge avoids it
+
+A synchronous hook runs on the critical path — the tool waits for it. The two
+observation registrations are marked async precisely so their disk writes never
+join that path, and the session-start record is built asynchronously for the same
+reason. What is left on the synchronous path is small and bounded: a scan of the
+text you were about to write, a counter increment, a context injection at the
+start.
+
+In practice hooks are not what makes a session feel slow. If one ever is, the
+first thing to check is whether learning is enabled, since that is what turns the
+observers from a single existence check into real work.
+
+## Turning things off
+
+There is no per-hook switch, because the hooks that could accumulate anything
+about you are already gated behind learning being enabled:
+
+```bash
+arcforge learn disable --project
 ```
 
-**What happens**: Claude Code condenses ALL hook stderr into `"N hooks ran"`. The individual messages are **completely invisible** — not shown in normal mode, not shown in Ctrl+O transcript mode, not shown anywhere. This was verified on PostToolUse (4 hooks) and Stop (2 hooks) events.
-
-**CRITICAL**: This means stderr is useless for communicating with users. It exists only for internal diagnostics that nobody will read unless they add custom logging.
-
-**Use for**: Diagnostic messages, progress tracking, debug info.
-
-**Do NOT use for**: User-facing suggestions or warnings — they will be invisible.
-
-### systemMessage — User-Visible Messages (Always Shown)
-
-```js
-const { output } = require('../../scripts/lib/utils');
-output({ systemMessage: '📊 50 tool calls. Consider /compact.' });
-```
-
-**What happens**: Claude Code displays the message directly to the user, labeled as `PostToolUse:HookName says:`. Not condensed, always visible.
-
-**Use for**: Compact suggestions, quality warnings, actionable notifications.
-
-**Example output in terminal**:
-```
-PostToolUse:Bash says:
-  📊 50 tool calls (mostly reads) — looks like a research/exploration phase.
-  If you're transitioning to implementation, /compact now to free context.
-```
-
-### additionalContext — Claude Context Injection
-
-```js
-const { outputContext } = require('../../scripts/lib/utils');
-outputContext('You have arcforge skills available...', 'SessionStart');
-```
-
-**What happens**: The text is injected into Claude's context as `additionalContext`. Claude sees it as part of its instructions. The user does NOT see it directly.
-
-**Available on**: SessionStart, UserPromptSubmit, and PostToolUse (PostToolUse spike-verified on Claude Code v2.1.172, including Task-subagent tool calls; rendered to the model as "PostToolUse:<Tool> hook additional context: <text>"). Other events ignore this field. For PostToolUse, use `outputPostToolUseFeedback(reason, { systemMessage })` from `scripts/lib/utils.js` — the plain `outputContext` helper is scoped to SessionStart/UserPromptSubmit.
-
-**Use for**: Injecting skill information, active instincts, pending action notifications.
-
-**Output format** (handled by `outputContext`):
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "SessionStart",
-    "additionalContext": "Your injected text here..."
-  }
-}
-```
-
-### Exit Code 2 — Blocking Actions
-
-```js
-// In a PreToolUse hook — block dangerous command
-if (isDangerous(input.tool_input.command)) {
-  console.error('Blocked: dangerous command detected');
-  process.exit(2);
-}
-```
-
-**What happens**: Claude Code prevents the action (tool call, prompt submission, or stop).
-
-**Available on**: PreToolUse, UserPromptSubmit, Stop events only. Other events ignore exit code 2.
-
-## Counter System
-
-Hooks run as fresh processes — use file-based counters for persistent state:
-
-```js
-const { createSessionCounter } = require('../../scripts/lib/utils');
-
-const counter = createSessionCounter('my-counter');
-const current = counter.read();    // Read current value
-counter.write(current + 1);       // Increment
-counter.reset();                   // Reset to 0
-counter.getFilePath();             // Get file path (for debugging)
-```
-
-Counter files are stored at `{TMPDIR}/arcforge-{name}-session-{sessionId}`.
-
-**Important**: If multiple systems need independent counters, use different names. Shared counter names create coupling (e.g., user-message-counter uses `user-count`, diary system uses `tool-count`).
-
-## Sync vs Async Hooks
-
-In `hooks.json`:
-
-<!-- doc-ref-lint: ignore R1 placeholder hook path in an illustrative config example -->
-```json
-{
-  "type": "command",
-  "command": "node hooks/my-hook/main.js",
-  "async": true  // ← fire-and-forget, non-blocking
-}
-```
-
-| Mode | Behavior | Use For |
-|------|----------|---------|
-| Sync (default) | Claude Code waits for hook to finish | Context injection, blocking decisions |
-| Async (`"async": true`) | Fire-and-forget, runs in background | Logging, tracking, observation |
-
-**Rule of thumb**: If the hook's output affects Claude's behavior → sync. If it only logs/tracks → async.
-
-## Registered Hooks (Current)
-
-| Event | Hook | Sync/Async | Purpose |
-|-------|------|-----------|---------|
-| SessionStart | session-tracker/inject-context | sync | Inject active instincts + pending actions |
-| SessionStart | session-tracker/start | async | Initialize session file, run decay |
-| UserPromptSubmit | user-message-counter | sync | Count user prompts |
-| PreToolUse | secrets-guard | sync | Block writes that would commit a secret |
-| PreToolUse | observe | async | Record tool call to observations |
-| PostToolUse | compact-suggester | sync | Suggest /compact at threshold |
-| PostToolUse | observe | async | Record tool result |
-| PreCompact | pre-compact | sync | Log compaction, update session |
-| Stop | session-tracker/end | sync | Update session, generate diary |
-
-## Testing Hooks
-
-### Unit Tests (function-level)
-
-Test individual exported functions in isolation:
-
-```js
-const { shouldSuggest, buildMessage } = require('../compact-suggester/main');
-assert.ok(shouldSuggest(50));
-assert.ok(!shouldSuggest(30));
-```
-
-### E2E Tests (execution-level)
-
-Test the full stdin → script → stdout/stderr pipeline using `spawnSync`:
-
-```js
-const { spawnSync } = require('node:child_process');
-
-const result = spawnSync('node', ['hooks/compact-suggester/main.js'], {
-  input: JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Read', ... }),
-  encoding: 'utf-8',
-});
-
-// spawnSync captures BOTH stdout and stderr (unlike execFileSync)
-assert.strictEqual(result.status, 0);
-assert.ok(result.stdout.includes('systemMessage'));
-```
-
-**Important**: Use `spawnSync`, not `execFileSync`. `execFileSync` discards stderr on success — you can't verify hook warnings or suggestions.
-
-### Eval (behavioral verification)
-
-For hooks that inject context into Claude (session-tracker/inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. Scenario format and grader options are documented in `docs/guide/eval-system.md`.
-
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| Using `console.log` for debug | Use `log()` (stderr) — console.log goes to stdout and corrupts hook protocol |
-| Using `logHighlight()` or `log()` for user-facing messages | Use `output({ systemMessage: "..." })` — stderr is completely invisible (not just condensed) |
-| Reading `input.trigger` on SessionStart | Use `input.source` — official field name is `source` |
-| Sharing counter names across independent systems | Use separate counter names (e.g., `user-count` vs `tool-count`) |
-| Using `execFileSync` in tests | Use `spawnSync` — captures stderr on success |
-| Testing only exit code 0 | Test actual behavior: check stdout JSON, stderr content, file side-effects |
+That stops observation and analysis for the project. To remove the hooks
+entirely, uninstall the plugin — they load and unload with it.
