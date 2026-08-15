@@ -1,16 +1,16 @@
-# D3 — task list format (frozen, v1)
+# Task List Format (v1)
 
-Status: **frozen in P1**. Owner: `scripts/lib/task-list.js` (engine side, per D8).
-Consumers: `looping` (P6 skill), `scripts/loop.js` (P2 shell), `task-list`
-(P6 skill). Changing the grammar after P1 means bumping the banner version and
-updating the parser + this file in the same commit.
+Status: **frozen**. Owner: `scripts/lib/task-list.js` (the engine side — skills
+never hand-parse this format). Consumers: the `looping` and `executing` skills
+and the `arcforge loop` command. Changing the grammar means bumping the banner
+version and updating the parser and this file in the same commit.
 
 ## Why a markdown checkbox list
 
-D3 keeps looping and drops the DAG. The task list is the loop's only state, so
-it has to survive the two things that kill in-memory state: a `/compact` inside
-a session, and the session ending entirely. A plain file in the repo survives
-both, is diffable, is editable by a human mid-run, and needs no engine to read.
+The task list is the loop's only state, so it has to survive the two things
+that kill in-memory state: a `/compact` inside a session, and the session
+ending entirely. A plain file in the repo survives both, is diffable, is
+editable by a human mid-run, and needs no engine to read.
 
 It also has to be readable by a **fresh subagent with zero context**. That is
 the constraint that shapes the grammar: the file explains its own notation in a
@@ -64,13 +64,11 @@ Rules:
   one. `updateTaskStatus` looks tasks up by id and rewrites only the marker.
 - **The status writer can also write the `note:`.** `note:` is REQUIRED on a
   `[!]` task, so a writer able to set `blocked` but not to state a reason
-  produces a file its own validator rejects — which is exactly what happened in
-  P2, where `scripts/loop.js` had to swallow that rule to resume over its own
-  output. `updateTaskStatus` therefore takes an optional 4th argument: the
-  reason. It replaces the task's existing `note:` bullet or inserts one below
-  its detail block, and touches nothing else. Swallowing a validation rule in a
-  consumer is not an option — the rule moves into the writer or it stops being
-  a rule.
+  produces a file its own validator rejects. `updateTaskStatus` therefore takes
+  an optional 4th argument: the reason. It replaces the task's existing `note:`
+  bullet or inserts one below its detail block, and touches nothing else.
+  Swallowing a validation rule in a consumer is not an option — the rule moves
+  into the writer or it stops being a rule.
 - **The parser is strict.** A malformed checkbox line throws with the line
   number and the expected shape rather than being skipped. A silently ignored
   task is a task the loop never runs — the worst possible failure for a file

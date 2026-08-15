@@ -20,7 +20,7 @@ directory entry:
 "skills": ["./skills/core/"]
 ```
 
-**Verified mechanics** (spike: `docs/plans/v6/spikes/plugin-skills-whitelist.md`):
+**Verified mechanics** (empirically tested against Claude Code, not inferred):
 
 - Nested directories are **not** auto-discovered. Remove the `skills` field and
   a nested layout loads nothing. The whitelist is not a filter — it is the only
@@ -39,7 +39,7 @@ Consequences to work with, not around:
 - The buckets are not tracked when empty; create one at the moment a skill moves
   into it rather than keeping a placeholder.
 - Guards resolve skills through the bucket. `skills/core` is the single point in
-  `tests/scripts/v6-legacy-skills.js` (jest) and `tests/skills/test_skill_structure.py`
+  `tests/scripts/skill-tree.js` (jest) and `tests/skills/test_skill_structure.py`
   (pytest); the D8 lint treats a bucket segment as generic tree access and keys
   on the skill name inside it.
 
@@ -74,9 +74,8 @@ Consequences to work with, not around:
 | `$CLAUDE_ENV_FILE` | SessionStart only | File to persist env vars |
 | `$CLAUDE_CODE_REMOTE` | All hooks | `"true"` in web environments, unset in CLI |
 
-There is no arcforge-specific env var. `ARCFORGE_ROOT` was removed along with
-the `inject-skills` hook that set it; skills reach the engine by subprocess CLI
-(D1), never by injected environment. Don't reintroduce one.
+There is no arcforge-specific env var, deliberately: skills reach the engine by
+subprocess CLI (D1), never by injected environment. Don't introduce one.
 
 `${CLAUDE_PLUGIN_ROOT}` is a **hooks-only** variable — spike-verified UNSET in
 skill-triggered Bash. The skill → engine boundary is the bare `arcforge` CLI
@@ -89,8 +88,8 @@ is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 - Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/`
 - Skills become namespaced when installed: `/arcforge:<skill-name>` — the bucket
   is a layout detail, never part of the name
-- There is no `agents/`, `templates/`, or `commands/` directory. Those component
-  types were removed; don't reintroduce one without a design decision
+- There is no `agents/`, `templates/`, or `commands/` directory. Adding a new
+  component type is a design decision, not a convenience
 
 ## Distribution
 

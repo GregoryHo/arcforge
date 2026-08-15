@@ -132,7 +132,7 @@ Skills are the most common contribution type. Read this section carefully.
 - `code-review` — the artifact under review, when the gerund reads worse
 
 **Bad names:**
-- `arc-brainstorming` — the `arc-` prefix is gone; the namespace supplies it <!-- doc-ref-lint: ignore R4 deliberate bad-name teaching example, not a skill reference -->
+- `arc-brainstorming` — prefixed; the plugin namespace already supplies `/arcforge:` <!-- doc-ref-lint: ignore R4 deliberate bad-name teaching example, not a skill reference -->
 - `coordinator` — agent-noun, use a gerund
 - `debug` — bare verb, use `debugging`
 
@@ -151,7 +151,7 @@ skills/
 ### Frontmatter Format
 
 The schema is **frozen**, and its single authority is
-`docs/plans/v6/decisions/skill-schema.md` — by that document's own rule it must
+`docs/decisions/skill-schema.md` — by that document's own rule it must
 not be restated elsewhere, so this section deliberately does not copy the field
 table. The mechanical form of the schema is `tests/skills/test_skill_structure.py`:
 run `npm run test:skills` and the failures name exactly what the schema demands
