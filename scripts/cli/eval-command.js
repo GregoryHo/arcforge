@@ -419,7 +419,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
 
     if (baseline.length === 0 || treatment.length === 0) {
-      console.error('Error: need both baseline and treatment results. Run: arcforge eval ab <name>');
+      console.error(
+        'Error: need both baseline and treatment results. Run: arcforge eval ab <name>',
+      );
       process.exit(1);
     }
 
