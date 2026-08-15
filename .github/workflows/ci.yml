@@ -40,6 +40,10 @@ jobs:
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
           node scripts/check-skill-eval-annotation.js
+      - name: Annotate rubric edits lacking a version bump
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: node scripts/check-eval-version-bump.js
 
   test:
     runs-on: ubuntu-latest
