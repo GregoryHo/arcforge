@@ -81,10 +81,15 @@ function parseActionsFromTranscript(richTranscript) {
   const blocks = richTranscript.split('\n\n').filter((b) => b.trim());
   const actions = [];
   for (const block of blocks) {
-    const toolMatch = block.match(/^\[Tool: ([^\]]+)\]\s*(.*)/);
+    // Whole block, not the first line: a multi-line Bash command kept only its
+    // first line, so `[tool_called] Bash:<pattern>` could not see anything the
+    // agent ran after a line break. Same instrument-fix lineage as the trial
+    // timeout raises — it changes what assertions can match, so pools that
+    // straddle it are not directly comparable.
+    const toolMatch = block.match(/^\[Tool: ([^\]]+)\]\s*([\s\S]*)/);
     if (toolMatch) {
-      const firstLine = toolMatch[2].split('\n')[0];
-      actions.push({ type: 'tool', name: toolMatch[1], args: firstLine, index: actions.length });
+      const args = toolMatch[2].trim();
+      actions.push({ type: 'tool', name: toolMatch[1], args, index: actions.length });
       continue;
     }
     const textMatch = block.match(/^\[Assistant\]\s*([\s\S]*)/);
