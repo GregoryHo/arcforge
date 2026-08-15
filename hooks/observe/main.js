@@ -442,7 +442,7 @@ function main() {
     const event = phase === 'pre' ? 'tool_start' : 'tool_end';
 
     // Build observation entry — Layer 1 ObservationSkeleton per
-    // docs/plans/references/learning-curator-schema/layer-1-observation-collection.md.
+    // docs/decisions/learning-curator-schema/layer-1-observation-collection.md.
     const observation = {
       schema_version: 1,
       ts: new Date().toISOString(),

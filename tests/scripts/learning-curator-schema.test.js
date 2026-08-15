@@ -549,7 +549,7 @@ describe('REJECTION_CODES — canonical code union', () => {
   });
 
   it('includes the canonical Layer 5 spec union', () => {
-    // From docs/plans/references/learning-curator-schema/layer-5-candidate-queue-lifecycle.md
+    // From docs/decisions/learning-curator-schema/layer-5-candidate-queue-lifecycle.md
     // CandidateRejectionReason.code
     const canonicalUnion = [
       'schema_invalid',

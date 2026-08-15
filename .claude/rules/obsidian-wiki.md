@@ -12,9 +12,8 @@ The Obsidian vault is arcforge's knowledge base. Use `/maintaining-obsidian` for
 | Skills | `skills/core/*/SKILL.md` |
 | Hook docs | `hooks/*/README.md` |
 | Guides | `docs/guide/*.md` |
-| Decision records | `docs/decisions/*.md` |
-| Design docs | `docs/plans/**/*-design.md` |
-| Research docs | `docs/research/*.md` |
+| Decision records | `docs/decisions/**/*.md` |
+| Product specs | `product/specs/*.md`, `product/ROADMAP.md` |
 
 ## Out of Scope
 

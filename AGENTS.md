@@ -19,6 +19,10 @@ harness-neutral.** Nothing here changes what arcforge targets.
    session).
 3. `CONTRIBUTING.md` — workflows: dev setup, skill authoring process (the Iron
    Law), PR expectations.
+4. `product/` — the product's living specs, roadmap, backlog, and decision log,
+   maintained per `product/AGENTS.md`. Product-level "what and why" lives there
+   (change the product → change its spec in the same PR); everything above is
+   the engineering "how".
 
 ## Non-negotiables (pointers, not restatements)
 
