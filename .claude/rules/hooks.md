@@ -7,19 +7,23 @@ paths:
 
 ## Language
 
-- Node.js only (exception: `inject-skills/main.sh` for environment injection)
-- Must be cross-platform — no bash for hook logic
+- Node.js only — no bash for hook logic
+- Must be cross-platform
 
 ## Structure
 
 ```
 hooks/
   hooks.json              # Hook registration
-  run-hook.cmd            # Dispatcher
+  __tests__/              # Node --test suites
   <hook-name>/
     main.js               # Entry point
     README.md             # Hook documentation
 ```
+
+`session-tracker` is the one component with multiple entry points
+(`start.js`, `end.js`, `inject-context.js`) because it spans the session
+lifecycle; each is registered separately in `hooks.json`.
 
 ## Error Handling
 

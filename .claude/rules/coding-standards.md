@@ -33,7 +33,7 @@ Arcforge uses different error strategies by layer:
 ### Library code (`scripts/lib/`)
 Throw with context — callers decide how to handle:
 ```js
-throw new Error(`Failed to read DAG: ${err.message}`);
+throw new Error(`Failed to read task list: ${err.message}`);
 ```
 
 ### Hooks (`hooks/`)

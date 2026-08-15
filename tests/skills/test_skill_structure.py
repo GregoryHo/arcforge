@@ -8,13 +8,11 @@ behavioral protection is the eval layer's job.
 Skills are discovered dynamically, so merges, renames, and new skills need zero
 test edits. Paths are anchored to the repo root, so the suite is cwd-proof.
 
-Grandfathering (v6 P1): the 30 v5 skills predate the frozen schema and the
-`/name` composition rule. `docs/plans/v6/legacy-skills.json` is the single source
-of truth for that exemption; skills outside it get the full v6 ruleset. The list
-is a ratchet — it may only shrink (see the ratchet tests at the bottom of this
-file) and must be empty by the end of P6. While every skill is still legacy, the
-new assertions are vacuous on real skills, so the parser/predicate unit tests at
-the end of this file carry their actual coverage.
+Grandfathering: the v5 skills predated the frozen schema and the `/name`
+composition rule, and `docs/plans/v6/legacy-skills.json` was the single source
+of truth for that exemption. The list is now **empty and closed** — the ratchet
+tests at the bottom of this file assert it can never regrow, so every shipped
+skill gets the full ruleset with no exemption available.
 """
 import json
 import re
@@ -51,9 +49,12 @@ FROZEN_FRONTMATTER_KEYS = frozenset(
     {"name", "description", "disable-model-invocation", "argument-hint", "allowed-tools"}
 )
 
-# Ratchet baseline: the legacy list is frozen at its P1 size and may only shrink.
-# Adding a name to dodge the frozen schema is exactly what this blocks.
-LEGACY_BASELINE = 30
+# Ratchet baseline: the legacy list started at 30 and only ever shrank. It
+# reached zero when the last v5 skill was rewritten, and the baseline was closed
+# to match — the exemption mechanism still exists in code (the loaders read the
+# manifest) but can no longer be used. Adding a name to dodge the frozen schema
+# is exactly what this blocks.
+LEGACY_BASELINE = 0
 
 # Sanity floor: guards against a broken glob silently passing the whole suite.
 MIN_SKILL_COUNT = 10
@@ -491,10 +492,10 @@ def test_legacy_entries_still_exist():
 
 
 def test_legacy_list_only_shrinks():
-    """The grandfather list is monotonic: no new skill may buy an exemption."""
+    """The grandfather list is monotonic and now closed: no skill may buy an exemption."""
     assert len(LEGACY_SKILLS) <= LEGACY_BASELINE, (
-        f"legacy list grew to {len(LEGACY_SKILLS)} (baseline {LEGACY_BASELINE}) — new skills "
-        f"must satisfy the frozen schema, not join the grandfather list"
+        f"legacy list grew to {len(LEGACY_SKILLS)} (baseline {LEGACY_BASELINE}) — the "
+        f"grandfather mechanism is closed; skills must satisfy the frozen schema"
     )
 
 
