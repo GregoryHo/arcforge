@@ -12,10 +12,7 @@ arcforge <command> [options]
 No path, no `node`, no environment variable. Claude Code puts every loaded
 plugin's `bin/` directory on `PATH`, so once arcforge is installed the bare
 command resolves anywhere — in your project, in a worktree, in a subshell.
-
-```bash
-claude plugin install arcforge@arcforge-dev
-```
+(Installation is in the README.)
 
 To confirm it resolved:
 
@@ -168,8 +165,10 @@ Commands that take `--json` emit a stable shape you can pipe into `jq`:
 arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | .path'
 ```
 
-Use `--json` for anything scripted — those shapes are contract-tested against the
-live command, so a field this guide names is a field the CLI emits.
+Prefer `--json` for anything scripted. `worktree list` has its shape pinned by a
+test that runs the live command, so the fields named in this guide are the fields
+it emits; the other commands are stable but not pinned that way, so check the
+output once before you build on a specific field.
 
 ## Environment
 

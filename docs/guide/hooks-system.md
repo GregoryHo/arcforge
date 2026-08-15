@@ -4,10 +4,6 @@ arcforge ships six hooks and wires them into Claude Code across six session
 events. They load automatically when the plugin is installed — there is nothing
 to configure, and nothing to add to your `settings.json`.
 
-```bash
-claude plugin install arcforge@arcforge-dev
-```
-
 Hooks run around the events of a session: it starts, you send a message, a tool
 is about to run, a tool just ran, the context is about to be compacted, the
 session stops. What follows is what each one actually does to your session.

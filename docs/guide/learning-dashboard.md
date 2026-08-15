@@ -170,11 +170,15 @@ happen: browse candidates, read the evidence behind each one, see the exact
 target paths a candidate would write, then dismiss, approve, materialize,
 activate, deactivate, or promote it to global scope.
 
-Activating and deactivating both require acknowledging what you are about to
-change — the dashboard shows the warning and the target-path summary and will not
-proceed until you have seen them.
+The buttons offered on a candidate are only the ones legal from its current
+state, so you cannot activate something that was never materialized. Activating
+and deactivating carry an extra gate on top of that: both are refused unless the
+request carries an explicit acknowledgement that you understand it changes
+behavior.
 
-Do not route around it by editing state files by hand.
+Every action is written to an audit log, accepted or rejected, with the reason.
+Do not route around the dashboard by editing state files by hand — that is the
+one path where nothing checks the transition and nothing records it.
 
 ### The same flow from the CLI
 
