@@ -35,20 +35,20 @@ paths from `__dirname`, so they must stay cwd-independent.
 
 ## Contract Lints
 
-Beyond unit tests, the suites carry the v6 boundary assertions. Treat a failure
-here as a design violation, not a broken test:
+Beyond unit tests, the suites carry the architecture's boundary assertions.
+Treat a failure here as a design violation, not a broken test:
 
 | Guard | Runner |
 |---|---|
 | **D1** — no file under `skills/<bucket>/<name>/` requires/imports/sources outside its own directory; skill prose doesn't name `scripts/lib/` or `ARCFORGE_ROOT` | jest (`tests/scripts/`) |
-| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`, except an explicit allowlist that must only ever shrink. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
+| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`. The allowlist that once held exceptions is asserted empty. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
 | **Router bijection** — every shipped skill appears in the router table and every router row resolves to a shipped skill | jest (`tests/scripts/`) |
 | **Task-list schema (D3)** — the markdown checkbox format parses; malformed samples are rejected | jest (`tests/scripts/`) |
-| **Frozen frontmatter schema** + **legacy ratchet** — every entry in `docs/plans/v6/legacy-skills.json` still exists as `skills/core/<name>/` | pytest (`tests/skills/`) |
+| **Frozen frontmatter schema** + **closed grandfather list** — every skill satisfies the schema, and `docs/plans/v6/legacy-skills.json` is asserted empty so no skill can buy an exemption | pytest (`tests/skills/`) |
 
-New enforcement exempts the skills listed in `legacy-skills.json` and applies in
-full to everything else. When you delete or rewrite a legacy skill, prune its
-entry in the same commit or the ratchet turns red.
+Adding or removing a skill is a deliberate three-part edit in one commit: the
+skill directory, its row in the router's Skill Map, and `EXPECTED_SKILL_COUNT`
+in `tests/skills/test_skill_structure.py`.
 
 ## Coverage Floor
 

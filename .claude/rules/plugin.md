@@ -1,7 +1,7 @@
 # Plugin
 
-v6 targets **Claude Code only**. There is no second packaging target to keep in
-sync — see `docs/plans/v6/PLAN.md`.
+arcforge targets **Claude Code only**. There is no second packaging target to
+keep in sync.
 
 ## Plugin Manifest (`.claude-plugin/plugin.json`)
 
@@ -73,7 +73,10 @@ Consequences to work with, not around:
 | `$CLAUDE_PROJECT_DIR` | All hooks | Project root directory |
 | `$CLAUDE_ENV_FILE` | SessionStart only | File to persist env vars |
 | `$CLAUDE_CODE_REMOTE` | All hooks | `"true"` in web environments, unset in CLI |
-| `ARCFORGE_ROOT` | Custom — **removed in P2** | Set by the `inject-skills` hook. Legacy: skills must reach the engine by subprocess CLI via `${CLAUDE_PLUGIN_ROOT}` (D1), not by injected env. Don't add new consumers. |
+
+There is no arcforge-specific env var. `ARCFORGE_ROOT` was removed along with
+the `inject-skills` hook that set it; skills reach the engine by subprocess CLI
+(D1), never by injected environment. Don't reintroduce one.
 
 `${CLAUDE_PLUGIN_ROOT}` is a **hooks-only** variable — spike-verified UNSET in
 skill-triggered Bash. The skill → engine boundary is the bare `arcforge` CLI
@@ -86,12 +89,11 @@ is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 - Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/`
 - Skills become namespaced when installed: `/arcforge:<skill-name>` — the bucket
   is a layout detail, never part of the name
-- `agents/` and `templates/` still exist on disk but are removed in P2 — don't
-  add to them
+- There is no `agents/`, `templates/`, or `commands/` directory. Those component
+  types were removed; don't reintroduce one without a design decision
 
 ## Distribution
 
-- `package.json` `files` array controls what ships (its `templates/`, `agents/`,
-  `.codex*`, `.agents/` entries are removed in P2 alongside those directories)
+- `package.json` `files` array controls what ships
 - Primary: GitHub marketplace (`claude plugin install arcforge@arcforge-dev`)
 - Plugin scopes: `user` (default), `project`, `local`, `managed`
