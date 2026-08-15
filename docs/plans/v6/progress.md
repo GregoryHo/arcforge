@@ -259,6 +259,79 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
   範圍（5 筆 flat legacy target 不可見，P7 刪除標的）；`package.json` files 含整個 skills/
   （未來 in-progress/deprecated 會被打包但不載入——P8 出貨面複審）。
 
+## P7 任務（進行中）
+
+**預登記（開跑前寫死，2026-08-15；量測後不得調整任何數字）**
+
+**語料庫分類（刪/留判準，開跑前定案）**：
+- **留（18 支，P3–P6 現役）**：brainstorming-alternatives-before-build、code-review ×3（two-axis /
+  range-fidelity / answering-feedback）、compacting-persist-before-compact、d1-bare-cli-invocation、
+  debugging-root-cause-first、diagramming-obsidian-unverified-save-claim、dispatching-report-not-evidence、
+  evaluating-cross-condition-validity、executing-verify-decides-done、finishing-verify-before-options、
+  learning-draft-not-fabricated（改名）、looping-stale-state-relaunch、maintaining-obsidian-vault-only-answer
+  （A1 重寫）、router-skill-selection、sessions-handover-completeness、tdd-test-first-gate。
+- **刪（33 支 + retired/ 5 支 + skill-files/ 2 支）**：Target 指引擎內部（scripts/lib、hooks/）或
+  v5 慣例（eval-arc-*、eval-plugin-dir-*、eval-release-flow-*、eval-sessionstart-*、eval-icl4-*、
+  eval-optional-workflow-*、eval-other-skill-noninterference、eval-trial-observation-exclusion、
+  learning 家族引擎 scenario ×10）。引擎行為歸 unit test，不歸 eval 語料庫。
+  skill-files 兩支 instinct 檔已 grep 證明無現役引用。
+- **補（1 支新寫）**：writing-skills——唯一零 v6 scenario 的 core skill。補完後 15/15 覆蓋
+  （compacting scenario 歸 sessions；router 矩陣由 e2e probe + router scenario 覆蓋；D1 路徑由
+  d1-bare-cli scenario 覆蓋）。
+
+**AC（機械）**：
+1. check:eval-targets 綠（刪除後零 dangling）。
+2. hasEvidence 述詞修復：移除 `tests/skills/test_skill_<name>.py` 死慣例，附單元測試。
+3. 「每支 core ≥1 scenario Target」寫成 jest 測試 + sanity floor（scenario 數 >10）+
+   scenarios/ 子目錄盲區斷言（listScenarios 非遞迴——retired/ 類盲區永久封死）。
+4. npm test 5 runner + 5 check 全綠。
+5. check-benchmark-freshness 以 prevTag=v5.0.0 模擬判 **not stale**（latest.json 重新生成後）。
+
+**AC（行為，全量 benchmark）**：
+- 量測協定：現役語料庫全數 **re-preflight**（P6.5 verifier D2 約束：bucket sweep 已使 hash 全失效）
+  k=3；之後 scenario 檔凍結，任何再編輯 = 該支重新 preflight。
+- benchmark = 每支現役 scenario 新鮮 treatment pool（A/B campaign 產出的 treatment 臂，或
+  `eval run` k=5）；error trial 剔除，有效 <4 補跑；`eval report --since <P7 量測窗起點>` →
+  latest.json + 日期版。
+- **門檻（事前寫死）**：現役 scenario 未加權平均 pass_rate **≥ 0.70**，且 **≥80%** 的 scenario
+  個別 pass_rate **≥ 0.60**。依據：P3–P6 已測 treatment 側多在 0.8–1.0，已知最弱
+  maintaining ~0.6（A1 修復前）。
+- **A/B 補池 campaign ×6**（P5/P6 掛帳的無池/無效池 + 明確改派項）：writing-skills（新 scenario）、
+  code-review range-fidelity、code-review answering-feedback、diagramming-obsidian（首個有效量測；
+  隔離逃逸須先由 scenario 側修復）、maintaining-obsidian（A1 重寫後）、finishing（description
+  no-summarize 修復自帶 baseline，P6 改派條款）。判讀沿用既有規則：IMPROVED（CI>0）= 過；
+  INCONCLUSIVE → redesign quota **1 次/scenario**；仍無 delta → 按 PLAN Stop 條款進入存廢審查
+  （裁決權在使用者），不得調門檻。
+- **Preflight 天花板處置（事前寫死）**：非回歸類 scenario（compacting-persist）豁免 ceiling BLOCK
+  （其主張是不退化，非 delta）；delta 類 BLOCK → redesign（quota 同上）→ 仍 BLOCK 記
+  unmet-but-covered 並入存廢審查。重擲政策：k=3 隨機閘，僅允許一次且須具名 infra 缺陷，落帳。
+- **改名裁定（事前）**：learning scenario 改名為 marker-preservation 語意，行為主張不變、僅標籤
+  更正 → 不強制重跑 A/B，舊池以 durable note 重新歸屬；新檔名照常 re-preflight 進 benchmark。
+
+**天花板家族存廢重估（P5/P6 掛帳）**：evaluating / dispatching / executing 三支 scenario 照常
+re-preflight + benchmark；再遇 ceiling 不再開新 campaign，改出具 keep-or-delete 建議書於 gate
+呈使用者裁決。diagramming 由 campaign 直接補量測。
+
+**儀器修復（benchmark 有效性前置）**：SIGTERM infraError 判準（killed 且最終輸出未完成）、
+duration_ms 低報（採 stream-json 值）、rubric 編輯→Version bump lint、report/compare trial 數
+不一致、parseActions 只留 Bash 首行、Design Notes 改引 --disable-slash-commands、
+render_template.html esm.sh import pin（修復自帶驗證）。
+
+**明確遞延（P8/掛帳，不入本 phase AC）**：dashboard rejections.jsonl 呈現；bucket 清單三處硬編
+單一來源化；tdd/debugging description register 邊界（B 面診斷性）；website/docs 敘事層；
+grader-void 與位置相關 grader_failed → 量測期間記發生率，任一池 >10% 才升級調查；900s ceiling
+→ benchmark 後以新池時長分布出報告。
+
+任務：
+
+- [ ] Worker A — 語料庫刪除面 + hasEvidence 修復 + 覆蓋測試（AC 機械 1–4）
+- [ ] Worker B — 儀器修復 ×7（各自帶單元測試/驗證）
+- [ ] Worker C — scenario 補齊面：writing-skills 新寫、learning 改名、maintaining A1 重寫、
+  sessions 結構守衛等價物、d1 穩定性強化、finishing description 修復、diagramming 隔離修復
+- [ ] Orchestrator — re-preflight 全量、6 campaign、全量 benchmark → latest.json、coverage 文件
+  終版數字、天花板家族建議書
+- [ ] gate 五步（機械→行為→verifier→進度/tag `gate-p7`→使用者確認）
+
 ## 偏離紀錄
 
 | 日期 | 偏離 | 理由 |
