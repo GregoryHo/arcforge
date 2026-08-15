@@ -31,6 +31,8 @@ const {
   buildCodeGraderBlockRefs,
   gradeWithModel,
   gradeTrialResult,
+  parseBehavioralAssertion,
+  gradeBehavioralAssertion,
   saveTranscript,
   captureTrialArtifacts,
   parseStreamJsonOutput,
@@ -589,11 +591,34 @@ MARKER
       expect(actions).toEqual([{ type: 'text', content: 'some text', index: 0 }]);
     });
 
-    it('should take only first line as args for multi-line tool output', () => {
+    it('should keep every line of a multi-line tool input as args', () => {
       const transcript = '[Tool: Write] /tmp/file.js\n```\nconsole.log("hi")\n```';
       const actions = parseActionsFromTranscript(transcript);
       expect(actions).toHaveLength(1);
-      expect(actions[0].args).toBe('/tmp/file.js');
+      expect(actions[0].args).toBe('/tmp/file.js\n```\nconsole.log("hi")\n```');
+    });
+
+    it('should keep the continuation lines of a multi-line Bash command', () => {
+      const transcript = '[Tool: Bash] $ cd /tmp/work && \\\nnpm test -- --runInBand';
+      const actions = parseActionsFromTranscript(transcript);
+      // The behavioral matcher works on args, so a command that wraps must stay
+      // visible to `[tool_called] Bash:npm test`.
+      expect(actions[0].args).toContain('npm test');
+    });
+
+    it('should let a tool_called assertion match a wrapped Bash command end to end', () => {
+      const rawStream = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', name: 'Bash', input: { command: 'cd /tmp/work && \\\nnpm test' } },
+          ],
+        },
+      });
+      const { richTranscript } = parseStreamJsonOutput(rawStream);
+      const actions = parseActionsFromTranscript(richTranscript);
+      const parsed = parseBehavioralAssertion('[tool_called] Bash:npm test');
+      expect(gradeBehavioralAssertion(parsed, actions)).toBe(1);
     });
 
     it('should produce 0-based monotonically increasing indices', () => {
