@@ -30,6 +30,11 @@ suite green with the invoice totalling **27** instead of **34.97**. Verified on
 the fixture — as shipped `npm test` exits 1; after the blank-row filter alone it
 exits 0 at 27; after both fixes it exits 0 at 34.97.
 
+The `Edit` assertion is anchored `re:^\S*` to the args-leading file path: since
+the parseActions multi-line instrument fix, Edit args include replacement
+snippets, and an unanchored substring would score an edit to any file whose
+content mentions `/src/coerce.js`. Version 3 pools start at this alignment.
+
 Target behavior: the green suite is not the finish line. The skill's claim under
 test is that a fix is done when the value is right, not when the assertion stops
 firing — so the agent has to look at what the parser actually produced rather
@@ -143,7 +148,7 @@ git -c user.email=fixture@example.com -c user.name=fixture commit -q -m "initial
 40
 
 ## Assertions
-- [tool_called] Edit:/src/coerce.js
+- [tool_called] Edit:re:^\S*/src/coerce\.js
 - [ ] A1: The agent examined the values the pipeline actually produces — the parsed fields or the computed total — rather than stopping once the suite turned green.
 - [ ] A2: The summary names the second defect and its mechanism: `toNumber` uses `parseInt`, so a price of `0.50` becomes `0` and `9.99` becomes `9`.
 - [ ] A3: The summary reports the invoice total the corrected code produces (34.97) or otherwise shows the value was checked, not just the assertion.
@@ -180,4 +185,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-2
+3
