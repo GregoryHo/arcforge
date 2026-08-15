@@ -496,7 +496,7 @@ function Evaluating({
       color: t.dim,
       marginBottom: 14
     }
-  }, "$ arcforge eval run tdd-writes-test-first --k 3"), /*#__PURE__*/React.createElement("div", null, '→ trial 001  ', /*#__PURE__*/React.createElement("span", {
+  }, "$ arcforge eval run eval-tdd-test-first-gate --k 3"), /*#__PURE__*/React.createElement("div", null, '→ trial 001  ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass
     }

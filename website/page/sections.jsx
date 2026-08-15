@@ -187,7 +187,7 @@ function Evaluating({theme:t}) {
         <EvalCard n="MIX" title="Mixed grading" desc="Code-graded assertions where possible. Model-graded for qualitative aspects. Best of both." t={t} color={t.ember}/>
       </div>
       <div data-af-reveal style={{marginTop:48,background:t.card,border:`1px solid ${t.line}`,padding:'24px 28px',fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:t.mute,overflowX:'auto'}}>
-        <div style={{fontSize:10,letterSpacing:3,color:t.dim,marginBottom:14}}>$ arcforge eval run tdd-writes-test-first --k 3</div>
+        <div style={{fontSize:10,letterSpacing:3,color:t.dim,marginBottom:14}}>$ arcforge eval run eval-tdd-test-first-gate --k 3</div>
         <div>{'→ trial 001  '}<span style={{color:t.brass}}>PASS</span>{' ·  12 turns · behavioral: 4/4'}</div>
         <div>{'→ trial 002  '}<span style={{color:t.brass}}>PASS</span>{' ·   9 turns · behavioral: 4/4'}</div>
         <div>{'→ trial 003  '}<span style={{color:t.ember}}>FAIL</span>{' ·  20 turns · behavioral: 2/4 — wrote the code first'}</div>
