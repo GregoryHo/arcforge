@@ -18,7 +18,7 @@
 - [x] P5 保留系統叢集（D1/D8 驗證場）— gate: PASS (2026-08-14, PR #140, tag gate-p5；首驗 FAIL→補救→再驗 PASS)
 - [x] P6 workflow 叢集 + router 收斂 — gate: PASS (2026-08-15, PR #141, tag gate-p6；verifier PASS 附 6 項補救全兌現)
 - [x] P6.5 bucket 落地 — gate: PASS (2026-08-15, PR #142, tag gate-p6.5；verifier 一次過)
-- [ ] P7 eval 語料庫重建 + 全量 benchmark
+- [x] P7 eval 語料庫重建 + 全量 benchmark — gate: PASS (2026-08-15, PR #143, tag gate-p7；verifier 一次過，2 項文件補救於 step 5 前落地)
 - [ ] P8 文件、規範、發版 → v6.0.0-rc
 
 ## P0.0 任務
@@ -259,7 +259,7 @@ arc-using-worktrees；worktree 面走 `arcforge worktree` CLI）、`looping`（u
   範圍（5 筆 flat legacy target 不可見，P7 刪除標的）；`package.json` files 含整個 skills/
   （未來 in-progress/deprecated 會被打包但不載入——P8 出貨面複審）。
 
-## P7 任務（進行中）
+## P7 任務（全數完成，PR #143，三 worker + orchestrator 量測）
 
 **預登記（開跑前寫死，2026-08-15；量測後不得調整任何數字）**
 
@@ -328,13 +328,46 @@ grader-void 與位置相關 grader_failed → 量測期間記發生率，任一�
 
 任務：
 
-- [ ] Worker A — 語料庫刪除面 + hasEvidence 修復 + 覆蓋測試（AC 機械 1–4）
-- [ ] Worker B — 儀器修復 ×7（各自帶單元測試/驗證）
-- [ ] Worker C — scenario 補齊面：writing-skills 新寫、learning 改名、maintaining A1 重寫、
+- [x] Worker A — 語料庫刪除面 + hasEvidence 修復 + 覆蓋測試（AC 機械 1–4）
+- [x] Worker B — 儀器修復 ×7（各自帶單元測試/驗證；esm.sh pin 依卡片改派 Worker C）
+- [x] Worker C — scenario 補齊面：writing-skills 新寫、learning 改名、maintaining A1 重寫、
   sessions 結構守衛等價物、d1 穩定性強化、finishing description 修復、diagramming 隔離修復
-- [ ] Orchestrator — re-preflight 全量、6 campaign、全量 benchmark → latest.json、coverage 文件
+- [x] Orchestrator — re-preflight 全量、campaign、全量 benchmark → latest.json、coverage 文件
   終版數字、天花板家族建議書
-- [ ] gate 五步（機械→行為→verifier→進度/tag `gate-p7`→使用者確認）
+- [x] gate 五步（機械→行為→verifier→進度/tag `gate-p7`→使用者確認）
+
+### P7 gate 備註
+
+- **verifier 一次過 PASS**，驗證強度：progress.md 預登記完整性以「85ba5d2 起單一 hunk
+  差異」證明；15/15 preflight hash 與 committed 檔 **byte-identical**（親算 sha256）；
+  門檻算術自 latest.json 重算（0.852632 / 84.21%）+ 帳目閉合（raw 199 列 = 103 aggregate
+  trials 無隱藏池）+ **剔除三支天花板支的穩健性檢驗仍雙過**（0.825 / 81.25%）；覆蓋測試
+  mutation 驗證（3 斷言反例全紅 + leave-one-out：12 支移除各自精確孤立其 skill）；
+  run→ab 選池規則稽核**零例外**（保留的 run 池全 ≥0.60、改 ab 者 run 全 <0.60）。
+- **verifier 提醒（約束性）**：第二門檻 16/19 = 84.21% 是最小滿足整數（0.8×19=15.2），
+  **零裕度**——P8 前任何單池翻面即失守；不得靠刪 scenario 湊分母。
+- **兩項 step-5 前必修已落地**（4c6e337 後補救 commit）：建議書「六支全 ≥ 門檻」假句
+  更正（diagramming treatment pass 0%，五支 100%）；Campaign 4 finishing 標題復歸。
+- **量測中發現並修正的儀器事實**：`eval run` 無 skill 注入（run 池 ≈ baseline 的自洽
+  性驗證：tdd run 0.17 == ab baseline 0.17）；協定修正案於計算門檻前落帳且門檻零改動。
+- **redesign quota 執行**：debugging（v3 prompt-斷言矛盾修正 → v4 授權令，仍 100%
+  ceiling，quota 1/1 耗盡）、writing-skills（v1 品質假說 → v2 機理診斷假說，均被
+  baseline 打穿，quota 1/1 耗盡）——兩支 unmet-but-covered；dispatching 依天花板家族
+  條款未動用。診斷史全存 scenario Design Notes。
+- **P7 新 delta 收成**：tdd +0.63、finishing +0.54（description 修復自帶 baseline，
+  P6 改派條款兌現）、two-axis +0.40、executing +0.40（k=10，**脫離 unmet-but-covered**）、
+  router +0.36、brainstorming +0.35、sessions +0.29、maintaining +0.28（A1 重寫後）、
+  diagramming +0.23（**首個有效量測**，P5 債清）、range-fidelity +0.27 non-reg PASS、
+  answering-feedback 分數面 non-reg 過（機器 REGRESSED 由成本旗標驅動，如實保留）。
+- **天花板家族建議書**呈使用者（本 gate step 5）：executing/diagramming 脫離結案；
+  evaluating 傾向保留（preflight 67% 恢復鑑別力）；debugging/dispatching/writing-skills
+  keep-or-delete 待裁——共同事實：教的東西現行模型已內化，treatment 無害。
+- **掛帳 P8（本 phase 產出）**：grader unparseable 之 raw stdout 持久化 + 抽取器放寬
+  （發生率 3/30，>10%/池 已觸發特徵化）；cost-regression 判準對 plugin 注入型 treatment
+  的適用性；floor 斷言是否計入 pass bar（writing-skills t1 0.83 過關路徑）；diagramming
+  A4 獵巡誘因 + skill references headless fallback + `render_excalidraw.py:131` 過期路徑；
+  version-bump check 對新檔的 stderr 噪音；eval-corpus-coverage 註解「18」過時；PLAN
+  「刪 64」字面漂移（實 40）；harness 強制隔離（P5 續掛）。
 
 ## 偏離紀錄
 
@@ -343,6 +376,9 @@ grader-void 與位置相關 grader_failed → 量測期間記發生率，任一�
 | 2026-07-31 | 回滾 tag 命名由 `v6-p<N>` 改為 `gate-p<N>` | `release.yml` 的 `on.push.tags: ['v*']` 會被 `v6-p0.0` 誤觸發（跑 release job 並因版本比對噴錯）。`gate-` 前綴避開 glob。 |
 | 2026-07-31 | P2 AC「hooks.json 10→6 條目」改判為「hook 實體 14→6」 | verifier 查證：baseline 本來就是 6 events（該讀法無鑑別力），而 6 條目按 check-hooks-schema 自身規則（sync/async 分列）不可達。實體 14→6 精準命中計畫 Context 的「14→6」。條目實況 9。 |
 | 2026-07-31 | P0.0 直接 commit 到 v6（未走 phase PR） | v6 分支自舉的雞生蛋問題（分支存在前無法對它開 PR）；P1 起全部走 phase PR。 |
+| 2026-08-15 | P7：`docs/guide/composable-skill-eval-coverage.md` 整檔刪除，牴觸 P5「最小 retarget（全面重寫是 P8）」裁定 | 13 列矩陣 + 全部 lint/ab 引用 100% dangling（引用的 scenario 全在預登記刪除面內），retarget 無存活對象；orchestrator 批准，P8 文件段按需重建。 |
+| 2026-08-15 | P7：duration_ms 修法與掛帳括號字面相反（掛帳寫「優先採 stream-json 值」，實作改 wall clock 為主） | 掛帳括號是成因指認非修法指令：stream-json 值本已優先且正是低報根因（實測 73% 低報，CLI 值只涵蓋 API turn）。wall 為主 + 新 `api_duration_ms` 欄位保留可回推性；verifier 覆核通過。 |
+| 2026-08-15 | P7：benchmark treatment 池來源修正案（`eval run` → 塌陷支改 ab treatment 臂） | 量測中發現 run 模態無 skill 注入（headless 亦無 Skill tool），run 池 ≈ baseline；修正案於計算門檻前落帳、門檻零改動、選池規則經 verifier 稽核零例外（方向保守）。 |
 
 ## 新開裁決（D9+）
 
