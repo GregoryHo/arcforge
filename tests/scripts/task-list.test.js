@@ -7,7 +7,7 @@ const {
   updateTaskStatus,
   TASK_STATUSES,
 } = require('../../scripts/lib/task-list');
-const { REPO_ROOT } = require('./v6-legacy-skills');
+const { REPO_ROOT } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
 // D3 task list format (v1) — schema tests.
