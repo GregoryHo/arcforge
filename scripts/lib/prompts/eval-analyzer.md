@@ -83,7 +83,7 @@ If per-assertion evidence is available:
 
 ## Automated Comparison Mode
 
-When used by `arc eval compare` (automated pipeline), respond with ONLY a JSON object:
+When used by `arcforge eval compare` (automated pipeline), respond with ONLY a JSON object:
 
 ```json
 {

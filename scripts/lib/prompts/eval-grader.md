@@ -75,7 +75,7 @@ For each assertion in the scenario:
 
 ## Automated Grading Mode
 
-When used by `arc eval run` (automated batch grading), respond with ONLY a JSON object instead of the markdown report:
+When used by `arcforge eval run` (automated batch grading), respond with ONLY a JSON object instead of the markdown report:
 
 ```json
 {

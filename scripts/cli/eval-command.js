@@ -233,9 +233,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const { lintScenario, formatDiagnostics } = require('../lib/eval-lint');
     const { resolveScenarioFile } = require('../lib/eval-preflight');
 
-    // Resolve by parsed `# Eval:` name (matching arc eval run/ab/preflight),
+    // Resolve by parsed `# Eval:` name (matching arcforge eval run/ab/preflight),
     // not by literal filename — otherwise renamed scenarios that still pass
-    // `arc eval run` would falsely fail `arc eval lint` with "file not found".
+    // `arcforge eval run` would falsely fail `arcforge eval lint` with "file not found".
     const scenarioFile = resolveScenarioFile(scenarioName, projectRoot);
     if (!scenarioFile) {
       console.error(`Error: scenario "${scenarioName}" not found in evals/scenarios/`);
@@ -419,7 +419,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
 
     if (baseline.length === 0 || treatment.length === 0) {
-      console.error('Error: need both baseline and treatment results. Run: arc eval ab <name>');
+      console.error('Error: need both baseline and treatment results. Run: arcforge eval ab <name>');
       process.exit(1);
     }
 
@@ -485,7 +485,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         output(display, false);
       }
     } else if (Object.keys(benchmark.evals).length === 0) {
-      console.log('No eval results yet. Run: arc eval run <scenario>');
+      console.log('No eval results yet. Run: arcforge eval run <scenario>');
     } else if (asJson) {
       output(benchmark, true);
     } else {
@@ -535,14 +535,14 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'history') {
     const benchmarkPath = path.join(projectRoot, eval_.BENCHMARKS_DIR);
     if (!fs.existsSync(benchmarkPath)) {
-      console.log('No benchmarks yet. Run: arc eval report');
+      console.log('No benchmarks yet. Run: arcforge eval report');
     } else {
       const snapshots = fs
         .readdirSync(benchmarkPath)
         .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
         .sort();
       if (snapshots.length === 0) {
-        console.log('No history snapshots yet. Run: arc eval report');
+        console.log('No history snapshots yet. Run: arcforge eval report');
       } else {
         for (const file of snapshots) {
           const data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, file), 'utf8'));
@@ -557,7 +557,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     startServer(projectRoot, { port });
   } else {
     console.error(
-      'Usage: arc eval [list|run|preflight|lint|ab|compare|report|history|audit|dashboard]',
+      'Usage: arcforge eval [list|run|preflight|lint|ab|compare|report|history|audit|dashboard]',
     );
     process.exit(1);
   }
