@@ -126,6 +126,7 @@ arcforge v5 的包袱（SDD/DAG 引擎、ARCFORGE_ROOT 注入、雙平台、肥�
 ### P7 eval 語料庫重建 + 全量 benchmark
 依賴：P3–P6（scenario 已逐 phase 累積，此處補齊+全量）。
 - 刪 64 舊 scenario + retired/ + 過期 skill-files；補齊覆蓋（每支 core ≥1、router 矩陣、D1 路徑）；修 check-skill-eval-annotation 的 hasEvidence 述詞（指向已不存在的慣例）；全量 benchmark → latest.json；coverage 文件重寫或刪
+  ＊執行註記（P8 補，經 P7 verifier 判定非 AC 缺口）：「64」為撰寫時語料庫規模；P3–P6 已逐相清理，P7 實刪 40（33 top-level + 5 retired + 2 skill-files），AC 判準為 check:eval-targets 與覆蓋測試，非字面計數。
 
 **AC**：`[機械]` check:eval-targets 綠；check-benchmark-freshness 以 prevTag=v5.0.0 判 not stale；「每支 core 有 ≥1 scenario target」寫成測試；`[行為]` benchmark pass rate 達事前門檻。
 **Stop**：某 skill 無 delta → 按 eval 規則 redesign ×2 仍 0 → 考慮該 skill 不該存在；不得調門檻過關。

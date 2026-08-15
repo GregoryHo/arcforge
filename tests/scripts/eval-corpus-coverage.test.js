@@ -1,8 +1,9 @@
 /**
  * eval-corpus-coverage.test.js — the eval corpus is a contract with skills/core/.
  *
- * P7 pruned the corpus from 51 scenarios to the 18 that still measure a v6
- * skill. Nothing mechanical stopped that prune from silently orphaning a core
+ * P7 pruned the corpus from 51 scenarios to the 19 that measure a v6 skill
+ * (18 kept + the new writing-skills scenario). Nothing mechanical stopped
+ * that prune from silently orphaning a core
  * skill, and nothing stopped the pre-P7 corpus from hiding scenarios in a
  * subdirectory the lister never reads. These assertions close both holes.
  */
