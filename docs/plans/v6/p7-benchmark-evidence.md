@@ -153,9 +153,10 @@ executing 以 k=10 拿到 CI>0 —— **P6 unmet-but-covered 正式脫離**（P6
   - 個別 ≥0.60 者 = 16/19 = **84.2% ≥ 80% ✓**（線下三支 brainstorming/diagramming/tdd
     的 delta 皆 IMPROVED）
 - freshness 模擬：prevTag=v5.0.0（2026-07-27）→ **not stale ✓**
-- error trial 帳：grader void 4 發（two-axis/dispatching/sessions run 池各 1、dispatching
-  已由 4 有效滿足 ≥4；被 ab 池取代者不影響 benchmark）；SIGTERM infra 1 發（diagramming
-  首輪，正確標記剔除）。無任何池有效數 <4。
+- error trial 帳：grader void **3 發**（two-axis/dispatching/sessions run 池各 1、dispatching
+  已由 4 有效滿足 ≥4；被 ab 池取代者不影響 benchmark；計數經 verifier 以 raw
+  `grade_error` 重核）；SIGTERM infra 1 發（diagramming 首輪，正確標記剔除）。
+  無任何池有效數 <4。
 
 ## 天花板家族存廢建議書（gate 呈使用者裁決）
 
@@ -170,8 +171,17 @@ P5–P7 累計，六支曾入 unmet-but-covered 的處置建議：
 | dispatching | ceiling ×3（P6 v1/v2 + P7），P6 診斷：baseline 合法讀 src/jobs.js | 同上——keep-or-delete 由使用者裁決；treatment 池 100% 佐證無害 |
 | writing-skills | 新支，P7 ceiling ×2（v1 品質假說、v2 診斷假說均被 baseline 打穿） | 傾向保留（meta-skill 為授權標準，價值不僅在 delta）；如實記載：其行為主張已被現行模型內化 |
 
-共同事實：六支的 treatment 池全數 ≥ 門檻（100% ×5、evaluating 100%）——技能無害且
-與模型預設行為一致；問題是「教的東西模型已會」，不是「教錯」。
+共同事實（verifier 更正後）：六支中**五支** treatment 池 100%（executing、evaluating、
+debugging、dispatching、writing-skills）——技能無害且與模型預設行為一致；問題是
+「教的東西模型已會」，不是「教錯」。**diagramming 例外**：其 treatment 池 pass_rate
+**0%**（avg 0.56，trial bar 0.8 之下）——「脫離家族」指的是 +0.23 CI[0.09, 0.38] 的
+delta 主張成立（skill 確實改變行為），但其絕對水準仍低於個別門檻，為 benchmark
+線下三支之一；P8 的 A4 誘因與 references fallback 修復是把絕對水準拉起來的路徑。
+
+### Campaign 4：finishing（04:53 完，description 修復的 mandated baseline）——標題補記
+
+（verifier 發現 d6e88e0 誤刪本標題致 finishing 數據段孤懸於建議書之下；數據本身
+經 verifier 與 latest.json 精確核對無誤，此處補回歸屬。）
 
 baseline 0.46 / pass 0% ｜ treatment **1.00 / pass 100%** ｜ delta **+0.54 CI[0.46, 0.62]**
 → **IMPROVED**（5/5 有效）。description no-summarize 修復後與 P4 +0.58 同量級——
