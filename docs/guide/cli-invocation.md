@@ -168,8 +168,8 @@ Commands that take `--json` emit a stable shape you can pipe into `jq`:
 arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | .path'
 ```
 
-Use `--json` for anything scripted. The human-readable output is formatted for
-reading and may be reworded between releases; the JSON shapes are contract-tested.
+Use `--json` for anything scripted — those shapes are contract-tested against the
+live command, so a field this guide names is a field the CLI emits.
 
 ## Environment
 
