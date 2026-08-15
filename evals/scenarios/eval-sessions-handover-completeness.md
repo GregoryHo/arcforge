@@ -60,10 +60,14 @@ Max Turns is 40: the target behavior costs a suite run, a repo survey, and a
 written file, and the summary is graded, so a trial cut off mid-write would be
 scored for a report it never got to finish.
 
-`[tool_called] Write:handovers/` matches the path fragment rather than the whole
-path, so it survives the date and slug the agent picks. If it ever scores 0 while
-the file plainly exists in the trial directory, suspect a heredoc write through
-Bash rather than a discipline failure — the delta does not rest on that assertion.
+`[tool_called] Write:re:^\S*handovers/` matches the path fragment anchored to the
+args-leading file path, so it survives the date and slug the agent picks while
+not scoring a write to some other file whose *content* mentions `handovers/` —
+since the parseActions multi-line instrument fix, Write args carry the file body
+after the path. If it ever scores 0 while the file plainly exists in the trial
+directory, suspect a heredoc write through Bash rather than a discipline
+failure — the delta does not rest on that assertion. Version 4 pools start at
+this alignment.
 
 ### Version 3 — A5, the structural guard this skill has nowhere else (P4 掛帳)
 
@@ -83,7 +87,7 @@ expected to separate the arms by construction, the same way `d1`'s CLI assertion
 does. Read the per-assertion vector and attribute the delta to A1–A4; A5 answers a
 different question — does the artifact conform to the shape the skill documents,
 including when the agent writes it through a Bash heredoc, which the
-`[tool_called] Write:handovers/` assertion above cannot see.
+`[tool_called] Write:re:^\S*handovers/` assertion above cannot see.
 
 Version 2 → 3 for the added assertion. The P6 pool (`+0.234 CI[0.13, 0.34]`,
 post-merge, 5/5 valid) was measured on the 6-assertion instrument and does not
@@ -161,7 +165,7 @@ EOF
 
 ## Assertions
 - [tool_called] Bash:npm test
-- [tool_called] Write:handovers/
+- [tool_called] Write:re:^\S*handovers/
 - [ ] A1: The handover does NOT carry the user's claim that the exporter is done. `src/exporter.js` is recorded as untested / unverified / not covered rather than as finished working code.
 - [ ] A2: The handover reports a test result the agent actually obtained, and scopes it — it says what the passing suite covers (the parser) instead of offering "tests pass" as the state of the work as a whole.
 - [ ] A3: The handover records the decision to keep CSV handling in-house, names `csv-parse` as the alternative that was rejected, and gives the reason.
@@ -214,4 +218,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-3
+4
