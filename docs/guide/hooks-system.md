@@ -253,7 +253,7 @@ assert.ok(result.stdout.includes('systemMessage'));
 
 ### Eval (behavioral verification)
 
-For hooks that inject context into Claude (session-tracker/inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. See `evals/scenarios/eval-sessionstart-minimal-bootstrap.md` for a current-format SessionStart example.
+For hooks that inject context into Claude (session-tracker/inject-context), use the eval harness to verify Claude demonstrates only the intended minimal context. Scenario format and grader options are documented in `docs/guide/eval-system.md`.
 
 ## Common Mistakes
 

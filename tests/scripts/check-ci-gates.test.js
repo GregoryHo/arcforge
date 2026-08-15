@@ -31,10 +31,12 @@ describe('skillsNeedingEval', () => {
     expect(skillsNeedingEval(['skills/core/tdd/SKILL.md'])).toEqual(['tdd']);
   });
 
-  it('does not flag when the matching test file changed', () => {
+  it('still flags when only the dead per-skill pytest convention changed', () => {
+    // `tests/skills/` is one generic structural checker over every skill —
+    // there is no `test_skill_<name>.py`, so it can never be eval evidence.
     expect(
       skillsNeedingEval(['skills/core/tdd/SKILL.md', 'tests/skills/test_skill_tdd.py']),
-    ).toEqual([]);
+    ).toEqual(['tdd']);
   });
 
   it('does not flag when a matching eval result changed', () => {
@@ -61,7 +63,7 @@ describe('skillsNeedingEval', () => {
       skillsNeedingEval([
         'skills/core/tdd/SKILL.md',
         'skills/core/debugging/SKILL.md',
-        'tests/skills/test_skill_debugging.py',
+        'evals/results/eval-debugging-root-cause-first/run.json',
       ]),
     ).toEqual(['tdd']);
   });

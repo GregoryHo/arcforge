@@ -18,14 +18,19 @@ const { execFileSync } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-/** Does the changed-file set carry eval evidence for skill `name`? */
+/**
+ * Does the changed-file set carry eval evidence for skill `name`?
+ *
+ * Evidence is behavioral measurement only: a result row for this skill's
+ * scenario, or a regenerated benchmark. A per-skill pytest file is NOT
+ * evidence — `tests/skills/` is one generic structural checker
+ * (`test_skill_structure.py`) that iterates every skill, so a
+ * `test_skill_<name>.py` cannot exist and never asserted behavior anyway.
+ */
 function hasEvidence(name, changed) {
-  const underscore = name.replace(/-/g, '_');
   return changed.some(
     (f) =>
-      f === `tests/skills/test_skill_${underscore}.py` ||
-      (f.startsWith('evals/results/') && f.includes(name)) ||
-      f.startsWith('evals/benchmarks/'),
+      (f.startsWith('evals/results/') && f.includes(name)) || f.startsWith('evals/benchmarks/'),
   );
 }
 
