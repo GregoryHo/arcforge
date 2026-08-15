@@ -1486,6 +1486,70 @@ Do something.
       expect(data.compared.metrics.output_tokens.delta).toBe(25);
     });
 
+    it('should count the same trial pool as compare across every field of an entry', () => {
+      writeScenario(
+        tempDir,
+        'pool-eval.md',
+        '# Eval: pool-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        for (let i = 1; i <= 3; i++) {
+          appendResult(
+            makeResult({
+              eval: `pool-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: condition === 'treatment',
+              score: condition === 'treatment' ? 1 : 0,
+              duration_ms: 1000,
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+        // Two rows the grader never scored: score 0 is a storage placeholder.
+        for (let i = 4; i <= 5; i++) {
+          appendResult(
+            makeResult({
+              eval: `pool-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: false,
+              score: 0,
+              duration_ms: 900000,
+              gradeError: true,
+              errorType: 'model_grader_failed',
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+      }
+
+      const data = generateBenchmark(tempDir).evals['pool-eval'];
+
+      expect(data.trials).toBe(3);
+      expect(data.error_trials).toBe(2);
+      // Same pool everywhere: the two unscored rows must not reappear as trials
+      // in the metrics block, nor drag pass_all_k false.
+      expect(data.metrics.duration_ms.count).toBe(3);
+      expect(data.metrics.duration_ms.max).toBe(1000);
+      expect(data.pass_at_k).toBe(true);
+      expect(data.pass_all_k).toBe(true);
+      // And it is the pool `eval compare` reports for the same results.
+      const comparison = compareResults(
+        { grader: 'code' },
+        loadResults('pool-eval-baseline', tempDir, { version: '1' }),
+        loadResults('pool-eval-treatment', tempDir, { version: '1' }),
+        tempDir,
+      );
+      expect(comparison.treatment.count).toBe(data.trials);
+      expect(data.compared.treatment.count).toBe(data.trials);
+    });
+
     it('should honor since filters for aggregate, A/B comparison, and raw benchmark rows', () => {
       writeScenario(
         tempDir,
