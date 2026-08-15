@@ -19,7 +19,7 @@
 - [x] P6 workflow 叢集 + router 收斂 — gate: PASS (2026-08-15, PR #141, tag gate-p6；verifier PASS 附 6 項補救全兌現)
 - [x] P6.5 bucket 落地 — gate: PASS (2026-08-15, PR #142, tag gate-p6.5；verifier 一次過)
 - [x] P7 eval 語料庫重建 + 全量 benchmark — gate: PASS (2026-08-15, PR #143, tag gate-p7；verifier 一次過，2 項文件補救於 step 5 前落地)
-- [ ] P8 文件、規範、發版 → v6.0.0-rc
+- [x] P8 文件、規範、發版 — gate: PASS (2026-08-15, PR #144, tag rc-v6.0.0；docs-only verifier 首驗 FAIL→補救→再驗 PASS；gate verifier 一次過附 1 項必修)
 
 ## P0.0 任務
 
@@ -375,7 +375,7 @@ grader-void 與位置相關 grader_failed → 量測期間記發生率，任一�
 skill 集終版維持 15 支。其 scenario 轉為 non-reg 用途留在語料庫；evaluating 的 delta 量測
 與 diagramming 絕對水準拉升列 post-rc backlog。P8 range = 15 skills 不變。
 
-## P8 任務（進行中）
+## P8 任務（全數完成，PR #144，三 worker 序列 + orchestrator）
 
 **預登記（開跑前寫死，2026-08-15）**
 
@@ -430,11 +430,40 @@ ignore 必附理由。
 
 任務：
 
-- [ ] Worker A — docs/guide ×6 重寫
-- [ ] Worker B — README/website/CONTRIBUTING/CLAUDE.md/rules 終掃
-- [ ] Worker C — CHANGELOG + 版本 bump + release 工程 + arc-releasing
-- [ ] Orchestrator — 儀器小修 ×4
-- [ ] gate 五步（機械→docs-only verifier→gate verifier→進度/tag `rc-v6.0.0`→使用者最終確認）
+- [x] Worker A — docs/guide ×6 重寫
+- [x] Worker B — README/website/CONTRIBUTING/CLAUDE.md/rules 終掃
+- [x] Worker C — CHANGELOG + 版本 bump + release 工程 + arc-releasing
+- [x] Orchestrator — 儀器小修 ×4 + Track C 五項裁定落地
+- [x] gate 五步（機械→docs-only verifier→gate verifier→進度/tag `rc-v6.0.0`→使用者最終確認）
+
+### P8 gate 備註
+
+- **docs-only 行為閘（本 phase 的行為 AC）首驗 FAIL → 補救 → 再驗 PASS**：F1 =
+  文件全稱承諾 `learn … --global` 但五個 candidate-transition 命令（approve/reject/
+  materialize/accept/activate）是引擎刻意 project-only 守衛（learning.js ×4 處）——
+  正是這道閘要抓的「文件對引擎說謊」；D1 = 假完整性宣告（子群「三個」實為四個，漏
+  recall）。補救 e17ccd2 經同 verifier 乾淨 HOME 隔離再驗（新正面主張逐一實測為真）。
+  盲讀答卷 lock 紀律 + 43/43 旗標全查（超出 ≥10 抽查門檻）。
+- **gate verifier 一次過 PASS**：預登記基準 diff 證明未被執行期改寫（progress 僅 1 行
+  歷史更正、PLAN 僅 1 行註記）；AC 四條全親跑；CHANGELOG 9 項宣稱全覆核（30→15 對照
+  24+6 閉合、CLI 19→5、hooks 14→6、eval 67→19、benchmark 0.8526）；rc tag 偏離兩條技
+  術理由親驗成立；範圍約束三目錄 gate-p7..HEAD 零命中、latest.json 零改動、15 支不變。
+- **1 項必修已落地（76a1c04）**：landing page 假 scenario 名 `tdd-writes-test-first`
+  →`eval-tdd-test-first-gate`（P8 自己引入，jsx+編譯產物同修）。
+- **本 phase 修復的發版級缺陷**：freshness gate prevTag 被 gate-* tag 劫持（現況空過、
+  動 skills/ 即假紅）→ `--match 'v[0-9]*'` + 5 測試（Track C 發現並實測驗證，orchestrator
+  落地）；files array 出貨面（hooks/__tests__ 違規出貨、skills/ 整樹隱患）→ 收斂後
+  clean pack 175 檔；arc-release-audit.js 兩處可執行錯誤（gating 檢查被指示吞掉、
+  CHANGELOG prompt 硬編 3.2.0 期事實）。
+- **溯源附註（gate verifier）**：CHANGELOG 的 learning +0.25 / looping +0.19 出自
+  coverage ledger（P5/P6 ab 池），latest.json 該兩支為 run 池 `delta: n/a`——宣稱屬實
+  但只看 latest.json 會撲空。
+- **掛帳 post-rc backlog（本 gate 新增）**：doc-refs R2 對「真命令+假子命令/假 id」無感
+  （website 假 scenario 名正是漏網成因）；SCAN_DIRS 不含 website/CONTRIBUTING/CLAUDE.md/
+  docs/README.md（本次已人工掃畢）；contributor-only scripts（check-*.js ×8 + dev/）仍
+  出貨；本地 pack 撿 gitignored hook log（可選 `!hooks/.claude/`）；`learn enable --global`
+  連動 project.enabled（docs-verifier O8，文件無牴觸但工程面待確認）；secrets-guard 註解
+  殘留 5.0 字樣。
 
 ## 偏離紀錄
 
@@ -446,6 +475,7 @@ ignore 必附理由。
 | 2026-08-15 | P7：`docs/guide/composable-skill-eval-coverage.md` 整檔刪除，牴觸 P5「最小 retarget（全面重寫是 P8）」裁定 | 13 列矩陣 + 全部 lint/ab 引用 100% dangling（引用的 scenario 全在預登記刪除面內），retarget 無存活對象；orchestrator 批准，P8 文件段按需重建。 |
 | 2026-08-15 | P7：duration_ms 修法與掛帳括號字面相反（掛帳寫「優先採 stream-json 值」，實作改 wall clock 為主） | 掛帳括號是成因指認非修法指令：stream-json 值本已優先且正是低報根因（實測 73% 低報，CLI 值只涵蓋 API turn）。wall 為主 + 新 `api_duration_ms` 欄位保留可回推性；verifier 覆核通過。 |
 | 2026-08-15 | P7：benchmark treatment 池來源修正案（`eval run` → 塌陷支改 ab treatment 臂） | 量測中發現 run 模態無 skill 注入（headless 亦無 Skill tool），run 池 ≈ baseline；修正案於計算門檻前落帳、門檻零改動、選池規則經 verifier 稽核零例外（方向保守）。 |
+| 2026-08-15 | P8：rc tag 命名 `rc-v6.0.0` 取代 PLAN 的 `v6.0.0-rc` | `v*` glob 觸發 release.yml 且 tag/版本比對必炸；pre-release 字串破 LOCATIONS 三個 regex（gate verifier 逐一親驗）。與 P0.0 gate tag 改名同因；預登於 fe6c9be 先於執行。真 `v6.0.0` tag 留待使用者最終確認 + merge main 後。 |
 
 ## 新開裁決（D9+）
 
