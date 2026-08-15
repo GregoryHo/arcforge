@@ -96,7 +96,82 @@ Skill tool）與 evaluating/compacting 滿分（無 skill 亦可過）。
 | compacting | 5/5（0.96 avg） | 保留 |
 | d1 | 4/5（0.93 avg） | 保留 |
 
-### Campaign 4：finishing（04:53 完，description 修復的 mandated baseline）
+### Run lane 2 結果（05:18 完）
+
+| scenario | run 池 | 處置 |
+|---|---|---|
+| code-review-two-axis | 1/4 有效 pass（+1 grader void） | 塌陷 → ab |
+| debugging | 5/5（1.00） | 保留（ceiling 家族） |
+| dispatching | 4/4 有效滿分（+1 grader void） | 保留（ceiling 家族，4 有效 ≥4） |
+| executing | 2/5（0.40） | 塌陷 → ab |
+| looping | 5/5（0.90 avg） | 保留 |
+| sessions | 0/4 有效（4×0.71，+1 grader void） | 塌陷 → ab |
+
+**grader-void 升級（預登記 >10%/池 觸發）**：two-axis、dispatching、sessions 各 1/5=20%，
+全為 `model_grader_unparseable`。三池中兩池將被 ab 池取代，但發生率已越線 →
+P7 內完成特徵化調查（是否 P5 位置相關家族），結果入 gate 報告。
+
+**特徵化結果（05:30）**：機理定位於 `eval-grader-model.js` — grader 以 `claude -p`
+（120s timeout、2 attempts）評分，exit 0 但 `extractJsonObject` 抽不出 JSON → 標
+unparseable 且 **raw stdout 直接丟棄**（該 trial 的 grading/*.json 不存在）——事後
+不可診斷。時間相關性：3 發全落在 4+ lane 併發窗（lane 1 零發生），供應端負載相關
+性成立、位置相關性無法排除（raw 缺失）。**P8 修復票**：unparseable 時持久化 raw
+stdout（grading/trial-N-unparseable.txt）+ 放寬抽取器；發生率 3/30（本窗全域 10%）。
+
+### ab 補測：tdd（05:51 完）：IMPROVED +0.63 CI[0.41, 0.86]
+
+baseline 0.17 / pass 0%（與 run 池 0.17 齊一——**run 模態 ≈ baseline 的自洽性驗證**）｜
+treatment 0.80 / pass 40%（2×1.0 + 3×0.67，A1/A2 test-first 序列斷言為丟分點）。
+benchmark 入池：tdd 用此 treatment 臂。
+
+### ab 補測：brainstorming / router（06:06 完）
+
+| | baseline | treatment | delta | 判定 |
+|---|---|---|---|---|
+| brainstorming | 0.50 / 0% | 0.85 / pass 40% | **+0.35 CI[0.11, 0.59]** | **IMPROVED** |
+| router | 0.60 / 0% | **0.96 / pass 100%** | **+0.36 CI[0.25, 0.47]** | **IMPROVED** |
+
+benchmark 入池：兩支皆用 ab treatment 臂。
+
+### ab 補測：two-axis / executing / sessions（08:11 完）
+
+| | baseline | treatment | delta | 判定 |
+|---|---|---|---|---|
+| code-review-two-axis | 0.60 / 0% | **1.00 / 100%** | **+0.40 CI[0.40, 0.40]** | **IMPROVED** |
+| executing（k=10） | 0.60 / 60% | **1.00 / 100%** | **+0.40 CI[0.03, 0.77]** | **IMPROVED** |
+| sessions | 0.71 / 0% | **1.00 / 100%** | **+0.29 CI[0.29, 0.29]** | **IMPROVED** |
+
+executing 以 k=10 拿到 CI>0 —— **P6 unmet-but-covered 正式脫離**（P6 判別器死亡的
+場景在本窗恢復鑑別，treatment 20/20 連續兩 phase 滿分後首次配上有效 baseline）。
+
+## 全量 benchmark 判定（08:12，`eval report --since 2026-08-15T02:09:09Z`）
+
+- `latest.json` + `2026-08-15.json`（aggregate + raw）已生成，19/19 現役 scenario 入列，
+  `result_filter.since` 落檔。
+- **門檻對照（預登記 85ba5d2，未調整）**：
+  - 平均 pass_rate = 16.2/19 = **0.853 ≥ 0.70 ✓**
+  - 個別 ≥0.60 者 = 16/19 = **84.2% ≥ 80% ✓**（線下三支 brainstorming/diagramming/tdd
+    的 delta 皆 IMPROVED）
+- freshness 模擬：prevTag=v5.0.0（2026-07-27）→ **not stale ✓**
+- error trial 帳：grader void 4 發（two-axis/dispatching/sessions run 池各 1、dispatching
+  已由 4 有效滿足 ≥4；被 ab 池取代者不影響 benchmark）；SIGTERM infra 1 發（diagramming
+  首輪，正確標記剔除）。無任何池有效數 <4。
+
+## 天花板家族存廢建議書（gate 呈使用者裁決）
+
+P5–P7 累計，六支曾入 unmet-but-covered 的處置建議：
+
+| skill | P7 事實 | 建議 |
+|---|---|---|
+| executing | **+0.40 CI[0.03, 0.77] IMPROVED（k=10）** | **脫離家族**，保留，結案 |
+| diagramming-obsidian | **+0.23 CI[0.09, 0.38] IMPROVED（合池）** | **脫離家族**，保留；P8 修 A4 獵巡誘因 + references headless fallback |
+| evaluating | preflight 67%（恢復鑑別力）、run 池 1.00 | 保留；delta 量測可行，列 P8/backlog |
+| debugging | P7 ceiling ×2（v3 矛盾修正後 v4 仍 100%：授權下 baseline 雙修+驗值）；P4 +0.16 歷史 | 傾向保留（紀律價值 + 對較弱模型的護欄）；scenario 轉 non-reg 用途。刪除選項一併呈報：現行模型已內化其教學 |
+| dispatching | ceiling ×3（P6 v1/v2 + P7），P6 診斷：baseline 合法讀 src/jobs.js | 同上——keep-or-delete 由使用者裁決；treatment 池 100% 佐證無害 |
+| writing-skills | 新支，P7 ceiling ×2（v1 品質假說、v2 診斷假說均被 baseline 打穿） | 傾向保留（meta-skill 為授權標準，價值不僅在 delta）；如實記載：其行為主張已被現行模型內化 |
+
+共同事實：六支的 treatment 池全數 ≥ 門檻（100% ×5、evaluating 100%）——技能無害且
+與模型預設行為一致；問題是「教的東西模型已會」，不是「教錯」。
 
 baseline 0.46 / pass 0% ｜ treatment **1.00 / pass 100%** ｜ delta **+0.54 CI[0.46, 0.62]**
 → **IMPROVED**（5/5 有效）。description no-summarize 修復後與 P4 +0.58 同量級——
@@ -112,6 +187,15 @@ baseline 0.30 / pass 0%（5 有效）｜ treatment 0.50 / pass 0%（4 有效，1
 treatment 臂有**（arm-correlated incentive），且暴露出貨面缺口：skill body 引用
 references 無 headless fallback。裁定：**量測中不改 rubric**；同日同版第二輪 ab 補池
 （P6 looping 前例）取可辯護 n；A4 結構性發現 + harness 強制隔離債掛 P8。
+
+### Campaign 5 續：diagramming 第二輪（06:24 完）→ 合池 IMPROVED
+
+第二輪單獨：baseline 0.35/0%、treatment 0.60/0%、**+0.25 CI[0.05, 0.45] IMPROVED**（5/5 雙臂
+有效）。**合池（同日同版，10 vs 9 有效）：+0.23 CI[0.09, 0.38] IMPROVED** — diagramming
+**首個有效量測**成立，P5「無任何有效量測」債清。修正先前 A4 判讀：第二輪顯示 **baseline
+也全掛 A4**（兩臂齊一）→ A4 是常數偏移非臂偏差，delta 由 A2/A3（不宣稱未驗證的存檔）
+承載。cost regression 如實記錄（treatment 2.3× duration，渲染工作）；A4 獵巡行為 +
+references headless fallback 缺口續掛 P8。
 
 ### writing-skills treatment run（03:54 完）：5/5 PASS（1.0）— benchmark 入池
 
