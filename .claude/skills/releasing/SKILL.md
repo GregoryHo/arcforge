@@ -92,7 +92,7 @@ Things to verify, with reasoning:
 
 - **No hardcoded skill counts.** Values like "15 skills" drift every time a skill ships. Prefer an invariant phrasing — a description that stays true across all releases needs no maintenance. The one place a count is legitimately pinned is `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py`, which exists precisely to fail when the number changes without anyone noticing.
 - **No stale path references.** If this release moved anything (state dirs, worktree paths, config locations), greps from the examples above apply here too. Skills live under `skills/core/<name>/`, so a reference to a bare `skills/<name>/` is stale.
-- **No stale invocation names.** Skills are invoked as `/arcforge:<name>` with no prefix. Any surviving `arc-<name>` slash reference in shipped surface is dangling — `npm run check:docs` gates that class, but it only scans `skills/`, `docs/guide/`, `hooks/`, and `README.md`, so check the website and any doc outside that set by hand.
+- **No stale invocation names.** Skills are invoked as `/arcforge:<name>` with no prefix. Any surviving `arc-<name>` slash reference in shipped surface is dangling — `npm run check:docs` gates that class over its scan set (`SCAN_DIRS` + `SCAN_ROOT_FILES` in `scripts/check-doc-refs.js` — read the constants, don't trust a cached list), so check the website and any doc outside that set by hand.
 
 **Never rewrite past `CHANGELOG.md` entries.** They are history, and downstream users, the vault's Decision notes, and `git log vPREV..vCURRENT` workflows all depend on them being stable. If a past entry turns out wrong, add a correction inside the *new* release's entry. Stealth edits break provenance.
 
