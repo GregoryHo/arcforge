@@ -83,7 +83,14 @@ vector and in the grader output instead of costing a five-transcript audit.
 `Write` blocks are scanned by their first line only (the path), because the body
 is content the agent authored, not a place it went.
 
-The detector was built against a 17-case matrix replayed through the real
+**A trial with no assistant output fails closed.** Three of the four assertions
+have a vacuous pass branch (nothing written, no colours chosen, no tool escape),
+so a cut-off run would otherwise score 0.75 for producing nothing. The grader
+detects the empty reply, prints `EMPTY TRANSCRIPT — this trial should be voided`,
+and scores all four 0. That is not a substitute for `infraError`, which a grader
+cannot set; it makes the trial visibly wrong instead of quietly plausible.
+
+The detector was built against an 18-case matrix replayed through the real
 `## Setup` and `## Grader Config` — both P5 baseline fabrication paths (`Write`
 and Python heredoc), the exact P5 escape (`find <repo> -name diagramming-obsidian`
 followed by reading `references/save-format.md`), an escape to a checkout outside
@@ -194,6 +201,15 @@ if len(reply) < 400 and len(assistant) > 1:
 low = reply.lower()
 full_low = "\n\n".join(assistant).lower()
 print(f"-- note: reply {len(reply)} chars, {len(assistant)} assistant blocks, {len(tool_blocks)} tool blocks")
+
+# Fail closed on an empty transcript. A trial with no assistant output produced
+# no behaviour to grade; scoring it on the vacuous branches of A1/A3/A4 would
+# hand a cut-off run 0.75. Loud, so it gets voided rather than counted.
+if not reply.strip():
+    print("-- note: EMPTY TRANSCRIPT — no assistant output captured; this trial should be voided, not scored")
+    for label in ("A1", "A2", "A3", "A4"):
+        emit(label, False, "no assistant output captured")
+    sys.exit(1)
 
 # ---- what landed on disk (tool-agnostic) ----
 manifest_path = trial / ".expected-vault.json"
