@@ -369,6 +369,73 @@ grader-void 與位置相關 grader_failed → 量測期間記發生率，任一�
   version-bump check 對新檔的 stderr 噪音；eval-corpus-coverage 註解「18」過時；PLAN
   「刪 64」字面漂移（實 40）；harness 強制隔離（P5 續掛）。
 
+## P7 gate step 5 — 使用者裁決（2026-08-15）
+
+**「全留」**：天花板家族四支（debugging、dispatching、writing-skills、evaluating）全數保留，
+skill 集終版維持 15 支。其 scenario 轉為 non-reg 用途留在語料庫；evaluating 的 delta 量測
+與 diagramming 絕對水準拉升列 post-rc backlog。P8 range = 15 skills 不變。
+
+## P8 任務（進行中）
+
+**預登記（開跑前寫死，2026-08-15）**
+
+**範圍約束（綁定）**：P8 是文件/規範/發版 phase——**不動 `skills/`、`evals/scenarios/`、
+`evals/fixtures/` 的任何內容**（P7 benchmark 為權威收官態；行為性 skill 編輯需 eval 證據，
+P8 不開量測窗）。允許面：docs/、README、website/、`.claude/rules/`、CONTRIBUTING、CHANGELOG、
+版本字串、`.claude/skills/arc-releasing*`（contributor 面）、scripts/ 純儀器修復（附測試、
+不影響已量測數字的語意）。
+
+**Tracks**：
+- A（worker）：docs/guide ×6 重寫（cli-invocation、hooks-system、skills-reference、
+  worktree-workflow、eval-system、learning-dashboard）——audience = 明天安裝的新使用者；
+  真相來源 = 現行 CLI --help、hooks/hooks.json、實際行為，不是舊文件。
+- B（worker，與 A 平行）：README 重寫 + assets、website 導覽修正、CONTRIBUTING（ARCFORGE_ROOT
+  敘事清除）、根 CLAUDE.md（runner 表失真）、`.claude/rules/` 12 份終掃（含
+  templates-commands-agents.md 刪除——其 path scope 三目錄 P2 已滅、hooks.md/skills.md
+  過期段、transition 段清理）。**不動版本字串**（C 統一 bump）。
+- C（A+B 合併後）：CHANGELOG `## [6.0.0]` 敘事 + awk 擷取本地驗證；版本 bump 全 LOCATIONS
+  （canonical `.claude-plugin/plugin.json` 5.0.0→6.0.0，共 8 處含 website 編譯產物
+  `npm run build:website`）；arc-releasing 敘事面 + arc-release-audit.js 對 v6 現實；
+  release.yml 五步全數本地模擬（tag 版本比對、version-sync、benchmark freshness、
+  CHANGELOG 擷取非空、npm pack）；package.json files array 出貨面複審。
+- Orchestrator：儀器小修（grader unparseable raw stdout 持久化 + 測試、version-bump check
+  對新檔 stderr 噪音、eval-corpus-coverage 註解「18」、PLAN「刪 64」漂移註記）。
+
+**AC（機械，PLAN 逐字 + 具體化）**：
+1. check:docs、check:versions 綠；npm test 5 runner + 全 check 綠。
+2. `git grep "arc-" -- docs/ README.md website/ .claude/rules/` 只剩刻意保留的歷史敘述
+   （CHANGELOG 歷史、arc-releasing 自身、明確標註的 v5 對照）——逐筆列冊。
+3. CHANGELOG awk 擷取（release.yml 同款邏輯）對 6.0.0 產出非空 body（本地驗證）。
+4. `npm pack --dry-run` 出貨清單審視通過（無 legacy 目錄、無 .venv、無 contributor-only 檔）。
+
+**AC（行為，docs-only verifier，門檻先寫死）**：fresh verifier **只讀 README + docs/guide**
+（禁讀原始碼/rules/skills）後：
+1. 列舉出的 skill 集 == 實際 15 支（逐名）；
+2. 列舉出的 CLI 群 == 實際 5 群（loop/worktree/eval/learn/obsidian），抽查 ≥10 個旗標無虛構；
+3. 「文件描述但實際不存在」的命令/旗標/路徑/env var == **0 筆**；
+4. 安裝與快速上手指示可自中性 cwd 依字面走通。
+任一不滿足 = 行為閘 FAIL。
+
+**偏離（預登）**：rc tag 命名 `rc-v6.0.0`（非 PLAN 的 `v6.0.0-rc`）——`v*` glob 會觸發
+release.yml 且 tag/package.json 版本比對必炸、pre-release 字串又破 LOCATIONS 三個 regex；
+與 P0.0 gate tag 改名同因。真 `v6.0.0` tag 留待使用者最終確認 + merge main 後。
+
+**明確遞延（post-rc backlog，不入本 phase）**：diagramming A4 誘因 + references headless
+fallback + render_excalidraw.py:131（皆在 skills/ 樹，動則需重量測）；cost-regression 判準；
+floor-in-pass-bar；harness 強制隔離；evaluating delta 量測；dashboard rejections.jsonl；
+bucket 清單三處硬編；tdd/debugging description 邊界。
+
+**Stop（PLAN）**：check:docs 需要 ignore 註記才能過 → 先判「文件說謊 vs 引擎缺功能」，
+ignore 必附理由。
+
+任務：
+
+- [ ] Worker A — docs/guide ×6 重寫
+- [ ] Worker B — README/website/CONTRIBUTING/CLAUDE.md/rules 終掃
+- [ ] Worker C — CHANGELOG + 版本 bump + release 工程 + arc-releasing
+- [ ] Orchestrator — 儀器小修 ×4
+- [ ] gate 五步（機械→docs-only verifier→gate verifier→進度/tag `rc-v6.0.0`→使用者最終確認）
+
 ## 偏離紀錄
 
 | 日期 | 偏離 | 理由 |
