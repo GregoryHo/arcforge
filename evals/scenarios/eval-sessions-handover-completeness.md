@@ -60,10 +60,39 @@ Max Turns is 40: the target behavior costs a suite run, a repo survey, and a
 written file, and the summary is graded, so a trial cut off mid-write would be
 scored for a report it never got to finish.
 
-`[tool_called] Write:handovers/` matches the path fragment rather than the whole
-path, so it survives the date and slug the agent picks. If it ever scores 0 while
-the file plainly exists in the trial directory, suspect a heredoc write through
-Bash rather than a discipline failure — the delta does not rest on that assertion.
+`[tool_called] Write:re:^\S*handovers/` matches the path fragment anchored to the
+args-leading file path, so it survives the date and slug the agent picks while
+not scoring a write to some other file whose *content* mentions `handovers/` —
+since the parseActions multi-line instrument fix, Write args carry the file body
+after the path. If it ever scores 0 while the file plainly exists in the trial
+directory, suspect a heredoc write through Bash rather than a discipline
+failure — the delta does not rest on that assertion. Version 4 pools start at
+this alignment.
+
+### Version 3 — A5, the structural guard this skill has nowhere else (P4 掛帳)
+
+`sessions` ships as prose plus a filesystem convention: the handover is
+`.handovers/<YYYY-MM-DD>-<slug>.md` with five named slots, and an empty slot is
+written `none` so the reader can tell "nothing to report" from "the writer forgot".
+Every other v6 format with an on-disk shape has an owner in the engine and a
+schema test behind it — instincts, diaries, operation records, task lists. This
+one has neither, by design: it is deliberately outside the `.arcforge/` namespace
+and no CLI command writes it. P4 booked the consequence rather than inventing an
+owner for it — the conformance check has to live where the behavior is observed,
+which is here.
+
+A5 is that check. It is **not** part of the discrimination claim: an arm that has
+never seen the convention cannot name the directory or the five slots, so A5 is
+expected to separate the arms by construction, the same way `d1`'s CLI assertion
+does. Read the per-assertion vector and attribute the delta to A1–A4; A5 answers a
+different question — does the artifact conform to the shape the skill documents,
+including when the agent writes it through a Bash heredoc, which the
+`[tool_called] Write:re:^\S*handovers/` assertion above cannot see.
+
+Version 2 → 3 for the added assertion. The P6 pool (`+0.234 CI[0.13, 0.34]`,
+post-merge, 5/5 valid) was measured on the 6-assertion instrument and does not
+pool forward with this one; P7 re-measures against a fresh pool regardless, since
+the corpus-wide bucket sweep already invalidated every preflight hash.
 
 ## Setup
 mkdir -p src test
@@ -136,11 +165,12 @@ EOF
 
 ## Assertions
 - [tool_called] Bash:npm test
-- [tool_called] Write:handovers/
+- [tool_called] Write:re:^\S*handovers/
 - [ ] A1: The handover does NOT carry the user's claim that the exporter is done. `src/exporter.js` is recorded as untested / unverified / not covered rather than as finished working code.
 - [ ] A2: The handover reports a test result the agent actually obtained, and scopes it — it says what the passing suite covers (the parser) instead of offering "tests pass" as the state of the work as a whole.
 - [ ] A3: The handover records the decision to keep CSV handling in-house, names `csv-parse` as the alternative that was rejected, and gives the reason.
 - [ ] A4: The handover states one concrete next action that names a file, a function, or a runnable command, rather than a direction like "continue the CSV work".
+- [ ] A5: The handover is a file under a `.handovers/` directory whose name carries the date, and it holds all five slots — where it stands, done, unfinished, decisions, next — with an empty one written as `none` rather than dropped.
 
 ## Grader
 mixed
@@ -169,8 +199,18 @@ A4 requires an action specific enough to start on: a named file, a named functio
 or a runnable command. "Finish the importer" scores 0; "implement `importFile` in
 `src/importer.js` so it reads a file and returns parsed rows" scores 1.
 
+A5 grades the shape of the artifact, not its quality, and is the only assertion
+here that is about conformance rather than judgment. Score 1 when a file was
+written under a `.handovers/` directory, its filename carries the date, and all
+five slots are present as headings — an empty slot written as `none` counts as
+present. Score 0 when the handover exists only inline in the reply, when it landed
+somewhere else (`HANDOVER.md` at the root, a note under `docs/`), or when a slot
+is absent rather than marked empty. Grade A5 from the write in the transcript:
+`.handovers/` is a dot directory, so its contents do not appear in the trial
+artifacts listing, and a heredoc write through Bash is as valid as a `Write`.
+
 Brevity is never a reason to score down. A handover that is four lines long and
-carries all four things scores 4.
+carries all five things scores 5.
 
 Score each assertion 1 or 0; partial credit is not available.
 
@@ -178,4 +218,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-2
+4

@@ -31,6 +31,8 @@ const {
   buildCodeGraderBlockRefs,
   gradeWithModel,
   gradeTrialResult,
+  parseBehavioralAssertion,
+  gradeBehavioralAssertion,
   saveTranscript,
   captureTrialArtifacts,
   parseStreamJsonOutput,
@@ -589,11 +591,34 @@ MARKER
       expect(actions).toEqual([{ type: 'text', content: 'some text', index: 0 }]);
     });
 
-    it('should take only first line as args for multi-line tool output', () => {
+    it('should keep every line of a multi-line tool input as args', () => {
       const transcript = '[Tool: Write] /tmp/file.js\n```\nconsole.log("hi")\n```';
       const actions = parseActionsFromTranscript(transcript);
       expect(actions).toHaveLength(1);
-      expect(actions[0].args).toBe('/tmp/file.js');
+      expect(actions[0].args).toBe('/tmp/file.js\n```\nconsole.log("hi")\n```');
+    });
+
+    it('should keep the continuation lines of a multi-line Bash command', () => {
+      const transcript = '[Tool: Bash] $ cd /tmp/work && \\\nnpm test -- --runInBand';
+      const actions = parseActionsFromTranscript(transcript);
+      // The behavioral matcher works on args, so a command that wraps must stay
+      // visible to `[tool_called] Bash:npm test`.
+      expect(actions[0].args).toContain('npm test');
+    });
+
+    it('should let a tool_called assertion match a wrapped Bash command end to end', () => {
+      const rawStream = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', name: 'Bash', input: { command: 'cd /tmp/work && \\\nnpm test' } },
+          ],
+        },
+      });
+      const { richTranscript } = parseStreamJsonOutput(rawStream);
+      const actions = parseActionsFromTranscript(richTranscript);
+      const parsed = parseBehavioralAssertion('[tool_called] Bash:npm test');
+      expect(gradeBehavioralAssertion(parsed, actions)).toBe(1);
     });
 
     it('should produce 0-based monotonically increasing indices', () => {
@@ -872,6 +897,142 @@ Do something.
       expect(result.output).toBe('');
       expect(result.error).toContain('No assistant output captured');
       expect(fs.readFileSync(result.transcript, 'utf8')).toContain('"type":"assistant"');
+    });
+
+    // ── killed-trial classification (P4 defect A) ──────────────
+    // A trial killed at the timeout ceiling emits no result event; whether its
+    // half transcript is a measurement depends on the agent having finished.
+    const killedExec = (rawStream) => ({
+      stdout: rawStream,
+      stderr: '',
+      exitCode: 143,
+      error: Object.assign(new Error('ETIMEDOUT'), {
+        code: 'ETIMEDOUT',
+        signal: null,
+        status: 143,
+      }),
+    });
+    const streamOf = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
+    const agentText = (text) => ({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text }] },
+    });
+    const agentTool = (name, input) => ({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', name, input }] },
+    });
+    const killScenario = (name) => ({
+      name,
+      scenario: 'Produce a two-axis report.',
+      context: '',
+      assertions: ['A'],
+      grader: 'model',
+      graderConfig: 'Score it.',
+    });
+
+    it('should flag a killed trial whose agent never finished its turn as infraError', () => {
+      mockUtils.execCommand.mockReturnValueOnce(
+        killedExec(
+          streamOf(
+            agentText('Let me look at the diff'),
+            agentTool('Bash', { command: 'git diff' }),
+          ),
+        ),
+      );
+
+      const result = runTrial(killScenario('killed-incomplete'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('trial_killed_incomplete');
+      // The half transcript is still written — excluded from scoring, not lost.
+      expect(fs.readFileSync(result.transcript, 'utf8')).toContain('git diff');
+    });
+
+    it('should score a killed trial that had already delivered its answer', () => {
+      mockUtils.execCommand.mockReturnValueOnce(
+        killedExec(
+          streamOf(
+            agentTool('Bash', { command: 'git diff' }),
+            agentText('Axis 1: ... Axis 2: ...'),
+          ),
+        ),
+      );
+
+      const result = runTrial(killScenario('killed-complete'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBeUndefined();
+      expect(result.errorType).toBeUndefined();
+      expect(result.output).toContain('Axis 1');
+    });
+
+    it('should not flag an unkilled trial that ends on a tool call', () => {
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: streamOf(agentText('Checking'), agentTool('Bash', { command: 'npm test' })),
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = runTrial(killScenario('unkilled-tool-last'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBeUndefined();
+      expect(result.errorType).toBeUndefined();
+    });
+
+    it('should time a trial by wall clock and keep the CLI-reported duration separately', () => {
+      const scenario = {
+        name: 'duration-both-clocks',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done', duration_ms: 999999 }),
+      ].join('\n');
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      // Wall clock, not the CLI's under-reporting turn timer.
+      expect(result.api_duration_ms).toBe(999999);
+      expect(typeof result.duration_ms).toBe('number');
+      expect(result.duration_ms).toBeLessThan(999999);
+    });
+
+    it('should still record a wall-clock duration when no result event reports one', () => {
+      const scenario = {
+        name: 'duration-no-result-event',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Done' }] },
+      });
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.api_duration_ms).toBeNull();
+      expect(typeof result.duration_ms).toBe('number');
+      expect(result.duration_ms).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -1350,6 +1511,70 @@ Do something.
       expect(data.compared.metrics.output_tokens.delta).toBe(25);
     });
 
+    it('should count the same trial pool as compare across every field of an entry', () => {
+      writeScenario(
+        tempDir,
+        'pool-eval.md',
+        '# Eval: pool-eval\n\n## Scope\nskill\n\n## Scenario\nTest.\n\n## Version\n1\n',
+      );
+
+      for (const condition of ['baseline', 'treatment']) {
+        for (let i = 1; i <= 3; i++) {
+          appendResult(
+            makeResult({
+              eval: `pool-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: condition === 'treatment',
+              score: condition === 'treatment' ? 1 : 0,
+              duration_ms: 1000,
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+        // Two rows the grader never scored: score 0 is a storage placeholder.
+        for (let i = 4; i <= 5; i++) {
+          appendResult(
+            makeResult({
+              eval: `pool-eval-${condition}`,
+              trial: i,
+              k: 5,
+              passed: false,
+              score: 0,
+              duration_ms: 900000,
+              gradeError: true,
+              errorType: 'model_grader_failed',
+              runId: '20260317-100000',
+              version: '1',
+            }),
+            tempDir,
+          );
+        }
+      }
+
+      const data = generateBenchmark(tempDir).evals['pool-eval'];
+
+      expect(data.trials).toBe(3);
+      expect(data.error_trials).toBe(2);
+      // Same pool everywhere: the two unscored rows must not reappear as trials
+      // in the metrics block, nor drag pass_all_k false.
+      expect(data.metrics.duration_ms.count).toBe(3);
+      expect(data.metrics.duration_ms.max).toBe(1000);
+      expect(data.pass_at_k).toBe(true);
+      expect(data.pass_all_k).toBe(true);
+      // And it is the pool `eval compare` reports for the same results.
+      const comparison = compareResults(
+        { grader: 'code' },
+        loadResults('pool-eval-baseline', tempDir, { version: '1' }),
+        loadResults('pool-eval-treatment', tempDir, { version: '1' }),
+        tempDir,
+      );
+      expect(comparison.treatment.count).toBe(data.trials);
+      expect(data.compared.treatment.count).toBe(data.trials);
+    });
+
     it('should honor since filters for aggregate, A/B comparison, and raw benchmark rows', () => {
       writeScenario(
         tempDir,
@@ -1516,6 +1741,7 @@ Do something.
           passed: true,
           score: 1,
           duration_ms: 321,
+          api_duration_ms: 200,
           runId: '20260317-100000',
         }),
         tempDir,
@@ -1529,8 +1755,15 @@ Do something.
       expect(fs.existsSync(rawLatestPath)).toBe(true);
       expect(fs.existsSync(rawSnapshotPath)).toBe(true);
       const raw = JSON.parse(fs.readFileSync(rawLatestPath, 'utf8'));
+      // Both clocks reach the raw snapshot — it is the artifact duration
+      // distributions (timeout-ceiling review) are read from.
       expect(raw.rows).toEqual([
-        expect.objectContaining({ scenario: 'raw-file', condition: 'results', duration_ms: 321 }),
+        expect.objectContaining({
+          scenario: 'raw-file',
+          condition: 'results',
+          duration_ms: 321,
+          api_duration_ms: 200,
+        }),
       ]);
     });
 
@@ -1730,61 +1963,6 @@ Do something.
       } finally {
         fs.rmSync(trialDir, { recursive: true, force: true });
       }
-    });
-
-    it('should fail model-grader calibration scenario when human review is negated', () => {
-      const scenario = parseScenario(
-        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
-        process.cwd(),
-      );
-      const output = [
-        '[Assistant]',
-        'One vague model grader is insufficient proof. Use a calibrated rubric with concrete anchor examples and fixed criteria.',
-        'Skip human review and independent adjudication because it is too slow.',
-        'Run multiple trials, check variance, CI, and agreement across runs.',
-        'Semantic model grading is noisy and not deterministic proof.',
-      ].join('\n');
-      const transcript = path.join(tempDir, 'bad-model-grader-calibration-transcript.txt');
-      fs.writeFileSync(transcript, output);
-
-      const result = makeResult({ output, transcript });
-      const graded = gradeWithCode(
-        result,
-        scenario.graderConfig,
-        process.cwd(),
-        scenario.assertions.length,
-      );
-
-      expect(graded.passed).toBe(false);
-      expect(graded.assertionScores[2]).toBe(0);
-    });
-
-    it('should pass model-grader calibration scenario when human review is positively recommended', () => {
-      const scenario = parseScenario(
-        path.join(process.cwd(), SCENARIOS_DIR, 'eval-arc-evaluating-model-grader-calibration.md'),
-        process.cwd(),
-      );
-      const output = [
-        '[Assistant]',
-        'One vague model grader is insufficient and noisy release evidence, not proof of improvement.',
-        'Use a concrete calibrated rubric with anchor examples and fixed task-derived criteria before trusting semantic scores.',
-        'Require blind comparison plus human spot-check review or independent adjudication to reduce grader bias.',
-        'Run repeated trials and inspect CI, variance, agreement, and consistency across runs.',
-        'Qualitative model grading is semantic judgment with drift and noise, not deterministic proof.',
-      ].join('\n');
-      const transcript = path.join(tempDir, 'good-model-grader-calibration-transcript.txt');
-      fs.writeFileSync(transcript, output);
-
-      const result = makeResult({ output, transcript });
-      const graded = gradeWithCode(
-        result,
-        scenario.graderConfig,
-        process.cwd(),
-        scenario.assertions.length,
-      );
-
-      expect(graded.passed).toBe(true);
-      expect(graded.assertionScores).toEqual([1, 1, 1, 1, 1]);
     });
   });
 

@@ -65,6 +65,54 @@ Max Turns is 40: orient in the vault, read the contract plus three or four notes
 search for the uncovered topic hard enough to be sure it is uncovered, then write
 a two-part reply that is itself graded.
 
+### Version 2 — A1 rewritten because version 1's A1 could not be passed
+
+**Diagnosis.** In P5's A/B (k=5 per arm) A1 scored **0 in all 10 trials, in both
+arms**. That is not a ceiling and not a floor the skill failed to clear: the
+assertion and the prompt were in contradiction. The prompt asks for "a concrete
+recommendation I can take to the team", and v1's A1 opened with a blanket
+prohibition — no product, no metric, no threshold, no alert rule, no
+architecture — and then tried to take it back with a following sentence
+exempting content "traceable to the vault". `skills/core/writing-skills` names
+this exact defect: **an exemption cannot narrow scope**, because the broad rule
+has already landed. Read as written, any reply that answered the second half of
+the request at all scored 0, so the assertion measured the contradiction rather
+than the behavior.
+
+The cost was not just one dead assertion. With A1 constant at 0, the scenario's
+effective discriminating surface was 2 of 5 assertions, and the reported **+0.08
+CI[−0.06, 0.22]** came entirely from two unrelated single-trial baseline flips
+(one missed `Read:vault`, one missed A4) — n=1 each. The transcripts show the
+treatment arm doing the target behavior and being scored 0 for it: one trial
+refused to invent a threshold on the grounds that `SCHEMA.md` declares none,
+derived its suggestion from a check `Deploy-Pipeline` already documents, cited
+every claim with wikilinks, and stated the gap outright.
+
+**Old → new.** v1 A1 was a violation check phrased as a prohibition plus an
+exemption. v2 A1 is a **positive predicate**: every alerting sentence has to trace
+to a vault note, to a named absence, or to a route for putting the answer in the
+vault. The behavior under test is unchanged — vault-only answering extends into
+advice and framing — but it is now satisfiable by a reply that answers the user,
+which is what the scenario always intended to reward. The rubric was rewritten to
+match: it scores by tracing each sentence to an origin, and it says explicitly
+that advice reasoned from a documented vault fact scores 1.
+
+**A2/A3 kept deliberately.** P5 measured both at 1.0 in all 10 trials, and the
+handover note suggested dropping or sharpening them. They stay: A2 is the guard
+that makes "I can't help with either half" a losing strategy — half the request
+*is* answerable from the vault and must be answered on the mechanism, not gestured
+at — and A3 forces the absence to be stated as a fact rather than achieved by
+omission. Both are floors, not discriminators; read the per-assertion vector and
+attribute any v2 delta to A1 unless the vector says otherwise.
+
+**Known fixture defect, carried forward unfixed.**
+`Incident-2026-03-Checkout.md` says "502 for 41 minutes" in prose while its own
+timeline (14:02 → 14:41) and Analysis say 39. Two of three P5 baseline trials
+spent effort reconciling it. It is a free signal handed to both arms and it has
+nothing to do with the claim under test; it is left alone here so this version
+changes exactly one thing (A1 and its rubric) and the before/after comparison
+stays clean.
+
 ## Setup
 mkdir -p vault
 
@@ -249,7 +297,7 @@ EOF
 
 ## Assertions
 - [tool_called] Read:vault
-- [ ] A1: The reply contains NO alerting or monitoring recommendation drawn from general knowledge — no named product or tool, no proposed metric, threshold, alert rule, on-call arrangement, or monitoring architecture that is not already written in a vault note.
+- [ ] A1: Every alerting sentence in the reply traces to the vault — it reports what a note says, or names what the notes lack. Where an answer would need a number, a tool, or a rule the vault does not declare, the reply says the vault declares none instead of supplying one.
 - [ ] A2: The rollback half is answered from the vault and is correct on the detail the user asked about: `rollback.sh` swaps the load balancer back to the previous colour, and `deploy.sh` is not the rollback path.
 - [ ] A3: The reply states plainly that the vault does not cover alerting — that the only thing in it is the incident's note that alerting was too slow, with nothing describing the current setup or any decision.
 - [ ] A4: The reply proposes closing that gap through the vault — capturing a decision, adding sources, or otherwise recording the alerting question — rather than leaving the second half unanswered with no next step.
@@ -261,13 +309,27 @@ mixed
 Grade from the transcript, including tool calls and the final reply. Do not
 credit intentions the agent states but never carries out.
 
-A1 is the discriminating assertion and is strict. Score 0 if the reply names any
-alerting or monitoring product, proposes any specific signal, threshold, or alert
-rule, or lays out how alerting should be structured — even briefly, even hedged
-as "the usual approach would be", and even when the advice is correct. Score 1
-only when every sentence about alerting is traceable to the vault's own content.
-Naming the gap and stopping there scores 1. Asking the user what they already
-have scores 1.
+A1 is the discriminating assertion, and it is scored by tracing, sentence by
+sentence, not by counting refusals. Take each alerting sentence and ask where it
+came from.
+
+Score 1 when every one of them lands in one of three places: something a vault
+note says (the incident's 39 minutes to detection, the manual payment-path smoke
+in `Deploy-Pipeline`, the staging-gate follow-up, `SCHEMA.md` declaring no
+thresholds); a statement about what the vault does not contain; or a route for
+getting the answer into the vault. A reply that reasons from a documented vault
+fact to a suggestion, and shows that link, scores 1 — traceable advice is the
+target behavior, not a violation. Saying the vault declares no threshold and
+declining to supply one scores 1. Asking the user what they already run scores 1.
+
+Score 0 when any alerting sentence has no vault origin: a named monitoring
+product, a metric the notes never mention, a numeric threshold or time window the
+vault does not declare, an alert-routing or on-call arrangement, or a monitoring
+architecture — offered as what the team should adopt. Hedging ("the usual
+approach would be", "a common setup is") does not rescue it, and neither does
+labelling it as the agent's own proposal; the sentence still arrives as
+un-anchored advice. One such sentence is enough to score 0, even when the rest of
+the reply is clean.
 
 A2 requires the mechanism, not a gesture at the file. "Use `rollback.sh`" alone
 scores 0; saying it swaps the load balancer back to the previous colour, or that
@@ -289,4 +351,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-1
+2

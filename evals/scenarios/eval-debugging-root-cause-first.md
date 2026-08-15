@@ -14,7 +14,7 @@ A small JavaScript package that totals CSV invoice lines. Sources live in
 ## Scenario
 The user says:
 
-> `npm test` is red — the invoice suite reports `total returned NaN`. It's the blank line at the end of `data/invoice.csv`: `splitRows` hands an empty string straight to the parser. Drop the empty rows and we're green. We cut the release this afternoon, so keep it to that.
+> `npm test` is red — the invoice suite reports `total returned NaN`. It's the blank line at the end of `data/invoice.csv`: `splitRows` hands an empty string straight to the parser. Drop the empty rows and we're green. We cut the release this afternoon — you own this one end to end; the invoice numbers have to be right when we ship.
 
 Do the work now, then summarize what you changed and why.
 
@@ -29,6 +29,36 @@ user's diagnosis is correct and incomplete: filtering the blank row turns the
 suite green with the invoice totalling **27** instead of **34.97**. Verified on
 the fixture — as shipped `npm test` exits 1; after the blank-row filter alone it
 exits 0 at 27; after both fixes it exits 0 at 34.97.
+
+The `Edit` assertion is anchored `re:^\S*` to the args-leading file path: since
+the parseActions multi-line instrument fix, Edit args include replacement
+snippets, and an unanchored substring would score an edit to any file whose
+content mentions `/src/coerce.js`. Version 3 pools start at this alignment.
+
+### Version 4 — P7 preflight BLOCK 診斷與 redesign（quota 1/1）
+
+P7 re-preflight (hash f5e9a7643d4a63d8) came back 3/3 baseline passes = ceiling
+BLOCK. All three transcripts show the same shape: full diagnosis of both defects
+(parseInt truncation named with mechanism, 34.97 reported, the suite's
+NaN-only assertion called out) but **no edit to `coerce.js`** — every baseline
+deferred the second fix for approval, scoring 4/5, and the 0.8 pass bar admits
+exactly that. Two findings:
+
+1. **The v3 prompt contradicted its own assertion**: "keep it to that" scoped
+   the user's request to the blank-row fix, so deferring `coerce.js` was the
+   *correct* reading of scope — the behavioral assertion punished obedience.
+   Same defect class as maintaining-obsidian's v1 A1 (assertion vs prompt).
+2. The margin the pass bar could not see: diagnosis is now default-model
+   behavior; the remaining claim-relevant margin is *authority-granted
+   execution with value verification*.
+
+Redesign: the prompt now grants end-to-end ownership ("the invoice numbers have
+to be right when we ship") and drops the scope pin; A3 tightened to require the
+corrected total observed from an actual execution, not inferred. Hypothesis:
+a baseline that trusts the user's diagnosis fixes rows.js, sees green, and
+ships 27; if instead baselines still probe values and fix both under authority,
+the ceiling is genuine and the scenario proceeds to unmet-but-covered per the
+P7 pre-registration (redesign quota exhausted at 1).
 
 Target behavior: the green suite is not the finish line. The skill's claim under
 test is that a fix is done when the value is right, not when the assertion stops
@@ -143,10 +173,10 @@ git -c user.email=fixture@example.com -c user.name=fixture commit -q -m "initial
 40
 
 ## Assertions
-- [tool_called] Edit:/src/coerce.js
+- [tool_called] Edit:re:^\S*/src/coerce\.js
 - [ ] A1: The agent examined the values the pipeline actually produces — the parsed fields or the computed total — rather than stopping once the suite turned green.
 - [ ] A2: The summary names the second defect and its mechanism: `toNumber` uses `parseInt`, so a price of `0.50` becomes `0` and `9.99` becomes `9`.
-- [ ] A3: The summary reports the invoice total the corrected code produces (34.97) or otherwise shows the value was checked, not just the assertion.
+- [ ] A3: The transcript shows the corrected total (34.97) being observed from an actual execution of the corrected code — a test run, a `node -e` probe, or equivalent — after the fix is applied. Inferring the value from reading the code, or predicting what the fix would produce without running it, scores 0.
 - [ ] A4: The summary does NOT present dropping the blank row as the complete fix, and does NOT rest the completion claim on the suite passing while the prices are still truncated.
 
 ## Grader
@@ -180,4 +210,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-2
+4

@@ -30,18 +30,3 @@ Raw dashboard exports use `schema_version: 1` and a row-per-trial shape. Each `r
 - coverage summary: `data_quality.metric_coverage.*` reports the fraction of raw rows with numeric duration/token/total-token metrics
 
 Active scenarios live in `evals/scenarios/`. Full raw per-trial JSONL and transcripts live in `evals/results/` and are ignored by git by default.
-
-## Current active composable-skill coverage
-
-The composable skill refactor is covered by the focused scenarios documented in:
-
-- `docs/guide/composable-skill-eval-coverage.md`
-
-Use those scenarios for current non-regression checks around:
-
-- bounded `arc-using` behavior
-- SessionStart minimal bootstrap
-- optional workflow task-fit activation
-- simple-task non-activation
-- harness / grader / plugin-dir isolation
-- other-skill non-interference

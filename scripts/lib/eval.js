@@ -31,6 +31,7 @@ const {
   buildIsolationSettings,
 } = require('./eval-trial-env');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
+const { isTrialKilled, isOutputComplete } = require('./eval-trial-outcome');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -59,6 +60,7 @@ const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-tr
  * @property {number} score - Score from 0.0 to 1.0
  * @property {string} timestamp - ISO timestamp
  * @property {number|null} duration_ms - Wall-clock duration of the trial in ms (null if unavailable)
+ * @property {number|null} api_duration_ms - Duration the CLI reported in its stream-json result event (null if the trial produced no result event)
  * @property {number|null} input_tokens - Input tokens used by the trial agent (null if unavailable)
  * @property {number|null} output_tokens - Output tokens used by the trial agent (null if unavailable)
  * @property {string} [transcript] - Path to transcript file
@@ -118,6 +120,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       score: 0,
       timestamp,
       duration_ms: null,
+      api_duration_ms: null,
       input_tokens: null,
       output_tokens: null,
       error,
@@ -226,8 +229,16 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // (e.g., max-turns reached). Try stdout first, fall back to stderr.
   const rawOutput = result.stdout || result.stderr || '';
   const { textResult, richTranscript, usage } = parseStreamJsonOutput(rawOutput);
-  // Prefer the stream-json duration_ms if available; fall back to wall-clock.
-  const duration_ms = usage.duration_ms ?? wallDuration;
+  // duration_ms is the trial's wall-clock cost, measured around the subprocess.
+  // The CLI's own `duration_ms` (result event) covers only the API turn — it
+  // excludes process start, hook and MCP init, and teardown, so preferring it
+  // under-reports a trial by seconds (measured: 1,882 ms reported vs 6,994 ms
+  // wall on a one-turn trial) and, because a killed trial emits no result event
+  // at all, it silently mixes two different clocks across a pool. Both clocks
+  // are kept: duration_ms for cost/ceiling analysis, api_duration_ms for the
+  // model-side time the CLI attributes to the turn.
+  const duration_ms = wallDuration;
+  const api_duration_ms = usage.duration_ms;
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
   const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
@@ -242,6 +253,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     score: 0,
     timestamp,
     duration_ms,
+    api_duration_ms,
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
     transcript,
@@ -250,6 +262,23 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     ...(model ? { model } : {}),
     ...(runId ? { runId } : {}),
   };
+  // A trial the runner killed before the agent finished its turn is an
+  // instrument failure, not behaviour: its half transcript otherwise grades as
+  // if the agent had chosen to stop there (P4 defect A — four of five two-axis
+  // treatment trials clipped at the 300s ceiling scored 0.2 with no error flag,
+  // so scorableResults() kept them and the delta moved against the treatment).
+  // Killed AND incomplete, both: a killed trial that had already delivered its
+  // answer is a valid measurement (the same P4 pool has one, scored 1.0).
+  if (isTrialKilled(result) && !isOutputComplete({ textResult, actions })) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: 'Trial killed before the agent finished its turn (runner timeout)',
+      errorType: 'trial_killed_incomplete',
+      infraError: true,
+    };
+  }
+
   if (result.exitCode !== 0 && !parsedOutput) {
     // Only treat as error if no usable output was captured
     return { ...base, error: result.stderr };

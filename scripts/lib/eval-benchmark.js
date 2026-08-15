@@ -129,6 +129,7 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
     for (const result of results) {
       const { assertion_count, assertion_passed_count } = assertionSummary(result);
       const durationMs = resultMetricValue(result, 'duration_ms');
+      const apiDurationMs = resultMetricValue(result, 'api_duration_ms');
       const inputTokens = resultMetricValue(result, 'input_tokens');
       const outputTokens = resultMetricValue(result, 'output_tokens');
       const totalTokens = resultMetricValue(result, 'total_tokens');
@@ -147,6 +148,7 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,
+        api_duration_ms: apiDurationMs,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: totalTokens,
@@ -306,6 +308,13 @@ function generateBenchmark(projectRoot, options = {}) {
 
     if (results.length === 0) continue;
 
+    // One pool for every number in the entry. `compare` routes everything
+    // through scorableResults(); the benchmark used to filter only the stats
+    // block, so a report could read "10 trials" beside a duration count of 15
+    // and a pass_all_k that grade/infra-error rows had dragged false. The
+    // dropped rows stay visible: raw rows keep them with their error flags,
+    // and error_trials carries the count P7 top-up decisions need.
+    const scorable = stats.scorableResults(results);
     const s = stats.statsFromResults(results);
     const warning = stats.confidenceWarning(results);
 
@@ -328,19 +337,20 @@ function generateBenchmark(projectRoot, options = {}) {
     }
 
     const claimType = inferClaimType(scenario);
-    const metrics = metricsFromResults(results);
+    const metrics = metricsFromResults(scorable);
     const comparison = isAb ? comparisonFromAbResults(scenario, projectRoot, filterOpts) : null;
     benchmarks[scenario.name] = {
       scope: scenario.scope,
       claim_type: claimType,
       grader: scenario.grader,
       trials: s.count,
+      error_trials: results.length - scorable.length,
       pass_rate: s.passRate,
       avg_score: s.avg,
       stddev: s.stddev,
       ci95: s.ci95,
-      pass_at_k: stats.passAtK(results),
-      pass_all_k: stats.passAllK(results),
+      pass_at_k: stats.passAtK(scorable),
+      pass_all_k: stats.passAllK(scorable),
       last_run: results[results.length - 1].timestamp,
       metrics,
       ...(comparison ? { compared: comparison } : {}),

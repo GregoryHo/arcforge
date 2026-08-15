@@ -92,7 +92,11 @@ treatment arm's pass rate instead of a delta whose ceiling makes it unreadable.
 
 The single `[tool_called]` assertion targets `Edit` on `TASKS.md` specifically
 because the file's own banner says markers are edited in place, which makes `Edit`
-the overwhelmingly likely tool for it. `docs/design-notes.md` is deliberately NOT
+the overwhelmingly likely tool for it. The pattern is anchored `re:^\S*` to the
+args-leading file path: since the parseActions multi-line instrument fix, Edit
+args include replacement snippets, and an unanchored substring would score an
+edit to any file whose content mentions `TASKS.md`. Version 4 pools start at
+this alignment. `docs/design-notes.md` is deliberately NOT
 asserted behaviorally: appending to it is equally natural via `Edit` or `Write`,
 and a tool-name assertion there would measure tool preference rather than whether
 the decisions landed. A1 covers that half and the grader is told to read the
@@ -173,7 +177,7 @@ skip
 40
 
 ## Assertions
-- [tool_called] Edit:TASKS.md
+- [tool_called] Edit:re:^\S*TASKS\.md
 - [ ] A1: Both decisions from T2 — choosing the streaming parser over the buffered one, and dropping the retry wrapper — are written into a file in the repository. The transcript shows the write actually happening.
 - [ ] A2: Every write of that state happens BEFORE the response proposes, announces, or performs compaction. Compacting first and writing afterwards scores 0.
 - [ ] A3: The response treats state that exists only in the conversation as the thing that decides the timing. Answering purely from tool count, session length, or the user's go-ahead scores 0.
@@ -210,4 +214,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-3
+4
