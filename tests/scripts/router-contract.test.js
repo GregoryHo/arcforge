@@ -1,33 +1,26 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { SKILLS_DIR, governedSkills } = require('./v6-legacy-skills');
+const { SKILLS_DIR, allSkills } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
-// Router bijection contract (v6).
+// Router bijection contract.
 // ---------------------------------------------------------------------------
 //
 // `skills/core/using/` is the router: a table mapping a slash invocation to the
 // situation it serves. The failure mode it guards against is drift in BOTH
 // directions — a shipped skill nobody can find, and a row that routes to a
 // skill that no longer exists. So the contract is a bijection, checked both
-// ways, added in P1 (before any v6 skill exists) so every later phase inherits
-// it instead of retrofitting it.
+// ways: every shipped skill has a row, and every row resolves to a shipped
+// skill. `using` itself is excluded, as the router cannot route to itself.
 //
-// Grandfathering: legacy v5 skills (docs/plans/v6/legacy-skills.json) are not
-// in the table — they are being deleted or rewritten, and listing them would
-// make the router advertise a surface v6 is dismantling. `using` itself is
-// excluded as the router cannot route to itself.
-//
-// In P1 both sides are empty, so the live assertion is structural: the table
-// exists, is parseable, and the bijection logic runs (proved against fixtures
-// below). Each later phase adds skills and rows together, and this test starts
-// biting the moment they disagree.
+// Adding or removing a skill therefore means editing the table in the same
+// commit; this test bites the moment the two sides disagree.
 
 // Router identity comes from tests/router-skill.json — the single source both
-// this suite and tests/skills/test_skill_structure.py read. Hardcoding it here
-// (as P3 did) meant the pytest side could keep exempting a Skill Map that this
-// side no longer recognized as the router, and neither suite would notice.
+// this suite and tests/skills/test_skill_structure.py read. Hardcoding it in
+// both would let the pytest side keep exempting a Skill Map that this side no
+// longer recognized as the router, with neither suite noticing.
 const ROUTER_MANIFEST = path.join(__dirname, '..', 'router-skill.json');
 const { router_skill: ROUTER_SKILL, skill_map_heading: SKILL_MAP_HEADING } = readRouterManifest();
 const ROUTER_PATH = path.join(SKILLS_DIR, ROUTER_SKILL, 'SKILL.md');
@@ -82,9 +75,9 @@ function parseSkillMap(content) {
 }
 
 describe('router contract — skills/using', () => {
-  it('the router skill exists and is not grandfathered', () => {
+  it('the router skill exists and ships', () => {
     expect(fs.existsSync(ROUTER_PATH)).toBe(true);
-    expect(governedSkills()).toContain(ROUTER_SKILL);
+    expect(allSkills()).toContain(ROUTER_SKILL);
   });
 
   const content = fs.readFileSync(ROUTER_PATH, 'utf8');
@@ -94,15 +87,15 @@ describe('router contract — skills/using', () => {
     expect(Array.isArray(parseSkillMap(content))).toBe(true);
   });
 
-  it('every governed skill (except the router) has a row', () => {
+  it('every shipped skill (except the router) has a row', () => {
     const rows = new Set(parseSkillMap(content));
-    const routable = governedSkills().filter((n) => n !== ROUTER_SKILL);
+    const routable = allSkills().filter((n) => n !== ROUTER_SKILL);
     const missing = routable.filter((n) => !rows.has(n));
     expect({ missing }).toEqual({ missing: [] });
   });
 
-  it('every row resolves to a shipped, governed skill', () => {
-    const routable = new Set(governedSkills().filter((n) => n !== ROUTER_SKILL));
+  it('every row resolves to a shipped skill', () => {
+    const routable = new Set(allSkills().filter((n) => n !== ROUTER_SKILL));
     const dangling = parseSkillMap(content).filter((n) => !routable.has(n));
     expect({ dangling }).toEqual({ dangling: [] });
   });
@@ -114,8 +107,8 @@ describe('router contract — skills/using', () => {
 });
 
 describe('router bijection logic (fixtures)', () => {
-  // The live table is empty in P1, so the bijection is proved here instead —
-  // otherwise the assertions above are vacuously true and could rot unnoticed.
+  // The assertions above only fire when the real table drifts. These prove the
+  // bijection logic itself, so it cannot rot into a no-op that passes silently.
   const table = (rows) =>
     ['# R', '', SKILL_MAP_HEADING, '', '| Skill | Use when |', '| --- | --- |', ...rows, ''].join(
       '\n',

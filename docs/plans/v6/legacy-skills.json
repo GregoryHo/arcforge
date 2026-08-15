@@ -1,4 +1,0 @@
-{
-  "_comment": "v5 legacy skills grandfathered during the v6 rewrite. New enforcement (frozen frontmatter schema, D1 self-containment) exempts these dirs. Ratchet: every entry MUST still exist as skills/core/<name>/ \u2014 when a skill is deleted or rewritten, prune it here in the same commit. Must be empty by end of P6.",
-  "legacy": []
-}

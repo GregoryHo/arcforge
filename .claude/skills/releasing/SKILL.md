@@ -1,9 +1,9 @@
 ---
-name: arc-releasing
+name: releasing
 description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 8-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
 ---
 
-# arc-releasing
+# releasing
 
 You are helping an arcforge contributor ship a new version. The goal of this skill is zero silent drift between the canonical version files, the CHANGELOG, shipped documentation, and the Obsidian vault knowledge base. Those four surfaces get out of sync surprisingly easily — a prior release (v1.4.0) discovered that `marketplace.json` had been stuck two versions behind, and v1.4.1 discovered the observer daemon and the JS side had diverged state roots. The checklist below is designed to catch exactly those classes of drift before they ship.
 

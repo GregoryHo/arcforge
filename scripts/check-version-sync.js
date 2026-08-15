@@ -10,7 +10,7 @@
  * other location that carries the version string.
  *
  * The checked set is anchored to the 8-location table in
- * `.claude/skills/arc-releasing/SKILL.md`, NOT a raw grep — a grep catches the
+ * `.claude/skills/releasing/SKILL.md`, NOT a raw grep — a grep catches the
  * deliberately-stale `package-lock.json` and misses the README badge. The table
  * is the maintained authoritative list.
  *
@@ -44,7 +44,7 @@ function regexExtract(content, re) {
 }
 
 // Non-canonical locations to verify against the canonical version. Mirrors the
-// 8-location table in arc-releasing/SKILL.md (canonical baseline + 7 others).
+// 8-location table in the releasing skill's SKILL.md (canonical baseline + 7 others).
 // `package-lock.json` is intentionally excluded — SKILL.md documents it as
 // known-stale; never folded into a release commit.
 const LOCATIONS = [

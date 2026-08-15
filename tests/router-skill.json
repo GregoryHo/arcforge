@@ -1,5 +1,5 @@
 {
-  "_comment": "Router identity for the v6 bijection contract. Two suites assert against the router — tests/scripts/router-contract.test.js (jest, bijection) and tests/skills/test_skill_structure.py (pytest, the schema §3.1 Skill Map exemption). Both read THIS file; a second copy of these constants is forbidden, the same rule legacy-skills.json carries. Renaming the router or its table heading is a one-line edit here, and a wrong value turns both suites red instead of silently disabling one of them.",
+  "_comment": "Router identity for the bijection contract. Two suites assert against the router — tests/scripts/router-contract.test.js (jest, bijection) and tests/skills/test_skill_structure.py (pytest, the schema §3.1 Skill Map exemption). Both read THIS file; a second copy of these constants is forbidden. Renaming the router or its table heading is a one-line edit here, and a wrong value turns both suites red instead of silently disabling one of them.",
   "router_skill": "using",
   "skill_map_heading": "## Skill Map"
 }
