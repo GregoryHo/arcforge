@@ -201,7 +201,9 @@ arcforge learn activate <candidate-id> --project
 | `learn activate` | Promote materialized drafts to active (project scope only) |
 | `learn drafts` | What is materialized and waiting for activation |
 
-Every one takes `--project` or `--global`, and `--json` for scripting.
+The review/list commands take `--project` or `--global`; the
+candidate-transition commands (`approve`, `reject`, `materialize`, `accept`,
+`activate`) are **project-scope only**. Every one takes `--json` for scripting.
 
 ## Turning it off
 

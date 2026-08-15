@@ -138,9 +138,12 @@ arcforge learn activate <candidate-id> --project
 arcforge learn dashboard [--port N]
 ```
 
-Every command takes `--project` or `--global` to pick the scope, and `--json`
-for machine-readable output. There are three further subgroups — `learn diary`,
-`learn reflect`, and `learn instinct` — which the `/learning` skill drives. The
+The scope-selecting commands take `--project` or `--global`; the
+candidate-transition commands (`approve`, `reject`, `materialize`, `accept`,
+`activate`) are **project-scope only** — the engine refuses `--global` for
+them. Every command takes `--json` for machine-readable output. There are four
+further subgroups — `learn diary`, `learn reflect`, `learn instinct`, and
+`learn recall` — which the `/learning` skill drives. The
 [learning guide](learning-dashboard.md) walks the whole loop.
 
 ## `obsidian`

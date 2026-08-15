@@ -77,13 +77,13 @@ COMMANDS:
                                      List candidates with materialized drafts awaiting activation.
   learn inspect <candidate-id> --project|--global [--json]
                                      Read-only review summary for a candidate (paths and next actions).
-  learn approve|reject <candidate-id> --project|--global [--json]
-                                     Record user authorization decision for a candidate.
+  learn approve|reject <candidate-id> --project [--json]
+                                     Record user authorization decision for a candidate (project scope only).
   learn accept <candidate-id> --project [--json]
                                      Approve and materialize drafts in one step; never activates.
-  learn materialize <candidate-id> --project|--global [--json]
-                                     Write approved candidate drafts without activating behavior.
-  learn activate <candidate-id> --project|--global [--json]
+  learn materialize <candidate-id> --project [--json]
+                                     Write approved candidate drafts without activating behavior (project scope only).
+  learn activate <candidate-id> --project [--json]
                                      Promote materialized drafts to active artifacts (project scope only).
   learn dashboard [--port N]
                                      Start a localhost review dashboard for learning suggestions
