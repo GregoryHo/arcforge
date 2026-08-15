@@ -1,137 +1,206 @@
-# CLI Invocation Convention
+# The arcforge CLI
 
-> The one blessed way to invoke the arcforge CLI, on both platforms
-> (Claude Code, Codex). Skills, templates, agents,
-> and docs that invoke the CLI follow this convention; this document is
-> the authority they defer to.
+arcforge ships one executable, `arcforge`. It is the whole engine surface —
+everything the toolkit can do that is not a skill happens through this command.
 
-## The blessed form
-
-Always invoke the CLI through `ARCFORGE_ROOT`:
+## Calling it
 
 ```bash
-node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>
+arcforge <command> [options]
 ```
 
-Examples:
+No path, no `node`, no environment variable. Claude Code puts every loaded
+plugin's `bin/` directory on `PATH`, so once arcforge is installed the bare
+command resolves anywhere — in your project, in a worktree, in a subshell.
+(Installation is in the README.)
+
+To confirm it resolved:
 
 ```bash
-node "${ARCFORGE_ROOT}/scripts/cli.js" worktree list --json
-node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
-node "${ARCFORGE_ROOT}/scripts/cli.js" loop --tasks tasks.md --max-runs 50
+arcforge --help
 ```
 
-Why one form: arcforge is installed in different places on different
-platforms, and your working directory is your *own* project — not the
-arcforge checkout. A single variable-anchored form works everywhere the
-variable resolves, and never depends on cwd.
+That prints the full command list. This guide is the same surface, organized by
+what you would want to do with it.
 
-## Resolving ARCFORGE_ROOT
+## The five command groups
 
-### Claude Code (plugin install)
+| Group | What it does | Guide |
+|-------|--------------|-------|
+| `worktree` | Isolated checkouts for parallel work | [worktree-workflow.md](worktree-workflow.md) |
+| `loop` | Unattended execution over a task list | below |
+| `eval` | Measure whether a change alters agent behavior | [eval-system.md](eval-system.md) |
+| `learn` | The opt-in session-learning loop | [learning-dashboard.md](learning-dashboard.md) |
+| `obsidian` | Register the Obsidian vaults the toolkit may write to | below |
 
-Nothing to do. The SessionStart hook (`inject-skills`) exports
-`ARCFORGE_ROOT` pointing at the installed plugin directory, so the
-blessed form works as-is in every plugin session.
+Every group is independent. You can use worktrees and never touch learning, or
+run evals without ever starting a loop.
 
-### Codex (fallback header)
-
-Codex has no SessionStart hook, so `ARCFORGE_ROOT` is unset.
-Its install guide standardizes the clone location at
-`~/.agents/arcforge`, which makes a one-line fallback valid.
-Put this header at the top of any shell block that invokes the CLI:
+## `worktree`
 
 ```bash
-: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"
-if [ ! -d "$ARCFORGE_ROOT" ]; then
-  echo "ERROR: ARCFORGE_ROOT=$ARCFORGE_ROOT does not exist. Set ARCFORGE_ROOT to your arcforge checkout." >&2
-  exit 1
-fi
-node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>
+arcforge worktree add <name> [--branch <b>] [--from <ref>] [--setup]
+arcforge worktree list [--json]
+arcforge worktree remove <name> [--force]
 ```
 
-How it behaves per platform:
+| Flag | Effect |
+|------|--------|
+| `--branch` | Branch to check out; defaults to `<name>`, created if it does not exist |
+| `--from` | Base ref when the branch has to be created (default: `HEAD`) |
+| `--setup` | Detect the project's package manager and run its installer |
+| `--json` | Machine-readable listing |
+| `--force` | Remove even when the worktree has uncommitted changes |
 
-| Platform | `ARCFORGE_ROOT` before header | Result |
-|----------|-------------------------------|--------|
-| Claude Code | Set by SessionStart hook | Hook value wins — `:=` only assigns when unset/null |
-| Codex | Unset | Falls back to `~/.agents/arcforge` (the standard clone location) |
-| Any, nonstandard install | Unset, clone elsewhere | Existence check reports the bad path; export `ARCFORGE_ROOT` manually |
+Worktrees are created under `~/.arcforge/worktrees/`, outside your repository,
+so they never show up in your working tree. See the
+[worktree guide](worktree-workflow.md) for the full workflow.
 
-Do **not** use the abort form `"${ARCFORGE_ROOT:?}"` instead — on
-Codex the variable starts unset, so a bare `:?`
-turns the very first command into a dead end. The `:=` fallback plus an
-existence check is the blessed pattern.
-
-## Skill-local scripts: SKILL_ROOT
-
-Some skills ship their own `scripts/` directory (e.g.
-`skills/<name>/scripts/`). **Any skill that ships its own
-`scripts/` directory** may anchor those scripts with a `SKILL_ROOT`
-fallback header — this is an attribute-based rule, not an enumerated
-allowlist of skill names:
+## `loop`
 
 ```bash
-: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/<skill-name>}"
-if [ ! -d "$SKILL_ROOT" ]; then
-  echo "ERROR: SKILL_ROOT=$SKILL_ROOT does not exist. Set ARCFORGE_ROOT or SKILL_ROOT manually." >&2
-  exit 1
-fi
-node "${SKILL_ROOT}/scripts/<script>.js" <args>
+arcforge loop --tasks <file> [options]
 ```
 
-`SKILL_ROOT` is for a skill's *own* files only. References to the shared
-engine (`scripts/lib/`, `scripts/cli.js`) always go through
-`${ARCFORGE_ROOT}` directly.
+Runs a markdown task list to completion across fresh Claude Code sessions — one
+task per session, restartable, with a cost and iteration ceiling.
 
-## The one forbidden form: same-command inline assignment
+| Flag | Effect |
+|------|--------|
+| `--tasks` | The task list to work through (required); this file is the only task state |
+| `--max-runs` | Maximum iterations (default: 50) |
+| `--max-cost` | Maximum spend in dollars (default: unlimited) |
+| `--task-timeout` | Per-session timeout in seconds (default: 600) |
+| `--model` | Passed through to each spawned session |
+| `--permission-mode` | Passed through to each spawned session |
+| `--allowed-tools` | Passed through to each spawned session |
+| `--verify-cmd` | Acceptance floor for tasks that carry no `verify:` line of their own |
+| `--verifier` | After the floor passes, spawn an independent verifier; a FAIL retries with feedback, and an exhausted or unreadable verdict blocks |
+| `--max-retries` | Verifier feedback retries before blocking (default: 2) |
+| `--reset` | Archive prior loop state and start fresh |
 
-The **only** forbidden invocation form is assigning `ARCFORGE_ROOT` in
-the same command that expands it:
+The loop keeps its own bookkeeping next to your project so an interrupted run
+picks up where it stopped. Nothing carries between iterations except files: the
+task list holds what is left and git holds the work.
 
 ```bash
-# FORBIDDEN — POSIX expansion trap
-ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
+arcforge loop --tasks TASKS.md --max-runs 10 --verify-cmd "npm test"
 ```
 
-POSIX shells expand the argument words *before* the temporary inline
-assignment takes effect, so `"${ARCFORGE_ROOT}"` expands to the
-*previous* value. If the variable was unset, the command actually run
-is `node /scripts/cli.js eval list`:
+The `/looping` skill drives this end to end — start there rather than composing
+flags by hand.
 
-```text
-$ unset ARCFORGE_ROOT
-$ ARCFORGE_ROOT=/opt/arcforge node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
-Error: Cannot find module '/scripts/cli.js'
-```
-
-If you need to pin a nonstandard location, export first on its own
-line — then the blessed form works:
+## `eval`
 
 ```bash
-export ARCFORGE_ROOT=/opt/arcforge
-node "${ARCFORGE_ROOT}/scripts/cli.js" eval list
+arcforge eval list
+arcforge eval lint <name>
+arcforge eval preflight <name>
+arcforge eval run <name> [--k N] [--model <m>]
+arcforge eval ab <name> [--skill-file <path>]
+arcforge eval compare <name>
+arcforge eval report [name] [--since <ISO>]
+arcforge eval history
+arcforge eval audit [--top N]
+arcforge eval dashboard [--port N]
 ```
 
-## Bare form: local checkout only
+| Flag | Applies to | Effect |
+|------|-----------|--------|
+| `--k` | `run`, `ab` | Trials per condition |
+| `--model` | `run`, `ab`, `preflight` | Model to run trials on |
+| `--no-isolate` | `run` | Run without a clean trial directory (isolated by default) |
+| `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
+| `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
+| `--skill-file` | `ab` | The skill body injected into the treatment arm |
+| `--interleave` | `ab` | Alternate baseline and treatment trials instead of running each arm in a block |
+| `--since` | `report` | Bound the report to results at or after an ISO timestamp |
+| `--top` | `audit` | How many candidates to surface |
+| `--port` | `dashboard` | Port for the live dashboard (default: 3333) |
+
+See the [eval guide](eval-system.md) for scenario format and how to read a
+verdict.
+
+## `learn`
+
+Learning is off until you turn it on, and nothing it proposes changes behavior
+until you activate it.
 
 ```bash
-node scripts/cli.js <cmd>
+arcforge learn status [--json]
+arcforge learn enable --project
+arcforge learn disable --project
+arcforge learn inbox --project
+arcforge learn inspect <candidate-id> --project
+arcforge learn approve <candidate-id> --project
+arcforge learn materialize <candidate-id> --project
+arcforge learn activate <candidate-id> --project
+arcforge learn dashboard [--port N]
 ```
 
-The bare relative form is limited to a **local checkout** of the
-arcforge repository — it only works when your cwd is the arcforge repo
-root (the package is not published to npm, so there is no global
-`arcforge` binary). It must not appear in skills, templates, agents, or
-any instruction that runs from a user's project, because there is no
-`scripts/cli.js` relative to the user's cwd there.
+The scope-selecting commands take `--project` or `--global`; the
+candidate-transition commands (`approve`, `reject`, `materialize`, `accept`,
+`activate`) are **project-scope only** — the engine refuses `--global` for
+them. Every command takes `--json` for machine-readable output. There are four
+further subgroups — `learn diary`, `learn reflect`, `learn instinct`, and
+`learn recall` — which the `/learning` skill drives. The
+[learning guide](learning-dashboard.md) walks the whole loop.
 
-## Quick reference
+## `obsidian`
 
-| Form | Status | Where |
-|------|--------|-------|
-| `node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>` | Blessed | Everywhere |
-| `: "${ARCFORGE_ROOT:=$HOME/.agents/arcforge}"` + existence check | Blessed header | Non-Claude platforms (harmless no-op under Claude Code) |
-| `: "${SKILL_ROOT:=${ARCFORGE_ROOT:-}/skills/<name>}"` | Allowed | Any skill shipping its own `scripts/` directory |
-| `ARCFORGE_ROOT=... node "${ARCFORGE_ROOT}/..."` | **Forbidden** | Nowhere — same-command inline assignment never resolves |
-| `node scripts/cli.js <cmd>` | Restricted | Local checkout of the arcforge repo only |
+```bash
+arcforge obsidian register --path <p> --name <n> [--default] [--preset <p>]
+arcforge obsidian list-vaults [--json]
+arcforge obsidian set-default <name>
+arcforge obsidian unregister <name>
+```
+
+The registry lives at `~/.arcforge/obsidian-vaults.json` and the first vault you
+register becomes the default. `--scope`, `--search-preferred`, and
+`--qmd-collection` tune how a vault is searched; the `/maintaining-obsidian`
+skill sets them for you during vault setup.
+
+## JSON output
+
+Commands that take `--json` emit a stable shape you can pipe into `jq`:
+
+```bash
+arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | .path'
+```
+
+Prefer `--json` for anything scripted. `worktree list` has its shape pinned by a
+test that runs the live command, so the fields named in this guide are the fields
+it emits; the other commands are stable but not pinned that way, so check the
+output once before you build on a specific field.
+
+## Environment
+
+| Variable | Effect |
+|----------|--------|
+| `CLAUDE_PROJECT_DIR` | Project root the CLI operates on (defaults to the current directory) |
+
+Everything else the CLI needs it derives — you do not point it at its own
+installation, and there is no configuration file to create before first use.
+
+## Calling the CLI from a skill
+
+Skills reach the engine exactly one way: by running the bare command in a shell.
+
+```bash
+arcforge worktree list --json
+```
+
+That is the entire contract. A skill never imports engine code, never builds a
+path to the CLI, and never depends on an environment variable being set for it.
+If you are writing your own skill, the same rule applies — shell out to
+`arcforge`, read its output, and treat everything behind it as a black box. That
+is what lets the engine change underneath without breaking what you wrote.
+
+## Exit codes
+
+`0` on success. Any failure exits non-zero and prints a single-line reason to
+stderr, so the usual shell idiom works:
+
+```bash
+arcforge worktree remove stale-branch || echo "removal refused"
+```

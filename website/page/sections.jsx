@@ -19,7 +19,7 @@ function BeforeAfter({theme:t}) {
             'Skips design. Jumps to code.',
             'Forgets the test-first discipline mid-session.',
             'Context evaporates between sessions.',
-            'Multi-epic work stomps on itself in one branch.',
+            'Parallel work stomps on itself in one branch.',
             'No record of what was tried, what failed, why.',
           ].map(x=>(
             <div key={x} style={{display:'flex',gap:10,alignItems:'flex-start',marginBottom:12,color:t.mute,fontSize:14,lineHeight:1.5}}>
@@ -31,11 +31,11 @@ function BeforeAfter({theme:t}) {
           <div style={{position:'absolute',top:-12,left:28,background:t.bg,padding:'2px 12px',fontSize:10,letterSpacing:3,color:t.ember,fontFamily:'"JetBrains Mono",monospace'}}>AFTER</div>
           <h3 style={{fontFamily:'"Fraunces",serif',fontStyle:'italic',fontWeight:400,fontSize:32,margin:'0 0 24px 0',color:t.ink}}>disciplined</h3>
           {[
-            ['Designs before building.','arc-brainstorming blocks the agent from jumping to code.'],
-            ['Tests before shipping.','arc-tdd enforces RED → GREEN → REFACTOR at every task.'],
-            ['Remembers across sessions.','arc-journaling + arc-managing-sessions persist context.'],
-            ['Parallelizes without chaos.','arc-coordinating spins isolated worktrees per epic.'],
-            ['Learns from its runs.','arc-reflecting surfaces patterns; arc-recalling turns them into instincts.'],
+            ['Designs before building.','brainstorming stops the jump from vague request to code.'],
+            ['Tests before shipping.','tdd holds RED → GREEN → REFACTOR on every task.'],
+            ['Remembers across sessions.','sessions writes the handover and reads it back.'],
+            ['Parallelizes without chaos.','dispatching gives each writer its own worktree.'],
+            ['Learns from its runs.','learning turns session diaries into patterns you approve.'],
           ].map(([h,d])=>(
             <div key={h} style={{display:'flex',gap:10,alignItems:'flex-start',marginBottom:14,fontSize:14,lineHeight:1.5}}>
               <span style={{color:t.ember,marginTop:2}}>◆</span>
@@ -51,15 +51,15 @@ function BeforeAfter({theme:t}) {
 // ─── Day in the life ───
 function DayInLife({theme:t}) {
   const steps = [
-    ['09:02', 'session start', 'SessionStart hooks fire. inject-skills sets a minimal bootstrap. Previous session handover injected — five lines, not an archive.', t.brass],
-    ['09:04', '"add OAuth login"', 'Vague intent. arc-using suggests arc-brainstorming as the smallest useful starting point.', t.ember],
-    ['09:12', 'brainstorm → refine', 'Design doc committed. Refiner produces spec.xml. Scope declared.', t.brass],
-    ['09:24', 'plan → coordinate', 'DAG emits 12 tasks across 3 epics. arc-using-worktrees spins isolated branches.', t.brass],
-    ['09:38', 'implement (TDD)', 'Subagent per task. Red tests first. Green. Then task-reviewer: spec compliance + quality in one pass.', t.ember],
-    ['11:20', 'compact suggested', 'compact-suggester hook fires at 50 tool calls. /compact runs, pre-compact checkpoints state.', t.dim],
-    ['14:05', 'dispatch teammates', 'Epic B and Epic C run in parallel via Claude Code teammate agents. Lead keeps context.', t.ember],
-    ['17:40', 'journal + reflect', 'arc-journaling captures the day\'s reflections before compaction. arc-reflecting surfaces patterns.', t.brass],
-    ['17:45', 'finish + merge', 'arc-finishing-epic runs the merge decision. Worktrees collapse back into main.', t.ember],
+    ['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session file and injects the previous handover — five lines, not an archive.', t.brass],
+    ['09:04', '"add OAuth login"', 'Vague intent, several plausible designs. brainstorming picks it up before a single line is written.', t.ember],
+    ['09:12', 'design settled', 'One approach chosen, its tradeoffs written down. executing turns it into a checkbox task list.', t.brass],
+    ['09:24', 'split the work', 'Two independent tracks. dispatching gives each writer its own worktree so neither can stomp the other.', t.brass],
+    ['09:38', 'implement (TDD)', 'tdd holds the line per task: failing test first, then the code that passes it, then the cleanup.', t.ember],
+    ['11:20', 'compact suggested', 'compact-suggester fires once the session gets long. /compact runs; pre-compact checkpoints state first.', t.dim],
+    ['14:05', 'a test fails', 'Not a guess-and-patch. debugging reads the failure to root cause before anything is changed.', t.ember],
+    ['17:40', 'wrap up', 'sessions writes the handover for tomorrow. learning captures the diary — opt-in, and only if you enabled it.', t.brass],
+    ['17:45', 'finish + merge', 'code-review on the diff, then finishing makes the merge decision and collapses the worktrees.', t.ember],
   ];
   return (
     <PageSection theme={t} id="day">
@@ -107,8 +107,8 @@ function Wiki({theme:t}) {
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:56,alignItems:'start'}}>
         <div>
-          <SkillRow name="arc-maintaining-obsidian" desc="Unified Obsidian vault lifecycle: ingest, query, audit. Builds a searchable wiki from session artifacts." color={t.brass} t={t}/>
-          <SkillRow name="arc-diagramming-obsidian" desc="First-class Excalidraw diagrams inside the vault. Agents draw as they think." color={t.ember} t={t}/>
+          <SkillRow name="maintaining-obsidian" desc="Unified Obsidian vault lifecycle: ingest, query, audit, bootstrap. Builds a searchable wiki from session artifacts." color={t.brass} t={t}/>
+          <SkillRow name="diagramming-obsidian" desc="First-class Excalidraw diagrams inside the vault. Agents draw as they think." color={t.ember} t={t}/>
           <div style={{marginTop:36,padding:'20px 24px',background:t.card,border:`1px dashed ${t.line}`,borderRadius:3}}>
             <div style={{fontSize:10,letterSpacing:3,color:t.dim,fontFamily:'"JetBrains Mono",monospace',marginBottom:8}}>WHY THIS MATTERS</div>
             <p style={{color:t.mute,fontSize:14,lineHeight:1.6,margin:0}}>
@@ -132,8 +132,8 @@ function Wiki({theme:t}) {
 
             {/* orbit nodes */}
             {[
-              {a:-135,n:'specs',s:'spec.xml + design.md'},
-              {a:-45,n:'journals',s:'per-session'},
+              {a:-135,n:'notes',s:'ingested knowledge'},
+              {a:-45,n:'diaries',s:'per-session'},
               {a:45,n:'instincts',s:'learned patterns'},
               {a:135,n:'diagrams',s:'.excalidraw'},
             ].map((o)=>{
@@ -187,11 +187,11 @@ function Evaluating({theme:t}) {
         <EvalCard n="MIX" title="Mixed grading" desc="Code-graded assertions where possible. Model-graded for qualitative aspects. Best of both." t={t} color={t.ember}/>
       </div>
       <div data-af-reveal style={{marginTop:48,background:t.card,border:`1px solid ${t.line}`,padding:'24px 28px',fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:t.mute,overflowX:'auto'}}>
-        <div style={{fontSize:10,letterSpacing:3,color:t.dim,marginBottom:14}}>$ arcforge eval run auth-skill --max-turns 20 --plugin-dir ./arcforge</div>
-        <div>{'→ trial 001  '}<span style={{color:t.brass}}>PASS</span>{' ·  12 turns · behavioral: 4/4 · quality: 92/100'}</div>
-        <div>{'→ trial 002  '}<span style={{color:t.brass}}>PASS</span>{' ·   9 turns · behavioral: 4/4 · quality: 89/100'}</div>
-        <div>{'→ trial 003  '}<span style={{color:t.ember}}>FAIL</span>{' ·  20 turns · behavioral: 2/4 — missed refine stage'}</div>
-        <div style={{marginTop:10,color:t.dim}}>summary: 2/3 trials · mean turns 13.7 · spec compliance 83%</div>
+        <div style={{fontSize:10,letterSpacing:3,color:t.dim,marginBottom:14}}>$ arcforge eval run eval-tdd-test-first-gate --k 3</div>
+        <div>{'→ trial 001  '}<span style={{color:t.brass}}>PASS</span>{' ·  12 turns · behavioral: 4/4'}</div>
+        <div>{'→ trial 002  '}<span style={{color:t.brass}}>PASS</span>{' ·   9 turns · behavioral: 4/4'}</div>
+        <div>{'→ trial 003  '}<span style={{color:t.ember}}>FAIL</span>{' ·  20 turns · behavioral: 2/4 — wrote the code first'}</div>
+        <div style={{marginTop:10,color:t.dim}}>summary: 2/3 trials · mean turns 13.7 · baseline 0/3</div>
       </div>
     </PageSection>
   );
@@ -231,14 +231,14 @@ function SessionLearning({theme:t}) {
             </g>
           </g>
           {[
-            {x:150,y:190,n:'journaling',d:'per-session reflection',c:t.ember},
-            {x:400,y:90,n:'reflecting',d:'patterns across entries',c:t.brass},
-            {x:700,y:90,n:'learning',d:'opt-in candidate queue',c:t.brass},
-            {x:950,y:190,n:'recalling',d:'instinct creation',c:t.ember},
-            {x:700,y:290,n:'observing',d:'tool-call watch',c:t.brass},
-            {x:400,y:290,n:'managing-sessions',d:'save / resume',c:t.brass},
+            {x:150,y:190,n:'sessions',d:'handover / resume',c:t.ember},
+            {x:400,y:90,n:'observe hook',d:'tool-call watch',c:t.brass},
+            {x:700,y:90,n:'diary',d:'per-session capture',c:t.brass},
+            {x:950,y:190,n:'candidates',d:'queued for review',c:t.ember},
+            {x:700,y:290,n:'you approve',d:'nothing auto-activates',c:t.brass},
+            {x:400,y:290,n:'instincts',d:'active behavior',c:t.brass},
           ].map(o=>{
-            const label = 'arc-'+o.n;
+            const label = o.n;
             // 7.5px per char for JetBrains Mono 12px + 28px padding
             const w = Math.max(132, label.length * 7.5 + 28);
             const hw = w/2;
@@ -264,16 +264,16 @@ function SessionLearning({theme:t}) {
 // ─── Platforms ───
 function Platforms({theme:t}) {
   const plats = [
-    {name:'Claude Code',tag:'PRIMARY',cmd:'/plugin install arcforge@arcforge-dev',note:'Full plugin marketplace. Hooks, agents, teammates, commands — all native.',primary:true},
-    {name:'Codex',tag:'SUPPORTED',cmd:'Fetch .codex/INSTALL.md',note:'Manual install. Core skills + SDD pipeline.'},
+    {name:'Claude Code',tag:'THE TARGET',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
+    {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
     <PageSection theme={t} id="platforms">
       <SectionHeader
         n="09"
-        kicker="PLATFORMS"
-        title={<>One toolkit, <em style={{color:t.brass,fontStyle:'italic'}}>two harnesses.</em></>}
-        sub="Claude Code gets the deepest integration via the plugin marketplace. Codex ships manually but shares the same skill library."
+        kicker="PLATFORM"
+        title={<>One harness, <em style={{color:t.brass,fontStyle:'italic'}}>done properly.</em></>}
+        sub="arcforge targets Claude Code and nothing else. No portability layer, no lowest-common-denominator features, no second packaging target to drift out of sync."
         theme={t}
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
@@ -295,60 +295,40 @@ function Platforms({theme:t}) {
   );
 }
 
-// ─── Skills Grid (all 33) ───
+// ─── Skills Grid (all 15) ───
 function SkillsGrid({theme:t}) {
-  // Aligned to the seven functional categories in docs/guide/skills-reference.md.
-  // Meta is called out as project-level, not a normal user-facing skill.
   const layers = [
-    ['Core toolkit', t.ember, '8 promoted skills', 'The small surface most users should learn first: router, design, specs, planning, TDD, debugging, verification, and eval.'],
-    ['Optional workflows', t.brass, '24 opt-in skills', 'Advanced orchestration for SDD, worktrees, reviews, sessions, learning, and knowledge work — only when scope earns them.'],
-    ['Harness + eval', t.dim, 'gated behavior', 'Activation, non-activation, instruction-strength, spec sync, drift, and reconstruction checks keep the layers honest.'],
+    ['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'],
+    ['Description-triggered', t.brass, 'no global preamble', 'A skill fires because its description matches the situation in front of you. There is no mandatory routing rule injected into every session.'],
+    ['Eval-backed', t.dim, 'measured, not asserted', 'A skill ships when trials show it changes what an agent does against a baseline that lacked it. Claims without numbers do not land.'],
   ];
   const groups = [
-    ['Planning', t.brass, [
-      ['arc-brainstorming','design exploration'],
-      ['arc-refining','spec generation'],
-      ['arc-writing-tasks','break into tasks'],
-      ['arc-planning','DAG breakdown'],
+    ['Orientation', t.dim, [
+      ['using','router · skill index'],
     ]],
-    ['Execution', t.ember, [
-      ['arc-executing-tasks','human-in-the-loop'],
-      ['arc-agent-driven','subagent per task + review'],
-      ['arc-implementing','epic orchestrator'],
-      ['arc-dispatching-parallel','parallel agent dispatch'],
-      ['arc-dispatching-teammates','multi-epic teammates'],
-      ['arc-looping','cross-session autonomy'],
+    ['Doing the work', t.ember, [
+      ['brainstorming','explore before the design settles'],
+      ['executing','task list, then run it'],
+      ['dispatching','parallel work, isolated writers'],
+      ['looping','unattended across fresh sessions'],
+      ['finishing','merge, PR, keep, or discard'],
     ]],
-    ['Coordination', t.brass, [
-      ['arc-using','bounded router · skill index'],
-      ['arc-using-worktrees','isolated workspaces'],
-      ['arc-coordinating','worktree lifecycle'],
-      ['arc-finishing','branch completion'],
-      ['arc-finishing-epic','epic completion'],
-      ['arc-compacting','strategic /compact timing'],
-      ['arc-managing-sessions','handover + archive'],
+    ['Quality gates', t.brass, [
+      ['tdd','RED → GREEN → REFACTOR'],
+      ['debugging','root cause before any fix'],
+      ['code-review','review the diff, answer the feedback'],
+      ['evaluating','measure behavioral change'],
     ]],
-    ['Quality', t.ember, [
-      ['arc-tdd','RED → GREEN → REFACTOR'],
-      ['arc-debugging','four-phase debug'],
-      ['arc-verifying','evidence before claims'],
-      ['arc-reviewing','request review + process feedback'],
-      ['arc-evaluating','measure behavioral change'],
-      ['arc-auditing-spec','read-only spec audit'],
+    ['Memory', t.ember, [
+      ['sessions','handover, resume, compact'],
+      ['learning','opt-in diary → candidate → activate'],
     ]],
-    ['Learning', t.brass, [
-      ['arc-journaling','pre-compaction reflection'],
-      ['arc-reflecting','insights from diaries'],
-      ['arc-learning','opt-in observe→activate lifecycle'],
-      ['arc-recalling','instinct creation'],
-      ['arc-researching','hypothesis experiments'],
+    ['Knowledge base', t.brass, [
+      ['maintaining-obsidian','vault lifecycle'],
+      ['diagramming-obsidian','Excalidraw diagrams'],
     ]],
-    ['Knowledge Base', t.ember, [
-      ['arc-maintaining-obsidian','vault lifecycle'],
-      ['arc-diagramming-obsidian','Excalidraw diagrams'],
-    ]],
-    ['Meta · project-level', t.dim, [
-      ['arc-writing-skills','TDD for ArcForge\'s own skills'],
+    ['Authoring', t.dim, [
+      ['writing-skills','build a skill that changes behavior'],
     ]],
   ];
   return (
@@ -356,8 +336,8 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="02"
         kicker="SKILLS"
-        title={<>33 skills: <em style={{color:t.brass,fontStyle:'italic'}}>layer first</em>, category second.</>}
-        sub="ArcForge has a promoted Core toolkit, Optional workflows, and Harness/eval gates. The catalog below keeps the seven functional categories for lookup; Meta stays project-level for maintaining ArcForge itself."
+        title={<>15 skills. <em style={{color:t.brass,fontStyle:'italic'}}>No pipeline</em> to enter through.</>}
+        sub="Each one is a closed unit that fires from its own description when the situation matches, and stays quiet when it doesn't. Three of them never auto-fire at all — looping, learning, and writing-skills wait to be asked."
         theme={t}
       />
       <div data-af-reveal style={{display:'flex',flexDirection:'column',gap:36}}>
@@ -370,7 +350,7 @@ function SkillsGrid({theme:t}) {
             </div>
           ))}
         </div>
-        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>Functional lookup · seven categories</div>
+        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>The full catalog · invoke any of them as /arcforge:&lt;name&gt;</div>
         {groups.map(([name,color,items])=>(
           <div key={name}>
             <div style={{display:'flex',alignItems:'baseline',gap:16,marginBottom:18,paddingBottom:10,borderBottom:`1px dashed ${t.line}`}}>
@@ -404,23 +384,23 @@ function SkillRow({name,desc,color,t}) {
 // ─── Hooks ───
 function Hooks({theme:t}) {
   const hooks = [
-    ['SessionStart','inject-skills','Minimal bootstrap: sets ARCFORGE_ROOT and tells the agent skills are tools, not laws. No mandatory routing.'],
-    ['SessionStart','session-tracker/start','Resets counters, initializes session state.'],
-    ['SessionStart','session-tracker/inject-context','Loads previous session context + learned instincts.'],
-    ['UserPromptSubmit','user-message-counter','Counts prompts for session evaluation.'],
-    ['PreToolUse','observe','Captures tool calls for behavioral pattern detection.'],
-    ['PostToolUse','quality-check','Auto-format (Prettier), type-check (TSC), console.log warnings on Edit.'],
-    ['PostToolUse','compact-suggester','Suggests /compact at 50 tool calls, then every 25.'],
-    ['PreCompact','pre-compact','Marks session file with compaction timestamp.'],
-    ['Stop','session-tracker/end','Saves session metrics (JSON + Markdown summary).'],
+    ['SessionStart','session-tracker/inject-context','Injects the previous session summary and any activated instincts.'],
+    ['SessionStart','session-tracker/start','Creates the session file; lazily starts the observer daemon.'],
+    ['UserPromptSubmit','user-message-counter','Counts user messages toward the diary threshold.'],
+    ['PreToolUse','secrets-guard','Warn-only scan for hardcoded credentials in edits and git commits.'],
+    ['PreToolUse','observe','Appends the pre-tool observation, async and off the blocking path.'],
+    ['PostToolUse','observe','Appends the post-tool observation.'],
+    ['PostToolUse','compact-suggester','Tracks the tool count and suggests /compact at the threshold.'],
+    ['PreCompact','pre-compact','Resets suggester state and captures the diary before compaction.'],
+    ['Stop','session-tracker/end','Finalizes the session and runs the threshold-gated diary capture.'],
   ];
   return (
     <PageSection theme={t} id="hooks">
       <SectionHeader
         n="10"
         kicker="IMPLEMENTATION DETAIL · HOOKS"
-        title={<>Hooks are how skills <em style={{color:t.brass,fontStyle:'italic'}}>show up without being called.</em></>}
-        sub="Claude Code hooks run at lifecycle events. Arcforge uses them to inject skills, track sessions, auto-format code, and suggest compaction before context fills."
+        title={<>Six components, <em style={{color:t.brass,fontStyle:'italic'}}>working quietly.</em></>}
+        sub="Claude Code fires hooks at lifecycle events. Arcforge registers six components across six of them — session continuity, observation, a credential guard, and compaction handling. A few hundred tokens per session, and never a block on your work."
         theme={t}
       />
       <div data-af-reveal style={{background:t.card,border:`1px solid ${t.line}`,padding:'0 0'}}>
@@ -449,7 +429,7 @@ function Install({theme:t}) {
       <SectionHeader
         n="11"
         kicker="INSTALL"
-        title={<>Two commands, <em style={{color:t.brass,fontStyle:'italic'}}>then /help.</em></>}
+        title={<>Two commands, <em style={{color:t.brass,fontStyle:'italic'}}>then ask for the map.</em></>}
         theme={t}
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:32}}>
@@ -459,14 +439,14 @@ function Install({theme:t}) {
           <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.ink,lineHeight:2,background:t.bg,padding:'16px 20px',border:`1px dashed ${t.line}`}}>
             <div><span style={{color:t.dim}}>$ </span>/plugin marketplace add GregoryHo/arcforge</div>
             <div><span style={{color:t.dim}}>$ </span>/plugin install arcforge@arcforge-dev</div>
-            <div><span style={{color:t.dim}}>$ </span>/help</div>
+            <div><span style={{color:t.dim}}>$ </span>/arcforge:using</div>
           </div>
         </div>
         <div style={{background:t.card,border:`1px solid ${t.line}`,padding:'36px 36px'}}>
-          <div style={{fontSize:10,letterSpacing:3,color:t.brass,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>OTHER HARNESSES</div>
-          <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Manual install</h3>
+          <div style={{fontSize:10,letterSpacing:3,color:t.brass,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>WHAT YOU GET</div>
+          <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Nothing you have to configure</h3>
           <div style={{color:t.mute,fontSize:13,lineHeight:1.7}}>
-            <div><b style={{color:t.ink,fontFamily:'monospace'}}>Codex:</b> Fetch <span style={{color:t.brass,fontFamily:'monospace'}}>.codex/INSTALL.md</span></div>
+            <div>Skills, hooks, and the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI load together. Learning stays off until you enable it per project. Update with <span style={{color:t.brass,fontFamily:'monospace'}}>/plugin update arcforge</span>.</div>
           </div>
         </div>
       </div>
@@ -484,7 +464,7 @@ function Footer({theme:t}) {
             <Logo size={20} ember={t.ember} brass={t.brass}/>
             <span style={{fontFamily:'"Fraunces",serif',fontSize:16,color:t.ink,fontWeight:500}}>arcforge</span>
           </div>
-          <div style={{color:t.dim}}>MIT · v5.0.0 · By Gregory Ho</div>
+          <div style={{color:t.dim}}>MIT · v6.0.0 · By Gregory Ho</div>
         </div>
         <div className="af-footer-links" style={{display:'flex',gap:48,letterSpacing:2,textTransform:'uppercase'}}>
           <a href="https://github.com/GregoryHo/arcforge" style={{color:t.ember,textDecoration:'none'}}>GitHub ↗</a>

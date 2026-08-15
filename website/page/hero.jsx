@@ -17,7 +17,7 @@ function Hero({theme}) {
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <Logo size={22} ember={t.ember} brass={t.brass}/>
           <span style={{fontFamily:'"Fraunces",serif',fontSize:18,letterSpacing:0,fontWeight:500,color:t.ink}}>arcforge</span>
-          <span style={{color:t.dim,marginLeft:6}}>v5.0.0</span>
+          <span style={{color:t.dim,marginLeft:6}}>v6.0.0</span>
         </div>
         <div className="af-nav-links" style={{display:'flex',gap:28,color:t.dim,textTransform:'uppercase'}}>
           <a href="#skills" style={{color:'inherit',textDecoration:'none'}}>Skills</a>
@@ -41,7 +41,7 @@ function Hero({theme}) {
             agents.
           </h1>
           <p style={{marginTop:32,fontSize:16,lineHeight:1.7,color:t.mute,maxWidth:520,fontFamily:'"JetBrains Mono",ui-monospace,monospace'}}>
-            A minimal, composable skill toolkit for Claude Code and Codex. Skills are tools, not laws — your agent picks the{' '}
+            A skill toolkit for Claude Code. Skills are tools, not laws — your agent picks the{' '}
             <span style={{color:t.ink}}>smallest useful workflow</span> for the task and runs direct when nothing more is needed.
           </p>
           <p style={{marginTop:14,fontSize:14,lineHeight:1.7,color:t.dim,maxWidth:520,fontFamily:'"Fraunces",serif',fontStyle:'italic'}}>
@@ -54,7 +54,7 @@ function Hero({theme}) {
               fontFamily:'"JetBrains Mono",monospace',fontSize:12,letterSpacing:2,fontWeight:700,
               textDecoration:'none',display:'inline-block',
             }}>/plugin install arcforge →</a>
-            <div style={{fontSize:11,color:t.dim,letterSpacing:1.5,fontFamily:'"JetBrains Mono",monospace'}}>MIT · 33 SKILLS · 9 HOOKS</div>
+            <div style={{fontSize:11,color:t.dim,letterSpacing:1.5,fontFamily:'"JetBrains Mono",monospace'}}>MIT · 15 SKILLS · 6 HOOKS · 0 DEPS</div>
           </div>
 
           <div style={{marginTop:56,display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}>
@@ -79,7 +79,7 @@ function Hero({theme}) {
         padding:'0 80px',fontSize:11,color:t.dim,letterSpacing:2,justifyContent:'space-between',
         fontFamily:'"JetBrains Mono",monospace',
       }}>
-        <span>◆ CLAUDE CODE · CODEX</span>
+        <span>◆ CLAUDE CODE · ZERO RUNTIME DEPENDENCIES</span>
         <span>SCALE 1:1 — DRAFT 05.02.26 — SHEET 01/08</span>
       </div>
     </section>
@@ -103,7 +103,7 @@ function HeroSchematic({theme:t}) {
         <path d="M310 90 L310 130" stroke={t.ember} strokeWidth="1.4" fill="none"/>
         <polygon points="305,125 315,125 310,135" fill={t.ember}/>
       </g>
-      <text x="330" y="115" fill={t.ember} fontSize="10" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">HOOK · inject-skills</text>
+      <text x="330" y="115" fill={t.ember} fontSize="10" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">HOOK · session-tracker</text>
 
       {/* Skills ring */}
       <g transform="translate(310,220)">
@@ -111,8 +111,8 @@ function HeroSchematic({theme:t}) {
           <circle r="60" fill="none" stroke={t.brass} strokeWidth="1.2" strokeDasharray="3 3"/>
         </g>
         <text y="4" textAnchor="middle" fill={t.brass} fontSize="12" fontFamily="Fraunces,serif" fontStyle="italic">skills</text>
-        <text y="22" textAnchor="middle" fill={t.dim} fontSize="9" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">33 AVAILABLE</text>
-        {['brainstorm','refine','plan','tdd','review','learn','journal','diagram'].map((s,i)=>{
+        <text y="22" textAnchor="middle" fill={t.dim} fontSize="9" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">15 AVAILABLE</text>
+        {['brainstorming','executing','tdd','debugging','code-review','sessions','learning','finishing'].map((s,i)=>{
           const a = (i/8)*Math.PI*2 - Math.PI/2;
           const r = 95;
           const x = Math.cos(a)*r, y = Math.sin(a)*r;
@@ -126,35 +126,24 @@ function HeroSchematic({theme:t}) {
         })}
       </g>
 
-      {/* SDD upstream — 4 stations, correctly linear */}
+      {/* Engine boundary — a skill reaches the engine only through the CLI */}
       <g transform="translate(60,400)" fontFamily="JetBrains Mono,monospace">
-        <text x="0" y="0" fill={t.dim} fontSize="10" letterSpacing="2">SDD · UPSTREAM</text>
+        <text x="0" y="0" fill={t.dim} fontSize="10" letterSpacing="2">ENGINE · arcforge CLI</text>
+        <text x="256" y="0" fill={t.brass} fontSize="10" fontStyle="italic" fontFamily="Fraunces,serif">the only way out of a skill</text>
         <g filter="url(#sk-hero)">
           <path d="M0 20 H 500" stroke={t.ink} strokeWidth="0.8"/>
         </g>
-        {['brainstorm','refine','plan','coordinate'].map((s,i)=>(
-          <g key={s} transform={`translate(${i*130+30},35)`}>
+        {['worktree','loop','eval','learn','obsidian'].map((s,i)=>(
+          <g key={s} transform={`translate(${i*100+42},35)`}>
             <g filter="url(#sk-hero)">
-              <rect x="-48" y="-13" width="96" height="26" fill={t.bg} stroke={t.brass} strokeWidth="1.2" rx="3"/>
+              <rect x="-42" y="-13" width="84" height="26" fill={t.bg} stroke={t.brass} strokeWidth="1.2" rx="3"/>
             </g>
-            <text y="4" textAnchor="middle" fill={t.ink} fontSize="10">arc-{s}</text>
+            <text y="4" textAnchor="middle" fill={t.ink} fontSize="10">{s}</text>
           </g>
         ))}
-        <g filter="url(#sk-hero)">
-          {[0,1,2].map(i=>{
-            const x1 = i*130 + 30 + 48;
-            const x2 = (i+1)*130 + 30 - 48;
-            return (
-              <g key={i}>
-                <path d={`M${x1+2} 35 L${x2-4} 35`} stroke={t.ember} strokeWidth="1.4" fill="none"/>
-                <polygon points={`${x2-8},31 ${x2},35 ${x2-8},39`} fill={t.ember}/>
-              </g>
-            );
-          })}
-        </g>
       </g>
 
-      {/* Session lifecycle — how hooks fire across a session (distinct from SDD, complements the top-half agent/hook/skills-ring story) */}
+      {/* Session lifecycle — how the six hook components fire across a session */}
       <g transform="translate(60,490)" fontFamily="JetBrains Mono,monospace">
         <text x="0" y="0" fill={t.dim} fontSize="10" letterSpacing="2">SESSION · LIFECYCLE</text>
         <text x="256" y="0" fill={t.brass} fontSize="10" fontStyle="italic" fontFamily="Fraunces,serif">hooks fire at every gate</text>
@@ -162,10 +151,10 @@ function HeroSchematic({theme:t}) {
           <path d="M0 20 H 500" stroke={t.ink} strokeWidth="0.8"/>
         </g>
         {[
-          {name:'SessionStart',   sub:'inject-skills'},
-          {name:'UserPrompt',     sub:'arc-using on demand'},
-          {name:'Pre/Post Tool',  sub:'observe · quality'},
-          {name:'Stop',           sub:'journal · compact'},
+          {name:'SessionStart',   sub:'session-tracker'},
+          {name:'UserPrompt',     sub:'message counter'},
+          {name:'Pre/Post Tool',  sub:'secrets-guard · observe'},
+          {name:'Stop',           sub:'finalize · diary'},
         ].map((o,i)=>(
           <g key={o.name} transform={`translate(${i*130+30},45)`}>
             <g filter="url(#sk-hero)">

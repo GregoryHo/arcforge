@@ -9,11 +9,10 @@ The Obsidian vault is arcforge's knowledge base. Use `/maintaining-obsidian` for
 | In Scope | Source Location |
 |----------|----------------|
 | Rules | `.claude/rules/*.md` |
-| Skills | `skills/*/SKILL.md` |
-| Agents | `agents/*.md` |
-| Templates | `templates/*.md` |
+| Skills | `skills/core/*/SKILL.md` |
+| Hook docs | `hooks/*/README.md` |
 | Guides | `docs/guide/*.md` |
-| Design docs | `docs/plans/*-design.md` |
+| Design docs | `docs/plans/**/*-design.md`, `docs/plans/v6/decisions/*.md` |
 | Research docs | `docs/research/*.md` |
 
 ## Out of Scope

@@ -14,10 +14,18 @@ This is a **project-local, contributor-only** skill. It lives in `.claude/skills
 Never start the release workflow on a broken branch.
 
 1. `npm run lint` — exit code 0 (warnings acceptable, errors are not)
-2. `npm test` — all 4 runners green
-3. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
-4. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
-5. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
+2. `npm test` — all **5** runners green (`test:scripts`, `test:hooks`, `test:node`, `test:skills`, `test:observer-daemon`)
+3. The **5 static checks**, which are CI-gated but deliberately *not* part of `npm test` — run each and require exit 0:
+
+   ```bash
+   npm run check:versions && npm run check:docs && npm run check:cli-consumers \
+     && npm run check:hooks && npm run check:eval-targets
+   ```
+
+   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 5 and must be green after it. The other four must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward.
+4. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
+5. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
+6. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
 
 If any pre-flight fails, stop and tell the user. A broken release is worse than a delayed one, because it ships to users through the marketplace cache and is painful to recall.
 
@@ -82,9 +90,9 @@ Also check for renamed helpers, removed CLI flags, or deprecated config keys tha
 
 Things to verify, with reasoning:
 
-- **No hardcoded skill/symlink counts.** Values like "24 symlinks" drift every time a skill ships. Replace with invariants ("one symlink per skill") — a description that stays true across all releases needs no maintenance.
-- **No stale path references.** If this release moved anything (state dirs, worktree paths, config locations), greps from the examples above apply here too.
-- **Pre-v1.0.0: no "Migrating from old paths" sections.** Before the first public release, migration sections describe fictional users — there is no prior published version they could be migrating from. Keep only the latest setup until after v1.0.0 ships.
+- **No hardcoded skill counts.** Values like "15 skills" drift every time a skill ships. Prefer an invariant phrasing — a description that stays true across all releases needs no maintenance. The one place a count is legitimately pinned is `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py`, which exists precisely to fail when the number changes without anyone noticing.
+- **No stale path references.** If this release moved anything (state dirs, worktree paths, config locations), greps from the examples above apply here too. Skills live under `skills/core/<name>/`, so a reference to a bare `skills/<name>/` is stale.
+- **No stale invocation names.** Skills are invoked as `/arcforge:<name>` with no prefix. Any surviving `arc-<name>` slash reference in shipped surface is dangling — `npm run check:docs` gates that class, but it only scans `skills/`, `docs/guide/`, `hooks/`, and `README.md`, so check the website and any doc outside that set by hand.
 
 **Never rewrite past `CHANGELOG.md` entries.** They are history, and downstream users, the vault's Decision notes, and `git log vPREV..vCURRENT` workflows all depend on them being stable. If a past entry turns out wrong, add a correction inside the *new* release's entry. Stealth edits break provenance.
 
@@ -113,6 +121,15 @@ A release that changes skill behavior must ship a benchmark that reflects *this*
    # Both GEN and RAW_GEN must sort AFTER PREV_TAG_DATE.
    echo "prev tag: $PREV_TAG_DATE | latest: $GEN | raw: $RAW_GEN"
    ```
+
+   > **This manual check and the CI gate do not resolve the same previous tag.** `release.yml` runs `scripts/check-benchmark-freshness.js`, which derives its previous tag from `git describe --tags --abbrev=0 <tag>^` — and `git describe` matches *any* nearest reachable tag, not just release tags. In a repo that also carries non-release tags (phase gates, rc markers), it will land on the nearest one of those instead of the last `vX.Y.Z`. The recipe above filters to version-sorted tags and lands on the real previous release, so **the manual answer is the trustworthy one**; treat a green CI gate as necessary, not sufficient. Verify by printing both:
+   >
+   > ```bash
+   > echo "manual   : $(git tag --sort=-version:refname | head -1)"
+   > echo "CI gate  : $(git describe --tags --abbrev=0 HEAD)"
+   > ```
+   >
+   > If they disagree, the CI gate compared against the wrong baseline. Two ways that goes wrong: it passes vacuously (no eval-backed file changed since a very recent non-release tag, so the timestamp is never even examined), or it false-fails (a non-release tag was cut *after* the benchmark was generated, so a genuinely fresh benchmark reads as stale).
 
 3. **No unclassified failing rows on changed scenarios.** For every scenario that changed since the last release, confirm the raw report has **no failing row left unclassified** (every fail must carry a known failure category, not a blank or `unknown` classification). An unclassified failing row means a regression nobody triaged — that is a release blocker until it is either classified as a known/accepted gap or fixed.
 
@@ -182,7 +199,7 @@ For releases that change **shipped surface area** (new skill, removed CLI flag, 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
 - Stage exactly the 9 release files (8 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 4 runners green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
+- `gh pr create` with a test-plan checklist in the body: 5 runners green, 5 static checks green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
 
 ### 7. After PR merges to main — tag it
 
@@ -213,7 +230,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Version bump without CHANGELOG entry** — the marketplace release cache is version-keyed. A bump with no CHANGELOG entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG *before* version bump) enforces pairing them.
 - **Editing past CHANGELOG entries** — downstream users and vault Decision notes depend on past entries being stable. Add corrections to the current entry; never stealth-edit the past.
 - **Partial bump shipped** — bumping a subset of the 8 locations produces a release where Claude Code, the marketplace JSON, or the website disagree about the current version. Always use the 8-location grep as a post-bump gate.
-- **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 10 release files. Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
+- **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 9 release files (8 version locations + `CHANGELOG.md`). Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
 - **Skipping the post-merge tag** — without the tag, the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. Missing tags cause the *next* release to either drop entries or include already-shipped ones.
 
 ## After the Release

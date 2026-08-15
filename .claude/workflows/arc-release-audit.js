@@ -127,7 +127,7 @@ Run these READ-ONLY checks from the repo root and report structured results. Do 
 2. Eval surface: \`git diff --name-only ${prevTag} HEAD | grep -E '^(skills/|evals/scenarios/|evals/fixtures/)'\` — evalSurfaceChanged = true if any output.
 3. Benchmark freshness: \`node scripts/check-benchmark-freshness.js\` — benchmarkFresh = (exit code 0). Include its stdout in the matching check detail.
 4. Version sync: \`npm run check:versions\` — versionSynced = (exit code 0). Capture the location→version table into the check detail.
-5. CLI consumers: \`npm run check:cli-consumers\` — read-only. Capture its stdout into the check detail. The linter is warn-mode today (always exits 0): record status 'warn' if it lists any zero-consumer command, else 'pass'. Do NOT treat a nonzero list as a hard fail while warn-mode is in effect.
+5. CLI consumers: \`npm run check:cli-consumers\` — read-only. Capture its stdout into the check detail. The linter is GATING (it exits 1 on any zero-consumer command): record status 'pass' on exit 0 and 'fail' on exit 1. A shipped CLI command that no skill or guide references is a release blocker, not a note.
 6. currentVersion: the top-level "version" in package.json.
 
 Return JSON per schema. 'checks' must contain one row per check above (name, status pass/fail/warn, detail).`,
@@ -169,7 +169,8 @@ Rules:
 - Header: \`## [${version}] - ${date}\`
 - Sections in this order, omit any that are empty: ### Fixed, ### Changed, ### Added, ### Removed
 - MERGE and DEDUPLICATE related items across commits into coherent narrative bullets (not one bullet per commit). Reference-grade prose — this text is extracted verbatim into the GitHub Release body, so it is user-facing.
-- Do NOT claim new eval coverage: for this release the benchmark was RE-AGGREGATED from existing results, not a fresh run of newly-added gate scenarios. If you mention evals, say only that the freshness gate / benchmark tooling shipped.
+- Eval claims must match what this release actually measured. For THIS release: evalSurfaceChanged=${setup.evalSurfaceChanged}, benchmarkFresh=${setup.benchmarkFresh}. If evalSurfaceChanged is false, do NOT claim new or re-run eval coverage — at most say the freshness gate / benchmark tooling shipped. If it is true, you may state measured results ONLY where a per-commit summary above cites a concrete number or verdict; never invent, round, or generalize one.
+- No line of your output may be exactly "EOF" and no line may begin with "## [" — the release workflow slices this section with awk up to the next "## [" header and emits it through an "EOF"-delimited heredoc, so either one silently truncates or corrupts the published release body. Use "### " for subsections.
 Return JSON {markdown: "<the section, starting at the ## header>"}.`,
   { schema: CHANGELOG_SCHEMA, label: 'changelog-synth', phase: 'Narrative' },
 );
@@ -180,8 +181,8 @@ Return JSON {markdown: "<the section, starting at the ## header>"}.`,
 const AXES = [
   {
     key: 'install-surface',
-    prompt: `Audit arcforge's install surface (READ-ONLY): the Installation section of README.md.
-Flag, with the exact file: (1) hardcoded skill/agent COUNTS that drift across releases (e.g. "24 skills") — should be invariants; (2) stale path references; (3) install commands that look broken. Return JSON per schema (empty findings is a valid result).`,
+    prompt: `Audit arcforge's install surface (READ-ONLY): the Installation section of README.md. arcforge targets Claude Code only — there is no second platform's install guide to cross-check.
+Flag, with the exact file: (1) hardcoded skill COUNTS that drift across releases (e.g. "15 skills") — should be invariants; (2) stale path references (skills live under skills/core/<name>/, and skills are invoked as /arcforge:<name> with no prefix); (3) install commands that look broken. Return JSON per schema (empty findings is a valid result).`,
   },
   {
     key: 'stale-patterns',

@@ -47,11 +47,14 @@ COMMANDS:
       --no-isolate   Run without isolation (default: isolated)
       --plugin-dir   Plugin directory for semi-isolated mode
       --max-turns    Max turns for Claude CLI (overrides scenario)
+      --effort       Reasoning effort passed to spawned trials
   eval preflight <name>              Run baseline trials to check scenario discriminability
   eval lint <name>                   Validate scenario file (sections, assertion shape)
   eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
       --plugin-dir   Plugin directory for treatment trials
       --max-turns    Max turns for treatment trials (overrides scenario)
+      --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
+      --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results
   eval report [name] [--since ISO]   Benchmark report, optionally bounded to recent result rows
   eval history                       List benchmark snapshots
@@ -74,13 +77,13 @@ COMMANDS:
                                      List candidates with materialized drafts awaiting activation.
   learn inspect <candidate-id> --project|--global [--json]
                                      Read-only review summary for a candidate (paths and next actions).
-  learn approve|reject <candidate-id> --project|--global [--json]
-                                     Record user authorization decision for a candidate.
+  learn approve|reject <candidate-id> --project [--json]
+                                     Record user authorization decision for a candidate (project scope only).
   learn accept <candidate-id> --project [--json]
                                      Approve and materialize drafts in one step; never activates.
-  learn materialize <candidate-id> --project|--global [--json]
-                                     Write approved candidate drafts without activating behavior.
-  learn activate <candidate-id> --project|--global [--json]
+  learn materialize <candidate-id> --project [--json]
+                                     Write approved candidate drafts without activating behavior (project scope only).
+  learn activate <candidate-id> --project [--json]
                                      Promote materialized drafts to active artifacts (project scope only).
   learn dashboard [--port N]
                                      Start a localhost review dashboard for learning suggestions

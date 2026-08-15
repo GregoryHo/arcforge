@@ -1,6 +1,6 @@
 # Eval Results
 
-This directory is for raw eval run output produced by `arc eval run` and `arc eval ab`.
+This directory is for raw eval run output produced by `arcforge eval run` and `arcforge eval ab`.
 
 Raw outputs are intentionally ignored by git:
 

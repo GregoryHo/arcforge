@@ -1,7 +1,7 @@
 /**
  * eval-preflight.js - Preflight gate for A/B eval runs
  *
- * Before running arc eval ab, a preflight must confirm the scenario is
+ * Before running arcforge eval ab, a preflight must confirm the scenario is
  * discriminative (baseline pass rate < 0.8). If the baseline already passes
  * >= 80% of trials without any skill, the scenario has a ceiling effect and
  * cannot reliably distinguish a good skill from a bad one.
@@ -63,7 +63,7 @@ function preflightFilename(hash, model) {
 
 /**
  * Resolve the scenario file path by parsed `# Eval:` name (matching
- * findScenario / `arc eval run` / `arc eval ab` semantics), with fallback
+ * findScenario / `arcforge eval run` / `arcforge eval ab` semantics), with fallback
  * to literal filename lookup. Returns null if no scenario matches either.
  *
  * Resolving by parsed name (not filename) prevents preflight from falsely
@@ -166,7 +166,7 @@ function runPreflight(name, projectRoot, opts = {}) {
   const reason =
     verdict === 'BLOCK'
       ? `Baseline pass rate ${(pass_rate * 100).toFixed(0)}% >= ${CEILING_THRESHOLD * 100}% ceiling — scenario is not discriminative. Redesign the scenario to be harder.`
-      : `Baseline pass rate ${(pass_rate * 100).toFixed(0)}% < ${CEILING_THRESHOLD * 100}% — scenario is discriminative. Proceed with arc eval ab.`;
+      : `Baseline pass rate ${(pass_rate * 100).toFixed(0)}% < ${CEILING_THRESHOLD * 100}% — scenario is discriminative. Proceed with arcforge eval ab.`;
 
   const record = {
     scenario_hash: hash,
@@ -187,7 +187,7 @@ function runPreflight(name, projectRoot, opts = {}) {
 }
 
 /**
- * Check the preflight gate before running arc eval ab.
+ * Check the preflight gate before running arcforge eval ab.
  *
  * Rules:
  * 1. Compute current scenario hash.
@@ -204,7 +204,7 @@ function runPreflight(name, projectRoot, opts = {}) {
  * @param {Object} [opts] - Options
  * @param {string} [opts.model] - Model identifier the A/B run will use; the
  *   gate verifies a preflight record exists for this exact model. Pass the
- *   same value `arc eval ab` will pass to its trials.
+ *   same value `arcforge eval ab` will pass to its trials.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
 function checkPreflightGate(name, projectRoot, opts = {}) {
@@ -225,7 +225,7 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
     const remediationFlag = model ? ` --model ${model}` : '';
     return (
       `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}).\n` +
-      `Run: arc eval preflight ${name}${remediationFlag}\n` +
+      `Run: arcforge eval preflight ${name}${remediationFlag}\n` +
       `Preflight is per-(scenario, model) — baseline pass rate is model-dependent, ` +
       `so a PASS under one model does not unblock A/B runs on another.`
     );
@@ -235,14 +235,14 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
   try {
     record = JSON.parse(fs.readFileSync(preflightFile, 'utf8'));
   } catch {
-    return `Preflight file for "${name}" is corrupt. ` + `Run: arc eval preflight ${name}`;
+    return `Preflight file for "${name}" is corrupt. ` + `Run: arcforge eval preflight ${name}`;
   }
 
   if (record.verdict === 'BLOCK') {
     return (
       `Preflight BLOCK for scenario "${name}": ${record.reason}\n` +
       `Redesign the scenario to reduce the baseline pass rate below ${CEILING_THRESHOLD * 100}%, ` +
-      `then re-run: arc eval preflight ${name}`
+      `then re-run: arcforge eval preflight ${name}`
     );
   }
 
@@ -253,7 +253,7 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
   if (record.verdict !== 'PASS') {
     return (
       `Preflight record for "${name}" has unexpected verdict "${record.verdict}". ` +
-      `Re-run: arc eval preflight ${name}`
+      `Re-run: arcforge eval preflight ${name}`
     );
   }
 
@@ -263,9 +263,9 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
 module.exports = {
   computeScenarioHash,
   preflightFilename,
-  // Exported so other CLI dispatchers (e.g. `arc eval lint`) share one
+  // Exported so other CLI dispatchers (e.g. `arcforge eval lint`) share one
   // resolver. Lookup-by-`# Eval:` name with filename fallback is the
-  // semantics `arc eval run` / `arc eval ab` already use; centralizing
+  // semantics `arcforge eval run` / `arcforge eval ab` already use; centralizing
   // here keeps the lint command from re-implementing a hardcoded-filename
   // pattern.
   resolveScenarioFile,

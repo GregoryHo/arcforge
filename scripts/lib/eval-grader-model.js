@@ -17,6 +17,7 @@ const {
   extractJsonObject,
   validateGraderResponse,
   writeGradingJson,
+  writeGraderRawDump,
   buildModelGraderError,
 } = require('./eval-grader-io');
 
@@ -82,6 +83,7 @@ function gradeWithModel(result, scenario, projectRoot) {
 
     if (exitCode !== 0) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'graderfail');
         return buildModelGraderError(
           result,
           'Model grader failed to respond',
@@ -94,6 +96,7 @@ function gradeWithModel(result, scenario, projectRoot) {
     const grade = extractJsonObject(stdout, ['scores']);
     if (!grade) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'unparseable');
         return buildModelGraderError(
           result,
           'Model grader returned unparseable response',
@@ -106,6 +109,7 @@ function gradeWithModel(result, scenario, projectRoot) {
     const validated = validateGraderResponse(grade, scenario.assertions.length);
     if (!validated) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'empty-scores');
         return buildModelGraderError(
           result,
           'Model grader returned empty scores',

@@ -1,6 +1,6 @@
 # Contributing to arcforge
 
-Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code and Codex. Contributions are welcome across skills, CLI engine, hooks, templates, and agents. Keep in mind that skills target AI agents as their primary consumers, not just humans.
+Welcome! arcforge is a skill-based agent toolkit for Claude Code. Contributions are welcome across skills, the CLI engine, and hooks. Keep in mind that skills target AI agents as their primary consumers, not just humans.
 
 ## Table of Contents
 
@@ -10,10 +10,7 @@ Welcome! arcforge is a skill-based autonomous agent toolkit for Claude Code and 
 - [Contributing Skills](#contributing-skills)
 - [Contributing to the CLI Engine](#contributing-to-the-cli-engine)
 - [Contributing Hooks](#contributing-hooks)
-- [Contributing Templates](#contributing-templates)
-- [Contributing Agents](#contributing-agents)
 - [Test Runner Map](#test-runner-map)
-- [Platform Considerations](#platform-considerations)
 - [PR Process](#pr-process)
 - [Guidelines](#guidelines)
 - [Getting Help](#getting-help)
@@ -38,7 +35,7 @@ This is TDD applied to process documentation. You write pressure scenarios, watc
 - **Evidence over claims** — if you didn't watch an agent fail without the skill, you don't know if it teaches the right thing
 - **Boring and obvious** — choose the simple, readable solution over the clever one
 
-See [`CLAUDE.md`](CLAUDE.md) for the full development philosophy.
+See [`CLAUDE.md`](CLAUDE.md) for the command reference and `.claude/rules/` for the standing conventions.
 
 ---
 
@@ -49,18 +46,23 @@ See [`CLAUDE.md`](CLAUDE.md) for the full development philosophy.
 gh repo fork GregoryHo/arcforge --clone
 cd arcforge
 
-# 2. Install dependencies
+# 2. Install dependencies (one package.json, one lockfile — hooks are not a
+#    separate npm project)
 npm install
+pip install pytest pyyaml    # required for npm run test:skills
 
-# 3. Install hook dependencies (separate package.json)
-
-# 4. Create a branch
+# 3. Create a branch
 git checkout -b feat/my-contribution   # or fix/..., docs/...
 
-# 5. Make your changes (see sections below)
+# 4. Make your changes (see sections below)
 
-# 6. Run all tests (must pass all 5 runners)
+# 5. Run all 5 test runners
 npm test
+
+# 6. Run the 5 static checks — CI gates on these and npm test does not cover them
+npm run check:versions && npm run check:docs && npm run check:cli-consumers \
+  && npm run check:hooks && npm run check:eval-targets
+npm run lint
 
 # 7. Submit PR
 git push -u origin feat/my-contribution
@@ -91,13 +93,13 @@ This runs `claude --plugin-dir .`, which starts Claude Code with the local plugi
 
 ### Verifying Local Plugin
 
-Inside a dev session, ask Claude:
+arcforge sets no environment variable of its own, so verify by behavior instead. Inside a dev session:
 
 ```
-What is ARCFORGE_ROOT?
+/arcforge:using
 ```
 
-The value should be your local repo path (e.g., `/Users/you/arcforge`), **not** a cache path like `~/.claude/plugins/cache/...`.
+If the router loads, the plugin is loaded. To confirm it came from your checkout rather than the cache, edit a line of `skills/core/using/SKILL.md`, run `/reload-plugins`, and invoke it again — your edit should be visible.
 
 ### Notes
 
@@ -117,47 +119,62 @@ Skills are the most common contribution type. Read this section carefully.
 
 ### Naming Convention
 
-All skills follow the pattern `arc-<action>[-<object>[-<scope>]]`:
-
 | Rule | Details |
 |------|---------|
-| Prefix | `arc-` required |
+| Prefix | None — the plugin namespace already supplies one (`/arcforge:<name>`) |
+| Match | `name` in the frontmatter must equal the directory name |
 | Case | kebab-case |
 | Voice | Verb-first, active |
 | Form | Gerund (-ing) for process skills |
 
 **Good names:**
-- `arc-brainstorming` — single action, gerund
-- `arc-writing-tasks` — action + target
+- `brainstorming` — single action, gerund
+- `code-review` — the artifact under review, when the gerund reads worse
 
 **Bad names:**
-- `arc-coordinator` — agent-noun, use `arc-coordinating`
-- `arc-debug` — bare verb, use `arc-debugging`
-- `arc-task-writer` — noun-first, use `arc-writing-tasks`
+- `arc-brainstorming` — the `arc-` prefix is gone; the namespace supplies it
+- `coordinator` — agent-noun, use a gerund
+- `debug` — bare verb, use `debugging`
 
 ### Directory Structure
 
+Skills live in lifecycle buckets. Only `core/` ships; `in-progress/` and `deprecated/` are on-disk holding areas that never load, so promoting or retiring a skill is a `git mv` between buckets with no manifest edit.
+
 ```
 skills/
-  arc-<name>/
-    SKILL.md              # Main skill file (required)
-    supporting-file.*     # Only if needed (heavy reference, scripts)
+  core/
+    <name>/
+      SKILL.md              # Main skill file (required)
+      references/           # Only if needed (heavy reference, scripts)
 ```
 
 ### Frontmatter Format
 
+The schema is **frozen**. Exactly five keys are legal, and only the first two are required:
+
 ```yaml
 ---
-name: arc-<name>
-description: Use when [specific triggering conditions and symptoms]
+name: <name>
+description: <identity>. Use when <specific triggering conditions>
 ---
 ```
 
-- Only two fields: `name` and `description`
-- Max 1024 characters total
-- `name`: letters, numbers, and hyphens only
-- `description`: starts with "Use when...", describes triggers only
-- **Never summarize the skill's workflow in the description** — Claude may follow the description instead of reading the full skill
+| Key | Notes |
+|-----|-------|
+| `name` | Required. Letters, numbers, hyphens. Must equal the directory name. |
+| `description` | Required. See the two registers below. |
+| `disable-model-invocation` | `true` makes the skill user-invoked only. |
+| `argument-hint` | Shown in the slash-command UI. |
+| `allowed-tools` | Restricts the tool surface for that skill. |
+
+Two description registers, both enforced by the structure test:
+
+- **Model-invoked** (the default): `"<identity>. Use when <triggers>"`, 60–280 characters. Describes triggers only.
+- **User-invoked** (`disable-model-invocation: true`): a plain one-liner, max 120 characters, with no "Use when" trigger list — nothing auto-fires it, so it needs no trigger register.
+
+**Never summarize the skill's workflow in the description** — Claude may follow the description instead of reading the full skill.
+
+The body has a **250-line hard cap** (frontmatter excluded), owned by the structure test. There is no exception table to add yourself to: if a skill doesn't fit, split it into `references/` or move behavior into the CLI.
 
 ### Iron Law Process
 
@@ -165,22 +182,37 @@ description: Use when [specific triggering conditions and symptoms]
 2. **GREEN** — Write the skill addressing those specific failures. Re-run scenarios WITH the skill. Agent should now comply.
 3. **REFACTOR** — Find new rationalizations, add explicit counters, re-test until bulletproof.
 
+Behavioral evidence comes from the eval harness (`arcforge eval`), not from a self-report. See `/arcforge:evaluating` and `.claude/rules/eval.md`.
+
 ### Test File
 
-No per-skill test file is needed. A single generic checker, `tests/skills/test_skill_structure.py`, discovers every `skills/*/SKILL.md` dynamically and validates frontmatter, `name` == directory, a non-empty description, at least one `## ` section, resolvable cross-references, referenced supporting files, and the line budget. Make sure `npm run test:skills` passes; behavioral protection lives in the eval layer (see `/evaluating`), not in pytest.
+No per-skill test file is needed. A single generic checker, `tests/skills/test_skill_structure.py`, discovers every `skills/core/*/SKILL.md` dynamically and validates the frozen frontmatter schema, `name` == directory, the description register, section structure, cross-references, referenced supporting files, and the line budget.
+
+Adding or removing a skill is a deliberate three-part edit in one commit:
+
+1. the skill directory under `skills/core/`
+2. its row in the Skill Map in `skills/core/using/SKILL.md` — a tested bijection, so a missing row fails CI
+3. `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py`
+
+### Self-Containment (D1)
+
+A skill directory is a **closed unit**. Nothing under `skills/<bucket>/<name>/` may require, import, or source anything outside that directory — not the engine, not a sibling skill. Engine functionality is reached exactly one way: a subprocess call to the bare `arcforge` CLI, which is on PATH because Claude Code adds every loaded plugin's `bin/` to it.
+
+Skill prose must not name engine internals (`scripts/lib/...`) or rely on environment variables that aren't set in skill Bash. `CLAUDE_PLUGIN_ROOT` is hooks-only and verified UNSET in skill-triggered Bash; arcforge sets no variable of its own.
 
 ### Quick Checklist
 
 - [ ] Read `skills/core/writing-skills/SKILL.md` before starting
-- [ ] Name follows `arc-<gerund>[-<object>]` pattern
-- [ ] Frontmatter has only `name` and `description`
-- [ ] Description starts with "Use when..." (triggers only, no workflow)
+- [ ] Name has no prefix and matches the directory name
+- [ ] Frontmatter uses only the five frozen keys
+- [ ] Description matches the register for its invocation mode
+- [ ] Body within the 250-line cap
+- [ ] Nothing outside the skill directory is required/imported/sourced
 - [ ] Ran baseline scenario WITHOUT skill (RED)
 - [ ] Skill addresses specific baseline failures (GREEN)
 - [ ] Closed loopholes from additional testing (REFACTOR)
-- [ ] `npm run test:skills` passes (the structure checker picks up the new skill)
-
-See [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md) for the full creation checklist.
+- [ ] Router row added and `EXPECTED_SKILL_COUNT` updated in the same commit
+- [ ] `npm run test:skills` passes
 
 ---
 
@@ -188,19 +220,25 @@ See [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md)
 
 ### Architecture
 
-- Entry point: `scripts/cli.js`
-- Modules: `scripts/lib/` (YAML parser, DAG schema, models)
-- No external runtime dependencies — Node.js only
+- Entry point: `scripts/cli.js` — the engine's only public surface
+- Modules: `scripts/lib/` — canonical source, imported directly by hooks
+- Five command groups: `worktree`, `loop`, `eval`, `learn`, `obsidian`
+- No external runtime dependencies — Node.js standard library only
+
+The dependency arrow points one way (D8): `scripts/**` and `hooks/**` must never reference a skill under `skills/`. A jest suite asserts this with an allowlist that is empty and must stay empty.
 
 ### Tests
 
-- **Jest**: `npm run test:scripts` — tests in `tests/scripts/`
-- **Custom runner**: `npm run test:node` — tests in `tests/node/` (CLI, DAG, models, YAML)
+- **Jest**: `npm run test:scripts` — tests in `tests/scripts/`, plus an 80% line floor over `scripts/lib/`
+- **Custom runner**: `npm run test:node` — tests in `tests/node/` (CLI manifest contract, YAML parser, locking)
+
+Any new file under `scripts/lib/` lands inside the coverage floor, so ship its tests in the same commit.
 
 ### Conventions
 
 - No external dependencies (keep `devDependencies` minimal)
-- Use `execFileSync` instead of `exec` to prevent shell injection
+- Use `execFileSync` with argument arrays instead of `exec` to prevent shell injection
+- Adding or changing a command or flag means updating `scripts/lib/cli-manifest.js` — the doc linter and the consumer check both read it, and a second hardcoded copy is forbidden
 - Follow existing module patterns in `scripts/lib/`
 
 ---
@@ -214,23 +252,24 @@ Hooks extend Claude Code behavior through event-driven JavaScript modules. See [
 ```
 hooks/
   hooks.json              # Hook registration
-  run-hook.cmd            # Bash dispatcher
+  __tests__/              # Node --test suites
   <hook-name>/
     main.js               # Entry point
     README.md             # Hook documentation
 ```
 
+Six components are registered across six lifecycle events: `session-tracker` (SessionStart, Stop), `user-message-counter` (UserPromptSubmit), `secrets-guard` (PreToolUse), `observe` (PreToolUse, PostToolUse), `compact-suggester` (PostToolUse), and `pre-compact` (PreCompact).
+
 ### Hook Events
 
 | Event | Trigger | Common Use Cases |
 |-------|---------|------------------|
-| SessionStart | startup, resume, clear, compact | Context injection, counter reset |
-| PreToolUse | Before tool execution | Block dangerous operations |
-| PostToolUse | After tool completion | Auto-format, type-check |
-| UserPromptSubmit | When user submits prompt | Input validation |
+| SessionStart | startup, resume, clear, compact | Context injection, session file creation |
+| PreToolUse | Before tool execution | Guard rails, observation |
+| PostToolUse | After tool completion | Observation, threshold suggestions |
+| UserPromptSubmit | When user submits prompt | Counters, input inspection |
 | PreCompact | Before context compaction | State checkpointing |
-| Stop | When Claude stops | Save state, cleanup |
-| SubagentStop | When subagent stops | Subagent-specific cleanup |
+| Stop | When Claude stops | Finalize session, diary capture |
 
 ### Shared Utilities
 
@@ -242,64 +281,11 @@ Import from `scripts/lib/utils.js` (canonical location) for common operations:
 ### Conventions
 
 - Must be Node.js (not bash) for cross-platform support
-- Use `path.join()` for file paths
-- Temp files go to `os.tmpdir()`
+- Silent catch — a hook must never crash the session
+- Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for path references in `hooks.json`
+- Use `path.join()` for file paths; temp files go to `os.tmpdir()`
 - Tests: `npm run test:hooks` (runs `hooks/__tests__/` with Node `--test`)
-
----
-
-## Contributing Templates
-
-Templates are subagent prompt definitions used by the workflow.
-
-### Location
-
-```
-templates/
-  <name>-prompt.md
-```
-
-### Format
-
-Templates use `{VARIABLE}` placeholders and follow a consistent structure:
-- Role definition
-- Workflow steps
-- Rules and constraints
-- Anti-patterns
-
-Follow the structure of existing templates (`implementer-prompt.md`, `task-reviewer-prompt.md`, `spec-reviewer-prompt.md`).
-
----
-
-## Contributing Agents
-
-Agents are specialized assistants invoked via the Task tool.
-
-### Location
-
-```
-agents/
-  <name>.md
-```
-
-### Format
-
-```yaml
----
-name: <name>
-description: |
-  When to invoke this agent (include examples for Claude's routing)
-model: inherit
----
-
-You are a [role] specialist.
-
-## Your Role
-...
-
-## Workflow
-...
-```
+- The schema of `hooks.json` is checked by `npm run check:hooks`
 
 ---
 
@@ -309,25 +295,22 @@ arcforge uses five separate test runners. **All must pass before submitting a PR
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
-| pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
-| Jest | `npm run test:scripts` | `tests/scripts/` | CLI engine (diary, reflect, session-utils) |
+| Jest | `npm run test:scripts` | `tests/scripts/` | Engine + the contract lints (D1, D8, router bijection, task-list schema) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
-| Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
-| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
+| Custom | `npm run test:node` | `tests/node/` | CLI manifest contract, YAML parser, locking |
+| pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
+| Bash | `npm run test:observer-daemon` | `tests/observer-daemon/` | Observer daemon behavior |
 | **All** | **`npm test`** | All above | **Run this before every PR** |
 
----
+Five static checks run in CI and are **not** part of `npm test`:
 
-## Platform Considerations
-
-arcforge targets multiple AI coding platforms:
-
-| Component | Platform Scope |
-|-----------|---------------|
-| Skills, CLI | Platform-agnostic |
-| Hooks, Commands | Claude Code-specific |
-
-arcforge targets Claude Code. Test your contribution there.
+| Command | Guards |
+|---|---|
+| `npm run check:versions` | Version strings in sync across the locations in `scripts/check-version-sync.js` |
+| `npm run check:docs` | Docs don't promise paths, commands, or flags the engine lacks |
+| `npm run check:cli-consumers` | CLI callers match the CLI surface |
+| `npm run check:hooks` | `hooks/hooks.json` schema |
+| `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
 
 ---
 
@@ -336,7 +319,7 @@ arcforge targets Claude Code. Test your contribution there.
 ### Branch Naming
 
 ```
-feat/add-arc-brainstorming-skill
+feat/add-brainstorming-skill
 fix/cli-yaml-parser-edge-case
 docs/update-hook-readme
 ```
@@ -346,10 +329,10 @@ docs/update-hook-readme
 Use conventional commits:
 
 ```
-feat(skills): add arc-debugging skill
+feat(skills): add debugging skill
 fix(cli): handle empty YAML files gracefully
 docs(hooks): document session-tracker events
-test(skills): add pressure scenarios for arc-planning
+test(skills): add pressure scenarios for executing
 ```
 
 ### For Skill PRs
@@ -365,16 +348,16 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 
 ### Doc-reference gate (`npm run check:docs`)
 
-CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the shipped markdown surface (`skills/`, `docs/guide/`, `agents/`, `templates/`, `hooks/`, and `README.md`). It fails the build when a doc makes a promise the engine does not keep:
+CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the user-facing markdown surface (`skills/`, `docs/guide/`, `hooks/`, and `README.md`). It fails the build when a doc makes a promise the engine does not keep:
 
 | Rule | Catches |
 |------|---------|
-| R1 | A repo-relative path in a code span (under `scripts/`, `skills/`, `hooks/`, `templates/`, `agents/`, `.claude-plugin/`) that does not resolve to a real file or directory. |
+| R1 | A repo-relative path in a code span (under `scripts/`, `skills/`, `hooks/`, `.claude-plugin/`) that does not resolve to a real file or directory. |
 | R2 | A CLI invocation naming a command, or a `--flag`, that the CLI manifest (`scripts/lib/cli-manifest.js`) does not declare. |
 | R3 | A `--json` output field promise that is not in that command's pinned manifest output shape. |
-| R4 | A backticked `arc-<name>` skill reference that does not resolve to `skills/<name>/`. **Warn-only** today (see note below). |
+| R4 | A doc's claim that a skill exists, when it does not resolve to a skill directory. |
 
-Run it locally before opening a PR:
+All four rules gate the build. Run it locally before opening a PR:
 
 ```bash
 npm run check:docs
@@ -388,8 +371,6 @@ When a finding is a genuine false positive — an illustrative or placeholder pa
 
 Use the escape hatch sparingly. If you find yourself adding many suppressions, the rule is probably mis-firing — fix the linter (its data comes from the manifest, never a second hardcoded copy) rather than papering over it.
 
-> **R4 is warn-only.** It currently over-matches: `arc-<name>` tokens that are agents (`agents/`), hooks (`hooks/`), eval-scenario identifiers (`eval-arc-…`), or deliberate bad-name examples are reported but do not fail the build. Promoting R4 to gating requires narrowing its resolver first; until then its warnings are advisory.
-
 ---
 
 ## Guidelines
@@ -399,17 +380,17 @@ Use the escape hatch sparingly. If you find yourself adding many suppressions, t
 - Read existing skills, hooks, and tests before writing new ones
 - Follow existing patterns and conventions
 - Run `npm test` before submitting (all 5 runners must pass)
-- Run `npm run check:docs` so doc promises (paths, CLI commands/flags, `--json` fields) match the engine
+- Run the 5 static checks so CI doesn't catch what you could have
 - Include tests for new functionality
-- Skill word count tiers (soft guidance): Lean <500w, Standard <1000w, Comprehensive <1800w, Meta <2500w — use `references/` for overflow
-- Use `execFileSync` over `exec` in hooks (prevents shell injection)
-- Cross-reference skills with `**REQUIRED BACKGROUND:** ...` syntax
+- Keep skills inside the 250-line cap; use `references/` for overflow
+- Use `execFileSync` over `exec` (prevents shell injection)
 
 ### Don't
 
 - Include sensitive data (API keys, tokens, local paths)
 - Summarize skill workflow in the description field
 - Skip the Iron Law — no exceptions, not even for "simple additions"
+- Reach outside a skill directory from inside it, or reference a skill from engine or hook code
 - Use `@`-file syntax to cross-reference skills (force-loads context)
 - Add external runtime dependencies without strong justification
 - Use bash for hooks (Node.js required for cross-platform)
@@ -421,10 +402,11 @@ Use the escape hatch sparingly. If you find yourself adding many suppressions, t
 
 - **GitHub Issues**: Report bugs or suggest features
 - **Key files to read first**:
-  - [`CLAUDE.md`](CLAUDE.md) — Project conventions and architecture
+  - [`README.md`](README.md) — Project overview and installation
+  - [`CLAUDE.md`](CLAUDE.md) — Command reference
+  - `.claude/rules/architecture.md` — The boundaries every contribution has to respect
   - [`skills/core/writing-skills/SKILL.md`](skills/core/writing-skills/SKILL.md) — Complete skill authoring guide
   - [`hooks/README.md`](hooks/README.md) — Hook architecture and events
-  - [`README.md`](README.md) — Project overview and installation
 
 ---
 

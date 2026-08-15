@@ -1,6 +1,6 @@
 {
   "name": "arcforge",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "description": "Skill-based autonomous agent toolkit for Claude Code",
   "license": "MIT",
   "author": {
@@ -15,8 +15,9 @@
   },
   "files": [
     "bin/",
-    "skills/",
+    "skills/core/",
     "hooks/",
+    "!hooks/__tests__/",
     "scripts/",
     ".claude-plugin/",
     "LICENSE",

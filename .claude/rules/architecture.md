@@ -1,9 +1,8 @@
 # Architecture
 
-arcforge is being rewritten as v6 (see `docs/plans/v6/PLAN.md`). This file
-describes the **v6 architecture that binds all new work**. Where v5 structures
-are still physically on disk, they are listed under [Transition](#transition)
-with the phase that removes them — do not build on anything listed there.
+This file describes the architecture that binds all work in this repo. The
+rewrite that produced it is documented in `docs/plans/v6/PLAN.md`; that plan is
+history, this file is the standing rule.
 
 ## Zero External Dependencies
 
@@ -61,10 +60,10 @@ skills/  ──(subprocess: bare `arcforge` CLI, plugin bin/ on PATH)──▶  
                                                                  hooks/ ┘   (no arrow back to skills/)
 ```
 
-Existing violations live in an **explicit allowlist**, which is a debt counter,
-not a design option — every entry is scheduled for removal, and the allowlist
-must reach zero by the end of P5. Adding an entry requires an explicit decision,
-never a convenience.
+The allowlist that once carried the exceptions is **empty, and the test asserts
+both the constant and the live scan are empty**. It is a debt counter, not a
+design option — an addition is a maintainer decision about the boundary, never
+a convenience.
 
 ## File-Based State
 
@@ -83,7 +82,7 @@ rules, or tests.
 
 ## Skill Set and Routing
 
-- ~14 self-contained skills, no `arc-` prefix (D7); `name` == directory name.
+- 15 self-contained skills, no name prefix (D7); `name` == directory name.
 - Invocation is **prose**: a skill fires because its description register
   matches the situation and the router maps that condition to it. There is no
   skill-type taxonomy (no Workflow / Discipline / Meta tiers) and no mandatory
@@ -100,8 +99,8 @@ rules, or tests.
 
 ## Single Platform
 
-v6 targets Claude Code only. There is no platform-agnostic / platform-specific
-split to maintain, and no second packaging target.
+arcforge targets Claude Code only. There is no platform-agnostic /
+platform-specific split to maintain, and no second packaging target.
 
 ## Directory Layout
 
@@ -114,25 +113,18 @@ evals/            # Behavioral eval corpus
 docs/             # Guides, design docs, plans
 ```
 
-## Transition
+## What Is Gone
 
-These are true **today** and untrue by design — each is scheduled for removal.
-Treat anything here as read-only legacy; do not extend it.
+These structures existed in v5 and were removed by the rewrite. They are named
+here so a stale reference is recognizable as stale, not as something to restore:
+the SDD pipeline and its DAG/coordinator engine (`dag.yaml`), epic-scoped
+worktree framing, `agents/` and `templates/`, the `.codex*` / `.agents/`
+multi-platform packaging, the `inject-skills` hook and its `ARCFORGE_ROOT`
+injection, and the `arc-` skill-name prefix.
 
-| Still on disk | Removed in |
-|---|---|
-| 30 v5 `arc-*` skills (grandfathered, see below) | P3–P6, replaced by ~14 rewritten skills |
-| SDD pipeline, DAG/coordinator engine + `dag.yaml`, epic-scoped worktree framing | P2 |
-| `agents/`, `templates/` | P2 |
-| `.codex*` / `.agents/` multi-platform packaging | P2 |
-| `ARCFORGE_ROOT` injection (`inject-skills` hook) | P2 |
-| D8 allowlist entries (engine/hook code reading `skills/`) | P2 shrinks it, P5 zeroes it |
+The **grandfather list** that exempted v5 skills from the new enforcement
+(`docs/plans/v6/legacy-skills.json`) reached zero and is **closed**: the tests
+assert it stays empty, so no skill can buy an exemption from the frozen
+frontmatter schema, D1 self-containment, or the naming rule.
 
-**Grandfather list — `docs/plans/v6/legacy-skills.json` is the single source of
-truth.** New enforcement (frozen frontmatter schema, D1 self-containment, naming)
-exempts the skills listed there and applies in full to every skill not listed.
-A **ratchet** test asserts each entry still exists as `skills/core/<name>/`: when
-a legacy skill is deleted or rewritten, prune its entry in the **same commit**.
-The list must be empty by the end of P6. Never add an entry to it.
-
-Plan: `docs/plans/v6/PLAN.md`. Progress: `docs/plans/v6/progress.md`.
+History: `docs/plans/v6/PLAN.md`, `docs/plans/v6/progress.md`.

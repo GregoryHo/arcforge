@@ -26,7 +26,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 // Shipped doc surface to lint. Markdown only — code files are checked by their
 // own contract tests, not prose linting.
-const SCAN_DIRS = ['skills', 'docs/guide', 'agents', 'templates', 'hooks'];
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks'];
 const SCAN_ROOT_FILES = ['README.md'];
 
 /** Recursively collect *.md files under a directory (skips node_modules). */

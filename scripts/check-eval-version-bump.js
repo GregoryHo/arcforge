@@ -65,7 +65,11 @@ function parseScenarioText(text, basename) {
 
 function main() {
   const base = process.env.BASE_REF || 'origin/main';
-  const git = (args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+  // stderr is piped (not inherited): `git show` on a file that is new in this
+  // diff throws an expected fatal that the catch below turns into a skip, and
+  // letting it print would bury real failures in noise.
+  const git = (args) =>
+    execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
 
   let changed = [];
   try {
