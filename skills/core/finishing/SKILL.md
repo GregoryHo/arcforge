@@ -1,6 +1,6 @@
 ---
 name: finishing
-description: Integrate completed work — verify tests, present four options, execute the choice, clean up. Use when implementation is done and you are deciding whether to merge, open a PR, keep, or discard a branch or worktree.
+description: Integrate completed work. Use when implementation is done and you are deciding whether to merge, open a PR, keep, or discard a branch or worktree.
 ---
 
 # Finishing
