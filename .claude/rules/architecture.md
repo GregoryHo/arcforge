@@ -4,6 +4,25 @@ This file describes the architecture that binds all work in this repo. The
 rewrite that produced it is documented in `docs/plans/v6/PLAN.md`; that plan is
 history, this file is the standing rule.
 
+## Docs Are the Contract
+
+Documentation outranks implementation: what the docs promise is what the
+project owes, and a doc↔engine mismatch is a **build failure**, not a cleanup
+chore. The working rules:
+
+- A behavior change ships **with its doc change in the same commit** — a PR
+  that changes what the engine does but not what the docs say is incomplete.
+- When docs and engine disagree, first decide which one lied: if the doc made
+  the promise deliberately, fix the engine; if the doc was wrong, fix the doc
+  and say so in the commit message. Never silently pick whichever is cheaper.
+- Sync is mechanical wherever possible, prose only where it can't be:
+  `check:docs` (paths/commands/flags/skills in every scanned doc resolve
+  against the engine), `check:versions`, `check:cli-consumers`, the router
+  bijection, and the CLI manifest (`scripts/lib/cli-manifest.js` — docs and
+  linters read it; a second hardcoded copy is forbidden).
+- A norm written in prose that could be a check is a drift risk — when you add
+  a rule, ask what would mechanically fail if someone broke it.
+
 ## Zero External Dependencies
 
 No external runtime dependencies — Node.js standard library only.
