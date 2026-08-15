@@ -58,9 +58,55 @@ trigger rate is P6's acceptance (`router 觸發矩陣命中率`), measured there
 smuggled in here.
 
 The positive assertion is anchored with a regex instead of a bare substring so it
-matches `arcforge worktree list` only in command position — a path such as
-`~/.arcforge/worktrees/...` that merely contains the product name cannot satisfy
-it, and `cd <dir> && arcforge worktree list` still does.
+matches only in command position — a path such as `~/.arcforge/worktrees/...`, or
+any `/…/arcforge/…` directory, cannot satisfy it because the product name there is
+preceded by a slash, while `cd <dir> && arcforge worktree list` still does. The
+trailing `[-\w]` requires an argument, so `which arcforge` is a probe and not an
+invocation.
+
+### Version 3 — stability, after treatment triggered in only 3 of 5 (P3 掛帳)
+
+The P3 gate recorded this scenario as unstable and named the cause precisely:
+treatment reached the CLI in 3/5 trials, so **no verdict policy would have passed
+it** — the instrument, not the policy, was the problem. Two defects are fixed
+here; a third is named and left alone because the scenario cannot reach it.
+
+**Defect 1 — the assertion was narrower than the claim it encodes.** v2 required
+`arcforge worktree list`, one specific subcommand. What D9 asserts, and what the
+Design Notes above state as this scenario's entire scope, is that **the bare
+command resolves on PATH inside a plugin session** — the two negative assertions
+are what make it mean "bare". Pinning the subcommand smuggles a tool-choice
+requirement into a scenario that explicitly disclaims routing scope, and it scores
+0 for a trial that demonstrated D9 through `arcforge worktree --help`,
+`arcforge worktree`, or any other subcommand. v1's own history says this happens:
+the treatment agents that reached the CLI got there by exploring, not by loading
+`finishing`, which was never in their context. The regex now credits any bare
+`arcforge <argument>` in command position and keeps both negatives intact. This
+widens what counts as evidence for the D9 claim; it does not weaken what the claim
+is, and nothing about the command form it accepts is looser — command position and
+the two negatives are unchanged.
+
+**Defect 2 — the turn budget was less than half the corpus norm.** 14 turns
+against 40 for every comparable scenario. The task is agentic — orient, run the
+suite in the linked worktree, answer the path question — and this corpus has
+recorded three separate instances of a trial cut off mid-work being scored as a
+behavior failure (P4 300s→600s, P6 600s→900s, the `tdd` scenario's 25→40 turn
+raise). Turn exhaustion is not a discipline failure. 30 turns.
+
+**Not fixed, and worth stating: `git worktree list` is a legitimate answer here.**
+The fixture builds the worktree with plain `git worktree add`, so it is `kind:
+external` in arcforge's own listing, and an agent that just wants a path has no
+reason inside the trial to prefer the arcforge CLI over git. Nothing the scenario
+can do about that without either teaching the CLI in the prompt — which would make
+the measurement circular — or putting `finishing` in the treatment's context, which
+`## Scope workflow` deliberately does not do (treatment is the real plugin loader,
+not an injected skill body). Residual variance from this cause stays; if treatment
+still misses after these two fixes, that is where to look first, and the answer is
+a harness modality that exposes skills, not a narrower regex.
+
+This scenario is `## Preflight skip` / `## Verdict Policy non-regression`, so it is
+not in the P7 delta-campaign set and these edits carry no re-preflight cost beyond
+the corpus-wide one.
 
 ## Preflight
 skip
@@ -72,7 +118,7 @@ non-regression
 ${PROJECT_ROOT}
 
 ## Max Turns
-14
+30
 
 ## Setup
 mkdir -p test
@@ -129,7 +175,7 @@ git -C wt-slugify add -A
 git -C wt-slugify commit -q -m "feat: slugify"
 
 ## Assertions
-- [tool_called] Bash:re:(^|[\s;&|(])arcforge\s+worktree\s+list\b
+- [tool_called] Bash:re:(^|[\s;&|(])arcforge\s+[-\w]
 - [tool_not_called] Bash:CLAUDE_PLUGIN_ROOT
 - [tool_not_called] Bash:scripts/cli.js
 
@@ -150,4 +196,4 @@ cannot satisfy it.
 5
 
 ## Version
-2
+3
