@@ -51,7 +51,7 @@
 - [x] Wave1-E：hooks 14→6 實體（刪 8 目錄+兩支派送器；session-tracker 拔 SDD 渲染）
 - [x] Wave1-F1：D8 翻正——daemon/auto-diary/eval prompts/dashboard 搬引擎側；allowlist 7→1
 - [x] Wave1-F2：loop 任務來源 DAG→D3 清單（--tasks）；loop-verifier 去 SDD
-- [x] Wave2-D-core：scripts/lib −19 檔、CLI 22→5、agents/templates/Codex/dogfood/integration 全刪、website sdd 頁移除、task-list blocked note 參數
+- [x] Wave2-D-core：scripts/lib −19 檔、CLI 19→5（原記 22；P8 對 651c140/gate-p1 的 cli.js 實測 19 個 top-level case，據 git 更正）、agents/templates/Codex/dogfood/integration 全刪、website sdd 頁移除、task-list blocked note 參數
 - [x] Wave2-D-skills：6 支 doomed skills 刪除、legacy 30→24、ARCFORGE_ROOT 四出貨目錄歸零、v5 快照 pytest 刪除、check:docs 52 條追到 0
 - [x] verifier 修正：README/plugin.json/marketplace.json 出貨面假敘述（ARCFORGE_ROOT/SDD 宣傳）清除
 

@@ -15,8 +15,9 @@
   },
   "files": [
     "bin/",
-    "skills/",
+    "skills/core/",
     "hooks/",
+    "!hooks/__tests__/",
     "scripts/",
     ".claude-plugin/",
     "LICENSE",
