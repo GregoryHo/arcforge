@@ -873,6 +873,54 @@ Do something.
       expect(result.error).toContain('No assistant output captured');
       expect(fs.readFileSync(result.transcript, 'utf8')).toContain('"type":"assistant"');
     });
+
+    it('should time a trial by wall clock and keep the CLI-reported duration separately', () => {
+      const scenario = {
+        name: 'duration-both-clocks',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Done' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'Done', duration_ms: 999999 }),
+      ].join('\n');
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      // Wall clock, not the CLI's under-reporting turn timer.
+      expect(result.api_duration_ms).toBe(999999);
+      expect(typeof result.duration_ms).toBe('number');
+      expect(result.duration_ms).toBeLessThan(999999);
+    });
+
+    it('should still record a wall-clock duration when no result event reports one', () => {
+      const scenario = {
+        name: 'duration-no-result-event',
+        scenario: 'Test.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+      };
+      const rawStream = JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Done' }] },
+      });
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: rawStream, stderr: '', exitCode: 0 });
+
+      const result = runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false });
+
+      expect(result.api_duration_ms).toBeNull();
+      expect(typeof result.duration_ms).toBe('number');
+      expect(result.duration_ms).toBeGreaterThanOrEqual(0);
+    });
   });
 
   // ── buildTrialPrompt ─────────────────────────────────────────
