@@ -1,23 +1,62 @@
 # Plugin
 
+arcforge targets **Claude Code only**. There is no second packaging target to
+keep in sync.
+
 ## Plugin Manifest (`.claude-plugin/plugin.json`)
 
 - Required field: `name` (kebab-case, becomes namespace prefix)
 - Optional metadata: `version`, `description`, `author`, `homepage`, `repository`, `license`, `keywords`
-- Component path fields: `commands`, `agents`, `skills`, `mcpServers`, `outputStyles`, `lspServers`
+- Component path fields available: `commands`, `agents`, `skills`, `mcpServers`, `outputStyles`, `lspServers`
 - Do NOT add a `hooks` field — `hooks/hooks.json` is auto-loaded by convention
+
+## Skill Discovery and the `skills` Whitelist
+
+Skills live in **lifecycle buckets** — `skills/core/<name>/`, plus
+`in-progress/` and `deprecated/` as needed — and `plugin.json` carries a single
+directory entry:
+
+```json
+"skills": ["./skills/core/"]
+```
+
+**Verified mechanics** (empirically tested against Claude Code, not inferred):
+
+- Nested directories are **not** auto-discovered. Remove the `skills` field and
+  a nested layout loads nothing. The whitelist is not a filter — it is the only
+  way to load a nested layout.
+- The whitelist accepts **directory entries**: `"skills": ["./skills/core/"]`
+  loads every skill under that directory in one entry.
+- The loaded identifier is the skill's `name` (== dirname); the bucket segment
+  does not appear in it, so a move between buckets never changes an invocation.
+
+Consequences to work with, not around:
+
+- Only `core/` ships. `in-progress/` and `deprecated/` are on-disk holding areas
+  that never load, so they need no manifest edit and no exclusion rule.
+- Promoting or retiring a skill is a **`git mv` between buckets** — the manifest
+  does not change.
+- The buckets are not tracked when empty; create one at the moment a skill moves
+  into it rather than keeping a placeholder.
+- Guards resolve skills through the bucket. `skills/core` is the single point in
+  `tests/scripts/skill-tree.js` (jest) and `tests/skills/test_skill_structure.py`
+  (pytest); the D8 lint treats a bucket segment as generic tree access and keys
+  on the skill name inside it.
+
+## Versioning
+
+- `plugin.json` is the canonical version (wins if `marketplace.json` also sets one)
+- Every other location that must match is enumerated in
+  `scripts/check-version-sync.js` (`LOCATIONS`) and enforced by
+  `npm run check:versions` — sync against that list, don't maintain a copy of it
+- Bumping the version is critical — plugin code is cached by version, so changes
+  without a version bump don't propagate to installed copies
 
 ## Marketplace (`.claude-plugin/marketplace.json`)
 
 - Required: `name`, `owner.name`, `plugins` array
 - Installation: `claude plugin install arcforge@arcforge-dev`
 - Source types: GitHub repo, git URL, npm, pip, relative path
-
-## Versioning
-
-- Set version in `plugin.json` (canonical source — wins if both `plugin.json` and `marketplace.json` set it)
-- Also sync to `package.json` and `.codex-plugin/plugin.json` for non-Claude platforms
-- Bumping version is critical — plugin code is cached by version, changes without version bump won't propagate
 
 ## Hook Registration
 
@@ -34,22 +73,23 @@
 | `$CLAUDE_PROJECT_DIR` | All hooks | Project root directory |
 | `$CLAUDE_ENV_FILE` | SessionStart only | File to persist env vars |
 | `$CLAUDE_CODE_REMOTE` | All hooks | `"true"` in web environments, unset in CLI |
-| `ARCFORGE_ROOT` | Custom | Set by `inject-skills` hook for downstream skills |
+
+There is no arcforge-specific env var, deliberately: skills reach the engine by
+subprocess CLI (D1), never by injected environment. Don't introduce one.
+
+`${CLAUDE_PLUGIN_ROOT}` is a **hooks-only** variable — spike-verified UNSET in
+skill-triggered Bash. The skill → engine boundary is the bare `arcforge` CLI
+(D9): Claude Code adds every loaded plugin's `bin/` to PATH, and `bin/arcforge`
+is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 
 ## Plugin Directory Layout
 
 - `.claude-plugin/` — only `plugin.json` + `marketplace.json` go here
-- Component dirs at plugin root: `skills/`, `hooks/`, `agents/`, `templates/`
-- Skills become namespaced when installed: `/arcforge:arc-brainstorming`
-
-## Multi-Platform Packaging
-
-One repo, two platforms:
-
-| Directory | Platform | Notes |
-|-----------|----------|-------|
-| `.claude-plugin/` | Claude Code | Hooks + marketplace |
-| `.codex/` | Codex | Installation guide (symlinks to `~/.agents/`) |
+- Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/`
+- Skills become namespaced when installed: `/arcforge:<skill-name>` — the bucket
+  is a layout detail, never part of the name
+- There is no `agents/`, `templates/`, or `commands/` directory. Adding a new
+  component type is a design decision, not a convenience
 
 ## Distribution
 

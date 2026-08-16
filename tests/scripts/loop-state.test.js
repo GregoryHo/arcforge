@@ -178,61 +178,15 @@ describe('loop-state', () => {
       expect(p.blocked).toEqual([{ id: 'T-9', reason: 'failed after retries' }]);
     });
 
-    it('queues ratify-pending counting proposed decisions across specs', () => {
-      const mkLedger = (specId, body) => {
-        const dir = path.join(tmpDir, 'specs', specId);
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, 'decisions.yml'), body);
-      };
-      mkLedger(
-        'spec-a',
-        '- D-id: D-001\n  status: proposed\n  decision: x\n- D-id: D-002\n  status: proposed\n  decision: y\n',
-      );
-      mkLedger('spec-b', '- D-id: D-003\n  status: accepted\n  decision: z\n');
-
+    it('leaves the state file on disk after finalize (AF-5 resume depends on it)', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';
       finalizeLoop(state, 50, tmpDir);
 
-      const ratify = getActions(tmpDir, 'ratify-pending');
-      expect(ratify).toHaveLength(1);
-      expect(ratify[0].payload.count).toBe(2);
-      expect(ratify[0].payload.specs).toEqual([
-        { spec_id: 'spec-a', decision_ids: ['D-001', 'D-002'] },
-      ]);
-    });
-
-    it('does not double-queue ratify-pending across two finalize calls', () => {
-      const dir = path.join(tmpDir, 'specs', 'spec-a');
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- D-id: D-001\n  status: proposed\n');
-
-      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
-      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
-
-      expect(getActions(tmpDir, 'ratify-pending')).toHaveLength(1);
-    });
-
-    it('does not queue ratify-pending when no decisions are proposed', () => {
-      const dir = path.join(tmpDir, 'specs', 'spec-a');
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'decisions.yml'), '- D-id: D-001\n  status: accepted\n');
-
-      finalizeLoop(loadLoopState(tmpDir), 50, tmpDir);
-      expect(getActions(tmpDir, 'ratify-pending')).toHaveLength(0);
-    });
-
-    it('writes a terminal sentinel that passes the AF-2 loop-sentinel gate (S3-4)', () => {
-      // After finalize, the on-disk sentinel is terminal, so the ratify command
-      // named in the morning notification is NOT denied by the sentinel gate.
-      const { loopSentinelPresent } = require('../../scripts/lib/sdd-utils');
-      const state = loadLoopState(tmpDir);
-      state.status = 'complete';
-      finalizeLoop(state, 50, tmpDir);
-
-      // Sentinel exists (resume depends on it) but reads as terminal.
       expect(fs.existsSync(path.join(tmpDir, '.arcforge-loop.json'))).toBe(true);
-      expect(loopSentinelPresent(tmpDir)).toBe(false);
+      const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, '.arcforge-loop.json'), 'utf8'));
+      expect(onDisk.status).toBe('complete');
+      expect(typeof onDisk.finished_at).toBe('string');
     });
   });
 

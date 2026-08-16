@@ -1,10 +1,16 @@
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const {
   isStalled,
   isRetryStorm,
   checkStopConditions,
   parseLoopArgs,
-  detectWorktree,
   buildTaskPrompt,
+  selectNextTask,
+  setTaskStatus,
+  resolveTasksPath,
+  resolveTaskVerifyCommand,
 } = require('../../scripts/loop');
 const { buildClaudeArgs } = require('../../scripts/lib/loop-session');
 
@@ -284,30 +290,28 @@ describe('loop safety mechanisms', () => {
 });
 
 describe('parseLoopArgs', () => {
-  it('should parse --epic flag', () => {
-    const result = parseLoopArgs(['--pattern', 'sequential', '--epic', 'epic-001']);
-    expect(result.epic).toBe('epic-001');
-    expect(result.pattern).toBe('sequential');
+  it('parses --tasks as the task source', () => {
+    const result = parseLoopArgs(['--tasks', 'docs/tasks.md']);
+    expect(result.tasksFile).toBe('docs/tasks.md');
   });
 
-  it('should default epic to null when not specified', () => {
-    const result = parseLoopArgs(['--pattern', 'dag']);
-    expect(result.epic).toBeNull();
+  it('defaults tasksFile to null when not specified', () => {
+    expect(parseLoopArgs([]).tasksFile).toBeNull();
   });
 
-  it('should parse --epic with other flags', () => {
-    const result = parseLoopArgs(['--epic', 'my-epic', '--max-runs', '10', '--max-cost', '5']);
-    expect(result.epic).toBe('my-epic');
+  it('parses --tasks alongside the budget flags', () => {
+    const result = parseLoopArgs(['--tasks', 'tasks.md', '--max-runs', '10', '--max-cost', '5']);
+    expect(result.tasksFile).toBe('tasks.md');
     expect(result.maxRuns).toBe(10);
     expect(result.maxCost).toBe(5);
   });
 
-  it('should parse --task-timeout in seconds to taskTimeoutMs', () => {
+  it('parses --task-timeout in seconds to taskTimeoutMs', () => {
     const result = parseLoopArgs(['--task-timeout', '900']);
     expect(result.taskTimeoutMs).toBe(900000);
   });
 
-  it('should default spawn pass-through options to null', () => {
+  it('defaults spawn pass-through options to null', () => {
     const result = parseLoopArgs([]);
     expect(result.taskTimeoutMs).toBeNull();
     expect(result.model).toBeNull();
@@ -315,7 +319,7 @@ describe('parseLoopArgs', () => {
     expect(result.allowedTools).toBeNull();
   });
 
-  it('should pass through --permission-mode and --allowed-tools values', () => {
+  it('passes through --permission-mode and --allowed-tools values', () => {
     const result = parseLoopArgs([
       '--permission-mode',
       'acceptEdits',
@@ -326,7 +330,7 @@ describe('parseLoopArgs', () => {
     expect(result.allowedTools).toBe('Bash,Read');
   });
 
-  it('should pass through the --model value so buildClaudeArgs pins the tier', () => {
+  it('passes through the --model value so buildClaudeArgs pins the tier', () => {
     const result = parseLoopArgs(['--model', 'opus']);
     expect(result.model).toBe('opus');
     // Proves the parsed value reaches the spawned argv: options.model flows
@@ -335,12 +339,90 @@ describe('parseLoopArgs', () => {
   });
 });
 
-describe('buildTaskPrompt', () => {
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
-  const { Coordinator } = require('../../scripts/lib/coordinator');
+describe('selectNextTask', () => {
+  const t = (id, status, extra = {}) => ({ id, status, text: id, ...extra });
 
+  it('returns the first pending task in file order', () => {
+    const task = selectNextTask([t('T1', 'done'), t('T2', 'pending'), t('T3', 'pending')]);
+    expect(task.id).toBe('T2');
+  });
+
+  it('resumes an in-progress task ahead of any pending one (crash recovery)', () => {
+    const task = selectNextTask([t('T1', 'pending'), t('T2', 'in-progress')]);
+    expect(task.id).toBe('T2');
+  });
+
+  it('never re-runs done or blocked tasks', () => {
+    expect(selectNextTask([t('T1', 'done'), t('T2', 'blocked')])).toBeNull();
+  });
+
+  it('returns null for a non-array input', () => {
+    expect(selectNextTask(undefined)).toBeNull();
+  });
+});
+
+describe('resolveTasksPath', () => {
+  it('resolves a relative path against the project root', () => {
+    expect(resolveTasksPath('tasks.md', '/proj')).toBe(path.resolve('/proj', 'tasks.md'));
+  });
+
+  it('throws when no task list was given — the loop has no other task source', () => {
+    expect(() => resolveTasksPath(null, '/proj')).toThrow(/--tasks/);
+    expect(() => resolveTasksPath('   ', '/proj')).toThrow(/--tasks/);
+  });
+});
+
+describe('resolveTaskVerifyCommand', () => {
+  it("uses the task's own verify: line as its acceptance floor", () => {
+    const argv = resolveTaskVerifyCommand({ verify: 'npm run test:scripts' }, {});
+    expect(argv).toEqual(['npm', 'run', 'test:scripts']);
+  });
+
+  it('falls back to the run-wide --verify-cmd when the task has none', () => {
+    const argv = resolveTaskVerifyCommand({ verify: null }, { verifyCommand: ['npm', 'test'] });
+    expect(argv).toEqual(['npm', 'test']);
+  });
+
+  it('returns null when neither is configured', () => {
+    expect(resolveTaskVerifyCommand({ verify: null }, {})).toBeNull();
+  });
+
+  it('throws on a verify line that needs a shell (security.md)', () => {
+    expect(() => resolveTaskVerifyCommand({ verify: 'npm test | tee out' }, {})).toThrow(
+      /shell features/,
+    );
+  });
+});
+
+describe('setTaskStatus', () => {
+  let tmpDir;
+  let tasksPath;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loop-tasks-'));
+    tasksPath = path.join(tmpDir, 'tasks.md');
+    fs.writeFileSync(
+      tasksPath,
+      '# Tasks\n\n> arcforge task list v1 — markers\n\n- [ ] T1 — First\n- [ ] T2 — Second\n',
+    );
+  });
+  afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+  it('rewrites only the target marker, byte-preserving the rest', () => {
+    const before = fs.readFileSync(tasksPath, 'utf8');
+    setTaskStatus(tasksPath, 'T2', 'done');
+    const after = fs.readFileSync(tasksPath, 'utf8');
+    expect(after).toContain('- [x] T2 — Second');
+    expect(after).toContain('- [ ] T1 — First');
+    expect(after.length).toBe(before.length);
+  });
+
+  it('throws on an unknown task id rather than silently no-op', () => {
+    expect(() => setTaskStatus(tasksPath, 'T9', 'done')).toThrow(/no task with id T9/);
+  });
+});
+
+describe('buildTaskPrompt', () => {
   let tmpDir;
   let savedPm;
 
@@ -356,185 +438,39 @@ describe('buildTaskPrompt', () => {
     if (savedPm !== undefined) process.env.CLAUDE_PACKAGE_MANAGER = savedPm;
   });
 
-  /**
-   * Helper: write a per-spec dag.yaml fixture (sdd-v2 layout) and return a
-   * Coordinator bound to it. Mirrors tests/integration/sdd-v2-pipeline.
-   */
-  function makeSpecProject({
-    specId = 'demo-spec',
-    specPathValue = 'epics/epic-parser/epic.md',
-    createEpicDoc = true,
-    nodeProject = true,
-    lintScript = false,
-  } = {}) {
-    const specDir = path.join(tmpDir, 'specs', specId);
-    fs.mkdirSync(specDir, { recursive: true });
-    const lines = ['epics:', '  - id: epic-parser', '    name: Parser Primitives'];
-    if (specPathValue) lines.push(`    spec_path: ${specPathValue}`);
-    lines.push(
-      '    status: pending',
-      '    worktree: null',
-      '    depends_on: []',
-      '    features:',
-      '      - id: fr-parser-001',
-      '        name: parseInteger Primitive',
-      '        status: pending',
-      '        depends_on: []',
-      '',
-    );
-    fs.writeFileSync(path.join(specDir, 'dag.yaml'), lines.join('\n'));
-    if (createEpicDoc) {
-      const epicDir = path.join(specDir, 'epics', 'epic-parser');
-      fs.mkdirSync(epicDir, { recursive: true });
-      fs.writeFileSync(path.join(epicDir, 'epic.md'), '# Epic: Parser Primitives\n');
-    }
-    if (nodeProject) {
-      const scripts = lintScript ? { test: 'jest', lint: 'biome check .' } : { test: 'jest' };
-      fs.writeFileSync(
-        path.join(tmpDir, 'package.json'),
-        JSON.stringify({ name: 'fixture', version: '1.0.0', scripts }),
-      );
-      // Lock file pins detectPackageManager to npm regardless of host config
-      fs.writeFileSync(path.join(tmpDir, 'package-lock.json'), '{}');
-    }
-    return new Coordinator(tmpDir, specId);
-  }
+  const task = { id: 'T2', text: 'Implement the parser', verify: null, note: null };
 
-  it('emits a spec-dir-relative spec_path resolvable from the spawn cwd (sdd-v2 fixture convention)', () => {
-    const coord = makeSpecProject();
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    const match = prompt.match(/^Spec: (.+)$/m);
-    expect(match).not.toBeNull();
-    expect(match[1]).toBe(path.join('specs', 'demo-spec', 'epics', 'epic-parser', 'epic.md'));
-    // The emitted path must exist from the spawn cwd (projectRoot)
-    expect(fs.existsSync(path.resolve(tmpDir, match[1]))).toBe(true);
+  it('carries the task id and text from the list', () => {
+    const prompt = buildTaskPrompt(task, { projectRoot: tmpDir });
+    expect(prompt).toContain('# Task: Implement the parser');
+    expect(prompt).toContain('## Task ID: T2');
   });
 
-  it('emits the epic docs directory when specs/<spec-id>/epics/<epic-id>/ exists', () => {
-    const coord = makeSpecProject();
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    const match = prompt.match(/^Epic docs: (.+)$/m);
-    expect(match).not.toBeNull();
-    expect(fs.existsSync(path.resolve(tmpDir, match[1]))).toBe(true);
+  it("states the task's own verify command as the acceptance bar", () => {
+    const prompt = buildTaskPrompt({ ...task, verify: 'npm test' }, { projectRoot: tmpDir });
+    expect(prompt).toContain('This task is done when `npm test` passes.');
   });
 
-  it('resolves project-root-relative spec_path (arc-planning convention)', () => {
-    const coord = makeSpecProject({
-      specPathValue: 'specs/demo-spec/epics/epic-parser/epic.md',
-    });
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    const match = prompt.match(/^Spec: (.+)$/m);
-    expect(match).not.toBeNull();
-    expect(match[1]).toBe(path.join('specs', 'demo-spec', 'epics', 'epic-parser', 'epic.md'));
-    expect(fs.existsSync(path.resolve(tmpDir, match[1]))).toBe(true);
+  it('tells the session the loop owns the task-list markers', () => {
+    const prompt = buildTaskPrompt(task, { projectRoot: tmpDir, tasksFile: 'tasks.md' });
+    expect(prompt).toContain('Do NOT edit the task list');
+    expect(prompt).toContain('## Task list: tasks.md');
   });
 
-  it('resolves the parent epic spec source for feature tasks via taskContext', () => {
-    const coord = makeSpecProject();
-    const prompt = buildTaskPrompt(coord.dag.getTask('fr-parser-001'), coord, tmpDir);
-
-    const match = prompt.match(/^Spec: (.+)$/m);
-    expect(match).not.toBeNull();
-    expect(fs.existsSync(path.resolve(tmpDir, match[1]))).toBe(true);
-  });
-
-  it('omits the Specs section for legacy dags without spec_path', () => {
-    const coord = makeSpecProject({ specPathValue: null, createEpicDoc: false });
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    expect(prompt).not.toContain('Spec:');
-    expect(prompt).not.toContain('## Specs');
-  });
-
-  it('omits spec_path entries that do not exist on disk', () => {
-    const coord = makeSpecProject({ createEpicDoc: false });
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    expect(prompt).not.toContain('Spec:');
-  });
-
-  it('uses the detected test command for Node projects', () => {
-    const coord = makeSpecProject();
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    expect(prompt).toContain('Run `npm test` and verify all tests pass');
-  });
-
-  it('emits a pytest verification line for pyproject projects', () => {
-    const coord = makeSpecProject({ nodeProject: false });
-    fs.writeFileSync(path.join(tmpDir, 'pyproject.toml'), '[project]\nname = "fixture"\n');
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
-    expect(prompt).toContain('Run `pytest tests/ -v` and verify all tests pass');
-    expect(prompt).not.toContain('npm test');
-  });
-
-  it('omits the verification block when the project type is unknown', () => {
-    const coord = makeSpecProject({ nodeProject: false });
-    const prompt = buildTaskPrompt(coord.dag.getTask('epic-parser'), coord, tmpDir);
-
+  it('omits the verification block for an unknown project type', () => {
+    const prompt = buildTaskPrompt(task, { projectRoot: tmpDir });
     expect(prompt).not.toContain('## Verification');
   });
 
-  it('emits the lint line only when package.json has a lint script', () => {
-    const withLint = makeSpecProject({ lintScript: true });
-    const promptWithLint = buildTaskPrompt(withLint.dag.getTask('epic-parser'), withLint, tmpDir);
-    expect(promptWithLint).toContain('Run `npm run lint` and fix any issues');
-
+  it('emits detected project commands when package.json is present', () => {
     fs.writeFileSync(
       path.join(tmpDir, 'package.json'),
-      JSON.stringify({ name: 'fixture', version: '1.0.0', scripts: { test: 'jest' } }),
+      JSON.stringify({ scripts: { test: 'jest', lint: 'biome check' } }),
     );
-    const withoutLint = new Coordinator(tmpDir, 'demo-spec');
-    const promptNoLint = buildTaskPrompt(
-      withoutLint.dag.getTask('epic-parser'),
-      withoutLint,
-      tmpDir,
-    );
-    expect(promptNoLint).not.toContain('npm run lint');
-  });
-});
-
-describe('detectWorktree', () => {
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
-
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loop-test-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('should detect worktree when .arcforge-epic exists', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.arcforge-epic'),
-      'epic: eval-core\nbase_worktree: /project/root\n',
-    );
-    const result = detectWorktree(tmpDir);
-    expect(result.inWorktree).toBe(true);
-    expect(result.epicId).toBe('eval-core');
-    expect(result.basePath).toBe('/project/root');
-  });
-
-  it('should return inWorktree false when no marker file', () => {
-    const result = detectWorktree(tmpDir);
-    expect(result.inWorktree).toBe(false);
-    expect(result.epicId).toBeNull();
-    expect(result.basePath).toBeNull();
-  });
-
-  it('should handle malformed marker file gracefully', () => {
-    fs.writeFileSync(path.join(tmpDir, '.arcforge-epic'), 'garbage content');
-    const result = detectWorktree(tmpDir);
-    expect(result.inWorktree).toBe(true);
-    expect(result.epicId).toBeNull();
+    fs.writeFileSync(path.join(tmpDir, 'package-lock.json'), '{}');
+    const prompt = buildTaskPrompt(task, { projectRoot: tmpDir });
+    expect(prompt).toContain('## Verification');
+    expect(prompt).toContain('npm test');
+    expect(prompt).toContain('npm run lint');
   });
 });

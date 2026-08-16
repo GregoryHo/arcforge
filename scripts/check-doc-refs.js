@@ -26,8 +26,8 @@ const repoRoot = path.resolve(__dirname, '..');
 
 // Shipped doc surface to lint. Markdown only — code files are checked by their
 // own contract tests, not prose linting.
-const SCAN_DIRS = ['skills', 'docs/guide', 'agents', 'templates', 'hooks'];
-const SCAN_ROOT_FILES = ['README.md'];
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product'];
+const SCAN_ROOT_FILES = ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md', 'docs/README.md'];
 
 /** Recursively collect *.md files under a directory (skips node_modules). */
 function collectMarkdown(dir, acc) {
@@ -55,15 +55,18 @@ function pathExists(relPath, docDir) {
   return false;
 }
 
+// Lifecycle buckets a skill dir can sit in (P6.5). Only `core` ships, but a doc
+// may legitimately name a skill parked elsewhere, so all three resolve.
+const SKILL_BUCKETS = ['core', 'in-progress', 'deprecated'];
+
 /**
  * Existence probe for a backticked arc-<name> reference. Resolves against all
  * three component trees a doc may legitimately name: a skill dir, a hook dir,
- * or an agent file. (arc-guard / arc-remind are hooks; arc-auditing-spec-*
- * are dispatched agents — neither lives under skills/.)
+ * or an agent file — a referenced component need not live under skills/.
  */
 function skillExists(name) {
   return (
-    fs.existsSync(path.join(repoRoot, 'skills', name)) ||
+    SKILL_BUCKETS.some((bucket) => fs.existsSync(path.join(repoRoot, 'skills', bucket, name))) ||
     fs.existsSync(path.join(repoRoot, 'hooks', name)) ||
     fs.existsSync(path.join(repoRoot, 'agents', `${name}.md`))
   );
@@ -84,12 +87,14 @@ function gatherFiles() {
 function main() {
   const files = gatherFiles();
   const allFindings = [];
+  let r4Probed = 0;
 
   for (const abs of files) {
     const rel = path.relative(repoRoot, abs);
     const content = fs.readFileSync(abs, 'utf8');
-    const { findings } = lintDoc(rel, content, { pathExists, skillExists });
+    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists });
     allFindings.push(...findings);
+    r4Probed += stats.r4.total;
   }
 
   const errors = allFindings.filter((f) => f.severity === 'error');
@@ -110,6 +115,14 @@ function main() {
     for (const f of errors) {
       console.error(`  [${f.rule}] ${f.file}:${f.line}  ${f.message}`);
     }
+    process.exit(1);
+  }
+
+  // R4 sanity floor: if the scan probed zero skill references across the whole
+  // shipped surface, the R4 patterns have silently stopped matching (e.g. a
+  // rename broke both tracks) — that is a linter failure, not a clean pass.
+  if (r4Probed === 0) {
+    console.error('R4 sanity floor: zero skill references probed across the shipped surface.');
     process.exit(1);
   }
 

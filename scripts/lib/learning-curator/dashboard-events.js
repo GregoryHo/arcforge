@@ -12,15 +12,17 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const crypto = require('node:crypto');
 
+const { getArcforgeHome } = require('../utils');
+
 // ---------------------------------------------------------------------------
-// Path helpers — evaluated lazily so tests can redirect via process.env.HOME
+// Path helpers — evaluated lazily so ARCFORGE_HOME/HOME can be redirected.
+// Must resolve identically to queue-writer.js: both write the same store.
 // ---------------------------------------------------------------------------
 
 function getCandidatesDir() {
-  return path.join(os.homedir(), '.arcforge', 'learning', 'candidates');
+  return path.join(getArcforgeHome(), 'learning', 'candidates');
 }
 
 function getQueuePath() {

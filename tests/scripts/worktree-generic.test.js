@@ -21,15 +21,49 @@ const {
   listWorktrees,
   removeGenericWorktree,
 } = require('../../scripts/lib/worktree-generic');
-const { Coordinator } = require('../../scripts/lib/coordinator');
 const {
   getWorktreeRoot,
   getWorktreePath,
   parseWorktreePath,
 } = require('../../scripts/lib/worktree-paths');
-const { runGit, setupRepo, DEFAULT_SPEC_ID } = require('./coordinator-test-helpers');
 
 const CLI = path.resolve(__dirname, '../../scripts/cli.js');
+
+/** Spec id used by the marker fixture below. */
+const DEFAULT_SPEC_ID = 'test-spec';
+
+/** Run a git command in the given directory. Returns stdout. */
+function runGit(args, cwd) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+}
+
+/** Create a temp git repo with one commit on `main`. */
+function setupRepo({ prefix = 'arcforge-test-' } = {}) {
+  const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), prefix));
+  runGit(['init', '-q', '-b', 'main'], root);
+  runGit(['config', 'user.email', 'test@example.com'], root);
+  runGit(['config', 'user.name', 'Test User'], root);
+  fs.writeFileSync(path.join(root, 'README.md'), 'base\n');
+  runGit(['add', 'README.md'], root);
+  runGit(['commit', '-q', '-m', 'init'], root);
+  return root;
+}
+
+/**
+ * Create a marker-bearing worktree at the canonical epic path. Stands in for
+ * whatever lifecycle owns `.arcforge-epic` trees — this module only needs the
+ * marker to exist, so the fixture writes it directly instead of depending on
+ * another engine module.
+ */
+function makeMarkedWorktree(projectRoot, epicId) {
+  const wtPath = getWorktreePath(projectRoot, DEFAULT_SPEC_ID, epicId);
+  runGit(['worktree', 'add', '-q', '-b', `${DEFAULT_SPEC_ID}/${epicId}`, wtPath], projectRoot);
+  fs.writeFileSync(
+    path.join(wtPath, '.arcforge-epic'),
+    `epic: ${epicId}\nspec_id: ${DEFAULT_SPEC_ID}\nbase_worktree: ${projectRoot}\nbase_branch: main\n`,
+  );
+  return wtPath;
+}
 
 function runCli(args, cwd) {
   try {
@@ -56,8 +90,6 @@ describe('worktree-generic', () => {
     process.env.HOME = testHome;
     jest.spyOn(os, 'homedir').mockReturnValue(testHome);
     root = fs.realpathSync(setupRepo({ prefix: 'wtg-repo-' }));
-    runGit(['add', '.'], root);
-    runGit(['commit', '-q', '-m', 'chore: add dag'], root);
   });
 
   afterEach(() => {
@@ -107,7 +139,7 @@ describe('worktree-generic', () => {
 
   describe('list', () => {
     test('annotates all four kinds: base, epic, generic, external', () => {
-      new Coordinator(root, DEFAULT_SPEC_ID).expandWorktrees({ epicId: 'epic-a' });
+      makeMarkedWorktree(root, 'epic-a');
       addGenericWorktree({ projectRoot: root, name: 'experiment' });
       const extPath = path.join(testHome, 'external-wt');
       runGit(['worktree', 'add', '-b', 'ext-branch', extPath], root);
@@ -134,13 +166,12 @@ describe('worktree-generic', () => {
   });
 
   describe('remove', () => {
-    test('epic-marker worktree: CLI exits 1 with an arcforge cleanup redirect, tree untouched', () => {
-      new Coordinator(root, DEFAULT_SPEC_ID).expandWorktrees({ epicId: 'epic-a' });
-      const epicPath = getWorktreePath(root, DEFAULT_SPEC_ID, 'epic-a');
+    test('marker-bearing worktree: CLI exits 1 and refuses, tree untouched', () => {
+      const epicPath = makeMarkedWorktree(root, 'epic-a');
 
       const result = runCli(['worktree', 'remove', epicPath], root);
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('arcforge cleanup');
+      expect(result.stderr).toContain('.arcforge-epic');
       expect(fs.existsSync(epicPath)).toBe(true);
     });
 

@@ -17,7 +17,7 @@ Format: `<type>(<scope>): <description>`
 
 ### Scopes
 
-`skills`, `cli`, `hooks`, `learning`, `templates`, `agents`
+`skills`, `cli`, `hooks`, `learning`, `eval`, `docs`
 
 ## Branch Naming
 
@@ -30,8 +30,11 @@ docs/description
 ## Pre-Commit Checklist
 
 1. `npm run lint:fix` — auto-fix formatting
-2. `npm test` — all 4 runners must pass
-3. No secrets in diff — stop and remove before committing
+2. `npm test` — all 5 runners must pass
+3. The 5 static checks (`check:versions`, `check:docs`, `check:cli-consumers`,
+   `check:hooks`, `check:eval-targets`) — they run in CI and are not part of
+   `npm test`; see `.claude/rules/testing.md`
+4. No secrets in diff — stop and remove before committing
 
 ## Skill PRs
 

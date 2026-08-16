@@ -12,11 +12,50 @@ Run `npm test` before every PR. It executes 5 separate runners:
 
 | Runner | Command | Location | What It Tests |
 |--------|---------|----------|---------------|
-| Jest | `npm run test:scripts` | `tests/scripts/` | Core engine (diary, reflect, session-utils) |
+| Jest | `npm run test:scripts` | `tests/scripts/` | Core engine + the contract lints (see below) |
 | Node `--test` | `npm run test:hooks` | `hooks/__tests__/` | Hook behavior |
-| Custom | `npm run test:node` | `tests/node/` | CLI, DAG schema, models, YAML parser |
+| Custom | `npm run test:node` | `tests/node/` | CLI manifest contract, YAML parser, locking |
 | pytest | `npm run test:skills` | `tests/skills/` | Skill structure validation |
-| Bash | `npm run test:observer-daemon` | `skills/arc-learning/tests/` | Observer daemon behavior |
+| Bash | `npm run test:observer-daemon` | `tests/observer-daemon/` | Observer daemon behavior |
+
+`hooks/` is **not** a separate npm project — there is no `hooks/package.json`,
+no `cd hooks && npm install`, and no second lockfile. `test:hooks` runs
+`node --test hooks/__tests__/*.test.js` from the repo root; hook tests resolve
+paths from `__dirname`, so they must stay cwd-independent.
+
+## Static Checks (all 5 run in CI)
+
+| Command | Guards |
+|---|---|
+| `npm run check:versions` | Version string sync across the locations in `scripts/check-version-sync.js` |
+| `npm run check:docs` | Shipped docs don't reference paths/flags the engine doesn't provide |
+| `npm run check:cli-consumers` | CLI callers match the CLI surface |
+| `npm run check:hooks` | `hooks/hooks.json` schema |
+| `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
+
+## Contract Lints
+
+Beyond unit tests, the suites carry the architecture's boundary assertions.
+Treat a failure here as a design violation, not a broken test:
+
+| Guard | Runner |
+|---|---|
+| **D1** — no file under `skills/<bucket>/<name>/` requires/imports/sources outside its own directory; skill prose doesn't name `scripts/lib/` or `ARCFORGE_ROOT` | jest (`tests/scripts/`) |
+| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`. The exception list is asserted empty. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
+| **Router bijection** — every shipped skill appears in the router table and every router row resolves to a shipped skill | jest (`tests/scripts/`) |
+| **Task-list schema (D3)** — the markdown checkbox format parses; malformed samples are rejected | jest (`tests/scripts/`) |
+| **Frozen frontmatter schema** — every skill satisfies `docs/decisions/skill-schema.md`; there are no exemptions | pytest (`tests/skills/`) |
+
+Adding or removing a skill is a deliberate three-part edit in one commit: the
+skill directory, its row in the router's Skill Map, and `EXPECTED_SKILL_COUNT`
+in `tests/skills/test_skill_structure.py`.
+
+## Coverage Floor
+
+Jest enforces an 80% **line** floor over `scripts/lib/` (`jest.config.js`). It is
+a partial gate — only the jest runner, only the canonical engine. Any new file
+you add under `scripts/lib/` lands inside it, so ship its tests in the same
+commit. Lowering the floor requires a written reason in the same commit.
 
 ## Jest Tests (`tests/scripts/`)
 
@@ -29,16 +68,19 @@ Run `npm test` before every PR. It executes 5 separate runners:
 - Use `require('node:test')` + `require('node:assert')`
 - Environment isolation: save/restore env vars in before/after hooks
 - Module cache: `delete require.cache[...]` in `beforeEach` (hooks use module-level state)
+- Resolve fixtures from `__dirname` — the runner is invoked from the repo root
 
 ## pytest Tests (`tests/skills/`)
 
 - Requires Python 3 + `pip install pytest pyyaml`
-- Generic checker: `test_skill_structure.py` iterates every `skills/*/SKILL.md`
-- Validates frontmatter, `name` == dirname, sections, references, and line budget
+- Generic checker: `test_skill_structure.py` iterates every `skills/core/*/SKILL.md`
+  and asserts an exact count, so a half-broken glob fails instead of passing quietly
+- Validates the frozen frontmatter schema, `name` == dirname, sections,
+  references, and the line budget
 
 ## Custom Runner (`tests/node/`)
 
-- CLI integration, DAG schema validation, model definitions, YAML parsing
+- CLI integration, schema validation, model definitions, YAML parsing
 - Lightweight — no test framework overhead
 
 ## Principles
@@ -48,6 +90,8 @@ Run `npm test` before every PR. It executes 5 separate runners:
 - Deterministic — no flaky tests
 - Real code over mocks — mocks only when unavoidable
 - Clear test names describing the scenario
+- Deleting code means deleting its tests **in the same commit** — a stale suite
+  that no longer has a subject is worse than no suite
 
 ## Temp Directory Lifecycle
 

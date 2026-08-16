@@ -113,6 +113,5 @@ Below threshold (stderr only, not shown to the user):
 
 The session JSON is not read back by any hook — editing it does not
 communicate anything to a future session. To leave yourself a message for
-next time, use `arc-managing-sessions`'s `save`/`handover --save`
-(`session-{alias}.md` / `handover-{slug}.md`) instead of editing the
+next time, write a handover with `/sessions` instead of editing the
 session JSON directly.

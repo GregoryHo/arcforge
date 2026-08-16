@@ -1,38 +1,28 @@
 # arcforge
 
-[![Version](https://img.shields.io/badge/version-5.0.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.0.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a minimal, composable skill toolkit for Claude Code and Codex. It gives agents lightweight routing, structured SDD artifacts, and eval-backed quality gates without turning every task into a mandatory workflow.
+arcforge is a skill toolkit for Claude Code. It gives your agent 15 self-contained skills, a small CLI engine, and six background hooks — so disciplined workflows are available when the work needs them, and never in the way when it doesn't.
 
 ## Why arcforge
 
-AI coding agents are powerful but uneven. Left to their defaults, they skip design, ignore review, and lose context across sessions. Heavy always-on process creates a different failure mode: the agent follows workflow ceremony when a direct answer or isolated eval would be better.
+Coding agents are capable but uneven. Left to their defaults they skip design, forget to test, and lose the thread between sessions. Bolting an always-on process on top creates the opposite failure: the agent performs workflow ceremony when a two-line answer was the right move.
 
-arcforge solves this with a small composable toolkit. Skills are available in the session, but they are selected when useful: design when intent is unclear, structured specs when artifacts matter, TDD/debugging/review when implementation risk is present, and verification before completion claims.
-
-The outcome: your agent has disciplined workflows when the task justifies them, while preserving direct execution, harness isolation, and small-task speed when a workflow would be overhead.
+arcforge takes the middle path. Every skill is a self-contained unit that fires from its own description when the situation matches — and stays quiet otherwise. There is no mandatory routing preamble and no global pipeline you have to enter through.
 
 ## How it works
 
-ArcForge is split into three layers:
+Three pieces, and that is the whole system:
 
-1. **Core toolkit** — a small promoted surface for routing, design, specs, planning, TDD, debugging, verification, and eval.
-2. **Optional workflows** — recipes for SDD, bugfixes, skill authoring, and multi-agent work. These are opt-in by task fit, not global laws.
-3. **Harness/eval layer** — tests that verify both activation and non-activation behavior, including instruction-strength regressions.
+1. **Skills** — 15 markdown skills under `skills/core/`, each a closed unit. A skill is selected because its description matches the situation in front of you, not because a pipeline scheduled it.
+2. **CLI engine** — the `arcforge` command, five subcommand groups. Skills reach engine functionality only by calling this CLI; nothing else crosses the boundary.
+3. **Hooks** — six background components on Claude Code lifecycle events: session continuity, observation logging, a secrets guard, and compaction handling.
 
-When your coding agent starts a session, arcforge's hooks inject a minimal bootstrap: ArcForge is available, `ARCFORGE_ROOT` is set, and agents should prefer the smallest useful workflow. Specific skills are read or invoked on demand.
-
-Once a design is approved, ArcForge can build a clear implementation plan and then execute tasks with a single per-task reviewer that returns both verdicts in one pass (spec compliance and task quality). For larger work, it can create parallel git worktrees so epics can run in isolation.
-
-Skills are tools, not laws. You can enter through `arc-using` for routing help or call any skill directly when you already know the needed workflow.
+Start anywhere. `/arcforge:using` is a router and index if you want a map; otherwise invoke the skill you already know you need.
 
 ## Installation
-
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex requires manual setup.
-
-### Claude Code (Plugin Marketplace)
 
 Register the marketplace:
 
@@ -46,275 +36,183 @@ Install the plugin:
 /plugin install arcforge@arcforge-dev
 ```
 
-### Verify Installation
+Requires Claude Code. arcforge has zero external runtime dependencies — Node.js standard library only.
 
-Check that commands appear:
+### Verify the install
+
+Ask for the router:
+
+```
+/arcforge:using
+```
+
+It prints a table mapping situations to skills. Every skill is invocable the same way — `/arcforge:<name>`, for example `/arcforge:tdd` or `/arcforge:debugging`.
+
+## Quick start
+
+| You want to | Invoke |
+|---|---|
+| A map of what's here | `/arcforge:using` |
+| Think through an underspecified request | `/arcforge:brainstorming` |
+| Turn work into a task list and run it | `/arcforge:executing` |
+| Write code test-first | `/arcforge:tdd` |
+| Chase down a failure you can't explain | `/arcforge:debugging` |
+| Review a change before it merges | `/arcforge:code-review` |
+
+Most skills also fire on their own when their trigger condition shows up. The three marked _user-invoked_ below never do.
+
+## The 15 skills
+
+**Getting oriented**
+
+- **using** — router and index: maps the situation in front of you to the smallest skill that fits
+
+**Doing the work**
+
+- **brainstorming** — structured exploration before a design is settled
+- **executing** — break work into a checkbox task list and run it, attended or unattended
+- **dispatching** — split work that can run in parallel, isolate each writer, accept on evidence
+- **looping** _(user-invoked)_ — hand a task list to an unattended loop that keeps working across fresh sessions
+- **finishing** — integrate completed work: merge, PR, keep, or discard
+
+**Quality gates**
+
+- **tdd** — test-first implementation, RED → GREEN → REFACTOR
+- **debugging** — root-cause discipline for a failure you cannot yet explain
+- **code-review** — review a change before hand-off, then answer the feedback on evidence
+- **evaluating** — measurement discipline for claims about agent behavior
+
+**Memory and continuity**
+
+- **sessions** — handover when work stops mid-task, resume when it restarts, decide when to compact
+- **learning** _(user-invoked)_ — the opt-in learning loop: session diaries, pattern extraction, review of what activates
+
+**Knowledge base**
+
+- **maintaining-obsidian** — ingest, query, audit, or bootstrap an Obsidian vault
+- **diagramming-obsidian** — Excalidraw diagrams inside that vault
+
+**Authoring**
+
+- **writing-skills** _(user-invoked)_ — write an arcforge skill that actually changes agent behavior
+
+Full per-skill detail lives in the **[Skills Reference](docs/guide/skills-reference.md)**.
+
+## Hooks
+
+Six components register on six Claude Code lifecycle events. They run in the background, add at most a few hundred tokens per session, and never block your work.
+
+| Component | Event(s) | What it does |
+|---|---|---|
+| `session-tracker` | SessionStart, Stop | Creates the session record, injects resume context, finalizes on stop |
+| `user-message-counter` | UserPromptSubmit | Counts user messages for the diary threshold |
+| `secrets-guard` | PreToolUse | Warn-only scan for hardcoded credentials in edits and commits |
+| `observe` | PreToolUse, PostToolUse | Appends tool observations for the opt-in learning subsystem |
+| `compact-suggester` | PostToolUse | Suggests `/compact` once a session gets long |
+| `pre-compact` | PreCompact | Checkpoints state before compaction |
+
+See the **[Hooks System guide](docs/guide/hooks-system.md)** for per-hook behavior.
+
+## CLI
+
+Skills call the CLI for you; you rarely run it by hand. When you do, the bare `arcforge` form works anywhere Claude Code has loaded the plugin — it puts every plugin's `bin/` on PATH. From a local checkout with no plugin loaded, use `node scripts/cli.js <cmd>`.
+
+Five command groups:
 
 ```bash
-/help
+# 1. worktree — generic isolated workspaces
+arcforge worktree add <name> --from main --setup
+arcforge worktree list --json
+arcforge worktree remove <name> --force
+
+# 2. loop — unattended execution over a markdown task list
+arcforge loop --tasks tasks.md --max-runs 10 --verifier
+
+# 3. eval — behavioral measurement harness
+arcforge eval list
+arcforge eval run <scenario> --k 5
+arcforge eval report
+
+# 4. learn — the opt-in learning subsystem (off until you enable it)
+arcforge learn status
+arcforge learn enable --project
+arcforge learn dashboard --port 3334
+
+# 5. obsidian — vault registry
+arcforge obsidian register --path <path> --name <name> --default
+arcforge obsidian list-vaults --json
 ```
 
-```
-# Should see:
-# /arcforge:arc-brainstorming - Design exploration
-# /arcforge:arc-writing-tasks - Break features into executable tasks
-# /arcforge:arc-executing-tasks - Execute tasks with checkpoints
-```
+`arcforge --help` prints the full flag surface for every group.
 
-Every skill is directly invocable by name — `/arcforge:arc-<name>` (e.g. `/arcforge:arc-tdd`, `/arcforge:arc-debugging`). Unsure where to start? Invoke `/arcforge:arc-using` for routing help.
+## Optional subsystems
 
-### Codex
+Three systems ship with arcforge and stay out of your way until you ask for them.
 
-Tell Codex:
-
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/GregoryHo/arcforge/main/.codex/INSTALL.md
-```
-
-**Detailed docs:** `docs/README.codex.md`
-
-## Quick Start: Common Commands
-
-These are the most frequently used commands:
-
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `/arcforge:arc-using` | Routing help + skill index | When unsure which skill or workflow applies |
-| `/arcforge:arc-brainstorming` | Design exploration | When starting new work or clarifying requirements |
-| `/arcforge:arc-writing-tasks` | Break down into tasks | When you have a clear spec and need executable steps |
-| `/arcforge:arc-executing-tasks` | Run task list | When tasks are ready and you want to implement |
-| `/arcforge:arc-journaling` | Session journaling | At end of session to capture reflections |
-| `/arcforge:arc-reflecting` | Analyze patterns | After 5+ journal entries to summarize learnings |
-
-## How Skills Compose
-
-![ArcForge Overview](assets/arcforge-overview.png)
-
-**`arc-using` is the canonical in-session router.** When you're unsure which skill applies, invoke it — it maps concrete conditions to the smallest useful workflow. It is a bounded router and index, not an always-on policy engine: you can also enter at any skill directly. The **[Skills Reference](docs/guide/skills-reference.md)** is the offline companion with full per-skill detail.
-
-| Context | Recommended skills | Entry point |
-|---------|-------------------|-------------|
-| Vague idea, new requirement | brainstorming, refining, planning | `arc-brainstorming` |
-| Clear spec, ready to plan | writing-tasks, executing-tasks | `arc-writing-tasks` |
-| Large multi-epic initiative | planning, coordinating, implementing | `arc-planning` |
-| Tasks already defined | executing-tasks or agent-driven | `arc-executing-tasks` |
-| Bug or regression | debugging, tdd, verifying | `arc-debugging` |
-| End of session | journaling | `arc-journaling` |
-
-**Within each path:** TDD (RED-GREEN-REFACTOR) with a single per-task reviewer returning both verdicts (spec compliance and task quality).
-
-**Finishing:** `arc-finishing` for both — its Step 0 discriminates on `.arcforge-epic` (epic worktree vs normal branch).
-
-## Terminology
-
-- **epic** - A large initiative that may require parallel worktrees and multiple features.
-- **feature** - A scoped deliverable inside an epic.
-- **task** - A small, executable step produced by `arc-writing-tasks`.
-- **design** - The design document from `arc-brainstorming`.
-- **spec** - The structured spec output from `arc-refining`.
-- **dag** - The dependency graph produced by `arc-planning`.
-
-## What's Inside
-
-Skills grouped by category. Within each category, model-invoked skills auto-trigger from their description when their condition is present; user-invoked skills _(marked)_ never auto-trigger and are reached only by `/arcforge:<name>` or a project-level task.
-
-### SDD (idea → spec → tasks → integration)
-
-- **arc-brainstorming** - Explore and shape a design before implementation
-- **arc-refining** - Formalize an approved design into a structured `spec.xml`
-- **arc-planning** - Break a refined spec into an executable DAG of epics
-- **arc-writing-tasks** - Break a feature into small executable tasks with exact code
-- **arc-executing-tasks** - Run a prepared task list with human-in-the-loop checkpoints
-- **arc-implementing** - Orchestrate a large multi-feature project inside a worktree
-- **arc-finishing** - Integrate finished work; Step 0 discriminates epic worktree vs branch on `.arcforge-epic`
-- **arc-auditing-spec** _(user-invoked)_ - Read-only advisory audit of an SDD spec family (`/arcforge:arc-auditing-spec <spec-id>`)
-
-### Orchestration (subagents, worktrees, loops)
-
-- **arc-agent-driven** - Execute a task list with one fresh subagent + task-reviewer per task
-- **arc-coordinating** - Coordinate multi-epic worktrees and cross-epic DAG state
-- **arc-dispatching-parallel** - Fan out independent features to parallel subagents in one worktree
-- **arc-dispatching-teammates** - Lead-present epic-level parallelism via agent teammates
-- **arc-looping** - Autonomous unattended cross-session DAG execution
-- **arc-using-worktrees** - Isolated git worktree for any repo (branch, experiment, review checkout); epic work auto-escalates to the coordinator
-
-### Discipline (quality gates)
-
-- **arc-tdd** - Test-first implementation (RED → GREEN → REFACTOR)
-- **arc-debugging** - Systematic root-cause investigation before any fix
-- **arc-verifying** - Fresh evidence before completion claims
-- **arc-reviewing** - Request code review, then process the returning feedback with technical rigor
-- **arc-researching** - Autonomous hypothesis-driven metric optimization
-
-### Memory (session continuity + learning; default-off module)
-
-- **arc-journaling** - Capture session reflections into a durable diary before compaction
-- **arc-reflecting** - Analyze accumulated diaries for patterns and preferences
-- **arc-learning** - Opt-in observe → curate → review → activate instinct lifecycle
-- **arc-recalling** _(user-invoked)_ - Manually save a session pattern as a reusable instinct
-- **arc-managing-sessions** - Hand off, save, or resume session state across turns
-- **arc-compacting** - Strategic manual compaction timing at workflow phase boundaries
-
-The **[Learning Dashboard](docs/guide/learning-dashboard.md)** is the review and control surface for learning candidates: run `arcforge learn dashboard` to open a local UI where you approve, promote, or deactivate each candidate before it changes active behavior.
-
-### Knowledge (Obsidian vault)
-
-- **arc-maintaining-obsidian** - Ingest, query, audit, or initialize an Obsidian vault (Karpathy LLM Wiki pattern)
-- **arc-diagramming-obsidian** - Excalidraw diagram creation inside an Obsidian vault
-
-### Meta (operates on the catalog itself)
-
-- **arc-using** - Bounded router: maps task conditions to the smallest useful skill or workflow
-- **arc-evaluating** - Measure whether a skill, agent, or workflow changes agent behavior
-- **arc-writing-skills** _(user-invoked)_ - Create, edit, or verify ArcForge's own skills and skill tests
-
-### Agents
-
-Skills delegate focused work to specialized subagents (Claude Code only). You rarely invoke these directly — the parenthesized skill dispatches them:
-
-| Agent | Role |
-|-------|------|
-| `implementer` | TDD implementation of one task in a fresh context (arc-agent-driven) |
-| `task-reviewer` | Per-task review: spec compliance + task quality in one pass (arc-agent-driven) |
-| `spec-reviewer` | Epic-acceptance spec compliance, whole merged branch (arc-dispatching-teammates / arc-dispatching-parallel) |
-| `code-reviewer` | Review a completed step against plan and standards (arc-reviewing) |
-| `verifier` | Independent acceptance-criteria verification (arc-dispatching-teammates / loop --verifier gate) |
-| `loop-operator` | Monitor an active autonomous loop for stalls (arc-looping) |
-| `arc-auditing-spec-internal-consistency` | Spec audit axis 1 (arc-auditing-spec) |
-| `arc-auditing-spec-cross-artifact-alignment` | Spec audit axis 2 (arc-auditing-spec) |
-| `arc-auditing-spec-state-transition-integrity` | Spec audit axis 3 (arc-auditing-spec) |
-
-### Hooks
-
-ArcForge registers event hooks (Claude Code only) that work silently in the background: a SessionStart bootstrap, session tracking, observation logging, SDD guards, and journaling triggers. They inject at most a few hundred tokens per session and never block normal work. See the **[Hooks System guide](docs/guide/hooks-system.md)** for the full list and how each one behaves.
-
-### Review Templates
-
-Platform-agnostic subagent prompts with `{PLACEHOLDER}` fields — usable from any
-harness that can dispatch a subagent (Claude Code, Codex):
-
-- `templates/implementer-prompt.md` - TDD implementer subagent prompt
-- `templates/task-reviewer-prompt.md` - Per-task reviewer prompt (spec compliance + task quality)
-- `templates/spec-reviewer-prompt.md` - Epic-acceptance spec compliance reviewer prompt
-
-## CLI Usage
-
-The CLI manages the DAG that `arc-planning` produces. You typically do not run these directly — skills invoke them. For manual use or debugging, the commands are:
-
-The examples below use the bare `arcforge <cmd>` shorthand. In a plugin session, invoke the CLI as `node "${ARCFORGE_ROOT}/scripts/cli.js" <cmd>` — the SessionStart hook sets `ARCFORGE_ROOT` to the installed plugin directory. (The package is not published to npm; the bare shorthand only works from a local checkout via `node scripts/cli.js`.)
-
-```bash
-# Show workflow status
-arcforge status
-
-# Get next available task
-arcforge next
-
-# Mark task as completed
-arcforge complete <task-id>
-
-# Mark task as blocked with reason
-arcforge block <task-id> <reason>
-
-# Show parallelizable epics
-arcforge parallel
-
-# Create worktrees for ready epics (--verify runs baseline tests)
-arcforge expand [--verify]
-
-# Merge completed epics into base branch
-arcforge merge [--base <branch>]
-
-# Remove merged worktree directories
-arcforge cleanup
-
-# Sync state between worktree and base DAG
-arcforge sync [--direction from-base|to-base|both|scan]
-
-# Show 5-Question Reboot context:
-#   Where am I? / Where am I going? / What's the goal?
-#   What have I learned? / What have I done?
-arcforge reboot
-```
+- **Learning** is off until you run `arcforge learn enable --project`. Once on, observations become candidates, candidates need your approval, and approved drafts still need an explicit activation step before they change behavior. The **[Learning Dashboard](docs/guide/learning-dashboard.md)** (`arcforge learn dashboard`) is the review surface for that queue.
+- **Eval** measures whether a skill or instruction actually changes what an agent does — trials, behavioral assertions, A/B comparison against a baseline. See the **[Eval System guide](docs/guide/eval-system.md)**.
+- **Obsidian** connects a vault so sessions can file knowledge into it and answer from it later. Register a vault, then use `/arcforge:maintaining-obsidian`.
 
 ## Development
 
-### Setup
-
 ```bash
 npm install
-cd hooks && npm install && cd ..
-pip install pytest pyyaml    # Required for test:skills
+pip install pytest pyyaml    # required for npm run test:skills
 ```
 
-### Plugin Development
-
-To develop arcforge itself with live plugin loading, see the [Plugin Development](CONTRIBUTING.md#plugin-development) section in CONTRIBUTING.md. Quick version: `npm run dev` starts a Claude session that loads the plugin directly from your local checkout.
-
-### Running Tests
+Run the suites:
 
 ```bash
-# Run all tests (5 runners — all must pass)
+# All 5 test runners
 npm test
 
-# Individual runners
-npm run test:scripts          # Jest — CLI engine (scripts/lib/)
-npm run test:hooks            # Node --test — hook behavior (hooks/__tests__/)
-npm run test:node             # Custom — CLI, DAG schema, models, YAML parser (tests/node/)
-npm run test:skills           # pytest — skill structure validation (tests/skills/)
-npm run test:observer-daemon  # Bash — observer daemon behavior (skills/arc-learning/tests/)
-
-# Run CLI
-node scripts/cli.js --help
+npm run test:scripts          # Jest — engine (scripts/lib/)
+npm run test:hooks            # Node --test — hook behavior
+npm run test:node             # Custom — CLI contract, YAML parser, locking
+npm run test:skills           # pytest — skill structure validation
+npm run test:observer-daemon  # Bash — observer daemon behavior
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
+Plus five static checks, all of which run in CI:
+
+```bash
+npm run check:versions        # version strings in sync
+npm run check:docs            # docs don't promise what the engine lacks
+npm run check:cli-consumers   # CLI callers match the CLI surface
+npm run check:hooks           # hooks.json schema
+npm run check:eval-targets    # eval scenarios target things that exist
+npm run lint                  # Biome
+```
+
+`npm run dev` starts a Claude Code session with the plugin loaded from your local checkout. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ## Philosophy
 
-- **Incremental progress** - Small changes that compile and pass tests
-- **Clear intent** - Boring and obvious code
-- **Smallest useful workflow** - Use skills when they add leverage; avoid ceremony when a direct answer is enough
-- **Evidence over claims** - Verify before declaring success
+- **Smallest useful workflow** — reach for a skill when it adds leverage; skip the ceremony when a direct answer is enough
+- **Evidence over claims** — verify before declaring success
+- **Incremental progress** — small changes that compile and pass tests
+- **Clear intent** — boring, obvious code
 
 ## Documentation
 
-**[Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge)** — an interconnected wiki knowledge base covering architecture, skills, agents, eval, and design history. Start with the [Master Map](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge).
-
-| Topic | Link |
-|-------|------|
-| Skill System | [MOC-ArcForge-Skills](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Skills) |
-| Agent System | [MOC-ArcForge-Agents](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Agents) |
-| Rules & Standards | [MOC-ArcForge-Rules](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Rules) |
-| Eval System | [MOC-ArcForge-Eval](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge-Eval) |
-| Changelog | [CHANGELOG.md](CHANGELOG.md) |
-
-### In-Repo Guides
-
-These guides live in the repo under `docs/guide/`:
+In-repo guides under `docs/guide/`:
 
 | Guide | Link |
 |-------|------|
+| Skills Reference | [docs/guide/skills-reference.md](docs/guide/skills-reference.md) |
 | CLI Invocation Convention | [docs/guide/cli-invocation.md](docs/guide/cli-invocation.md) |
-| Eval System | [docs/guide/eval-system.md](docs/guide/eval-system.md) |
-| Composable Skill Eval Coverage | [docs/guide/composable-skill-eval-coverage.md](docs/guide/composable-skill-eval-coverage.md) |
 | Hooks System | [docs/guide/hooks-system.md](docs/guide/hooks-system.md) |
 | Worktree Workflow | [docs/guide/worktree-workflow.md](docs/guide/worktree-workflow.md) |
-| Skills Reference | [docs/guide/skills-reference.md](docs/guide/skills-reference.md) |
+| Eval System | [docs/guide/eval-system.md](docs/guide/eval-system.md) |
 | Learning Dashboard | [docs/guide/learning-dashboard.md](docs/guide/learning-dashboard.md) |
+
+There is also a published **[Knowledge Base](https://publish.obsidian.md/greghodev/ArcForge/MOC-ArcForge)** wiki covering architecture and design history.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. It covers:
-
-- **Naming conventions** — `arc-<gerund>[-<object>]` pattern for skills
-- **The Iron Law** — no skill without a failing test first (TDD for documentation)
-- **Test runners** — all 5 runners must pass before submitting a PR
-- **PR process** — branch naming, conventional commits, Iron Law compliance
+See [CONTRIBUTING.md](CONTRIBUTING.md). It covers the Iron Law (no skill without a failing test first), the test runner map, and the PR process.
 
 ## Updating
-
-Skills update automatically when you update the plugin:
 
 ```bash
 /plugin update arcforge

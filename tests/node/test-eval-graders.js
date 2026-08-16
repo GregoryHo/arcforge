@@ -344,4 +344,80 @@ console.log('  gradeWithMixed...');
   console.log('    ✓ Per-assertion scores preserved in result');
 }
 
+// ============================================================
+// Feature 5: Regex args patterns (`re:`) in tool references
+// ============================================================
+
+console.log('  actionMatches — regex args patterns...');
+
+// A substring pattern cannot express a command whose parts are separated by
+// arguments; `git -C <path> merge` is a real merge that `Bash:git merge` misses.
+{
+  const actions = [
+    { type: 'tool', name: 'Bash', args: '$ git -C /tmp/x merge --no-edit feat', index: 0 },
+  ];
+  assert.strictEqual(
+    gradeBehavioralAssertion(parseBehavioralAssertion('[tool_not_called] Bash:git merge'), actions),
+    1,
+    'substring form false-passes on git -C <path> merge',
+  );
+  assert.strictEqual(
+    gradeBehavioralAssertion(
+      parseBehavioralAssertion(String.raw`[tool_not_called] Bash:re:\bgit\b.*\bmerge\b`),
+      actions,
+    ),
+    0,
+  );
+  console.log('    ✓ regex catches a merge the substring form misses');
+}
+
+{
+  const actions = [{ type: 'tool', name: 'Bash', args: '$ npm test', index: 0 }];
+  assert.strictEqual(
+    gradeBehavioralAssertion(
+      parseBehavioralAssertion(String.raw`[tool_called] Bash:re:^\$ npm test$`),
+      actions,
+    ),
+    1,
+  );
+  assert.strictEqual(
+    gradeBehavioralAssertion(parseBehavioralAssertion('[tool_called] Bash:re:^npm'), actions),
+    0,
+  );
+  console.log('    ✓ anchored regex matches and rejects as written');
+}
+
+// A malformed regex must not crash grading — it degrades to substring matching.
+{
+  const actions = [{ type: 'tool', name: 'Bash', args: '$ echo re:a[', index: 0 }];
+  assert.strictEqual(
+    gradeBehavioralAssertion(parseBehavioralAssertion('[tool_called] Bash:re:a['), actions),
+    1,
+  );
+  console.log('    ✓ unparseable regex falls back to substring matching');
+}
+
+// Bare-slash patterns keep their existing substring meaning.
+{
+  const actions = [
+    { type: 'tool', name: 'Write', args: '/repo/src/temperature.test.js', index: 0 },
+  ];
+  assert.strictEqual(
+    gradeBehavioralAssertion(parseBehavioralAssertion('[tool_called] Write:/test/'), actions),
+    0,
+    'bare /test/ must stay a substring, not become the regex /test/',
+  );
+  console.log('    ✓ /pattern/ is still a substring, not a regex');
+}
+
+// Plain substrings keep working unchanged.
+{
+  const actions = [{ type: 'tool', name: 'Bash', args: '$ git push origin main', index: 0 }];
+  assert.strictEqual(
+    gradeBehavioralAssertion(parseBehavioralAssertion('[tool_called] Bash:git push'), actions),
+    1,
+  );
+  console.log('    ✓ substring patterns unaffected');
+}
+
 console.log('\n✅ All eval-graders behavioral/mixed tests passed');

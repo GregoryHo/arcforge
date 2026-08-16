@@ -47,44 +47,48 @@ neutral cwd outside the repo (`/tmp/<test>/` or similar). That cwd has no
 project-level override, so the plugin loads from its installed version
 exactly as any user would see.
 
-## Everything you ship is for users, not contributors
+## Everything user-facing is for users, not contributors
 
 arcforge is a **toolkit** distributed to many users via marketplace
-install. **Anything in the shipped surface area is for users.** This is
-not a "skills only" rule — it covers every layer of the project that
-ends up in a user's installed copy.
+install. **Anything a user can read or run is for users.** This is not a
+"skills only" rule — it covers every layer of the project that reaches
+them, whether through the installed plugin or the public repo.
 
-| Layer | Ships? | Audience |
+| Layer | User-facing? | Audience |
 |---|---|---|
 | `skills/` | Yes | arcforge users on their own projects |
 | `hooks/` | Yes | users (loaded into their sessions) |
-| `commands/` | Yes | users (CLI surface) |
-| `agents/` | Yes | users (delegated by skills) |
-| `templates/` | Yes | users (prompt scaffolding) |
-| `scripts/lib/`, `scripts/cli.js` | Yes | users (the engine) |
+| `scripts/cli.js`, `scripts/lib/` | Yes | users (the engine) |
+| `.claude-plugin/`, `bin/` | Yes | plugin manifest and CLI shim |
+| `README.md`, `CHANGELOG.md` | Yes | users deciding whether to install |
 | `docs/guide/` | Yes | users (how-to documentation) |
-| `.claude-plugin/` | Yes | plugin manifest |
+| `website/` | Yes | prospective users |
 | `.claude/rules/` (this file) | **No** | contributors editing arcforge |
 | `docs/plans/` (design docs) | **No** | contributors planning features |
 | `tests/`, `hooks/__tests__/` | **No** | contributors verifying code |
+| `evals/` | **No** | contributors measuring behavior |
 | Auto-memory | **No** (per-user) | the assistant working on arcforge |
 
-When you're writing or editing anything in the "Ships = Yes" rows, the
+The axis here is **audience**, not packaging. `package.json`'s `files` array is
+narrower — it controls the npm/plugin payload, so `docs/guide/` and `website/`
+are read on GitHub rather than installed — but everything in the Yes rows is
+written for a user, wherever they read it.
+
+When you're writing or editing anything in a "User-facing = Yes" row, the
 audience is a fresh user installing arcforge tomorrow on their own
 project. Contributor-specific quirks, dev-environment warnings, footnotes
 about the local repo, and "this only matters when you're editing arcforge"
-caveats DO NOT belong in the shipped surface — they pollute the toolkit
-with concerns that don't apply to its actual audience.
+caveats DO NOT belong there — they pollute the toolkit with concerns that
+don't apply to its actual audience.
 
-When tempted to add a footnote, warning, or special-case to anything in
-the "Ships = Yes" rows, ask: *"would a fresh user installing arcforge
-tomorrow benefit from this, or is it only relevant to people editing
-arcforge itself?"* If contributor-only, it belongs in this file (or
-another rule, or memory, or a `docs/plans/` design note) — never in
-shipped surface.
+When tempted to add a footnote, warning, or special-case to a user-facing
+layer, ask: *"would a fresh user installing arcforge tomorrow benefit from
+this, or is it only relevant to people editing arcforge itself?"* If
+contributor-only, it belongs in this file (or another rule, or memory, or a
+`docs/plans/` design note) — never in the user-facing surface.
 
-Concrete example: "don't run arc-looping from inside the arcforge dev
+Concrete example: "don't run `/looping` from inside the arcforge dev
 repo because the plugin is disabled here" is a contributor fact. It
-belongs in this file, not in `arc-looping`'s SKILL.md, not in
-`scripts/lib/loop.js`, not in `docs/guide/`. The shipped audience never
-encounters that situation.
+belongs in this file, not in the `looping` skill, not in
+`scripts/lib/loop-session.js`, not in `docs/guide/`. The user-facing
+audience never encounters that situation.

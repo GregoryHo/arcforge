@@ -229,8 +229,15 @@ describe('runSkillEval A/B flow', () => {
     const { parseScenario } = require('../../scripts/lib/eval');
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'test-ab.md'));
 
-    // Baseline: fail (score 0), Treatment: pass (score 1)
-    const trialOutput = { stdout: 'output', stderr: '', exitCode: 0 };
+    // Baseline: fail (score 0), Treatment: pass (score 1).
+    // The trial stdout must be real stream-json: a trial that captures no
+    // assistant output is an infra error, and infra errors are excluded from
+    // the delta rather than counted as a zero-scoring trial.
+    const trialOutput = {
+      stdout: JSON.stringify({ type: 'result', result: 'output' }),
+      stderr: '',
+      exitCode: 0,
+    };
     // Baseline trials: grade fails
     mockUtils.execCommand.mockReturnValueOnce(trialOutput);
     mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'fail', exitCode: 1 });

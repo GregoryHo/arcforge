@@ -1,13 +1,11 @@
 /**
- * inject-context.js — SDD-5 rendering + S7-1 relay-isolation tests.
+ * inject-context.js — S7-1 relay-isolation tests.
  *
  * Covers:
- * - renderRatifyPending / renderLoopFinished produce the model-visible forms.
  * - loadPendingActions consumes normally, but SKIPS consumption when
  *   ARCFORGE_SPAWNED is set (relay isolation).
- * - SessionStart child process surfaces both the ratify line and the
- *   loop-finished line; ARCFORGE_SPAWNED preserves the actions for the user's
- *   next (unmarked) SessionStart.
+ * - SessionStart child process: ARCFORGE_SPAWNED preserves the actions for the
+ *   user's next (unmarked) SessionStart.
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
@@ -18,58 +16,6 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const INJECT_CONTEXT = path.join(__dirname, '..', 'session-tracker', 'inject-context.js');
-
-// ─────────────────────────────────────────────
-// Pure render helpers
-// ─────────────────────────────────────────────
-
-describe('inject-context render helpers (SDD-5)', () => {
-  beforeEach(() => {
-    delete require.cache[require.resolve('../session-tracker/inject-context')];
-  });
-
-  it('renderRatifyPending uses the PARSABLE ratify command and pipeline doc', () => {
-    const { renderRatifyPending } = require('../session-tracker/inject-context');
-    const out = renderRatifyPending({
-      count: 2,
-      specs: [{ spec_id: 'my-spec', decision_ids: ['D-007', 'D-009'] }],
-    });
-    assert.ok(out.includes('2 decisions pending ratification'), 'mentions count');
-    assert.ok(
-      out.includes(
-        'ARCFORGE_MODE=attended node "$ARCFORGE_ROOT/scripts/cli.js" ratify my-spec D-007',
-      ),
-      'parsable ratify invocation with concrete spec/D-id',
-    );
-    assert.ok(
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder, not JS interpolation.
-      out.includes('${ARCFORGE_ROOT}/docs/guide/sdd-pipeline.md'),
-      'points at the ARCFORGE_ROOT-relative pipeline guide',
-    );
-    assert.ok(!/(^|\s)arcforge ratify/.test(out), 'no bare `arcforge` bin invocation');
-  });
-
-  it('renderLoopFinished renders the morning review-queue line', () => {
-    const { renderLoopFinished } = require('../session-tracker/inject-context');
-    const out = renderLoopFinished({
-      status: 'complete',
-      completed_count: 3,
-      blocked: [{ id: 'T-9', reason: 'conflict' }],
-      base_branch: 'main',
-      total_cost: 2.5,
-    });
-    assert.ok(out.includes('3 merged on main'), 'mentions merged count + branch');
-    assert.ok(out.includes('1 blocked'), 'mentions blocked count');
-    assert.ok(out.includes('T-9'), 'lists blocked id');
-  });
-
-  it('renderLoopFinished tolerates a null base_branch', () => {
-    const { renderLoopFinished } = require('../session-tracker/inject-context');
-    const out = renderLoopFinished({ completed_count: 0, blocked: [], base_branch: null });
-    assert.ok(out.includes('0 merged'), 'renders without a branch suffix');
-    assert.ok(!out.includes('on null'), 'never prints "on null"');
-  });
-});
 
 // ─────────────────────────────────────────────
 // loadPendingActions relay isolation (S7-1)
@@ -106,7 +52,7 @@ describe('loadPendingActions relay isolation (S7-1)', () => {
 
   it('consumes pending actions on an unmarked session', () => {
     const project = 'relay-proj';
-    seedAction(project, 'ratify-pending', { count: 1, specs: [] });
+    seedAction(project, 'diary-ready', { count: 1 });
     const { loadPendingActions } = require('../session-tracker/inject-context');
 
     const result = loadPendingActions(project);
@@ -116,7 +62,7 @@ describe('loadPendingActions relay isolation (S7-1)', () => {
 
   it('does NOT consume when ARCFORGE_SPAWNED is set', () => {
     const project = 'relay-proj';
-    seedAction(project, 'ratify-pending', { count: 1, specs: [] });
+    seedAction(project, 'diary-ready', { count: 1 });
     process.env.ARCFORGE_SPAWNED = 'enricher';
     const { loadPendingActions } = require('../session-tracker/inject-context');
 
@@ -127,10 +73,10 @@ describe('loadPendingActions relay isolation (S7-1)', () => {
 });
 
 // ─────────────────────────────────────────────
-// SessionStart child process (SDD-5 end-to-end)
+// SessionStart child process (relay isolation, end-to-end)
 // ─────────────────────────────────────────────
 
-describe('inject-context SessionStart child process (SDD-5)', () => {
+describe('inject-context SessionStart child process (S7-1)', () => {
   let homeDir;
   let projectDir;
   let project;
@@ -167,54 +113,8 @@ describe('inject-context SessionStart child process (SDD-5)', () => {
     };
   }
 
-  it('surfaces BOTH the ratify count line and the loop-finished line', () => {
-    writePending([
-      makeAction('ratify-pending', {
-        count: 2,
-        specs: [{ spec_id: 'spec-x', decision_ids: ['D-001'] }],
-      }),
-      makeAction('loop-finished', {
-        status: 'complete',
-        completed_count: 4,
-        blocked: [{ id: 'T-2', reason: 'conflict' }],
-        base_branch: 'main',
-        total_cost: 1.0,
-      }),
-    ]);
-
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
-    delete env.ARCFORGE_SPAWNED;
-    const res = spawnSync('node', [INJECT_CONTEXT], {
-      input: JSON.stringify({
-        session_id: 'ss-test',
-        cwd: projectDir,
-        hook_event_name: 'SessionStart',
-        source: 'startup',
-      }),
-      encoding: 'utf-8',
-      env,
-    });
-
-    assert.strictEqual(res.status, 0, res.stderr);
-    // Parse the single JSON object the hook emits; assert against the decoded
-    // additionalContext so escaped quotes in the raw stdout don't trip us.
-    const parsed = JSON.parse(res.stdout.trim());
-    const ctx = parsed.hookSpecificOutput.additionalContext;
-    assert.ok(ctx.includes('pending ratification'), 'ratify line present');
-    assert.ok(
-      ctx.includes('ARCFORGE_MODE=attended node "$ARCFORGE_ROOT/scripts/cli.js" ratify'),
-      'parsable ratify command present',
-    );
-    assert.ok(ctx.includes('Loop finished: 4 merged on main'), 'loop-finished line present');
-  });
-
   it('preserves actions under ARCFORGE_SPAWNED, then consumes on the next unmarked start', () => {
-    writePending([
-      makeAction('ratify-pending', {
-        count: 1,
-        specs: [{ spec_id: 'spec-x', decision_ids: ['D-001'] }],
-      }),
-    ]);
+    writePending([makeAction('diary-ready', { count: 1 })]);
 
     // Spawned session: must NOT consume.
     const spawnedEnv = {

@@ -62,7 +62,6 @@ function App() {
       <Hero theme={theme}/>
       <SkillsGrid theme={theme}/>
       <BeforeAfter theme={theme}/>
-      <SDDPipeline theme={theme}/>
       <DayInLife theme={theme}/>
       <Wiki theme={theme}/>
       <SessionLearning theme={theme}/>

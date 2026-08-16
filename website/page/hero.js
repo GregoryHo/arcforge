@@ -75,7 +75,7 @@ function Hero({
       color: t.dim,
       marginLeft: 6
     }
-  }, "v5.0.0")), /*#__PURE__*/React.createElement("div", {
+  }, "v6.0.0")), /*#__PURE__*/React.createElement("div", {
     className: "af-nav-links",
     style: {
       display: 'flex',
@@ -84,12 +84,6 @@ function Hero({
       textTransform: 'uppercase'
     }
   }, /*#__PURE__*/React.createElement("a", {
-    href: "#pipeline",
-    style: {
-      color: 'inherit',
-      textDecoration: 'none'
-    }
-  }, "Pipeline"), /*#__PURE__*/React.createElement("a", {
     href: "#skills",
     style: {
       color: 'inherit',
@@ -163,7 +157,7 @@ function Hero({
       maxWidth: 520,
       fontFamily: '"JetBrains Mono",ui-monospace,monospace'
     }
-  }, "A minimal, composable skill toolkit for Claude Code and Codex. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
+  }, "A skill toolkit for Claude Code. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.ink
     }
@@ -206,7 +200,7 @@ function Hero({
       letterSpacing: 1.5,
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, "MIT \xB7 33 SKILLS \xB7 9 HOOKS")), /*#__PURE__*/React.createElement("div", {
+  }, "MIT \xB7 15 SKILLS \xB7 6 HOOKS \xB7 0 DEPS")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 56,
       display: 'flex',
@@ -261,7 +255,7 @@ function Hero({
       justifyContent: 'space-between',
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 CODEX"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
+  }, /*#__PURE__*/React.createElement("span", null, "\u25C6 CLAUDE CODE \xB7 ZERO RUNTIME DEPENDENCIES"), /*#__PURE__*/React.createElement("span", null, "SCALE 1:1 \u2014 DRAFT 05.02.26 \u2014 SHEET 01/08")));
 }
 function HeroSchematic({
   theme: t
@@ -320,7 +314,7 @@ function HeroSchematic({
     fontSize: "10",
     letterSpacing: "1.5",
     fontFamily: "JetBrains Mono,monospace"
-  }, "HOOK \xB7 inject-skills"), /*#__PURE__*/React.createElement("g", {
+  }, "HOOK \xB7 session-tracker"), /*#__PURE__*/React.createElement("g", {
     transform: "translate(310,220)"
   }, /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
@@ -344,7 +338,7 @@ function HeroSchematic({
     fontSize: "9",
     letterSpacing: "1.5",
     fontFamily: "JetBrains Mono,monospace"
-  }, "33 AVAILABLE"), ['brainstorm', 'refine', 'plan', 'tdd', 'review', 'learn', 'journal', 'diagram'].map((s, i) => {
+  }, "15 AVAILABLE"), ['brainstorming', 'executing', 'tdd', 'debugging', 'code-review', 'sessions', 'learning', 'finishing'].map((s, i) => {
     const a = i / 8 * Math.PI * 2 - Math.PI / 2;
     const r = 95;
     const x = Math.cos(a) * r,
@@ -373,21 +367,28 @@ function HeroSchematic({
     fill: t.dim,
     fontSize: "10",
     letterSpacing: "2"
-  }, "SDD \xB7 UPSTREAM"), /*#__PURE__*/React.createElement("g", {
+  }, "ENGINE \xB7 arcforge CLI"), /*#__PURE__*/React.createElement("text", {
+    x: "256",
+    y: "0",
+    fill: t.brass,
+    fontSize: "10",
+    fontStyle: "italic",
+    fontFamily: "Fraunces,serif"
+  }, "the only way out of a skill"), /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M0 20 H 500",
     stroke: t.ink,
     strokeWidth: "0.8"
-  })), ['brainstorm', 'refine', 'plan', 'coordinate'].map((s, i) => /*#__PURE__*/React.createElement("g", {
+  })), ['worktree', 'loop', 'eval', 'learn', 'obsidian'].map((s, i) => /*#__PURE__*/React.createElement("g", {
     key: s,
-    transform: `translate(${i * 130 + 30},35)`
+    transform: `translate(${i * 100 + 42},35)`
   }, /*#__PURE__*/React.createElement("g", {
     filter: "url(#sk-hero)"
   }, /*#__PURE__*/React.createElement("rect", {
-    x: "-48",
+    x: "-42",
     y: "-13",
-    width: "96",
+    width: "84",
     height: "26",
     fill: t.bg,
     stroke: t.brass,
@@ -398,23 +399,7 @@ function HeroSchematic({
     textAnchor: "middle",
     fill: t.ink,
     fontSize: "10"
-  }, "arc-", s))), /*#__PURE__*/React.createElement("g", {
-    filter: "url(#sk-hero)"
-  }, [0, 1, 2].map(i => {
-    const x1 = i * 130 + 30 + 48;
-    const x2 = (i + 1) * 130 + 30 - 48;
-    return /*#__PURE__*/React.createElement("g", {
-      key: i
-    }, /*#__PURE__*/React.createElement("path", {
-      d: `M${x1 + 2} 35 L${x2 - 4} 35`,
-      stroke: t.ember,
-      strokeWidth: "1.4",
-      fill: "none"
-    }), /*#__PURE__*/React.createElement("polygon", {
-      points: `${x2 - 8},31 ${x2},35 ${x2 - 8},39`,
-      fill: t.ember
-    }));
-  }))), /*#__PURE__*/React.createElement("g", {
+  }, s)))), /*#__PURE__*/React.createElement("g", {
     transform: "translate(60,490)",
     fontFamily: "JetBrains Mono,monospace"
   }, /*#__PURE__*/React.createElement("text", {
@@ -438,16 +423,16 @@ function HeroSchematic({
     strokeWidth: "0.8"
   })), [{
     name: 'SessionStart',
-    sub: 'inject-skills'
+    sub: 'session-tracker'
   }, {
     name: 'UserPrompt',
-    sub: 'arc-using on demand'
+    sub: 'message counter'
   }, {
     name: 'Pre/Post Tool',
-    sub: 'observe · quality'
+    sub: 'secrets-guard · observe'
   }, {
     name: 'Stop',
-    sub: 'journal · compact'
+    sub: 'finalize · diary'
   }].map((o, i) => /*#__PURE__*/React.createElement("g", {
     key: o.name,
     transform: `translate(${i * 130 + 30},45)`

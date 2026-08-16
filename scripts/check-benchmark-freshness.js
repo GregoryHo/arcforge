@@ -3,7 +3,7 @@
 /**
  * check-benchmark-freshness.js — fail a release if its eval benchmark is stale.
  *
- * arc-releasing's Iron Law: any release that touched eval-backed surface must
+ * The releasing skill's Iron Law: any release that touched eval-backed surface must
  * regenerate a fresh benchmark before tagging. `release.yml` already enforces
  * version-sync and tag-match, but nothing checked benchmark freshness — it was a
  * hand-run step in the skill. This wires it.
@@ -76,11 +76,18 @@ function readGeneratedISO() {
   }
 }
 
-/** Most recent tag strictly before the current release tag, or null on first release. */
+/**
+ * Most recent RELEASE tag strictly before the current release tag, or null on
+ * first release. `--match 'v[0-9]*'` pins the walk to release tags: without it
+ * `git describe` returns whatever tag is nearest (gate-p7, rc-v6.0.0, ...),
+ * which either short-circuits the check against a tag with no surface delta
+ * (vacuous pass) or flags a fresh benchmark as stale against a tag committed
+ * after it was generated.
+ */
 function previousTag(currentTag) {
   try {
     const ref = currentTag ? `${currentTag}^` : 'HEAD^';
-    return git(['describe', '--tags', '--abbrev=0', ref]) || null;
+    return git(['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', ref]) || null;
   } catch {
     return null;
   }

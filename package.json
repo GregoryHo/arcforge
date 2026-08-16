@@ -1,7 +1,7 @@
 {
   "name": "arcforge",
-  "version": "5.0.0",
-  "description": "Skill-based autonomous agent toolkit for Claude Code and Codex",
+  "version": "6.0.0",
+  "description": "Skill-based autonomous agent toolkit for Claude Code",
   "license": "MIT",
   "author": {
     "name": "Gregory Ho"
@@ -14,15 +14,12 @@
     "arcforge": "scripts/cli.js"
   },
   "files": [
-    "skills/",
+    "bin/",
+    "skills/core/",
     "hooks/",
+    "!hooks/__tests__/",
     "scripts/",
-    "templates/",
-    "agents/",
     ".claude-plugin/",
-    ".codex-plugin/",
-    ".agents/",
-    ".codex/",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"
@@ -31,12 +28,10 @@
     "dev": "claude --plugin-dir .",
     "test": "npm run test:scripts && npm run test:hooks && npm run test:node && npm run test:skills && npm run test:observer-daemon",
     "test:scripts": "jest",
-    "test:hooks": "cd hooks && npm test",
+    "test:hooks": "node --test hooks/__tests__/*.test.js",
     "test:node": "node tests/node/run-tests.js",
     "test:skills": "python3 -m pytest tests/skills/ -v",
-    "test:observer-daemon": "bash skills/arc-learning/tests/run-tests.sh",
-    "test:diary": "node skills/arc-journaling/scripts/diary.js",
-    "test:reflect": "node skills/arc-reflecting/scripts/reflect.js",
+    "test:observer-daemon": "bash tests/observer-daemon/run-tests.sh",
     "check:versions": "node scripts/check-version-sync.js",
     "check:docs": "node scripts/check-doc-refs.js",
     "check:cli-consumers": "node scripts/check-cli-consumers.js",

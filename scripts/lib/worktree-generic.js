@@ -9,9 +9,12 @@
  *
  * Discrimination needs NO new marker file:
  *   kind = parseWorktreePath × hasArcforgeMarker
- *     managed ∧ marker  → epic     (coordinator lifecycle: expand/cleanup)
+ *     managed ∧ marker  → epic     (externally managed; this module keeps hands off)
  *     managed ∧ ¬marker → generic  (this module)
  *     ¬managed          → base (first such entry) or external
+ *
+ * The `.arcforge-epic` marker reader lives here — this module is its only
+ * reader.
  *
  * Error strategy: lib tier — throw with context. The CLI catch prints the
  * message and exits 1.
@@ -21,9 +24,52 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { getDefaultInstallCommand } = require('./package-manager');
-const { hasArcforgeMarker, readArcforgeMarker } = require('./marker');
 const { sanitizeProjectName } = require('./utils');
 const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
+const { parse } = require('./yaml-parser');
+
+const MARKER_FILENAME = '.arcforge-epic';
+
+/**
+ * Absolute path to the marker within a directory.
+ * @param {string} dir - Directory expected to hold the marker (a worktree root).
+ * @returns {string|null} marker path, or null when `dir` is not a usable string
+ */
+function markerPath(dir) {
+  if (typeof dir !== 'string' || !dir) return null;
+  return path.join(dir, MARKER_FILENAME);
+}
+
+/**
+ * Cheap existence check — does `dir` carry an `.arcforge-epic` marker?
+ * @param {string} dir
+ * @returns {boolean}
+ */
+function hasArcforgeMarker(dir) {
+  const p = markerPath(dir);
+  if (!p) return false;
+  try {
+    return fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read and parse the `.arcforge-epic` marker, returning the parsed object or
+ * null when the file is missing / unreadable.
+ * @param {string} dir
+ * @returns {Object|null}
+ */
+function readArcforgeMarker(dir) {
+  const p = markerPath(dir);
+  if (!p || !hasArcforgeMarker(dir)) return null;
+  try {
+    return parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 function runGit(args, cwd) {
   try {
@@ -112,8 +158,7 @@ function runProjectSetup(worktreePath, slug) {
   try {
     const [cmd, ...cmdArgs] = installCmd;
     // stdio: 'inherit' streams installer output live and avoids the 1 MB
-    // maxBuffer that `npm install` can exceed (same rationale as the
-    // coordinator's _runSubprocess).
+    // maxBuffer that `npm install` can exceed.
     execFileSync(cmd, cmdArgs, { cwd: worktreePath, stdio: 'inherit' });
   } catch (err) {
     throw new Error(
@@ -185,10 +230,10 @@ function listWorktrees({ projectRoot }) {
 /**
  * Remove a generic worktree and prune git's registry.
  *
- * Refuses epic (marker-bearing) worktrees — those belong to the
- * coordinator's `arcforge cleanup` — and refuses non-managed paths
- * outright (external worktrees are managed with raw git). A dirty tree
- * is refused unless `force` is set.
+ * Refuses marker-bearing worktrees — an `.arcforge-epic` marker means some
+ * other lifecycle owns the tree — and refuses non-managed paths outright
+ * (external worktrees are managed with raw git). A dirty tree is refused
+ * unless `force` is set.
  *
  * @param {Object} options
  * @param {string} options.projectRoot - Repository root the worktree belongs to.
@@ -214,7 +259,7 @@ function removeGenericWorktree({ projectRoot, target, force = false }) {
   }
   if (hasArcforgeMarker(resolved)) {
     throw new Error(
-      `Refusing to remove epic worktree ${resolved} — it is tracked by the coordinator DAG. Use \`arcforge cleanup\` instead.`,
+      `Refusing to remove ${resolved} — it carries an ${MARKER_FILENAME} marker, so another lifecycle owns it. Remove the marker first, or use raw git.`,
     );
   }
 
@@ -228,9 +273,8 @@ function removeGenericWorktree({ projectRoot, target, force = false }) {
     );
   }
 
-  // Filesystem remove + one prune, same approach as the coordinator's
-  // cleanupWorktrees: `git worktree remove` is fragile around untracked
-  // files, while rm + prune has the same net effect on git state.
+  // Filesystem remove + one prune: `git worktree remove` is fragile around
+  // untracked files, while rm + prune has the same net effect on git state.
   fs.rmSync(resolved, { recursive: true, force: true });
   const prune = runGit(['worktree', 'prune'], root);
   if (prune.exitCode !== 0) {

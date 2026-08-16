@@ -4,12 +4,11 @@
  * check-skill-eval-annotation.js — warn (never block) when a PR changes a skill's
  * spec without a matching eval/benchmark update.
  *
- * arc-writing-skills' Iron Law is "eval before ship". A hard CI gate can't enforce
- * it precisely: there is no mechanical way to tell a behavioral SKILL.md edit from
- * a typo/metadata edit (the carve-out), so a blocking check would false-fire. This
- * emits a non-blocking GitHub annotation instead — a visible nudge a reviewer can
- * judge. The deterministic, user-facing enforcement lives in the arc-remind hook;
- * this is the arcforge-repo safeguard (the plugin is disabled here).
+ * A behavioral skill edit is supposed to ship with eval evidence. A hard CI gate
+ * can't enforce that precisely: there is no mechanical way to tell a behavioral
+ * SKILL.md edit from a typo/metadata edit (the carve-out), so a blocking check
+ * would false-fire. This emits a non-blocking GitHub annotation instead — a
+ * visible nudge a reviewer can judge.
  *
  * Always exits 0. Diffs BASE_REF...HEAD (BASE_REF defaults to origin/main).
  */
@@ -19,16 +18,26 @@ const { execFileSync } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-/** Does the changed-file set carry eval evidence for skill `name`? */
+/**
+ * Does the changed-file set carry eval evidence for skill `name`?
+ *
+ * Evidence is behavioral measurement only: a result row for this skill's
+ * scenario, or a regenerated benchmark. A per-skill pytest file is NOT
+ * evidence — `tests/skills/` is one generic structural checker
+ * (`test_skill_structure.py`) that iterates every skill, so a
+ * `test_skill_<name>.py` cannot exist and never asserted behavior anyway.
+ */
 function hasEvidence(name, changed) {
-  const underscore = name.replace(/-/g, '_');
   return changed.some(
     (f) =>
-      f === `tests/skills/test_skill_${underscore}.py` ||
-      (f.startsWith('evals/results/') && f.includes(name)) ||
-      f.startsWith('evals/benchmarks/'),
+      (f.startsWith('evals/results/') && f.includes(name)) || f.startsWith('evals/benchmarks/'),
   );
 }
+
+// Shipped skills live one bucket deep: `skills/<bucket>/<name>/SKILL.md` (P6.5).
+// The bucket is matched generically rather than pinned to `core`, so a skill
+// edited while parked in another bucket still gets the nudge.
+const SKILL_SPEC_RE = /^skills\/[^/]+\/([^/]+)\/SKILL\.md$/;
 
 /**
  * Pure core: from a changed-file list, return the skill names whose SKILL.md
@@ -38,8 +47,9 @@ function hasEvidence(name, changed) {
  */
 function skillsNeedingEval(changed) {
   const names = changed
-    .filter((f) => /^skills\/[^/]+\/SKILL\.md$/.test(f))
-    .map((f) => f.split('/')[1]);
+    .map((f) => f.match(SKILL_SPEC_RE))
+    .filter(Boolean)
+    .map((m) => m[1]);
   return names.filter((name) => !hasEvidence(name, changed));
 }
 
@@ -59,10 +69,14 @@ function main() {
   }
 
   const flagged = skillsNeedingEval(changed);
+  // Annotate the file that actually changed — the bucket segment is part of the
+  // path GitHub needs to anchor the warning.
+  const specPath = (name) =>
+    changed.find((f) => (f.match(SKILL_SPEC_RE) || [])[1] === name) || `${name}/SKILL.md`;
   for (const name of flagged) {
     console.log(
-      `::warning file=skills/${name}/SKILL.md::SKILL.md changed without a matching eval/benchmark ` +
-        `update. If this was a behavioral change, re-run the eval (arc-writing-skills Iron Law). ` +
+      `::warning file=${specPath(name)}::SKILL.md changed without a matching eval/benchmark ` +
+        `update. If this was a behavioral change, re-run the eval before shipping. ` +
         `Ignore for typo/metadata-only edits.`,
     );
   }

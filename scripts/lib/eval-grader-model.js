@@ -17,6 +17,7 @@ const {
   extractJsonObject,
   validateGraderResponse,
   writeGradingJson,
+  writeGraderRawDump,
   buildModelGraderError,
 } = require('./eval-grader-io');
 
@@ -34,7 +35,7 @@ const {
  */
 function gradeWithModel(result, scenario, projectRoot) {
   const agentDef = loadAgentDef(
-    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-grader.md'),
+    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-grader.md'),
   );
 
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
@@ -82,6 +83,7 @@ function gradeWithModel(result, scenario, projectRoot) {
 
     if (exitCode !== 0) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'graderfail');
         return buildModelGraderError(
           result,
           'Model grader failed to respond',
@@ -94,6 +96,7 @@ function gradeWithModel(result, scenario, projectRoot) {
     const grade = extractJsonObject(stdout, ['scores']);
     if (!grade) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'unparseable');
         return buildModelGraderError(
           result,
           'Model grader returned unparseable response',
@@ -106,6 +109,7 @@ function gradeWithModel(result, scenario, projectRoot) {
     const validated = validateGraderResponse(grade, scenario.assertions.length);
     if (!validated) {
       if (attempt === 2) {
+        writeGraderRawDump(result, projectRoot, stdout, 'empty-scores');
         return buildModelGraderError(
           result,
           'Model grader returned empty scores',
@@ -130,7 +134,7 @@ function gradeWithModel(result, scenario, projectRoot) {
 
 /**
  * Compare baseline vs treatment results using the eval-analyzer agent.
- * Reads skills/arc-evaluating/agents/eval-analyzer.md as the comparison methodology.
+ * Reads scripts/lib/prompts/eval-analyzer.md as the comparison methodology.
  * Returns qualitative post-hoc analysis based on harness-computed metrics.
  * The agent does not determine the verdict — the harness does that deterministically.
  * If the agent returns a "recommendation" field, it is dropped with a warning.
@@ -143,7 +147,7 @@ function gradeWithModel(result, scenario, projectRoot) {
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
   const rawDef = loadAgentDef(
-    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-analyzer.md'),
+    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-analyzer.md'),
   );
   if (!rawDef) return null;
   const agentDef = rawDef
@@ -151,7 +155,17 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
     .replace(/\{REGRESSED_THRESHOLD\}/g, String(DELTA_REGRESSED_THRESHOLD));
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
-    results.map((r) => `Trial ${r.trial}: score=${r.score}, passed=${r.passed}`).join('\n');
+    results
+      .map((r) => {
+        // Ship per-assertion scores when the row carries them — without these
+        // the analyzer's "Weak Assertions" section is inference, and it has
+        // guessed wrong on verified cases (P4: debugging, sessions).
+        const per = Array.isArray(r.assertionScores)
+          ? `, assertions=[${r.assertionScores.join(',')}]`
+          : '';
+        return `Trial ${r.trial}: score=${r.score}, passed=${r.passed}${per}`;
+      })
+      .join('\n');
 
   const prompt = [
     agentDef,
@@ -259,7 +273,7 @@ function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
  */
 function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, projectRoot, skillName) {
   const agentDef = loadAgentDef(
-    path.join(projectRoot, 'skills', 'arc-evaluating', 'agents', 'eval-blind-comparator.md'),
+    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-blind-comparator.md'),
   );
 
   // Randomly assign baseline/treatment to A/B.

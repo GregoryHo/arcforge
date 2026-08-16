@@ -331,6 +331,26 @@ function writeGradingJson(result, gradeData, validated, projectRoot) {
   }
 }
 
+/**
+ * Persist the grader's raw output next to where grading.json would live, so a
+ * failed/unparseable grade can be diagnosed after the fact. Without this the
+ * raw response is discarded and the error type is the only surviving evidence.
+ * @param {import('./eval').TrialResult} result - Trial result being graded
+ * @param {string} projectRoot - Project root directory
+ * @param {string} rawText - Raw grader stdout (may be empty)
+ * @param {string} label - Failure label, becomes the filename suffix
+ */
+function writeGraderRawDump(result, projectRoot, rawText, label) {
+  try {
+    if (!rawText || !rawText.trim()) return;
+    const gradingPath = getGradingPath(result, projectRoot);
+    fs.mkdirSync(path.dirname(gradingPath), { recursive: true });
+    fs.writeFileSync(gradingPath.replace(/\.json$/, `-${label}.txt`), rawText);
+  } catch {
+    /* raw dump write failure must never crash a trial */
+  }
+}
+
 module.exports = {
   GRADING_RESULTS_DIR,
   CLAIM_REQUIRED_KEYS,
@@ -347,4 +367,5 @@ module.exports = {
   getGradingPath,
   validateGraderEntries,
   writeGradingJson,
+  writeGraderRawDump,
 };

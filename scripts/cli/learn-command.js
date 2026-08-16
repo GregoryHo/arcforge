@@ -3,8 +3,14 @@
  */
 
 const { output } = require('./shared');
+const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 
 function runLearnCommand(args, { projectRoot, asJson }) {
+  // The diary/reflect/instinct/recall workflow subgroups own their own dispatch.
+  // They are keyed on positional[0], disjoint from the lifecycle subcommands
+  // below, so an unhandled group falls straight through.
+  if (runLearnWorkflowCommand(args, { projectRoot, asJson })) return;
+
   const learning = require('../lib/learning');
   const subcommand = args.positional[0];
   const resolveLearningScope = () => {
@@ -87,7 +93,10 @@ function runLearnCommand(args, { projectRoot, asJson }) {
     );
   } else {
     console.error(
-      'Usage: arc learn [dashboard [--port N]|status|enable|disable|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
+      'Usage: arcforge learn [dashboard [--port N]|status|enable|disable|inbox|review|drafts|inspect <id>|approve <id>|reject <id>|accept <id>|materialize <id>|activate <id>] [--project|--global]',
+    );
+    console.error(
+      "       arcforge learn <diary|reflect|instinct|recall> <action> — run 'learn diary' for that usage",
     );
     process.exit(1);
   }

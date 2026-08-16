@@ -11,7 +11,7 @@ const {
 
 // ---------------------------------------------------------------------------
 // Matrix self-test — guards against silent drift from the Layer 5 spec
-// (docs/plans/references/learning-curator-schema/layer-5-candidate-queue-lifecycle.md
+// (docs/decisions/learning-curator-schema/layer-5-candidate-queue-lifecycle.md
 // section "Action × Status legality matrix (canonical)").
 // ---------------------------------------------------------------------------
 

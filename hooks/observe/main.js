@@ -26,6 +26,10 @@ function learningDefinitelyDisabled() {
   if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return true;
   if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return true;
   const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  // Deliberately NOT getArcforgeHome() from utils: this runs before the heavy
+  // requires below, and importing utils here would defeat the fast path. This
+  // must stay byte-equivalent to utils.getArcforgeHome() — same env var, same
+  // fallback. It is the one sanctioned copy of that resolution.
   const override = process.env.ARCFORGE_HOME;
   const arcforgeHome = override?.trim() ? override : path.join(os.homedir(), '.arcforge');
   const projectConfig = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
@@ -396,7 +400,7 @@ function spawnDaemonIfNeeded(obsPath) {
 
     const daemonScript = path.resolve(
       __dirname,
-      '../../skills/arc-learning/scripts/observer-daemon.sh',
+      '../../scripts/lib/learning-curator/observer-daemon.sh',
     );
     const child = spawn('bash', [daemonScript, 'start'], {
       detached: true,
@@ -438,7 +442,7 @@ function main() {
     const event = phase === 'pre' ? 'tool_start' : 'tool_end';
 
     // Build observation entry — Layer 1 ObservationSkeleton per
-    // docs/plans/references/learning-curator-schema/layer-1-observation-collection.md.
+    // docs/decisions/learning-curator-schema/layer-1-observation-collection.md.
     const observation = {
       schema_version: 1,
       ts: new Date().toISOString(),

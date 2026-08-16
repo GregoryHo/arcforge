@@ -1,5 +1,4 @@
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { readJsonFile, writeJsonFile, getArcforgeHome } = require('./utils');
@@ -33,8 +32,15 @@ const REQUIRED_CANDIDATE_FIELDS = [
   'updated_at',
 ];
 
-function homePath(homeDir) {
-  return homeDir || os.homedir();
+/**
+ * Resolve the global arcforge root.
+ *
+ * An explicit homeDir (tests) keeps the historical `<home>/.arcforge` shape;
+ * otherwise go through the shared resolver so ARCFORGE_HOME redirects the whole
+ * tree. Byte-identical to `~/.arcforge` when ARCFORGE_HOME is unset.
+ */
+function arcforgeRoot(homeDir) {
+  return homeDir ? path.join(homeDir, '.arcforge') : getArcforgeHome();
 }
 
 function getProjectId(projectRoot = process.cwd()) {
@@ -49,13 +55,7 @@ function assertScope(scope) {
 
 function getLearningConfigPath({ scope, projectRoot = process.cwd(), homeDir } = {}) {
   assertScope(scope);
-  if (scope === 'global')
-    // No explicit homeDir → honor ARCFORGE_HOME (eval-trial isolation) via the
-    // shared resolver; byte-identical to ~/.arcforge when ARCFORGE_HOME is unset.
-    // An explicit homeDir (tests) keeps the original path exactly.
-    return homeDir
-      ? path.join(homePath(homeDir), '.arcforge', 'learning', 'config.json')
-      : path.join(getArcforgeHome(), 'learning', 'config.json');
+  if (scope === 'global') return path.join(arcforgeRoot(homeDir), 'learning', 'config.json');
   return path.join(projectRoot, '.arcforge', 'learning', 'config.json');
 }
 
@@ -63,15 +63,14 @@ function getCandidateQueuePath({ scope, projectRoot = process.cwd(), homeDir } =
   assertScope(scope);
   const base =
     scope === 'global'
-      ? path.join(homePath(homeDir), '.arcforge', 'learning')
+      ? path.join(arcforgeRoot(homeDir), 'learning')
       : path.join(projectRoot, '.arcforge', 'learning');
   return path.join(base, 'candidates', 'queue.jsonl');
 }
 
 function getObservationPath({ projectRoot = process.cwd(), homeDir } = {}) {
   return path.join(
-    homePath(homeDir),
-    '.arcforge',
+    arcforgeRoot(homeDir),
     'observations',
     path.basename(projectRoot),
     'observations.jsonl',

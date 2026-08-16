@@ -2,7 +2,7 @@
 paths:
   - "evals/**"
   - "scripts/lib/eval*.js"
-  - "scripts/eval-dashboard*"
+  - "scripts/lib/eval-dashboard/**"
 ---
 
 # Eval-Driven Development
@@ -42,4 +42,4 @@ If you can't measure improvement, you can't ship with confidence. Eval is not op
 
 ## Reference
 
-Follow `skills/arc-evaluating/SKILL.md` for the complete methodology — scenario design, grader selection, metrics, execution, and reporting.
+Follow `skills/core/evaluating/SKILL.md` for the complete methodology — scenario design, grader selection, metrics, execution, and reporting.

@@ -6,15 +6,14 @@
  * and differ only in the field set the operation emits.
  *
  * Operation records are distinct from instinct files (instinct-writer.js):
- * they track that an arc-reflecting or arc-recalling session happened, not the learned
+ * they track that a reflection or manual-recall operation happened, not the learned
  * instincts themselves. Keeping the storage roots separate prevents
  * provenance loops with Layer 8 activated instincts.
  */
 
 const path = require('node:path');
-const os = require('node:os');
 
-const { atomicWriteFile } = require('./utils');
+const { atomicWriteFile, getArcforgeHome } = require('./utils');
 
 // Map operation kind → directory name under ~/.arcforge/.
 // reflect → reflections (not "reflects") matches the spec storage path.
@@ -71,7 +70,10 @@ function writeOperationRecord({
     throw new Error(`writeOperationRecord: project must be a non-empty string`);
   }
 
-  const homeDir = homeOverride || os.homedir();
+  // An explicit homeDir (tests) keeps the historical <home>/.arcforge shape;
+  // otherwise resolve through the shared resolver so ARCFORGE_HOME redirects.
+  // Byte-identical to ~/.arcforge when ARCFORGE_HOME is unset.
+  const root = homeOverride ? path.join(homeOverride, '.arcforge') : getArcforgeHome();
   const dirName = KIND_DIRS[kind];
   if (!dirName) throw new Error(`writeOperationRecord: unknown kind "${kind}"`);
 
@@ -86,7 +88,7 @@ function writeOperationRecord({
     );
   }
 
-  const dir = path.join(homeDir, '.arcforge', dirName, project);
+  const dir = path.join(root, dirName, project);
   const filePath = path.join(dir, `${id}.md`);
 
   const idFieldName = `${kind}_id`;

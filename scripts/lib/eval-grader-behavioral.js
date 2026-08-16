@@ -101,17 +101,45 @@ function classifyAssertions(assertions) {
 }
 
 /**
- * Check whether a single action matches a tool reference (name + args substring).
+ * Compile a `re:<pattern>` argument matcher, or null when the pattern is a
+ * plain substring. A substring cannot express a command whose parts are
+ * separated by arguments (`git -C <path> merge`), so a regex form is needed for
+ * assertions that must survive equivalent spellings of the same command.
+ *
+ * The opt-in `re:` marker is deliberate: bare-slash patterns like `Write:/test/`
+ * already exist as substrings, and inferring a regex from the delimiter would
+ * silently re-interpret them.
+ *
+ * An unparseable regex falls back to substring matching rather than throwing —
+ * a malformed assertion must not crash grading.
+ * @param {string} pattern - Raw pattern from the tool reference
+ * @returns {RegExp|null} Compiled regex, or null for substring matching
+ */
+function compileArgsPattern(pattern) {
+  if (!pattern.startsWith('re:')) return null;
+  try {
+    return new RegExp(pattern.slice(3));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a single action matches a tool reference (name + args pattern).
+ * The args pattern is a substring by default, or a regex when prefixed with
+ * `re:` (e.g. `Bash:re:\bgit\b.*\bmerge\b`).
  * @param {Object} action - Action from the action log
  * @param {string} name - Tool name to match
- * @param {string} pattern - Substring to match in args
+ * @param {string} pattern - Substring, or `re:<regex>`, to match in args
  * @returns {boolean}
  */
 function actionMatches(action, name, pattern) {
   if (action.type !== 'tool') return false;
   if (action.name !== name) return false;
   if (!pattern) return true;
-  return (action.args || '').includes(pattern);
+  const args = action.args || '';
+  const re = compileArgsPattern(pattern);
+  return re ? re.test(args) : args.includes(pattern);
 }
 
 /**

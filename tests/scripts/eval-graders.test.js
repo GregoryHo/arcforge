@@ -414,4 +414,35 @@ describe('eval-graders.js', () => {
       expect(graded.errorType).toBe('action_log_missing');
     });
   });
+
+  describe('grader raw-output persistence on failure', () => {
+    it('persists raw stdout when the response is unparseable on both attempts', () => {
+      const result = makeTrialResult({ trialDir: tempDir });
+      const scenario = makeScenario();
+      const rawGibberish = 'I graded it thoughtfully but forgot the JSON entirely.';
+
+      mockUtils.execCommand.mockReturnValue({ stdout: rawGibberish, exitCode: 0 });
+
+      const graded = gradeWithModel(result, scenario, tempDir);
+
+      expect(graded.gradeError).toBe(true);
+      expect(graded.errorType).toBe('model_grader_unparseable');
+      const dumpFile = getGradingPath(result, tempDir).replace(/\.json$/, '-unparseable.txt');
+      expect(fs.existsSync(dumpFile)).toBe(true);
+      expect(fs.readFileSync(dumpFile, 'utf8')).toBe(rawGibberish);
+    });
+
+    it('writes no dump when the failed grader produced no output', () => {
+      const result = makeTrialResult({ trialDir: tempDir });
+      const scenario = makeScenario();
+
+      mockUtils.execCommand.mockReturnValue({ stdout: '', exitCode: 1 });
+
+      const graded = gradeWithModel(result, scenario, tempDir);
+
+      expect(graded.errorType).toBe('model_grader_failed');
+      const dumpFile = getGradingPath(result, tempDir).replace(/\.json$/, '-graderfail.txt');
+      expect(fs.existsSync(dumpFile)).toBe(false);
+    });
+  });
 });
