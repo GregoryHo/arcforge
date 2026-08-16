@@ -7,13 +7,13 @@ const {
   updateTaskStatus,
   TASK_STATUSES,
 } = require('../../scripts/lib/task-list');
-const { REPO_ROOT } = require('./v6-legacy-skills');
+const { REPO_ROOT } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
 // D3 task list format (v1) — schema tests.
 // ---------------------------------------------------------------------------
 //
-// Spec: docs/plans/v6/decisions/task-list-format.md. The positive cases pin the
+// Spec: docs/decisions/task-list-format.md. The positive cases pin the
 // grammar the loop depends on; the negative cases are the point of the suite —
 // a format whose parser accepts malformed input silently drops tasks, and a
 // dropped task is one the loop never runs.
@@ -40,7 +40,7 @@ describe('the frozen spec and the parser agree', () => {
   // The spec doc is the artifact humans and P2's loop.js author read. If it
   // drifts from the parser, both stay green while the format quietly forks —
   // so the doc's own example is parsed as a test input, not transcribed.
-  const SPEC = path.join(REPO_ROOT, 'docs', 'plans', 'v6', 'decisions', 'task-list-format.md');
+  const SPEC = path.join(REPO_ROOT, 'docs', 'decisions', 'task-list-format.md');
 
   const firstMarkdownFence = (content) => {
     const m = content.match(/```markdown\n([\s\S]*?)```/);

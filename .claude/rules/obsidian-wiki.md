@@ -12,13 +12,12 @@ The Obsidian vault is arcforge's knowledge base. Use `/maintaining-obsidian` for
 | Skills | `skills/core/*/SKILL.md` |
 | Hook docs | `hooks/*/README.md` |
 | Guides | `docs/guide/*.md` |
-| Design docs | `docs/plans/**/*-design.md`, `docs/plans/v6/decisions/*.md` |
-| Research docs | `docs/research/*.md` |
+| Decision records | `docs/decisions/**/*.md` |
+| Product specs | `product/specs/*.md`, `product/ROADMAP.md` |
 
 ## Out of Scope
 
 - Code files (`.js`) — implementation, not knowledge
 - Auto-generated reference dumps (`.txt` >30KB) — low signal-to-noise
-- Task lists (`docs/tasks/`) — ephemeral
-- Eval workspace directories (`evals/workspaces/`) — in-progress experiments
+- Eval scenarios and results — measurement corpus, not knowledge
 - Test files — verified by CI

@@ -88,7 +88,7 @@ This runs `claude --plugin-dir .`, which starts Claude Code with the local plugi
 ### Hot Reload Workflow
 
 1. Edit skill files, hooks, or other plugin components
-2. In the Claude session, run `/reload-plugins`
+2. In the Claude session, run `/reload-plugins` <!-- doc-ref-lint: ignore R4 Claude Code built-in command, not an arcforge skill -->
 3. Changes are reflected immediately — no restart needed
 
 ### Verifying Local Plugin
@@ -99,7 +99,7 @@ arcforge sets no environment variable of its own, so verify by behavior instead.
 /arcforge:using
 ```
 
-If the router loads, the plugin is loaded. To confirm it came from your checkout rather than the cache, edit a line of `skills/core/using/SKILL.md`, run `/reload-plugins`, and invoke it again — your edit should be visible.
+If the router loads, the plugin is loaded. To confirm it came from your checkout rather than the cache, edit a line of `skills/core/using/SKILL.md`, run `/reload-plugins`, and invoke it again — your edit should be visible. <!-- doc-ref-lint: ignore R4 Claude Code built-in command, not an arcforge skill -->
 
 ### Notes
 
@@ -132,7 +132,7 @@ Skills are the most common contribution type. Read this section carefully.
 - `code-review` — the artifact under review, when the gerund reads worse
 
 **Bad names:**
-- `arc-brainstorming` — the `arc-` prefix is gone; the namespace supplies it
+- `arc-brainstorming` — prefixed; the plugin namespace already supplies `/arcforge:` <!-- doc-ref-lint: ignore R4 deliberate bad-name teaching example, not a skill reference -->
 - `coordinator` — agent-noun, use a gerund
 - `debug` — bare verb, use `debugging`
 
@@ -150,31 +150,20 @@ skills/
 
 ### Frontmatter Format
 
-The schema is **frozen**. Exactly five keys are legal, and only the first two are required:
+The schema is **frozen**, and its single authority is
+`docs/decisions/skill-schema.md` — by that document's own rule it must
+not be restated elsewhere, so this section deliberately does not copy the field
+table. The mechanical form of the schema is `tests/skills/test_skill_structure.py`:
+run `npm run test:skills` and the failures name exactly what the schema demands
+(legal keys, `name` == directory, the description register for your invocation
+mode, and the body line cap).
 
-```yaml
----
-name: <name>
-description: <identity>. Use when <specific triggering conditions>
----
-```
+Two warnings worth carrying up front, because agents trip on them most:
 
-| Key | Notes |
-|-----|-------|
-| `name` | Required. Letters, numbers, hyphens. Must equal the directory name. |
-| `description` | Required. See the two registers below. |
-| `disable-model-invocation` | `true` makes the skill user-invoked only. |
-| `argument-hint` | Shown in the slash-command UI. |
-| `allowed-tools` | Restricts the tool surface for that skill. |
-
-Two description registers, both enforced by the structure test:
-
-- **Model-invoked** (the default): `"<identity>. Use when <triggers>"`, 60–280 characters. Describes triggers only.
-- **User-invoked** (`disable-model-invocation: true`): a plain one-liner, max 120 characters, with no "Use when" trigger list — nothing auto-fires it, so it needs no trigger register.
-
-**Never summarize the skill's workflow in the description** — Claude may follow the description instead of reading the full skill.
-
-The body has a **250-line hard cap** (frontmatter excluded), owned by the structure test. There is no exception table to add yourself to: if a skill doesn't fit, split it into `references/` or move behavior into the CLI.
+- **Never summarize the skill's workflow in the description** — Claude may
+  follow the description instead of reading the full skill.
+- There is **no exception table** for the body line cap: if a skill doesn't
+  fit, split it into `references/` or move behavior into the CLI.
 
 ### Iron Law Process
 
@@ -204,9 +193,7 @@ Skill prose must not name engine internals (`scripts/lib/...`) or rely on enviro
 
 - [ ] Read `skills/core/writing-skills/SKILL.md` before starting
 - [ ] Name has no prefix and matches the directory name
-- [ ] Frontmatter uses only the five frozen keys
-- [ ] Description matches the register for its invocation mode
-- [ ] Body within the 250-line cap
+- [ ] Frontmatter, description register, and body budget satisfy `docs/decisions/skill-schema.md` — `npm run test:skills` names any violation
 - [ ] Nothing outside the skill directory is required/imported/sourced
 - [ ] Ran baseline scenario WITHOUT skill (RED)
 - [ ] Skill addresses specific baseline failures (GREEN)

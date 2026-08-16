@@ -1,8 +1,25 @@
 # Architecture
 
-This file describes the architecture that binds all work in this repo. The
-rewrite that produced it is documented in `docs/plans/v6/PLAN.md`; that plan is
-history, this file is the standing rule.
+This file describes the architecture that binds all work in this repo.
+
+## Docs Are the Contract
+
+Documentation outranks implementation: what the docs promise is what the
+project owes, and a doc↔engine mismatch is a **build failure**, not a cleanup
+chore. The working rules:
+
+- A behavior change ships **with its doc change in the same commit** — a PR
+  that changes what the engine does but not what the docs say is incomplete.
+- When docs and engine disagree, first decide which one lied: if the doc made
+  the promise deliberately, fix the engine; if the doc was wrong, fix the doc
+  and say so in the commit message. Never silently pick whichever is cheaper.
+- Sync is mechanical wherever possible, prose only where it can't be:
+  `check:docs` (paths/commands/flags/skills in every scanned doc resolve
+  against the engine), `check:versions`, `check:cli-consumers`, the router
+  bijection, and the CLI manifest (`scripts/lib/cli-manifest.js` — docs and
+  linters read it; a second hardcoded copy is forbidden).
+- A norm written in prose that could be a check is a drift risk — when you add
+  a rule, ask what would mechanically fail if someone broke it.
 
 ## Zero External Dependencies
 
@@ -60,10 +77,9 @@ skills/  ──(subprocess: bare `arcforge` CLI, plugin bin/ on PATH)──▶  
                                                                  hooks/ ┘   (no arrow back to skills/)
 ```
 
-The allowlist that once carried the exceptions is **empty, and the test asserts
-both the constant and the live scan are empty**. It is a debt counter, not a
-design option — an addition is a maintainer decision about the boundary, never
-a convenience.
+There are no exceptions: the test asserts both the exception constant and the
+live scan are empty. An addition is a maintainer decision about the boundary,
+never a convenience.
 
 ## File-Based State
 
@@ -72,7 +88,7 @@ format has a **single owner in `scripts/lib/` plus a schema test**; skills read
 and write those formats through the CLI, never by hand-parsing engine files.
 
 **D3 — task lists**: the one task-list format is a markdown checkbox list, owned
-by `scripts/lib/`. There is no second task-state format in v6.
+by `scripts/lib/`. There is no second task-state format.
 
 ## Worktrees
 
@@ -113,18 +129,10 @@ evals/            # Behavioral eval corpus
 docs/             # Guides, design docs, plans
 ```
 
-## What Is Gone
+## Recognizing Stale References
 
-These structures existed in v5 and were removed by the rewrite. They are named
-here so a stale reference is recognizable as stale, not as something to restore:
-the SDD pipeline and its DAG/coordinator engine (`dag.yaml`), epic-scoped
-worktree framing, `agents/` and `templates/`, the `.codex*` / `.agents/`
-multi-platform packaging, the `inject-skills` hook and its `ARCFORGE_ROOT`
-injection, and the `arc-` skill-name prefix.
-
-The **grandfather list** that exempted v5 skills from the new enforcement
-(`docs/plans/v6/legacy-skills.json`) reached zero and is **closed**: the tests
-assert it stays empty, so no skill can buy an exemption from the frozen
-frontmatter schema, D1 self-containment, or the naming rule.
-
-History: `docs/plans/v6/PLAN.md`, `docs/plans/v6/progress.md`.
+External material (old wiki pages, blog posts, cached docs) may still mention
+an SDD pipeline, a DAG engine, `agents/` or `templates/` directories, `.codex*`
+packaging, an `ARCFORGE_ROOT` variable, or `arc-`-prefixed skill names. None of
+those exist in this project — treat such a reference as stale, not as something
+to restore.

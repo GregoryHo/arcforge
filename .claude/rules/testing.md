@@ -41,10 +41,10 @@ Treat a failure here as a design violation, not a broken test:
 | Guard | Runner |
 |---|---|
 | **D1** — no file under `skills/<bucket>/<name>/` requires/imports/sources outside its own directory; skill prose doesn't name `scripts/lib/` or `ARCFORGE_ROOT` | jest (`tests/scripts/`) |
-| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`. The allowlist that once held exceptions is asserted empty. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
+| **D8** — `scripts/**` and `hooks/**` don't name a skill under `skills/`. The exception list is asserted empty. A bucket segment on its own (`skills/core/`) is generic tree access, not a reference | jest (`tests/scripts/`) |
 | **Router bijection** — every shipped skill appears in the router table and every router row resolves to a shipped skill | jest (`tests/scripts/`) |
 | **Task-list schema (D3)** — the markdown checkbox format parses; malformed samples are rejected | jest (`tests/scripts/`) |
-| **Frozen frontmatter schema** + **closed grandfather list** — every skill satisfies the schema, and `docs/plans/v6/legacy-skills.json` is asserted empty so no skill can buy an exemption | pytest (`tests/skills/`) |
+| **Frozen frontmatter schema** — every skill satisfies `docs/decisions/skill-schema.md`; there are no exemptions | pytest (`tests/skills/`) |
 
 Adding or removing a skill is a deliberate three-part edit in one commit: the
 skill directory, its row in the router's Skill Map, and `EXPECTED_SKILL_COUNT`

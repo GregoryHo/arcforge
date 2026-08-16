@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { lintDoc, R4_SEVERITY, HOST_SLASH_COMMANDS } = require('../../scripts/lib/doc-refs');
-const { REPO_ROOT } = require('./v6-legacy-skills');
+const { REPO_ROOT } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
 // R4 dual-track skill-reference resolution + sanity floor (v6, D7).
@@ -97,7 +97,7 @@ describe('R4 slash track (/<name>)', () => {
 // Sanity floor over the real shipped doc surface.
 // ---------------------------------------------------------------------------
 
-const SCAN_DIRS = ['skills', 'docs/guide', 'agents', 'templates', 'hooks'];
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product'];
 
 function collectMarkdown(dir, acc) {
   if (!fs.existsSync(dir)) return acc;

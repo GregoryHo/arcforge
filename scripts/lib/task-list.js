@@ -6,7 +6,7 @@
  * and nothing else. This module is its single owner (D8) — skills read and
  * write it through the CLI, never by reparsing markdown themselves.
  *
- * Grammar, and the reasoning behind it: docs/plans/v6/decisions/task-list-format.md
+ * Grammar, and the reasoning behind it: docs/decisions/task-list-format.md
  *
  *   > arcforge task list v1 — …banner…
  *

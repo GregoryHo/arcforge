@@ -5,7 +5,7 @@ evals/preflight/
 # Project-local contributor skills — ignored by default (experimental/workspace).
 # Skills meant to ship in the repo are explicitly allowlisted below.
 .claude/skills/*/
-!.claude/skills/arc-releasing/
+!.claude/skills/releasing/
 .claude/settings.local.json
 .claude/logs/
 skills/**/.claude/logs/

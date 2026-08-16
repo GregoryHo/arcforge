@@ -109,7 +109,7 @@ arcforge eval dashboard [--port N]
 |------|-----------|--------|
 | `--k` | `run`, `ab` | Trials per condition |
 | `--model` | `run`, `ab`, `preflight` | Model to run trials on |
-| `--no-isolate` | `run` | Run without a clean trial directory (isolated by default) |
+| `--no-isolate` | `run` | Keep plugins and MCP servers loaded in the trial session (stripped by default); the clean trial directory is used either way |
 | `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
@@ -198,9 +198,16 @@ is what lets the engine change underneath without breaking what you wrote.
 
 ## Exit codes
 
-`0` on success. Any failure exits non-zero and prints a single-line reason to
-stderr, so the usual shell idiom works:
+`0` on success, non-zero on any failure, so the usual shell idiom works:
 
 ```bash
 arcforge worktree remove stale-branch || echo "removal refused"
 ```
+
+Where the reason goes depends on how the command failed. When a command runs
+and fails, a plain invocation prints a single-line reason to stderr, while
+`--json` returns a machine-readable `{"error": "..."}` object on stdout — so a
+script parsing stdout reads the reason in the shape it already expects.
+
+Usage errors are the exception: naming no command, or one that does not exist,
+prints the help text and exits non-zero regardless of `--json`.

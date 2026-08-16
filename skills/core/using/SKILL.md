@@ -34,12 +34,10 @@ the work is described as finished — `/finishing` presumes nothing is known to 
 wrong. Between the two disciplines: `/debugging` when a failure is not yet
 explained, `/tdd` once you know what to change.
 
-v6 rebuilds the skill set from zero; each skill adds its own row in the same
-change that creates it, so the table grows as the rewrite lands.
-
 ## Sync Contract
 
-The Skill Map is a bijection with the shipped skill set: every skill has exactly
-one row, and every row names a skill that exists. Both directions are enforced
+The Skill Map is a bijection with the shipped skill set: every skill except
+`using` itself has exactly one row (the router cannot route to itself), and
+every row names a skill that exists. Both directions are enforced
 by a test, so a skill added without its row — or a row left behind after its
 skill is deleted — fails CI rather than silently misrouting.

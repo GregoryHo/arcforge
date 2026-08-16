@@ -1,18 +1,15 @@
-"""Structure-only validation for every skill under skills/*/SKILL.md.
+"""Structure-only validation for every skill under skills/core/*/SKILL.md.
 
-Checks frontmatter validity, name == dirname, the frozen v6 frontmatter schema,
+Checks frontmatter validity, name == dirname, the frozen frontmatter schema,
 description register, generic structure, cross-reference resolution, referenced
 supporting-file existence, and line budget. No literal sentence assertions —
 behavioral protection is the eval layer's job.
 
+Every shipped skill gets the full ruleset. There is no exemption to ask for: a
+skill that cannot satisfy the schema is a skill to fix, not to exempt.
+
 Skills are discovered dynamically, so merges, renames, and new skills need zero
 test edits. Paths are anchored to the repo root, so the suite is cwd-proof.
-
-Grandfathering: the v5 skills predated the frozen schema and the `/name`
-composition rule, and `docs/plans/v6/legacy-skills.json` was the single source
-of truth for that exemption. The list is now **empty and closed** — the ratchet
-tests at the bottom of this file assert it can never regrow, so every shipped
-skill gets the full ruleset with no exemption available.
 """
 import json
 import re
@@ -23,19 +20,18 @@ import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Shipped skills live in the `core` lifecycle bucket (P6.5) — the one bucket
+# Shipped skills live in the `core` lifecycle bucket — the one bucket
 # `.claude-plugin/plugin.json` whitelists. `in-progress/` and `deprecated/` are
 # on-disk holding areas that never load, so this schema does not govern them.
 SKILLS_DIR = PROJECT_ROOT / "skills" / "core"
-LEGACY_MANIFEST = PROJECT_ROOT / "docs" / "plans" / "v6" / "legacy-skills.json"
 ROUTER_MANIFEST = PROJECT_ROOT / "tests" / "router-skill.json"
 
 # Line budget: soft cap warns, hard cap fails.
 SOFT_LINE_CAP = 150
 HARD_LINE_CAP = 250
 
-# Description grammar — two registers, applied to every skill (legacy included)
-# because it is the machine-readable half of the invocation dichotomy.
+# Description grammar — two registers, applied to every skill because it is the
+# machine-readable half of the invocation dichotomy.
 #   model-invoked (default): "<identity>. Use when <triggers>", 60–280 chars.
 #   user-invoked (disable-model-invocation: true): plain one-liner, max 120 chars,
 #   no "Use when" trigger list.
@@ -43,65 +39,42 @@ MODEL_DESC_MIN = 60
 MODEL_DESC_MAX = 280
 USER_DESC_MAX = 120
 
-# Frozen frontmatter schema (v6). Anything outside this set fails — including the
-# v5 `category` / `status` fields, which v6 drops. Legacy skills are exempt.
+# Frozen frontmatter schema. Anything outside this set fails, for every skill.
 FROZEN_FRONTMATTER_KEYS = frozenset(
     {"name", "description", "disable-model-invocation", "argument-hint", "allowed-tools"}
 )
 
-# Ratchet baseline: the legacy list started at 30 and only ever shrank. It
-# reached zero when the last v5 skill was rewritten, and the baseline was closed
-# to match — the exemption mechanism still exists in code (the loaders read the
-# manifest) but can no longer be used. Adding a name to dodge the frozen schema
-# is exactly what this blocks.
-LEGACY_BASELINE = 0
-
 # Sanity floor: guards against a broken glob silently passing the whole suite.
 MIN_SKILL_COUNT = 10
 
-# Exact expected count, pre-registered at the P6.5 bucket move. The floor above
-# catches a glob that broke to zero; this catches one that broke to "some". A
-# real change to the shipped skill set is a deliberate edit here, not a mystery
-# failure — update it in the same commit that adds or removes a skill.
+# Exact expected count of the shipped skill set. The floor above catches a glob
+# that broke to zero; this catches one that broke to "some". A real change to the
+# shipped skill set is a deliberate edit here, not a mystery failure — update it
+# in the same commit that adds or removes a skill.
 EXPECTED_SKILL_COUNT = 15
-
-# Permanent exceptions — per-skill overrides of the hard cap, keyed by skill name
-# and measured in BODY lines (frontmatter excluded). The table is EMPTY and is
-# meant to stay that way: `test_permanent_budget_is_legacy_only` forbids an entry
-# for any v6 skill, so the only legal key would be a grandfathered v5 skill, and
-# every one of those is on its way out. The two historical entries are gone —
-# `arc-refining` with the skill in P2, `arc-finishing` in P3 when the pilot-B
-# rewrite (`finishing`) landed inside the 250-line cap without an exception.
-# Over the cap, the answer is `references/` or the CLI, never a new key here.
-PERMANENT_LINE_BUDGET = {}
 
 # Supporting-file references: references/, scripts/, templates/, agents/ paths ending
 # in a known extension. The lookbehind skips matches embedded in a longer path
-# (cross-skill `arc-using/references/...`) or a variable example
+# (cross-skill `using/references/...`) or a variable example
 # (`${SKILL_ROOT}/scripts/...`) so only first-class path pointers are validated.
 _SUPPORTING_FILE_PATTERN = re.compile(
     r"(?<![\w./$-])(?:references|scripts|templates|agents)/[A-Za-z0-9._/-]+\.(?:md|js|sh|ya?ml)"
 )
 
-# Legacy cross-references: first arc-* token after a REQUIRED SUB-SKILL /
-# REQUIRED BACKGROUND marker. Legacy skills only — v6 skills use `/name`.
-_CROSS_REF_PATTERN = re.compile(r"(?:REQUIRED SUB-SKILL|REQUIRED BACKGROUND).*?(arc-[\w-]+)")
-
-# v6 composition: the only sanctioned cross-skill pointer is a prose `/name`
+# Composition: the only sanctioned cross-skill pointer is a prose `/name`
 # invocation (backticked or bare — both parse), optionally plugin-namespaced as
 # `/arcforge:name`. The lookarounds reject path-shaped slashes
 # (`references/x.md`, `/usr/local`, `and/or`, `2026/07/31`, `${SKILL_ROOT}/scripts`)
 # and XML closing tags (`</delta>`), so a match is a genuine invocation.
 # The trailing `(?!\.\w)` rejects a file extension without rejecting a sentence
-# period, so `/finishing.` at the end of a sentence still parses.
-# Calibrated against all 30 v5 skills: with these exclusions plus
-# BUILTIN_SLASH_COMMANDS, the parser reports zero unresolved targets on real
-# skill prose.
+# period, so `/finishing.` at the end of a sentence still parses. With these
+# exclusions plus BUILTIN_SLASH_COMMANDS, the parser reports zero unresolved
+# targets on real skill prose.
 _SLASH_INVOCATION_PATTERN = re.compile(
     r"(?<![\w./$<-])/(?:arcforge:)?([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?![\w/-])(?!\.\w)"
 )
 
-# Router index (schema §3.1 exemption, P3). `skills/using` carries a `## Skill Map`
+# Router index (schema §3.1 exemption). The router skill carries a `## Skill Map`
 # table listing every shipped skill. Those rows are an INDEX, not invocations: the
 # table answers "which skills exist and when does each apply", and the execution
 # semantics still require the user to type `/name`. Without this carve-out §3.1
@@ -116,8 +89,8 @@ _SLASH_INVOCATION_PATTERN = re.compile(
 #
 # Router identity is NOT spelled out here. `tests/router-skill.json` is the single
 # source this file and tests/scripts/router-contract.test.js (jest) both read —
-# P3 hardcoded `"using"` in both, so a rename could leave this side exempting a
-# table the bijection side no longer treated as the router, with both suites green.
+# hardcoding the name in both would let a rename leave this side exempting a table
+# the bijection side no longer treated as the router, with both suites green.
 def _load_router_manifest():
     """Read the shared router manifest, failing loudly on a malformed field."""
     data = json.loads(ROUTER_MANIFEST.read_text())
@@ -139,8 +112,8 @@ _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 # sanctioned pointer is a `/name` invocation. Matches both spellings the schema
 # names — `skills/<bucket>/<other>/...` and `../<other>/...` — and resolves the
 # offender by skill name, so a pointer at the skill's OWN directory is not a
-# boundary crossing. The bucket segment (P6.5) is optional so the pre-bucket
-# spelling `skills/<other>/` is still caught rather than silently ignored.
+# boundary crossing. The bucket segment is optional so a bucket-less
+# `skills/<other>/` spelling is still caught rather than silently ignored.
 _DEEP_LINK_PATTERN = re.compile(
     r"(?:\.\./|skills/(?:core/|in-progress/|deprecated/)?)([a-z][a-z0-9-]*)/"
 )
@@ -177,21 +150,6 @@ BUILTIN_SLASH_COMMANDS = frozenset(
 )
 
 
-def _load_legacy_skills() -> frozenset[str]:
-    data = json.loads(LEGACY_MANIFEST.read_text(encoding="utf-8"))
-    legacy = data["legacy"]
-    assert isinstance(legacy, list), "legacy-skills.json: 'legacy' must be a list"
-    return frozenset(legacy)
-
-
-LEGACY_SKILLS = _load_legacy_skills()
-
-
-def _is_legacy(name: str) -> bool:
-    """True when the skill is grandfathered out of the v6 frontmatter/composition rules."""
-    return name in LEGACY_SKILLS
-
-
 def _skill_dirs() -> list[Path]:
     return sorted(
         d for d in SKILLS_DIR.iterdir() if d.is_dir() and (d / "SKILL.md").exists()
@@ -222,7 +180,7 @@ def _load_frontmatter(text: str) -> dict:
 
 
 def _schema_violations(data: dict) -> list[str]:
-    """Frontmatter keys outside the frozen v6 schema, sorted."""
+    """Frontmatter keys outside the frozen schema, sorted."""
     return sorted(key for key in data if key not in FROZEN_FRONTMATTER_KEYS)
 
 
@@ -234,10 +192,6 @@ def _slash_invocations(text: str) -> list[str]:
 def _is_builtin_slash_command(target: str) -> bool:
     """True for a Claude Code builtin that is not also a shipped skill name."""
     return target in BUILTIN_SLASH_COMMANDS and target not in SKILL_NAMES
-
-
-def _line_budget(name: str) -> int:
-    return PERMANENT_LINE_BUDGET.get(name, HARD_LINE_CAP)
 
 
 def _markdown_files(skill_dir: Path) -> list[Path]:
@@ -280,17 +234,10 @@ def _classify_slash_targets(source: str, text: str) -> list[tuple[str, str, str]
 
 
 def _collect_cross_references() -> list[tuple[str, str, str]]:
-    """(source, ref_type, target) triples — legacy uses arc-* markers, v6 uses `/name`."""
+    """(source, ref_type, target) triples — every cross-skill pointer is a `/name`."""
     refs = []
     for skill_dir in SKILL_DIRS:
-        text = _read(skill_dir)
-        if _is_legacy(skill_dir.name):
-            for line in text.splitlines():
-                for match in _CROSS_REF_PATTERN.finditer(line):
-                    ref_type = "SUB-SKILL" if "SUB-SKILL" in line else "BACKGROUND"
-                    refs.append((skill_dir.name, ref_type, match.group(1)))
-        else:
-            refs.extend(_classify_slash_targets(skill_dir.name, text))
+        refs.extend(_classify_slash_targets(skill_dir.name, _read(skill_dir)))
     return refs
 
 
@@ -313,10 +260,7 @@ def test_frontmatter_valid(skill_dir):
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_frontmatter_schema_frozen(skill_dir):
-    """Non-legacy skills declare only frozen-schema frontmatter keys."""
-    if _is_legacy(skill_dir.name):
-        pytest.skip("grandfathered via docs/plans/v6/legacy-skills.json")
-
+    """Every skill declares only frozen-schema frontmatter keys."""
     violations = _schema_violations(_load_frontmatter(_read(skill_dir)))
     assert not violations, (
         f"{skill_dir.name} declares frontmatter keys outside the frozen schema: {violations} "
@@ -375,39 +319,31 @@ def test_has_section_and_body(skill_dir):
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_referenced_supporting_files_exist(skill_dir):
-    """Every references/scripts/templates/agents pointer resolves.
+    """Every references/scripts/templates/agents pointer resolves inside the skill.
 
-    Legacy skills may still resolve against the repo root; v6 skills may not
-    (schema §5.3 + §7 gap 2, closed in P3). A v6 skill is a closed unit, so a
-    pointer that only resolves at the repo root is reaching outside itself —
-    exactly what the repo-root fallback used to let through.
+    A skill is a closed unit (schema §5.3), so a pointer is checked against the
+    skill directory and nowhere else. One that only resolves at the repo root is
+    reaching outside itself, which is exactly the violation this catches.
     """
-    local_only = not _is_legacy(skill_dir.name)
-    missing = []
-    for match in _SUPPORTING_FILE_PATTERN.finditer(_read(skill_dir)):
-        rel = match.group(0)
-        if (skill_dir / rel).exists():
-            continue
-        if not local_only and (PROJECT_ROOT / rel).exists():
-            continue
-        missing.append(rel)
+    missing = [
+        match.group(0)
+        for match in _SUPPORTING_FILE_PATTERN.finditer(_read(skill_dir))
+        if not (skill_dir / match.group(0)).exists()
+    ]
     assert not missing, (
-        f"{skill_dir.name} references supporting files that do not resolve"
-        f"{' inside the skill directory' if local_only else ''}: {sorted(set(missing))}"
+        f"{skill_dir.name} references supporting files that do not resolve "
+        f"inside the skill directory: {sorted(set(missing))}"
     )
 
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_no_cross_skill_deep_links(skill_dir):
-    """No markdown in a v6 skill links into another skill's directory (schema §5.2).
+    """No markdown in a skill links into another skill's directory (schema §5.2).
 
     Scans every markdown file under the skill, not just SKILL.md: a deep link is
     most likely to appear in a `references/*.md`, so a SKILL.md-only guard would
     have a hole exactly where the risk lives.
     """
-    if _is_legacy(skill_dir.name):
-        pytest.skip("grandfathered via docs/plans/v6/legacy-skills.json")
-
     offenders = {}
     for md in _markdown_files(skill_dir):
         found = _deep_link_violations(md.read_text(encoding="utf-8"), skill_dir.name)
@@ -428,8 +364,9 @@ def test_line_budget(skill_dir):
     """
     _, body = _split_frontmatter(_read(skill_dir))
     lines = body.count("\n")
-    limit = _line_budget(skill_dir.name)
-    assert lines <= limit, f"{skill_dir.name} SKILL.md is {lines} lines (hard cap {limit})"
+    assert lines <= HARD_LINE_CAP, (
+        f"{skill_dir.name} SKILL.md is {lines} lines (hard cap {HARD_LINE_CAP})"
+    )
     if lines > SOFT_LINE_CAP:
         warnings.warn(
             f"{skill_dir.name} SKILL.md is {lines} lines (> soft cap {SOFT_LINE_CAP})",
@@ -443,7 +380,7 @@ def test_line_budget(skill_dir):
     ids=[f"{s}->{t}" for s, _, t in CROSS_REFS],
 )
 def test_cross_reference_resolves(source, ref_type, target):
-    """Every cross-skill pointer (legacy REQUIRED marker or v6 `/name`) resolves."""
+    """Every cross-skill `/name` pointer resolves to a shipped skill."""
     assert target in SKILL_NAMES, (
         f"{source} has {ref_type} reference to '{target}' "
         f"but no {SKILLS_DIR.name}/{target}/SKILL.md exists under {SKILLS_DIR}"
@@ -463,7 +400,7 @@ def test_user_invoked_skills_are_not_prose_invoked(source, ref_type, target):
     indexes the skill set, it does not call into it.
     """
     if ref_type != "INVOCATION" or target not in SKILL_NAMES:
-        pytest.skip("not a v6 prose invocation of a shipped skill")
+        pytest.skip("not a prose invocation of a shipped skill")
 
     assert not _invokes_user_invoked(ref_type, _load_frontmatter(_read(SKILLS_DIR / target))), (
         f"{source} prose-invokes /{target}, which is user-invoked "
@@ -479,24 +416,7 @@ def test_cross_references_found():
     )
 
 
-# --- Ratchet -----------------------------------------------------------------
-
-
-def test_legacy_entries_still_exist():
-    """Every legacy entry names a live skill — deleting a skill must prune the list."""
-    dangling = sorted(name for name in LEGACY_SKILLS if not (SKILLS_DIR / name / "SKILL.md").exists())
-    assert not dangling, (
-        f"docs/plans/v6/legacy-skills.json lists skills that no longer exist: {dangling} — "
-        f"prune them in the same commit that deletes or rewrites the skill"
-    )
-
-
-def test_legacy_list_only_shrinks():
-    """The grandfather list is monotonic and now closed: no skill may buy an exemption."""
-    assert len(LEGACY_SKILLS) <= LEGACY_BASELINE, (
-        f"legacy list grew to {len(LEGACY_SKILLS)} (baseline {LEGACY_BASELINE}) — the "
-        f"grandfather mechanism is closed; skills must satisfy the frozen schema"
-    )
+# --- Scan integrity ----------------------------------------------------------
 
 
 def test_skill_scan_floor():
@@ -517,34 +437,13 @@ def test_skill_scan_matches_expected_count():
     )
 
 
-def test_permanent_budget_is_legacy_only():
-    """Line budget exceptions exist for legacy skills only — never for a v6 skill."""
-    non_legacy = sorted(name for name in PERMANENT_LINE_BUDGET if not _is_legacy(name))
-    assert not non_legacy, (
-        f"PERMANENT_LINE_BUDGET opens exceptions for non-legacy skills: {non_legacy} — "
-        f"v6 skills live within the {HARD_LINE_CAP}-line hard cap"
-    )
-
-
 # --- Helper coverage ---------------------------------------------------------
-# While every shipped skill is still legacy, the v6 assertions above are vacuous.
-# These pin the predicates and parsers they depend on.
+# The corpus assertions above only fire when a real skill breaks a rule. These
+# pin the predicates and parsers they depend on, so the lint cannot rot into a
+# no-op that passes because it stopped matching anything.
 
 
-def test_is_legacy_discriminates():
-    """The grandfather predicate reads the manifest, not the shipped skill set."""
-    # Read the positive case out of the manifest rather than naming a skill:
-    # a hardcoded name turns this test red the phase that skill is rewritten,
-    # which is noise, not a finding. The manifest empties by the end of P6.
-    for name in LEGACY_SKILLS:
-        assert _is_legacy(name) is True
-    # `tdd` ships and is absent from the manifest — the predicate must not
-    # infer legacy status from a directory merely existing.
-    assert _is_legacy("tdd") is False
-    assert _is_legacy("not-a-shipped-skill") is False
-
-
-def test_schema_violations_rejects_v5_fields():
+def test_schema_violations_rejects_unknown_fields():
     """The frozen schema accepts only its five keys and names every offender."""
     assert _schema_violations({"name": "tdd", "description": "d"}) == []
     assert (
@@ -642,7 +541,7 @@ def test_deep_link_violations_flag_other_skill_paths():
 
 
 def test_deep_link_violations_see_through_the_bucket_segment():
-    """The canonical P6.5 spelling resolves to the skill, not to the bucket."""
+    """The canonical bucketed spelling resolves to the skill, not to the bucket."""
     text = "Read skills/core/tdd/references/examples.md."
     assert _deep_link_violations(text, "writing-skills") == ["skills/core/tdd/"]
     # ...and a pointer at the skill's OWN dir is still not a boundary crossing.

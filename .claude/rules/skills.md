@@ -13,7 +13,7 @@ methodology.
 
 | Question | Canonical source |
 |---|---|
-| What frontmatter is legal | `docs/plans/v6/decisions/skill-schema.md` (**frozen** — do not redefine, restate, or extend it elsewhere) |
+| What frontmatter is legal | `docs/decisions/skill-schema.md` (**frozen** — do not redefine, restate, or extend it elsewhere) |
 | Is my skill structurally valid | `tests/skills/test_skill_structure.py` (the mechanical form of the schema) |
 | Which skills exist | `skills/core/` on disk, and the Skill Map in `skills/core/using/SKILL.md` — the two are a tested bijection |
 | How to write a good skill | `skills/core/writing-skills/` — the authoring methodology. The schema doc stays authoritative for the fields themselves. |
@@ -33,10 +33,9 @@ Rationale and the matching D8 rule for engine code: `.claude/rules/architecture.
 
 ## There is no exemption to ask for
 
-`docs/plans/v6/legacy-skills.json` was the single source of truth for which v5
-skills the assertions skipped. It is **empty and closed** — the ratchet test
-fails on any entry, so every skill gets the full rule set. If a skill cannot
-satisfy the schema, fix the skill.
+Every skill gets the full rule set — there is no exemption list, no override
+table, and no "temporary" carve-out. If a skill cannot satisfy the schema, fix
+the skill.
 
 ## Test file convention
 

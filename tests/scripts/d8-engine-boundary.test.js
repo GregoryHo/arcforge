@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { REPO_ROOT } = require('./v6-legacy-skills');
+const { REPO_ROOT } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
 // D8 — engine/skill boundary lint (v6).

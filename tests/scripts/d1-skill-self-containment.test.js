@@ -2,22 +2,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { REPO_ROOT, SKILLS_DIR, legacySkills, governedSkills } = require('./v6-legacy-skills');
+const { REPO_ROOT, SKILLS_DIR, allSkills } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
-// D1 — skill self-containment lint (v6).
+// D1 — skill self-containment lint.
 // ---------------------------------------------------------------------------
 //
 // D1 (unrevisable decision): a skill is a black box. Its executable files NEVER
 // require/import/source anything outside their own `skills/<name>/` directory,
 // and its prose NEVER names engine internals. Engine functionality is reached
 // exactly one way: a subprocess call to the bare `arcforge` CLI (plugin bin/ on PATH, D9).
-//
-// This file REPLACES tests/scripts/skill-path-discipline.test.js, which enforced
-// the exact inverse (cc-005 demanded an `${ARCFORGE_ROOT}/scripts/lib/` prefix on
-// engine references; cc-006 demanded an `ARCFORGE_ROOT` fallback header inside
-// every skill bash block). Both are D1 violations by construction, so the file
-// was deleted rather than amended.
 //
 // Two rules:
 //   D1-A  executable files (.js/.sh/.py) under skills/<name>/ must not: reference
@@ -27,10 +21,7 @@ const { REPO_ROOT, SKILLS_DIR, legacySkills, governedSkills } = require('./v6-le
 //   D1-B  markdown under skills/<name>/ must not contain `scripts/lib/` or
 //         `ARCFORGE_ROOT` — engine internals are not part of a skill's prose.
 //
-// GRANDFATHERING: skills listed in docs/plans/v6/legacy-skills.json are exempt
-// wholesale (whole directory). They are v5 skills that will be deleted or
-// rewritten in P2–P6; rewriting them now is out of scope for P1. Every other
-// skill is fully governed. The ratchet below keeps the exemption honest.
+// Every shipped skill is governed. There is no exemption list.
 
 const ARCFORGE_ROOT_TOKEN = 'ARCFORGE_ROOT';
 const ENGINE_PATH_TOKEN = 'scripts/lib/';
@@ -185,39 +176,13 @@ function formatReport(violations) {
 }
 
 // ---------------------------------------------------------------------------
-// Ratchet: the grandfather list may only shrink, and may never name a ghost.
-// ---------------------------------------------------------------------------
-
-describe('v6 legacy-skills.json ratchet', () => {
-  it('every grandfathered entry still exists as skills/<name>/', () => {
-    const missing = legacySkills().filter(
-      (name) => !fs.existsSync(path.join(SKILLS_DIR, name, 'SKILL.md')),
-    );
-    expect({ missing }).toEqual({ missing: [] });
-  });
-
-  it('the list has no duplicates', () => {
-    const list = legacySkills();
-    expect(list.length).toBe(new Set(list).size);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Real-corpus enforcement.
 // ---------------------------------------------------------------------------
 
-describe('D1 skill self-containment (governed skills)', () => {
-  it('governed-skill enumeration is computable (scope sanity)', () => {
-    // Deliberately NOT a >0 floor: P1 ships exactly one governed skill and the
-    // set is empty by design until the rewrite lands. What must hold is that the
-    // legacy list is a strict subset of the shipped skills — enforced by the
-    // ratchet above — so this only guards the loader itself.
-    expect(Array.isArray(governedSkills())).toBe(true);
-  });
-
-  it('no governed skill escapes its own directory or names engine internals', () => {
+describe('D1 skill self-containment (shipped skills)', () => {
+  it('no shipped skill escapes its own directory or names engine internals', () => {
     const violations = [];
-    for (const name of governedSkills()) {
+    for (const name of allSkills()) {
       violations.push(...scanSkillDir(path.join(SKILLS_DIR, name)));
     }
     if (violations.length > 0) throw new Error(formatReport(violations));
@@ -225,9 +190,10 @@ describe('D1 skill self-containment (governed skills)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Detector fixtures — the governed corpus is small in P1, so the detectors are
-// verified against synthetic skills. Without these the lint could silently rot
-// into a no-op and nobody would notice until a real violation shipped.
+// Detector fixtures — the real corpus only exercises a detector when a skill
+// actually breaks the rule, so each one is verified against a synthetic skill.
+// Without these the lint could silently rot into a no-op and nobody would
+// notice until a real violation shipped.
 // ---------------------------------------------------------------------------
 
 describe('D1 detectors (synthetic fixtures)', () => {
