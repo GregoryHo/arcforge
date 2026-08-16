@@ -57,7 +57,26 @@ const R4_SEVERITY = 'error';
 // docs are additionally resolved relative to the doc's own directory (many skill
 // docs cite `agents/foo.md` meaning the skill-local `agents/` dir), so a path is
 // only a finding when it resolves against NEITHER the repo root NOR the doc dir.
-const PATH_PREFIXES = ['scripts/', 'skills/', 'hooks/', 'templates/', 'agents/', '.claude-plugin/'];
+//
+// The second group is the shipped DOC surface's own cross-references. Doc
+// indexes cite their neighbours doc-relative — `docs/README.md` names its
+// guides as `guide/<name>.md` — so without these prefixes a renamed or deleted
+// guide stayed green. They are safe where a bare `docs/` is not: the
+// per-spec placeholders that force the `docs/` exclusion are written in the
+// `docs/plans/<spec>/...` form, which starts with `docs/`, not with one of
+// these.
+const PATH_PREFIXES = [
+  'scripts/',
+  'skills/',
+  'hooks/',
+  'templates/',
+  'agents/',
+  '.claude-plugin/',
+  'guide/',
+  'decisions/',
+  'plans/',
+  'product/',
+];
 
 // Extensions that mark a token as a concrete file reference (vs. a directory
 // fragment or a glob). Directory references are handled separately.

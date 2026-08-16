@@ -73,6 +73,22 @@ describe('doc-refs engine (SRH-4)', () => {
       });
       expect(findings.filter((f) => f.rule === 'R1')).toHaveLength(0);
     });
+
+    test('a doc-relative guide link that no longer resolves is a finding (renamed-guide defect class)', () => {
+      // A doc index cites its neighbours relative to its own directory:
+      // docs/README.md names guides as `guide/<name>.md`. The probe mirrors the
+      // runner — repo-root first, then the doc's own directory — so only the
+      // renamed guide is left dangling.
+      const doc = 'Guides: `guide/cli-invocation.md` and `guide/renamed-away.md`.\n';
+      const { findings } = lintDoc('docs/README.md', doc, {
+        pathExists: (relPath, docDir) => docDir === 'docs' && relPath === 'guide/cli-invocation.md',
+        skillExists: () => true,
+      });
+      const r1 = findings.filter((f) => f.rule === 'R1');
+      expect(r1).toHaveLength(1);
+      expect(r1[0].severity).toBe('error');
+      expect(r1[0].message).toContain('guide/renamed-away.md');
+    });
   });
 
   describe('R2 — CLI commands and flags (against cli-manifest.js)', () => {
