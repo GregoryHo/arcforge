@@ -62,17 +62,23 @@ silent.
 ## The quiet ones
 
 `user-message-counter`, `session-start`, and `session-end` maintain the record of
-the session itself: how long it ran, how much happened in it. That record is what
-the learning loop reads later, and what a diary is built from.
+the session itself: how long it ran, how much happened in it. Every session gets
+one, as a JSON file under `~/.arcforge/sessions/`. That record is what the
+learning loop reads later, and what a diary is built from.
+
+Once a session passes the diary threshold — ten of your messages, or fifty tool
+calls — `session-end` also fills that record in with your ten most recent
+messages (truncated), writes a diary draft under `~/.arcforge/diaries/`, and
+starts a short background run to flesh the draft out.
 
 `pre-compact` runs just before compaction and captures what is about to be
 dropped, so the part of a long session worth keeping survives the boundary.
 
 The two `observe` registrations record tool calls for pattern detection — **but
 only if you have turned learning on**. With learning disabled, the default, each
-checks one
-file, finds no configuration, and exits before doing any work. Nothing about your
-session is recorded until you opt in:
+checks one file, finds no configuration, and exits before doing any work. That
+opt-in is what gates the learning capture; the session record and diary above
+are continuity, and they run either way. To see where learning stands:
 
 ```bash
 arcforge learn status

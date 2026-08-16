@@ -11,7 +11,7 @@ tool use, compaction, stop — to maintain continuity (session records, compacti
 salvage, carried-over context), to warn before a credential lands in a file or
 commit, and to feed the learning loop once a user opts in. Its defining stance
 is restraint: a hook may decline its own job, but it must never take the session
-down, never block the user, and never record anything about them uninvited.
+down, never block the user, and never observe them uninvited.
 
 ## Scope
 
@@ -52,12 +52,16 @@ down, never block the user, and never record anything about them uninvited.
   before any filesystem or shell use (`.claude/rules/security.md`).
 
 ### Privacy
-- **B-6 Nothing is recorded until learning is enabled.** The two observation
-  registrations check for an enabled configuration and exit before doing any
-  work when learning is off — the default. There is no per-hook switch because
-  the only hooks that could accumulate anything about the user are gated behind
-  that single opt-in; disabling learning stops them, uninstalling the plugin
-  removes everything.
+- **B-6 The opt-in gates the learning capture, not every record.** The two
+  observation registrations check for an enabled configuration and exit before
+  doing any work when learning is off — the default — so with learning off
+  nothing is observed and no pattern is ever mined. Session bookkeeping sits
+  outside that gate and runs either way: every session leaves a durable record
+  on disk, and a session that passes the activity threshold additionally writes
+  a diary draft, stores in that record the recent user messages the draft is
+  built from, and hands the draft to a background enrichment run. There is no
+  per-hook switch: the single opt-in covers the learning loop, disabling
+  learning stops it, and uninstalling the plugin removes everything.
 
 ### Performance
 - **B-7 The synchronous path stays small.** Observation writes and
@@ -69,7 +73,9 @@ down, never block the user, and never record anything about them uninvited.
 ### Continuity
 - **B-8 The session leaves a record.** Session tracking maintains a durable
   record of each session (duration, activity) that the learning loop and diary
-  build from; `pre-compact` captures what compaction is about to drop so the
+  build from — kept unconditionally, because continuity is not a learning
+  feature (B-6 bounds what that record holds); `pre-compact` captures what
+  compaction is about to drop so the
   worthwhile part of a long session survives the boundary; `inject-context`
   starts the next session with what carried over — active instincts, pending
   reviews, where the last session left off — and is close to silent when

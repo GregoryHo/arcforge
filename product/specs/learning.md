@@ -26,35 +26,43 @@ was recorded about them.
 
 ### Consent
 - **B-1 Off until turned on.** With learning disabled — the default — the
-  observation hooks exit before doing any work and nothing about a session is
-  recorded. Enabling is an explicit, scoped act (`--project` or `--global`),
-  and status is always inspectable.
-- **B-2 Exactly one automatic step.** Once enabled, observations become
-  review-queue candidates automatically — and that is the *only* thing that
-  happens by itself. Every subsequent arrow in the loop is a decision the user
-  makes.
+  observation hooks exit before doing any work, so nothing is observed and no
+  candidate is ever proposed. What the opt-in does not gate is session
+  bookkeeping: the durable session record, and the diary an active enough
+  session produces, are continuity features that run either way
+  ([hooks](hooks.md) B-6). Enabling is an explicit, scoped act (`--project` or
+  `--global`), and status is always inspectable.
+- **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,
+  observations become review-queue candidates automatically — and that is the
+  *only* step of that pipeline that happens by itself. Every subsequent arrow
+  is a decision the user makes. (Diary drafting is the separate always-on path
+  of B-1; it produces nothing a user must decide about.)
 - **B-3 Three gates before behavior changes.** A candidate moves
-  `pending_review → approved → materialized → activated`, and each transition
-  is a separate human decision: *approved* records agreement with nothing on
-  disk; *materialized* writes a draft the user can read, still inert;
-  *activated* takes effect. They are deliberately not one click, because
-  agreeing a pattern is real, seeing exactly what would be written, and
-  accepting a behavior change are different decisions. Activation and
-  deactivation additionally require an explicit acknowledgement that behavior
-  is changing.
+  `pending_review → approved → materialized → activated`, and every state stays
+  separate and inspectable: *approved* records agreement with nothing on disk;
+  *materialized* writes a draft the user can read, still inert; *activated*
+  takes effect. A convenience may collapse the two inert transitions — the
+  CLI's `accept` approves and materializes in one call — but never the one that
+  changes behavior: activation is always its own decision, because agreeing a
+  pattern is real, seeing exactly what would be written, and accepting a
+  behavior change are different decisions. Activation and deactivation
+  additionally require an explicit acknowledgement that behavior is changing.
 - **B-4 Injection is bounded and reversible.** Only activated instincts are
   injected, at SessionStart, capped at the top five by confidence. Disabling
   learning stops accumulation but MUST NOT silently undo what the user
   accepted — retiring an instinct is its own explicit deactivation.
 
 ### Integrity
-- **B-5 Transitions go through the engine, and are audited.** The dashboard
-  and CLI offer only the transitions legal from a candidate's current state,
-  and every action — accepted or rejected — lands in an audit log with its
-  reason. Hand-editing state files is the one path with no checks and no
-  record; the product treats it as out of contract. The on-disk formats are
-  append-only or atomically overwritten, owned by the engine per the curator
-  schema (cited above).
+- **B-5 Transitions go through the engine, and are audited.** Curator-proposed
+  candidates live in one canonical queue and the dashboard is their surface: it
+  offers only the transitions legal from a candidate's current state, and every
+  action — accepted or rejected — lands in an audit log with its reason. The
+  CLI's candidate commands are a second, project-scoped path over the project's
+  own queue, not a front-end onto the canonical one; a global transition is
+  refused rather than written behind the curator's back. Hand-editing state
+  files is the one path with no checks and no record; the product treats it as
+  out of contract. The on-disk formats are append-only or atomically
+  overwritten, owned by the engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
   Its ceiling depends on source: a rule the user stated outright can climb
@@ -72,8 +80,12 @@ was recorded about them.
   processed diaries are marked so the same ground is not re-mined.
 
 ### Privacy
-- **B-9 Local, legible, scoped.** Everything stays on the user's machine and
-  nothing is sent anywhere. State follows its scope: home-global state under
+- **B-9 Local, legible, scoped.** All state stays on the user's machine:
+  arcforge has no telemetry and no service of its own to report to. The one
+  outbound path is diary enrichment, which runs the host tool over a parsed
+  summary of the session — so that summary reaches the model the way any turn
+  of the session does, and nowhere else. State follows its scope: home-global
+  state under
   `~/.arcforge/`, project-scoped state under the project's own
   `.arcforge/learning/`, and materialized artifacts in the project tree itself,
   as drafts the user reviews and commits. Commands print the absolute path

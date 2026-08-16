@@ -40,7 +40,9 @@ arcforge learn status --json
 ```
 
 Until one of those is `true`, the observation hooks exit immediately and nothing
-about your sessions is recorded.
+is observed. That switch covers the learning capture, not the session record and
+diary — those are continuity, and they run either way; see the
+[hooks guide](hooks-system.md) for exactly what they keep.
 
 ## Diaries
 
@@ -142,8 +144,8 @@ Contradict it enough and it archives itself.
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is
-the only thing that happens automatically. A candidate moves through explicit
-states, and you move it:
+the only step here that happens automatically — from a candidate onward, you move
+it, through explicit states:
 
 ```
 pending_review → approved → materialized → activated
@@ -157,7 +159,8 @@ pending_review → approved → materialized → activated
 
 Three separate gates, on purpose: agreeing that a pattern is real, seeing exactly
 what would be written, and accepting that it changes behavior are different
-decisions and should not be one click.
+decisions. The CLI's `accept` collapses the first two as a convenience — both
+are inert. Nothing collapses activation.
 
 ### The dashboard
 
@@ -180,7 +183,13 @@ Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
 one path where nothing checks the transition and nothing records it.
 
-### The same flow from the CLI
+### The candidate commands in the CLI
+
+The CLI has its own candidate commands. They work the project's own queue under
+`.arcforge/learning/` — **not** the curator queue the dashboard reviews, which
+is home-global. They are a scriptable project-scope path, not a second way to
+work the dashboard's inbox: review what you see in the dashboard from the
+dashboard.
 
 ```bash
 arcforge learn inbox --project
@@ -218,7 +227,10 @@ the dashboard.
 
 ## What is stored, and where
 
-Everything stays on your own machine; nothing is sent anywhere. State sits in two
+All state stays on your own machine — arcforge has no telemetry and no server of
+its own to report to. The one thing that leaves is diary enrichment: it runs
+`claude` locally over a parsed summary of the session, so that summary reaches
+the model exactly the way anything you type in a session does. State sits in two
 places, split by scope:
 
 - **Home-global** — under `~/.arcforge/`: diaries in `diaries/<project>/<date>/`,
