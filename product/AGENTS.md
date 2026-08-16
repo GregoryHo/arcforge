@@ -22,12 +22,6 @@ less ceremony and a readable format, NOT less substance.**
 Nothing here is "frozen." A shipped feature keeps its spec as living documentation —
 read and update it whenever you touch that area.
 
-**Migration state:** `specs/` starts empty. The candidate areas are the skill system
-(router + 15 skills), the CLI engine, the hook layer, the learning system, the eval
-harness, the obsidian pair, and worktrees/loop. Write an area's spec the next time
-that area changes — spec first, then build — rather than backfilling all of them in
-one sitting.
-
 ## Boundaries with the rest of the repo
 
 - **Engineering conventions** live in `.claude/rules/` and are out of scope here.

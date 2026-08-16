@@ -8,7 +8,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 
 | Version | Tag | Milestone | Status | What & why | Spec |
 |---|---|---|---|---|---|
-| 6.0.0 | `rc-v6.0.0` | v6 toolkit | **building ← we are here** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. Release candidate is tagged; flips to `shipped` with the `v6.0.0` tag on the main branch. | — (specs are written per-area on next touch; see AGENTS.md *Migration state*) |
+| 6.0.0 | `rc-v6.0.0` | v6 toolkit | **building ← we are here** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. Release candidate is tagged; flips to `shipped` with the `v6.0.0` tag on the main branch. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -41,3 +41,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   The architecture keeps the second harness cheap — skills are self-contained
   markdown plus a bare CLI on PATH — so the future work is packaging plus spike
   verification of Codex's discovery/invocation mechanics, not a redesign.
+
+### D-003 — Backfill all seven area specs at 6.0.0
+- Date: 2026-08-16
+- Version: process
+- Status: Accepted
+- Decision: Every shipped area gets its spec now, in one pass — `specs/` covers
+  skill-system, cli, hooks, learning, eval, obsidian, and worktrees-loop — and
+  the earlier write-on-next-touch stance is retired.
+- Why: A spec written later would be reverse-engineered from code by whoever
+  next touches the area, without the context the choices were made with.
+  Writing all seven while that context is at hand costs one sitting and gives
+  every future change a spec to update instead of a blank to fill.
