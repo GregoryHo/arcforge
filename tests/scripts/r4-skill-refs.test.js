@@ -97,7 +97,7 @@ describe('R4 slash track (/<name>)', () => {
 // Sanity floor over the real shipped doc surface.
 // ---------------------------------------------------------------------------
 
-const SCAN_DIRS = ['skills', 'docs/guide', 'agents', 'templates', 'hooks'];
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product'];
 
 function collectMarkdown(dir, acc) {
   if (!fs.existsSync(dir)) return acc;
