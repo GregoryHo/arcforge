@@ -99,7 +99,7 @@ The cross-reference parser that enforces §4.1 and rule 2.1:
 
 | Rule | Guard | Runner |
 |---|---|---|
-| §1 field set frozen | `test_frontmatter_schema_frozen` (+ synthetic negatives in `test_schema_violations_rejects_v5_fields`) | pytest |
+| §1 field set frozen | `test_frontmatter_schema_frozen` (+ synthetic negatives in `test_schema_violations_rejects_unknown_fields`) | pytest |
 | §1 `name` == dirname / description present | `test_frontmatter_valid` | pytest |
 | §2 description registers | `test_description_register` | pytest |
 | Rule 2.1 + index exemption | `test_user_invoked_skills_are_not_prose_invoked` | pytest |

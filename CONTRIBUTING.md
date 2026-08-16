@@ -193,9 +193,7 @@ Skill prose must not name engine internals (`scripts/lib/...`) or rely on enviro
 
 - [ ] Read `skills/core/writing-skills/SKILL.md` before starting
 - [ ] Name has no prefix and matches the directory name
-- [ ] Frontmatter uses only the five frozen keys
-- [ ] Description matches the register for its invocation mode
-- [ ] Body within the 250-line cap
+- [ ] Frontmatter, description register, and body budget satisfy `docs/decisions/skill-schema.md` — `npm run test:skills` names any violation
 - [ ] Nothing outside the skill directory is required/imported/sourced
 - [ ] Ran baseline scenario WITHOUT skill (RED)
 - [ ] Skill addresses specific baseline failures (GREEN)

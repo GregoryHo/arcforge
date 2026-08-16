@@ -32,10 +32,10 @@
 
 ## P1 任務（全數完成，PR #136）
 
-- [x] pytest schema 凍結（category/status 移除、frozen 鍵集、ratchet ×3、slash cross-ref）+ `decisions/skill-schema.md`
+- [x] pytest schema 凍結（category/status 移除、frozen 鍵集、ratchet ×3、slash cross-ref）+ `docs/decisions/skill-schema.md`
 - [x] D1 lint（skill-path-discipline 反轉刪除）、D8 lint（精確 allowlist，P5 歸零）、doc-refs R4 雙軌 + floor（runner 級）
 - [x] router stub（`skills/using/`）+ 雙向契約測試
-- [x] D3 任務清單格式凍結：`scripts/lib/task-list.js` + `decisions/task-list-format.md`
+- [x] D3 任務清單格式凍結：`scripts/lib/task-list.js` + `docs/decisions/task-list-format.md`
 - [x] CI 補 check:hooks/check:eval-targets；hooks 子 npm 專案收斂；test:diary/reflect 移除
 - [x] 承重規則改寫 ×5 + hooks.md/CLAUDE.md/README/AGENTS/CONTRIBUTING 假敘述清除
 - [x] 負向驗證：router 壞列→router-contract 紅；反引號假引用→check:docs+pytest 雙紅；task-list 壞樣本→10+4 負向案例

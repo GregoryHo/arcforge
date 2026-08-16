@@ -72,8 +72,11 @@ was recorded about them.
   processed diaries are marked so the same ground is not re-mined.
 
 ### Privacy
-- **B-9 Local, legible, scoped.** Everything lives under `~/.arcforge/` on the
-  user's machine; nothing is sent anywhere. Commands print the absolute path
+- **B-9 Local, legible, scoped.** Everything stays on the user's machine and
+  nothing is sent anywhere. State follows its scope: home-global state under
+  `~/.arcforge/`, project-scoped state under the project's own
+  `.arcforge/learning/`, and materialized artifacts in the project tree itself,
+  as drafts the user reviews and commits. Commands print the absolute path
   of anything they write. Candidate-transition commands are project-scope
   only — a global flip of behavior-changing state is refused by the engine.
 

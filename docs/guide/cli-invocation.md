@@ -198,9 +198,16 @@ is what lets the engine change underneath without breaking what you wrote.
 
 ## Exit codes
 
-`0` on success. Any failure exits non-zero and prints a single-line reason to
-stderr, so the usual shell idiom works:
+`0` on success, non-zero on any failure, so the usual shell idiom works:
 
 ```bash
 arcforge worktree remove stale-branch || echo "removal refused"
 ```
+
+Where the reason goes depends on how the command failed. When a command runs
+and fails, a plain invocation prints a single-line reason to stderr, while
+`--json` returns a machine-readable `{"error": "..."}` object on stdout — so a
+script parsing stdout reads the reason in the shape it already expects.
+
+Usage errors are the exception: naming no command, or one that does not exist,
+prints the help text and exits non-zero regardless of `--json`.

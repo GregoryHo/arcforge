@@ -47,10 +47,14 @@ underneath without breaking anything written against it.
   holds them to it.
 
 ### Output contracts
-- **B-5 Exit codes are the API.** `0` on success; any failure exits non-zero
-  and prints a single-line reason to stderr, so `cmd || handle` works from any
-  shell. Failures are user-facing messages, never stack traces
-  (`.claude/rules/coding-standards.md`, error tiers).
+- **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,
+  so `cmd || handle` works from any shell. For a command that runs and fails,
+  the reason travels with the invocation style: a single-line message on
+  stderr, or a machine-readable error object on stdout under `--json`. Usage
+  errors — no command, or an unknown one — print help and exit non-zero
+  whatever the flags. Failures are user-facing
+  messages, never stack traces (`.claude/rules/coding-standards.md`, error
+  tiers).
 - **B-6 `--json` where scripting is expected.** Commands that take `--json`
   emit a stable shape suitable for `jq`. `worktree list --json` has its shape
   pinned by a test that runs the live command; other shapes are stable but

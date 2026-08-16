@@ -2,14 +2,13 @@
 
 **Date**: 2026-05-09
 **Status**: Working schema companion
-**Parent design**: [`2026-05-08-learning-curator-pivot-design.md`](./2026-05-08-learning-curator-pivot-design.md)
 **Audience**: arcforge contributors implementing or reviewing the learning subsystem
 
 ## Purpose
 
 This document records concrete layer-by-layer schemas, producer/consumer responsibilities, and transform boundaries for the learning curator pivot.
 
-The parent design document owns architecture intent, product boundaries, and locked decisions. This companion owns the operational contract details:
+This directory is the authority for the learning curator: its architecture intent, its product boundaries, and the decisions locked behind the layer model. The operational contract details it fixes are:
 
 - what each layer receives;
 - what it writes;
@@ -66,8 +65,8 @@ Layer 0 is a real layer in the architecture. Its output is a deterministic gate 
 
 This file is the schema contract index and governance document. It is not the source of truth for full per-layer TypeScript-style schemas.
 
-- The parent design document owns product intent, architectural decisions, and high-level flow boundaries.
-- This index owns terminology, layer numbering, cross-layer invariants, and navigation to the detailed contracts.
+- This index owns architecture intent, product boundaries, high-level flow boundaries, and the locked decisions behind the layer model.
+- It also owns terminology, layer numbering, cross-layer invariants, and navigation to the detailed contracts.
 - Each per-layer reference owns the concrete schema, input/output contract, persisted artifacts, forbidden behavior, consumers, and acceptance criteria for that layer.
 - Do not duplicate full schemas in this index. Link to the relevant per-layer contract instead.
 - Do not turn either this index or the references into the implementation plan. After contracts are reviewed, write the TDD implementation plan as a separate document.

@@ -218,7 +218,23 @@ the dashboard.
 
 ## What is stored, and where
 
-Everything lives under `~/.arcforge/` on your own machine — diaries under
-`diaries/<project>/<date>/`, instincts under `instincts/<project>/`. Nothing is
-sent anywhere. The commands above print the absolute path of anything they write,
-so you can always read exactly what was recorded about a session.
+Everything stays on your own machine; nothing is sent anywhere. State sits in two
+places, split by scope:
+
+- **Home-global** — under `~/.arcforge/`: diaries in `diaries/<project>/<date>/`,
+  raw observations in `observations/<project>/`, activated global instincts in
+  `instincts/<project>/`, and the global learning config and candidate queue in
+  `learning/`.
+- **Project-scoped** — under `.arcforge/learning/` inside the project itself:
+  that scope's config, its candidate queue, and the instincts and patches
+  materialized for it.
+
+Materialization and activation additionally write into the project tree. A skill
+candidate materializes as `skills/<name>/SKILL.md.draft` inside your project and
+activation renames it to `SKILL.md`; command, agent, and eval candidates follow
+the same draft-then-rename pattern in their own directories. So an accepted
+candidate becomes a real file in your repository, which you review and commit
+like any other change.
+
+The commands above print the absolute path of anything they write, so you can
+always read exactly what was recorded and where it went.
