@@ -109,7 +109,7 @@ arcforge eval dashboard [--port N]
 |------|-----------|--------|
 | `--k` | `run`, `ab` | Trials per condition |
 | `--model` | `run`, `ab`, `preflight` | Model to run trials on |
-| `--no-isolate` | `run` | Run without a clean trial directory (isolated by default) |
+| `--no-isolate` | `run` | Keep plugins and MCP servers loaded in the trial session (stripped by default); the clean trial directory is used either way |
 | `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
