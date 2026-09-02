@@ -88,14 +88,17 @@ interesting domain model says so in one line rather than deleting the section.
 
 - `next` — chosen as the upcoming version; not yet being built.
 - `building` — implementation in progress.
-- `shipped` — merged and tagged; the `Tag` column holds its `vX.Y.Z`.
+- `shipped` — merged and tagged; the `Tag` column holds its `vX.Y.Z` (C7).
 
-Exactly one row carries `← we are here`. A non-shipped row shows `—` in `Tag`.
+A non-shipped row shows `—` in `Tag` (C7). Exactly one row carries
+`← we are here` (C1) — the check counts markers; *which* row deserves one is a
+judgment it does not make.
 
 ## The three mechanical rules
 
 These three are pinned in exactly this form because `npm run check:product` reads
-them. Change the rule here and the check changes with it, in the same commit.
+them, as it reads the `Tag` and marker rules above (C7, C1). Change a rule here and
+the check changes with it, in the same commit.
 
 **1. Row status → spec header (C4).** A roadmap row's Status maps to the `Status:`
 header of every spec it links:
@@ -139,7 +142,7 @@ Fields beyond the base template, and where they are enforced. Everything marked
 | `Verification:` | decision entry | how the decision was proven to have landed: the command, test, or eval that fails if it regresses | prose |
 | `Residual:` | decision entry | what the decision knowingly leaves unsolved, so the next reader doesn't file it as a bug | prose |
 | `Cost accepted:` | decision entry | the price paid, stated up front — a decision that admits its cost survives review; one that hides it gets re-litigated | prose |
-| `Refines:` / `Extends:` | decision entry | narrows or widens an earlier decision without reversing it; no flip on the old entry | `check:product` (C3) |
+| `Refines:` / `Extends:` | decision entry | narrows or widens an earlier decision without reversing it; the named decision must exist, and no flip lands on it | `check:product` (C3) |
 | `Supersedes: D-NNN (clause N)` | decision entry | clause-scoped reversal — only that clause dies | `check:product` (C3) |
 | `Status: Proposed` | decision entry | the choice is recorded but still open; it must resolve to `Accepted` or be superseded before its version ships | prose |
 | graduation tombstone | `BACKLOG.md` | a promoted wish leaves one struck-through line naming the version and `D-id` that took it, so a reader can tell "picked up" from "quietly dropped" | prose |
@@ -211,7 +214,10 @@ commit flips all four things at once: the roadmap row to `shipped`, the `Tag` co
 to `vX.Y.Z`, every spec header the row governs, and the `← we are here` marker onto
 whatever is next. `npm run check:product` is green before the flip and green after —
 what it catches is a *half-done* flip, which is the failure mode that actually
-happens.
+happens. Three of the four edits are gated: the row's Status, its `Tag` cell, and
+every spec header the row governs all have to agree. The fourth is not — C1 counts
+markers, so a `← we are here` left on the row that just shipped passes green. Re-read
+that one yourself.
 
 ## Few-shot — a decision and its later reversal
 

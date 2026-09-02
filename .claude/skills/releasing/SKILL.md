@@ -22,7 +22,7 @@ Never start the release workflow on a broken branch.
      && npm run check:hooks && npm run check:eval-targets && npm run check:product
    ```
 
-   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 6 and must be green after it. The other five must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward. `check:product` green here means the product state is coherent going in; step 5 flips it and you run the check again to prove the flip landed whole rather than half.
+   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 6 and must be green after it. The other five must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward. `check:product` green here means the product state is coherent going in; step 5 flips it and you run the check again to catch a half-done flip.
 4. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
 5. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
 6. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
@@ -173,7 +173,7 @@ places at once, and nothing in the version bump touches any of them. `product/AG
 4. Move `← we are here` onto whatever is next. If nothing is next yet it stays on the
    row that just shipped: exactly one row carries it, always.
 
-Then prove all four landed:
+Then check the flip:
 
 ```bash
 npm run check:product
@@ -181,10 +181,12 @@ npm run check:product
 
 It was green before this step and it must be green after — a `building` row with
 `building` spec headers agrees just as well as a `shipped` row with `shipped` headers.
-What it catches is a **half-done flip**: the row moved but a spec header didn't, the
-`Tag` cell left empty, the marker never moved. That is the failure that actually
+What it catches is a **half-done flip**: the row moved but a spec header didn't, or
+the `Tag` cell was left empty (or still reads `—`). That is the failure that actually
 happens, because the four edits live in four different files and only the first one
-feels like "the release".
+feels like "the release". Edit 4 is the one it cannot make for you — C1 counts
+markers, so a `← we are here` left behind on the row that just shipped passes green.
+Re-read that one yourself.
 
 Commit this on its own, ahead of the release commit:
 
@@ -259,7 +261,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **README badge URL.** The shields.io badge is image-cached; stale numbers visually persist even after every other file is correct. Worth an extra explicit mention.
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
-- **The product-state flip.** The roadmap row, its `Tag` cell, the spec headers, and the `← we are here` marker are four edits in four files, and a version bump touches none of them. `npm run check:product` is the proof you did all four.
+- **The product-state flip.** The roadmap row, its `Tag` cell, the spec headers, and the `← we are here` marker are four edits in four files, and a version bump touches none of them. `npm run check:product` proves the first three; where the marker ended up is on you.
 - **The post-merge tag.** Merging the PR does not auto-tag. This is the single most commonly skipped step.
 
 ## Anti-Patterns (from real arcforge release incidents)

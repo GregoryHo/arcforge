@@ -11,21 +11,26 @@
  * shipped. None of that breaks a build; it just turns the product state into a
  * plausible-looking lie that the next reader trusts.
  *
- * This linter asserts the three mechanical rules pinned in `product/AGENTS.md`
- * (row → header mapping, the governing-row rule, the two supersession forms)
- * plus the log's numbering invariants. Fits the scripts/check-*.js family.
+ * This linter asserts the mechanical rules pinned in `product/AGENTS.md` (row →
+ * header mapping, the governing-row rule, the two supersession forms, the
+ * Status ↔ `Tag` pairing) plus the log's numbering invariants. Fits the
+ * scripts/check-*.js family.
  *
  * Validates:
  *   - C1  exactly one roadmap row carries the `← we are here` marker;
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
  *         folded `<details>` index, unique, and gap-free from D-001;
- *   - C3  every `Supersedes:` carries its flip on the entry it supersedes —
- *         bare form ⇒ `Superseded-by: D-NNN`, clause-scoped form ⇒
- *         `partially superseded by D-NNN`;
+ *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
+ *         a decision that exists, and every `Supersedes:` carries its flip on
+ *         the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
+ *         clause-scoped form ⇒ `partially superseded by D-NNN`. `Refines:` and
+ *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` exists in the log;
- *   - C6  sanity floor — at least one roadmap row, one decision, one spec.
+ *   - C6  sanity floor — at least one roadmap row, one decision, one spec;
+ *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
+ *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
  * CLI tier: prints a report and exits 0 (valid) / 1 (invalid).
  */
@@ -39,11 +44,14 @@ const SPECS_DIR = path.join(PRODUCT_DIR, 'specs');
 
 const HERE_MARKER = '← we are here';
 const ROW_STATUSES = new Set(['next', 'building', 'shipped']);
+const NO_TAG = '—';
 
 const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
 const DECISION_ANY_RE = /^###\s+D-/;
 const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
-const SUPERSEDES_FIELD_RE = /^-\s+Supersedes:\s+D-(\d{3})(\s*\(clause\s+[^)]+\))?\s*$/;
+const RELATION_FIELD_RE =
+  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+[^)]+\))?\s*$/;
+const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 
 /** Semver-ish ordering for roadmap Version cells (`X.Y.Z`). */
@@ -70,7 +78,7 @@ function roadmapSection(roadmap) {
  * Parse the roadmap table. Pushes structural errors onto `errors` and returns
  * the rows it could read.
  *
- * @returns {{version: string, status: string, here: boolean, specs: string[]}[]}
+ * @returns {{version: string, tag: string, status: string, here: boolean, specs: string[]}[]}
  */
 function parseRoadmapRows(roadmap, errors) {
   const rows = [];
@@ -101,8 +109,9 @@ function parseRoadmapRows(roadmap, errors) {
         `C4 roadmap row ${version}: unknown Status "${status}" (expected next | building | shipped)`,
       );
     }
+    const tag = cells[1].replace(/`/g, '').trim();
     const specs = [...cells[5].matchAll(SPEC_LINK_RE)].map((m) => m[1]);
-    rows.push({ version, status, here, specs });
+    rows.push({ version, tag, status, here, specs });
   }
   return rows;
 }
@@ -129,7 +138,7 @@ function parseDecisions(roadmap, errors) {
         current = null;
         continue;
       }
-      current = { id: `D-${m[1]}`, num: Number(m[1]), inFold, status: null, supersedes: [] };
+      current = { id: `D-${m[1]}`, num: Number(m[1]), inFold, status: null, relations: [] };
       entries.push(current);
       continue;
     }
@@ -140,9 +149,16 @@ function parseDecisions(roadmap, errors) {
     }
     const status = line.match(STATUS_FIELD_RE);
     if (status) current.status = status[1];
-    const supersedes = line.match(SUPERSEDES_FIELD_RE);
-    if (supersedes)
-      current.supersedes.push({ target: Number(supersedes[1]), clause: !!supersedes[2] });
+    if (RELATION_ANY_RE.test(line)) {
+      const rel = line.match(RELATION_FIELD_RE);
+      if (!rel) {
+        errors.push(
+          `C3 ${current.id}: malformed relation line "${line.trim()}" (expected "- Supersedes|Refines|Extends: D-NNN", optionally "(clause N)")`,
+        );
+        continue;
+      }
+      current.relations.push({ kind: rel[1], target: Number(rel[2]), clause: !!rel[3] });
+    }
   }
   return entries;
 }
@@ -176,17 +192,22 @@ function checkDecisionNumbering(entries, errors) {
   });
 }
 
-/** C3 — a supersession is two edits; the flip on the superseded entry is one of them. */
-function checkSupersessions(entries, errors) {
+/**
+ * C3 — every relation resolves, and a supersession is two edits: the flip on the
+ * superseded entry is the second one. `Refines:` and `Extends:` sharpen or widen
+ * a decision that stays in force, so they need a live target and nothing else.
+ */
+function checkRelations(entries, errors) {
   const byNum = new Map(entries.map((e) => [e.num, e]));
   for (const e of entries) {
-    for (const { target, clause } of e.supersedes) {
+    for (const { kind, target, clause } of e.relations) {
       const targetId = `D-${String(target).padStart(3, '0')}`;
       const victim = byNum.get(target);
       if (!victim) {
-        errors.push(`C3 ${e.id}: "Supersedes: ${targetId}" names a decision that does not exist`);
+        errors.push(`C3 ${e.id}: "${kind}: ${targetId}" names a decision that does not exist`);
         continue;
       }
+      if (kind !== 'Supersedes') continue;
       if (victim.status === null) {
         errors.push(`C3 ${targetId}: no "Status:" line to carry the flip that ${e.id} requires`);
         continue;
@@ -197,6 +218,19 @@ function checkSupersessions(entries, errors) {
           `C3 ${targetId}: Status is "${victim.status}" but ${e.id} supersedes it — expected it to carry "${expected}"`,
         );
       }
+    }
+  }
+}
+
+/** C7 — the `Tag` cell is the row's Status said a second way; a release fills it. */
+function checkRoadmapTags(rows, errors) {
+  for (const row of rows) {
+    if (!ROW_STATUSES.has(row.status)) continue;
+    const expected = row.status === 'shipped' ? `v${row.version}` : NO_TAG;
+    if (row.tag !== expected) {
+      errors.push(
+        `C7 roadmap row ${row.version}: Tag is "${row.tag}" but a ${row.status} row must carry "${expected}"`,
+      );
     }
   }
 }
@@ -303,9 +337,10 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
   }
 
   checkDecisionNumbering(entries, errors);
-  checkSupersessions(entries, errors);
+  checkRelations(entries, errors);
   checkSpecHeaders(rows, specs, errors);
   checkSpecCitations(entries, specs, errors);
+  checkRoadmapTags(rows, errors);
 
   if (rows.length === 0) errors.push('C6 sanity floor: the roadmap table has no rows');
   if (entries.length === 0) errors.push('C6 sanity floor: the Decision Log has no entries');

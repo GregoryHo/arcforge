@@ -20,10 +20,16 @@ const TABLE_HEADER = [
   '|---|---|---|---|---|---|',
 ];
 
-function row({ version = '1.0.0', status = 'shipped', here = true, specs = ['alpha'] } = {}) {
+function row({
+  version = '1.0.0',
+  status = 'shipped',
+  here = true,
+  specs = ['alpha'],
+  tag = status === 'shipped' ? `\`v${version}\`` : '—',
+} = {}) {
   const statusCell = here ? `**${status} ${'← we are here'}**` : `**${status}**`;
   const specCell = specs.map((s) => `[${s}](specs/${s}.md)`).join(' · ');
-  return `| ${version} | \`v${version}\` | milestone | ${statusCell} | what & why | ${specCell} |`;
+  return `| ${version} | ${tag} | milestone | ${statusCell} | what & why | ${specCell} |`;
 }
 
 function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra = [] } = {}) {
@@ -211,6 +217,46 @@ describe('check-product', () => {
       ];
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
     });
+
+    it('rejects a Refines naming a decision that does not exist', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Refines: D-009'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/"Refines: D-009" names a decision that does not exist/);
+    });
+
+    it('rejects an Extends naming a decision that does not exist', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Extends: D-009'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/"Extends: D-009" names a decision that does not exist/);
+    });
+
+    it('rejects a relation line that misses the strict form instead of ignoring it', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-1'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "- Supersedes: D-1"/);
+    });
+
+    it('rejects a Supersedes naming two decisions on one line', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001, D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line/);
+    });
   });
 
   describe('C4 — a spec header matches its governing row', () => {
@@ -316,6 +362,53 @@ describe('check-product', () => {
       expect(of('C6', validateProduct({ roadmap: roadmap(), specs: [] }))).toEqual([
         'C6 sanity floor: specs/ holds no spec',
       ]);
+    });
+  });
+
+  describe('C7 — the Tag cell matches the row Status', () => {
+    it('accepts a shipped row tagged with its own version', () => {
+      expect(of('C7', run())).toEqual([]);
+    });
+
+    it('accepts an unshipped row carrying the em-dash placeholder', () => {
+      const rows = [row({ status: 'building' })];
+      const specs = [spec({ status: 'building v1.0.0' })];
+      expect(of('C7', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
+    });
+
+    it('accepts a shipped row alongside an unshipped one extending it', () => {
+      const rows = [
+        row({ version: '1.0.0', here: false }),
+        row({ version: '1.1.0', status: 'building' }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.1.0 (building)' })];
+      expect(of('C7', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
+    });
+
+    it('rejects a shipped row whose Tag cell was left empty', () => {
+      const errors = of('C7', run({ roadmap: { rows: [row({ tag: '' })] } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/Tag is "" but a shipped row must carry "v1\.0\.0"/);
+    });
+
+    it('rejects a shipped row still carrying the unshipped placeholder', () => {
+      const errors = of('C7', run({ roadmap: { rows: [row({ tag: '—' })] } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/must carry "v1\.0\.0"/);
+    });
+
+    it('rejects a Tag naming a version other than the row it sits on', () => {
+      const errors = of('C7', run({ roadmap: { rows: [row({ tag: '`v9.9.9`' })] } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/Tag is "v9\.9\.9"/);
+    });
+
+    it('rejects an unshipped row already tagged as if it had shipped', () => {
+      const rows = [row({ status: 'building', tag: '`v1.0.0`' })];
+      const specs = [spec({ status: 'building v1.0.0' })];
+      const errors = of('C7', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a building row must carry "—"/);
     });
   });
 });

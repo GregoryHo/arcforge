@@ -48,7 +48,7 @@ Three consequences for a PR:
 
 - **A behavior change ships with its spec change in the same PR.** The spec describes the *current* product, not the original plan. A merged PR whose spec still describes the old behavior is incomplete, not tidy-later.
 - **A choice becomes a `D-NNN`** in the ROADMAP Decision Log, cited from the spec it pins. Recorded decisions are never edited or renumbered — reverse one by appending a superseding entry and flipping one line on the old one.
-- **`npm run check:product` gates the mechanical half** — one `← we are here` marker, a gap-free Decision Log, every supersession flipped, and spec headers matching their governing roadmap row. It cannot tell whether what you wrote is *true*; that is what review is for.
+- **`npm run check:product` gates the mechanical half** — one `← we are here` marker, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row, and a `Tag` cell that agrees with its row's status. It cannot tell whether what you wrote is *true*; that is what review is for.
 
 Two project-local agents make this cheaper: `pm` writes `product/**` and nothing else, `qa` runs the gates and changes nothing. See `.claude/agents/README.md`.
 

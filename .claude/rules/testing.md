@@ -32,7 +32,7 @@ paths from `__dirname`, so they must stay cwd-independent.
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
 | `npm run check:hooks` | `hooks/hooks.json` schema |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
-| `npm run check:product` | `product/` stays internally consistent: one `← we are here`, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row |
+| `npm run check:product` | `product/` stays internally consistent: one `← we are here`, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row, `Tag` cells matching their row status |
 
 ## Contract Lints
 
