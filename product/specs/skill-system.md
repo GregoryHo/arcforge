@@ -28,14 +28,17 @@ situations to skills.
 ## Behavior
 
 ### Inventory and routing
-- **B-1 Fifteen skills, one shipping bucket.** The product ships exactly the
-  skills under `skills/core/`: `using`, `brainstorming`, `executing`, `tdd`,
-  `debugging`, `code-review`, `finishing`, `dispatching`, `looping`, `sessions`,
-  `maintaining-obsidian`, `diagramming-obsidian`, `writing-skills`, `evaluating`,
-  `learning`. A skill's `name` equals its directory name, carries no prefix, and
-  is namespaced at install time — `/arcforge:<name>` on Claude Code,
-  `arcforge:<name>` (no leading slash) on Codex CLI
-  ([codex-harness](codex-harness.md) B-2).
+- **B-1 One shipping bucket, and the set it holds.** The product ships exactly
+  the skills under `skills/core/`: `using`, `brainstorming`, `executing`,
+  `speccing`, `tdd`, `debugging`, `code-review`, `finishing`, `dispatching`,
+  `looping`, `sessions`, `maintaining-obsidian`, `diagramming-obsidian`,
+  `writing-skills`, `evaluating`, `learning`. A skill's `name` equals its
+  directory name, carries no prefix, and is namespaced at install time —
+  `/arcforge:<name>` on Claude Code, `arcforge:<name>` (no leading slash) on
+  Codex CLI ([codex-harness](codex-harness.md) B-2). The count is not restated
+  here — `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py` is the
+  one place it is pinned, so a number in this clause could only ever drift from
+  it.
 - **B-2 The router is an index, not a gate.** `using` holds one table mapping
   situations to skills. It exists for the moment the user is unsure which
   workflow fits; it points at one skill and gets out of the way. No workflow is
