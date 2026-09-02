@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a skill toolkit for Claude Code. It gives your agent 15 self-contained skills, a small CLI engine, and six background hooks — so disciplined workflows are available when the work needs them, and never in the way when it doesn't.
+arcforge is a skill toolkit for coding agents. It gives your agent 15 self-contained skills, a small CLI engine, and six background hooks — so disciplined workflows are available when the work needs them, and never in the way when it doesn't. Claude Code gets all of it; Codex CLI installs the skills.
 
 ## Why arcforge
 
@@ -24,29 +24,45 @@ Start anywhere. `/arcforge:using` is a router and index if you want a map; other
 
 ## Installation
 
-Register the marketplace:
+arcforge has zero external runtime dependencies — Node.js standard library only.
+
+### Claude Code
+
+Register the marketplace, then install the plugin:
 
 ```bash
 /plugin marketplace add GregoryHo/arcforge
-```
-
-Install the plugin:
-
-```bash
 /plugin install arcforge@arcforge-dev
 ```
 
-Requires Claude Code. arcforge has zero external runtime dependencies — Node.js standard library only.
-
-### Verify the install
-
-Ask for the router:
+Verify by asking for the router:
 
 ```
 /arcforge:using
 ```
 
 It prints a table mapping situations to skills. Every skill is invocable the same way — `/arcforge:<name>`, for example `/arcforge:tdd` or `/arcforge:debugging`.
+
+### Codex CLI
+
+The same repo is a Codex plugin marketplace:
+
+```bash
+codex plugin marketplace add GregoryHo/arcforge
+codex plugin add arcforge@arcforge-dev
+```
+
+All 15 skills load, namespaced `arcforge:<name>`. **Skills are all that installs.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
+
+| On Codex | Status |
+|---|---|
+| The 8 skills that need no engine — `using`, `brainstorming`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
+| The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
+| Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
+
+arcforge's hooks ship in the same tree, so Codex can see `hooks/hooks.json`. It will not execute anything there without an explicit persisted hook-trust grant, and arcforge never asks you for one — those hooks speak Claude Code's protocol and have nothing useful to say to Codex. Leave them untrusted.
+
+If you want the whole toolkit, use Claude Code.
 
 ## Quick start
 
@@ -115,7 +131,7 @@ See the **[Hooks System guide](docs/guide/hooks-system.md)** for per-hook behavi
 
 ## CLI
 
-Skills call the CLI for you; you rarely run it by hand. When you do, the bare `arcforge` form works anywhere Claude Code has loaded the plugin — it puts every plugin's `bin/` on PATH. From a local checkout with no plugin loaded, use `node scripts/cli.js <cmd>`.
+Skills call the CLI for you; you rarely run it by hand. When you do, the bare `arcforge` form works anywhere Claude Code has loaded the plugin — it puts every plugin's `bin/` on PATH. From a local checkout with no plugin loaded, use `node scripts/cli.js <cmd>`. Codex does not add plugin `bin/` directories to PATH, so on Codex the bare command does not resolve.
 
 Five command groups:
 
@@ -215,8 +231,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). It covers the Iron Law (no skill without
 
 ## Updating
 
+On Claude Code:
+
 ```bash
 /plugin update arcforge
+```
+
+On Codex CLI, refresh the marketplace snapshot, then reinstall:
+
+```bash
+codex plugin marketplace upgrade arcforge-dev
+codex plugin add arcforge@arcforge-dev
 ```
 
 ## Acknowledgements
