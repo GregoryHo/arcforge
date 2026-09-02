@@ -9,7 +9,7 @@
  * source of truth per `.claude/rules/plugin.md`) and compares it against every
  * other location that carries the version string.
  *
- * The checked set is anchored to the 8-location table in
+ * The checked set is anchored to the 9-location table in
  * `.claude/skills/releasing/SKILL.md`, NOT a raw grep — a grep catches the
  * deliberately-stale `package-lock.json` and misses the README badge. The table
  * is the maintained authoritative list.
@@ -44,9 +44,11 @@ function regexExtract(content, re) {
 }
 
 // Non-canonical locations to verify against the canonical version. Mirrors the
-// 8-location table in the releasing skill's SKILL.md (canonical baseline + 7 others).
+// 9-location table in the releasing skill's SKILL.md (canonical baseline + 8 others).
 // `package-lock.json` is intentionally excluded — SKILL.md documents it as
 // known-stale; never folded into a release commit.
+// `.agents/plugins/marketplace.json` is deliberately absent: the Codex
+// marketplace schema carries no version field, so there is nothing to drift.
 const LOCATIONS = [
   {
     file: 'package.json',
@@ -55,6 +57,12 @@ const LOCATIONS = [
   {
     file: '.claude-plugin/marketplace.json',
     extract: (c) => jsonField(c, (j) => j.plugins?.[0]?.version),
+  },
+  // The Codex manifest pair's version half — hand-maintained beside its Claude
+  // Code twin, so it drifts the same way `marketplace.json` once did.
+  {
+    file: '.codex-plugin/plugin.json',
+    extract: (c) => jsonField(c, (j) => j.version),
   },
   {
     file: 'README.md',
