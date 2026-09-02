@@ -89,9 +89,14 @@ was recorded about them.
   arcforge has no telemetry and no service of its own to report to. The one
   outbound path is diary enrichment, which runs the host tool over a parsed
   summary of the session — so that summary reaches the model the way any turn
-  of the session does, and nowhere else. It is opt-in (B-1), and it is not
-  privileged: the run gets the two tools it needs, sees only the directory the
-  draft lives in, and never bypasses the host's permission checks. State
+  of the session does, and nowhere else. It is opt-in (B-1), and it no longer
+  runs with permissions switched off: it gets two tools, `Read` and `Write`,
+  and the draft's own directory is added to the ones it may work in. It is not
+  a sandbox, and the spec does not claim one — the run still inherits the
+  directory it was started from, which is the project, and edits inside those
+  directories are auto-approved rather than prompted, because a detached run
+  has nobody to answer a prompt. What it no longer carries is the blanket
+  bypass of every check. State
   follows its scope: home-global
   state under
   `~/.arcforge/`, project-scoped state under the project's own
