@@ -39,8 +39,12 @@ across sessions until the threshold is met; reset is owned exclusively by
 
 ### On Session End (Stop) — `end.js`
 - Saves session metrics (duration, tool calls)
-- Records modified files from transcript parsing (parseTranscript)
-- Runs diary-capture (threshold-gated draft + counter reset)
+- Records modified files and tool names from transcript parsing (parseTranscript)
+- Stores verbatim recent user messages (`userMessageContent`) **only when
+  learning is enabled in some scope** — the parse itself is unconditional, so
+  the metadata above is recorded either way
+- Runs diary-capture (threshold-gated draft + counter reset; the enricher spawn
+  is behind the same learning opt-in)
 - Outputs session summary
 
 ## Triggers
@@ -74,12 +78,18 @@ Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
   "started": "2025-01-24T10:00:00.000Z",
   "lastUpdated": "2025-01-24T12:30:00.000Z",
   "toolCalls": 47,
+  "userMessages": 12,
+  "toolsUsed": ["Read", "Edit", "Bash"],
   "filesModified": [
     "src/foo.ts",
     "tests/foo.test.ts"
   ]
 }
 ```
+
+Every field above is continuity and is written regardless of the learning
+opt-in. One field is not: `userMessageContent` — the last 10 user messages,
+each truncated — is added only when learning is enabled in some scope.
 
 ## Output Examples
 

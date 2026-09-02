@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.1.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -56,12 +56,23 @@ down, never block the user, and never observe them uninvited.
   observation registrations check for an enabled configuration and exit before
   doing any work when learning is off — the default — so with learning off
   nothing is observed and no pattern is ever mined. Session bookkeeping sits
-  outside that gate and runs either way: every session leaves a durable record
-  on disk, and a session that passes the activity threshold additionally writes
-  a diary draft, stores in that record the recent user messages the draft is
-  built from, and hands the draft to a background enrichment run. There is no
-  per-hook switch: the single opt-in covers the learning loop, disabling
-  learning stops it, and uninstalling the plugin removes everything.
+  outside that gate and runs either way, but *depth* is split by what the field
+  is: metadata about the session is continuity, the user's own words and
+  anything handed to a model are not.
+
+  | Recorded on a threshold hit | Learning off | Learning on |
+  |---|---|---|
+  | Session record: duration, message and tool counts, compactions | yes | yes |
+  | Tool names used, files modified (paths) | yes | yes |
+  | Diary draft (built from those counts alone) | yes | yes |
+  | Verbatim recent user messages, in the session record | **no** | yes |
+  | Background enrichment run over a session summary | **no** | yes |
+
+  So with learning off the draft is written but never filled in: its unfilled
+  sections are the contract, not a failed enrichment, and the hooks do not
+  report them as one. There is no per-hook switch: the single opt-in covers the
+  learning loop in either scope, disabling learning stops it, and uninstalling
+  the plugin removes everything.
 
 ### Performance
 - **B-7 The synchronous path stays small.** Observation writes and
@@ -105,3 +116,8 @@ of its own (B-5).
 The warn-only and fail-open stances predate this log; their rationale is
 inline above (B-2, B-3). The error-handling tier that
 implements fail-open is pinned in `.claude/rules/coding-standards.md`.
+
+- **D-010** — session capture depth: counts always, verbatim user prose only
+  under the opt-in (B-6).
+- **D-009** — the enrichment run that B-6 gates is also unprivileged
+  ([learning](learning.md) B-9).

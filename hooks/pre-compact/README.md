@@ -15,8 +15,12 @@ diary when the threshold is met.
 3. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
    Delegates to the shared diary-capture core (`scripts/lib/diary-capture.js`),
    the same path the Stop hook runs:
-   - Generates the auto-diary draft
-   - Spawns the background diary enricher (dual path — Stop AND PreCompact)
+   - Generates the auto-diary draft (always — it is built from counts)
+   - Spawns the background diary enricher **only when learning is enabled in
+     some scope** (dual path — Stop AND PreCompact). With learning off the
+     draft keeps its `TO BE ENRICHED` stubs; that is the contract, not a
+     failure. `projectRoot` is passed explicitly so the opt-in is read from the
+     project, not from the compaction cwd.
    - Resets both counters (the sole reset path)
 
    Then it queues a `diary-ready` pending action for the next `SessionStart`.
