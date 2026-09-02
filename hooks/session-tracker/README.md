@@ -17,7 +17,10 @@ Provides session persistence and SessionStart context injection.
 Emits one combined JSON with two channels (see `hooks.md` → Output Visibility):
 
 - **additionalContext** (Claude-visible): activated behavioral instincts,
-  pending action notifications, stale-draft warnings.
+  pending action notifications, stale-draft warnings (only for drafts written
+  since the learning opt-in took effect — stubs from a learning-off period are
+  by design, so counting them would report the whole backlog the moment a user
+  opts in).
 - **systemMessage** (user-visible): a brief one-line summary, plus
   discoverability hints (available session aliases, recent global promotions).
 
