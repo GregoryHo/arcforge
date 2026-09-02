@@ -194,8 +194,8 @@ rationale intact. A pivot is two small edits, not a rewrite.
 Implementing a spec is ordinary disciplined development — this system bookends it, it
 does not add ceremony.
 1. Flip the row to `Status: building` **and** the spec header to `building vX.Y.Z`
-   (or the compound form, per mechanical rule 2). One edit, both halves;
-   `npm run check:product` proves you did both.
+   (or the compound form, per mechanical rule 2). One edit, both halves; C4 in
+   `npm run check:product` proves you did both (the `Tag` stays `—` either way).
 2. Branch from `main`. Build the spec's **Behavior** items test-first — a failing
    test per `B-id` → make it pass → refactor. Keep the 5 runners and the 6 static
    checks green.
