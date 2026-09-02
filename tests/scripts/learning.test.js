@@ -145,10 +145,14 @@ describe('learning subsystem MVP-1', () => {
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
     });
 
-    it('falls back to the config mtime when updated_at is missing', () => {
+    it.each([
+      ['missing', { scope: 'project', enabled: true }],
+      ['unparseable', { scope: 'project', enabled: true, updated_at: 'garbage' }],
+      ['not a string', { scope: 'project', enabled: true, updated_at: {} }],
+    ])('falls back to the config mtime when updated_at is %s', (_label, config) => {
       const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
-      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+      fs.writeFileSync(configPath, JSON.stringify(config));
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(fs.statSync(configPath).mtimeMs);
     });
   });
