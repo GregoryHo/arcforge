@@ -198,6 +198,12 @@ function tryGenerateAutoDiary(project, date, sessionId) {
  * pre-approves, it does not deny, so it changed nothing here and would have
  * read like a confinement it does not provide.
  *
+ * What this is NOT, so no caller or doc overstates it: no `cwd` is passed, so
+ * the child inherits this process's working directory — the user's project —
+ * and --add-dir ADDS the draft's directory alongside it rather than restricting
+ * the run to it. Together with acceptEdits that means edits are auto-approved
+ * across both. This is a narrowing of the old blanket bypass, not a sandbox.
+ *
  * @param {string} draftPath - Path to the draft to enrich.
  * @param {Object} transcriptData - { userMessages, toolsUsed, filesModified, stats }.
  * @param {string} project - Project name (for the enricher.log location).

@@ -262,7 +262,7 @@ describe('diary-capture', () => {
       return null;
     }
 
-    it('drops --dangerously-skip-permissions and confines the run to the draft dir', async () => {
+    it('drops --dangerously-skip-permissions and adds the draft dir with acceptEdits', async () => {
       const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
       const draftPath = path.join(homeDir, '.arcforge', 'diaries', 'demo', '2026-06-14', 'd.md');
       fs.mkdirSync(path.dirname(draftPath), { recursive: true });

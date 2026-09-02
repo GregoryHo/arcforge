@@ -45,7 +45,7 @@ describe('spawnDiaryEnricher invocation', () => {
     assert.ok(
       !argv.includes('--dangerously-skip-permissions'),
       'the enricher must not bypass every permission check — it runs --tools Read,Write ' +
-        'confined to the draft directory with --permission-mode acceptEdits.',
+        'with the draft directory added via --add-dir and --permission-mode acceptEdits.',
     );
   });
 
