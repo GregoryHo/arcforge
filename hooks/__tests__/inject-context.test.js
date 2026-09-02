@@ -169,6 +169,7 @@ describe('inject-context SessionStart child process (S7-1)', () => {
 // ─────────────────────────────────────────────
 
 describe('inject-context stale-draft warning gate (D-009)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
   let homeDir;
   let projectDir;
   let project;
@@ -177,19 +178,41 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-home-'));
     projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-proj-'));
     project = path.basename(projectDir);
-    // One unenriched draft — the shape the warning fires on.
-    const dir = path.join(homeDir, '.arcforge', 'diaries', project, '2026-09-01');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
-      path.join(dir, 'diary-session-xyz-draft.md'),
-      '# Diary\n\n## Decisions\n<!-- TO BE ENRICHED -->\n- \n',
-    );
   });
 
   afterEach(() => {
     fs.rmSync(homeDir, { recursive: true, force: true });
     fs.rmSync(projectDir, { recursive: true, force: true });
   });
+
+  /**
+   * Write one unenriched draft — the shape the warning fires on — stamped
+   * `ageMs` in the past. Ages are whole days apart so filesystem timestamp
+   * granularity never decides an assertion.
+   */
+  function writeStaleDraft(name, ageMs) {
+    const dir = path.join(homeDir, '.arcforge', 'diaries', project, '2026-09-01');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, '# Diary\n\n## Decisions\n<!-- TO BE ENRICHED -->\n- \n');
+    const at = new Date(Date.now() - ageMs);
+    fs.utimesSync(file, at, at);
+    return file;
+  }
+
+  /** Turn the project-scope opt-in on, as of `ageMs` in the past. */
+  function enableLearning(ageMs) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        scope: 'project',
+        enabled: true,
+        updated_at: new Date(Date.now() - ageMs).toISOString(),
+      }),
+    );
+  }
 
   function runInject() {
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
@@ -207,6 +230,8 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
   }
 
   it('stays silent with learning off — unenriched drafts are the contract, not a failure', () => {
+    writeStaleDraft('diary-session-xyz-draft.md', 2 * DAY_MS);
+
     const res = runInject();
     assert.strictEqual(res.status, 0, res.stderr);
     assert.ok(
@@ -215,16 +240,40 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
     );
   });
 
-  it('warns once learning is on — then the enricher really should have run', () => {
-    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  it('warns about a draft written after the opt-in — the enricher really should have run', () => {
+    enableLearning(3 * DAY_MS);
+    writeStaleDraft('diary-session-xyz-draft.md', 2 * DAY_MS);
 
     const res = runInject();
     assert.strictEqual(res.status, 0, res.stderr);
     assert.ok(
       res.stdout.includes('unenriched'),
       `learning-on session must surface the stale-draft warning. stdout: ${res.stdout}`,
+    );
+  });
+
+  it('opting in does not report the learning-off backlog, only what came after', () => {
+    // Three drafts accumulated while learning was off — all by-design stubs.
+    writeStaleDraft('diary-session-a-draft.md', 5 * DAY_MS);
+    writeStaleDraft('diary-session-b-draft.md', 4 * DAY_MS);
+    writeStaleDraft('diary-session-c-draft.md', 3 * DAY_MS);
+    enableLearning(0);
+
+    const first = runInject();
+    assert.strictEqual(first.status, 0, first.stderr);
+    assert.ok(
+      !first.stdout.includes('unenriched'),
+      `the first session after opting in must not report the backlog. stdout: ${first.stdout}`,
+    );
+
+    // A draft the enricher was authorized for, and left stale, still warns —
+    // and reports only itself.
+    writeStaleDraft('diary-session-d-draft.md', 0);
+    const second = runInject();
+    assert.strictEqual(second.status, 0, second.stderr);
+    assert.ok(
+      second.stdout.includes('1 diary draft unenriched'),
+      `only the post-opt-in draft should be counted. stdout: ${second.stdout}`,
     );
   });
 });

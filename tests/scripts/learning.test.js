@@ -16,6 +16,7 @@ const {
   isLearningEnabled,
   isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
+  learningEnabledSince,
   listLearningInbox,
   loadCandidates,
   materializeCandidate,
@@ -114,6 +115,41 @@ describe('learning subsystem MVP-1', () => {
       setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
       setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
       expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+  });
+
+  // The stale-draft healthcheck needs "since when", not just "is it on":
+  // drafts from a learning-off period are by-design stubs (D-009).
+  describe('learningEnabledSince', () => {
+    const EARLY = '2026-01-01T00:00:00.000Z';
+    const LATE = '2026-06-01T00:00:00.000Z';
+
+    it('is null when neither scope is enabled', () => {
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBeNull();
+    });
+
+    it("returns the enabled scope's updated_at", () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
+    it('returns the EARLIEST scope — when enrichment first became authorized', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    it('ignores a disabled scope, however recently it was written', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    it('falls back to the config mtime when updated_at is missing', () => {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(fs.statSync(configPath).mtimeMs);
     });
   });
 

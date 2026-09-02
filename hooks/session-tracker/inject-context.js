@@ -38,7 +38,7 @@ const { getArcforgeHome } = require('../../scripts/lib/utils');
 const { listActivatedCandidateIds } = require('../../scripts/lib/learning-curator/activate');
 const {
   isInjectActivatedInstinctsEnabled,
-  isLearningEnabledAnyScope,
+  learningEnabledSince,
 } = require('../../scripts/lib/learning');
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
@@ -150,10 +150,32 @@ function loadInstinctFiles(dir) {
 // single owner shared by this healthcheck and the curator batch-assembler.
 
 /**
+ * Whether a draft was written before enrichment was ever authorized.
+ * Fails open — an unreadable timestamp lets the stub probe decide.
+ */
+function draftPredatesOptIn(filePath, enabledSince) {
+  try {
+    return fs.statSync(filePath).mtimeMs < enabledSince;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns { count, message } when stale drafts exist, else null.
  * Surfaces silent enrichment failures so they don't accumulate forever.
+ *
+ * Only drafts written since the learning opt-in count. Drafts from a
+ * learning-off period keep their stubs by design (D-009), so counting them
+ * would turn the first session after opting in into a report of the entire
+ * backlog — and the message's diagnosis ("the enricher may be failing") would
+ * be wrong about every one of them.
+ *
+ * @param {string} project
+ * @param {number} [enabledSince] - Epoch ms the opt-in took effect; 0 (the
+ *   default) applies no floor and counts every stale draft.
  */
-function loadStaleDraftWarning(project) {
+function loadStaleDraftWarning(project, enabledSince = 0) {
   try {
     const dir = getProjectDiariesDir(project);
     if (!fs.existsSync(dir)) return null;
@@ -164,7 +186,9 @@ function loadStaleDraftWarning(project) {
       const dateDirPath = path.join(dir, dateEntry.name);
       for (const file of fs.readdirSync(dateDirPath)) {
         if (!file.startsWith('diary-') || !file.endsWith('-draft.md')) continue;
-        if (draftIsStale(path.join(dateDirPath, file))) stale++;
+        const draftPath = path.join(dateDirPath, file);
+        if (draftPredatesOptIn(draftPath, enabledSince)) continue;
+        if (draftIsStale(draftPath)) stale++;
       }
     }
 
@@ -325,11 +349,12 @@ function main() {
   // Stale-draft healthcheck (re-evaluated every session start, not consumed).
   // Only meaningful once enrichment can run: with learning off, drafts keep
   // their TO BE ENRICHED stubs by design (D-009), so the warning would be a
-  // permanent complaint about intended behavior.
+  // permanent complaint about intended behavior. The opt-in TIMESTAMP, not just
+  // the flag, is what bounds it — otherwise the whole learning-off backlog
+  // surfaces at once on the first session after opting in.
   const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const staleWarning = isLearningEnabledAnyScope({ projectRoot })
-    ? loadStaleDraftWarning(project)
-    : null;
+  const enabledSince = learningEnabledSince({ projectRoot });
+  const staleWarning = enabledSince === null ? null : loadStaleDraftWarning(project, enabledSince);
   if (staleWarning) {
     contextParts.push(staleWarning.message);
     userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);

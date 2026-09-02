@@ -120,6 +120,54 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
 }
 
 /**
+ * Timestamp at which the learning opt-in took effect, in epoch ms.
+ *
+ * `isLearningEnabledAnyScope` answers "may we capture now"; this answers "since
+ * when", which is what any healthcheck over accumulated artifacts needs. With
+ * learning off, diary drafts keep their unfilled sections by design (D-009), so
+ * every stub from that period is expected. A check that only asked "is learning
+ * on" would report the whole backlog the moment a user opted in — moving the
+ * false alarm to the opt-in boundary instead of removing it.
+ *
+ * The source is `updated_at`, which `setLearningEnabled` writes and nothing
+ * else in the engine touches. A config without it (hand-written, or older than
+ * the field) falls back to the file's mtime; one that cannot be stat'd returns
+ * 0, so an unreadable timestamp warns about everything rather than going quiet
+ * on a real failure. When both scopes are enabled the EARLIEST wins — that is
+ * the moment enrichment first became authorized.
+ *
+ * Accepted cost: disabling and re-enabling moves the floor forward, so drafts
+ * left stale before the toggle stop being reported. A missed warning is the
+ * cheaper failure than a permanent one about intended behavior.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
+ * @param {string} [opts.homeDir] - Override for the global config's home.
+ * @returns {number|null} Epoch ms, or null when learning is off in both scopes.
+ */
+function learningEnabledSince({ projectRoot = process.cwd(), homeDir } = {}) {
+  let earliest = null;
+  for (const scope of ['project', 'global']) {
+    const config = readScopeConfig({ scope, projectRoot, homeDir });
+    if (config.enabled !== true) continue;
+    const at = scopeEnabledAt(config, getLearningConfigPath({ scope, projectRoot, homeDir }));
+    if (earliest === null || at < earliest) earliest = at;
+  }
+  return earliest;
+}
+
+/** When one enabled scope was last written. See learningEnabledSince. */
+function scopeEnabledAt(config, configPath) {
+  const stamped = Date.parse(config.updated_at ?? '');
+  if (!Number.isNaN(stamped)) return stamped;
+  try {
+    return fs.statSync(configPath).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Kill-switch for SessionStart injection of activated instincts (ICL-4).
  *
  * DEFAULT ON: injection happens unless `inject_activated_instincts` is set to
@@ -773,6 +821,7 @@ module.exports = {
   inspectCandidate,
   isLearningEnabled,
   isLearningEnabledAnyScope,
+  learningEnabledSince,
   isInjectActivatedInstinctsEnabled,
   listLearningInbox,
   listMaterializedDrafts,
