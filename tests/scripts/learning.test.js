@@ -14,6 +14,7 @@ const {
   getLearningConfigPath,
   inspectCandidate,
   isLearningEnabled,
+  isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
   listLearningInbox,
   loadCandidates,
@@ -92,6 +93,28 @@ describe('learning subsystem MVP-1', () => {
     });
 
     expect(isLearningEnabled({ scope: 'project', projectRoot, homeDir })).toBe(false);
+  });
+
+  describe('isLearningEnabledAnyScope', () => {
+    it('is false when neither scope is enabled', () => {
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(false);
+    });
+
+    it('is true when only the project scope is enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+
+    it('is true when only the global scope is enabled', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+
+    it('is true when both scopes are enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
   });
 
   describe('inject_activated_instincts kill-switch (ICL-4)', () => {

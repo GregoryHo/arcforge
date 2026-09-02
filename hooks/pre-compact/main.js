@@ -98,7 +98,15 @@ function main() {
 
     // Shared diary-capture core: threshold gate → draft → background enricher
     // → counter reset. Enricher fires on PreCompact too (dual-path ON).
-    const { triggered, userCount, toolCount } = runDiaryCapture({ project, date, sessionId });
+    // projectRoot is passed explicitly: runDiaryCapture reads the learning
+    // opt-in from it, and the compaction cwd is not a reliable stand-in.
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const { triggered, userCount, toolCount } = runDiaryCapture({
+      project,
+      date,
+      sessionId,
+      projectRoot,
+    });
 
     if (triggered) {
       // Stamp the current counts onto the session file.

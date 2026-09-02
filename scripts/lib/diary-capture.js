@@ -17,6 +17,12 @@
  * (getSuggesterStatePath) so ICL-9's compaction reset re-uses one filename
  * instead of re-deriving it, and the SOLE stale-draft probe (draftIsStale)
  * imported by inject-context and the curator batch-assembler.
+ *
+ * Consent split (D-009 / D-010): the draft is continuity and is written either
+ * way, from counts alone. ENRICHMENT is not — it hands a session summary to a
+ * model — so it runs only when learning is enabled in some scope. With learning
+ * off the draft therefore keeps its `TO BE ENRICHED` stubs permanently; that is
+ * the contract, not a failure.
  */
 
 const fs = require('node:fs');
@@ -114,6 +120,32 @@ function draftIsStale(filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Consent gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the learning opt-in authorizes handing session content to a model.
+ *
+ * `./learning` is required LAZILY on purpose: compact-suggester imports this
+ * module on the synchronous PostToolUse path (hooks B-7), and that path must
+ * not pay learning.js's module-load cost on every tool call. The gate is only
+ * ever consulted from the Stop/PreCompact paths, which are already off it.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
+ * @returns {boolean}
+ */
+function learningCaptureEnabled({ projectRoot = process.cwd() } = {}) {
+  try {
+    const { isLearningEnabledAnyScope } = require('./learning');
+    return isLearningEnabledAnyScope({ projectRoot });
+  } catch {
+    // Unreadable config is not consent.
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Draft generation + background enrichment
 // ---------------------------------------------------------------------------
 
@@ -147,6 +179,24 @@ function tryGenerateAutoDiary(project, date, sessionId) {
  * (inject-context) skips consuming the user's pending actions — otherwise the
  * detached enricher's session would eat diary-ready / reflect-ready /
  * ratify-pending before the user's next session sees them.
+ *
+ * Permissions (D-009). The run used to pass --dangerously-skip-permissions,
+ * which bypasses every check in the child. It now carries the narrowest set
+ * that still enriches, verified by spike against the real CLI:
+ *   --tools Read,Write        the only tools that exist in the child at all.
+ *   --add-dir <draft dir>     the draft lives outside the spawning cwd, so
+ *                             without this the write is refused outright.
+ *   --permission-mode acceptEdits
+ *                             auto-approves file edits inside those
+ *                             directories, replacing the blanket bypass. It is
+ *                             required, not a convenience: a detached run has
+ *                             nobody to answer a permission prompt, so without
+ *                             it the write simply hangs and the draft is never
+ *                             filled in.
+ *
+ * A per-file --allowed-tools allowlist was tried and deliberately left out: it
+ * pre-approves, it does not deny, so it changed nothing here and would have
+ * read like a confinement it does not provide.
  *
  * @param {string} draftPath - Path to the draft to enrich.
  * @param {Object} transcriptData - { userMessages, toolsUsed, filesModified, stats }.
@@ -185,7 +235,10 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
         '--max-turns',
         '10',
         '--print',
-        '--dangerously-skip-permissions',
+        '--add-dir',
+        path.dirname(draftPath),
+        '--permission-mode',
+        'acceptEdits',
         '--system-prompt',
         systemPrompt,
         '--tools',
@@ -221,33 +274,44 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
  * Shared diary-capture core for Stop and PreCompact.
  *
  * Reads the counters, gates on the shared threshold, and on a hit: generates a
- * draft, spawns the background enricher (BOTH event paths), then resets the
- * counters (the sole reset). Callers handle event-specific work (queuing
- * diary-ready vs reflect-ready, session-file updates).
+ * draft, spawns the background enricher when the learning opt-in allows it
+ * (BOTH event paths), then resets the counters (the sole reset). Callers handle
+ * event-specific work (queuing diary-ready vs reflect-ready, session-file
+ * updates).
+ *
+ * `projectRoot` is required for the consent gate and is deliberately explicit:
+ * defaulting it to process.cwd() would make the answer depend on wherever the
+ * caller happened to be running from.
  *
  * @param {Object} opts
  * @param {string} opts.project
  * @param {string} opts.date
  * @param {string} opts.sessionId
+ * @param {string} opts.projectRoot - Project root the learning opt-in is read from.
  * @param {Object} [opts.transcriptData] - { userMessages, toolsUsed, filesModified, stats }.
- * @returns {{ triggered: boolean, draftPath: string|null, userCount: number, toolCount: number }}
+ * @returns {{ triggered: boolean, draftPath: string|null, enriched: boolean,
+ *   userCount: number, toolCount: number }}
  */
 function runDiaryCapture(opts) {
-  const { project, date, sessionId, transcriptData = {} } = opts;
+  const { project, date, sessionId, projectRoot, transcriptData = {} } = opts;
   const { userCount, toolCount } = readCounts();
 
   if (!shouldTrigger(userCount, toolCount)) {
-    return { triggered: false, draftPath: null, userCount, toolCount };
+    return { triggered: false, draftPath: null, enriched: false, userCount, toolCount };
   }
 
   const draftPath = tryGenerateAutoDiary(project, date, sessionId);
-  if (draftPath) {
+
+  // The draft is continuity and is always written; enrichment sends a session
+  // summary to a model, so it waits for the opt-in (D-009).
+  const enriched = Boolean(draftPath) && learningCaptureEnabled({ projectRoot });
+  if (enriched) {
     spawnDiaryEnricher(draftPath, transcriptData, project);
   }
 
   resetCounters();
 
-  return { triggered: true, draftPath, userCount, toolCount };
+  return { triggered: true, draftPath, enriched, userCount, toolCount };
 }
 
 module.exports = {
@@ -257,6 +321,7 @@ module.exports = {
   incrementSharedToolCount,
   getSuggesterStatePath,
   draftIsStale,
+  learningCaptureEnabled,
   tryGenerateAutoDiary,
   spawnDiaryEnricher,
   runDiaryCapture,

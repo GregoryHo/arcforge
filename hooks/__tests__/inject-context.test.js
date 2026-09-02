@@ -163,3 +163,68 @@ describe('inject-context SessionStart child process (S7-1)', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────
+// Stale-draft warning is gated on the learning opt-in (D-009)
+// ─────────────────────────────────────────────
+
+describe('inject-context stale-draft warning gate (D-009)', () => {
+  let homeDir;
+  let projectDir;
+  let project;
+
+  beforeEach(() => {
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-home-'));
+    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-proj-'));
+    project = path.basename(projectDir);
+    // One unenriched draft — the shape the warning fires on.
+    const dir = path.join(homeDir, '.arcforge', 'diaries', project, '2026-09-01');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'diary-session-xyz-draft.md'),
+      '# Diary\n\n## Decisions\n<!-- TO BE ENRICHED -->\n- \n',
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  function runInject() {
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
+    delete env.ARCFORGE_SPAWNED;
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [INJECT_CONTEXT], {
+      input: JSON.stringify({
+        cwd: projectDir,
+        hook_event_name: 'SessionStart',
+        source: 'startup',
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+  }
+
+  it('stays silent with learning off — unenriched drafts are the contract, not a failure', () => {
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      !res.stdout.includes('unenriched'),
+      `learning-off session must not warn about unenriched drafts. stdout: ${res.stdout}`,
+    );
+  });
+
+  it('warns once learning is on — then the enricher really should have run', () => {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      res.stdout.includes('unenriched'),
+      `learning-on session must surface the stale-draft warning. stdout: ${res.stdout}`,
+    );
+  });
+});
