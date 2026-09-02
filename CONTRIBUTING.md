@@ -59,9 +59,9 @@ git checkout -b feat/my-contribution   # or fix/..., docs/...
 # 5. Run all 5 test runners
 npm test
 
-# 6. Run the 5 static checks — CI gates on these and npm test does not cover them
+# 6. Run the 6 static checks — CI gates on these and npm test does not cover them
 npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-  && npm run check:hooks && npm run check:eval-targets
+  && npm run check:hooks && npm run check:eval-targets && npm run check:product
 npm run lint
 
 # 7. Submit PR
@@ -289,7 +289,7 @@ arcforge uses five separate test runners. **All must pass before submitting a PR
 | Bash | `npm run test:observer-daemon` | `tests/observer-daemon/` | Observer daemon behavior |
 | **All** | **`npm test`** | All above | **Run this before every PR** |
 
-Five static checks run in CI and are **not** part of `npm test`:
+Six static checks run in CI and are **not** part of `npm test`:
 
 | Command | Guards |
 |---|---|
@@ -298,6 +298,7 @@ Five static checks run in CI and are **not** part of `npm test`:
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
 | `npm run check:hooks` | `hooks/hooks.json` schema |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
+| `npm run check:product` | `product/` roadmap, Decision Log, and spec headers stay consistent |
 
 ---
 
@@ -367,7 +368,7 @@ Use the escape hatch sparingly. If you find yourself adding many suppressions, t
 - Read existing skills, hooks, and tests before writing new ones
 - Follow existing patterns and conventions
 - Run `npm test` before submitting (all 5 runners must pass)
-- Run the 5 static checks so CI doesn't catch what you could have
+- Run the 6 static checks so CI doesn't catch what you could have
 - Include tests for new functionality
 - Keep skills inside the 250-line cap; use `references/` for overflow
 - Use `execFileSync` over `exec` (prevents shell injection)

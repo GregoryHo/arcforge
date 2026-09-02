@@ -15,14 +15,14 @@ Never start the release workflow on a broken branch.
 
 1. `npm run lint` — exit code 0 (warnings acceptable, errors are not)
 2. `npm test` — all **5** runners green (`test:scripts`, `test:hooks`, `test:node`, `test:skills`, `test:observer-daemon`)
-3. The **5 static checks**, which are CI-gated but deliberately *not* part of `npm test` — run each and require exit 0:
+3. The **6 static checks**, which are CI-gated but deliberately *not* part of `npm test` — run each and require exit 0:
 
    ```bash
    npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-     && npm run check:hooks && npm run check:eval-targets
+     && npm run check:hooks && npm run check:eval-targets && npm run check:product
    ```
 
-   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 5 and must be green after it. The other four must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward.
+   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 5 and must be green after it. The other five must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward.
 4. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
 5. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
 6. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
@@ -199,7 +199,7 @@ For releases that change **shipped surface area** (new skill, removed CLI flag, 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
 - Stage exactly the 9 release files (8 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 5 runners green, 5 static checks green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
+- `gh pr create` with a test-plan checklist in the body: 5 runners green, 6 static checks green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
 
 ### 7. After PR merges to main — tag it
 
