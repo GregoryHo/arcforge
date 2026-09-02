@@ -131,11 +131,19 @@ function draftIsStale(filePath) {
  * not pay learning.js's module-load cost on every tool call. The gate is only
  * ever consulted from the Stop/PreCompact paths, which are already off it.
  *
+ * Fails CLOSED on a missing projectRoot rather than falling back to
+ * process.cwd(): consent belongs to a project the caller named, and a cwd is
+ * whatever directory the host happened to start the hook in. Answering from it
+ * would let an unrelated project's opt-in authorize this one's capture. A
+ * caller that forgets the argument gets "no consent", never a guess.
+ *
  * @param {Object} [opts]
- * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
+ * @param {string} [opts.projectRoot] - Project root whose scoped config to
+ *   read. Omitted or blank means no consent.
  * @returns {boolean}
  */
-function learningCaptureEnabled({ projectRoot = process.cwd() } = {}) {
+function learningCaptureEnabled({ projectRoot } = {}) {
+  if (typeof projectRoot !== 'string' || projectRoot.trim() === '') return false;
   try {
     const { isLearningEnabledAnyScope } = require('./learning');
     return isLearningEnabledAnyScope({ projectRoot });
@@ -285,15 +293,19 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
  * event-specific work (queuing diary-ready vs reflect-ready, session-file
  * updates).
  *
- * `projectRoot` is required for the consent gate and is deliberately explicit:
- * defaulting it to process.cwd() would make the answer depend on wherever the
- * caller happened to be running from.
+ * `projectRoot` carries the consent gate and is deliberately explicit: it is
+ * never defaulted to process.cwd(), which would make the answer depend on
+ * wherever the caller happened to be running from. Omit it and the gate reads
+ * as "no consent" (learningCaptureEnabled fails closed) — the draft is still
+ * written, the enricher is not spawned. That is a degraded call, not an error:
+ * hooks silently catch, so throwing here would take the draft down with it.
  *
  * @param {Object} opts
  * @param {string} opts.project
  * @param {string} opts.date
  * @param {string} opts.sessionId
- * @param {string} opts.projectRoot - Project root the learning opt-in is read from.
+ * @param {string} opts.projectRoot - Project root the learning opt-in is read
+ *   from. Omitted means no consent: draft yes, enrichment no.
  * @param {Object} [opts.transcriptData] - { userMessages, toolsUsed, filesModified, stats }.
  * @returns {{ triggered: boolean, draftPath: string|null, enriched: boolean,
  *   userCount: number, toolCount: number }}

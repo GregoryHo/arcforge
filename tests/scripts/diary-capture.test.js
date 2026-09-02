@@ -204,6 +204,30 @@ describe('diary-capture', () => {
       expect(await waitForMarker(marker, 1000)).toBeNull();
     });
 
+    it('fails closed when projectRoot is omitted — draft yes, enricher no', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      // A GLOBAL opt-in answers true for any projectRoot, so nothing but the
+      // fail-closed guard can stop the spawn here: if the gate ever falls back
+      // to process.cwd() again, this test spawns and fails.
+      const globalConfig = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+      fs.mkdirSync(path.dirname(globalConfig), { recursive: true });
+      fs.writeFileSync(globalConfig, JSON.stringify({ scope: 'global', enabled: true }));
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        // projectRoot deliberately omitted.
+      });
+
+      expect(result.triggered).toBe(true);
+      expect(fs.existsSync(result.draftPath)).toBe(true);
+      expect(result.enriched).toBe(false);
+      expect(await waitForMarker(path.join(binDir, 'spawned.marker'), 1000)).toBeNull();
+    });
+
     it('spawns the enricher on a GLOBAL-scope opt-in too', async () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');
       const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
