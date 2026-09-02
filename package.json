@@ -20,6 +20,8 @@
     "!hooks/__tests__/",
     "scripts/",
     ".claude-plugin/",
+    ".codex-plugin/",
+    ".agents/",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"

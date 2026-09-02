@@ -72,6 +72,8 @@ const PATH_PREFIXES = [
   'templates/',
   'agents/',
   '.claude-plugin/',
+  '.codex-plugin/',
+  '.agents/',
   'guide/',
   'decisions/',
   'plans/',

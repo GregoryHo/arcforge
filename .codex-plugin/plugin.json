@@ -1,0 +1,29 @@
+{
+  "name": "arcforge",
+  "version": "6.0.0",
+  "description": "Minimal, composable skill toolkit for AI coding agents: intent-first routing, self-contained skills, TDD, opt-in session learning",
+  "author": {
+    "name": "Gregory Ho",
+    "url": "https://github.com/GregoryHo"
+  },
+  "homepage": "https://github.com/GregoryHo/arcforge",
+  "repository": "https://github.com/GregoryHo/arcforge",
+  "license": "MIT",
+  "keywords": ["skills", "tdd", "workflows", "planning", "review", "worktrees", "arcforge"],
+  "skills": "./skills/core/",
+  "interface": {
+    "displayName": "arcforge",
+    "shortDescription": "Skills for disciplined coding work, quiet until the work needs them",
+    "longDescription": "arcforge gives an agent 15 self-contained skills — design exploration, task execution, test-first implementation, root-cause debugging, code review, session continuity. Each fires from its own description when the situation matches and stays out of the way otherwise, so there is no mandatory pipeline to enter through. On Codex the skills load; the hooks, learning, eval, and loop subsystems are Claude Code only.",
+    "developerName": "Gregory Ho",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/GregoryHo/arcforge",
+    "defaultPrompt": [
+      "Map this task to the right arcforge skill.",
+      "Think this through before I write any code.",
+      "Write it test-first, red then green."
+    ],
+    "brandColor": "#ff6a3d"
+  }
+}
