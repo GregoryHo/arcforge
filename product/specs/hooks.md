@@ -67,6 +67,13 @@ down, never block the user, and never observe them uninvited.
   | Diary draft (built from those counts alone) | yes | yes |
   | Verbatim recent user messages, in the session record | **no** | yes |
   | Background enrichment run over a session summary | **no** | yes |
+  | Reflection nudge ("N diaries ready for reflection") | **no** | yes |
+
+  The last row is why the nudge and the diary-ready notice split: diary-ready
+  points at a continuity artifact that exists and can be read now, while
+  reflection is the learning loop itself, which [learning](learning.md) B-1
+  keeps off. Left ungated it would re-queue at every threshold hit, forever,
+  over diaries the user never authorized anything to be made of.
 
   So with learning off the draft is written but never filled in: its unfilled
   sections are the contract, not a failed enrichment, and the hooks do not

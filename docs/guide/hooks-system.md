@@ -71,12 +71,14 @@ calls — `session-end` also writes a diary draft under `~/.arcforge/diaries/`.
 The draft is built from the counts above, and its interpretive sections are
 left as `TO BE ENRICHED` stubs.
 
-Two further things happen at that same threshold, and **only if you have turned
-learning on**: your ten most recent messages (truncated) are stored in the
-session record, and a short background run is started to fill the draft's stubs
-in. With learning off, neither does — so a draft you open will still have its
-stubs. That is the intended state, not a failure, and nothing will warn you
-about it.
+Three further things happen at that same threshold, and **only if you have
+turned learning on**: your ten most recent messages (truncated) are stored in
+the session record, a short background run is started to fill the draft's stubs
+in, and — once a few drafts have accumulated — a note appears at your next
+session start offering to reflect over them. With learning off, none of the
+three does, so a draft you open will still have its stubs. That is the intended
+state, not a failure: nothing warns you about it and nothing keeps offering to
+process it.
 
 `pre-compact` runs just before compaction and captures what is about to be
 dropped, so the part of a long session worth keeping survives the boundary.

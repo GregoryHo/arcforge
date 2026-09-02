@@ -34,7 +34,10 @@ was recorded about them.
   the user's own words are stored: **diary enrichment — the one outbound path
   (B-9) — runs only under the opt-in**, so with learning off a draft keeps its
   unfilled sections permanently, and that stub is the contract rather than a
-  failure to report. Enabling is an explicit, scoped act (`--project` or
+  failure to report. Nothing invites the user into the loop from that state
+  either: the reflection nudge waits for the same opt-in, because a permanent
+  offer to analyze diaries is itself a way of not taking "off" for an answer.
+  Enabling is an explicit, scoped act (`--project` or
   `--global`) but *being* enabled is not scoped: either scope authorizes
   capture. Status is always inspectable.
 - **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,
