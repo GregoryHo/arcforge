@@ -184,9 +184,9 @@ It was green before this step and it must be green after — a `building` row wi
 What it catches is a **half-done flip**: the row moved but a spec header didn't, or
 the `Tag` cell was left empty (or still reads `—`). That is the failure that actually
 happens, because the four edits live in four different files and only the first one
-feels like "the release". Edit 4 is the one it cannot make for you — C1 counts
-markers, so a `← we are here` left behind on the row that just shipped passes green.
-Re-read that one yourself.
+feels like "the release". Edit 4 is the one it cannot judge for you — C1 counts
+markers, it does not know which row deserves one, so a marker that should have moved
+and didn't passes green. Re-read that one yourself.
 
 Commit this on its own, ahead of the release commit:
 

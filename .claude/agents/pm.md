@@ -41,12 +41,16 @@ engine does something else" is a finding you hand back, not a file you edit.
    version* — and follow it step for step. Don't improvise a shortcut.
 3. Make the edit. Prefer the smallest one that is true: a wish is one line, a
    decision is six fields, a spec change is the `B-` item that actually moved.
-4. Run `npm run check:product` and report its output. A green run is evidence that
-   the numbering, the flips, the marker, and the spec headers all agree — it is not
-   evidence that what you wrote is *right*, so say what you changed and why.
+4. Hand off `npm run check:product`. You cannot run it — your `tools:` allowlist
+   holds no Bash, deliberately — so name it as the next step for the human or the
+   `qa` agent, and say which of its rules your edit touched. Note what a green run
+   would and would not mean: it proves the numbering, the flips, the `Tag` cells, and
+   the spec headers agree, never that what you wrote is *right*. Say what you changed
+   and why regardless.
 
 ## Report back
 
 State which playbook you ran, the `D-id`s you appended (never reused), which specs
-changed, and the `check:product` result. If you found drift you were not asked to
-fix, name it; do not fix it silently.
+changed, and that `npm run check:product` still needs running — by whom, and on which
+rules your edit lands. If you found drift you were not asked to fix, name it; do not
+fix it silently.

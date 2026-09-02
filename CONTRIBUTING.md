@@ -50,7 +50,7 @@ Three consequences for a PR:
 - **A choice becomes a `D-NNN`** in the ROADMAP Decision Log, cited from the spec it pins. Recorded decisions are never edited or renumbered — reverse one by appending a superseding entry and flipping one line on the old one.
 - **`npm run check:product` gates the mechanical half** — one `← we are here` marker, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row, and a `Tag` cell that agrees with its row's status. It cannot tell whether what you wrote is *true*; that is what review is for.
 
-Two project-local agents make this cheaper: `pm` writes `product/**` and nothing else, `qa` runs the gates and changes nothing. See `.claude/agents/README.md`.
+Two project-local agents make this cheaper: `pm` is scoped to write `product/**` and nothing else, `qa` runs the gates and holds no editing tools. See `.claude/agents/README.md`.
 
 Add one line to your pre-PR check, alongside the runners and the static checks:
 

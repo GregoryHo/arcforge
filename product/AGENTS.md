@@ -216,8 +216,8 @@ whatever is next. `npm run check:product` is green before the flip and green aft
 what it catches is a *half-done* flip, which is the failure mode that actually
 happens. Three of the four edits are gated: the row's Status, its `Tag` cell, and
 every spec header the row governs all have to agree. The fourth is not — C1 counts
-markers, so a `← we are here` left on the row that just shipped passes green. Re-read
-that one yourself.
+markers, it does not know which row deserves one, so a marker that should have moved
+and didn't passes green. Re-read that one yourself.
 
 ## Few-shot — a decision and its later reversal
 
