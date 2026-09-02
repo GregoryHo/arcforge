@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.1.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -28,10 +28,15 @@ was recorded about them.
 - **B-1 Off until turned on.** With learning disabled — the default — the
   observation hooks exit before doing any work, so nothing is observed and no
   candidate is ever proposed. What the opt-in does not gate is session
-  bookkeeping: the durable session record, and the diary an active enough
+  bookkeeping: the durable session record, and the diary draft an active enough
   session produces, are continuity features that run either way
-  ([hooks](hooks.md) B-6). Enabling is an explicit, scoped act (`--project` or
-  `--global`), and status is always inspectable.
+  ([hooks](hooks.md) B-6). The line falls where content leaves the machine or
+  the user's own words are stored: **diary enrichment — the one outbound path
+  (B-9) — runs only under the opt-in**, so with learning off a draft keeps its
+  unfilled sections permanently, and that stub is the contract rather than a
+  failure to report. Enabling is an explicit, scoped act (`--project` or
+  `--global`) but *being* enabled is not scoped: either scope authorizes
+  capture. Status is always inspectable.
 - **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,
   observations become review-queue candidates automatically — and that is the
   *only* step of that pipeline that happens by itself. Every subsequent arrow
@@ -84,7 +89,10 @@ was recorded about them.
   arcforge has no telemetry and no service of its own to report to. The one
   outbound path is diary enrichment, which runs the host tool over a parsed
   summary of the session — so that summary reaches the model the way any turn
-  of the session does, and nowhere else. State follows its scope: home-global
+  of the session does, and nowhere else. It is opt-in (B-1), and it is not
+  privileged: the run gets the two tools it needs, sees only the directory the
+  draft lives in, and never bypasses the host's permission checks. State
+  follows its scope: home-global
   state under
   `~/.arcforge/`, project-scoped state under the project's own
   `.arcforge/learning/`, and materialized artifacts in the project tree itself,
@@ -123,3 +131,8 @@ location (B-9), and one session yields one diary (B-7).
 The conservative trust design — default-off, three gates, bounded injection,
 audit trail — predates this log; its rationale is inline above. The mechanical
 data contracts live in `docs/decisions/learning-curator-schema/`.
+
+- **D-009** — diary enrichment is opt-in, and the enricher loses its blanket
+  permissions (B-1, B-9).
+- **D-010** — session capture depth: counts always, verbatim user prose only
+  under the opt-in ([hooks](hooks.md) B-6).
