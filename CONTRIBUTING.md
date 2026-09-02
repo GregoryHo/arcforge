@@ -5,6 +5,7 @@ Welcome! arcforge is a skill-based agent toolkit for Claude Code. Contributions 
 ## Table of Contents
 
 - [Philosophy & Principles](#philosophy--principles)
+- [How we work](#how-we-work)
 - [Quick Start](#quick-start)
 - [Plugin Development](#plugin-development)
 - [Contributing Skills](#contributing-skills)
@@ -36,6 +37,24 @@ This is TDD applied to process documentation. You write pressure scenarios, watc
 - **Boring and obvious** — choose the simple, readable solution over the clever one
 
 See [`CLAUDE.md`](CLAUDE.md) for the command reference and `.claude/rules/` for the standing conventions.
+
+---
+
+## How we work
+
+arcforge is maintained **spec-driven**. `product/` holds the product's living state — one spec per feature area, a semver roadmap, an append-only Decision Log, and a backlog of un-scheduled wishes — and `product/AGENTS.md` is the guide to keeping it current. Engineering conventions stay in `.claude/rules/`; `product/` answers *what the toolkit does, for whom, and in what order*.
+
+Three consequences for a PR:
+
+- **A behavior change ships with its spec change in the same PR.** The spec describes the *current* product, not the original plan. A merged PR whose spec still describes the old behavior is incomplete, not tidy-later.
+- **A choice becomes a `D-NNN`** in the ROADMAP Decision Log, cited from the spec it pins. Recorded decisions are never edited or renumbered — reverse one by appending a superseding entry and flipping one line on the old one.
+- **`npm run check:product` gates the mechanical half** — one `← we are here` marker, a gap-free Decision Log, every supersession flipped, and spec headers matching their governing roadmap row. It cannot tell whether what you wrote is *true*; that is what review is for.
+
+Two project-local agents make this cheaper: `pm` writes `product/**` and nothing else, `qa` runs the gates and changes nothing. See `.claude/agents/README.md`.
+
+Add one line to your pre-PR check, alongside the runners and the static checks:
+
+- [ ] relevant `product/specs/*.md` updated in this PR (+ `D-NNN` recorded when a choice was made)
 
 ---
 
