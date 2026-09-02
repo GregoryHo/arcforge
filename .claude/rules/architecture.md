@@ -113,10 +113,26 @@ rules, or tests.
   instructions, and harness/eval isolation. For simple answers, read-only
   inspection, grading, or single-skill evals, do not force routing.
 
-## Single Platform
+## Packaging Targets
 
-arcforge targets Claude Code only. There is no platform-agnostic /
-platform-specific split to maintain, and no second packaging target.
+One codebase, two manifests, no source split. Claude Code installs over
+`.claude-plugin/`; Codex CLI installs over `.codex-plugin/plugin.json` +
+`.agents/plugins/marketplace.json`. The manifest pair is the *entire* difference
+— there is no platform-agnostic / platform-specific source tree, no per-target
+copy of a skill, and no build step that emits one target from the other.
+
+What each target gets is not symmetric, and that asymmetry is the contract:
+
+- **Skills port; nothing else does.** All 15 skills load on both hosts. Hooks,
+  learning, eval, and loop are Claude Code only — they depend on Claude Code's
+  hook protocol and on `claude` being spawnable, neither of which Codex offers.
+- **The D9 bare-`arcforge` boundary is Claude Code's.** Codex does not put a
+  plugin's `bin/` on PATH (spike-verified), so on Codex the CLI-backed skills
+  report `command not found` rather than silently misbehaving. D1/D9 do not
+  bend for this: a skill still never builds a path to the engine.
+
+Details and rationale: `.claude/rules/plugin.md` (the manifest pair) and
+`product/specs/codex-harness.md` (why the boundary sits here).
 
 ## Directory Layout
 

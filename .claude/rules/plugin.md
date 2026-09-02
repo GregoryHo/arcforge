@@ -1,7 +1,9 @@
 # Plugin
 
-arcforge targets **Claude Code only**. There is no second packaging target to
-keep in sync.
+arcforge ships **one source tree with two plugin manifests**: Claude Code reads
+`.claude-plugin/`, Codex CLI reads `.codex-plugin/` + `.agents/plugins/`. There is
+no platform-specific source split — see *The Codex manifest pair* below for what
+each target actually loads.
 
 ## Plugin Manifest (`.claude-plugin/plugin.json`)
 
@@ -58,6 +60,49 @@ Consequences to work with, not around:
 - Installation: `claude plugin install arcforge@arcforge-dev`
 - Source types: GitHub repo, git URL, npm, pip, relative path
 
+## The Codex manifest pair (`.codex-plugin/` + `.agents/plugins/`)
+
+Codex CLI installs from the same repo root over a second manifest pair. Both
+files are hand-maintained alongside their Claude Code twins; nothing generates
+one from the other.
+
+| File | Read by | Carries |
+|---|---|---|
+| `.claude-plugin/plugin.json` | Claude Code | canonical `version`, `skills` array |
+| `.claude-plugin/marketplace.json` | Claude Code | `owner`, `plugins[0].version`, `source: "./"` |
+| `.codex-plugin/plugin.json` | Codex CLI | mirrored `version`, `skills` **string**, `interface` block |
+| `.agents/plugins/marketplace.json` | Codex CLI | `interface.displayName`, `plugins[0].source` object, `policy` |
+
+Differences that are deliberate, not oversights:
+
+- **`skills` is a bare string** (`"./skills/core/"`), not an array. Both forms
+  load identically on codex-cli 0.151.0 — spike-verified byte-identical
+  `<skills_instructions>` blocks — so the string is the documented shape and the
+  array buys nothing.
+- **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
+  `/arcforge:<name>`. All 15 load from one directory entry.
+- **The Codex manifest declares no `hooks` key, and must not gain one.**
+  `npm run check:hooks` asserts its absence. Two independent reasons: Codex's
+  documented schema *rejects* a `hooks` field outright, and its component
+  discovery treats manifest paths as **supplements to** default discovery rather
+  than replacements — so an empty hooks file cannot suppress `hooks/hooks.json`
+  either. Codex finds that file regardless; what stops it running is Codex's own
+  hook-trust gate (`codex exec --dangerously-bypass-hook-trust` exists precisely
+  because untrusted hooks do not run). arcforge never asks for that grant.
+- **`.claude-plugin/marketplace.json` stays.** Codex tolerates it and prefers
+  `.agents/plugins/marketplace.json` when both exist — spike-verified with two
+  distinguishable marketplace names, no warning either way.
+- **Version parity is enforced.** `.codex-plugin/plugin.json` is the 9th row in
+  `scripts/check-version-sync.js`. The Codex marketplace schema carries no
+  version field, so `.agents/plugins/marketplace.json` is not a version location.
+- **`package.json` `files` does not gate the Codex payload.** `codex plugin add`
+  from a local marketplace copies the whole source tree into
+  `$CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>/`. Keep `files`
+  correct for npm, but never assume it narrows what Codex ships.
+
+Product-level rationale — why Codex gets skills and nothing else — is
+`product/specs/codex-harness.md`.
+
 ## Hook Registration
 
 - `hooks/hooks.json` at plugin root — auto-loaded by Claude Code v2.1+
@@ -85,14 +130,22 @@ is the shim to `scripts/cli.js` (D1, see `.claude/rules/architecture.md`).
 ## Plugin Directory Layout
 
 - `.claude-plugin/` — only `plugin.json` + `marketplace.json` go here
-- Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/`
-- Skills become namespaced when installed: `/arcforge:<skill-name>` — the bucket
-  is a layout detail, never part of the name
-- There is no `agents/`, `templates/`, or `commands/` directory. Adding a new
+- `.codex-plugin/` — only `plugin.json` goes here; the Codex marketplace file
+  lives at `.agents/plugins/marketplace.json` (the location Codex looks in)
+- Component dirs at plugin root: `skills/` (bucketed, see above), `hooks/` —
+  shared by both manifests, never duplicated per target
+- Skills become namespaced when installed: `/arcforge:<skill-name>` on Claude
+  Code, `arcforge:<skill-name>` on Codex — the bucket is a layout detail, never
+  part of the name
+- There is no `agents/`, `templates/`, or `commands/` directory. `.agents/` is
+  the Codex marketplace location and is not a component dir. Adding a new
   component type is a design decision, not a convenience
 
 ## Distribution
 
-- `package.json` `files` array controls what ships
-- Primary: GitHub marketplace (`claude plugin install arcforge@arcforge-dev`)
+- `package.json` `files` array controls the npm payload — it does **not** gate
+  what a marketplace install copies (see the Codex manifest pair above)
+- Claude Code: GitHub marketplace (`claude plugin install arcforge@arcforge-dev`)
+- Codex CLI: `codex plugin marketplace add GregoryHo/arcforge` then
+  `codex plugin add arcforge@arcforge-dev`
 - Plugin scopes: `user` (default), `project`, `local`, `managed`

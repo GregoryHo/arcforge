@@ -1,0 +1,20 @@
+{
+  "name": "arcforge-dev",
+  "interface": {
+    "displayName": "arcforge"
+  },
+  "plugins": [
+    {
+      "name": "arcforge",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
