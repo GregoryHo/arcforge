@@ -108,6 +108,13 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
     return path.join(tmpDir, `arcforge-${name}-session-${sessionId}`);
   }
 
+  /** Turn the project-scope learning opt-in on for a project dir. */
+  function enableLearning(projectDir) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
   function pendingActions(project) {
     const file = path.join(homeDir, '.arcforge', 'sessions', project, 'pending-actions.json');
     if (!fs.existsSync(file)) return [];
@@ -138,6 +145,8 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
 
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-proj-'));
     const project = path.basename(projectDir);
+    // Enrichment is opt-in (D-009): this case asserts the spawn, so opt in.
+    enableLearning(projectDir);
 
     const env = {
       ...process.env,
@@ -176,6 +185,59 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
       // Enricher stub fired with the relay-isolation env (poll: detached spawn).
       assert.ok(await waitFor(marker, 5000), 'enricher stub invoked');
       assert.strictEqual(fs.readFileSync(marker, 'utf-8'), 'enricher', 'ARCFORGE_SPAWNED=enricher');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('learning off: draft + diary-ready still happen, but the enricher never spawns', async () => {
+    const marker = path.join(binDir, 'spawned.marker');
+    fs.writeFileSync(
+      path.join(binDir, 'claude'),
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}"\n`,
+      { mode: 0o755 },
+    );
+
+    fs.writeFileSync(counterPath('user-count'), '15');
+    fs.writeFileSync(counterPath('tool-count'), '0');
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-proj-'));
+    const project = path.basename(projectDir);
+    // No learning config anywhere — the default.
+
+    const env = {
+      ...process.env,
+      HOME: homeDir,
+      TMPDIR: tmpDir,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      CLAUDE_PROJECT_DIR: projectDir,
+    };
+    delete env.CLAUDE_SESSION_ID;
+
+    const res = spawnSync('node', [PRE_COMPACT], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'PreCompact',
+        cwd: projectDir,
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      // Continuity is unchanged by the opt-in.
+      assert.strictEqual(
+        pendingActions(project).filter((a) => a.type === 'diary-ready').length,
+        1,
+        'diary-ready still queued',
+      );
+      assert.ok(
+        fs.existsSync(path.join(homeDir, '.arcforge', 'diaries', project)),
+        'draft still generated',
+      );
+      // Enrichment is not.
+      assert.strictEqual(await waitFor(marker, 1000), false, 'enricher must NOT spawn');
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
     }

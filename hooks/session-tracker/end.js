@@ -24,7 +24,11 @@ const {
   log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
+const {
+  runDiaryCapture,
+  readCounts,
+  learningCaptureEnabled,
+} = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { parseTranscript } = require('../../scripts/lib/transcript');
 const { checkReflectReady: reflectReady } = require('../../scripts/lib/learning-workflow');
@@ -130,6 +134,7 @@ function main() {
   setSessionIdFromInput(input);
 
   const session = getOrCreateSession();
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const { userCount, toolCount } = readCounts();
 
   session.lastUpdated = getTimestamp();
@@ -145,7 +150,12 @@ function main() {
     shouldTrigger(userCount, toolCount) && transcriptPath ? parseTranscript(transcriptPath) : null;
 
   if (transcriptData) {
-    session.userMessageContent = transcriptData.userMessages;
+    // Counts, tool names and paths are the continuity record and are kept
+    // either way. Verbatim user prose is not — it only lands in the session
+    // file once the learning opt-in is on (D-010).
+    if (learningCaptureEnabled({ projectRoot })) {
+      session.userMessageContent = transcriptData.userMessages;
+    }
     session.toolsUsed = transcriptData.toolsUsed;
     session.filesModified = transcriptData.filesModified;
   } else {
@@ -161,6 +171,7 @@ function main() {
     project: session.project,
     date: session.date,
     sessionId: session.sessionId,
+    projectRoot,
     transcriptData: {
       userMessages: session.userMessageContent || [],
       toolsUsed: session.toolsUsed || [],

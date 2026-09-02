@@ -36,7 +36,10 @@ const {
 const { parseConfidenceFrontmatter } = require('../../scripts/lib/confidence');
 const { getArcforgeHome } = require('../../scripts/lib/utils');
 const { listActivatedCandidateIds } = require('../../scripts/lib/learning-curator/activate');
-const { isInjectActivatedInstinctsEnabled } = require('../../scripts/lib/learning');
+const {
+  isInjectActivatedInstinctsEnabled,
+  isLearningEnabledAnyScope,
+} = require('../../scripts/lib/learning');
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
@@ -319,8 +322,14 @@ function main() {
     userParts.push(pendingSummary);
   }
 
-  // Stale-draft healthcheck (re-evaluated every session start, not consumed)
-  const staleWarning = loadStaleDraftWarning(project);
+  // Stale-draft healthcheck (re-evaluated every session start, not consumed).
+  // Only meaningful once enrichment can run: with learning off, drafts keep
+  // their TO BE ENRICHED stubs by design (D-009), so the warning would be a
+  // permanent complaint about intended behavior.
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const staleWarning = isLearningEnabledAnyScope({ projectRoot })
+    ? loadStaleDraftWarning(project)
+    : null;
   if (staleWarning) {
     contextParts.push(staleWarning.message);
     userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);

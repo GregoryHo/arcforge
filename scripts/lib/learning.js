@@ -99,6 +99,27 @@ function isLearningEnabled({ scope = 'project', projectRoot = process.cwd(), hom
 }
 
 /**
+ * True when learning is enabled in EITHER scope.
+ *
+ * The one question every capture path asks: a user who opted in globally must
+ * not have to opt in again per project, and a project opt-in must work without
+ * the global one. Enabling is scoped (`--project` / `--global`); *being*
+ * enabled is not, so consent lives in one predicate instead of a disjunction
+ * re-derived at each call site.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
+ * @param {string} [opts.homeDir] - Override for the global config's home.
+ * @returns {boolean}
+ */
+function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}) {
+  return (
+    isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
+    isLearningEnabled({ scope: 'global', projectRoot, homeDir })
+  );
+}
+
+/**
  * Kill-switch for SessionStart injection of activated instincts (ICL-4).
  *
  * DEFAULT ON: injection happens unless `inject_activated_instincts` is set to
@@ -751,6 +772,7 @@ module.exports = {
   getProjectId,
   inspectCandidate,
   isLearningEnabled,
+  isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
   listLearningInbox,
   listMaterializedDrafts,

@@ -12,11 +12,15 @@ const os = require('node:os');
 describe('diary-capture', () => {
   let homeDir;
   let tmpDir;
+  let projectRoot;
   let savedSession;
 
   beforeEach(() => {
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-home-'));
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-tmp-'));
+    // Consent is read from projectRoot, never from the runner's cwd — a temp
+    // root keeps the gate's answer independent of local repo state.
+    projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-proj-'));
     jest.spyOn(os, 'homedir').mockReturnValue(homeDir);
     process.env.TMPDIR = tmpDir;
     savedSession = process.env.CLAUDE_SESSION_ID;
@@ -30,7 +34,15 @@ describe('diary-capture', () => {
     else process.env.CLAUDE_SESSION_ID = savedSession;
     fs.rmSync(homeDir, { recursive: true, force: true });
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(projectRoot, { recursive: true, force: true });
   });
+
+  /** Turn the project-scope learning opt-in on for the temp projectRoot. */
+  function enableLearning() {
+    const configPath = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
 
   describe('counter ownership', () => {
     it('readCounts reflects both counters', () => {
@@ -92,6 +104,7 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
 
       expect(result.triggered).toBe(false);
@@ -109,6 +122,7 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
 
       expect(result.triggered).toBe(true);
@@ -148,7 +162,27 @@ describe('diary-capture', () => {
       return null;
     }
 
-    it('spawns the enricher with ARCFORGE_SPAWNED=enricher when triggered', async () => {
+    it('spawns the enricher with ARCFORGE_SPAWNED=enricher when learning is on', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      enableLearning();
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        projectRoot,
+      });
+      expect(result.triggered).toBe(true);
+      expect(result.enriched).toBe(true);
+
+      const marker = path.join(binDir, 'spawned.marker');
+      const content = await waitForMarker(marker, 5000);
+      expect(content).toBe('enricher');
+    });
+
+    it('writes the draft but does NOT spawn the enricher when learning is off', async () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');
       const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
       createSessionCounter('user-count').write(15);
@@ -157,12 +191,90 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
+
+      // Continuity survives the gate; enrichment does not (D-009).
       expect(result.triggered).toBe(true);
+      expect(result.draftPath).toBeTruthy();
+      expect(fs.existsSync(result.draftPath)).toBe(true);
+      expect(result.enriched).toBe(false);
 
       const marker = path.join(binDir, 'spawned.marker');
-      const content = await waitForMarker(marker, 5000);
-      expect(content).toBe('enricher');
+      expect(await waitForMarker(marker, 1000)).toBeNull();
+    });
+
+    it('spawns the enricher on a GLOBAL-scope opt-in too', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      const globalConfig = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+      fs.mkdirSync(path.dirname(globalConfig), { recursive: true });
+      fs.writeFileSync(globalConfig, JSON.stringify({ scope: 'global', enabled: true }));
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        projectRoot,
+      });
+      expect(result.enriched).toBe(true);
+
+      const marker = path.join(binDir, 'spawned.marker');
+      expect(await waitForMarker(marker, 5000)).toBe('enricher');
+    });
+  });
+
+  describe('enricher permissions (D-009)', () => {
+    let binDir;
+    let savedPath;
+
+    beforeEach(() => {
+      binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-argv-'));
+      savedPath = process.env.PATH;
+      process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
+      // Stub `claude` so the REAL argv the enricher spawns with is recorded,
+      // one argument per line (paths contain no newlines).
+      const argvFile = path.join(binDir, 'argv.txt');
+      fs.writeFileSync(
+        path.join(binDir, 'claude'),
+        `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}"\n`,
+        { mode: 0o755 },
+      );
+    });
+
+    afterEach(() => {
+      process.env.PATH = savedPath;
+      fs.rmSync(binDir, { recursive: true, force: true });
+    });
+
+    async function recordedArgv(timeoutMs) {
+      const file = path.join(binDir, 'argv.txt');
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(file)) {
+          const lines = fs.readFileSync(file, 'utf-8').split('\n');
+          lines.pop();
+          if (lines.length > 0) return lines;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return null;
+    }
+
+    it('drops --dangerously-skip-permissions and confines the run to the draft dir', async () => {
+      const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
+      const draftPath = path.join(homeDir, '.arcforge', 'diaries', 'demo', '2026-06-14', 'd.md');
+      fs.mkdirSync(path.dirname(draftPath), { recursive: true });
+
+      spawnDiaryEnricher(draftPath, { userMessages: [] }, 'demo');
+      const argv = await recordedArgv(5000);
+      expect(argv).not.toBeNull();
+
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+      expect(argv[argv.indexOf('--add-dir') + 1]).toBe(path.dirname(draftPath));
+      expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('acceptEdits');
+      expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Write');
     });
   });
 });

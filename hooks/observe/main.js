@@ -63,7 +63,7 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
-const { getProjectId, isLearningEnabled } = require('../../scripts/lib/learning');
+const { getProjectId, isLearningEnabledAnyScope } = require('../../scripts/lib/learning');
 const {
   sanitizeObservationPayload,
   EVIDENCE_STATUS,
@@ -118,10 +118,7 @@ function shouldObserve({
     if (process.env.ARCFORGE_OBSERVE_EXPLICIT_SKIP === '1') return false;
     if (process.env.ARCFORGE_OBSERVE_SELF_ANALYSIS === '1') return false;
     if (isSkippedPath(projectRoot)) return false;
-    return (
-      isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
-      isLearningEnabled({ scope: 'global', projectRoot, homeDir })
-    );
+    return isLearningEnabledAnyScope({ projectRoot, homeDir });
   } catch {
     return false;
   }

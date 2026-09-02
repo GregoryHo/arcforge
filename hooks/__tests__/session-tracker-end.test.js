@@ -133,6 +133,13 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
     return path.join(tmpDir, `arcforge-${name}-session-${sessionId}`);
   }
 
+  /** Turn the project-scope learning opt-in on for a project dir. */
+  function enableLearning(projectDir) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
   function runStop(projectDir, transcriptPath) {
     return spawnSync('node', [END], {
       input: JSON.stringify({
@@ -183,7 +190,7 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
     assert.deepStrictEqual(session.filesModified, [], 'filesModified defaults to empty');
   });
 
-  it('above threshold: transcript IS parsed → enrichment present in session JSON', () => {
+  it('above threshold + learning ON: transcript IS parsed → enrichment present in session JSON', () => {
     fs.writeFileSync(counterPath('tool-count'), '60');
     fs.writeFileSync(counterPath('user-count'), '0');
 
@@ -192,6 +199,7 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
 
     const projectDir = path.join(homeDir, 'v5tg-high');
     fs.mkdirSync(projectDir, { recursive: true });
+    enableLearning(projectDir);
 
     const res = runStop(projectDir, transcript);
     assert.strictEqual(res.status, 0, res.stderr);
@@ -201,6 +209,49 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
       session.userMessageContent,
       ['hello there'],
       'above threshold enriches userMessageContent from the transcript',
+    );
+  });
+
+  // ---------------------------------------------------------------------
+  // D-010: capture depth. Counts, tool names and paths are continuity and
+  // stay always-on; verbatim user prose waits for the learning opt-in.
+  // ---------------------------------------------------------------------
+  it('above threshold + learning OFF: keeps filesModified/toolsUsed, drops user prose', () => {
+    fs.writeFileSync(counterPath('tool-count'), '60');
+    fs.writeFileSync(counterPath('user-count'), '0');
+
+    const transcript = path.join(tmpDir, 'transcript.jsonl');
+    fs.writeFileSync(
+      transcript,
+      [
+        JSON.stringify({ type: 'user', content: 'a secret sentence' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/tmp/foo.ts' } }],
+          },
+        }),
+      ].join('\n') + '\n',
+    );
+
+    const projectDir = path.join(homeDir, 'v5tg-off');
+    fs.mkdirSync(projectDir, { recursive: true });
+    // No learning config anywhere — the default.
+
+    const res = runStop(projectDir, transcript);
+    assert.strictEqual(res.status, 0, res.stderr);
+
+    const session = savedSession(projectDir);
+    assert.strictEqual(
+      session.userMessageContent,
+      undefined,
+      'user prose must NOT be stored with learning off',
+    );
+    assert.deepStrictEqual(session.toolsUsed, ['Edit'], 'tool names still recorded');
+    assert.deepStrictEqual(
+      session.filesModified,
+      ['/tmp/foo.ts'],
+      'filesModified still recorded — the diary Files-modified line depends on it',
     );
   });
 });
