@@ -182,12 +182,19 @@ function main() {
 
   const systemMessages = [];
   if (triggered) {
-    const reflectStatus = checkReflectReady(session.project);
-    if (reflectStatus?.ready) {
-      addPendingAction(session.project, 'reflect-ready', {
-        strategy: reflectStatus.strategy,
-        count: reflectStatus.count,
-      });
+    // The reflection nudge is behind the same opt-in as the enrichment it
+    // follows (D-009). Reflection IS the learning loop — learning.md B-1 says
+    // that loop does not run when learning is off — and the diaries it counts
+    // are permanent stubs in that state, so an ungated nudge would recur at
+    // every Stop above the threshold, forever, about work the user declined.
+    if (learningCaptureEnabled({ projectRoot })) {
+      const reflectStatus = checkReflectReady(session.project);
+      if (reflectStatus?.ready) {
+        addPendingAction(session.project, 'reflect-ready', {
+          strategy: reflectStatus.strategy,
+          count: reflectStatus.count,
+        });
+      }
     }
     // Only surface the 'Session paused' notification when the diary threshold
     // actually fired — a Stop worth telling the user about. Below threshold a

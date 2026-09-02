@@ -48,6 +48,10 @@ across sessions until the threshold is met; reset is owned exclusively by
   the metadata above is recorded either way
 - Runs diary-capture (threshold-gated draft + counter reset; the enricher spawn
   is behind the same learning opt-in)
+- Queues the `reflect-ready` nudge **only when learning is enabled in some
+  scope** — reflection is the learning loop, and with learning off the diaries
+  it counts never get processed, so the nudge would re-queue at every threshold
+  hit forever
 - Outputs session summary
 
 ## Triggers

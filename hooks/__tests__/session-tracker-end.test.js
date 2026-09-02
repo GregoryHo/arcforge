@@ -255,3 +255,109 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// D-009: the reflection nudge is behind the same opt-in as the enrichment it
+// follows. Reflection IS the learning loop, and with learning off the diaries
+// it counts are permanent stubs — an ungated nudge would recur at every Stop
+// above the threshold, forever, about work the user declined.
+// ---------------------------------------------------------------------------
+
+describe('Stop reflect-ready nudge gate (D-009)', () => {
+  const originalEnv = { ...process.env };
+  let tmpDir;
+  let homeDir;
+  let binDir;
+  const sessionId = 'reflect-gate';
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reflect-gate-tmp-'));
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reflect-gate-home-'));
+    binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reflect-gate-bin-'));
+    // Stub `claude` so the opted-in case never launches the real enricher.
+    fs.writeFileSync(path.join(binDir, 'claude'), '#!/bin/sh\ncat > /dev/null\n', { mode: 0o755 });
+  });
+
+  afterEach(() => {
+    for (const dir of [tmpDir, homeDir, binDir]) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  /** Turn the project-scope learning opt-in on for a project dir. */
+  function enableLearning(projectDir) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
+  /** Three unprocessed diaries — REFLECT_READY_MIN_DIARIES. */
+  function seedDiaries(project) {
+    const dir = path.join(homeDir, '.arcforge', 'diaries', project, '2026-09-01');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of ['a', 'b', 'c']) {
+      fs.writeFileSync(path.join(dir, `diary-session-${name}.md`), '# Diary\n');
+    }
+  }
+
+  function pendingReflectActions(project) {
+    const file = path.join(homeDir, '.arcforge', 'sessions', project, 'pending-actions.json');
+    if (!fs.existsSync(file)) return [];
+    const { actions = [] } = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return actions.filter((a) => a.type === 'reflect-ready');
+  }
+
+  /** Run a Stop above the diary threshold, so the nudge is even considered. */
+  function runStop(projectDir) {
+    fs.writeFileSync(path.join(tmpDir, `arcforge-user-count-session-${sessionId}`), '15');
+    fs.writeFileSync(path.join(tmpDir, `arcforge-tool-count-session-${sessionId}`), '0');
+    return spawnSync('node', [END], {
+      input: JSON.stringify({ session_id: sessionId, hook_event_name: 'Stop', cwd: projectDir }),
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        TMPDIR: tmpDir,
+        CLAUDE_PROJECT_DIR: projectDir,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      },
+    });
+  }
+
+  function makeProject(name) {
+    const projectDir = path.join(homeDir, name);
+    fs.mkdirSync(projectDir, { recursive: true });
+    seedDiaries(path.basename(projectDir));
+    return projectDir;
+  }
+
+  it('learning off: no reflect-ready nudge, however many diaries pile up', () => {
+    const projectDir = makeProject('reflect-off');
+
+    const res = runStop(projectDir);
+    assert.strictEqual(res.status, 0, res.stderr);
+    // Guard against a vacuous pass: this Stop really was above the threshold,
+    // so the nudge was considered and declined, not skipped upstream.
+    assert.ok(res.stdout.includes('Session paused'), `expected a triggered Stop: ${res.stdout}`);
+    assert.deepStrictEqual(
+      pendingReflectActions(path.basename(projectDir)),
+      [],
+      'reflect-ready must not be queued while learning is off',
+    );
+  });
+
+  it('learning on: the nudge is queued as before', () => {
+    const projectDir = makeProject('reflect-on');
+    enableLearning(projectDir);
+
+    const res = runStop(projectDir);
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.strictEqual(
+      pendingReflectActions(path.basename(projectDir)).length,
+      1,
+      'reflect-ready is queued once learning is on',
+    );
+  });
+});
