@@ -14,14 +14,22 @@ still a design decision, and this directory is not one.
 
 ## Why the two are scoped differently
 
-`pm` gets an **allowlist** (`tools:`). Its whole risk is scope creep — a product
-agent that can edit `scripts/lib/` will "just fix" the code instead of recording
-what the code should do. Read, search, and write; nothing that runs.
+Both carry a `tools:` **allowlist**, because that is the field that actually holds.
+The two allowlists differ in the one axis that matters for each agent's failure mode.
 
-`qa` gets a **denylist** (`disallowedTools:`). It has to run things — `npm test`,
-the six static checks, `git diff` — so an allowlist would fight its job. What it
-must never do is *fix* what it finds: a reviewer that edits the branch it is
-reviewing has stopped being evidence. It reports; a human or `pm` acts.
+`pm` gets read, search, and write, and **nothing that executes**. Its risk is scope
+creep: a product agent that can run and edit code will "just fix" the engine instead
+of recording what the engine should do. With no Bash it can only describe.
+
+`qa` gets read, search, and **Bash**, because running `npm test` and the six static
+checks is its entire job — and no editing tools, because a reviewer that fixes what
+it finds has stopped being evidence. It reports; a human or `pm` acts. The explicit
+`disallowedTools:` line states that intent a second time.
+
+Be honest about the seam: `qa` holds Bash, and a shell can write files. The allowlist
+removes the editing tools, not the possibility — what makes "verify, never fix" hold
+is the instruction in the agent body, backed by a tool set that gives it no
+convenient way to break the rule by accident.
 
 ## Using them
 

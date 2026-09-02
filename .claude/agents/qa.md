@@ -1,6 +1,7 @@
 ---
 name: qa
 description: Use to review an arcforge branch before it opens or merges — checking the diff against the spec it claims to implement, running the 5 test runners and the 6 static checks, and reporting what is actually green. Use when someone claims work is done and you want evidence rather than a self-report. Do NOT use to fix what it finds.
+tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: inherit
 ---
