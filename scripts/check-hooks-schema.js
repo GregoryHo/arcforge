@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * check-hooks-schema.js — static validation of hooks/hooks.json.
+ * check-hooks-schema.js — static validation of the hook registry and of the
+ * plugin manifests' silence about it.
  *
  * The hook registry is load-bearing and silently fails: a typo'd command, an
  * unknown event name, or an async guard leaves the session running with a hook
@@ -9,7 +10,7 @@
  * never catch a broken registration. This linter is the only guard on the
  * hooks.json wiring itself. Fits the scripts/check-*.js linter family.
  *
- * Validates:
+ * Validates hooks/hooks.json:
  *   - every event key is a known Claude Code hook event;
  *   - every matcher-group has a stable string `id`, a valid-regex `matcher`,
  *     and a non-empty `hooks` array;
@@ -20,13 +21,30 @@
  *     synchronous (non-async) matcher-group — the dispatcher — so the blocking
  *     path is a single sync process and the async observers cannot creep onto it.
  *
+ * And validates that neither plugin manifest declares a `hooks` key:
+ *   - `.claude-plugin/plugin.json` — Claude Code auto-loads hooks/hooks.json by
+ *     convention, so a `hooks` field is redundant at best (`.claude/rules/plugin.md`).
+ *   - `.codex-plugin/plugin.json` — Codex's documented manifest schema REJECTS a
+ *     `hooks` field outright. It is also useless as a neutralizer: Codex treats
+ *     manifest component paths as supplements to default discovery rather than
+ *     replacements, so pointing `hooks` at an empty file cannot stop Codex
+ *     finding hooks/hooks.json. What stops those Claude-shaped hooks running
+ *     under Codex is Codex's own hook-trust gate, which arcforge never asks a
+ *     user to grant. This assertion exists so a future editor does not "fix" the
+ *     leak by adding the key and break the manifest instead.
+ *
  * CLI tier: prints a report and exits 0 (valid) / 1 (invalid).
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const HOOKS_JSON = path.resolve(__dirname, '..', 'hooks', 'hooks.json');
+const repoRoot = path.resolve(__dirname, '..');
+const HOOKS_JSON = path.join(repoRoot, 'hooks', 'hooks.json');
+
+// Plugin manifests that must stay silent about hooks. Both are shipped files,
+// so a missing one is a finding rather than a skipped check.
+const MANIFESTS = ['.claude-plugin/plugin.json', '.codex-plugin/plugin.json'];
 
 // Known Claude Code hook events (see .claude/rules/plugin.md).
 const ALLOWED_EVENTS = new Set([
@@ -128,6 +146,46 @@ function validateHooksJson(config) {
   return errors;
 }
 
+/**
+ * Assert that no plugin manifest declares a `hooks` key. Pure over the read
+ * results — returns a list of error strings (empty = valid).
+ *
+ * @param {{file: string, status: 'ok'|'missing'|'unreadable', manifest?: object, error?: string}[]} reads
+ * @returns {string[]} error messages
+ */
+function validateManifestsHaveNoHooks(reads) {
+  const errors = [];
+  for (const read of reads) {
+    if (read.status === 'missing') {
+      errors.push(`${read.file}: manifest missing — it is a shipped file`);
+      continue;
+    }
+    if (read.status === 'unreadable') {
+      errors.push(`${read.file}: cannot read/parse — ${read.error}`);
+      continue;
+    }
+    if (Object.hasOwn(read.manifest, 'hooks')) {
+      errors.push(
+        `${read.file}: declares a "hooks" key — plugin manifests must stay silent about hooks (see this file's header)`,
+      );
+    }
+  }
+  return errors;
+}
+
+/** Read one manifest into the shape validateManifestsHaveNoHooks consumes. */
+function readManifest(file) {
+  const abs = path.join(repoRoot, file);
+  if (!fs.existsSync(abs)) {
+    return { file, status: 'missing' };
+  }
+  try {
+    return { file, status: 'ok', manifest: JSON.parse(fs.readFileSync(abs, 'utf8')) };
+  } catch (err) {
+    return { file, status: 'unreadable', error: err.message };
+  }
+}
+
 function main() {
   let config;
   try {
@@ -137,7 +195,10 @@ function main() {
     process.exit(1);
   }
 
-  const errors = validateHooksJson(config);
+  const errors = [
+    ...validateHooksJson(config),
+    ...validateManifestsHaveNoHooks(MANIFESTS.map(readManifest)),
+  ];
   const eventCount = Object.keys(config.hooks || {}).length;
   const groupCount = Object.values(config.hooks || {}).reduce(
     (n, g) => n + (Array.isArray(g) ? g.length : 0),
@@ -145,20 +206,21 @@ function main() {
   );
 
   console.log(
-    `hooks-schema linter — ${eventCount} events / ${groupCount} matcher-groups in hooks.json\n`,
+    `hooks-schema linter — ${eventCount} events / ${groupCount} matcher-groups in hooks.json, ` +
+      `${MANIFESTS.length} manifests checked for a "hooks" key\n`,
   );
 
   if (errors.length === 0) {
-    console.log('hooks.json is valid.');
+    console.log('hooks.json is valid and no plugin manifest declares hooks.');
     process.exit(0);
   }
 
-  console.error(`hooks.json has ${errors.length} schema violation(s):`);
+  console.error(`hook registry has ${errors.length} violation(s):`);
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
 
-module.exports = { validateHooksJson, ALLOWED_EVENTS };
+module.exports = { validateHooksJson, validateManifestsHaveNoHooks, ALLOWED_EVENTS, MANIFESTS };
 
 if (require.main === module) {
   main();
