@@ -21,7 +21,8 @@ because starting them is a deliberate act rather than something to infer:
 ```
 
 Any skill can be invoked by name this way — installing the plugin namespaces
-them, so the form is always `/arcforge:<name>`.
+them. The form is host-specific: `/arcforge:<name>` on Claude Code, and
+`arcforge:<name>` (no leading slash) on Codex CLI.
 
 ## Start here: `using`
 
