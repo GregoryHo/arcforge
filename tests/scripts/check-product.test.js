@@ -1260,6 +1260,17 @@ describe('check-product', () => {
       expect(run({ roadmap: { note } })).toEqual([]);
     });
 
+    it('tracks each scan on its own, so an unclosed fence does not bleed into the next', () => {
+      // Fence state belongs to a scan, not to the module: the roadmap and every
+      // spec are read by separate calls, and `specStatusHeader` reads a whole
+      // document where the others read a section slice. Held in one shared
+      // tracker, this unclosed fence would still be open when the spec is read
+      // and its header would come back missing.
+      const errors = run({ roadmap: { note: ['', '```markdown'] } });
+      expect(of('C4', errors)).toEqual([]);
+      expect(of('C6', errors)).toEqual(['C6 sanity floor: the Decision Log has no entries']);
+    });
+
     it('still reads a fence indented one to three spaces as a delimiter', () => {
       // The bound is ` {0,3}`, not column 1: this block opens, so the row is an
       // illustration rather than product state.

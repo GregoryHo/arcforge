@@ -188,7 +188,8 @@ carrying nothing but whitespace after it, closes one. Two consequences worth kno
 before writing an example: a fence line with text after its backticks closes nothing,
 and an example that itself shows a fenced block needs a longer outer fence — four
 backticks around three — or the inner one ends the outer block and the illustration
-below it is read as product state.
+below it is read as product state. A fence line indented four spaces or more is no
+delimiter at all: at that depth it is content, which is the next exemption.
 
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
 relation bullet and a roadmap row all sit in column 1; indented four spaces or more,
@@ -210,7 +211,9 @@ block opens no section and closes none, so a worked example may show a whole
 `## Decision Log` — the way the few-shots here do — without standing in for the log
 or cutting it short at the entry above it. Indentation is not an exemption at this
 boundary: a section heading is read at column 1 only, so an indented `## Decision
-Log` leaves the log empty and C6 rejects it, the same way a renamed one does. The
+Log` leaves the log empty and C6 rejects it, the same way a renamed one does — this
+is the one boundary that reads at column 1, and the paragraph on a spec's header
+below says why it is the exception rather than the rule. The
 `## Decisions` section a spec's citations live in (C5) is scoped the same way, but
 without that backstop: no rule asserts a spec's headings, so a spec whose section is
 renamed, dropped, or swallowed by an unclosed fence cites nothing and is checked for
