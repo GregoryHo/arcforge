@@ -64,9 +64,10 @@ supersession to the clause:
 - Supersedes: D-007 (clause 2)
 ```
 
-The old entry's status then reads `Status: Partially superseded by D-011
-(clause 2)`, and its other clauses stay in force. Without the clause marker you
-have quietly retired two decisions nobody re-made.
+The old entry's status then reads `Status: Accepted · partially superseded by
+D-011`. The `Accepted` clause is what records that its other clauses still
+govern; the clause marker stays on the new entry's `Supersedes:` line. Without
+it you have quietly retired two decisions nobody re-made.
 
 ## Backlog graduation leaves a tombstone
 
