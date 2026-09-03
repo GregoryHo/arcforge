@@ -52,8 +52,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   straddling zero is `INCONCLUSIVE` — a real answer, not a failure to get one.
   Under 5 trials per arm the harness returns `INSUFFICIENT_DATA` rather than
   guessing. A `non-regression` verdict policy replaces the delta with a strict
-  bar: the verdict is `PASS` when every treatment trial passes and `REGRESSED`
-  otherwise.
+  bar: the verdict is `PASS` when the treatment arm has at least one scored
+  trial and every one of them passes, `REGRESSED` otherwise — an arm with
+  nothing scored fails the bar rather than deferring.
 - **B-5 A trial is pass or fail, never partial credit.** Behavioral assertions
   (graded deterministically from the log of what the agent actually did) are
   the preferred evidence — they cost nothing, never drift, and cannot be
