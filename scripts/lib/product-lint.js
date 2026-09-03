@@ -24,7 +24,10 @@
  *         elsewhere in `ROADMAP.md` is prose rather than an entry, and a missing
  *         log section is C6's job rather than a silent zero. That section's own
  *         boundaries are found fence-aware, so a fenced `##` line in a worked
- *         example neither stands in for the log nor truncates it. The heading is read
+ *         example neither stands in for the log nor truncates it, and the heading
+ *         that ends it is read at the indent a reader still sees as a heading, so
+ *         an indented `## Appendix` does not leave its decision-shaped headings
+ *         inside the log. The entry heading is read
  *         at column 1, and one indented far enough to still render as a heading
  *         (one to three spaces) is reported rather than dropped, so a stray
  *         indent cannot hide an entry in the log's flat structure;
@@ -133,7 +136,10 @@ const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
 // before it is parsed, so a `### D-NNN` heading anywhere else in the file is
 // prose, not product state. It is matched at column 1, and the slice's
 // boundaries are found fence-aware (see `section`), so a fenced illustration can
-// neither stand in for the section nor cut it short.
+// neither stand in for the section nor cut it short. Column 1 is the bound of the
+// heading that *opens* the slice, where an indented one fails closed and C6
+// catches it; the heading that closes it is read at ` {0,3}` by `SECTION_END_RE`,
+// where column 1 would fail open — see `section`.
 const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
 // The one `##` section of a spec this linter reads, sliced the same way.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
@@ -453,11 +459,12 @@ function checkRoadmapTags(rows, errors) {
  * The boundary spans ` {0,3}`, not column 1, because CommonMark still renders a
  * `##` carrying one to three leading spaces as a heading: read at column 1 the
  * preamble ran past such a heading, and a body blockquote below it stood in for
- * a header the spec does not have — this boundary is the one place in the file
- * where a column-1 read fails *open*, which is why it takes the same bound as
- * `DECISION_ANY_RE` rather than the column-1 read `section()` uses. Four spaces
- * is an indented code block, so an illustrative `##` in the preamble still does
- * not cut it short.
+ * a header the spec does not have. That is the same bound `DECISION_ANY_RE` takes
+ * and the same one `SECTION_END_RE` takes, for the same reason — every boundary a
+ * heading *ends* fails open when it is read at column 1. The one column-1 read
+ * left is the heading that *opens* a section, which fails closed and has C6
+ * behind it. Four spaces is an indented code block, so an illustrative `##` in
+ * the preamble still does not cut it short.
  */
 function specStatusHeader(content) {
   for (const line of unfenced(content.split('\n'))) {

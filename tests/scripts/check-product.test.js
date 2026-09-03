@@ -53,7 +53,10 @@ function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra
  * `note` sits *inside* the `## Roadmap` section, below the table, so a fixture
  * can put row-shaped lines where the roadmap is. `header` is the table's frame —
  * its header and delimiter rows — so a fixture can serve rows under a broken
- * frame, or none at all.
+ * frame, or none at all. `appendixHeading` is the line that closes the log, so a
+ * fixture can indent the boundary the appendix sits behind, and `logHeading` is
+ * the line that closes `## Roadmap` and opens the log — the one boundary line
+ * that is read at both ends.
  */
 function roadmap({
   rows = [row()],
@@ -62,13 +65,15 @@ function roadmap({
   intro = [],
   note = [],
   appendix = [],
+  appendixHeading = '## Appendix',
+  logHeading = '## Decision Log',
   header = TABLE_HEADER,
 } = {}) {
   const folded =
     fold.length === 0
       ? []
       : ['<details>', '<summary>Superseded</summary>', '', ...fold, '</details>', ''];
-  const appended = appendix.length === 0 ? [] : ['## Appendix', '', ...appendix];
+  const appended = appendix.length === 0 ? [] : [appendixHeading, '', ...appendix];
   return [
     '# Roadmap — fixture',
     '',
@@ -79,7 +84,7 @@ function roadmap({
     ...rows,
     ...note,
     '',
-    '## Decision Log',
+    logHeading,
     '',
     ...decisions,
     ...folded,
@@ -215,6 +220,25 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/extended by 2\.0\.0 \(building\)/);
     });
 
+    it('ends `## Roadmap` at an indented `## Decision Log`', () => {
+      // Both halves of the boundary asymmetry in one corpus. The indented
+      // heading does not *open* the log — that read is column 1, and C6 catches
+      // the empty log — but it does *close* the roadmap, so the pipe-shaped line
+      // below it is not a row. Read at column 1 at both ends, this illustration
+      // added a second `← we are here` and a link to a spec that does not exist.
+      const errors = run({
+        roadmap: {
+          logHeading: '  ## Decision Log',
+          decisions: [row({ version: '9.9.9', status: 'building', specs: ['beta'] })],
+        },
+      });
+      expect(of('C1', errors)).toEqual([]);
+      expect(of('C4', errors)).toEqual([]);
+      expect(of('C6', errors)).toContainEqual(
+        expect.stringMatching(/the Decision Log has no entries/),
+      );
+    });
+
     it('rejects two marked rows', () => {
       const rows = [row({ version: '1.0.0' }), row({ version: '1.1.0', status: 'building' })];
       const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.1.0 (building)' })];
@@ -321,6 +345,40 @@ describe('check-product', () => {
       expect(of('C5', errors)).toContainEqual(
         expect.stringMatching(/cites D-002, which is not in the Decision Log/),
       );
+    });
+
+    it('does not read a decision heading in an indented section after the log', () => {
+      // The section-closing boundary spans ` {0,3}`, the bound a reader still
+      // sees a heading at. Read at column 1 this appendix never ended the log,
+      // so its illustration became an entry that C2 numbered and C5 resolved —
+      // the same corpus above, passing with no errors at all.
+      const errors = run({
+        roadmap: {
+          decisions: [decision({ id: 'D-001' })],
+          appendixHeading: '  ## Appendix',
+          appendix: [decision({ id: 'D-002', title: 'illustrative, not a real decision' })],
+        },
+        specs: [spec({ cites: ['D-002'] })],
+      });
+      expect(of('C2', errors)).toEqual([]);
+      expect(of('C5', errors)).toContainEqual(
+        expect.stringMatching(/cites D-002, which is not in the Decision Log/),
+      );
+    });
+
+    it('does not end the log at a `##` inside an indented code block', () => {
+      // The upper bound of the same constant: at four spaces the heading is an
+      // indented code block, so it closes nothing and the column-1 entry below it
+      // is a real log entry. Re-widen the boundary to `\s*` and this goes red.
+      const errors = run({
+        roadmap: {
+          decisions: [decision({ id: 'D-001' })],
+          appendixHeading: '    ## Appendix',
+          appendix: [decision({ id: 'D-002' })],
+        },
+        specs: [spec({ cites: ['D-002'] })],
+      });
+      expect(errors).toEqual([]);
     });
 
     it('does not report a duplicate for a decision heading re-listed outside the log', () => {
@@ -1142,6 +1200,24 @@ describe('check-product', () => {
         spec({
           cites: ['D-001'],
           extra: ['```markdown', '- **D-007** — an example citation.', '```'],
+        }),
+      ];
+      expect(of('C5', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
+    it('ends a spec `## Decisions` at an indented `##`', () => {
+      // The same boundary in its false-positive direction: read at column 1 the
+      // section ran into this appendix, and prose a reader sees outside it raised
+      // two C5 errors against a spec whose citations are clean.
+      const specs = [
+        spec({
+          cites: ['D-001'],
+          extra: [
+            '',
+            '  ## Appendix',
+            '',
+            'How a citation is written: `- **D-999**`, never `D-001a`.',
+          ],
         }),
       ];
       expect(of('C5', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);

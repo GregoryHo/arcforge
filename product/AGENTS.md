@@ -230,10 +230,16 @@ The scope's own boundaries honour the fence exemption: a `##` line inside a fenc
 block opens no section and closes none, so a worked example may show a whole
 `## Decision Log` — the way the few-shots here do — without standing in for the log
 or cutting it short at the entry above it. Indentation is not an exemption at this
-boundary: a section heading is read at column 1 only, so an indented `## Decision
-Log` leaves the log empty and C6 rejects it, the same way a renamed one does — this
-is the one boundary that reads at column 1, and the paragraph on a spec's header
-below says why it is the exception rather than the rule. The
+boundary either, at either end, but the two ends are read at different bounds
+because they fail in opposite directions. The heading that **opens** the scope is
+read at column 1, and an indented `## Decision Log` therefore leaves the log empty
+and C6 rejects it, the same way a renamed one does — fail-closed. The heading that
+**closes** it is read at one to three spaces, the same bound a `### D-NNN` heading
+and a spec's preamble boundary take, because a heading a reader can see has to end
+the section: read at column 1, an indented `## Appendix` left the log running into
+it, and the appendix's decision-shaped headings became entries that C2 numbered and
+a spec's citation resolved — the fail-open direction the paragraph above forbids.
+Four spaces or more is an indented code block at either end, and closes nothing. The
 `## Decisions` section a spec's citations live in (C5) is scoped the same way, but
 without that backstop: no rule asserts a spec's headings, so a spec whose section is
 renamed, dropped, or swallowed by an unclosed fence cites nothing and is checked for
@@ -253,13 +259,13 @@ directly under the H1 — a `> Status:` line below the first `##` is prose, and 
 reports the header as missing.
 
 That first `##` ends the preamble even when it carries one to three leading spaces —
-the same bound a `### D-NNN` heading is read at, and deliberately not the column-1
-read the section boundary above uses. The two differ because they fail in opposite
-directions: an indented `## Decision Log` leaves the log empty, which C6 rejects,
-while an indented `## Purpose` read at column 1 would leave the preamble running past
-it, so a body blockquote further down could stand in for a header the spec does not
-have. Four spaces or more is an indented code block, and an illustrative `##` there
-does not end the preamble.
+the same bound a `### D-NNN` heading is read at, and the same one that ends a section
+above. Every boundary a heading *ends* takes it, for the same reason: an indented
+`## Purpose` read at column 1 would leave the preamble running past it, so a body
+blockquote further down could stand in for a header the spec does not have. Column 1
+is reserved for the heading that *opens* a scope, where an indented one empties the
+scope instead and C6 catches it. Four spaces or more is an indented code block, and
+an illustrative `##` there does not end the preamble.
 
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.

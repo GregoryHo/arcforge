@@ -39,7 +39,11 @@ const ROW_COLUMNS = 6;
 // parsed, so a table row anywhere else in the file is prose, not product state.
 // It is matched at column 1, and the slice's boundaries are found fence-aware
 // (see `section`), so a fenced illustration can neither stand in for the section
-// nor cut it short.
+// nor cut it short. Column 1 is the bound of the heading that *opens* the slice,
+// where an indented one fails closed and C6 catches it; the heading that closes
+// it is read at ` {0,3}`, where column 1 would fail open — an indented
+// `## Decision Log` never ended `## Roadmap`, so a pipe-shaped line inside the
+// log parsed as a roadmap row. See `section`.
 const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // A link into `specs/`, which is what a `Spec` cell must carry.
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;

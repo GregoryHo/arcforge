@@ -27,6 +27,16 @@
 // is an indented code block rather than a delimiter.
 const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
 
+// The `##` heading that *ends* a section, read at the same ` {0,3}` bound as
+// FENCE_RE and as the linter's heading and relation probes: CommonMark renders a
+// `##` carrying one to three leading spaces as a heading, so a reader sees the
+// section end there and the slice must too. Read at column 1 this boundary fails
+// open — an indented `## Appendix` left the Decision Log running into it, and the
+// appendix's `### D-NNN` headings became entries C2 numbered and C5 resolved. At
+// four spaces the line is an indented code block, which is content, not a
+// heading, and closes nothing.
+const SECTION_END_RE = /^ {0,3}##\s+/;
+
 /**
  * A per-scan fence-state machine: call the returned predicate with each line in
  * order and it answers whether that line is fenced — either a delimiter itself
@@ -99,6 +109,20 @@ function fenceTracker() {
  * renames or drops that section already is: nothing asserts a spec's headings.
  * The first matching heading wins: a second `## Decision Log` later in the file
  * is not read.
+ *
+ * The two boundaries take *different* indent bounds, and the asymmetry is the
+ * point rather than an oversight. The **opening** heading is the caller's regex —
+ * `DECISION_LOG_HEADING_RE`, `ROADMAP_HEADING_RE`, `SPEC_DECISIONS_HEADING_RE`,
+ * all anchored at column 1 — and reading it there fails *closed*: an indented
+ * `## Decision Log` yields an empty slice, which C6 rejects the same way it
+ * rejects a renamed one. The **closing** heading is `SECTION_END_RE`, which spans
+ * ` {0,3}`, the bound a `### D-NNN` heading and a spec's preamble boundary are
+ * read at, because reading it at column 1 fails *open*: an indented `## Appendix`
+ * left the log running into the appendix below it, whose decision-shaped headings
+ * then became entries C2 numbered and C5 resolved — and, in the other direction,
+ * pulled appendix prose into a spec's `## Decisions` and invented citations
+ * there. Four spaces is an indented code block at either end: it is content, so
+ * it neither opens a section nor closes one.
  */
 function section(md, heading) {
   const lines = md.split('\n');
@@ -110,7 +134,7 @@ function section(md, heading) {
       if (heading.test(lines[i])) start = i;
       continue;
     }
-    if (/^##\s+/.test(lines[i])) return lines.slice(start + 1, i);
+    if (SECTION_END_RE.test(lines[i])) return lines.slice(start + 1, i);
   }
   return start === -1 ? [] : lines.slice(start + 1);
 }
