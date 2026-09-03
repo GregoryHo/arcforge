@@ -89,8 +89,10 @@ unconditionally and B-6 bounds. Its path and its safe read/write belong to
 `hooks/session-tracker/start.js` opens the record, `hooks/session-tracker/end.js`
 closes it with the counts and, above the diary threshold, with the summary
 `scripts/lib/transcript.js` parses out of the harness transcript (below it,
-`filesModified` is cleared and the other transcript-derived fields are simply not
-written), and `hooks/pre-compact/main.js` appends each compaction. The diary is
+`filesModified` is cleared while `userMessageContent` and `toolsUsed` are neither
+written nor cleared, so a record an earlier threshold hit filled keeps that turn's
+prose and tool list until the next hit refreshes them), and
+`hooks/pre-compact/main.js` appends each compaction. The diary is
 not a hooks format but learning's ([learning](learning.md)); what this area owns is its
 trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`
 coordinates for both Stop and PreCompact. Everything else a hook handles — tool
