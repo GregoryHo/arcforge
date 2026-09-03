@@ -782,6 +782,29 @@ describe('learn candidate commands over the canonical queue', () => {
       ]);
     });
 
+    // `activate` is the only action the matrix allows a materialized candidate,
+    // so every drafts entry named it — including the ones this listing has just
+    // marked stale, which activation refuses on the recorded content hash.
+    it('never recommends the activation a stale draft would refuse', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      expect(runJson(['drafts', '--project']).drafts[0].next_command).toBe(
+        `arcforge learn activate ${CANDIDATE_ID} --project`,
+      );
+
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(entry.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'hash_mismatch' }]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = entry.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+      // …and the activation it stopped advertising is the one that refuses.
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
     it('stops telling inspect to review a draft that is not there', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);
