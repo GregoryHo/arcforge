@@ -169,6 +169,23 @@ describe('inject-context SessionStart child process (S7-1)', () => {
 // Stale-draft warning is gated on the learning opt-in (D-009)
 // ─────────────────────────────────────────────
 
+// The creation-time half of the floor only exists where the filesystem records
+// one. Where it does not, the engine degrades to last-write alone by design
+// (product/specs/hooks.md B-6), so the case below has nothing to assert and is
+// skipped rather than failed. Probed on the same filesystem the tests use.
+const recordsBirthtime = (() => {
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-birthtime-'));
+  const probe = path.join(probeDir, 'probe');
+  try {
+    fs.writeFileSync(probe, 'x');
+    return fs.statSync(probe).birthtimeMs > 0;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
+
 describe('inject-context stale-draft warning gate (D-009)', () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   let homeDir;
@@ -281,32 +298,36 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
   // Direct call, not a spawn: only mtime can be backdated portably, and this
   // case is about the CREATION stamp — so the draft is written now and the
   // floor is placed after it, which is the same ordering a pre-opt-in stub has.
-  it('keeps a pre-opt-in draft suppressed after it is hand-edited or touched', () => {
-    const previousHome = process.env.ARCFORGE_HOME;
-    process.env.ARCFORGE_HOME = path.join(homeDir, '.arcforge');
-    try {
-      const draft = writeStaleDraft('diary-session-old-draft.md', 0);
-      const enabledSince = Date.now() + DAY_MS;
+  it(
+    'keeps a pre-opt-in draft suppressed after it is hand-edited or touched',
+    { skip: recordsBirthtime ? false : 'filesystem records no creation time' },
+    () => {
+      const previousHome = process.env.ARCFORGE_HOME;
+      process.env.ARCFORGE_HOME = path.join(homeDir, '.arcforge');
+      try {
+        const draft = writeStaleDraft('diary-session-old-draft.md', 0);
+        const enabledSince = Date.now() + DAY_MS;
 
-      assert.strictEqual(
-        loadStaleDraftWarning(project, enabledSince),
-        null,
-        'a draft that existed before the opt-in must not be reported',
-      );
+        assert.strictEqual(
+          loadStaleDraftWarning(project, enabledSince),
+          null,
+          'a draft that existed before the opt-in must not be reported',
+        );
 
-      // A hand-edit or `touch` moves mtime past the floor. Creation time does
-      // not move, so the draft is still recognized as a pre-opt-in stub.
-      const after = new Date(Date.now() + 3 * DAY_MS);
-      fs.utimesSync(draft, after, after);
+        // A hand-edit or `touch` moves mtime past the floor. Creation time does
+        // not move, so the draft is still recognized as a pre-opt-in stub.
+        const after = new Date(Date.now() + 3 * DAY_MS);
+        fs.utimesSync(draft, after, after);
 
-      assert.strictEqual(
-        loadStaleDraftWarning(project, enabledSince),
-        null,
-        'touching a pre-opt-in stub must not turn it into a reported failure',
-      );
-    } finally {
-      if (previousHome === undefined) delete process.env.ARCFORGE_HOME;
-      else process.env.ARCFORGE_HOME = previousHome;
-    }
-  });
+        assert.strictEqual(
+          loadStaleDraftWarning(project, enabledSince),
+          null,
+          'touching a pre-opt-in stub must not turn it into a reported failure',
+        );
+      } finally {
+        if (previousHome === undefined) delete process.env.ARCFORGE_HOME;
+        else process.env.ARCFORGE_HOME = previousHome;
+      }
+    },
+  );
 });
