@@ -67,6 +67,16 @@ crash, a compaction, or a closed laptop could lose.
   marked blocked without a stated reason — the write-path guarantees behind
   both live in the frozen format doc.
 
+## Data / domain model
+
+Two formats, two owners. The task list is the markdown checkbox grammar frozen in
+`docs/decisions/task-list-format.md` and owned by `scripts/lib/task-list.js` — four
+marker states, stable ids, no nesting, and no second task-state format (B-7). Loop
+run state is a separate JSON file owned by `scripts/lib/loop-state.js`, holding the
+bounds of B-5 and the retry bookkeeping of B-6; it is orchestration bookkeeping,
+never task state. Worktree paths are derived by `scripts/lib/worktree-paths.js` and
+never constructed by hand (B-1).
+
 ## Decisions
 
 The four-state marker set, stable ids, and no-nesting rules carry their own

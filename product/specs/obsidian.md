@@ -79,6 +79,16 @@ work carries provenance a reader can check.
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.
 
+## Data / domain model
+
+Two contracts meet here, and only one is arcforge's. The vault registry — one
+entry per vault plus a default — is engine state owned by
+`scripts/lib/obsidian-registry.js`, which locks it and writes atomically (B-2).
+The note schema is the vault's own: each vault declares its types, frontmatter
+fields, taxonomy, and thresholds in its `AGENTS.md` + `SCHEMA.md`, and that
+declaration wins wherever it overlaps the skill (B-1). The only fields arcforge
+itself insists on are the ingest provenance pair, `source_url` and `sha256` (B-4).
+
 ## Decisions
 
 The vault-contract model (mechanism/domain split, contract-wins) and the

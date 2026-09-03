@@ -81,6 +81,15 @@ down, never block the user, and never observe them uninvited.
   reviews, where the last session left off — and is close to silent when
   learning has never been enabled.
 
+## Data / domain model
+
+Hooks own one durable format: the per-session record that B-8 keeps
+unconditionally and B-6 bounds. It is written through
+`scripts/lib/session-utils.js` from the summary `scripts/lib/transcript.js` parses
+out of the harness transcript, and the diary an active enough session produces is
+the same pair's output. Everything else a hook handles — tool names, paths, prompts
+arriving in an event — is untrusted input with no persistence of its own (B-5).
+
 ## Decisions
 
 The warn-only and fail-open stances predate this log; their rationale is

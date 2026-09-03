@@ -92,6 +92,18 @@ was recorded about them.
   of anything they write. Candidate-transition commands are project-scope
   only — a global flip of behavior-changing state is refused by the engine.
 
+## Data / domain model
+
+The area's formats are frozen layer by layer in
+`docs/decisions/learning-curator-schema/` and pinned mechanically by
+`scripts/lib/learning-schemas.js`, which validates what each writer emits rather
+than restating the shapes. The entities are the observation, the candidate, the
+instinct, the diary, and the audit record. The candidate is the one with a
+lifecycle — `pending_review → approved → materialized → activated`, the three gates
+of B-3 — and its state and scope vocabularies live in `scripts/lib/learning.js`.
+The invariants: state is only ever advanced through the engine (B-5), scope decides
+location (B-9), and one session yields one diary (B-7).
+
 ## Decisions
 
 The conservative trust design — default-off, three gates, bounded injection,

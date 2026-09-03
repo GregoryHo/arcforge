@@ -68,6 +68,16 @@ underneath without breaking anything written against it.
   owner, and skills reach state only through the CLI — ownership and format
   rules per `.claude/rules/architecture.md` (File-Based State).
 
+## Data / domain model
+
+This area owns no on-disk format of its own: each command group's state belongs to
+the area behind it, and the CLI is only the door to it (B-8). What it does own is
+the command surface — command groups, flags, and the `--json` field promises — held
+once in `scripts/lib/cli-manifest.js` and checked bidirectionally against the live
+CLI by a contract test, with a second copy forbidden (B-4). Its structural
+invariants are the exit-code API (B-5) and the stability of a `--json` shape once a
+command offers one (B-6).
+
 ## Decisions
 
 - **D-002** — the bare-command discovery contract (B-1) leans on the host
