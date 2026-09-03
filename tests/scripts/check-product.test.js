@@ -480,6 +480,47 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/malformed relation line "- Supersedes: D-1"/);
     });
 
+    it('rejects a relation line with a space before the colon', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Supersedes : D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "- Supersedes : D-001"/);
+    });
+
+    it('rejects a lowercase relation label', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "- supersedes: D-001"/);
+    });
+
+    it('rejects a relation line on a non-dash markdown bullet', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['* Refines: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "\* Refines: D-001"/);
+    });
+
+    it('does not see a relation label it cannot recognize', () => {
+      // The boundary, pinned so a later reader does not assume closure: the
+      // detector keys on the three labels, and matching on the value instead
+      // would false-fire on prose fields that legitimately cite a `D-id`.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Superseds: D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('rejects a Supersedes naming two decisions on one line', () => {
       const decisions = [
         decision({ id: 'D-001' }),

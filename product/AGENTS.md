@@ -148,6 +148,13 @@ superseded by` clause whose named entry carries no `Supersedes:` back, or that n
 `D-id` the log does not have. Both are the same half-done reversal seen from opposite
 sides, and only one of them is the edit people remember to make.
 
+A bullet whose label is one of the three relations but whose form misses the canonical
+one — a space before the colon, a lowercase label, a `*` bullet — is reported as
+malformed rather than skipped, because `Supersedes :` and `Supersedes:` render
+identically and a dropped line is a reversal that quietly left the checked history. A
+label spelled differently enough (`Superseds:`) is not recognized at all, so the
+canonical spelling is the one that gets checked.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

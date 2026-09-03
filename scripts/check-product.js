@@ -21,7 +21,10 @@
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
  *         folded `<details>` index, unique, and gap-free from D-001;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
- *         an earlier decision that exists, and every `Supersedes:` carries its
+ *         an earlier decision that exists — a relation-shaped bullet that misses
+ *         the canonical form is reported as malformed rather than dropped, and
+ *         the detector keys on the three labels, so a label spelled differently
+ *         enough is not seen at all — and every `Supersedes:` carries its
  *         flip on the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
  *         clause-scoped form ⇒ `partially superseded by D-NNN`. The pairing is
  *         checked from both ends, so a flip clause with no superseding entry
@@ -58,7 +61,13 @@ const DECISION_ANY_RE = /^###\s+D-/;
 const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
 const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
-const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
+// Candidate-shaped: any markdown bullet whose field label is one of the three
+// relation labels, however it is cased or spaced around the colon. Wider than
+// RELATION_FIELD_RE on purpose — the strict form is what reports these, so a
+// near-miss (`- Supersedes : D-001`, `* refines: D-001`) is rejected, not
+// silently dropped. A misspelled label stays out of reach: matching on the value
+// instead would false-fire on the prose fields that legitimately cite a `D-id`.
+const RELATION_ANY_RE = /^\s*[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
