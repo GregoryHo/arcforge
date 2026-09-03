@@ -462,7 +462,9 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Verification: `evals/scenarios/eval-speccing-spec-before-code.md`, measured
   **+0.67 CI[0.67, 0.67] IMPROVED** at k=10 (baseline 0/10, treatment 10/10);
   `eval-speccing-supersede-not-overwrite.md` ships as corpus coverage, its
-  baseline having measured at ceiling (11/11 across two samples). B-6 in
+  baseline having measured at ceiling in the one executed sample (k=3 preflight,
+  3/3 BLOCK, under the Version-3 text); the 8/8 re-score of the k=10 pool is the
+  scenario's pre-registered prediction, not an executed measurement. B-6 in
   `product/specs/sdd.md`.
 
 ### D-016 — No arcforge product CLI group in 6.1.0

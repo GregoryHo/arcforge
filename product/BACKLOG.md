@@ -108,6 +108,13 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   gets default-on injection back with no notice. Fix: merge over the previous
   config instead of replacing it. Pre-existing; surfaced during the #146/#147
   review.
+
+- **strand-free-candidate-names** — Layer 5 admits a candidate `name` that
+  Layer 7 can never render (`schema.js` checks presence, type and length only;
+  `materialize.js` refuses it with `path_policy_rejected`); decide
+  reject-at-ingestion vs normalize-at-materialization, then close the
+  `approve` + `materialize` stranding that the `accept` guard does not cover
+  (D-012 residual).
 ## Product method
 - **product-cli** — an `arcforge product check` command that verifies a
   project's own product state: dense monotonic decision ids, every
@@ -142,3 +149,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   the CSV branch, so a trial can pass the floor without the feature working; the
   repair is a grader-owned `node -e` probe of `formatFor('csv', run)` and must
   ride the next `## Version` bump + k=10 rerun of the scenario · issue: [#156](https://github.com/GregoryHo/arcforge/issues/156).
+- **supersede-v6-preflight** — `eval-speccing-supersede-not-overwrite` ships at
+  `## Version` 6 with no preflight ever scored under its current grader (the
+  recorded BLOCK is the k=3 Version-3 sample); run one k=3 preflight under the
+  Version-6 text so the ceiling claim rests on the shipped instrument · cost:
+  three baseline trials.
