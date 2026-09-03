@@ -177,6 +177,17 @@ Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
 prose or illustration, not an entry, and is not checked as one. Rename or drop the
 section and the log reads as empty, which C6's sanity floor rejects.
 
+The scope's own boundaries honour the fence exemption: a `##` line inside a fenced
+block opens no section and closes none, so a worked example may show a whole
+`## Decision Log` — the way the few-shots here do — without standing in for the log
+or cutting it short at the entry above it. Indentation is not an exemption at this
+boundary: a section heading is read at column 1 only, so an indented `## Decision
+Log` leaves the log empty and C6 rejects it, the same way a renamed one does. The
+`## Decisions` section a spec's citations live in (C5) is scoped the same way, but
+without that backstop: no rule asserts a spec's headings, so a spec whose section is
+renamed, dropped, or swallowed by an unclosed fence cites nothing and is checked for
+nothing. Keep the heading as the template writes it.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

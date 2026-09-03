@@ -78,12 +78,37 @@ function roadmap({
   ].join('\n');
 }
 
-function spec({ name = 'alpha', status = 'shipped v1.0.0', cites = [] } = {}) {
+/**
+ * `intro` sits above `## Purpose`, outside the `## Decisions` section; `extra`
+ * is appended inside it, below the citations — so a fixture can put
+ * decisions-shaped prose on either side of the section boundary.
+ */
+function spec({
+  name = 'alpha',
+  status = 'shipped v1.0.0',
+  cites = [],
+  intro = [],
+  extra = [],
+} = {}) {
   const header = status === null ? '' : `> Status: ${status} · [ROADMAP](../ROADMAP.md)\n`;
   const decisions = cites.map((d) => `- **${d}** — pins a choice here.`).join('\n');
   return {
     name,
-    content: `# ${name} — spec\n\n${header}\n## Purpose\n\nWhat it does.\n\n## Decisions\n\n${decisions}\n`,
+    content: [
+      `# ${name} — spec`,
+      '',
+      header,
+      ...intro,
+      '## Purpose',
+      '',
+      'What it does.',
+      '',
+      '## Decisions',
+      '',
+      decisions,
+      ...extra,
+      '',
+    ].join('\n'),
   };
 }
 
@@ -127,6 +152,23 @@ describe('check-product', () => {
       const errors = of('C1', run({ roadmap: { rows: [row({ here: false })] } }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/found 0/);
+    });
+
+    it('does not let a fenced `## Roadmap` illustration stand in for the table', () => {
+      // The roadmap is sliced by the same fence-aware `section`, so an example
+      // table above it is prose — read fence-blind, its rows become the roadmap.
+      const intro = [
+        [
+          '```markdown',
+          '## Roadmap',
+          '',
+          ...TABLE_HEADER,
+          row({ version: '9.9.9', specs: [] }),
+          '```',
+          '',
+        ].join('\n'),
+      ];
+      expect(run({ roadmap: { intro } })).toEqual([]);
     });
 
     it('rejects two marked rows', () => {
@@ -247,6 +289,40 @@ describe('check-product', () => {
         },
       });
       expect(of('C2', errors)).toEqual([]);
+    });
+
+    it('does not let a fenced `##` line inside the log truncate it', () => {
+      // The section boundary is found fence-aware. Read fence-blind, the log
+      // would end inside this worked example and every entry below it — the
+      // shape `product/AGENTS.md`'s own few-shots use — would leave the log.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        ['```markdown', '## Decision Log', '### D-009 — a worked example', '```', ''].join('\n'),
+        decision({ id: 'D-002' }),
+      ];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
+    });
+
+    it('still checks an entry below a fenced `##` line', () => {
+      // The silent half of the same truncation: a dropped entry takes its
+      // broken relation out of the checked history with no error at all.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        ['```markdown', '## Decision Log', '```', ''].join('\n'),
+        decision({ id: 'D-002', extra: ['- Refines: D-009'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toContainEqual(
+        expect.stringMatching(/"Refines: D-009" names a decision that does not exist/),
+      );
+    });
+
+    it('does not let a fenced `## Decision Log` illustration stand in for the log', () => {
+      // The hijack half: the first *unfenced* heading opens the section, so an
+      // illustration of the log above it is prose, not the log.
+      const intro = [
+        ['```markdown', '## Decision Log', '', decision({ id: 'D-009' }), '```', ''].join('\n'),
+      ];
+      expect(run({ roadmap: { intro, decisions: [decision({ id: 'D-001' })] } })).toEqual([]);
     });
   });
 
@@ -763,6 +839,39 @@ describe('check-product', () => {
       const errors = of('C5', run({ specs: [spec({ cites: [id] })] }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/not a zero-padded D-NNN id/);
+    });
+
+    it('still reads the citations below a fenced `##` line', () => {
+      // A spec's `## Decisions` is sliced by the same fence-aware `section`:
+      // read fence-blind, the section ends inside this example and the citation
+      // below it goes unchecked.
+      const specs = [
+        spec({
+          cites: ['D-001'],
+          extra: [
+            '```markdown',
+            '## Decisions',
+            'how a citation is written.',
+            '```',
+            '- **D-009** — cites a decision the log does not carry.',
+          ],
+        }),
+      ];
+      const errors = of('C5', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/cites D-009/);
+    });
+
+    it('does not let a fenced `## Decisions` illustration stand in for the section', () => {
+      const specs = [
+        spec({
+          cites: ['D-009'],
+          intro: ['```markdown', '## Decisions', '- **D-001** — an example citation.', '```', ''],
+        }),
+      ];
+      const errors = of('C5', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/cites D-009/);
     });
   });
 

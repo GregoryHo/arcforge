@@ -22,7 +22,9 @@
  *         folded `<details>` index, unique, and gap-free from D-001 — read
  *         inside the `## Decision Log` section, so a `### D-NNN` heading
  *         elsewhere in `ROADMAP.md` is prose rather than an entry, and a missing
- *         log section is C6's job rather than a silent zero. The heading is read
+ *         log section is C6's job rather than a silent zero. That section's own
+ *         boundaries are found fence-aware, so a fenced `##` line in a worked
+ *         example neither stands in for the log nor truncates it. The heading is read
  *         at column 1, and one indented far enough to still render as a heading
  *         (one to three spaces) is reported rather than dropped, so a stray
  *         indent cannot hide an entry in the log's flat structure;
@@ -49,7 +51,8 @@
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
- *         and exists in the log;
+ *         and exists in the log — that section is sliced the same fence-aware
+ *         way, so an example `##` heading cannot carry citations out of reach;
  *   - C6  sanity floor — at least one roadmap row, one decision, one spec;
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
@@ -101,9 +104,13 @@ const TOTAL_FLIP_RE = /^Superseded-by: D-(\d{3})$/;
 const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
 // The two `##` sections of ROADMAP.md this linter reads. Each is sliced out
 // before it is parsed, so a table row or a `### D-NNN` heading anywhere else in
-// the file is prose, not product state.
+// the file is prose, not product state. Both are matched at column 1, and the
+// slice's boundaries are found fence-aware (see `section`), so a fenced
+// illustration can neither stand in for the section nor cut it short.
 const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
+// The one `##` section of a spec this linter reads, sliced the same way.
+const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
@@ -120,14 +127,40 @@ function compareVersions(a, b) {
   return 0;
 }
 
-/** The lines between a `##` heading and the next one, or `[]` when it is absent. */
+/**
+ * The lines between a `##` heading and the next one, or `[]` when it is absent.
+ *
+ * Both boundaries are found fence-aware: a `##` line inside a fenced block is an
+ * illustration, so it neither opens the section early nor closes it — otherwise a
+ * worked example in the log (the shape `product/AGENTS.md` itself uses) would cut
+ * the slice short and silently drop every entry below it. Only the boundary scan
+ * skips fenced lines; the returned slice is a raw index range, so the fence lines
+ * stay in it and each parser applies its own fence exemption. An unclosed fence
+ * therefore swallows the heading and yields `[]` — fail-closed for ROADMAP.md's two
+ * sections, which C6 rejects as a corpus with no rows or no decisions, but silent
+ * for a spec's `## Decisions`, exactly as a spec that renames or drops that section
+ * already is: nothing asserts a spec's headings. The first matching heading wins: a
+ * second `## Decision Log` later in the file is not read.
+ */
 function section(md, heading) {
   const lines = md.split('\n');
-  const start = lines.findIndex((l) => heading.test(l));
-  if (start === -1) return [];
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex((l) => /^##\s+/.test(l));
-  return end === -1 ? rest : rest.slice(0, end);
+  let fenceMarker = null;
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const fence = lines[i].match(FENCE_RE);
+    if (fence) {
+      if (!fenceMarker) fenceMarker = fence[1];
+      else if (fence[1] === fenceMarker) fenceMarker = null;
+      continue;
+    }
+    if (fenceMarker) continue;
+    if (start === -1) {
+      if (heading.test(lines[i])) start = i;
+      continue;
+    }
+    if (/^##\s+/.test(lines[i])) return lines.slice(start + 1, i);
+  }
+  return start === -1 ? [] : lines.slice(start + 1);
 }
 
 /** The lines between `## Roadmap` and the next `##` heading. */
@@ -494,23 +527,22 @@ function checkSpecHeaders(rows, specs, errors) {
   }
 }
 
-/** The body of a spec's `## Decisions` section, or null when it has none. */
+/**
+ * The body of a spec's `## Decisions` section, empty when it has none. It takes
+ * the same fence-aware slice the roadmap's sections do, so a fenced `## …` in a
+ * worked example neither stands in for the section nor cuts it short and drops
+ * the citations below it. A spec with no such section cites nothing, which is
+ * what an empty body already says.
+ */
 function decisionsSection(content) {
-  const lines = content.split('\n');
-  const start = lines.findIndex((l) => /^##\s+Decisions\s*$/.test(l));
-  if (start === -1) return null;
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex((l) => /^##\s/.test(l));
-  return (end === -1 ? rest : rest.slice(0, end)).join('\n');
+  return section(content, SPEC_DECISIONS_HEADING_RE).join('\n');
 }
 
 /** C5 — a spec may only cite well-formed `D-NNN` ids the log actually carries. */
 function checkSpecCitations(entries, specs, errors) {
   const known = new Set(entries.map((e) => e.id));
   for (const spec of specs) {
-    const section = decisionsSection(spec.content);
-    if (section === null) continue;
-    for (const m of section.matchAll(CITATION_RE)) {
+    for (const m of decisionsSection(spec.content).matchAll(CITATION_RE)) {
       if (m[1].length !== 3 || m[2] !== '') {
         errors.push(
           `C5 specs/${spec.name}.md: cites "${m[0]}", which is not a zero-padded D-NNN id`,
