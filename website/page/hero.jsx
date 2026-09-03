@@ -54,7 +54,7 @@ function Hero({theme}) {
               fontFamily:'"JetBrains Mono",monospace',fontSize:12,letterSpacing:2,fontWeight:700,
               textDecoration:'none',display:'inline-block',
             }}>/plugin install arcforge →</a>
-            <div style={{fontSize:11,color:t.dim,letterSpacing:1.5,fontFamily:'"JetBrains Mono",monospace'}}>MIT · 15 SKILLS · 6 HOOKS · 0 DEPS</div>
+            <div style={{fontSize:11,color:t.dim,letterSpacing:1.5,fontFamily:'"JetBrains Mono",monospace'}}>MIT · 16 SKILLS · 6 HOOKS · 0 DEPS</div>
           </div>
 
           <div style={{marginTop:56,display:'flex',gap:16,alignItems:'center',flexWrap:'wrap'}}>
@@ -111,7 +111,7 @@ function HeroSchematic({theme:t}) {
           <circle r="60" fill="none" stroke={t.brass} strokeWidth="1.2" strokeDasharray="3 3"/>
         </g>
         <text y="4" textAnchor="middle" fill={t.brass} fontSize="12" fontFamily="Fraunces,serif" fontStyle="italic">skills</text>
-        <text y="22" textAnchor="middle" fill={t.dim} fontSize="9" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">15 AVAILABLE</text>
+        <text y="22" textAnchor="middle" fill={t.dim} fontSize="9" letterSpacing="1.5" fontFamily="JetBrains Mono,monospace">16 AVAILABLE</text>
         {['brainstorming','executing','tdd','debugging','code-review','sessions','learning','finishing'].map((s,i)=>{
           const a = (i/8)*Math.PI*2 - Math.PI/2;
           const r = 95;

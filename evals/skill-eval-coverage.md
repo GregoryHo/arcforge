@@ -264,10 +264,15 @@ Version 1（無結構壓力）與 Version 2（加入「精簡日誌、丟掉過�
 
 - treatment 臂 10/10 trial 回傳 "You've hit your session limit"、0 token，被 runner
   當成真 trial 計分（fixture 自身檔案就足以讓部分 assertion 過）。該臂已刪除。
-- baseline 臂的失敗全部是 grader 的字面比對，不是行為：trial 1/4/9 把
+- baseline 臂另有 2 筆（trial 9、10）被同一道汙染閘門攔下，已連同 transcript 刪除。
+  本檔是這個池的 provenance 唯一記載處：那 2 筆已不存在，本 PR 的任何文件都不對
+  它們作行為陳述；run log 印出的臂層數字（avg 0.85 / pass 50%）分母含那 2 筆，依
+  本檔評分規則「error trial（infra/grade）不入分母」不予採用。**留存池** =
+  `20260902-171249/baseline.jsonl` 的 8 筆有效 trial，**avg 0.906 / pass 62.5%**。
+- 留存池的失敗全部是 grader 的字面比對，不是行為：trial 1／4 把
   `supersedes D-005` 寫在 `Decision:`／`Status:` 句中而非 `Supersedes:` 欄位；
   trial 7 把回指寫進標題 `### D-005 — Upload storage backend (superseded by D-008)`。
-  10/10 都明確拒絕重新編號，並說明理由：
+  8 筆全部明確拒絕重新編號，並說明理由：
 
 > "Renumbering would break the spec's D-references and make 'D-005' mean
 > different things in old commits versus the log, which is the exact confusion
@@ -280,9 +285,8 @@ Version 3 只修 grader（A2 由標題全等改為包含；A3 接受任何把 su
 後重編號使七個 id 各出現一次」皆在該當的 assertion 上 FAIL；只提 id 而無 supersede
 字樣不算過。
 
-以該 grader 重評 Version-2 baseline 池：**8/8 全過**（10 筆中 2 筆為 session-limit
-汙染，已連同 transcript 刪除；`20260902-171249/baseline.jsonl` 保留 8 筆有效 trial
-作為本結論的證據）。Version 3 全新 preflight 再測：**BLOCK, baseline pass 100%
+以該 grader 重評上述留存池：**8/8 全過**——trial 1／4 的 A3 與 trial 7 的 A2 各自
+翻正，其餘 5 筆本就滿分。Version 3 全新 preflight 再測：**BLOCK, baseline pass 100%
 (k=3)**。兩次獨立取樣合計 11/11。
 
 **結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
@@ -290,13 +294,22 @@ Version 3 只修 grader（A2 由標題全等改為包含；A3 接受任何把 su
 40 個 trial 不會產生資訊。真正未被覆蓋的是「帳本在壓力下是否與程式碼同時移動」，
 那正是 `spec-before-code` 量到的 +0.67。
 
-### 第 16 支技能的相鄰風險：router 回歸
+### 第 16 支技能的相鄰風險：未量測；router 另跑一次煙霧測試
 
 `speccing` 的 description register 與 `brainstorming` 相鄰（D-014 已列為 accepted
-cost），因此本 PR 另跑 `eval-router-skill-selection` 作回歸：**+0.16 CI[0.05, 0.27]
-IMPROVED**（k=5；baseline avg 0.60 / pass 0%，treatment avg 0.76 / pass 80%）。
-加入第 16 列後 router 未退化，P7 的 +0.36 仍為該支的現行證據，本次僅作 non-regression
-用。註：`check-skill-eval-annotation` 仍會對 `skills/core/using/SKILL.md` 發 warning
+cost）。**這項相鄰風險本 PR 沒有量到**：本 PR 另跑的 `eval-router-skill-selection`
+問的是 slugify 缺陷該走 `tdd` 還是 `finishing`，題面裡沒有「settle the design」與
+「record what was settled」的歧義；也沒有 15 列 vs 16 列的對照臂。因此不能據該次
+執行宣稱「加入第 16 列後 router 未退化」。
+
+該次執行支持的只有一句話：**router 已含第 16 列時，注入 router 仍改善技能選擇**
+——**+0.16 CI[0.05, 0.27] IMPROVED**（k=5；baseline avg 0.60 / pass 0%，treatment
+avg 0.76 / pass 80%）。這是煙霧測試而非 non-regression 判定：沒有預登記的下界，
+k=5 與 P7 的 +0.36（k、題目皆不同）也不可相減。P7 的 +0.36 仍為 `using` 的現行
+證據。相鄰歧義的直接量測列為 BACKLOG 的 `speccing-router-adjacency-eval`，本版
+未設計題目。
+
+註：`check-skill-eval-annotation` 仍會對 `skills/core/using/SKILL.md` 發 warning
 ——該啟發式以檔名子字串比對，而 `using` 的 scenario 名為 `eval-router-skill-selection`，
 本質上比不到；此為非阻斷提示，證據見本節與 `evals/results/eval-router-skill-selection/`。
 

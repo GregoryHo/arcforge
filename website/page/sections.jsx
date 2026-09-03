@@ -296,7 +296,7 @@ function Platforms({theme:t}) {
   );
 }
 
-// ─── Skills Grid (all 15) ───
+// ─── Skills Grid (every shipped skill) ───
 function SkillsGrid({theme:t}) {
   const layers = [
     ['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'],
@@ -310,6 +310,7 @@ function SkillsGrid({theme:t}) {
     ['Doing the work', t.ember, [
       ['brainstorming','explore before the design settles'],
       ['executing','task list, then run it'],
+      ['speccing','specs and decision log move with the code'],
       ['dispatching','parallel work, isolated writers'],
       ['looping','unattended across fresh sessions'],
       ['finishing','merge, PR, keep, or discard'],
@@ -337,7 +338,7 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="02"
         kicker="SKILLS"
-        title={<>15 skills. <em style={{color:t.brass,fontStyle:'italic'}}>No pipeline</em> to enter through.</>}
+        title={<>One skill per situation. <em style={{color:t.brass,fontStyle:'italic'}}>No pipeline</em> to enter through.</>}
         sub="Each one is a closed unit that fires from its own description when the situation matches, and stays quiet when it doesn't. Three of them never auto-fire at all — looping, learning, and writing-skills wait to be asked."
         theme={t}
       />
