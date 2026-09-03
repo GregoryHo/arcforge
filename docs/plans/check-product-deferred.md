@@ -172,6 +172,20 @@ Not taken in round 9 on purpose: at 699 the standard was met, and a file split w
 rule forcing it is churn a reviewer then has to re-read against no behaviour change.
 Round 11 had the rule.
 
+**Round 13 bound the same ceiling a second time**, which is the evidence that this
+section is a standing constraint rather than a one-off. C6's framing clause (§6) put
+`product-lint.js` at **772** — over the hard limit, and still nothing counts lines in
+CI. The cut this time is by *format* rather than by markdown-versus-product-state:
+`scripts/lib/product-roadmap.js` takes the roadmap table's reader — `parseRoadmapRows`,
+`rowCells`, `checkRoadmapFraming`, `roadmapSection` and the table's constants — so one
+on-disk format has one owner, and the two rules about the table's own shape (C4's arity
+check, C6's framing clause) travel with it. `product-lint.js` came out at 635 and keeps
+every rule that reads the parsed state. The same proof applied: the suite requires only
+`validateProduct`, so a green run across the move showed no behaviour changed.
+`scripts/check-product.js` now imports `parseRoadmapRows` from the new module directly
+rather than through a re-export, per the no-barrel rule in
+`.claude/rules/coding-standards.md`.
+
 ## 5. `stripCodeSpans()` empties code-styled link text
 
 C4 reads a `Spec` cell with its code spans removed, and a span is dropped whole —
@@ -226,9 +240,11 @@ way a fenced one did — the case C1's own docblock says it must not.
 
 Landed in round 13 as a **clause of C6**, the way round 11's duplicate-`Version` rule
 landed as a clause of C4, so the rule count stays at seven:
-`checkRoadmapFraming()` in `scripts/lib/product-lint.js`, the framing paragraph in
-`product/AGENTS.md`'s roadmap-row section, and four cases in
-`tests/scripts/check-product.test.js`.
+`checkRoadmapFraming()`, the framing paragraph in `product/AGENTS.md`'s roadmap-row
+section, and four cases in `tests/scripts/check-product.test.js`. The rule pushed
+`product-lint.js` past the 700-line hard limit, so the roadmap table's reader moved to
+`scripts/lib/product-roadmap.js` in a follow-up commit with no behaviour change — §4
+records that.
 
 Both recorded constraints held. One was satisfied differently than written:
 

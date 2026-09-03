@@ -6,6 +6,7 @@
  * Reads the hand-maintained product state under `product/` — the roadmap table
  * and Decision Log in `ROADMAP.md`, plus every living spec in `specs/` — and
  * validates it with scripts/lib/product-lint.js, which owns the C1–C7 rules
+ * (reading the roadmap table through scripts/lib/product-roadmap.js)
  * (the `← we are here` marker, the log's numbering and supersession
  * invariants, spec headers against their governing roadmap row, spec citations,
  * the sanity floor, and the `Tag` cell). Fits the scripts/check-*.js family.
@@ -16,7 +17,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { validateProduct, parseRoadmapRows, parseDecisions } = require('./lib/product-lint');
+const { validateProduct, parseDecisions } = require('./lib/product-lint');
+const { parseRoadmapRows } = require('./lib/product-roadmap');
 
 const PRODUCT_DIR = path.resolve(__dirname, '..', 'product');
 const ROADMAP_MD = path.join(PRODUCT_DIR, 'ROADMAP.md');

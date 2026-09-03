@@ -82,31 +82,24 @@
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
- * The markdown primitives every rule reads with — the fence-aware `section()`,
- * `unfenced()` and `stripCodeSpans()` — live in `product-markdown.js`, which
- * knows nothing about product state. This file holds the rules.
+ * Two siblings hold what this file is not about. The markdown primitives every
+ * rule reads with — the fence-aware `section()`, `unfenced()` and
+ * `stripCodeSpans()` — live in `product-markdown.js`, which knows nothing about
+ * product state (`stripCodeSpans()` is read from there by `product-roadmap.js`,
+ * the one rule whose answer a code span changes). The roadmap table's reader lives in `product-roadmap.js`, and
+ * the two rules about the table's own shape rather than about what its rows say
+ * travel with it: C4's arity check and C6's framing clause. This file holds the
+ * rules that read the parsed state.
  *
  * Library tier: pure — no I/O of its own; every rule reads the corpus strings
  * its caller hands it, and a violation is an error string rather than a throw.
  */
 
-const { section, unfenced, stripCodeSpans } = require('./product-markdown');
+const { section, unfenced } = require('./product-markdown');
+const { parseRoadmapRows, HERE_MARKER, ROW_STATUSES } = require('./product-roadmap');
 
-const HERE_MARKER = '← we are here';
-const ROW_STATUSES = new Set(['next', 'building', 'shipped']);
+// The `Tag` cell an unshipped row carries.
 const NO_TAG = '—';
-// A cell of a GFM delimiter row — the second line of a table, which decides
-// whether the lines around it render as one at all. A single dash is legal
-// (`|-|-|` renders), so the run is `-+`: read as `-{2,}` the framing rule below
-// would reject a table every renderer draws.
-const DELIMITER_CELL_RE = /^:?-+:?$/;
-// The `Version` header cell, which is what marks a pipe line as the table's
-// header rather than one of its rows.
-const HEADER_FIRST_CELL = 'Version';
-// The width every line of the table carries: the six columns `product/AGENTS.md`
-// defines a roadmap row as.
-const ROW_COLUMNS = 6;
-
 // CommonMark lets an ATX heading carry up to three leading spaces; at four — as
 // measured from column 1, and the log nests no headings under list items — it is
 // an indented code block, where `### D-NNN` is not a heading at all and must stay
@@ -135,16 +128,15 @@ const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
 const TOTAL_FLIP_RE = /^Superseded-by: D-(\d{3})$/;
 const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
-// The two `##` sections of ROADMAP.md this linter reads. Each is sliced out
-// before it is parsed, so a table row or a `### D-NNN` heading anywhere else in
-// the file is prose, not product state. Both are matched at column 1, and the
-// slice's boundaries are found fence-aware (see `section`), so a fenced
-// illustration can neither stand in for the section nor cut it short.
-const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
+// The Decision Log section of ROADMAP.md — the second of the two this linter
+// reads, the roadmap table's being `product-roadmap.js`'s. It is sliced out
+// before it is parsed, so a `### D-NNN` heading anywhere else in the file is
+// prose, not product state. It is matched at column 1, and the slice's
+// boundaries are found fence-aware (see `section`), so a fenced illustration can
+// neither stand in for the section nor cut it short.
 const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
 // The one `##` section of a spec this linter reads, sliced the same way.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
-const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 // The spec header line, matched per line rather than against the whole file, so
 // the scope in `specStatusHeader` is what decides which line is the header.
 const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
@@ -178,133 +170,6 @@ function compareVersions(a, b) {
 /** The identity two `Version` cells share when `compareVersions` calls them equal. */
 function versionKey(version) {
   return versionParts(version).join('.');
-}
-
-/** The lines between `## Roadmap` and the next `##` heading. */
-function roadmapSection(roadmap) {
-  return section(roadmap, ROADMAP_HEADING_RE);
-}
-
-/**
- * The cells of a pipe line, in order.
- *
- * A cell that carries a literal pipe writes it `\|` — the only form GFM has —
- * so the split reads unescaped delimiters and unescapes the cells it hands
- * back. Read escape-blind, such a cell splits in two and every cell after it is
- * read from the wrong index: a `What & why` mentioning `input \| output` moved
- * `Spec` out of reach, the row parsed as linking nothing, and C4 went on
- * governing that spec from an older row. One reader for the framing check and
- * the row loop below, so the header a table is judged by and the row a rule
- * reads are cut the same way.
- */
-function rowCells(line) {
-  return line
-    .replace(/^\|/, '')
-    .replace(/(?<!\\)\|$/, '')
-    .split(/(?<!\\)\|/)
-    .map((c) => c.replace(/\\\|/g, '|').trim());
-}
-
-/**
- * C6 — the roadmap's rows sit under a table that renders.
- *
- * Every rule that reads the table reads a *row*, and until this ran nothing
- * above the rows was required: a `## Roadmap` holding one data row and no header
- * at all, a header with no delimiter under it, or a header over a two-column
- * delimiter each linted green. GFM renders none of the three — a delimiter row
- * is required, and one whose arity differs from the header's un-recognizes the
- * table — so each reaches a reader as a paragraph of literal pipes while C1, C4,
- * C6 and C7 go on reading it as product state. The corruption is visible rather
- * than plausible, which is why this stayed a deferral for several rounds; it is
- * a floor rather than a widening, because "the roadmap table has no rows"
- * already promised a table.
- *
- * The frame is the first two pipe lines of the section, the way GFM reads one:
- * a header of six cells opening on `Version`, then a delimiter of the same
- * width. Reported and the rows kept, the way a duplicate `Version` and a
- * duplicate `D-id` are — dropping them would take the `← we are here` marker
- * with them and trade this rule's error for C1's.
- */
-function checkRoadmapFraming(table, errors) {
-  // An empty `## Roadmap` is the row floor's to report, not this rule's.
-  if (table.length === 0) return;
-  const [header, delimiter] = table;
-  if (header.cells[0] !== HEADER_FIRST_CELL || header.cells.length !== ROW_COLUMNS) {
-    errors.push(
-      `C6 the roadmap table opens on "${header.line}", not a ${ROW_COLUMNS}-column header row starting with "${HEADER_FIRST_CELL}", so its rows render as a paragraph of pipes rather than a table`,
-    );
-    return;
-  }
-  if (!delimiter || !delimiter.cells.every((c) => DELIMITER_CELL_RE.test(c))) {
-    errors.push(
-      'C6 the roadmap table has no delimiter row under its header, so GFM renders no table',
-    );
-    return;
-  }
-  if (delimiter.cells.length !== header.cells.length) {
-    errors.push(
-      `C6 the roadmap table's delimiter row carries ${delimiter.cells.length} column(s) against a ${header.cells.length}-column header, so GFM renders no table`,
-    );
-  }
-}
-
-/**
- * Parse the roadmap table. Pushes structural errors onto `errors` and returns
- * the rows it could read. Read outside fenced blocks, so an illustrative table
- * row inside `## Roadmap` is not a roadmap row.
- *
- * The arity check is exact rather than a floor — a row that does not resolve to
- * six cells is rejected instead of read from indexes that may have shifted,
- * which is also what catches the one input the escape rule in `rowCells` cannot
- * see through: a cell ending in a literal backslash makes the delimiter after it
- * look escaped. It runs *before* the header and delimiter lines are skipped, so
- * an off-arity delimiter is reported rather than dropped by an all-dash test
- * that never looked at how many cells it had.
- *
- * The scan is indent-bounded the way the log's heading and relation probes are:
- * a row indented four spaces or more is an indented code block, so it is an
- * illustration rather than product state. Read indent-blind, such a row still
- * became a spec's governing row and forced its `Status:` header to a version
- * that exists only in the example — the honest header rejected, the phantom one
- * accepted. One to three spaces is not an exemption: the row still renders in
- * the table.
- *
- * @returns {{version: string, tag: string, status: string, here: boolean, specs: string[]}[]}
- */
-function parseRoadmapRows(roadmap, errors) {
-  const table = [];
-  for (const raw of unfenced(roadmapSection(roadmap))) {
-    if (!/^ {0,3}\|/.test(raw)) continue;
-    const line = raw.trim();
-    table.push({ line, cells: rowCells(line) });
-  }
-  checkRoadmapFraming(table, errors);
-
-  const rows = [];
-  for (const { line, cells } of table) {
-    if (cells.length !== ROW_COLUMNS) {
-      errors.push(`C4 roadmap row "${line}": expected 6 columns, found ${cells.length}`);
-      continue;
-    }
-    if (cells.every((c) => DELIMITER_CELL_RE.test(c))) continue;
-    if (cells[0] === HEADER_FIRST_CELL) continue;
-    const version = cells[0].replace(/`/g, '').trim();
-    if (!/^\d+\.\d+\.\d+$/.test(version)) {
-      errors.push(`C4 roadmap row "${cells[0]}": Version must be a semver X.Y.Z`);
-      continue;
-    }
-    const here = cells[3].includes(HERE_MARKER);
-    const status = cells[3].replace(HERE_MARKER, '').replace(/\*/g, '').trim();
-    if (!ROW_STATUSES.has(status)) {
-      errors.push(
-        `C4 roadmap row ${version}: unknown Status "${status}" (expected next | building | shipped)`,
-      );
-    }
-    const tag = cells[1].replace(/`/g, '').trim();
-    const specs = [...stripCodeSpans(cells[5]).matchAll(SPEC_LINK_RE)].map((m) => m[1]);
-    rows.push({ version, tag, status, here, specs });
-  }
-  return rows;
 }
 
 /**
@@ -764,9 +629,7 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
 
 module.exports = {
   validateProduct,
-  parseRoadmapRows,
   parseDecisions,
   expectedSpecStatus,
   specStatusHeader,
-  ROW_STATUSES,
 };
