@@ -808,10 +808,7 @@ function Platforms({
       border: `1px dashed ${t.line}`
     }
   }, Array.isArray(p.cmd) ? p.cmd.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c,
-    style: {
-      lineHeight: 1.7
-    }
+    key: c
   }, c)) : p.cmd)))));
 }
 
