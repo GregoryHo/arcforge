@@ -233,11 +233,6 @@ function draftPathsFor(candidateId) {
   return draftPathsIn(latestMaterializationFor(candidateId));
 }
 
-/** The one-question form, for the callers that ask only about staleness. */
-function staleDraftsFor(candidateId) {
-  return staleDraftsIn(latestMaterializationFor(candidateId));
-}
-
 /** Each stale draft named with what went wrong with it. */
 function describeStaleDrafts(stale) {
   return stale
@@ -582,9 +577,10 @@ function runAccept({ scope }, candidateId) {
     // been edited since the manifest recorded it — would be success over a
     // draft that activation then refuses, so the report has to be checked even
     // though there is no transition to guard.
-    const stale = staleDraftsFor(candidateId);
+    const materialization = latestMaterializationFor(candidateId);
+    const stale = staleDraftsIn(materialization);
     if (stale.length > 0) throw new Error(staleDraftAcceptMessage(card, stale));
-    return { scope, candidate: card, draft_paths: draftPathsFor(candidateId) };
+    return { scope, candidate: card, draft_paths: draftPathsIn(materialization) };
   }
   if (card.lifecycle_status === 'pending_review') {
     dispatchAction({ verb: 'approve', card, expectedStatus: 'pending_review' });
