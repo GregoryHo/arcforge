@@ -8,6 +8,8 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 
+const { sha256Truncated } = require('../../scripts/lib/utils');
+
 // ---------------------------------------------------------------------------
 // Helpers — build a valid approved instinct candidate
 // ---------------------------------------------------------------------------
@@ -111,6 +113,43 @@ function callMaterialize(candidateOverrides = {}, opts = {}) {
     renderPolicy: opts.renderPolicy || defaultRenderPolicy(),
     arcforgeRoot: opts.arcforgeRoot || path.join(tmpDir, '.arcforge'),
   });
+}
+
+// Helper: the materialization directories written for a candidate
+function materializationDirs(arcforgeRoot, candidateId) {
+  const base = path.join(arcforgeRoot, 'learning', 'drafts', candidateId);
+  return fs
+    .readdirSync(base)
+    .filter((entry) => fs.existsSync(path.join(base, entry, 'materialization.json')));
+}
+
+// Helper: the `materialize → materialized` transitions recorded for a candidate
+function materializeTransitions(arcforgeRoot, candidateId) {
+  const queuePath = path.join(arcforgeRoot, 'learning', 'candidates', 'queue.jsonl');
+  if (!fs.existsSync(queuePath)) return [];
+  return fs
+    .readFileSync(queuePath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter(
+      (event) =>
+        event.event_type === 'candidate.transitioned' &&
+        event.candidate_id === candidateId &&
+        event.action === 'materialize' &&
+        event.next_status === 'materialized',
+    );
+}
+
+// Manifests are ordered by `created_at`, which has millisecond resolution, so two
+// materializations inside one millisecond would tie. Step the clock between them
+// to keep "the latest manifest" unambiguous in the assertions below.
+function waitForNextMillisecond() {
+  const start = Date.now();
+  while (Date.now() === start) {
+    /* busy-wait */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -598,6 +637,136 @@ describe('L7-11: duplicate materialization handling', () => {
     });
     expect(result2.ok).toBe(true);
     expect(result2.record.materialization_id).not.toBe(result1.record.materialization_id);
+  });
+
+  // What the next three pin: the reuse branch returns "the latest existing draft"
+  // (layer-7-materialization.md, First-slice defaults #3) — an existing *draft*,
+  // not merely an existing manifest. Reusing a manifest whose draft was deleted or
+  // hand-edited would advance the lifecycle to `materialized` and let `learn drafts`
+  // print a path that is not there, while the activation that follows refuses on the
+  // very same content hash (activate.js, L8-3).
+  it('re-materializes when the recorded draft file was deleted', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    expect(fs.existsSync(second.draftPaths[0])).toBe(true);
+    expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
+
+    // The manifest `learn drafts` reads is the fresh one, and its paths are real.
+    const { findLatestMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findLatestMaterialization(arcforgeRoot, approved.candidate_id);
+    expect(latest.materialization_id).toBe(second.record.materialization_id);
+    for (const artifact of latest.draft_artifacts) {
+      expect(fs.existsSync(artifact.draft_path)).toBe(true);
+      expect(sha256Truncated(fs.readFileSync(artifact.draft_path, 'utf8'), 64)).toBe(
+        artifact.content_hash,
+      );
+    }
+  });
+
+  it('re-materializes when the recorded draft no longer matches its content hash', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    const tampered = 'hand-edited draft body\n';
+    fs.writeFileSync(first.draftPaths[0], tampered, 'utf8');
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    expect(second.draftPaths[0]).not.toBe(first.draftPaths[0]);
+    // The fresh materialization gets its own directory, so the edited draft is left
+    // where the reviewer left it — the render policy's overwrite_existing_draft:
+    // false holds without anything having to overwrite-guard.
+    expect(fs.readFileSync(first.draftPaths[0], 'utf8')).toBe(tampered);
+
+    const { findLatestMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findLatestMaterialization(arcforgeRoot, approved.candidate_id);
+    expect(latest.materialization_id).toBe(second.record.materialization_id);
+    const artifact = latest.draft_artifacts[0];
+    expect(sha256Truncated(fs.readFileSync(artifact.draft_path, 'utf8'), 64)).toBe(
+      artifact.content_hash,
+    );
+  });
+
+  it('reuses the materialization when the recorded draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).toBe(first.record.materialization_id);
+    expect(second.draftPaths).toEqual(first.draftPaths);
+    expect(materializationDirs(arcforgeRoot, approved.candidate_id)).toHaveLength(1);
+    expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
   });
 });
 
