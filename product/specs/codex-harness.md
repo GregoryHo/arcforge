@@ -65,14 +65,17 @@ whole and fails halfway through a workflow.
   to hold a security boundary that one careless grant defeats.
 - **B-3 The CLI does not reach Codex, and says so at the call site.** The bare
   `arcforge` command is Claude Code's mechanism: it puts every loaded plugin's
-  `bin/` on PATH, and Codex does not — verified twice, once under an inherited
-  environment and once with Codex's own environment policy, with `command -v
-  arcforge` empty both times. On Codex the eight engine-free skills work in
-  full; the seven CLI-backed ones load and read correctly but report `command
-  not found` at their first engine step. That failure is loud and located, which
-  is the accepted cost — the alternative, a skill that constructs its own path to
-  the engine, would break the black-box boundary that makes the engine safe to
-  change (D1/D9 in `.claude/rules/architecture.md`).
+  `bin/` on PATH, and Codex does not — verified twice with a fixture plugin,
+  once under an inherited environment and once with Codex's own environment
+  policy: `command -v <plugin bin>` was empty both times, and the same turn's
+  `PATH` dump carried no Codex plugin `bin/` entry while the Claude Code plugin
+  `bin/` directories inherited from the parent shell were plainly visible in it.
+  On Codex the eight engine-free skills work in full; the seven CLI-backed ones
+  load and read correctly but report `command not found` at their first engine
+  step. That failure is loud and located, which is the accepted cost — the
+  alternative, a skill that constructs its own path to the engine, would break
+  the black-box boundary that makes the engine safe to change (D1/D9 in
+  `.claude/rules/architecture.md`).
 - **B-4 Version parity is a gate, not a habit.** `.codex-plugin/plugin.json`
   carries its own `version`, so it is the ninth row in
   `npm run check:versions` and a bump that misses it fails CI. The Codex
@@ -139,7 +142,7 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
 
 - **D-002** — Codex as a wrapped second harness was directionally decided at
   6.0.0 and left unscheduled.
-- **D-004** — Codex packaging ships at 6.1.0, skills only, with the hook registry
+- **D-013** — Codex packaging ships at 6.1.0, skills only, with the hook registry
   renamed out of Codex's discovery path.
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
