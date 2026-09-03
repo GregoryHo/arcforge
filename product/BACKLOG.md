@@ -86,6 +86,12 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   the terminal through the path. B-9 says commands print the absolute path of
   anything they write, so this is a product call between the two promises, not
   a review fix.
+- **project-keyspace-collision** — two project roots whose basenames sanitize to
+  the same slug share one observation store, one instincts tree and therefore one
+  candidate set; `learn --project` keys on that slug (D-012) because filtering on
+  `scope.project_id` would hide candidates (the id is taken from whichever
+  observation wrote first, or a name hash). Separating them is a keyspace
+  decision (ICL-3 territory), not a CLI filter.
 ## Product method
 - **product-cli** — an `arcforge product check` command that verifies a
   project's own product state: dense monotonic decision ids, every
@@ -110,3 +116,13 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   so an exhausted quota reads as a behavioral regression rather than an error
   trial excluded from the denominator, which the coverage rules already require.
   Cost one false REGRESSED verdict during 6.1.0.
+- **check-product-spec-sections** — extend `check:product` with a rule asserting
+  every `product/specs/*.md` carries the template's section headings (`Purpose`,
+  `Scope`, `Behavior`, `Data / domain model`, `Decisions`), so the spec shape is
+  a gate rather than a habit · needs: a decision refining D-006 (its recorded
+  text enumerates seven rules).
+- **speccing-a5-floor-executes-nothing** — `eval-speccing-spec-before-code`'s A5
+  floor greps `src/exporter.js` for a quoted `csv` token instead of exercising
+  the CSV branch, so a trial can pass the floor without the feature working; the
+  repair is a grader-owned `node -e` probe of `formatFor('csv', run)` and must
+  ride the next `## Version` bump + k=10 rerun of the scenario · issue: [#156](https://github.com/GregoryHo/arcforge/issues/156).
