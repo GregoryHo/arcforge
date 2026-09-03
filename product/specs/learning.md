@@ -91,9 +91,9 @@ was recorded about them.
   reviewing one is what the product asks of the user: no surface names a draft
   as ready to review, hands its path back as a success, or offers the
   activation that would refuse, when the draft it would name is not there —
-  the file missing, changed since it was written, or the record of it gone. The on-disk formats are append-only or
-  atomically overwritten, owned by the engine per the curator schema (cited
-  above).
+  the file missing, changed since it was written, or no usable record of it
+  left. The on-disk formats are append-only or atomically overwritten, owned
+  by the engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
   Its ceiling depends on source: a rule the user stated outright can climb

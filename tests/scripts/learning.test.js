@@ -937,7 +937,7 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.draft_paths).toEqual([]);
       expect(detail.draft_paths_stale).toEqual([]);
       expect(detail.next_actions.join(' ')).not.toMatch(/review the draft/);
-      expect(detail.next_actions[0]).toMatch(/no materialization record remains/);
+      expect(detail.next_actions[0]).toMatch(/no usable materialization record remains/);
     });
 
     // The override is scoped to `materialized` for the record-absent case too:
@@ -1257,6 +1257,24 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
     });
 
+    // The other half of that pairing's contract. DH-1 attaches the paths to the
+    // action RESULT, deliberately outside `accept()`, whose argument is written
+    // verbatim to the B-5 audit trail. Folding the spread back inside would
+    // start writing absolute filesystem paths into the log, and nothing else
+    // here would fail.
+    it('keeps the accepted draft paths out of the shared audit log', () => {
+      seed(makeRecord());
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+      expect(accepted.draft_paths[0]).toContain(path.join('learning', 'drafts'));
+
+      const materialize = auditEntries().find((entry) => entry.action === 'materialize');
+      expect(materialize).toMatchObject({ accepted: true, candidate_id: CANDIDATE_ID });
+      expect(materialize.materialization_id).toBeTruthy();
+      expect(materialize.draft_paths).toBeUndefined();
+      // No path under any other key either — the id travels, the paths do not.
+      expect(JSON.stringify(auditEntries())).not.toContain(path.join('learning', 'drafts'));
+    });
+
     // What the next two pin: the `materialized` short-circuit dispatches nothing
     // and reports the draft the candidate already has, so when that draft is
     // gone or edited the only thing it can get wrong is the report — and a path
@@ -1308,7 +1326,7 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(result.status).not.toBe(0);
       const { error } = JSON.parse(result.stdout);
-      expect(error).toMatch(/No materialization record remains/);
+      expect(error).toMatch(/No usable materialization record remains/);
       expect(error).toMatch(/nothing was applied/);
       // Not the stale-file wording, which would name no file after its colon.
       expect(error).not.toMatch(/is no longer what was written/);
@@ -1317,9 +1335,10 @@ describe('learn candidate commands over the canonical queue', () => {
 
     // `activate` is still the command the guide names for a materialized
     // candidate, so a reviewer can reach this refusal by typing it after
-    // `drafts` stops advertising it. `materialization_missing` is rejected by
-    // the shared handler rather than by a curator module, so its detail never
-    // reaches `module_failure` — without prose it prints as the bare reason.
+    // `drafts` stops advertising it. Nothing resolved at all here, so the
+    // shared handler rejects it itself and puts its detail at the top level of
+    // the result, where the `module_failure` fallback never sees it — without
+    // prose of its own it prints as the bare reason.
     it('renders reviewer prose when activation finds no materialization record', () => {
       seed(makeRecord());
       runJson(['accept', CANDIDATE_ID, '--project']);
@@ -1329,9 +1348,53 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(result.status).not.toBe(0);
       const { error } = JSON.parse(result.stdout);
-      expect(error).toMatch(/no materialization record remains for/);
+      expect(error).toMatch(/no usable materialization record remains for/);
       expect(error).toMatch(/arcforge learn dashboard/);
       expect(error).not.toBe('arcforge learn activate refused: materialization_missing');
+    });
+
+    // The other two ways to reach `materialization_missing`, both from Layer 8
+    // and both about a manifest that IS on disk. They arrive with a real
+    // `module_failure.detail` naming the defect, so the prose above — which
+    // asserts no usable record remains — must not be printed over them.
+    it('keeps Layer 8 detail when the record names no draft artifact', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      const manifest = JSON.parse(fs.readFileSync(manifestPath(), 'utf8'));
+      fs.writeFileSync(
+        manifestPath(),
+        JSON.stringify({ ...manifest, draft_artifacts: [] }, null, 2),
+        'utf8',
+      );
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/No draft artifact in materialization record/);
+      expect(error).not.toMatch(/no usable materialization record remains/);
+      // The record the refusal would have denied the existence of is right here.
+      expect(fs.existsSync(manifestPath())).toBe(true);
+      expect(fs.existsSync(draftPath)).toBe(true);
+    });
+
+    it('keeps Layer 8 detail when the record belongs to another candidate', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      const manifest = JSON.parse(fs.readFileSync(manifestPath(), 'utf8'));
+      fs.writeFileSync(
+        manifestPath(),
+        JSON.stringify({ ...manifest, candidate_id: OTHER_PROJECT_CANDIDATE_ID }, null, 2),
+        'utf8',
+      );
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/Materialization record does not match candidate/);
+      expect(error).not.toMatch(/no usable materialization record remains/);
+      expect(fs.existsSync(manifestPath())).toBe(true);
     });
 
     it('refuses to accept an activated candidate as a policy violation, not a race', () => {
