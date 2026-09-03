@@ -252,10 +252,11 @@ On a candidate that is already materialized, `accept` has nothing left to do,
 so it re-reports the draft it already wrote — but only while that file is still
 there and still says what the engine wrote. If the draft has been deleted or
 edited, `accept` refuses and names the file instead of handing back a path that
-does not resolve; `learn drafts` and `learn inspect` mark it the same way. Read
-a draft, but do not edit it in place: activation checks the draft against the
-content hash recorded when it was written, so an edited draft is one that
-`learn activate` will refuse.
+does not resolve; `learn drafts` and `learn inspect` mark it the same way, and
+neither offers you the activation that would refuse — a marked entry points at
+`learn inspect` instead. Read a draft, but do not edit it in place: activation
+checks the draft against the content hash recorded when it was written, so an
+edited draft is one that `learn activate` will refuse.
 
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.

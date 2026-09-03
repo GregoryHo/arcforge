@@ -293,11 +293,20 @@ function cliActionsFor(card) {
   });
 }
 
+/**
+ * Where a card is sent when no transition is worth advertising: `inspect` runs
+ * from every status, and it is the surface that says why the step the status
+ * would otherwise name is not on offer.
+ */
+function inspectCommandFor(card) {
+  return `arcforge learn inspect ${card.candidate_id} --project`;
+}
+
 function nextCommandFor(card) {
   const runnable = cliActionsFor(card);
   const action = NEXT_ACTION_PREFERENCE.find((a) => runnable.includes(a));
-  const verb = action ? VERB_FOR_ACTION[action] : 'inspect';
-  return `arcforge learn ${verb} ${card.candidate_id} --project`;
+  if (!action) return inspectCommandFor(card);
+  return `arcforge learn ${VERB_FOR_ACTION[action]} ${card.candidate_id} --project`;
 }
 
 /**
@@ -480,11 +489,19 @@ function runDrafts({ scope }) {
       // staleness check adds one stat and one hash per recorded draft — worth
       // it on the command whose whole subject is the drafts.
       const materialization = latestMaterializationFor(card.candidate_id);
+      const stale = staleDraftsIn(materialization);
       return {
         ...card,
-        next_command: nextCommandFor(card),
+        // `nextCommandFor` is keyed on status and artifact type, so for every
+        // entry here it names `activate` — the one action the matrix allows a
+        // materialized candidate. Activation refuses on the recorded content
+        // hash, so for a stale entry that is a command the CLI would then
+        // refuse, and this listing already carries the fact that disqualifies
+        // it. Same norm as the artifact-type narrowing: send it to `inspect`,
+        // which says why, rather than advertising a step with nothing behind it.
+        next_command: stale.length > 0 ? inspectCommandFor(card) : nextCommandFor(card),
         draft_paths: draftPathsIn(materialization),
-        draft_paths_stale: staleDraftsIn(materialization),
+        draft_paths_stale: stale,
       };
     });
   return { scope, count: drafts.length, drafts };
