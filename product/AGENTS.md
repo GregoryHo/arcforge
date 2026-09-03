@@ -212,9 +212,11 @@ opens with three backticks and then quotes a `code span` is not a fence, so it o
 no block and hides nothing below it.
 
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
-relation bullet and a roadmap row all sit in column 1; indented four spaces or more,
-none is read, so an illustration can be shown as an indented block rather than a
-fenced one. One to three spaces is not an exemption — the line still renders as the
+relation bullet, a roadmap row and the `<details>` / `</details>` delimiters of the
+folded index all sit in column 1; indented four spaces or more, none is read, so an
+illustration can be shown as an indented block rather than a fenced one — including
+an illustration of the fold move itself, which at that depth opens no fold and
+closes none. One to three spaces is not an exemption — the line still renders as the
 heading, the field or the row a reader would trust, so it is read or reported like any
 other near-miss. The roadmap row is why this matters beyond the log: an indented
 six-cell row read as product state can become a spec's governing row and force its

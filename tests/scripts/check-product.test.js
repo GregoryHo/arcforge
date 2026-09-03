@@ -288,6 +288,44 @@ describe('check-product', () => {
       expect(of('C2', run({ roadmap: { decisions, fold } }))).toEqual([]);
     });
 
+    it('does not open the fold at an indented `<details>` illustration', () => {
+      // Four spaces is an indented code block, where `<details>` is literal text
+      // rather than the HTML block that opens a fold. Read at `\s*` it opened
+      // one, exempting every live entry below it from the ascending clause
+      // indefinitely — the one C2 clause the fold switches off.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '    <details>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toContainEqual(
+        expect.stringMatching(/out of order: D-002 follows D-003/),
+      );
+    });
+
+    it('does not close the fold at an indented `</details>` illustration', () => {
+      // The same bound in its false-positive direction: an example of the
+      // closing tag, shown indented inside a real fold, ended the fold early and
+      // reported entries that are genuinely folded as out of order.
+      const decisions = [decision({ id: 'D-001' })];
+      const fold = ['    </details>\n', decision({ id: 'D-003' }), decision({ id: 'D-002' })];
+      expect(of('C2', run({ roadmap: { decisions, fold } }))).toEqual([]);
+    });
+
+    it('still opens the fold at a `<details>` indented one to three spaces', () => {
+      // The lower bound, pinned so a regression to `\s*` trips on more than the
+      // four-space case: an HTML block opens at three leading spaces at most, and
+      // three is still a fold.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '   <details>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('does not read a decision heading inside a fenced code block', () => {
       // The illustration would otherwise enter the log as D-009 and open a
       // D-002…D-008 gap, so an example entry could never be shown in the log.

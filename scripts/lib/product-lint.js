@@ -30,7 +30,11 @@
  *         inside the log. The entry heading is read
  *         at column 1, and one indented far enough to still render as a heading
  *         (one to three spaces) is reported rather than dropped, so a stray
- *         indent cannot hide an entry in the log's flat structure;
+ *         indent cannot hide an entry in the log's flat structure. The fold's own
+ *         `<details>` delimiters are read at that same bound, so an indented
+ *         illustration of the fold move neither opens a fold — which would exempt
+ *         every live entry below it from the ascending clause — nor closes a real
+ *         one early;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists — a relation-shaped bullet that misses
  *         the canonical form is reported as malformed rather than dropped, and
@@ -126,6 +130,12 @@ const RELATION_FIELD_RE =
 // line rather than a field, and stays unread instead of raising a bogus C3 —
 // whatever markdown makes of it.
 const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
+// The folded index's delimiters, bounded the way the two probes above are: an
+// HTML block opens at three leading spaces at most, and at four the line is an
+// indented code block rather than HTML. See `parseDecisions` for both directions
+// this leaked in when it was read at `\s*`.
+const FOLD_OPEN_RE = /^ {0,3}<details\b/i;
+const FOLD_CLOSE_RE = /^ {0,3}<\/details>/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
@@ -187,14 +197,28 @@ function versionKey(version) {
  * entries parked in the folded `<details>` index at the bottom of the log — they
  * keep their place in the numbering but sit outside the ascending-order
  * requirement.
+ *
+ * An unclosed `<details>` at column 1 is not reported. GFM genuinely folds
+ * everything below it, and `product/AGENTS.md` puts the fold at the bottom of the
+ * log, so a fold running to the end of the section is the documented shape — this
+ * file reads what markdown renders, and a rule against it would flag a document
+ * whose render really is a fold. The indent bound is what the leak needed.
  */
 function parseDecisions(roadmap, errors) {
   const entries = [];
   let inFold = false;
   let current = null;
   for (const line of unfenced(section(roadmap, DECISION_LOG_HEADING_RE))) {
-    if (/^\s*<details\b/i.test(line)) inFold = true;
-    if (/^\s*<\/details>/i.test(line)) inFold = false;
+    // The fold's delimiters are read at the bound every other structural line
+    // is: at four columns or more — and a leading tab is four — the line is an
+    // indented code block, where `<details>` is literal text rather than the
+    // HTML block that opens a fold, so it neither opens one nor closes one. Read
+    // at `\s*` both leaked, in opposite directions: an indented `<details>` shown
+    // as an example exempted every live entry below it from C2's ascending
+    // clause, and an indented `</details>` shown as one closed a real fold early,
+    // reporting entries that are genuinely folded as out of order.
+    if (FOLD_OPEN_RE.test(line)) inFold = true;
+    if (FOLD_CLOSE_RE.test(line)) inFold = false;
 
     if (DECISION_ANY_RE.test(line)) {
       const m = line.match(DECISION_HEADING_RE);
