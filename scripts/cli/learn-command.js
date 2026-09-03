@@ -8,6 +8,12 @@
  * models; transitions dispatch through `handleDashboardAction`, which owns the
  * Action × Status legality matrix, the `safety_ack` gate and the audit log.
  *
+ * This file is the entry and dispatch layer of that front end. Its two
+ * siblings hold the halves it coordinates: `learn-candidate-queue.js` reads the
+ * queue and the materialization manifests, `learn-candidate-prose.js` turns a
+ * card or an engine result into what the reviewer reads. Flag reads stay here —
+ * the CLI manifest gate derives the command's live flag set from these files.
+ *
  * `--global` is refused for every candidate subcommand: a global-scoped
  * candidate applies to every project on the machine, and the dashboard is its
  * review surface. `--project` means *this* project — see `readProjectCards`
@@ -16,81 +22,31 @@
 
 const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
-
-// Layer 7/8 render and activate the instinct artifact and nothing else, and
-// `materialize.js` is where that narrowing is enforced — it refuses any other
-// artifact type with `artifact_type_mismatch`. The CLI reads that module's own
-// list rather than keeping a second copy, and uses it to describe the
-// narrowing: which commands are worth suggesting, and what to say when the
-// engine refuses one. Every single-transition command dispatches and renders
-// the engine's refusal; `accept` is the one exception, and `runAccept` says
-// why. The other types do have a producer — the dashboard's `evolve` action
-// writes a `skill` record into the same queue — so this is a live branch, not
-// a defensive one.
-//
-// Lazily required, like every other `../lib` import in this file: a `learn
-// diary` run should not pay for the curator's module graph.
-function supportedArtifactTypes() {
-  return require('../lib/learning-curator/materialize').FIRST_SLICE_SUPPORTED_TYPES;
-}
-
-function isMaterializableType(artifactType) {
-  return supportedArtifactTypes().includes(artifactType);
-}
+const {
+  readProjectCards,
+  findProjectCard,
+  latestMaterializationFor,
+  draftPathsIn,
+  staleDraftsIn,
+  draftUnavailableIn,
+  draftPathsFor,
+} = require('./learn-candidate-queue');
+const {
+  ACTION_FOR_VERB,
+  STATUS_RANK,
+  isMaterializableType,
+  staleDraftActions,
+  inspectCommandFor,
+  nextCommandFor,
+  nextActionsFor,
+  refusalMessage,
+  acceptRefusalMessage,
+  staleDraftAcceptMessage,
+} = require('./learn-candidate-prose');
 
 // Every action the CLI dispatches is attributed to the CLI, so the audit log
 // distinguishes a typed command from a dashboard click.
 const CLI_ACTOR = { layer: 6, actor_type: 'cli', reviewer: 'local_user' };
-
-// `reject` is the CLI's long-standing name for the matrix's `dismiss`.
-const ACTION_FOR_VERB = {
-  approve: 'approve',
-  reject: 'dismiss',
-  materialize: 'materialize',
-  activate: 'activate',
-};
-const VERB_FOR_ACTION = {
-  approve: 'approve',
-  dismiss: 'reject',
-  materialize: 'materialize',
-  activate: 'activate',
-};
-
-// Inbox ordering: what is waiting on the reviewer first, terminal states last.
-const STATUS_RANK = {
-  approved: 0,
-  pending_review: 1,
-  needs_more_evidence: 2,
-  materialized: 3,
-  activated: 4,
-  deactivated: 5,
-  dismissed: 6,
-  superseded: 7,
-};
-
-// The forward move wins when several actions are legal — `pending_review`
-// allows `dismiss` too, but "reject it" is not the suggested next step.
-const NEXT_ACTION_PREFERENCE = ['approve', 'materialize', 'activate', 'dismiss'];
-
-const NEXT_ACTIONS = {
-  pending_review: ['approve or reject this candidate before any artifact is written'],
-  needs_more_evidence: ['reject it, or leave it for the curator to gather more evidence'],
-  approved: ['materialize the candidate to write an inactive draft artifact'],
-  materialized: [
-    'review the draft at draft_paths',
-    'activate explicitly when satisfied — activation changes how future sessions behave',
-  ],
-  activated: ['already active — retire it by deactivating it from the dashboard'],
-  deactivated: ['materialize or activate it again, or leave it retired'],
-  dismissed: ['dismissed — no action available'],
-  superseded: ['superseded by another candidate — no action available'],
-};
-
-// The statuses whose prose above names a materialize or activate step, and so
-// the only ones the artifact-type narrowing has anything to say about. Every
-// other status's prose is true whatever the candidate's type, and overriding it
-// would lose information — a dismissed candidate is not "leave it queued".
-const STATUSES_NAMING_A_BUILD = new Set(['approved', 'materialized', 'deactivated']);
 
 function requireProjectCandidateScope(args) {
   if (args.flags.project) return 'project';
@@ -107,333 +63,6 @@ function requireProjectCandidateScope(args) {
 /** The scope the candidate subcommands run in: this project. */
 function candidateContext(args) {
   return { scope: requireProjectCandidateScope(args) };
-}
-
-/**
- * The project slug a record's `scope.project` has to equal to be ours.
- *
- * `getProjectName()` in the engine's utils is the single owner of that
- * derivation — every producer in the pipeline goes through it, so the CLI
- * calls it rather than re-deriving from the project root it was handed.
- * A local `path.basename(projectRoot)` was the same string only for a project
- * directory that needs no sanitizing; anything else (`My Project` →
- * `My-Project`) matched no record at all and emptied the whole front end.
- */
-function currentProjectName() {
-  const { getProjectName } = require('../lib/utils');
-  return getProjectName();
-}
-
-/**
- * This project's candidates from the canonical queue, as dashboard cards.
- *
- * The canonical queue is home-global, so `--project` has to say *which*
- * project. It matches `scope.project` — the sanitized project slug, which is
- * the identity the rest of the pipeline already keys on
- * (`observations/<slug>/`, `instincts/<slug>/`) and the only one the sanitized
- * card prints, so a row can be checked against the filter by eye.
- *
- * `scope.project_id` is deliberately not the key. `batch-assembler.js` takes it
- * from the *first* observation in the batch that carries one and falls back to
- * hashing the project name when none does, so a candidate carries whichever
- * value that batch happened to see — matching on it would hide candidates
- * silently. Activation keys its instinct output on `scope.project` too, so the
- * slug is the identity that is actually enforced downstream. Two project roots
- * whose basenames sanitize to the same slug are one project to the entire
- * pipeline — observation store, instincts tree, and this filter alike — and
- * that is decided upstream of the CLI, not here.
- *
- * A project-scoped record carrying no `scope.project` at all therefore belongs
- * to no project here and is invisible to the CLI. That is the safe direction —
- * the alternative is showing it from every project — and the dashboard serves
- * the whole queue, so it stays the escape hatch.
- */
-function readProjectCards() {
-  const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
-  const { sanitizeDashboardCard } = require('../lib/learning-dashboard');
-  const project = currentProjectName();
-  return Object.values(readCurrentCandidates())
-    .filter((record) => record.scope?.kind === 'project' && record.scope.project === project)
-    .map(sanitizeDashboardCard);
-}
-
-/**
- * A candidate id is usually copied off the machine-wide dashboard, which shows
- * other projects' candidates and the global ones too — so say which of those it
- * was rather than leaving the user to guess at a bare "not found".
- */
-function missingCandidateError(candidateId) {
-  const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
-  const base = `candidate not found among this project's candidates: ${candidateId}`;
-  const scope = readCurrentCandidates()[candidateId]?.scope;
-  if (scope?.kind === 'project' && scope.project) {
-    return new Error(
-      `${base} — it belongs to the project "${scope.project}", not to ` +
-        `"${currentProjectName()}"; review it from there, or run: ` +
-        'arcforge learn dashboard',
-    );
-  }
-  if (scope?.kind === 'global') {
-    return new Error(
-      `${base} — it is a global-scoped candidate, reviewed in: arcforge learn dashboard`,
-    );
-  }
-  return new Error(`${base} — run: arcforge learn inbox --project`);
-}
-
-function findProjectCard(candidateId) {
-  const card = readProjectCards().find((c) => c.candidate_id === candidateId);
-  if (!card) throw missingCandidateError(candidateId);
-  return card;
-}
-
-/**
- * The newest materialization manifest for a candidate, or `null`.
- *
- * Both draft questions the CLI asks — which paths, and which of them are
- * stale — are answered from this one record, so the surfaces that ask both
- * resolve it once and read it twice rather than scanning the manifest
- * directory per question.
- */
-function latestMaterializationFor(candidateId) {
-  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
-  const { getArcforgeHome } = require('../lib/utils');
-  return findLatestMaterialization(getArcforgeHome(), candidateId);
-}
-
-/**
- * Absolute draft paths from a materialization manifest.
- *
- * Deliberately not `active_target_hint.target_path_summary`: that string
- * embeds `scope.project_id`, which no CLI or dashboard surface prints.
- */
-function draftPathsIn(record) {
-  if (!record || !Array.isArray(record.draft_artifacts)) return [];
-  return record.draft_artifacts.map((artifact) => artifact.draft_path).filter(Boolean);
-}
-
-/**
- * The recorded drafts that are no longer what the manifest describes — deleted,
- * or edited since it was written.
- *
- * `findLatestMaterialization` picks the newest manifest by `created_at` and
- * checks nothing about the files it names, so every surface that prints
- * `draft_paths` can print a path that does not resolve. Layer 7 already owns
- * the comparison — `staleDraftArtifacts` is the same predicate the reuse branch
- * screens manifests with — so this asks it rather than re-hashing here.
- */
-function staleDraftsIn(record) {
-  if (!record) return [];
-  const { staleDraftArtifacts } = require('../lib/learning-curator/materialize');
-  return staleDraftArtifacts(record);
-}
-
-/**
- * Whether the candidate has no reviewable draft behind its manifest at all.
- *
- * `staleDraftsIn` cannot answer this. It is a per-recorded-file question, and a
- * manifest that is absent, unparseable or structurally empty names no file to
- * call stale — `findLatestMaterialization` returns `null` when the drafts
- * directory is gone and silently skips a manifest it cannot parse, so an empty
- * stale list means either "every recorded draft is intact" or "there is no
- * record to check", which are opposite answers to the only question the draft
- * surfaces ask.
- *
- * `draftArtifactsIntact` is Layer 7's own answer to "is there a reviewable
- * draft" — it is the predicate the reuse branch screens manifests with, and it
- * is false for a missing, empty or pathless record as well as a stale one — so
- * this asks it rather than adding a second predicate here.
- */
-function draftUnavailableIn(record) {
-  const { draftArtifactsIntact } = require('../lib/learning-curator/materialize');
-  return !draftArtifactsIntact(record);
-}
-
-/** The one-question form, for the callers that ask only about the paths. */
-function draftPathsFor(candidateId) {
-  return draftPathsIn(latestMaterializationFor(candidateId));
-}
-
-/** Each stale draft named with what went wrong with it. */
-function describeStaleDrafts(stale) {
-  return stale
-    .map(
-      (entry) =>
-        `${entry.draft_path} ${entry.reason === 'missing' ? 'is missing' : 'has changed since it was written'}`,
-    )
-    .join('; ');
-}
-
-/**
- * The two prose lines `inspect` prints in place of the `materialized` status
- * prose, which says "review the draft at draft_paths" — the draft it names is
- * not there to review. Layered over `nextActionsFor` at the call site, exactly
- * as `unsupportedTypeActions` is: `nextActionsFor` is pure, and this answer
- * comes off disk.
- *
- * Two arms, because there are two ways to have no draft and they refuse
- * differently: recorded files that no longer match (activation refuses on the
- * content hash) and no usable record at all (activation refuses with
- * `materialization_missing`). The empty-list arm is not cosmetic —
- * `describeStaleDrafts([])` would leave a dangling colon naming nothing.
- *
- * `materialized` is the only status this may replace, for the same reason
- * `STATUSES_NAMING_A_BUILD` exists: it is the only one whose prose names the
- * draft, so it is the only one a stale draft contradicts. Every other status's
- * prose is true whatever became of the recorded draft, and printing this
- * instead would replace it with something false — a `deactivated` candidate
- * can still be materialized afresh (the matrix allows it, and `accept` does
- * exactly that), and an `activated` one is already live, its draft only ever
- * read and never removed by activation.
- */
-function staleDraftActions(stale) {
-  if (stale.length === 0) {
-    return [
-      'no usable materialization record remains for this candidate, so there is no draft to review',
-      'activation refuses without a usable record, so there is nothing to activate — ' +
-        'review the queue in: arcforge learn dashboard',
-    ];
-  }
-  return [
-    `the recorded draft is not what was written: ${describeStaleDrafts(stale)}`,
-    'activation refuses on the recorded content hash, so there is nothing to activate — ' +
-      'review the queue in: arcforge learn dashboard',
-  ];
-}
-
-/**
- * The subset of a card's legal actions the CLI will actually carry out.
- *
- * `available_actions` comes straight from the Action × Status matrix, which is
- * keyed on status alone and knows nothing about artifact types. The CLI's reach
- * is narrower on two axes: it has verbs for four of the seven actions
- * (`promote`, `evolve` and `deactivate` are dashboard-only), and
- * `materialize`/`activate` run through the curator, which renders the instinct
- * artifact and nothing else. Suggesting anything outside this intersection
- * advertises a command the curator then refuses — and a non-instinct candidate
- * is reachable, since the dashboard's `evolve` action
- * writes a project-scoped `skill` record into the same canonical queue.
- */
-function cliActionsFor(card) {
-  return card.available_actions.filter((action) => {
-    if (!Object.hasOwn(VERB_FOR_ACTION, action)) return false;
-    if (action !== 'materialize' && action !== 'activate') return true;
-    return isMaterializableType(card.artifact_type);
-  });
-}
-
-/**
- * Where a card is sent when no transition is worth advertising: `inspect` runs
- * from every status, and it is the surface that says why the step the status
- * would otherwise name is not on offer.
- */
-function inspectCommandFor(card) {
-  return `arcforge learn inspect ${card.candidate_id} --project`;
-}
-
-function nextCommandFor(card) {
-  const runnable = cliActionsFor(card);
-  const action = NEXT_ACTION_PREFERENCE.find((a) => runnable.includes(a));
-  if (!action) return inspectCommandFor(card);
-  return `arcforge learn ${VERB_FOR_ACTION[action]} ${card.candidate_id} --project`;
-}
-
-/**
- * The `NEXT_ACTIONS` prose for the three statuses in `STATUSES_NAMING_A_BUILD`
- * names the build step that status allows. For a candidate type the curator
- * cannot render, that step does not exist, so the narrowing itself is what is
- * worth printing — the same fact the curator's refusal states when one of those
- * commands is typed. Nothing else is left for the CLI to run from
- * those three statuses (besides the build step the matrix allows only `promote`
- * and `evolve`, both dashboard-only), so the second line says where the
- * candidate can still be looked at.
- */
-function unsupportedTypeActions(card) {
-  return [
-    `arcforge materializes ${supportedArtifactTypes().join(', ')} candidates only, so this ` +
-      `${card.artifact_type} candidate has no materialize or activate step`,
-    'leave it queued — the whole queue is reviewable in: arcforge learn dashboard',
-  ];
-}
-
-function nextActionsFor(card) {
-  const unbuildable =
-    !isMaterializableType(card.artifact_type) && STATUSES_NAMING_A_BUILD.has(card.lifecycle_status);
-  if (unbuildable) return unsupportedTypeActions(card);
-  return NEXT_ACTIONS[card.lifecycle_status] || [];
-}
-
-/**
- * The instinct-only narrowing, in the words the CLI has always used for it.
- *
- * The narrowing belongs to Layer 7: `materialize.js` refuses any other artifact
- * type with `artifact_type_mismatch`, which the shared action handler turns into
- * an audited rejection. For a single-transition command all the CLI does is
- * render that reason in reviewer-facing prose instead of the engine's internal
- * detail string — a pre-check there would be a second copy of a gate the engine
- * already owns, and it would refuse before the audit log ever saw the request.
- * `accept` is the documented exception: it is two transitions, so it has to
- * decide before the first one lands (see `runAccept`). This function supplies
- * the prose for both, and reads the curator's list for the type it names.
- */
-function narrowingMessage(card) {
-  return (
-    `supports ${supportedArtifactTypes().join(', ')} candidates only — ${card.candidate_id} is a ` +
-    `${card.artifact_type} candidate. Materialization and activation run through the ` +
-    'curator, which renders the instinct artifact and nothing else today; the other ' +
-    'artifact types the queue schema names have no renderer behind them. Leave it queued, ' +
-    'or review it in: arcforge learn dashboard'
-  );
-}
-
-function refusalMessage(result, verb, card) {
-  const base = `arcforge learn ${verb} refused: ${result.reason}`;
-  if (result.reason === 'artifact_type_mismatch') {
-    return `${base} — ${narrowingMessage(card)}`;
-  }
-  if (result.reason === 'policy_violation') {
-    const legal = card.available_actions.join(', ') || 'nothing';
-    const matrix =
-      `${base} — ${card.candidate_id} is ${card.lifecycle_status}, and the canonical ` +
-      `Action × Status matrix allows: ${legal}`;
-    // The matrix is keyed on status alone, so for a candidate the curator cannot
-    // build it can name a `materialize` that refuses in turn — and `activate` on
-    // such a candidate is illegal from every status, because nothing ever
-    // materializes it. Say the narrowing too rather than sending the reviewer
-    // around that loop. Prose on an already-audited refusal, not a second gate.
-    const narrowed =
-      (verb === 'materialize' || verb === 'activate') && !isMaterializableType(card.artifact_type);
-    return narrowed ? `${matrix}. arcforge learn ${verb} also ${narrowingMessage(card)}` : matrix;
-  }
-  if (result.reason === 'stale_status') {
-    return (
-      `${base} — ${card.candidate_id} moved to ${result.current} while the command was ` +
-      `running (it was ${result.expected}); re-run to act on the current state`
-    );
-  }
-  // `materialization_missing` has two origins and only one of them wants this
-  // prose, so the guard is the absence of a module failure rather than the
-  // reason alone. The shared handler rejects with it when nothing resolved at
-  // all, and puts its detail at the top level of the result where the
-  // `module_failure` fallback below never sees it — the bare reason string is
-  // what a reviewer would otherwise read. Layer 8 fails with the same reason
-  // for a manifest that DID resolve but does not describe this candidate's
-  // draft; that one arrives with a real `module_failure.detail` saying which,
-  // and printing "no usable materialization record remains" over it would
-  // assert something false about a record still on disk.
-  //
-  // The handler arm is reachable by typing the command the guide documents for
-  // a materialized candidate, so it gets reviewer prose like the other
-  // handler-level refusals above, not a `result.detail` fallback, which would
-  // change how every other one renders.
-  if (result.reason === 'materialization_missing' && !result.module_failure) {
-    return (
-      `${base} — no usable materialization record remains for ${card.candidate_id}, so there ` +
-      'is no recorded draft to activate. Review the queue in: arcforge learn dashboard'
-    );
-  }
-  const detail = result.module_failure?.detail;
-  return detail ? `${base} — ${detail}` : base;
 }
 
 function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
@@ -565,60 +194,6 @@ function runDrafts({ scope }) {
       };
     });
   return { scope, count: drafts.length, drafts };
-}
-
-/**
- * The refusal `accept` prints instead of dispatching, when the curator has no
- * renderer for the candidate's artifact type.
- *
- * It names the type, states that nothing was applied, and offers the two moves
- * that still exist: leave it queued (the dashboard reviews the whole queue) or
- * record the approval on its own. It deliberately does not claim the candidate
- * is otherwise ready — a `dismissed` or `activated` candidate has a nearer
- * obstacle, and this message would be the wrong one to answer it with.
- */
-function acceptRefusalMessage(card) {
-  return (
-    `arcforge learn accept refused, and nothing was applied — no approval, no draft, ` +
-    `${card.candidate_id} is unchanged. It ${narrowingMessage(card)}. ` +
-    'To record the approval on its own, run: ' +
-    `arcforge learn approve ${card.candidate_id} --project`
-  );
-}
-
-/**
- * The refusal `accept` prints instead of re-reporting a draft that is not there.
- *
- * An already-`materialized` candidate is `accept`'s no-op: it dispatches
- * nothing and hands back the draft it already has. So "nothing was applied" is
- * literally true here — the refusal replaces a report, not a transition.
- *
- * It names no recovery command on purpose. `materialized` allows only
- * `activate`, and activation refuses on the recorded content hash — or with
- * `materialization_missing` when no usable manifest is left — so every command
- * the CLI has would refuse in turn; inventing one would send the reviewer
- * around that loop. The dashboard is where the queue is reviewable, so that is
- * what it points at.
- *
- * `stale` is empty when the manifest itself is absent, unparseable or names no
- * draft: there is no recorded file left to call stale, so the cause clause says
- * there is no usable record rather than emitting a colon with nothing after it.
- * "Usable", not "gone", because a manifest whose `draft_artifacts` list is
- * empty or pathless is still on disk — `draftArtifactsIntact` is false for it
- * all the same, and it is Layer 8 that then names the specific defect.
- */
-function staleDraftAcceptMessage(card, stale) {
-  const cause =
-    stale.length > 0
-      ? `Its recorded draft is no longer what was written: ${describeStaleDrafts(stale)}.`
-      : 'No usable materialization record remains for it, so there is no draft to hand back.';
-  return (
-    `arcforge learn accept refused, and nothing was applied — ${card.candidate_id} is ` +
-    `already materialized and is unchanged. ${cause} There is nothing left to hand back: the ` +
-    'canonical Action × Status matrix allows a materialized candidate only to activate, and ' +
-    'activation refuses without an intact recorded draft. Review the queue in: ' +
-    'arcforge learn dashboard'
-  );
 }
 
 /**
