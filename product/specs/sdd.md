@@ -55,11 +55,13 @@ want it.
   entry uses `Supersedes: D-NNN (clause n)` and leaves the entry partially
   superseded. `Refines:` and `Extends:` relate entries without retiring them and
   never flip a status.
-- **B-5 Semver is the spine, and exactly one marker moves.** Each milestone is a
+- **B-5 Semver is the spine, and exactly one row is marked.** Each milestone is a
   semver version whose row carries a status of `next`, `building`, or `shipped`;
   exactly one row carries the `← we are here` marker before and after any edit.
   Shipping flips the row, fills the tag cell, sets each affected spec's status
-  header, and moves the marker — the four edits are one act, not four chores.
+  header, and settles the marker — moved onto the next row, or left on the row
+  that just shipped when nothing has been promoted after it. The four are one
+  act, not four chores; shipping never invents the row it would move to.
 - **B-6 The skill never bootstraps unasked.** In a repo with no product state and
   no user request for any, `speccing` does not apply. Creating the four files is
   offered once and started only on a yes. Product state is a maintenance
