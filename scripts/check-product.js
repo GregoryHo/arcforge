@@ -41,13 +41,17 @@
  *         by clause against the closed vocabulary, so a totally superseded entry
  *         is no longer `Accepted`, no entry dies twice, and no decision both
  *         replaces an entry whole and reverses one of its clauses. An entry
- *         carries exactly one `Status:` line, so a second one is reported rather
- *         than silently overwriting the first — otherwise the same
- *         self-contradiction is rejected `·`-separated and accepted
- *         newline-separated. Both existing exemptions already cover it and need
- *         no new code: a fenced illustration never reaches the field scan, and
- *         `STATUS_FIELD_RE` is anchored at column 1, so an indented illustration
- *         stays unread. `Refines:` and `Extends:` require no flip;
+ *         carries exactly one `Status:` line, counted structurally rather than
+ *         only on a victim: a second one is reported rather than silently
+ *         overwriting the first — otherwise the same self-contradiction is
+ *         rejected `·`-separated and accepted newline-separated — and a missing
+ *         one is reported too, because an entry with no `Status:` records
+ *         nothing about whether it still governs and no later flip has a line to
+ *         replace. Both existing exemptions already cover the counting and need
+ *         no new code: an illustration inside a fence or an indented code block
+ *         never becomes an entry at all, so it is never counted, and
+ *         `STATUS_FIELD_RE` is anchored at column 1, so a line only counts where
+ *         the entry form puts it. `Refines:` and `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
@@ -311,6 +315,23 @@ function checkDecisionNumbering(entries, errors) {
   });
 }
 
+/**
+ * C3 — the other half of the one-`Status:`-line count. Rejecting a second line
+ * while accepting none applies the same structural rule in one direction only:
+ * an entry with no `Status:` records nothing about whether it still governs, and
+ * a later reversal finds no line to flip. Counting needs no vocabulary, so this
+ * runs on every entry — unlike the *value* check below, which stays scoped to
+ * entries something supersedes (D-006 records that scope as a deliberate residual).
+ */
+function checkStatusPresence(entries, errors) {
+  for (const e of entries) {
+    if (e.status !== null) continue;
+    errors.push(
+      `C3 ${e.id}: no "- Status:" line — an entry carries exactly one, so a decision that never records whether it still governs is reported rather than read as live`,
+    );
+  }
+}
+
 /** A decision `Status:` split into its `·`-separated clauses. */
 function statusClauses(status) {
   return status
@@ -438,10 +459,10 @@ function checkRelations(entries, errors) {
         continue;
       }
       if (kind !== 'Supersedes') continue;
-      if (victim.status === null) {
-        errors.push(`C3 ${targetId}: no "Status:" line to carry the flip that ${e.id} requires`);
-        continue;
-      }
+      // A victim with no `Status:` is already reported once by
+      // `checkStatusPresence`; saying it again per superseding edge would turn
+      // one missing line into N errors.
+      if (victim.status === null) continue;
       victims.set(target, victim);
       const expected = clause ? `partially superseded by ${e.id}` : `Superseded-by: ${e.id}`;
       if (!statusClauses(victim.status).includes(expected)) {
@@ -575,6 +596,7 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
   }
 
   checkDecisionNumbering(entries, errors);
+  checkStatusPresence(entries, errors);
   checkRelations(entries, errors);
   checkSpecHeaders(rows, specs, errors);
   checkSpecCitations(entries, specs, errors);

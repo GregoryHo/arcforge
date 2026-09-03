@@ -137,9 +137,11 @@ entry carry two clause-scoped flips from different decisions, or a partial flip
 alongside the later total one that finished it off — and what rejects the
 self-contradicting `Accepted · Superseded-by: D-MMM`.
 
-An entry carries exactly one `- Status:` line, and a second one is reported as
-malformed (C3). The flip in step 2 of *Change a decision* **replaces** the existing
-line rather than being appended below it — two `Status:` lines are the same
+An entry carries exactly one `- Status:` line, at column 1, and C3 counts them from
+both sides: a second one is reported as malformed, and so is a missing one — an entry
+with no `Status:` records nothing about whether it still governs, and leaves a later
+reversal no line to flip. The flip in step 2 of *Change a decision* **replaces** the
+existing line rather than being appended below it — two `Status:` lines are the same
 contradiction spelled with a newline instead of a `·`.
 
 The two forms are exclusive *per pair*, though: one decision either replaces another

@@ -32,13 +32,14 @@ function row({
   return `| ${version} | ${tag} | milestone | ${statusCell} | what & why | ${specCell} |`;
 }
 
+/** `status: null` omits the `- Status:` line, the way `spec()` omits its header. */
 function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra = [] } = {}) {
   return [
     `### ${id} — ${title}`,
     '- Date: 2026-01-01',
     '- Version: process',
     ...extra,
-    `- Status: ${status}`,
+    ...(status === null ? [] : [`- Status: ${status}`]),
     '- Decision: the choice, in one sentence.',
     '- Why: the tradeoff a future reader needs.',
     '',
@@ -427,6 +428,28 @@ describe('check-product', () => {
       const errors = of('C3', run({ roadmap: { decisions } }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
+    it('rejects an entry with no status line at all', () => {
+      // The other half of the same count. Rejecting two while accepting zero
+      // reads the rule in one direction only, and zero is the case that leaves
+      // a later reversal no line to flip.
+      const decisions = [decision({ id: 'D-001', status: null })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/no "- Status:" line/);
+    });
+
+    it('reports a superseded entry with no status line once, not once per superseder', () => {
+      // A missing line is a property of the entry, not of each edge into it.
+      const decisions = [
+        decision({ id: 'D-001', status: null }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/D-001: no "- Status:" line/);
     });
 
     it('reports an incoherent status once, not once per superseding entry', () => {
