@@ -73,7 +73,9 @@ down, never block the user, and never observe them uninvited.
   points at a continuity artifact that exists and can be read now, while
   reflection is the learning loop itself, which [learning](learning.md) B-1
   keeps off. Left ungated it would re-queue at every threshold hit, forever,
-  over diaries the user never authorized anything to be made of.
+  over diaries the user never authorized anything to be made of. The nudge is
+  gated at both ends — queue and delivery — so an opt-out between them retracts
+  a nudge already queued instead of spending it on the next session start.
 
   So with learning off the draft is written but never filled in: its unfilled
   sections are the contract, not a failed enrichment, and the hooks do not

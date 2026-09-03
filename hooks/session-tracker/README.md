@@ -20,7 +20,12 @@ Emits one combined JSON with two channels (see `hooks.md` → Output Visibility)
   pending action notifications, stale-draft warnings (only for drafts written
   since the learning opt-in took effect — stubs from a learning-off period are
   by design, so counting them would report the whole backlog the moment a user
-  opts in).
+  opts in). A queued `reflect-ready` is dropped at delivery when learning is off
+  in both scopes, so disabling it between the queuing Stop and this SessionStart
+  retracts the invitation rather than spending it; the action is consumed either
+  way, so a suppressed nudge never resurfaces later with a stale count.
+  `diary-ready` is unaffected — it points at an artifact that exists and can be
+  read now.
 - **systemMessage** (user-visible): a brief one-line summary, plus
   discoverability hints (available session aliases, recent global promotions).
 

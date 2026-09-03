@@ -43,7 +43,7 @@ const {
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
-const { draftIsStale } = require('../../scripts/lib/diary-capture');
+const { draftIsStale, learningCaptureEnabled } = require('../../scripts/lib/diary-capture');
 
 // Max activated instincts injected into SessionStart context (ICL-4).
 const MAX_INJECTED_INSTINCTS = 5;
@@ -218,8 +218,15 @@ function loadStaleDraftWarning(project, enabledSince = 0) {
 
 /**
  * Load and consume pending actions for context injection.
+ *
+ * @param {string} project
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose learning opt-in
+ *   decides whether a queued `reflect-ready` may still be delivered. Omitted or
+ *   blank means no consent, so the nudge is suppressed — the safe direction for
+ *   an invitation.
  */
-function loadPendingActions(project) {
+function loadPendingActions(project, { projectRoot } = {}) {
   try {
     // Relay-isolation: a session arcforge spawned itself (e.g. the detached
     // diary enricher, or a loop's headless task session) must NOT consume the
@@ -234,9 +241,24 @@ function loadPendingActions(project) {
     const lines = [];
     const summaryParts = [];
 
+    // The reflection nudge is gated at BOTH ends of its life: at queue time in
+    // end.js (D-009), so it never accumulates while learning is off, and here at
+    // delivery, so an opt-out between the queuing Stop and this SessionStart
+    // retracts a nudge already in the queue instead of spending it. Both ends
+    // ask the one consent predicate — end.js's queue gate reads it through the
+    // same helper — so the fail-closed-on-a-missing-projectRoot rule is stated
+    // once, in diary-capture.js, rather than restated here.
+    //
+    // The action stays in `actions` either way, so the consume loop below still
+    // clears it — a suppressed nudge is dropped, never deferred to fire later
+    // with a stale count. `reflect-ready` also stays in DEDICATED_TYPES, so a
+    // suppressed nudge cannot fall through to the raw `Pending: <type>` line and
+    // deliver the same invitation with its payload attached.
+    const learningOn = learningCaptureEnabled({ projectRoot });
+
     const DEDICATED_TYPES = ['diary-ready', 'reflect-ready'];
     const diaryActions = actions.filter((a) => a.type === 'diary-ready');
-    const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
+    const reflectActions = learningOn ? actions.filter((a) => a.type === 'reflect-ready') : [];
     const otherActions = actions.filter((a) => !DEDICATED_TYPES.includes(a.type));
 
     if (diaryActions.length > 0) {
@@ -350,8 +372,14 @@ function main() {
     userParts.push(`${instinctCount} active instinct${instinctCount === 1 ? '' : 's'}`);
   }
 
+  // One projectRoot serves both the pending-action delivery gate and the
+  // stale-draft floor below.
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
   // Pending action notifications
-  const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project);
+  const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project, {
+    projectRoot,
+  });
   if (pendingContext) {
     contextParts.push(pendingContext);
   }
@@ -365,7 +393,6 @@ function main() {
   // permanent complaint about intended behavior. The opt-in TIMESTAMP, not just
   // the flag, is what bounds it — otherwise the whole learning-off backlog
   // surfaces at once on the first session after opting in.
-  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const enabledSince = learningEnabledSince({ projectRoot });
   const staleWarning = enabledSince === null ? null : loadStaleDraftWarning(project, enabledSince);
   if (staleWarning) {
