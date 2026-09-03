@@ -121,11 +121,16 @@ grader with the pre-fix set-difference predicate and the numeric one:
 
 Unlike A3's, this difference set is not a singleton and cannot be enumerated —
 every version below `0.3.0` that is not one of the three shipped rows moves
-PASS → FAIL. So `## Version` stays 2 on the pool rather than on enumeration: the
-baseline arm's three retained transcripts write no version row at all, so A2
-failed there and a strictly narrower predicate cannot lift a failure, while every
-retained treatment transcript writes a `| 0.4.0 |` row, which both predicates
-pass.
+PASS → FAIL. So `## Version` stays 2 on the pool rather than on enumeration: no
+retained baseline transcript carries a command that writes a version row (trial-3
+only suggests a `0.4.0` row in its closing prose), so A2 failed there and a
+strictly narrower predicate cannot lift a failure, while every retained treatment
+transcript writes a `| 0.4.0 |` row, which both predicates pass. The verdict does
+not rest on that reading of the baseline arm alone: narrowing a predicate can
+only lower a score, and the treatment arm is directly observed to pass either
+way, so the delta under the numeric predicate can only sit at or above the
+published +0.67. An IMPROVED verdict is safe under the narrowing whatever the
+baseline files held.
 
 **Fixture hygiene.** No maintenance guide beside the four files, no instruction
 anywhere that the ledger moves with the code, and no earlier commit
