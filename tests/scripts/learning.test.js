@@ -656,6 +656,38 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(inbox.candidates[0].next_actions[0]).toMatch(/approve or reject/);
     });
 
+    it('points an approved instinct candidate at materialize', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const inbox = runJson(['inbox', '--project']);
+
+      expect(inbox.candidates[0].next_command).toBe(
+        `arcforge learn materialize ${CANDIDATE_ID} --project`,
+      );
+    });
+
+    // The dashboard's `evolve` action writes a project-scoped `skill` record
+    // into the same canonical queue, so an approved non-instinct candidate is
+    // reachable. The matrix allows `materialize` from `approved` — it is keyed
+    // on status alone — but the CLI refuses it for that artifact type, so the
+    // inbox must not name it as the next step.
+    it('never recommends a command the artifact-type narrowing would refuse', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+
+      expect(card.available_actions).toContain('materialize');
+      expect(card.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      expect(card.next_actions[0]).toMatch(/materializes instinct candidates only/);
+      expect(card.next_actions[1]).toMatch(/leave it queued/);
+
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = card.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+    });
+
     it('inspects one candidate with a redacted body preview and no project id', () => {
       seed(makeRecord());
 
