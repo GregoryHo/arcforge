@@ -9,7 +9,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | Version | Tag | Milestone | Status | What & why | Spec |
 |---|---|---|---|---|---|
 | 6.0.0 | `v6.0.0` | v6 toolkit | **shipped** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
-| 6.1.0 | — | learning trust · spec-driven method · Codex packaging | **building ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) |
+| 6.1.0 | — | learning trust · spec-driven method · Codex packaging | **building ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -421,3 +421,64 @@ reverse one, append a superseding entry (see AGENTS.md).
   papered over. Also accepted: the registry no longer sits at the name every
   other Claude Code plugin uses, which is a discoverability cost paid to close a
   cross-host leak.
+
+### D-014 — Ship the spec-driven method as a user-facing skill at 6.1.0
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: The lightweight spec-driven method arcforge maintains its own
+  `product/` with ships to users at 6.1.0 as the `speccing` skill — living specs,
+  a semver roadmap, an append-only decision log, and a backlog of wishes, taught
+  as skill prose with the file shapes carried in the skill's own references.
+- Why: v6.0.0 deleted the SDD skills with no replacement, so the method that
+  governs this repo reached no user. It is the highest-leverage thing arcforge
+  knows that it was not shipping: a project that adopts it gets documentation
+  that cannot silently go stale and a decision history that survives its own
+  reversals. Shipping it as one self-contained skill costs no engine surface.
+- Cost accepted: A sixteenth skill sits adjacent to `brainstorming` in the
+  description register, so both are in context on every turn and the model must
+  tell "settle the design" from "record what was settled". The router carries an
+  explicit precedence sentence and the skill's own "When this does not apply"
+  section names `/brainstorming` for the open-design case. The residual risk is
+  a wrong pick on a genuinely ambiguous turn, and 6.1.0 ships it **unmeasured**:
+  the router run this branch carries asks a `tdd` vs `finishing` question and
+  says nothing about this pair. Booked as the `speccing-router-adjacency-eval`
+  wish rather than claimed as covered.
+
+### D-015 — `speccing` is model-invoked, and never bootstraps unasked
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: `speccing` is model-invoked (no `disable-model-invocation`), and its
+  body gates creation of product state behind an explicit user request: it
+  offers once and starts only on a yes, and it does not apply at all in a repo
+  that keeps no `product/` state and whose user has not asked for any.
+- Why: The failures the method prevents — a spec that drifted, a decision
+  overwritten during a pivot — happen mid-task, when nobody would think to type
+  a slash command, so a user-invoked skill would never fire when it mattered.
+  The cost of model invocation is the opposite failure: an agent creating four
+  markdown files in a repo that wanted none. Splitting the two — the skill fires
+  on its own, bootstrapping needs a yes — takes the useful half of each.
+- Verification: `evals/scenarios/eval-speccing-spec-before-code.md`, measured
+  **+0.67 CI[0.67, 0.67] IMPROVED** at k=10 (baseline 0/10, treatment 10/10);
+  `eval-speccing-supersede-not-overwrite.md` ships as corpus coverage, its
+  baseline having measured at ceiling (11/11 across two samples). B-6 in
+  `product/specs/sdd.md`.
+
+### D-016 — No arcforge product CLI group in 6.1.0
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: 6.1.0 ships the method as skill prose only. There is no `arcforge
+  product` command group, no schema file, no linter over the four artifacts, and
+  no state under `.arcforge/` for them.
+- Why: The artifacts are markdown a human reads and edits; a CLI would have to
+  parse a format whose whole value is that it stays hand-editable, and every
+  rule worth checking is project-specific (which ids exist, which spec governs
+  which row). arcforge's own `check:product` is a repo-local gate over a
+  repo-local corpus, not a shipped feature. Shipping the discipline before the
+  tooling also keeps the tooling honest: if the wishes below never get asked
+  for, the tool was never needed.
+- Residual: A project adopting the method gets no mechanical check that its own
+  log stays dense, its supersessions stay paired, or its spec headers agree with
+  their rows. Booked as the `product-cli` wish below.
