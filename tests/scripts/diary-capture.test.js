@@ -197,6 +197,42 @@ describe('diary-capture', () => {
     });
   });
 
+  // The summary the enricher prompt carries. Both hooks build it here so the
+  // compaction path cannot drift from Stop's.
+  describe('buildSessionSummary', () => {
+    it("carries the record's prose, tool names, paths and a stats line", () => {
+      const { buildSessionSummary } = require('../../scripts/lib/diary-capture');
+      const summary = buildSessionSummary({
+        started: '2025-01-01T10:00:00Z',
+        lastUpdated: '2025-01-01T10:30:00Z',
+        userMessages: 12,
+        toolCalls: 55,
+        userMessageContent: ['ship the fix'],
+        toolsUsed: ['Edit', 'Bash'],
+        filesModified: ['/repo/a.js'],
+      });
+
+      expect(summary).toEqual({
+        userMessages: ['ship the fix'],
+        toolsUsed: ['Edit', 'Bash'],
+        filesModified: ['/repo/a.js'],
+        stats: '~30 min, 12 messages, 55 tool calls, 1 files modified',
+      });
+    });
+
+    it('yields empty lists — never undefined — for a record with nothing parsed', () => {
+      const { buildSessionSummary } = require('../../scripts/lib/diary-capture');
+      // The learning-off shape: pruneUngatedProse has removed the prose, so the
+      // summary carries none by construction rather than by a second gate.
+      const summary = buildSessionSummary({ userMessages: 0, toolCalls: 3 });
+
+      expect(summary.userMessages).toEqual([]);
+      expect(summary.toolsUsed).toEqual([]);
+      expect(summary.filesModified).toEqual([]);
+      expect(summary.stats).toBe('0 messages, 3 tool calls');
+    });
+  });
+
   describe('runDiaryCapture threshold gating', () => {
     it('does NOT trigger or reset below threshold', () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');

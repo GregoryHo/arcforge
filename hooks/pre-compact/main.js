@@ -30,6 +30,7 @@ const {
   getSuggesterStatePath,
   pruneUngatedProse,
   applyTranscriptToSession,
+  buildSessionSummary,
 } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 
@@ -74,14 +75,16 @@ function resetSuggesterState() {
  * @param {number} [opts.toolCount] - Live tool-call count, the pair of userCount.
  * @param {string} [opts.transcriptPath] - Harness transcript to parse for the
  *   tool names and touched paths of this compaction.
- * @returns {boolean}
+ * @returns {Object|null} The stamped record as written, or null when there was
+ *   no record to update. Returned rather than re-read because the caller hands
+ *   the same record to the enricher summary.
  */
 function updateSessionFile(project, date, timestamp, sessionId, opts = {}) {
   const { projectRoot, userCount, toolCount, transcriptPath } = opts;
   const sessionFile = path.join(getSessionDir(project, date), `${sessionId}.json`);
 
   const content = readFileSafe(sessionFile);
-  if (!content) return false;
+  if (!content) return null;
 
   try {
     const session = JSON.parse(content);
@@ -107,9 +110,9 @@ function updateSessionFile(project, date, timestamp, sessionId, opts = {}) {
     session.lastUpdated = timestamp;
 
     writeFileSafe(sessionFile, JSON.stringify(session, null, 2));
-    return true;
+    return session;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -147,7 +150,10 @@ function main() {
       : undefined;
 
     // Update session file with compaction marker (+ metrics, above threshold)
-    updateSessionFile(project, date, timestamp, sessionId, { projectRoot, ...metrics });
+    const session = updateSessionFile(project, date, timestamp, sessionId, {
+      projectRoot,
+      ...metrics,
+    });
 
     // Reset the compact-suggester state on EVERY compaction (unconditional,
     // independent of the diary threshold) so suggestions don't survive the
@@ -158,11 +164,18 @@ function main() {
     // → counter reset. Enricher fires on PreCompact too (dual-path ON).
     // projectRoot is passed explicitly: runDiaryCapture reads the learning
     // opt-in from it, and the compaction cwd is not a reliable stand-in.
+    //
+    // The enricher gets the same summary the Stop hook builds, from the record
+    // just stamped above — a compaction used to hand it nothing, so the draft's
+    // prose sections were enriched from an empty object. Built only when the
+    // stamp ran (above threshold), since that is the only case the enricher can
+    // fire; below it the summary would be work nothing reads.
     const { triggered } = runDiaryCapture({
       project,
       date,
       sessionId,
       projectRoot,
+      transcriptData: metrics && session ? buildSessionSummary(session) : undefined,
     });
 
     if (triggered) {

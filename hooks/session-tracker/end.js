@@ -29,18 +29,10 @@ const {
   readCounts,
   pruneUngatedProse,
   applyTranscriptToSession,
+  buildSessionSummary,
 } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { checkReflectReady: reflectReady } = require('../../scripts/lib/learning-workflow');
-
-/**
- * Calculate duration in minutes between two ISO timestamps
- */
-function calculateDurationMinutes(startISO, endISO) {
-  if (!startISO || !endISO) return null;
-  const durationMs = new Date(endISO) - new Date(startISO);
-  return Math.round(durationMs / 60000);
-}
 
 /**
  * Create default session if none exists
@@ -88,22 +80,6 @@ function checkReflectReady(project) {
   } catch {
     return null;
   }
-}
-
-/**
- * Format session stats as a one-liner.
- */
-function formatStats(session) {
-  const duration = calculateDurationMinutes(session.started, session.lastUpdated);
-
-  let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
-  if (duration > 0) {
-    stats = `~${duration} min, ${stats}`;
-  }
-  if (session.filesModified?.length > 0) {
-    stats += `, ${session.filesModified.length} files modified`;
-  }
-  return stats;
 }
 
 /**
@@ -175,12 +151,7 @@ function main() {
     date: session.date,
     sessionId: session.sessionId,
     projectRoot,
-    transcriptData: {
-      userMessages: session.userMessageContent || [],
-      toolsUsed: session.toolsUsed || [],
-      filesModified: session.filesModified || [],
-      stats: formatStats(session),
-    },
+    transcriptData: buildSessionSummary(session),
   });
 
   const systemMessages = [];
@@ -216,10 +187,8 @@ function main() {
 
 // Export for testing
 module.exports = {
-  calculateDurationMinutes,
   getOrCreateSession,
   saveSessionJson,
-  formatStats,
   formatShortMessage,
   formatTriggeredMessage,
   checkReflectReady,

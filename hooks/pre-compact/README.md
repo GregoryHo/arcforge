@@ -34,10 +34,12 @@ diary when the threshold is met.
      record's metadata, none of which the opt-in gates, and step 2 has just
      refreshed it)
    - Spawns the background diary enricher **only when learning is enabled in
-     some scope** (dual path — Stop AND PreCompact). With learning off the
-     draft keeps its `TO BE ENRICHED` stubs; that is the contract, not a
-     failure. `projectRoot` is passed explicitly so the opt-in is read from the
-     project, not from the compaction cwd.
+     some scope** (dual path — Stop AND PreCompact), handing it the same
+     session summary the Stop hook builds — the prose, tool names, paths and
+     stats line of the record step 2 just stamped, not an empty object. With
+     learning off the draft keeps its `TO BE ENRICHED` stubs; that is the
+     contract, not a failure. `projectRoot` is passed explicitly so the opt-in
+     is read from the project, not from the compaction cwd.
    - Resets both counters (the sole reset path)
 
    Then it queues a `diary-ready` pending action for the next `SessionStart`.
