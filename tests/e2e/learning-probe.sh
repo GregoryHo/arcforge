@@ -62,8 +62,8 @@ step "0. Isolation self-check"
 RESOLVED_HOME=$(node -e "console.log(require('${REPO_ROOT}/scripts/lib/utils').getArcforgeHome())")
 [ "${RESOLVED_HOME}" = "${ARCFORGE_HOME}" ] || fail "getArcforgeHome() = ${RESOLVED_HOME}"
 RESOLVED_QUEUE=$(node -e "
-  const l = require('${REPO_ROOT}/scripts/lib/learning');
-  console.log(l.getCandidateQueuePath({ scope: 'global' }));
+  const q = require('${REPO_ROOT}/scripts/lib/learning-curator/queue-writer');
+  console.log(q.getQueuePath());
 ")
 case "${RESOLVED_QUEUE}" in
   "${ARCFORGE_HOME}"/*) pass "curator queue resolves inside the probe home" ;;

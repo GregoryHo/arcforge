@@ -66,8 +66,9 @@ was recorded about them.
   offers only the transitions legal from a candidate's current state, and every
   action — accepted or rejected — lands in an audit log with its reason. The
   CLI's candidate commands are a second, project-scoped path over the project's
-  own queue, not a front-end onto the canonical one; a global transition is
-  refused rather than written behind the curator's back. Hand-editing state
+  own queue, not a front-end onto the canonical one; `--global` is refused for
+  all of them — reads included — rather than reading or writing the canonical
+  queue behind the curator's back. Hand-editing state
   files is the one path with no checks and no record; the product treats it as
   out of contract. The on-disk formats are append-only or atomically
   overwritten, owned by the engine per the curator schema (cited above).
@@ -105,8 +106,11 @@ was recorded about them.
   `~/.arcforge/`, project-scoped state under the project's own
   `.arcforge/learning/`, and materialized artifacts in the project tree itself,
   as drafts the user reviews and commits. Commands print the absolute path
-  of anything they write. Candidate-transition commands are project-scope
-  only — a global flip of behavior-changing state is refused by the engine.
+  of anything they write. The candidate commands are project-scope
+  only — reads as well as transitions. A `--global` read would have printed
+  the canonical queue's records as they sit on disk, project id and proposal
+  body included; a global transition would have flipped behavior-changing
+  state. Both are refused by the engine.
 
 ## Data / domain model
 
@@ -144,3 +148,5 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   permissions (B-1, B-9).
 - **D-010** — session capture depth: counts always, verbatim user prose only
   under the opt-in ([hooks](hooks.md) B-6).
+- **D-011** — the CLI's candidate read commands fail closed on `--global`
+  (B-5, B-9).

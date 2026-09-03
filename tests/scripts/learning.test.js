@@ -8,7 +8,6 @@ const { execFileSync } = require('node:child_process');
 const {
   acceptCandidate,
   activateCandidate,
-  appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
   getLearningConfigPath,
@@ -18,6 +17,7 @@ const {
   isInjectActivatedInstinctsEnabled,
   learningEnabledSince,
   listLearningInbox,
+  listMaterializedDrafts,
   loadCandidates,
   materializeCandidate,
   readLearningConfig,
@@ -25,6 +25,16 @@ const {
   transitionCandidate,
   validateCandidate,
 } = require('../../scripts/lib/learning');
+
+// Seeds the project queue directly. The engine no longer exposes a writer for
+// it — appendCandidate had no shipped producer and was deleted — so tests write
+// the JSONL line themselves rather than through a function kept alive for them.
+function seedCandidate(record, { projectRoot: root } = {}) {
+  const queuePath = path.join(root, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+  fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+  fs.appendFileSync(queuePath, `${JSON.stringify(record)}\n`, 'utf8');
+  return { path: queuePath, candidate: record };
+}
 
 describe('learning subsystem MVP-1', () => {
   let testDir;
@@ -433,15 +443,10 @@ describe('learning subsystem MVP-1', () => {
     expect(result.errors.some((msg) => /evidence/i.test(msg))).toBe(true);
   });
 
-  it('appends candidates to the project JSONL queue and loads them back', () => {
-    const written = appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+  it('loads project candidates back from the JSONL queue', () => {
+    const written = seedCandidate(candidate(), { projectRoot });
 
-    expect(written.path).toBe(
-      path.join(projectRoot, '.arcforge', 'learning', 'candidates', 'queue.jsonl'),
-    );
-    expect(fs.existsSync(getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }))).toBe(
-      true,
-    );
+    expect(written.path).toBe(getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }));
 
     const records = loadCandidates({ scope: 'project', projectRoot, homeDir });
     expect(records).toHaveLength(1);
@@ -449,22 +454,13 @@ describe('learning subsystem MVP-1', () => {
     expect(records[0].status).toBe('pending');
   });
 
-  it('suppresses duplicate candidate ids instead of appending duplicate queue entries', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const duplicate = appendCandidate(candidate({ summary: 'duplicate observation' }), {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-
-    const records = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(duplicate.duplicate).toBe(true);
-    expect(records).toHaveLength(1);
-    expect(records[0].summary).toBe('Project release flow repeated across sessions.');
+  it('no longer exports a candidate writer — the project queue has no producer', () => {
+    const learning = require('../../scripts/lib/learning');
+    expect(learning.appendCandidate).toBeUndefined();
   });
 
   it('approve and reject transitions preserve provenance evidence', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
     const updated = transitionCandidate('arc-releasing-20260501-001', 'approved', {
       scope: 'project',
@@ -493,7 +489,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('forbids bypassing approval when transitioning to materialized', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
     expect(() =>
       transitionCandidate('arc-releasing-20260501-001', 'materialized', {
@@ -518,7 +514,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('materializes approved project skill candidates as inactive draft artifacts', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
 
     const result = materializeCandidate('arc-releasing-20260501-001', {
       scope: 'project',
@@ -542,7 +538,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('refuses to materialize pending or rejected candidates', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
     expect(() =>
       materializeCandidate('arc-releasing-20260501-001', {
@@ -588,7 +584,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('CLI learn materialize writes drafts after approval without activating a skill', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -678,7 +674,7 @@ describe('learning subsystem MVP-1', () => {
     expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
   });
   it('CLI learn review/approve/reject manages candidate lifecycle without deleting evidence', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -706,7 +702,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('lists an actionable learning inbox grouped by status and artifact type', () => {
-    appendCandidate(
+    seedCandidate(
       candidate({ id: 'pending-instinct', artifact_type: 'instinct', name: 'prefer-tests' }),
       {
         scope: 'project',
@@ -714,7 +710,7 @@ describe('learning subsystem MVP-1', () => {
         homeDir,
       },
     );
-    appendCandidate(
+    seedCandidate(
       candidate({
         id: 'approved-command',
         artifact_type: 'command',
@@ -724,7 +720,7 @@ describe('learning subsystem MVP-1', () => {
       }),
       { scope: 'project', projectRoot, homeDir },
     );
-    appendCandidate(
+    seedCandidate(
       candidate({
         id: 'rejected-skill',
         artifact_type: 'skill',
@@ -753,7 +749,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('accepts a pending project candidate by approving and materializing drafts without activation', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
     const result = acceptCandidate('arc-releasing-20260501-001', {
       scope: 'project',
@@ -770,8 +766,6 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('keeps the accept shortcut project-only and fails closed for global candidates', () => {
-    appendCandidate(candidate({ scope: 'global' }), { scope: 'global', projectRoot, homeDir });
-
     expect(() =>
       acceptCandidate('arc-releasing-20260501-001', {
         scope: 'global',
@@ -784,23 +778,8 @@ describe('learning subsystem MVP-1', () => {
     );
   });
 
-  it('points approved global inbox entries to inspection instead of unsupported materialization', () => {
-    appendCandidate(candidate({ scope: 'global', status: 'approved' }), {
-      scope: 'global',
-      projectRoot,
-      homeDir,
-    });
-
-    const inbox = listLearningInbox({ scope: 'global', projectRoot, homeDir });
-
-    expect(inbox.candidates[0]).toMatchObject({
-      id: 'arc-releasing-20260501-001',
-      next_command: 'arc learn inspect arc-releasing-20260501-001 --global',
-    });
-  });
-
   it('CLI learn inbox and accept support the compact review flow', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -829,7 +808,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('activates a materialized project candidate by promoting drafts to active artifacts', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
     materializeCandidate('arc-releasing-20260501-001', {
       scope: 'project',
       projectRoot,
@@ -872,7 +851,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('refuses to activate candidates that are not materialized', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     expect(() =>
       activateCandidate('arc-releasing-20260501-001', {
         scope: 'project',
@@ -962,7 +941,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('refuses to activate when draft artifacts are missing and leaves the queue untouched', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
     materializeCandidate('arc-releasing-20260501-001', {
       scope: 'project',
       projectRoot,
@@ -985,7 +964,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('refuses to overwrite an existing active SKILL.md', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
     materializeCandidate('arc-releasing-20260501-001', {
       scope: 'project',
       projectRoot,
@@ -1010,7 +989,7 @@ describe('learning subsystem MVP-1', () => {
   });
 
   it('CLI learn activate promotes a materialized candidate to active artifacts', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+    seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -1110,7 +1089,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('returns review-safe summary for pending candidate (approve/reject first)', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
       const summary = inspectCandidate('arc-releasing-20260501-001', {
         scope: 'project',
         projectRoot,
@@ -1128,7 +1107,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('returns next_action materialize for approved candidate', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
+      seedCandidate(candidate({ status: 'approved' }), {
         scope: 'project',
         projectRoot,
         homeDir,
@@ -1143,7 +1122,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('returns artifact paths with exists flags after materialization and guides explicit activation', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
+      seedCandidate(candidate({ status: 'approved' }), {
         scope: 'project',
         projectRoot,
         homeDir,
@@ -1172,7 +1151,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('does not embed file contents, unexpected raw candidate fields, or raw evidence payloads', () => {
-      appendCandidate(
+      seedCandidate(
         candidate({
           status: 'approved',
           raw_tool_payload: 'raw terminal transcript should not be exposed in review summary',
@@ -1219,23 +1198,10 @@ describe('learning subsystem MVP-1', () => {
       }
     });
 
-    it('does not probe project artifact paths when inspecting global candidates', () => {
-      const globalCandidate = candidate({ scope: 'global', status: 'materialized' });
-      appendCandidate(globalCandidate, { scope: 'global', projectRoot, homeDir });
-      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
-      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
-
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      });
-
-      expect(summary.scope).toBe('global');
-      expect(summary.candidate.scope).toBe('global');
-      expect(summary.artifacts).toEqual({});
-      expect(JSON.stringify(summary)).not.toContain('skills/arc-releasing/SKILL.md.draft');
+    it('refuses to inspect under --global and points at the dashboard', () => {
+      expect(() =>
+        inspectCandidate('arc-releasing-20260501-001', { scope: 'global', projectRoot, homeDir }),
+      ).toThrow(/arcforge learn dashboard/);
     });
 
     it('does not echo stored artifact path fields from the candidate payload', () => {
@@ -1268,7 +1234,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('reports already active for activated candidates', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
+      seedCandidate(candidate({ status: 'approved' }), {
         scope: 'project',
         projectRoot,
         homeDir,
@@ -1297,7 +1263,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('reports rejected candidates as terminal with new-candidate guidance', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
       transitionCandidate('arc-releasing-20260501-001', 'rejected', {
         scope: 'project',
         projectRoot,
@@ -1314,7 +1280,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('does not write or persist anything when inspecting', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
       const before = fs.readFileSync(
         getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }),
         'utf8',
@@ -1337,7 +1303,7 @@ describe('learning subsystem MVP-1', () => {
 
   describe('CLI learn inspect / drafts', () => {
     it('CLI learn inspect returns review summary for a materialized candidate', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
+      seedCandidate(candidate({ status: 'approved' }), {
         scope: 'project',
         projectRoot,
         homeDir,
@@ -1389,7 +1355,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('CLI learn inspect fails closed without explicit scope', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
       const cli = path.join(__dirname, '../../scripts/cli.js');
       const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -1410,7 +1376,7 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('CLI learn drafts lists only materialized candidates and excludes other statuses', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
 
       const otherPending = candidate({
         id: 'arc-releasing-20260601-002',
@@ -1418,7 +1384,7 @@ describe('learning subsystem MVP-1', () => {
         created_at: '2026-06-01T00:00:00Z',
         updated_at: '2026-06-01T00:00:00Z',
       });
-      appendCandidate(otherPending, { scope: 'project', projectRoot, homeDir });
+      seedCandidate(otherPending, { scope: 'project', projectRoot, homeDir });
 
       materializeCandidate('arc-releasing-20260601-002', {
         scope: 'project',
@@ -1432,7 +1398,7 @@ describe('learning subsystem MVP-1', () => {
         created_at: '2026-07-01T00:00:00Z',
         updated_at: '2026-07-01T00:00:00Z',
       });
-      appendCandidate(rejected, { scope: 'project', projectRoot, homeDir });
+      seedCandidate(rejected, { scope: 'project', projectRoot, homeDir });
       transitionCandidate('arc-releasing-20260701-003', 'rejected', {
         scope: 'project',
         projectRoot,
@@ -1459,33 +1425,8 @@ describe('learning subsystem MVP-1', () => {
       );
     });
 
-    it('CLI learn drafts with global scope does not probe project-local artifact paths', () => {
-      appendCandidate(candidate({ scope: 'global', status: 'materialized' }), {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      });
-      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
-      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      const drafts = JSON.parse(
-        execFileSync('node', [cli, 'learn', 'drafts', '--global', '--json'], {
-          env,
-          encoding: 'utf8',
-        }),
-      );
-
-      expect(drafts.scope).toBe('global');
-      expect(drafts.count).toBe(1);
-      expect(drafts.drafts[0].artifacts).toEqual({});
-      expect(JSON.stringify(drafts)).not.toContain('skills/arc-releasing/SKILL.md.draft');
-    });
-
     it('CLI learn drafts returns an empty list when no materialized candidates exist', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
+      seedCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
       const cli = path.join(__dirname, '../../scripts/cli.js');
       const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
 
@@ -1555,6 +1496,142 @@ describe('learning subsystem MVP-1', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The candidate READ commands fail closed on --global (D-011).
+//
+// `getCandidateQueuePath({ scope: 'global' })` used to resolve to the curator's
+// canonical queue.jsonl — the same file the dashboard reviews. The lifecycle
+// commands already refused --global; the read commands did not. So
+// `learn review --global --json` printed the raw curator event records verbatim
+// (scope.project_id and the proposal body included), while inbox/inspect/drafts
+// matched nothing at all against those same records, because they compare
+// `c.scope` and `c.id` where a curator record carries `scope.kind` and
+// `candidate_id`. Silent one way, disclosing the other.
+// ---------------------------------------------------------------------------
+
+describe('learn candidate reads fail closed on --global', () => {
+  // Distinctive sentinels: asserting on the literal field names would break on
+  // any future output that legitimately carries a redacted preview.
+  const BODY_CANARY = 'CANARY-BODY-must-never-be-printed-5f2a';
+  const PROJECT_ID_CANARY = 'canaryprojectid0';
+  const CANDIDATE_ID = 'cand_canary_0001';
+
+  let testDir;
+  let projectRoot;
+  let homeDir;
+  let cli;
+  let env;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-global-read-'));
+    projectRoot = path.join(testDir, 'project');
+    homeDir = path.join(testDir, 'home');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(homeDir, { recursive: true });
+
+    // A curator-shaped event record in the canonical queue, carrying exactly
+    // the two things the old read path leaked.
+    const queuePath = path.join(homeDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify({
+        schema_version: 1,
+        event_id: 'evt_canary',
+        ts: '2026-05-01T00:00:00Z',
+        candidate_id: CANDIDATE_ID,
+        event_type: 'candidate.created',
+        actor: { layer: 5, actor_type: 'validator' },
+        record: {
+          candidate_id: CANDIDATE_ID,
+          artifact_type: 'instinct',
+          scope: { kind: 'project', project: 'canary', project_id: PROJECT_ID_CANARY },
+          name: 'canary',
+          summary: 'canary candidate',
+          body: BODY_CANARY,
+          lifecycle: { status: 'pending_review', status_changed_at: '2026-05-01T00:00:00Z' },
+          created_at: '2026-05-01T00:00:00Z',
+          updated_at: '2026-05-01T00:00:00Z',
+        },
+      })}\n`,
+      'utf8',
+    );
+
+    cli = path.join(__dirname, '../../scripts/cli.js');
+    env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
+    delete env.ARCFORGE_HOME;
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function runCli(args) {
+    try {
+      const stdout = execFileSync('node', [cli, 'learn', ...args], {
+        env,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return { status: 0, stdout, stderr: '' };
+    } catch (err) {
+      return {
+        status: err.status,
+        stdout: err.stdout ? err.stdout.toString() : '',
+        stderr: err.stderr ? err.stderr.toString() : '',
+      };
+    }
+  }
+
+  for (const [name, args] of [
+    ['review', ['review', '--global', '--json']],
+    ['inbox', ['inbox', '--global', '--json']],
+    ['inspect', ['inspect', CANDIDATE_ID, '--global', '--json']],
+    ['drafts', ['drafts', '--global', '--json']],
+  ]) {
+    it(`learn ${name} --global exits non-zero and points at the dashboard`, () => {
+      const result = runCli(args);
+
+      // With --json the CLI renders a thrown error as `{ "error": ... }` on
+      // stdout (scripts/cli.js). Asserting the whole envelope proves the
+      // refusal is the ONLY thing printed — no partial candidate listing.
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        error: expect.stringContaining('arcforge learn dashboard'),
+      });
+    });
+
+    it(`learn ${name} --global prints neither the candidate body nor the project id`, () => {
+      const result = runCli(args);
+
+      expect(`${result.stdout}${result.stderr}`).not.toContain(BODY_CANARY);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(PROJECT_ID_CANARY);
+    });
+  }
+
+  it('learn review --project still reads the project queue', () => {
+    const result = runCli(['review', '--project', '--json']);
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ scope: 'project', count: 0, candidates: [] });
+  });
+
+  it('every library read entry point refuses --global', () => {
+    expect(() => getCandidateQueuePath({ scope: 'global', projectRoot })).toThrow(
+      /arcforge learn dashboard/,
+    );
+    expect(() => loadCandidates({ scope: 'global', projectRoot })).toThrow(
+      /arcforge learn dashboard/,
+    );
+    expect(() => listLearningInbox({ scope: 'global', projectRoot })).toThrow(
+      /arcforge learn dashboard/,
+    );
+    expect(() => listMaterializedDrafts({ scope: 'global', projectRoot })).toThrow(
+      /arcforge learn dashboard/,
+    );
+  });
+});
+
 describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts', () => {
   let testDir;
   let projectRoot;
@@ -1620,7 +1697,7 @@ describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts',
     it('materializes an instinct candidate as a draft markdown file under the instincts dir', () => {
       const learning = require('../../scripts/lib/learning');
       const c = approvedCandidate('instinct', 'arc-learned-instinct-x');
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      seedCandidate(c, { scope: 'project', projectRoot, homeDir });
       const result = learning.materializeCandidate(c.id, {
         scope: 'project',
         projectRoot,
@@ -1654,7 +1731,7 @@ describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts',
       ];
       for (const c of cases) {
         const cand = approvedCandidate(c.type, c.name);
-        learning.appendCandidate(cand, { scope: 'project', projectRoot, homeDir });
+        seedCandidate(cand, { scope: 'project', projectRoot, homeDir });
         const result = learning.materializeCandidate(cand.id, {
           scope: 'project',
           projectRoot,
@@ -1670,7 +1747,7 @@ describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts',
     it('materializes repo_convention_patch candidates only as draft text proposals', () => {
       const learning = require('../../scripts/lib/learning');
       const c = approvedCandidate('repo_convention_patch', 'arc-learned-convention-x');
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      seedCandidate(c, { scope: 'project', projectRoot, homeDir });
       const result = learning.materializeCandidate(c.id, {
         scope: 'project',
         projectRoot,
@@ -1696,7 +1773,7 @@ describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts',
         name,
         status: 'approved',
       });
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
+      seedCandidate(c, { scope: 'project', projectRoot, homeDir });
       learning.materializeCandidate(c.id, { scope: 'project', projectRoot, homeDir });
       return c.id;
     }
