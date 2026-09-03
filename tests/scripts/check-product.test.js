@@ -970,6 +970,24 @@ describe('check-product', () => {
       const specs = [spec({ preamble: ['```markdown', '> Status: draft', '```', ''] })];
       expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
     });
+
+    it('ends the preamble at an indented `##`, which still renders as a heading', () => {
+      // Read at column 1 the preamble ran past this heading, so the blockquote
+      // below it stood in for a header the spec does not carry.
+      const specs = [
+        spec({ status: null, intro: ['  ## Overview', '', '> Status: shipped v1.0.0', ''] }),
+      ];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/missing the "> Status:" header line/);
+    });
+
+    it('does not end the preamble at a `##` inside an indented code block', () => {
+      // The bound is ` {0,3}`, not `\s*`: at four spaces the line is an indented
+      // code block, so an illustrative heading above the header is not a boundary.
+      const specs = [spec({ preamble: ['    ## Purpose', ''] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
   });
 
   describe('the shape of a roadmap row', () => {

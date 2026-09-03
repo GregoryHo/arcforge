@@ -481,10 +481,19 @@ function checkRoadmapTags(rows, errors) {
  * illustration and a fenced `##` does not end the preamble. An unclosed fence
  * above the header swallows it and C4 reports it missing — fail-closed, the way
  * `section()` is.
+ *
+ * The boundary spans ` {0,3}`, not column 1, because CommonMark still renders a
+ * `##` carrying one to three leading spaces as a heading: read at column 1 the
+ * preamble ran past such a heading, and a body blockquote below it stood in for
+ * a header the spec does not have — this boundary is the one place in the file
+ * where a column-1 read fails *open*, which is why it takes the same bound as
+ * `DECISION_ANY_RE` rather than the column-1 read `section()` uses. Four spaces
+ * is an indented code block, so an illustrative `##` in the preamble still does
+ * not cut it short.
  */
 function specStatusHeader(content) {
   for (const line of unfenced(content.split('\n'))) {
-    if (/^##\s+/.test(line)) break;
+    if (/^ {0,3}##\s+/.test(line)) break;
     const m = line.match(SPEC_STATUS_HEADER_RE);
     if (!m) continue;
     return m[1]

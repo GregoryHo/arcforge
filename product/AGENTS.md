@@ -217,6 +217,15 @@ copy of the template is an illustration. Keep the header where the template puts
 directly under the H1 — a `> Status:` line below the first `##` is prose, and C4
 reports the header as missing.
 
+That first `##` ends the preamble even when it carries one to three leading spaces —
+the same bound a `### D-NNN` heading is read at, and deliberately not the column-1
+read the section boundary above uses. The two differ because they fail in opposite
+directions: an indented `## Decision Log` leaves the log empty, which C6 rejects,
+while an indented `## Purpose` read at column 1 would leave the preamble running past
+it, so a body blockquote further down could stand in for a header the spec does not
+have. Four spaces or more is an indented code block, and an illustrative `##` there
+does not end the preamble.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 
