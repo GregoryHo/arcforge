@@ -351,7 +351,7 @@ function SkillsGrid({theme:t}) {
             </div>
           ))}
         </div>
-        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>The full catalog · invoke any of them as /arcforge:&lt;name&gt;</div>
+        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>The full catalog · invoke any of them as /arcforge:&lt;name&gt; · arcforge:&lt;name&gt; on Codex</div>
         {groups.map(([name,color,items])=>(
           <div key={name}>
             <div style={{display:'flex',alignItems:'baseline',gap:16,marginBottom:18,paddingBottom:10,borderBottom:`1px dashed ${t.line}`}}>

@@ -889,7 +889,7 @@ function SkillsGrid({
       borderTop: `1px dashed ${t.line}`,
       paddingTop: 18
     }
-  }, "The full catalog \xB7 invoke any of them as /arcforge:<name>"), groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
+  }, "The full catalog \xB7 invoke any of them as /arcforge:<name> \xB7 arcforge:<name> on Codex"), groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
     key: name
   }, /*#__PURE__*/React.createElement("div", {
     style: {
