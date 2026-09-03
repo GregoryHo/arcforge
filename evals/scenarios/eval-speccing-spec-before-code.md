@@ -91,8 +91,8 @@ grader with the pre-fix set-difference predicate and the numeric one:
 | no new entry | FAIL | FAIL |
 
 Enumerating ids `000`–`999` against both predicates gives a difference set of
-exactly `{"000"}`, which is why `## Version` stays 2: the two graders score the
-published k=10 pool identically, so there is no pool to keep apart.
+exactly `{"000"}` — the one entry id that scores differently. What that does to
+the published pool is settled below, once A2's narrowing is on the table too.
 
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
 version the fixture shipped, because that is what the assertion's own second
@@ -121,16 +121,54 @@ grader with the pre-fix set-difference predicate and the numeric one:
 
 Unlike A3's, this difference set is not a singleton and cannot be enumerated —
 every version below `0.3.0` that is not one of the three shipped rows moves
-PASS → FAIL. So `## Version` stays 2 on the pool rather than on enumeration: no
-retained baseline transcript carries a command that writes a version row (trial-3
-only suggests a `0.4.0` row in its closing prose), so A2 failed there and a
-strictly narrower predicate cannot lift a failure, while every retained treatment
-transcript writes a `| 0.4.0 |` row, which both predicates pass. The verdict does
-not rest on that reading of the baseline arm alone: narrowing a predicate can
-only lower a score, and the treatment arm is directly observed to pass either
-way, so the delta under the numeric predicate can only sit at or above the
-published +0.67. An IMPROVED verdict is safe under the narrowing whatever the
-baseline files held.
+PASS → FAIL.
+
+**k.** `## Trials` below is the per-run default `defaultK` reads when no `--k`
+is passed, and it is the corpus's 5. The pre-registered design for this scenario
+is k=10 per arm, and every recorded A/B run of it was launched with `--k 10`.
+Preflight is unaffected either way — it runs at its own fixed k=3.
+
+**Why `## Version` stays 2, for both narrowings.** The published pool is the
+k=10 A/B of 2026-09-03T00:37Z, the run whose preflight record is
+`evals/preflight/afb5f3da7d729aca-default.json` (an earlier k=10 run under this
+same scenario text was voided and discarded whole;
+`evals/skill-eval-coverage.md` owns that provenance and states it once). The
+argument is that pool's per-assertion record, published in the same file — not
+any transcript:
+
+- *Baseline, settled.* All ten baseline trials scored 0.33 with A1–A4 failing in
+  every one. A2 and A3 are inside A1–A4, so both failed ten times out of ten
+  under the old predicates, and a strictly narrower predicate cannot lift a
+  failure. The baseline arm scores 0.33 / 0% under either reading.
+- *Treatment, bounded.* All ten treatment trials scored 1.00, so A2 and A3 both
+  passed under the old predicates. The narrowings touch no other assertion, so
+  were the pool re-scored under the shipped ones — it cannot be, see below — a
+  treatment trial would score 1.00, or 0.83 having lost one of the two, or 0.67
+  having lost both. The delta would land between **+0.33** and the +0.67 that
+  was measured, and with a zero-variance baseline and every treatment value
+  inside [0.67, 1.00], no interval over that range reaches 0.
+
+IMPROVED holds across that whole range: `## Verdict Policy` is `delta`, which
+reads the score-delta interval alone (`verdictFromDeltaCI`,
+`scripts/lib/eval-stats.js:382`). Pass rate is the published number a re-score
+could actually move — `Grader: code` passes a trial only when all six assertions
+score 1.0, so a treatment trial that lost A2 or A3 would stop passing while
+still scoring 0.83 — but pass rate is not what the verdict reads. So the two
+readings do not split this pool into two experiments and there is nothing to
+keep apart. The measured result is untouched and stays stated as measured:
++0.67 CI[0.67, 0.67] at k=10, treatment pass 100%.
+
+**What is not claimed.** That the shipped predicates would reproduce +0.67
+exactly. Settling that needs the treatment arm's roadmap rows and decision ids,
+and the pool cannot be re-read: `evals/results/` is gitignored and the run
+directory is gone. The transcripts that do survive under
+`evals/results/eval-speccing-spec-before-code/` are **not** its arms —
+`20260902-164317/` and `20260902-170634/` both hold `trial-N.txt`, the name
+`saveTranscript` writes only for a single-condition run (`condition ===
+'results'`, `scripts/lib/eval.js:314`); an A/B arm is written
+`baseline-trial-N.txt` / `treatment-trial-N.txt`, and no such file exists
+anywhere in the tree. Their directory names match the two k=3 preflights'
+start times, but that is adjacency, not something the filename guarantees.
 
 **Fixture hygiene.** No maintenance guide beside the four files, no instruction
 anywhere that the ledger moves with the code, and no earlier commit
