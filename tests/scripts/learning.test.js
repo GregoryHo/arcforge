@@ -1204,6 +1204,10 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
       expect(error).toMatch(/nothing was applied/);
       expect(error).toMatch(new RegExp(`arcforge learn approve ${CANDIDATE_ID} --project`));
+      // Alongside it, never instead of it: the narrowing this message ends in
+      // always points at the dashboard, so the type refusal names both wherever
+      // the approval is legal. The guide documents that pairing.
+      expect(error).toMatch(/arcforge learn dashboard/);
 
       // Zero state change: `approve` appends a transition event to the queue,
       // so a byte-identical queue is what proves no half-dispatch happened.
@@ -1268,6 +1272,9 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(error).toMatch(/nothing was applied/);
       expect(error).not.toMatch(/arcforge learn approve/);
       expect(error).not.toMatch(/arcforge learn reject/);
+      // The dashboard survives the one status that names no command: it comes
+      // from the narrowing, not from the conditional recovery.
+      expect(error).toMatch(/arcforge learn dashboard/);
       expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
         /reject it, or leave it for the curator/,
       );
@@ -1322,6 +1329,26 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(runCli(['reject', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
       expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('dismissed');
+    });
+
+    // The other arm of the same ternary, and the difference from the type
+    // refusal the guide draws: that one names the dashboard alongside its
+    // command, this one names it instead of one. `approve` is a single
+    // transition with no name pre-check, so a reviewer reaches `approved` with
+    // a name the draft writer can never use — and from there the matrix refuses
+    // to dismiss, so there is no `learn reject` left to offer.
+    it('sends the name refusal to the dashboard where declining is not legal', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+
+      const { error } = JSON.parse(runCli(['accept', CANDIDATE_ID, '--project', '--json']).stdout);
+
+      expect(error).toMatch(/name is not one the draft writer can use/);
+      expect(error).toMatch(/arcforge learn dashboard/);
+      expect(error).not.toMatch(/arcforge learn reject/);
+      // The command it stopped naming is the one the matrix refuses. Last,
+      // because a refused dispatch appends its own audited rejection.
+      expect(runCli(['reject', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
     });
 
     // The other half of what the policy calls blank: `sanitizeFilename` rejects
