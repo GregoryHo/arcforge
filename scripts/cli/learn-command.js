@@ -18,9 +18,11 @@ const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 
 // Layer 7/8 render and activate the instinct artifact and nothing else. The
-// other artifact types the queue schema names have no producer and no renderer
-// behind them, so the CLI says which one it can act on rather than failing deep
-// inside the curator.
+// other artifact types the queue schema names have no renderer behind them, so
+// the CLI says which one it can act on rather than failing deep inside the
+// curator. They do have a producer — the dashboard's `evolve` action writes a
+// `skill` record into the same queue — so this is a live branch, not a
+// defensive one.
 const SUPPORTED_ARTIFACT_TYPE = 'instinct';
 
 // Every action the CLI dispatches is attributed to the CLI, so the audit log
@@ -70,6 +72,12 @@ const NEXT_ACTIONS = {
   dismissed: ['dismissed — no action available'],
   superseded: ['superseded by another candidate — no action available'],
 };
+
+// The statuses whose prose above names a materialize or activate step, and so
+// the only ones the artifact-type narrowing has anything to say about. Every
+// other status's prose is true whatever the candidate's type, and overriding it
+// would lose information — a dismissed candidate is not "leave it queued".
+const STATUSES_NAMING_A_BUILD = new Set(['approved', 'materialized', 'deactivated']);
 
 function requireProjectCandidateScope(args) {
   if (args.flags.project) return 'project';
@@ -209,24 +217,28 @@ function nextCommandFor(card) {
 }
 
 /**
- * The status prose in `NEXT_ACTIONS` assumes the candidate is one the curator
- * can build. For any other artifact type `materialize` and `activate` are not
- * steps at all, so the narrowing itself is what is worth printing — the same
- * fact `assertSupportedArtifactType` states when one of them is typed.
+ * The `NEXT_ACTIONS` prose for the three statuses in `STATUSES_NAMING_A_BUILD`
+ * names the build step that status allows. For a candidate type the curator
+ * cannot render, that step does not exist, so the narrowing itself is what is
+ * worth printing — the same fact `assertSupportedArtifactType` states when one
+ * of those commands is typed. Nothing else is left for the CLI to run from
+ * those three statuses (besides the build step the matrix allows only `promote`
+ * and `evolve`, both dashboard-only), so the second line says where the
+ * candidate can still be looked at.
  */
 function unsupportedTypeActions(card) {
-  const verbs = cliActionsFor(card).map((action) => VERB_FOR_ACTION[action]);
-  const open =
-    verbs.length > 0 ? `${verbs.join(' or ')} it, or leave it queued` : 'leave it queued';
   return [
     `arcforge materializes ${SUPPORTED_ARTIFACT_TYPE} candidates only, so this ` +
       `${card.artifact_type} candidate has no materialize or activate step`,
-    `${open} — the whole queue is reviewable in: arcforge learn dashboard`,
+    'leave it queued — the whole queue is reviewable in: arcforge learn dashboard',
   ];
 }
 
 function nextActionsFor(card) {
-  if (card.artifact_type !== SUPPORTED_ARTIFACT_TYPE) return unsupportedTypeActions(card);
+  const unbuildable =
+    card.artifact_type !== SUPPORTED_ARTIFACT_TYPE &&
+    STATUSES_NAMING_A_BUILD.has(card.lifecycle_status);
+  if (unbuildable) return unsupportedTypeActions(card);
   return NEXT_ACTIONS[card.lifecycle_status] || [];
 }
 
