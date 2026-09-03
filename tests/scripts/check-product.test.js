@@ -903,6 +903,39 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/a second row carries this Version/);
     });
 
+    it('rejects two rows whose Versions differ only by a leading zero', () => {
+      // `Version` admits `\d+`, so `01.0.0` and `1.0.0` are two strings that
+      // `compareVersions` calls equal. Keyed on the string, this pair was the
+      // duplicate the rule could not see: green written this way round, and a
+      // header mismatch written the other — one version in two milestone
+      // states, decided by typing order.
+      const shipped = row({ version: '01.0.0' });
+      const building = row({ version: '1.0.0', status: 'building', here: false });
+      const specs = [spec({ status: 'shipped v01.0.0' })];
+      const collision =
+        /a second row carries this Version \(the earlier row's ".+" resolves to it\)/;
+      // Written this way round the pair raised a header mismatch; swapped, the
+      // same two rows linted completely green. Both orders must name the pair,
+      // and the collision is spelled out — the two cells do not read alike.
+      expect(
+        of('C4', validateProduct({ roadmap: roadmap({ rows: [shipped, building] }), specs }))[0],
+      ).toMatch(collision);
+      expect(
+        of('C4', validateProduct({ roadmap: roadmap({ rows: [building, shipped] }), specs })),
+      ).toEqual([
+        `C4 roadmap row 01.0.0: a second row carries this Version (the earlier row's "1.0.0" resolves to it), so the specs it links have no single highest-version governing row`,
+      ]);
+    });
+
+    it('accepts a lone row whose Version carries a leading zero', () => {
+      // Nothing collides, so the cell is read as written and its spec's header
+      // says the same — odd, and self-consistent. This rule sees collisions; it
+      // is not a `Version` validator.
+      const rows = [row({ version: '01.0.0' })];
+      const specs = [spec({ status: 'shipped v01.0.0' })];
+      expect(validateProduct({ roadmap: roadmap({ rows }), specs })).toEqual([]);
+    });
+
     it('keeps a duplicate row, so its marker still counts for C1', () => {
       // Reported and kept, the way C2 keeps a duplicate `D-id`. Dropped
       // instead, this corpus would pass C1 at one marker while carrying two.

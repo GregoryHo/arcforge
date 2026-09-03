@@ -153,14 +153,31 @@ const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
 // leading `\d` keeps ordinary prose (`D-Bus`) out of the scan.
 const CITATION_RE = /\bD-(\d+)(\w*)/g;
 
+/**
+ * The three numbers a roadmap `Version` cell orders by. The ordering below and
+ * C4's uniqueness key both read this one parse, so no pair of cells can be
+ * distinct to one and equal to the other — which is exactly what a leading zero
+ * did while uniqueness keyed on the raw string: `01.0.0` and `1.0.0` are two Set
+ * keys that compare equal, so the duplicate went unreported and the tie left the
+ * governing row decided by table order, the ambiguity the rule exists to reject.
+ */
+function versionParts(version) {
+  return version.split('.').map(Number);
+}
+
 /** Semver-ish ordering for roadmap Version cells (`X.Y.Z`). */
 function compareVersions(a, b) {
-  const av = a.split('.').map(Number);
-  const bv = b.split('.').map(Number);
+  const av = versionParts(a);
+  const bv = versionParts(b);
   for (let i = 0; i < 3; i++) {
     if (av[i] !== bv[i]) return av[i] - bv[i];
   }
   return 0;
+}
+
+/** The identity two `Version` cells share when `compareVersions` calls them equal. */
+function versionKey(version) {
+  return versionParts(version).join('.');
 }
 
 /** The lines between `## Roadmap` and the next `##` heading. */
@@ -620,17 +637,29 @@ function expectedSpecStatus(linking) {
  * keeps a duplicate `D-id`. Dropping it would take its `← we are here` with it
  * and let a corpus whose two same-version rows are both marked pass C1 at one
  * marker — failing open on the marker rule while closing this one.
+ *
+ * "The same Version" is `versionKey`, not the cell's text: the `Version`
+ * validator admits a leading zero, so `01.0.0` and `1.0.0` are two strings that
+ * `compareVersions` calls equal, and a Set of strings let exactly the pair this
+ * rule exists to reject through. A row whose cell reads `01.0.0` and no second
+ * row for it stays legal and makes its spec's header `shipped v01.0.0` — the
+ * header is built from the cell as written, so the two agree; odd to read, but
+ * self-consistent, and narrowing what a `Version` cell may say is a separate
+ * change from making this rule see the collision.
  */
 function checkRoadmapVersions(rows, errors) {
-  const seen = new Set();
+  const seen = new Map();
   for (const row of rows) {
-    if (seen.has(row.version)) {
-      errors.push(
-        `C4 roadmap row ${row.version}: a second row carries this Version, so the specs it links have no single highest-version governing row`,
-      );
-    } else {
-      seen.add(row.version);
+    const key = versionKey(row.version);
+    const first = seen.get(key);
+    if (first === undefined) {
+      seen.set(key, row.version);
+      continue;
     }
+    const collision = first === row.version ? '' : ` (the earlier row's "${first}" resolves to it)`;
+    errors.push(
+      `C4 roadmap row ${row.version}: a second row carries this Version${collision}, so the specs it links have no single highest-version governing row`,
+    );
   }
 }
 
