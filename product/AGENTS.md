@@ -94,6 +94,10 @@ A non-shipped row shows `—` in `Tag` (C7). Exactly one row carries
 `← we are here` (C1) — the check counts markers; *which* row deserves one is a
 judgment it does not make.
 
+A roadmap row carries exactly six cells, and a literal pipe inside a cell is
+written `\|` — the only form the table has for one. A row that resolves to any
+other number of cells is rejected rather than read from shifted columns.
+
 ## The three mechanical rules
 
 These three are pinned in exactly this form because `npm run check:product` reads

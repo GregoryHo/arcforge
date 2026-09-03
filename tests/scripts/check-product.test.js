@@ -26,10 +26,11 @@ function row({
   here = true,
   specs = ['alpha'],
   tag = status === 'shipped' ? `\`v${version}\`` : '—',
+  why = 'what & why',
 } = {}) {
   const statusCell = here ? `**${status} ${'← we are here'}**` : `**${status}**`;
   const specCell = specs.map((s) => `[${s}](specs/${s}.md)`).join(' · ');
-  return `| ${version} | ${tag} | milestone | ${statusCell} | what & why | ${specCell} |`;
+  return `| ${version} | ${tag} | milestone | ${statusCell} | ${why} | ${specCell} |`;
 }
 
 /** `status: null` omits the `- Status:` line, the way `spec()` omits its header. */
@@ -899,6 +900,54 @@ describe('check-product', () => {
       // wins and C4 rejects a correct header, quoting text it does not contain.
       const specs = [spec({ preamble: ['```markdown', '> Status: draft', '```', ''] })];
       expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+  });
+
+  describe('the shape of a roadmap row', () => {
+    // `\|` is the only way a GFM cell can carry a literal pipe. Read
+    // escape-blind, it splits the cell it sits in and every later cell is read
+    // from the wrong index — so the row's own `Spec` link goes unseen and an
+    // older row keeps governing the spec it names.
+    const ESCAPED = 'Pipe filters: `input \\| output` chaining.';
+
+    it('reads the Spec cell of a row whose What & why carries an escaped pipe', () => {
+      expect(run({ roadmap: { rows: [row({ why: ESCAPED })] } })).toEqual([]);
+    });
+
+    it('rejects a stale header on a spec extended by a row with an escaped pipe', () => {
+      const rows = [
+        row({ version: '1.0.0', here: false }),
+        row({ version: '1.1.0', status: 'building', why: ESCAPED }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0' })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/extended by 1\.1\.0 \(building\)/);
+    });
+
+    it('rejects a row whose unescaped pipe adds a seventh cell', () => {
+      const errors = of('C4', run({ roadmap: { rows: [row({ why: 'input | output' })] } }));
+      expect(errors[0]).toMatch(/expected 6 columns, found 7/);
+    });
+
+    it('rejects a cell ending in an escaped backslash rather than mis-reading it', () => {
+      // The escape rule's one blind spot, pinned rather than left latent: `\\|`
+      // is an escaped backslash then a real delimiter, but the lookbehind reads
+      // it as an escaped pipe. The exact arity is what keeps that fail-closed —
+      // the row is rejected, not parsed from columns that shifted left.
+      const rows = [
+        '| 1.0.0 | `v1.0.0` | milestone | **shipped ← we are here** | C:\\\\| [alpha](specs/alpha.md) |',
+      ];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+      expect(errors[0]).toMatch(/expected 6 columns, found 5/);
+    });
+
+    it('rejects a row missing its Spec cell', () => {
+      // Coverage for a branch that predates the escape fix — `expected 6
+      // columns` had no test in either direction — not a regression guard.
+      const rows = ['| 1.0.0 | `v1.0.0` | milestone | **shipped ← we are here** | what & why |'];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+      expect(errors[0]).toMatch(/expected 6 columns, found 5/);
     });
   });
 

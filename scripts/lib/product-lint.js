@@ -212,6 +212,17 @@ function roadmapSection(roadmap) {
  * the rows it could read. Read outside fenced blocks, so an illustrative table
  * row inside `## Roadmap` is not a roadmap row.
  *
+ * A cell that carries a literal pipe writes it `\|` — the only form GFM has —
+ * so the split reads unescaped delimiters and unescapes the cells it hands
+ * back. Read escape-blind, such a cell splits in two and every cell after it is
+ * read from the wrong index: a `What & why` mentioning `input \| output` moved
+ * `Spec` out of reach, the row parsed as linking nothing, and C4 went on
+ * governing that spec from an older row. The arity check is exact rather than a
+ * floor for the same reason — a row that does not resolve to six cells is
+ * rejected instead of read from indexes that may have shifted, which is also
+ * what catches the one input the escape rule cannot see through: a cell ending
+ * in a literal backslash makes the delimiter after it look escaped.
+ *
  * @returns {{version: string, tag: string, status: string, here: boolean, specs: string[]}[]}
  */
 function parseRoadmapRows(roadmap, errors) {
@@ -221,13 +232,13 @@ function parseRoadmapRows(roadmap, errors) {
     if (!line.startsWith('|')) continue;
     const cells = line
       .replace(/^\|/, '')
-      .replace(/\|$/, '')
-      .split('|')
-      .map((c) => c.trim());
+      .replace(/(?<!\\)\|$/, '')
+      .split(/(?<!\\)\|/)
+      .map((c) => c.replace(/\\\|/g, '|').trim());
     if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue;
     if (cells[0] === 'Version') continue;
 
-    if (cells.length < 6) {
+    if (cells.length !== 6) {
       errors.push(`C4 roadmap row "${line}": expected 6 columns, found ${cells.length}`);
       continue;
     }
