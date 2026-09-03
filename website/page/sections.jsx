@@ -288,7 +288,7 @@ function Platforms({theme:t}) {
               <Stamp label={p.tag} color={p.primary?t.ember:t.brass} small/>
             </div>
             <div style={{color:t.mute,fontSize:13,lineHeight:1.55,marginBottom:18}}>{p.note}</div>
-            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c} style={{lineHeight:1.7}}>{c}</div>):p.cmd}</div>
+            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c}>{c}</div>):p.cmd}</div>
           </div>
         ))}
       </div>
