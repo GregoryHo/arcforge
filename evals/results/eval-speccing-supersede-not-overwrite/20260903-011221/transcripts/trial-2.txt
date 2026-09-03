@@ -1,0 +1,94 @@
+[Assistant] Reading the product docs first, then editing.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t2-z0fQNg" && find . -type f -not -path './.git/*' | sort && echo '---' && cat .claude/* 2>/dev/null; find .claude -type f 2>/dev/null -exec sh -c 'echo "=== $1"; cat "$1"' _ {} \;
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t2-z0fQNg" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "===== $f"; cat -A "$f" | sed 's/\$$//' ; echo; done; echo "===== git log"; git log --stat --oneline | head -40; echo "===== grep D-0 / Blobstash / Vaultbox"; grep -rn -i 'D-0\|blobstash\|vaultbox\|decision' --include='*' . --exclude-dir=.git
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t2-z0fQNg" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "===== $f"; cat -n "$f"; echo; done
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t2-z0fQNg" && python3 - <<'PY'
+import pathlib
+
+def swap(path, old, new):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    assert s.count(old) == 1, (path, old[:40], s.count(old))
+    p.write_text(s.replace(old, new))
+
+# --- ROADMAP.md: decision log ---
+swap("product/ROADMAP.md",
+"""## Decision Log
+
+""",
+"""## Decision Log
+
+Entry numbers are stable references (the specs cite them). A reversed decision
+is marked Superseded and points at its replacement; entries are not deleted or
+renumbered.
+
+""")
+
+swap("product/ROADMAP.md",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Accepted
+- Decision: Store uploaded files in Blobstash.
+- Why: Blobstash was the cheapest tier at the volume we projected, and one fewer vendor to operate while the team was three people.
+""",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: **Superseded by D-008** (2026-09-03)
+- Decision: Store uploaded files in Blobstash.
+- Why: Blobstash was the cheapest tier at the volume we projected, and one fewer vendor to operate while the team was three people.
+- Superseded: Uploads move to Vaultbox (D-008). Blobstash is retired as a backend and must not be wired back up.
+""")
+
+swap("product/ROADMAP.md",
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+""",
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+
+### D-008 — Upload storage backend moves to Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Vaultbox migration branch, after 0.4.0
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is retired as an upload backend and must not be reintroduced.
+- Why: Not recorded yet — owner to fill in before the migration branch lands. (D-005 records why Blobstash was chosen originally.)
+""")
+
+# --- specs/uploads.md ---
+swap("product/specs/uploads.md",
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.
+""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.
+  Blobstash (D-005, superseded by D-008) is retired and must not be wired back
+  in.
+""")
+
+swap("product/specs/uploads.md",
+"""- **D-005** — the storage backend is Blobstash.
+- **D-006** — streaming, not buffering.
+""",
+"""- **D-006** — streaming, not buffering.
+- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).
+""")
+print("ok")
+PY
+echo "===== headings"; grep -n '^### D-' product/ROADMAP.md
+echo "===== remaining Blobstash refs"; grep -rn -i 'blobstash' . --exclude-dir=.git
+echo "===== diff"; git --no-pager diff --stat
+
+[Assistant] Next: fill in the `Why:` line of D-008 at `product/ROADMAP.md:73`. It is the one thing I could not write without inventing a reason.
+
+1. **D-005 kept, marked Superseded by D-008.** Its Blobstash text stays as history plus a "retired, do not wire back up" line. New D-008 records the Vaultbox decision.
+2. **Spec fixed.** `product/specs/uploads.md` B-4 now says Vaultbox and names Blobstash as retired. Decisions list cites D-008 instead of D-005.
+3. **Nothing dropped, nothing renumbered.** Every entry still backs a shipped behavior line in the spec, and the spec cites the D-numbers, so renumbering would have broken those references. The log already runs D-001 to D-008 with no gaps.
+4. **Convention note added** at the top of the log stating numbers are stable and reversed entries get superseded, not deleted.
+5. **Not touched:** `src/uploads.js` still calls the Blobstash client. That is the Thursday branch's job.
+
+Separately: the spec's Decisions list omits D-004 and D-007. Left as is.

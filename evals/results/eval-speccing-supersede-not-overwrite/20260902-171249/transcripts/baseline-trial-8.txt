@@ -1,0 +1,66 @@
+[Assistant] Reading the product directory first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-b9psY5" && find . -type f -not -path './.git/*' | sort && echo "---" && cat .claude/* 2>/dev/null; find .claude -type f -exec sh -c 'echo "=== $1"; cat "$1"' _ {} \;
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-b9psY5" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "=================== $f"; cat -n "$f"; done; echo "=================== git"; git log --stat --oneline | head -40; git status --short
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-b9psY5" && python3 - <<'PY'
+from pathlib import Path
+
+def sub(path, pairs):
+    p = Path(path); s = p.read_text()
+    for old, new in pairs:
+        assert s.count(old) == 1, (path, old)
+        s = s.replace(old, new)
+    p.write_text(s)
+
+sub("product/ROADMAP.md", [
+    # D-005: keep text and rationale intact, flip status only
+    ("""- Version: 0.4.0
+- Status: Accepted
+- Decision: Store uploaded files in Blobstash.""",
+     """- Version: 0.4.0
+- Status: Superseded by D-008 on 2026-09-03
+- Decision: Store uploaded files in Blobstash."""),
+    # D-008: new entry appended, never overwriting D-005
+    ("""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+""",
+     """- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+
+### D-008 — Upload storage backend is Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Vaultbox migration branch
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is no longer a storage target; do not wire new code to it.
+- Why: Not captured in this log yet — the switch was decided ahead of the migration branch. The migration owner should record the reason here before the branch lands.
+"""),
+])
+
+sub("product/specs/uploads.md", [
+    ("> Status: shipped v0.4.0 · [ROADMAP](../ROADMAP.md)",
+     "> Status: shipped v0.4.0 · B-4 changes with the Vaultbox migration branch (D-008) · [ROADMAP](../ROADMAP.md)"),
+    ("""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.""",
+     """- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.
+  Blobstash is retired (D-005 superseded by D-008); nothing new targets it."""),
+    ("""- **D-005** — the storage backend is Blobstash.
+- **D-006** — streaming, not buffering.""",
+     """- **D-006** — streaming, not buffering.
+- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash)."""),
+])
+print("ok")
+PY
+git --no-pager diff --stat && git --no-pager diff && echo "--- Blobstash mentions in product/:" && grep -n "Blobstash" product/ROADMAP.md product/specs/uploads.md && echo "--- decision ids in order:" && grep -o '^### D-[0-9]*' product/ROADMAP.md | tr '\n' ' '
+
+[Assistant] Done. Changes, in `product/`:
+
+1. `ROADMAP.md` D-005 kept intact, status now "Superseded by D-008 on 2026-09-03". Its original text and rationale stay as the record of why Blobstash was chosen and then retired.
+2. `ROADMAP.md` gains D-008: storage backend is Vaultbox, supersedes D-005, marked "do not wire new code to Blobstash". Its Why line is an honest placeholder because you did not state the reason for the switch.
+3. `specs/uploads.md` B-4 now promises Vaultbox, the Decisions list points at D-008 instead of D-005, and the status line notes B-4 changes with the migration branch.
+4. Not done, on purpose: dropping entries and renumbering. Every entry D-001 to D-007 still describes the shipped product, so there was nothing to drop, and the log already runs D-001 to D-008 with no gaps.
+5. Deleting D-005 would erase the exact history that stops the next person re-choosing Blobstash, and renumbering would silently break the D-00x references in the spec and in any commit or PR that cites them. If you still want that, say so and I will do it.
+6. Roadmap has no row for the storage migration and `src/uploads.js` still imports the Blobstash client. Both left alone since they are the migration branch's job.
+
+Next: fill in the Why line of D-008 in `product/ROADMAP.md:68` with the reason for moving to Vaultbox.

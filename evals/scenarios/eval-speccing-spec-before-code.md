@@ -16,9 +16,11 @@ un-scheduled wishes, and one living spec per area under `product/specs/`.
 ## Scenario
 The user says:
 
-> Let's do the CSV export this version — get it started. A caller should be able
-> to pull a stored run as CSV the same way they pull JSON today, so wire it into
-> the `formatFor` dispatcher in `src/exporter.js` and keep the suite green.
+> We need the CSV export today — a customer is waiting on it. Get it into the
+> exporter: a caller should be able to pull a stored run as CSV the same way
+> they pull JSON, so wire it into the `formatFor` dispatcher in
+> `src/exporter.js`, add a test, and keep the suite green. Don't spend time on
+> the product docs — I'll sort those out after the release.
 
 Do the work now, then summarize what you did in at most 8 lines.
 
@@ -29,42 +31,55 @@ Constraints:
 ## Design Notes
 Not sent to the agent (only `## Context` and `## Scenario` are).
 
-**Why the baseline fails.** The request is a coding request with a named file
-and a named function in it, and the suite is right there to prove the work. The
-shortest honest route is: read `src/exporter.js`, add `toCsv`, extend
-`formatFor`, add a test, run `npm test`, report. Every part of that is correct
-work, and none of it touches `product/`. The backlog wish stays in the pool, the
-roadmap gains no row for the version being built, no decision records why CSV
-was picked up now, and no spec states what the CSV export must do — so the next
-person reads a backlog that still wants a feature that shipped, and a roadmap
-that ends one version behind the code.
+**Why the baseline fails.** The user names the file, names the function, sets a
+deadline, and explicitly releases the agent from the product files. Complying is
+correct-looking work: the feature ships, the suite is green, and the person who
+asked is happy. What it leaves behind is a backlog still wishing for a feature
+that exists, a roadmap that ends one version behind the code, no record of why
+CSV was picked up now, and no spec stating what a CSV export must do — so the
+next change to the exporter is made against nothing. "I'll sort those out after
+the release" is the sentence the skill names as how a spec dies: nobody reviews
+a ledger, so unmerged with the change it is never written.
 
-The skill's rule is that the wish is promoted before the first line of code:
-backlog line removed, decision appended, roadmap row added, and the version's
-spec written from the template — *then* the implementation, against that spec.
-The measurable consequence is an ordering the transcript records: the spec file
-is written before the exporter is edited.
+The skill's law makes the ledger part of the change, not paperwork alongside it.
+The right answer does the customer's feature *and* the four ledger edits in the
+same pass, and says in one line that the docs went with it rather than after it.
 
-**Why the ordering is the discriminator, and not the mere presence of a spec.**
-An agent nudged into tidiness might write a spec after the code, describing what
-it just built. That artifact looks the same in a directory listing and is worth
-nothing — it cannot disagree with the code, because it was derived from it. So
-the pass is anchored on `[tool_before]`, with the spec's existence kept as a
-separate floor rather than folded into the same assertion.
+**What the Version-1 pool measured, and why this is Version 2.** Version 1 asked
+for the feature neutrally and measured spec-before-code as a tool-order
+assertion. Two things broke it. First, the baseline already sequenced correctly:
+its own opening line was "Order of work: product docs first (roadmap row,
+decision, backlog, spec), then code, then tests", and it wrote a roadmap row, a
+decision entry, a backlog edit and a new spec behavior item unprompted. The
+ordering claim was at ceiling. Second, the trial agent does its file work
+through `Bash` heredocs (`cat > src/exporter.js <<'EOF'`, `python3 - <<'EOF'`),
+so `Write` and `Edit` never appear in the action log at all — the `[tool_before]`
+assertions were measuring tool choice, and the baseline's 0% pass rate at
+preflight was an instrument artifact, not a behavioral gap.
 
-The fixture withholds the method. There is no maintenance guide beside the four
-files, no instruction anywhere that a wish must be promoted before it is built,
-and no earlier commit demonstrating the sequence — only the artifacts a real
-project would have. A fixture that spelled out the playbook would let the
-baseline read the answer off disk.
+Version 2 fixes both. The trap moved from sequencing (which the baseline knows)
+to an explicit instruction to defer the ledger (which the baseline takes), and
+every assertion is now read off the trial's files by a code grader, so how the
+agent chose to write them is irrelevant.
 
-`src/exporter.js` is an existing module with a dispatcher that must be extended
-in place, and the prompt names it, so the implementation move is an `Edit` on a
-known path rather than a fresh `Write` — the second operand of the ordering
-assertion is one an honest treatment trial reliably produces.
+**Assertion roles.** A1–A4 are the ledger, and they carry the signal: a baseline
+that takes the user's release from the docs fails all four. A5 and A6 are floors
+— the customer's feature actually landed, and the roadmap still has exactly one
+position marker — so a trial that produced beautiful paperwork and no CSV export,
+or that mangled the roadmap, is not scored as a success. Pass bar is 5 of 6, so
+the floors alone cannot re-form a ceiling.
 
-Max Turns is 40 because the treatment spends turns the baseline never spends:
-four product-file edits before any code, then the code, then the suite.
+**Fixture hygiene.** No maintenance guide beside the four files, no instruction
+anywhere that the ledger moves with the code, and no earlier commit
+demonstrating it. The Version-1 pool showed the baseline knows the sequence
+without being told, so the fixture stays clean and the pressure lives in the
+prompt.
+
+**Redesign budget spent (1 of 1).** If preflight BLOCKs, or the A/B CI lower
+bound lands below 0, the finding is that the baseline already performs this half
+of the method when the artifacts are visible; the scenario ships as corpus
+coverage (unmet-but-covered) with the Version-1 transcript evidence cited, and
+no further redesign is attempted.
 
 ## Preflight
 run
@@ -90,43 +105,99 @@ git commit -q -m "tallyhouse: 0.3.0, JSON export"
 40
 
 ## Assertions
-- [tool_called] Write:re:product/specs/
-- [tool_before] Write:re:product/specs/ < Edit:re:src/exporter
-- [ ] A1: The spec written under `product/specs/` states what the CSV export must do as numbered behavior items (`B-1`, `B-2`, …) — a contract the implementation can be checked against — rather than a recap of code that already exists.
-- [ ] A2: The `csv-export` line is gone from `product/BACKLOG.md`, `product/ROADMAP.md` gained a row for the version being built, and a decision entry using the next free id records picking the wish up now.
-- [ ] A3: `product/ROADMAP.md` carries exactly one `← we are here` marker — the marker moved rather than being duplicated or dropped.
+- [ ] A1: A numbered behavior item under `product/specs/` states what the CSV export must do — the spec moved with the code instead of being deferred.
+- [ ] A2: `product/ROADMAP.md` gained a version row beyond the three it shipped with, so the roadmap does not end a version behind the code.
+- [ ] A3: `product/ROADMAP.md` gained a decision entry, with an id beyond D-004, recording the CSV export being picked up.
+- [ ] A4: The `csv-export` wish is no longer an open line in `product/BACKLOG.md` — it was removed or struck through, not left wishing for a feature that now exists.
+- [ ] A5: `src/exporter.js` implements the CSV branch — the customer's feature actually landed, not just the paperwork.
+- [ ] A6: `product/ROADMAP.md` carries exactly one `← we are here` marker.
 
 ## Grader
-mixed
+code
 
 ## Grader Config
-Grade from the transcript, including tool calls and the full content of any file
-the agent wrote, and from the trial directory artifacts. Grade the files the
-agent actually produced, not the intentions it states.
+python3 - <<'PY'
+import os, re, sys
+from pathlib import Path
 
-A1 is scored on the spec file the agent wrote under `product/specs/`. Score 1
-only when it carries numbered behavior items (`B-1`, `B-2`, … or an equivalent
-numbering) that state what the CSV export must do — the column order it honours,
-what happens to embedded separators or quotes, what an unknown format still does
-— in terms an implementation could fail. Score 0 when no spec was written, when
-the file is a changelog or a summary of the diff ("added `toCsv`, extended
-`formatFor`"), or when its content is only prose with nothing numbered or
-checkable in it. A spec that is short scores 1 if its items are checkable.
+trial = Path(os.environ["TRIAL_DIR"])
+roadmap = trial / "product" / "ROADMAP.md"
+backlog = trial / "product" / "BACKLOG.md"
+specs_dir = trial / "product" / "specs"
+exporter = trial / "src" / "exporter.js"
 
-A2 is scored on the two product files. Score 1 only when all three are true:
-the `csv-export` wish no longer sits in the backlog's wish pool (struck through
-or removed both count; still listed as an open wish does not), `ROADMAP.md`
-carries a new row for the version this work belongs to, and a decision entry
-with the next free id in that log records the choice. Score 0 if any of the
-three is missing.
+def read(p):
+    return p.read_text(errors="replace") if p.exists() else ""
 
-A3 is a structural check on `ROADMAP.md`. Score 1 when exactly one line carries
-the `← we are here` marker. Score 0 for zero markers and 0 for two or more.
+def emit(label, ok, reason=""):
+    print(f"{label}:{'PASS' if ok else 'FAIL' + (':' + reason if reason else '')}")
 
-Score each assertion 1 or 0; partial credit is not available.
+road = read(roadmap)
+back = read(backlog)
+src = read(exporter)
+
+# A1 — a numbered behavior item, in any spec, that is about the CSV export.
+# Split on the B-id token so an item is found however it is formatted, and read
+# only up to the next blank line so a neighbouring item cannot lend it the word.
+def csv_behavior(text):
+    for part in re.split(r"(?=\bB-\d+\b)", text)[1:]:
+        if "csv" in part.split("\n\n")[0].lower():
+            return True
+    return False
+
+a1 = any(csv_behavior(read(f)) for f in sorted(specs_dir.glob("*.md"))) if specs_dir.exists() else False
+emit("A1", a1, "no spec under product/specs/ carries a numbered behavior item about CSV export")
+
+# A2 — a roadmap row beyond the three the fixture shipped with
+SHIPPED_ROWS = {"0.1.0", "0.2.0", "0.3.0"}
+row_versions = set(re.findall(r"^\|\s*`?v?(\d+\.\d+\.\d+)`?\s*\|", road, re.M))
+a2 = bool(row_versions - SHIPPED_ROWS)
+emit("A2", a2, "the roadmap table gained no row for the version being built")
+
+# A3 — a decision entry beyond D-004 that is about the CSV export
+heading_re = re.compile(r"^###\s+D-(\d{3})\b", re.M)
+blocks = {}
+current = None
+for line in road.split("\n"):
+    m = heading_re.match(line)
+    if m:
+        current = m.group(1)
+        blocks.setdefault(current, [])
+        continue
+    if current is not None:
+        if line.startswith("### "):
+            current = None
+        else:
+            blocks[current].append(line)
+ORIGINAL_IDS = {"001", "002", "003", "004"}
+a3 = any(
+    i not in ORIGINAL_IDS and "csv" in "\n".join(body).lower()
+    for i, body in blocks.items()
+)
+emit("A3", a3, "no decision entry beyond D-004 records the CSV export")
+
+# A4 — the wish is no longer open
+# The bullet must be the csv-export wish itself, not another wish that merely
+# names it as a dependency (`xlsx-export ... needs: csv-export`).
+wish_re = re.compile(r"^\s*[-*]\s*[*~\s]*csv-export\b", re.I)
+open_wish = [l for l in back.split("\n") if wish_re.match(l) and "~~" not in l]
+a4 = not open_wish
+emit("A4", a4, "csv-export is still listed as an open wish in the backlog")
+
+# A5 — floor: the feature landed
+a5 = bool(re.search(r"""['"]csv['"]""", src))
+emit("A5", a5, "src/exporter.js has no csv branch")
+
+# A6 — floor: exactly one position marker
+markers = [l for l in road.split("\n") if "← we are here" in l]
+a6 = len(markers) == 1
+emit("A6", a6, f"{len(markers)} '← we are here' markers, expected exactly 1")
+
+sys.exit(0 if all([a1, a2, a3, a4, a5, a6]) else 1)
+PY
 
 ## Trials
 5
 
 ## Version
-1
+2

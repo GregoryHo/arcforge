@@ -1,0 +1,77 @@
+[Assistant] Reading the product directory first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t5-DCw89n" && find . -path ./.git -prune -o -type f -print | sort && echo "-----" && cat .claude/* 2>/dev/null; ls -la .claude
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t5-DCw89n" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "=================== $f"; cat -n "$f"; done; echo "=================== git log"; git log --stat --oneline | head -40
+
+[Assistant] Plan: supersede D-005 with a new D-008 rather than rewriting it, update the spec's B-4 and Decisions list, and audit the log for dead entries before touching numbering.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t5-DCw89n" && python3 - <<'PY'
+import pathlib
+
+def sub(path, old, new):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    assert s.count(old) == 1, (path, old[:40], s.count(old))
+    p.write_text(s.replace(old, new))
+
+# --- ROADMAP.md: mark D-005 superseded (text kept verbatim), append D-008 ---
+sub("product/ROADMAP.md",
+"""- Status: Accepted
+- Decision: Store uploaded files in Blobstash.""",
+"""- Status: Superseded by D-008 (2026-09-03)
+- Decision: Store uploaded files in Blobstash.""")
+
+p = pathlib.Path("product/ROADMAP.md")
+s = p.read_text().rstrip("\n") + "\n"
+s += """
+### D-008 — Upload storage backend is Vaultbox
+- Date: 2026-09-03
+- Version: unreleased (not yet on the roadmap; lands with the Vaultbox migration branch)
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is no longer the upload storage backend; do not reintroduce it.
+- Why: TODO — the reason for leaving Blobstash was not stated when this was recorded. Migration owner to fill in before the branch lands.
+"""
+p.write_text(s)
+
+# --- uploads.md: B-4 and the Decisions list ---
+sub("product/specs/uploads.md",
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.""")
+
+sub("product/specs/uploads.md",
+"- **D-005** — the storage backend is Blobstash.",
+"- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).")
+print("edits applied")
+PY
+echo "===== remaining Blobstash mentions"; grep -rn "Blobstash\|blobstash" --exclude-dir=.git .
+echo "===== D-number sequence"; grep -n "^### D-" product/ROADMAP.md
+echo "===== diff"; git --no-pager diff
+
+[Assistant] One tidy-up: the spec's Decisions list is now out of numeric order. Moving D-008 below D-006.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t5-DCw89n" && python3 - <<'PY'
+import pathlib
+p = pathlib.Path("product/specs/uploads.md")
+s = p.read_text()
+old = """- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).
+- **D-006** — streaming, not buffering.
+"""
+new = """- **D-006** — streaming, not buffering.
+- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).
+"""
+assert s.count(old) == 1
+p.write_text(s.replace(old, new))
+PY
+sed -n '33,40p' product/specs/uploads.md; git --no-pager status --short
+
+[Assistant] 1. **Next:** fill in the `Why` on D-008 in `product/ROADMAP.md`. The reason for leaving Blobstash was never stated, so it is a marked TODO rather than an invented rationale.
+2. **Added D-008** (Vaultbox is the upload backend, supersedes D-005), dated today, version marked unreleased because the migration has no roadmap row.
+3. **D-005 kept verbatim** with status changed to "Superseded by D-008". The Blobstash rationale now reads as history, not as a current instruction.
+4. **Spec updated:** B-4 in `product/specs/uploads.md` now says uploads are stored in Vaultbox, and the Decisions list points at D-008 instead of D-005.
+5. **Did not drop or renumber.** Every entry D-001 through D-007 still describes shipped behavior, and the numbering already runs D-001 to D-008 with no gaps.
+6. Renumbering would also change what "D-005" means in the spec, in your own message, and in any old PR or chat. That is the exact confusion you want to prevent. If you still want D-005 deleted outright, say so and I will do it.
+7. Left `src/uploads.js` and the roadmap table alone for the migration branch. Nothing committed.

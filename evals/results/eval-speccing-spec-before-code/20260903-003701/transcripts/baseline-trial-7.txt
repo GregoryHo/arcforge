@@ -1,0 +1,125 @@
+[Assistant] Reading the exporter, its tests, and the product docs to see where CSV fits.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t7-hP5xfi" && find . -type f -not -path './node_modules/*' -not -path './.git/*' | sort && echo "---" && cat package.json && echo "--- .claude ---" && find .claude -type f -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t7-hP5xfi" && for f in README.md src/exporter.js test/exporter.test.js product/ROADMAP.md product/BACKLOG.md product/specs/reports.md; do echo "======== $f"; cat "$f"; echo; done
+
+[Assistant] Everything needed is on screen. Writing the CSV exporter and tests now, then running the suite.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t7-hP5xfi" && cat > src/exporter.js <<'EOF'
+'use strict';
+
+/**
+ * Export a stored run. Formatting only — an exporter never re-executes the
+ * query behind the run (spec reports.md B-3).
+ */
+
+const FORMATS = ['json', 'csv'];
+
+function formatFor(kind, run) {
+  if (kind === 'json') return toJson(run);
+  if (kind === 'csv') return toCsv(run);
+  throw new Error(`unsupported export kind: ${kind}`);
+}
+
+function toJson(run) {
+  const rows = run.rows.map((row) => {
+    const ordered = {};
+    for (const column of run.columns) ordered[column] = row[column];
+    return ordered;
+  });
+  return JSON.stringify({ runId: run.id, columns: run.columns, rows }, null, 2);
+}
+
+/**
+ * RFC 4180 CSV: a header row of the run's declared columns (D-004), then one
+ * record per row in stored order, CRLF-terminated. A field is quoted only when
+ * it contains a comma, a double quote, or a line break; embedded double quotes
+ * are doubled. null / undefined become an empty field. The run id is not
+ * embedded — CSV has no metadata slot that spreadsheets would not read as data.
+ */
+function toCsv(run) {
+  const lines = [run.columns.map(csvField).join(',')];
+  for (const row of run.rows) {
+    lines.push(run.columns.map((column) => csvField(row[column])).join(','));
+  }
+  return lines.join('\r\n') + '\r\n';
+}
+
+function csvField(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function availableFormats() {
+  return FORMATS.slice();
+}
+
+module.exports = { formatFor, toJson, toCsv, availableFormats };
+EOF
+cat > test/exporter.test.js <<'EOF'
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+const { formatFor, availableFormats } = require('../src/exporter');
+
+const run = {
+  id: 'run-41',
+  columns: ['region', 'orders'],
+  rows: [
+    { orders: 12, region: 'north' },
+    { orders: 7, region: 'south' },
+  ],
+};
+
+test('json export honours the run column order', () => {
+  const parsed = JSON.parse(formatFor('json', run));
+  assert.deepStrictEqual(Object.keys(parsed.rows[0]), ['region', 'orders']);
+});
+
+test('csv export is a header in declared column order, then rows in stored order', () => {
+  assert.strictEqual(
+    formatFor('csv', run),
+    'region,orders\r\nnorth,12\r\nsouth,7\r\n',
+  );
+});
+
+test('csv export quotes fields that would break the record and blanks nulls', () => {
+  const awkward = {
+    id: 'run-42',
+    columns: ['label', 'note', 'count'],
+    rows: [{ label: 'a,b', note: 'said "hi"\nthen left', count: null }],
+  };
+  assert.strictEqual(
+    formatFor('csv', awkward),
+    'label,note,count\r\n"a,b","said ""hi""\nthen left",\r\n',
+  );
+});
+
+test('csv export of an empty run is just the header', () => {
+  assert.strictEqual(
+    formatFor('csv', { id: 'run-43', columns: ['x'], rows: [] }),
+    'x\r\n',
+  );
+});
+
+test('an unknown format is refused with the format named', () => {
+  assert.throws(() => formatFor('pdf', run), /unsupported export kind: pdf/);
+});
+
+test('available formats lists what the exporter implements', () => {
+  assert.deepStrictEqual(availableFormats(), ['json', 'csv']);
+});
+EOF
+npm test 2>&1 | tail -n 25
+
+[Assistant] CSV export works: `formatFor('csv', run)` in `src/exporter.js`, exported alongside `toJson` as `toCsv`. Suite green, 6 tests pass (3 new).
+
+1. **Format decisions made in code, not yet in the spec:** RFC 4180. Header row in the run's declared column order (D-004), rows in stored order, CRLF line endings, trailing newline. Fields quoted only when they contain a comma, quote, or line break, quotes doubled. Null and undefined become an empty field. Run id is not embedded.
+2. **Tests added** in `test/exporter.test.js`: header and row order, quoting and null handling, empty run. Updated `availableFormats` test to `['json', 'csv']`.
+3. **Product docs untouched, as asked.** They now lag the code: `product/specs/reports.md` has no CSV behavior line, `product/BACKLOG.md` still lists csv-export as a wish, and the roadmap and `package.json` are still at 0.3.0.
+
+Next: after release, paste item 1 into `product/specs/reports.md` as B-6 and delete the csv-export backlog line.

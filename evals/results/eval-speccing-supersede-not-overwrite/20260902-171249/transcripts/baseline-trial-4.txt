@@ -1,0 +1,77 @@
+[Assistant] Reading the product directory first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-PEgiCo" && find . -path ./.git -prune -o -type f -print | sort && echo "---" && cat product/*.md 2>/dev/null; echo "--- specs ---"; for f in product/specs/*; do echo "=== $f ==="; cat "$f"; done
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-PEgiCo" && echo "=== README ===" && cat README.md && echo "=== package.json ===" && cat package.json && echo "=== src/uploads.js ===" && cat src/uploads.js && echo "=== settings ===" && cat .claude/settings.json && echo "=== git log ===" && git log --stat --format='%h %ad %s' --date=short && echo "=== refs ===" && grep -rn -E 'D-00[0-9]|Blobstash|Vaultbox' --exclude-dir=.git . && date
+
+[Assistant] Plan: mark D-005 superseded, add D-008 for Vaultbox, update the spec. No deletions or renumbering, reason in the summary.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-PEgiCo" && python3 - <<'PY'
+import pathlib
+
+def sub(path, old, new):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    assert s.count(old) == 1, (path, old[:40], s.count(old))
+    p.write_text(s.replace(old, new))
+
+# --- ROADMAP.md: supersede D-005, append D-008 ---
+sub("product/ROADMAP.md",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Accepted
+""",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Superseded by D-008 on 2026-09-03. Uploads are moving to Vaultbox; do not wire Blobstash back up.
+""")
+
+sub("product/ROADMAP.md",
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+""",
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+
+### D-008 — Upload storage backend is Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Vaultbox migration branch
+- Status: Accepted
+- Decision: Store uploaded files in Vaultbox. Supersedes D-005. The Blobstash client goes away with the migration branch and is not to be reintroduced.
+- Why: Not recorded yet. The reason for leaving Blobstash was not stated when this entry was opened; migration owner to fill in before the branch lands.
+""")
+
+# --- uploads.md: header, B-4, decisions list ---
+sub("product/specs/uploads.md",
+"> Status: shipped v0.4.0 · [ROADMAP](../ROADMAP.md)",
+"> Status: shipped v0.4.0 · storage backend moving to Vaultbox (D-008) · [ROADMAP](../ROADMAP.md)")
+
+sub("product/specs/uploads.md",
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.
+""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process writes the blob to
+  Vaultbox under its random id and stores nothing on local disk. Blobstash was
+  the backend through v0.4.0 (D-005, superseded); do not wire it back up.
+""")
+
+sub("product/specs/uploads.md",
+"""- **D-005** — the storage backend is Blobstash.
+- **D-006** — streaming, not buffering.
+""",
+"""- **D-006** — streaming, not buffering.
+- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).
+""")
+print("edits applied")
+PY
+echo "=== diff ===" && git --no-pager diff && echo "=== Blobstash refs left ===" && grep -rn Blobstash --exclude-dir=.git . && echo "=== D-numbers in log ===" && grep -n '^### D-' product/ROADMAP.md
+
+[Assistant] Done. Next: fill in the "Why" line of D-008 in `product/ROADMAP.md` with the reason for leaving Blobstash. I did not have it and did not invent one.
+
+1. D-005 now reads "Superseded by D-008" with a do-not-rewire note. Its decision and reasoning stay intact as history.
+2. Added D-008: uploads are stored in Vaultbox, supersedes D-005, Blobstash client is not to be reintroduced.
+3. Spec B-4 now says Vaultbox, notes Blobstash as the superseded v0.4.0 backend. Spec header and decisions list point at D-008.
+4. Dropped nothing and renumbered nothing. Every entry D-001 to D-007 still describes the shipped 0.4.0 product, so none qualified. The log already runs D-001 to D-008 with no gaps.
+5. Renumbering would also silently repoint the spec's D-005 and D-006 references at the wrong decisions. That is the exact confusion you want to avoid. If you still want entries removed, name them and I will do it.
+
+Separately: `src/uploads.js` still imports `blobstashClient`. Left for the migration branch.
