@@ -1,0 +1,27 @@
+{
+  "eval": "eval-speccing-spec-before-code-baseline",
+  "trial": 1,
+  "score": 1,
+  "passed": true,
+  "discovered_claims": [
+    {
+      "text": "Agent wrote product docs (roadmap, decision, backlog, spec) before touching code",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 7 edits product/ files; Block 9 writes src/exporter.js and tests afterward"
+    },
+    {
+      "text": "Implementation and tests match the spec items B-6 and D-005",
+      "category": "factual",
+      "passed": true,
+      "evidence": "toCsv uses CRLF, quotes on [\",\\r\\n], doubles quotes, empty for null/undefined; tests cover each case and suite reports 7/7 passing in Block 10"
+    },
+    {
+      "text": "Agent did not bump package.json version or commit",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 12 states version stays 0.3.0 and nothing is committed; package.json artifact shows 0.3.0"
+    }
+  ],
+  "weak_assertions": []
+}
