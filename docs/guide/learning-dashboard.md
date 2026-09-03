@@ -272,6 +272,14 @@ being materialized again after the dashboard deactivated it, and there the
 commands agree on which one counts: the draft `learn drafts` and `learn accept`
 report is the draft `learn activate` consumes.
 
+A retired candidate can lose its draft the same way, and `learn inspect` says so
+there too — but what it offers is different, because `deactivated` is the one
+status the matrix lets both materialize and activate. Activating it again is the
+half that refuses, on the same content hash; materializing it again writes a
+fresh draft and is what `learn inspect` points you at. `learn inbox` prints no
+paths and reads no drafts, so a retired entry there still names both moves —
+`learn inspect` is where the draft question is answered.
+
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.
 

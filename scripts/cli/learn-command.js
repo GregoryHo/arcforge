@@ -37,7 +37,7 @@ const {
   STATUS_RANK,
   isMaterializableType,
   isMaterializableName,
-  staleDraftActions,
+  draftUnavailableActions,
   inspectCommandFor,
   nextCommandFor,
   nextActionsFor,
@@ -151,17 +151,19 @@ function runInspect({ scope }, candidateId) {
   const materialization = materializationFor(card.candidate_id);
   const stale = staleDraftsIn(materialization);
   // The disk fact is reported for every status — it is a fact about disk, not
-  // about the lifecycle — but it only overrides the prose of the one status
-  // that names the draft. See `staleDraftActions`. The predicate is
-  // "unavailable", not "stale": a candidate whose manifest is gone has no draft
-  // to review either, and reports an empty `draft_paths_stale` because there is
-  // no recorded file left to call stale.
-  const unavailable = draftUnavailableIn(materialization);
-  const overrideProse = unavailable && card.lifecycle_status === 'materialized';
+  // about the lifecycle — but it overrides the prose only of the statuses whose
+  // own prose it contradicts. `draftUnavailableActions` owns that choice and
+  // returns null for the rest. The predicate is "unavailable", not "stale": a
+  // candidate whose manifest is gone has no draft to review either, and reports
+  // an empty `draft_paths_stale` because there is no recorded file left to call
+  // stale.
+  const override = draftUnavailableIn(materialization)
+    ? draftUnavailableActions(card, stale)
+    : null;
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
-    next_actions: overrideProse ? staleDraftActions(stale) : nextActionsFor(card),
+    next_actions: override ?? nextActionsFor(card),
     draft_paths: draftPathsIn(materialization),
     draft_paths_stale: stale,
   };
