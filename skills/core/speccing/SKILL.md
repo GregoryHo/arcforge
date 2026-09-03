@@ -70,8 +70,12 @@ item, and the divergence is resolved in the same PR:
 | What happened | What lands in the same PR |
 |---|---|
 | A behavior turned out wrong or impossible | Its `B-n` is rewritten, plus a decision saying why |
-| A behavior was added along the way | A new `B-n`, and its id in the spec's decision list |
+| A behavior was added along the way | A new `B-n`, plus a decision saying why it was added now |
 | Scope was cut | The item moves to out-of-scope, or back to the backlog as a wish |
+
+Both of those decisions are appended as a `D-NNN`; the spec's **Decisions**
+section carries that id and the one-line reason it is cited — a `B-n` never
+stands alone there.
 
 "I'll update the spec after it merges" is how a spec dies. The PR is the only
 moment a reviewer can see both halves at once.
