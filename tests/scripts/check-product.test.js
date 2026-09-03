@@ -289,6 +289,34 @@ describe('check-product', () => {
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
     });
 
+    it('rejects an entry both wholly and partially superseded by the same decision', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-002 · partially superseded by D-002' }),
+        decision({
+          id: 'D-002',
+          extra: ['- Supersedes: D-001', '- Supersedes: D-001 (clause 1)'],
+        }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(
+        errors.filter((e) => /exclusive for one superseder\/victim pair/.test(e)),
+      ).toHaveLength(1);
+    });
+
+    it('rejects both flips from one decision even when it claims only one form', () => {
+      // The mirror pass is deliberately form-blind, so the stale `partially
+      // superseded by` left behind when a partial reversal is upgraded to a
+      // total one has to be caught on the victim's own Status.
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-002 · partially superseded by D-002' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(
+        errors.filter((e) => /exclusive for one superseder\/victim pair/.test(e)),
+      ).toHaveLength(1);
+    });
+
     it('rejects a clause id that is not a number', () => {
       const decisions = supersedingLog(
         '- Supersedes: D-001 (clause two)',

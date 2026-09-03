@@ -137,6 +137,11 @@ entry carry two clause-scoped flips from different decisions, or a partial flip
 alongside the later total one that finished it off — and what rejects the
 self-contradicting `Accepted · Superseded-by: D-MMM`.
 
+The two forms are exclusive *per pair*, though: one decision either replaces another
+whole or reverses one of its clauses, never both, so `Superseded-by: D-MMM · partially
+superseded by D-MMM` is rejected however many `Supersedes:` lines D-MMM carries. What
+the cross-decision cases above allow, the same-decision case does not.
+
 C3 checks that pairing from both ends. A `Supersedes:` with no flip on its target is
 rejected, and so is a flip with nothing behind it — a `Superseded-by:` or `partially
 superseded by` clause whose named entry carries no `Supersedes:` back, or that names a

@@ -28,7 +28,8 @@
  *         behind it, or one naming a decision the log does not carry, is
  *         rejected too. A superseded entry's whole `Status:` is then read clause
  *         by clause against the closed vocabulary, so a totally superseded entry
- *         is no longer `Accepted` and no entry dies twice. `Refines:` and
+ *         is no longer `Accepted`, no entry dies twice, and no decision both
+ *         replaces an entry whole and reverses one of its clauses. `Refines:` and
  *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
@@ -219,8 +220,10 @@ function statusClauses(status) {
  * C3 — a superseded entry's `Status:` as a whole has to stay coherent, not just
  * contain the right phrase somewhere: every clause comes from the closed
  * vocabulary, a decision dies at most once, a totally superseded one has stopped
- * being live, and a partially superseded one keeps the live clause that still
- * governs the rest of it.
+ * being live, a partially superseded one keeps the live clause that still
+ * governs the rest of it, and one decision does not both replace it whole and
+ * reverse a clause of it — the two forms mean different things, so they cannot
+ * both hold for one superseder/victim pair.
  */
 function checkSupersededStatus(victim, errors) {
   const clauses = statusClauses(victim.status);
@@ -235,6 +238,20 @@ function checkSupersededStatus(victim, errors) {
   }
   const totals = clauses.filter((c) => TOTAL_FLIP_RE.test(c));
   const live = clauses.filter((c) => DECISION_LIVE_STATUS.has(c));
+  // Each relation edge only ever asks whether its own flip clause is present, so
+  // a bare and a clause-scoped supersession from one decision both go green
+  // independently. The contradiction is a property of the pair, so it is caught
+  // here. Keys on the flip's `D-id`, never on a clause number — two clause-scoped
+  // flips from *different* decisions stay legal.
+  const partialIds = new Set(
+    clauses.filter((c) => PARTIAL_FLIP_RE.test(c)).map((c) => c.match(PARTIAL_FLIP_RE)[1]),
+  );
+  const bothForms = totals.map((c) => c.match(TOTAL_FLIP_RE)[1]).find((n) => partialIds.has(n));
+  if (bothForms) {
+    errors.push(
+      `C3 ${victim.id}: Status is "${victim.status}" — D-${bothForms} cannot both replace it whole and reverse one clause of it; the two supersession forms are exclusive for one superseder/victim pair`,
+    );
+  }
   if (totals.length > 1) {
     errors.push(
       `C3 ${victim.id}: Status is "${victim.status}" — a decision dies once, so it carries at most one "Superseded-by:"`,
