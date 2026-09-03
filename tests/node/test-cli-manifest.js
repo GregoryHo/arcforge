@@ -274,7 +274,14 @@ function liveFlagsFromSource(source) {
 }
 
 const evalSource = fs.readFileSync(path.join(CLI_DIR, 'eval-command.js'), 'utf8');
-const learnSource = fs.readFileSync(path.join(CLI_DIR, 'learn-command.js'), 'utf8');
+// `learn` is spread over three files — the entry/dispatch layer and the two
+// halves it coordinates. Every flag read is meant to stay in the entry layer,
+// but the derivation reads all three: a flag read that drifted into a sibling
+// would otherwise shrink the derived set, the ⊆ assertion below would still
+// pass, and the flag would escape the manifest gate unnoticed.
+const learnSource = ['learn-command.js', 'learn-candidate-queue.js', 'learn-candidate-prose.js']
+  .map((file) => fs.readFileSync(path.join(CLI_DIR, file), 'utf8'))
+  .join('\n');
 const loopSource = fs.readFileSync(path.join(CLI_DIR, 'loop-command.js'), 'utf8');
 const obsidianSource = fs.readFileSync(path.join(CLI_DIR, 'obsidian-command.js'), 'utf8');
 const worktreeSource = fs.readFileSync(path.join(LIB_DIR, 'worktree-generic.js'), 'utf8');
