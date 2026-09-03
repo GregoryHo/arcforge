@@ -1,8 +1,8 @@
 # Deferred from the `check:product` review rounds
 
 Process record from the review of the product-method alignment PR — the round that
-built `scripts/check-product.js` and its falsifiability suite. Two things came out
-of it that were deliberately **not** landed, and both would otherwise have survived
+built `scripts/check-product.js` and its falsifiability suite. Three things came out
+of it that were deliberately **not** landed, and each would otherwise have survived
 only in a review thread. They are written down here so the next person hardening the
 linter starts from the constraints rather than rediscovering them.
 
@@ -108,3 +108,28 @@ PR lands the change owns that sentence and the decision entry that covers captur
 depth — either its text says the three fields share one lifetime, or it carries a
 `Residual:` recording that a pre-opt-out record keeps its prose. Delete this section
 once that lands.
+
+## 3. `docs/guide/eval-system.md` — the verdict table has no `PASS` row
+
+Not this PR's to fix, and deliberately so. The PR rewrote `product/specs/eval.md`'s
+verdict vocabulary — the spec now enumerates `PASS` as the A/B token a
+`non-regression` scenario gets, and distinguishes it from the preflight `PASS` of
+B-3. The guide's own "read the verdict" table predates that rewrite and still lists
+only the four delta-CI tokens (`IMPROVED`, `REGRESSED`, `INCONCLUSIVE`,
+`INSUFFICIENT_DATA`); the prose under it describes the non-regression policy without
+naming the token it produces.
+
+Both surfaces are now *accurate* — the prose was corrected in the same round the
+spec was — so this is a completeness gap, not a mismatch. It stayed out because the
+spec's `## Scope` delegates authoring practice to that guide, and widening a
+user-facing table is a call about what the guide teaches rather than a correction the
+review turned up.
+
+The row, if someone lands it, goes after `INSUFFICIENT_DATA`:
+
+```
+| `PASS` | Every treatment trial that produced a score passed — the verdict a `non-regression` scenario gets instead of a delta |
+```
+
+The paragraph below the table then names `PASS` where it currently says "it passes",
+so the table and the prose introduce the token together.
