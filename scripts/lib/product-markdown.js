@@ -10,7 +10,7 @@
  * `.claude/rules/coding-standards.md` (`docs/plans/check-product-deferred.md`
  * §4 records the split and why it waited).
  *
- * These four know nothing about product state — no roadmap row, no `D-id`, no
+ * These primitives know nothing about product state — no roadmap row, no `D-id`, no
  * spec header reaches them — so the fence rule has one implementation and each
  * rule that needs it keeps saying what it is about.
  *
@@ -34,7 +34,9 @@ const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
 // open — an indented `## Appendix` left the Decision Log running into it, and the
 // appendix's `### D-NNN` headings became entries C2 numbered and C5 resolved. At
 // four spaces the line is an indented code block, which is content, not a
-// heading, and closes nothing.
+// heading, and closes nothing. Exported because `specStatusHeader` in
+// `product-lint.js` ends a spec's preamble at this same boundary, and two copies
+// of the bound are two things to widen.
 const SECTION_END_RE = /^ {0,3}##\s+/;
 
 /**
@@ -178,4 +180,4 @@ function stripCodeSpans(text) {
   return text.replace(/(`+)[^\n]*?\1/g, '');
 }
 
-module.exports = { section, unfenced, stripCodeSpans };
+module.exports = { SECTION_END_RE, section, unfenced, stripCodeSpans };

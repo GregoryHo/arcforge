@@ -102,7 +102,7 @@
  * its caller hands it, and a violation is an error string rather than a throw.
  */
 
-const { section, unfenced } = require('./product-markdown');
+const { SECTION_END_RE, section, unfenced } = require('./product-markdown');
 const { parseRoadmapRows, HERE_MARKER, ROW_STATUSES } = require('./product-roadmap');
 
 // The `Tag` cell an unshipped row carries.
@@ -483,19 +483,20 @@ function checkRoadmapTags(rows, errors) {
  * The boundary spans ` {0,3}`, not column 1, because CommonMark still renders a
  * `##` carrying one to three leading spaces as a heading: read at column 1 the
  * preamble ran past such a heading, and a body blockquote below it stood in for
- * a header the spec does not have. That is the same bound `DECISION_ANY_RE` takes
- * and the same one `SECTION_END_RE` takes, for the same reason — every boundary a
- * heading *ends* fails open when it is read at column 1. The one column-1
- * *boundary* read left is the heading that *opens* a section, which fails closed
- * and has C6 behind it — the field and entry forms (`STATUS_FIELD_RE`,
- * `DECISION_HEADING_RE`'s canonical form, `SPEC_STATUS_HEADER_RE`) are anchored
- * there for a different reason, which is that column 1 is where the form puts
- * them. Four spaces is an indented code block, so an illustrative `##` in
- * the preamble still does not cut it short.
+ * a header the spec does not have. The preamble therefore ends at the shared
+ * `SECTION_END_RE`, the same boundary that ends a section, at the bound
+ * `DECISION_ANY_RE` also takes and for the same reason — every boundary a heading
+ * *ends* fails open when it is read at column 1. The one column-1 *boundary* read
+ * left is the heading that *opens* a section, which fails closed and has C6 behind
+ * it — the field and entry forms (`STATUS_FIELD_RE`, `DECISION_HEADING_RE`'s
+ * canonical form, `SPEC_STATUS_HEADER_RE`) are anchored there for a different
+ * reason, which is that column 1 is where the form puts them. Four spaces is an
+ * indented code block, so an illustrative `##` in the preamble still does not cut
+ * it short.
  */
 function specStatusHeader(content) {
   for (const line of unfenced(content.split('\n'))) {
-    if (/^ {0,3}##\s+/.test(line)) break;
+    if (SECTION_END_RE.test(line)) break;
     const m = line.match(SPEC_STATUS_HEADER_RE);
     if (!m) continue;
     return m[1]
