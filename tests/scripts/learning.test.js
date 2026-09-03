@@ -1155,6 +1155,72 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('approved');
     });
 
+    // A name Layer 7 can never write to disk is as non-transient as an artifact
+    // type it cannot render, and it strands the candidate the same way: approve
+    // is legal, materialize then refuses `path_policy_rejected` forever, and the
+    // matrix allows an `approved` candidate neither materialize nor dismiss.
+    // Layer 5 admits such a name — its schema checks presence, type and length,
+    // and nothing about path policy — so `accept` decides it up front too.
+    it('refuses a name the draft writer cannot use, without approving it', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/name is not one the draft writer can use/);
+      expect(error).toMatch(/nothing was applied/);
+
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+    });
+
+    // The refusal is built from the raw queue name's verdict, never from the
+    // name. Interpolating the value back in would put a field the card redacts
+    // and truncates onto stdout unsanitized. Scoped to `accept`: the engine's
+    // own `path_policy_rejected` detail does name it, and `learn materialize`
+    // renders that audited refusal deliberately.
+    it('never prints the name it refused', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).not.toContain('some/path/traversal');
+      expect(result.stderr).not.toContain('some/path/traversal');
+    });
+
+    // Nothing the CLI offers renames a candidate, so declining it is the only
+    // way out — and the advertised next step has to run. `dismiss` is legal from
+    // `pending_review`, which is exactly where refusing up front leaves it.
+    it('names a recovery that actually runs', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+
+      const { error } = JSON.parse(runCli(['accept', CANDIDATE_ID, '--project', '--json']).stdout);
+      expect(error).toMatch(new RegExp(`arcforge learn reject ${CANDIDATE_ID} --project`));
+
+      expect(runCli(['reject', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('dismissed');
+    });
+
+    // The other half of what the policy calls blank: `sanitizeFilename` rejects
+    // a whitespace-only name as well as an empty one, and the schema admits both.
+    it('refuses a blank name the same way', () => {
+      seed(makeRecord({ name: '   ' }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/name is not one the draft writer can use/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+    });
+
     it('warns on stderr before activating, so the safety ack it sends is true', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);

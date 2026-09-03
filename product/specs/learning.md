@@ -83,9 +83,11 @@ was recorded about them.
   rather than re-decides, so it too is audited; every single-step command
   renders that refusal rather than pre-empting it. `accept`, the one compound
   command, is the exception that proves the rule: it would approve before
-  meeting the refusal, and the queue is append-only, so it decides the
-  narrowing itself and refuses before its first move — nothing applied,
-  nothing recorded, the candidate untouched. Hand-editing state files is the
+  meeting the refusal, and the queue is append-only, so it decides for itself
+  the two things that no re-run clears — the artifact type, and whether the
+  candidate's name is one the draft writer can use as a filename — and refuses
+  before its first move: nothing applied, nothing recorded, the candidate
+  untouched. Hand-editing state files is the
   one path with no checks and no record; the product treats it as out of
   contract. A draft is the exception that is still owed a report, because
   reviewing one is what the product asks of the user: no surface names a draft

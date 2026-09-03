@@ -41,6 +41,40 @@ function isMaterializableType(artifactType) {
   return FIRST_SLICE_SUPPORTED_TYPES.includes(artifactType);
 }
 
+/**
+ * The name policy of L7-12, in words a reviewer can act on.
+ *
+ * Exported for the same reason the type list is: the front end that has to
+ * explain a refusal reads this rather than keeping a second description of a
+ * rule it does not own. "Blank" covers both halves of what `sanitizeFilename`
+ * rejects at the top — an empty string and a whitespace-only one.
+ */
+const NAME_POLICY_SUMMARY =
+  'a draft filename may not be blank, and may not contain a path separator, ".." or a control ' +
+  'character';
+
+/**
+ * Whether L7-12 would accept this name as a draft filename.
+ *
+ * Exported so a front end that must refuse BEFORE it dispatches — the CLI's
+ * `accept`, which approves first and would strand the candidate on a refusal it
+ * could never clear — asks this module instead of keeping a second copy of the
+ * policy. `materialize()` below still calls `sanitizeFilename` directly, so the
+ * enforced branch and this predicate share one implementation of the rule and
+ * differ only in what they do with the answer.
+ *
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isMaterializableName(name) {
+  try {
+    sanitizeFilename(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // candidate_record_hash — stable hash over semantic fields
 // Fields chosen to be stable: changing any of these means a new materialization.
@@ -583,6 +617,8 @@ module.exports = {
   defaultRenderPolicy,
   FIRST_SLICE_SUPPORTED_TYPES,
   isMaterializableType,
+  isMaterializableName,
+  NAME_POLICY_SUMMARY,
   staleDraftArtifacts,
   draftArtifactsIntact,
 };
