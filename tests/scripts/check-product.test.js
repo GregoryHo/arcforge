@@ -11,7 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { validateProduct } = require('../../scripts/check-product');
+const { validateProduct } = require('../../scripts/lib/product-lint');
 
 const PRODUCT_DIR = path.join(__dirname, '..', '..', 'product');
 
