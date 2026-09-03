@@ -117,24 +117,29 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 14 synthetic roadmaps, old grader against new:
+Validated offline against 14 synthetic roadmaps. Each row's `old` and `new` are
+the graders on either side of the correction that added the row, and the
+`graders` column names which pair — the two corrections have different
+predecessors. Version 5 re-ran all fourteen under its own pair and only the
+three negated rows moved: under `V4→V5` the three reversed rows read
+`A3 FAIL | A3 FAIL`, already rejected by Version 4.
 
-| case | old | new |
-|---|---|---|
-| `Supersedes: D-005` field + `Status: Superseded by D-008` | 4/4 | 4/4 |
-| `Supersedes D-005` inside the `Decision:` line | 4/4 | 4/4 |
-| heading annotated `(superseded by D-008)` — the trial-7 spelling | 4/4 | 4/4 |
-| back-pointer `Status: Superseded — see D-008` | 4/4 | 4/4 |
-| reversed pair: `Superseded by D-005` + `D-005 supersedes D-008` | 4/4 | **A3 FAIL** |
-| back-pointer reversed only | 4/4 | **A3 FAIL** |
-| appended entry reversed only | 4/4 | **A3 FAIL** |
-| bare id, no supersede word | A3 FAIL | A3 FAIL |
-| prose citation only ("the two reasons D-005 gave") | A3 FAIL | A3 FAIL |
-| D-005 rewritten in place | A1, A3 FAIL | A1, A3 FAIL |
-| D-005 dropped, survivors renumbered | A1, A2, A3 FAIL | A1, A2, A3 FAIL |
-| negated pair: `D-008 does not supersede D-005` + `was not superseded by D-008` | 4/4 | **A3 FAIL** |
-| back-pointer negated only | 4/4 | **A3 FAIL** |
-| appended entry negated only | 4/4 | **A3 FAIL** |
+| case | graders | old | new |
+|---|---|---|---|
+| `Supersedes: D-005` field + `Status: Superseded by D-008` | V3→V4 | 4/4 | 4/4 |
+| `Supersedes D-005` inside the `Decision:` line | V3→V4 | 4/4 | 4/4 |
+| heading annotated `(superseded by D-008)` — the trial-7 spelling | V3→V4 | 4/4 | 4/4 |
+| back-pointer `Status: Superseded — see D-008` | V3→V4 | 4/4 | 4/4 |
+| reversed pair: `Superseded by D-005` + `D-005 supersedes D-008` | V3→V4 | 4/4 | **A3 FAIL** |
+| back-pointer reversed only | V3→V4 | 4/4 | **A3 FAIL** |
+| appended entry reversed only | V3→V4 | 4/4 | **A3 FAIL** |
+| bare id, no supersede word | V3→V4 | A3 FAIL | A3 FAIL |
+| prose citation only ("the two reasons D-005 gave") | V3→V4 | A3 FAIL | A3 FAIL |
+| D-005 rewritten in place | V3→V4 | A1, A3 FAIL | A1, A3 FAIL |
+| D-005 dropped, survivors renumbered | V3→V4 | A1, A2, A3 FAIL | A1, A2, A3 FAIL |
+| negated pair: `D-008 does not supersede D-005` + `was not superseded by D-008` | V4→V5 | 4/4 | **A3 FAIL** |
+| back-pointer negated only | V4→V5 | 4/4 | **A3 FAIL** |
+| appended entry negated only | V4→V5 | 4/4 | **A3 FAIL** |
 
 No trials were spent, and the recorded pools are not re-scored: `evals/results/`
 is gitignored and only the transcripts survive. What those transcripts do
