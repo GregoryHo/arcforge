@@ -842,7 +842,9 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.next_actions).toEqual([
         'materialize or activate it again, or leave it retired',
       ]);
-      // The recovery the prose names is the one the engine actually runs.
+      // The recovery the prose names is the one the engine actually runs. This
+      // writes a fresh, non-stale manifest, so it goes last — assert against
+      // the deleted draft above this line, never below it.
       expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
     });
 
