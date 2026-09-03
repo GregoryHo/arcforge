@@ -111,6 +111,6 @@ the same test — can someone extend this area from the spec alone?
 
 The fourth file is short and says only what a newcomer cannot infer: which files
 exist, the status vocabulary, and the playbooks for capturing a wish, promoting
-one, recording a decision, superseding a decision, and shipping. Those playbooks
-are steps 2–6 of this skill — write them in the project's own words rather than
-copying a toolkit's.
+one, building with the spec in sync, recording and reversing a decision, and
+shipping. Those playbooks are steps 2–6 of this skill — write them in the
+project's own words rather than copying a toolkit's.
