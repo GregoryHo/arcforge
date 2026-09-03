@@ -98,6 +98,11 @@ The decision-log ids that pin this area's choices, each with the one-line reason
 it is cited here.
 ```
 
+The three statuses in that header line are the ones a spec written from this
+template moves through. The fourth is the extension case — an already-shipped spec
+that a newly promoted version extends — and it is the compound form in
+`references/conventions.md`, set on the existing file rather than on a fresh one.
+
 Make the spec as long as the area needs and no longer. A two-screen feature gets
 a two-screen spec; padding it into ceremony and amputating it into a stub fail
 the same test — can someone extend this area from the spec alone?
