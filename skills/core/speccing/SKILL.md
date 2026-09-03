@@ -77,9 +77,9 @@ item, and the divergence is resolved in the same PR:
 |---|---|
 | A behavior turned out wrong or impossible | Its `B-n` is rewritten, plus a decision saying why |
 | A behavior was added along the way | A new `B-n`, plus a decision saying why it was added now |
-| Scope was cut | The item moves to out-of-scope, or back to the backlog as a wish |
+| Scope was cut | The item moves to out-of-scope, or back to the backlog as a wish, plus a decision saying why it was cut |
 
-Both of those decisions are appended as a `D-NNN`; the spec's **Decisions**
+Each of those decisions is appended as a `D-NNN`; the spec's **Decisions**
 section carries that id and the one-line reason it is cited — a `B-n` never
 stands alone there.
 
