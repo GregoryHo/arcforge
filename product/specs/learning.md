@@ -61,17 +61,22 @@ was recorded about them.
   accepted — retiring an instinct is its own explicit deactivation.
 
 ### Integrity
-- **B-5 Transitions go through the engine, and are audited.** Curator-proposed
-  candidates live in one canonical queue and the dashboard is their surface: it
-  offers only the transitions legal from a candidate's current state, and every
-  action — accepted or rejected — lands in an audit log with its reason. The
-  CLI's candidate commands are a second, project-scoped path over the project's
-  own queue, not a front-end onto the canonical one; `--global` is refused for
-  all of them — reads included — rather than reading or writing the canonical
-  queue behind the curator's back. Hand-editing state
-  files is the one path with no checks and no record; the product treats it as
-  out of contract. The on-disk formats are append-only or atomically
-  overwritten, owned by the engine per the curator schema (cited above).
+- **B-5 One queue, one gate, one audit trail.** Every candidate lives in one
+  canonical queue, and both surfaces onto it — the dashboard and the CLI's
+  `learn` candidate commands — are front ends over that one store. Neither
+  keeps its own state machine: both offer only the transitions legal from a
+  candidate's current state, both require the same explicit acknowledgement
+  before anything that changes future behavior, and every action either takes —
+  accepted or refused — lands in the same audit log with its reason and with
+  who asked for it. What the CLI adds is scriptability, not a second store. It
+  works the project-scoped candidates in that queue and refuses `--global`:
+  a candidate that would apply to every project on the machine is reviewed
+  where the reviewer can see what it changes. Its reach is what the engine can
+  actually build — the instinct artifact — and it says so rather than offering
+  a step with nothing behind it. Hand-editing state files is the one path with
+  no checks and no record; the product treats it as out of contract. The
+  on-disk formats are append-only or atomically overwritten, owned by the
+  engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
   Its ceiling depends on source: a rule the user stated outright can climb
@@ -101,16 +106,17 @@ was recorded about them.
   directories are auto-approved rather than prompted, because a detached run
   has nobody to answer a prompt. What it no longer carries is the blanket
   bypass of every check. State
-  follows its scope: home-global
-  state under
-  `~/.arcforge/`, project-scoped state under the project's own
-  `.arcforge/learning/`, and materialized artifacts in the project tree itself,
-  as drafts the user reviews and commits. Commands print the absolute path
-  of anything they write. The candidate commands are project-scope
-  only — reads as well as transitions. A `--global` read would have printed
-  the canonical queue's records as they sit on disk, project id and proposal
-  body included; a global transition would have flipped behavior-changing
-  state. Both are refused by the engine.
+  follows its scope: the candidate queue, the audit log, the drafts
+  materialization writes and the activated instincts are all home-global under
+  `~/.arcforge/`, and the project's own `.arcforge/learning/` holds that
+  scope's opt-in. Nothing in the review loop writes into the user's repository,
+  so a half-finished review never turns up in their `git status`. Commands
+  print the absolute path of anything they write. The candidate commands are
+  project-scope only — reads as well as transitions — and what they print is
+  the same allowlisted view the dashboard serves: never the hashed project id,
+  never a raw proposal body. A `--global` read would have printed the canonical
+  queue's records as they sit on disk; a global transition would have flipped
+  behavior-changing state for every project at once. Both are refused.
 
 ## Data / domain model
 
@@ -150,3 +156,5 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   under the opt-in ([hooks](hooks.md) B-6).
 - **D-011** — the CLI's candidate read commands fail closed on `--global`
   (B-5, B-9).
+- **D-012** — the `learn` candidate commands are a front end onto the canonical
+  queue; the project-scoped queue is gone (B-5, B-9).
