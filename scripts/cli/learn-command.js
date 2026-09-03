@@ -254,6 +254,15 @@ function describeStaleDrafts(stale) {
  * not there to review. Layered over `nextActionsFor` at the call site, exactly
  * as `unsupportedTypeActions` is: `nextActionsFor` is pure, and this answer
  * comes off disk.
+ *
+ * `materialized` is the only status this may replace, for the same reason
+ * `STATUSES_NAMING_A_BUILD` exists: it is the only one whose prose names the
+ * draft, so it is the only one a stale draft contradicts. Every other status's
+ * prose is true whatever became of the recorded draft, and printing this
+ * instead would replace it with something false — a `deactivated` candidate
+ * can still be materialized afresh (the matrix allows it, and `accept` does
+ * exactly that), and an `activated` one is already live, its draft only ever
+ * read and never removed by activation.
  */
 function staleDraftActions(stale) {
   return [
@@ -450,10 +459,14 @@ function runInspect({ scope }, candidateId) {
   const card = findProjectCard(candidateId);
   const materialization = latestMaterializationFor(card.candidate_id);
   const stale = staleDraftsIn(materialization);
+  // The staleness fact is reported for every status — it is a fact about disk,
+  // not about the lifecycle — but it only overrides the prose of the one
+  // status that names the draft. See `staleDraftActions`.
+  const overrideProse = stale.length > 0 && card.lifecycle_status === 'materialized';
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
-    next_actions: stale.length > 0 ? staleDraftActions(stale) : nextActionsFor(card),
+    next_actions: overrideProse ? staleDraftActions(stale) : nextActionsFor(card),
     draft_paths: draftPathsIn(materialization),
     draft_paths_stale: stale,
   };

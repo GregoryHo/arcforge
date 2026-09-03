@@ -798,6 +798,49 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.next_actions[0]).toContain(draftPath);
       expect(detail.next_actions[0]).toMatch(/is missing/);
     });
+
+    // The override above answers `materialized`, whose prose names the draft.
+    // It must not reach a status whose prose names something else: the recorded
+    // draft is irrelevant there, and "there is nothing to activate" would be
+    // false. A `deactivated` candidate is the sharp case — the matrix lets it
+    // materialize afresh, and `accept` does exactly that.
+    it('keeps the deactivated prose when the retired draft is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.rmSync(draftPath);
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions).toEqual([
+        'materialize or activate it again, or leave it retired',
+      ]);
+      // The recovery the prose names is the one the engine actually runs.
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+    });
+
+    // Activation reads the draft and never removes it, so a user who tidies the
+    // drafts directory afterwards is looking at an instinct that is already
+    // live — not at something with "nothing to activate".
+    it('keeps the activated prose when the read draft is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftPath);
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('activated');
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions).toEqual([
+        'already active — retire it by deactivating it from the dashboard',
+      ]);
+    });
   });
 
   // -------------------------------------------------------------------------
