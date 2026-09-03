@@ -164,6 +164,19 @@ describe('learning subsystem MVP-1', () => {
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
     });
 
+    // Accepted cost, pinned: disabling the scope that carries the earliest
+    // opt-in advances the floor even though any-scope authorization never
+    // lapsed. A scope's `updated_at` records its latest transition, so the
+    // disable overwrites the enable it replaced (D-009 Residual).
+    it('advances to the surviving scope when the earliest-enabled scope is disabled', () => {
+      const MIDDLE = '2026-03-01T00:00:00.000Z';
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: MIDDLE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+      setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(MIDDLE));
+    });
+
     it('ignores a disabled scope, however recently it was written', () => {
       setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
       setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });

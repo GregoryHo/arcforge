@@ -138,11 +138,14 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
  * a real failure. When both scopes are enabled the EARLIEST wins — that is the
  * moment enrichment first became authorized.
  *
- * Accepted cost: disabling and re-enabling moves the floor forward, so drafts
- * left stale before the toggle stop being reported. A missed warning is the
- * cheaper failure than a permanent one about intended behavior. Since an
- * idempotent re-run preserves the stamp, that toggle is the only way the floor
- * moves — and it is a real consent boundary, which a repeated enable is not.
+ * Accepted cost: a disable moves the floor forward, so drafts left stale
+ * before it stop being reported. That includes the overlapping case — global
+ * on at T1, project on at T2, global off at T3 — where any-scope authorization
+ * never lapsed yet the floor becomes T2: a scope's `updated_at` records its
+ * latest transition, so the disable overwrites the enable it replaced and T1 is
+ * not recoverable from state. A missed warning is the cheaper failure than a
+ * permanent one about intended behavior, and an idempotent re-enable preserves
+ * the stamp, so only a real consent toggle moves the floor.
  *
  * @param {Object} [opts]
  * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
