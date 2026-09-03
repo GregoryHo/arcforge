@@ -29,6 +29,18 @@ function isMaterializableType(artifactType) {
   return supportedArtifactTypes().includes(artifactType);
 }
 
+// The draft writer's other deterministic prerequisite: L7-12 refuses a name it
+// cannot use as a filename. Read from the same module for the same reason as
+// the type list — the rule belongs to Layer 7, and a second copy here would
+// drift from the branch that enforces it.
+function isMaterializableName(name) {
+  return require('../lib/learning-curator/materialize').isMaterializableName(name);
+}
+
+function namePolicySummary() {
+  return require('../lib/learning-curator/materialize').NAME_POLICY_SUMMARY;
+}
+
 // `reject` is the CLI's long-standing name for the matrix's `dismiss`.
 const ACTION_FOR_VERB = {
   approve: 'approve',
@@ -281,6 +293,35 @@ function acceptRefusalMessage(card) {
 }
 
 /**
+ * The refusal `accept` prints instead of dispatching, when the draft writer
+ * cannot use the candidate's name as a filename.
+ *
+ * Like its sibling above it does not claim the candidate is otherwise ready —
+ * a `dismissed` or `activated` candidate has a nearer obstacle — and for the
+ * same reason the recovery it names is conditional: `dismiss` is legal only
+ * from `pending_review` and `needs_more_evidence`, so a candidate the matrix
+ * would refuse to dismiss is sent to the dashboard rather than at a command
+ * that would refuse in turn. Unlike its sibling it offers no "approve it on its
+ * own" either: approving is exactly the move that would strand it, since an
+ * `approved` candidate can be neither materialized (the name is refused) nor
+ * dismissed.
+ *
+ * It deliberately never echoes the name. The card redacts and truncates that
+ * field for a reason, and the raw queue value — which is what was checked — is
+ * the one string here that has never been through the sanitizer.
+ */
+function acceptNameRefusalMessage(card) {
+  const recovery = card.available_actions.includes('dismiss')
+    ? `the way out is to decline it: arcforge learn reject ${card.candidate_id} --project`
+    : 'review it in: arcforge learn dashboard';
+  return (
+    `arcforge learn accept refused, and nothing was applied — no approval, no draft, ` +
+    `${card.candidate_id} is unchanged. Its name is not one the draft writer can use: ` +
+    `${namePolicySummary()}. Nothing the CLI offers renames a candidate, so ${recovery}`
+  );
+}
+
+/**
  * The refusal `accept` prints instead of re-reporting a draft that is not there.
  *
  * An already-`materialized` candidate is `accept`'s no-op: it dispatches
@@ -319,11 +360,13 @@ module.exports = {
   ACTION_FOR_VERB,
   STATUS_RANK,
   isMaterializableType,
+  isMaterializableName,
   staleDraftActions,
   inspectCommandFor,
   nextCommandFor,
   nextActionsFor,
   refusalMessage,
   acceptRefusalMessage,
+  acceptNameRefusalMessage,
   staleDraftAcceptMessage,
 };

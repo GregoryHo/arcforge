@@ -78,6 +78,7 @@ let buildDraftContent;
 let getDraftRoot;
 let defaultRenderPolicy;
 let staleDraftArtifacts;
+let isMaterializableName;
 
 beforeEach(() => {
   jest.resetModules();
@@ -90,6 +91,7 @@ beforeEach(() => {
     getDraftRoot,
     defaultRenderPolicy,
     staleDraftArtifacts,
+    isMaterializableName,
   } = require('../../scripts/lib/learning-curator/materialize'));
 });
 
@@ -831,6 +833,29 @@ describe('L7-12: path policy — reject path traversal in name', () => {
     const result = callMaterialize({ name: 'some/path/traversal' });
     expect(result.ok).toBe(false);
     expect(result.failure.reason).toBe('path_policy_rejected');
+  });
+
+  // `isMaterializableName` is exported so a front end that must refuse before it
+  // dispatches — the CLI's `accept` — asks Layer 7 instead of keeping a second
+  // copy of this rule. That front end never reaches the branch below, so a drift
+  // between the predicate and the branch would stay invisible until a candidate
+  // stranded. This is the assertion that keeps them together.
+  it('the exported predicate agrees with the branch that enforces the policy', () => {
+    const names = [
+      'use-edit-bash-workflow',
+      'a name with spaces',
+      'some/path/traversal',
+      'back\\slash',
+      '../../../etc/passwd',
+      '',
+      '   ',
+      'null\u0000byte',
+    ];
+
+    for (const name of names) {
+      const rejected = callMaterialize({ name }).failure?.reason === 'path_policy_rejected';
+      expect({ name, allowed: isMaterializableName(name) }).toEqual({ name, allowed: !rejected });
+    }
   });
 });
 

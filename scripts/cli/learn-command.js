@@ -24,6 +24,7 @@ const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 const {
   readProjectCards,
+  findProjectCandidate,
   findProjectCard,
   latestMaterializationFor,
   draftPathsIn,
@@ -35,12 +36,14 @@ const {
   ACTION_FOR_VERB,
   STATUS_RANK,
   isMaterializableType,
+  isMaterializableName,
   staleDraftActions,
   inspectCommandFor,
   nextCommandFor,
   nextActionsFor,
   refusalMessage,
   acceptRefusalMessage,
+  acceptNameRefusalMessage,
   staleDraftAcceptMessage,
 } = require('./learn-candidate-prose');
 
@@ -200,29 +203,42 @@ function runDrafts({ scope }) {
  * Approve (when still pending) and materialize in one step — never activates.
  *
  * `accept` is the CLI's one compound command, and that is why it — alone —
- * decides the artifact-type narrowing itself instead of rendering the curator's
- * refusal. The queue is an append-only event log, so the approve is not rolled
- * back when the materialize is refused. For a transient refusal that is fine:
- * the candidate stays `approved`, which the matrix allows to materialize, so
- * re-running is the recovery. The artifact-type narrowing is not transient — no
- * re-run clears it — and the matrix allows an `approved` candidate neither to
- * materialize nor to dismiss, so half-landing strands it in a status with no
- * way out. Refusing before the first dispatch is the only outcome that keeps
- * the command all-or-nothing.
+ * decides the draft writer's deterministic prerequisites itself instead of
+ * rendering the curator's refusal. The queue is an append-only event log, so
+ * the approve is not rolled back when the materialize is refused. For a
+ * transient refusal that is fine: the candidate stays `approved`, which the
+ * matrix allows to materialize, so re-running is the recovery. Neither
+ * prerequisite checked below is transient — no re-run clears an artifact type
+ * the curator cannot render, and none clears a name it cannot write to disk —
+ * and the matrix allows an `approved` candidate neither to materialize nor to
+ * dismiss, so half-landing strands it in a status with no way out. Refusing
+ * before the first dispatch is the only outcome that keeps the command
+ * all-or-nothing.
  *
- * The guard is on the command, not on the dispatch count: `accept` refuses an
- * unbuildable type from every status, including the ones where it would have
- * dispatched materialize alone. One rule for one command name beats a refusal
- * that depends on where the candidate happened to be. `approve`, `materialize`
- * and `activate` are single transitions and keep rendering the curator's own
- * audited refusal — do not add a pre-check to them.
+ * Those two are the whole list. Of Layer 7's other pre-write checks,
+ * `invalid_lifecycle_status` is already carried by `expected_current_status`;
+ * `unsafe_content` cannot fire on a queued record, because `appendCandidate` is
+ * the single ingestion gate and it redacts the body before storing it, with an
+ * idempotent redactor; and a lock timeout or a write error is transient, which
+ * is the class re-running already answers.
+ *
+ * The guard is on the command, not on the dispatch count: `accept` refuses from
+ * every status, including the ones where it would have dispatched materialize
+ * alone. One rule for one command name beats a refusal that depends on where
+ * the candidate happened to be. `approve`, `materialize` and `activate` are
+ * single transitions and keep rendering the curator's own audited refusal — do
+ * not add a pre-check to them.
  *
  * The second dispatch carries `expected_current_status` so a concurrent writer
  * is caught rather than overwritten.
  */
 function runAccept({ scope }, candidateId) {
-  const card = findProjectCard(candidateId);
+  // The record as well as the card: the name policy is enforced against the
+  // stored `name`, and the card's is redacted and truncated. See
+  // `findProjectCandidate`.
+  const { record, card } = findProjectCandidate(candidateId);
   if (!isMaterializableType(card.artifact_type)) throw new Error(acceptRefusalMessage(card));
+  if (!isMaterializableName(record.name)) throw new Error(acceptNameRefusalMessage(card));
   if (card.lifecycle_status === 'materialized') {
     // The no-op branch dispatches nothing and reports the draft the candidate
     // already has. Reporting a path that is not there — or one whose file has

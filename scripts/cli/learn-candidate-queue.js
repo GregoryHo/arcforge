@@ -51,13 +51,17 @@ function currentProjectName() {
  * the alternative is showing it from every project — and the dashboard serves
  * the whole queue, so it stays the escape hatch.
  */
-function readProjectCards() {
+function readProjectCandidates() {
   const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
-  const { sanitizeDashboardCard } = require('../lib/learning-dashboard');
   const project = currentProjectName();
-  return Object.values(readCurrentCandidates())
-    .filter((record) => record.scope?.kind === 'project' && record.scope.project === project)
-    .map(sanitizeDashboardCard);
+  return Object.values(readCurrentCandidates()).filter(
+    (record) => record.scope?.kind === 'project' && record.scope.project === project,
+  );
+}
+
+function readProjectCards() {
+  const { sanitizeDashboardCard } = require('../lib/learning-dashboard');
+  return readProjectCandidates().map(sanitizeDashboardCard);
 }
 
 /**
@@ -84,10 +88,29 @@ function missingCandidateError(candidateId) {
   return new Error(`${base} — run: arcforge learn inbox --project`);
 }
 
+/**
+ * One candidate, as both the queue record and the card the CLI prints.
+ *
+ * Almost every surface wants only the card — the sanitized wire model is what
+ * may be printed. The exception is a check the engine will run against the
+ * stored record itself: `sanitizeDashboardCard` redacts `name` and truncates it
+ * to 120 characters, so a precheck reading `card.name` would be judging a
+ * different string than the engine judges, and a name whose offending character
+ * sat inside a redacted span would pass here and be refused there. Those checks
+ * read `record`; everything printed still comes from `card`.
+ *
+ * Both come out of one queue pass, so a caller that needs both does not read
+ * the store twice.
+ */
+function findProjectCandidate(candidateId) {
+  const { sanitizeDashboardCard } = require('../lib/learning-dashboard');
+  const record = readProjectCandidates().find((r) => r.candidate_id === candidateId);
+  if (!record) throw missingCandidateError(candidateId);
+  return { record, card: sanitizeDashboardCard(record) };
+}
+
 function findProjectCard(candidateId) {
-  const card = readProjectCards().find((c) => c.candidate_id === candidateId);
-  if (!card) throw missingCandidateError(candidateId);
-  return card;
+  return findProjectCandidate(candidateId).card;
 }
 
 /**
@@ -159,6 +182,7 @@ function draftPathsFor(candidateId) {
 
 module.exports = {
   readProjectCards,
+  findProjectCandidate,
   findProjectCard,
   latestMaterializationFor,
   draftPathsIn,
