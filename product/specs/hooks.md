@@ -88,10 +88,10 @@ unconditionally and B-6 bounds. Its path and its safe read/write belong to
 `scripts/lib/utils.js`; the fields are assembled by the three hooks that write it —
 `hooks/session-tracker/start.js` opens the record, `hooks/session-tracker/end.js`
 closes it with the counts and, above the diary threshold, with the summary
-`scripts/lib/transcript.js` parses out of the harness transcript (below it, the
-transcript-derived fields are cleared rather than filled), and
-`hooks/pre-compact/main.js` appends each compaction. The diary is not a hooks
-format but learning's ([learning](learning.md)); what this area owns is its
+`scripts/lib/transcript.js` parses out of the harness transcript (below it,
+`filesModified` is cleared and the other transcript-derived fields are simply not
+written), and `hooks/pre-compact/main.js` appends each compaction. The diary is
+not a hooks format but learning's ([learning](learning.md)); what this area owns is its
 trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`
 coordinates for both Stop and PreCompact. Everything else a hook handles — tool
 names, paths, prompts arriving in an event — is untrusted input with no persistence
