@@ -137,6 +137,11 @@ entry carry two clause-scoped flips from different decisions, or a partial flip
 alongside the later total one that finished it off — and what rejects the
 self-contradicting `Accepted · Superseded-by: D-MMM`.
 
+An entry carries exactly one `- Status:` line, and a second one is reported as
+malformed (C3). The flip in step 2 of *Change a decision* **replaces** the existing
+line rather than being appended below it — two `Status:` lines are the same
+contradiction spelled with a newline instead of a `·`.
+
 The two forms are exclusive *per pair*, though: one decision either replaces another
 whole or reverses one of its clauses, never both, so `Superseded-by: D-MMM · partially
 superseded by D-MMM` is rejected however many `Supersedes:` lines D-MMM carries. What

@@ -36,8 +36,14 @@
  *         rejected too. A superseded entry's whole `Status:` is then read clause
  *         by clause against the closed vocabulary, so a totally superseded entry
  *         is no longer `Accepted`, no entry dies twice, and no decision both
- *         replaces an entry whole and reverses one of its clauses. `Refines:` and
- *         `Extends:` require no flip;
+ *         replaces an entry whole and reverses one of its clauses. An entry
+ *         carries exactly one `Status:` line, so a second one is reported rather
+ *         than silently overwriting the first — otherwise the same
+ *         self-contradiction is rejected `·`-separated and accepted
+ *         newline-separated. Both existing exemptions already cover it and need
+ *         no new code: a fenced illustration never reaches the field scan, and
+ *         `STATUS_FIELD_RE` is anchored at column 1, so an indented illustration
+ *         stays unread. `Refines:` and `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
@@ -206,7 +212,18 @@ function parseDecisions(roadmap, errors) {
       continue;
     }
     const status = line.match(STATUS_FIELD_RE);
-    if (status) current.status = status[1];
+    if (status) {
+      // Last-wins on purpose. First-wins would report the duplicate *and* claim
+      // the flip is missing on an entry that carries it one line down, which
+      // invites a third `Status:` line; last-wins keeps the appended flip a
+      // single-error mutant.
+      if (current.status !== null) {
+        errors.push(
+          `C3 ${current.id}: a second "- Status:" line ("${line.trim()}") — an entry carries exactly one, so a flip appended beside the line it replaces is reported rather than silently winning`,
+        );
+      }
+      current.status = status[1];
+    }
     if (RELATION_ANY_RE.test(line)) {
       const rel = line.match(RELATION_FIELD_RE);
       if (!rel) {

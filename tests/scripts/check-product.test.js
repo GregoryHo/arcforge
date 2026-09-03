@@ -276,6 +276,28 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/a decision dies once/);
     });
 
+    it('rejects a flip appended beside the status line it should replace', () => {
+      // Two `Status:` lines are the same self-contradiction as
+      // `Accepted · Superseded-by: D-002`, spelled with a newline instead of a
+      // `·`. Without this the last one silently wins and every clause goes green.
+      const decisions = [
+        decision({ id: 'D-001', extra: ['- Status: Accepted'], status: 'Superseded-by: D-002' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
+    it('rejects a duplicate status on an entry nothing supersedes', () => {
+      // The rule is structural, not victim-scoped: counting fields needs no
+      // vocabulary, so it fires on an entry no `Supersedes:` names.
+      const decisions = [decision({ id: 'D-001', extra: ['- Status: Proposed'] })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
     it('reports an incoherent status once, not once per superseding entry', () => {
       const decisions = [
         decision({ id: 'D-001', status: 'Accepted · Superseded-by: D-002' }),
