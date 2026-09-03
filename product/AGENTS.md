@@ -181,6 +181,15 @@ of the log, so an entry may show a worked example — a wrong form, or a whole
 illustrative `### D-NNN` — the way the few-shot below does, without the example
 being checked as if it were real.
 
+A block starts and ends where CommonMark says it does. Three or more backticks or
+tildes open one, info string and all — ` ```markdown `, as the few-shots here are
+written. Only a line of the same marker, at least as long as the opening run and
+carrying nothing but whitespace after it, closes one. Two consequences worth knowing
+before writing an example: a fence line with text after its backticks closes nothing,
+and an example that itself shows a fenced block needs a longer outer fence — four
+backticks around three — or the inner one ends the outer block and the illustration
+below it is read as product state.
+
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
 relation bullet and a roadmap row all sit in column 1; indented four spaces or more,
 none is read, so an illustration can be shown as an indented block rather than a

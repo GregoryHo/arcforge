@@ -18,9 +18,57 @@
  * returns strings or arrays.
  */
 
-// Opening or closing marker of a fenced code block, capturing which marker it is
-// so a `~~~` inside a ``` block cannot close it.
-const FENCE_RE = /^\s*(```|~~~)/;
+// A fence delimiter, per CommonMark: a run of three or more backticks or tildes
+// indented at most three spaces, plus whatever follows it on the line. The run
+// and the trailing text are both captured because a *closing* fence is
+// constrained in ways an opening one is not — see `fenceTracker`. The indent
+// bound matches the one the linter's heading and relation probes use: at four
+// spaces the line is an indented code block rather than a delimiter.
+const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
+
+/**
+ * A per-scan fence-state machine: call the returned predicate with each line in
+ * order and it answers whether that line is fenced — either a delimiter itself
+ * or content inside a block. Both readers below drop exactly those lines, so
+ * this is the single place the fence rule lives.
+ *
+ * A delimiter of three or more backticks or tildes **opens** a block, info
+ * string and all (` ```markdown ` is how every example in `product/AGENTS.md`
+ * opens one). It **closes** only on a line whose run is the same character, at
+ * least as long as the opening run, and carries nothing but whitespace after it
+ * — the two constraints CommonMark puts on a closing fence and nothing else
+ * does.
+ *
+ * Both were needed, in opposite directions. Read marker-only, a ` ```not-a-close `
+ * line ended the block early and the illustrative table row below it became a
+ * roadmap row — a row no renderer shows, standing in for a table that is not
+ * there. And a four-backtick block wrapping a three-backtick one — the ordinary
+ * way to document a fenced example, which is what `product/AGENTS.md` teaches —
+ * was closed by its own inner fence, so the worked example's body was read live
+ * and its deliberately wrong `### D-009` became a Decision Log entry.
+ *
+ * A fence-shaped line that is neither is block content: `~~~` inside a backtick
+ * block does not close it, and a run shorter than the opening one does not
+ * either. Failure stays closed — an unclosed fence swallows the rest of its
+ * scope, which C6 rejects for `ROADMAP.md`'s two sections.
+ *
+ * Call it once per scan. The state is the block a scan is inside, so a tracker
+ * shared between scans would carry one document's open fence into the next.
+ */
+function fenceTracker() {
+  let open = null;
+  return function fenced(line) {
+    const m = line.match(FENCE_RE);
+    if (!m) return open !== null;
+    const [, run, info] = m;
+    if (open === null) {
+      open = { char: run[0], length: run.length };
+    } else if (run[0] === open.char && run.length >= open.length && info.trim() === '') {
+      open = null;
+    }
+    return true;
+  };
+}
 
 /**
  * The lines between a `##` heading and the next one, or `[]` when it is absent.
@@ -40,16 +88,10 @@ const FENCE_RE = /^\s*(```|~~~)/;
  */
 function section(md, heading) {
   const lines = md.split('\n');
-  let fenceMarker = null;
+  const fenced = fenceTracker();
   let start = -1;
   for (let i = 0; i < lines.length; i++) {
-    const fence = lines[i].match(FENCE_RE);
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[1];
-      else if (fence[1] === fenceMarker) fenceMarker = null;
-      continue;
-    }
-    if (fenceMarker) continue;
+    if (fenced(lines[i])) continue;
     if (start === -1) {
       if (heading.test(lines[i])) start = i;
       continue;
@@ -68,22 +110,13 @@ function section(md, heading) {
  * as a malformed relation line, so the log could not document its own rules the
  * way `product/AGENTS.md` does — and, in the other direction, a fenced sample
  * table row would count as a roadmap row and a fenced `- **D-007**` as a spec's
- * citation. One implementation keeps `FENCE_RE`'s marker matching (a `~~~`
- * cannot close a ``` block) as the single fence rule.
+ * citation. Both readers drive `fenceTracker()`, so where a block starts and
+ * ends has one answer for the whole linter — each gets its own tracker, because
+ * each is a scan of its own.
  */
 function unfenced(lines) {
-  const out = [];
-  let fenceMarker = null;
-  for (const line of lines) {
-    const fence = line.match(FENCE_RE);
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[1];
-      else if (fence[1] === fenceMarker) fenceMarker = null;
-      continue;
-    }
-    if (!fenceMarker) out.push(line);
-  }
-  return out;
+  const fenced = fenceTracker();
+  return lines.filter((line) => !fenced(line));
 }
 
 /**
@@ -99,7 +132,7 @@ function unfenced(lines) {
  * still reads as `← we are here` inside a span. The `Spec` cell is the one cell
  * whose content must be a link, so it is the one place a span changes the answer.
  *
- * The closing run must match the opening one, the way `FENCE_RE`'s marker does,
+ * The closing run must match the opening one, the way a fence's does,
  * so a doubled span is not closed by a single backtick inside it. Unbalanced
  * backticks open no span in CommonMark either, and are left alone.
  */

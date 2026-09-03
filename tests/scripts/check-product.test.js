@@ -1209,4 +1209,62 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/a building row must carry "—"/);
     });
   });
+  describe('where a fenced block starts and ends', () => {
+    // The fence exemption every rule rests on. A block opens on a run of three
+    // or more backticks or tildes; it closes only on a line whose run is the
+    // same character, at least as long, and carries nothing after it. Read
+    // marker-only, both halves of that leaked — in opposite directions.
+    const LIVE_ROW = row({ version: '9.9.9', status: 'building', specs: ['beta'] });
+
+    it('does not let a fence line carrying an info string close a block', () => {
+      // Read marker-only this line closed the block, so the row below it became
+      // a roadmap row — one every renderer keeps inside the code block, standing
+      // in for a table that is not there.
+      const note = ['', '```markdown', ...TABLE_HEADER, '```not-a-close', LIVE_ROW, '```'];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+
+    it('does not let an inner three-backtick block close a four-backtick one', () => {
+      // The ordinary way to document a fenced example, which is the shape
+      // `product/AGENTS.md` itself teaches by. Read marker-only the inner fence
+      // closed the outer block and the illustration below became a real entry.
+      const extra = [
+        '````markdown',
+        '```markdown',
+        '### D-009 — an illustration, deliberately wrong',
+        '- Supersedes : D-001',
+        '- Status: banana',
+        '```',
+        '````',
+      ];
+      const decisions = [decision({ id: 'D-001', extra })];
+      expect(validateProduct({ roadmap: roadmap({ decisions }), specs: [spec()] })).toEqual([]);
+    });
+
+    it('lets a longer fence close a shorter block', () => {
+      // The other side of the length rule: `>=`, not `===`. Were this not a
+      // close, the block would swallow `## Decision Log` and C6 would fire.
+      const note = ['', '```markdown', LIVE_ROW, '````'];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+
+    it('does not let a `~~~` line close a backtick block', () => {
+      const note = ['', '```markdown', '~~~', LIVE_ROW, '~~~', '```'];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+
+    it('does not read a four-space-indented fence as a delimiter', () => {
+      // At four spaces the line is block content, not a close — read `\\s*`, it
+      // ended the block and freed the row below it.
+      const note = ['', '```markdown', '    ```', LIVE_ROW, '```'];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+
+    it('still reads a fence indented one to three spaces as a delimiter', () => {
+      // The bound is ` {0,3}`, not column 1: this block opens, so the row is an
+      // illustration rather than product state.
+      const note = ['', '   ```markdown', LIVE_ROW, '   ```'];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+  });
 });
