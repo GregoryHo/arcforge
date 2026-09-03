@@ -212,6 +212,10 @@ never renumbered):
 - Decision: <the choice, one committed sentence>
 - Why: <the rationale — enough that a future reader understands the tradeoff>
 ```
+The `### D-NNN` heading starts in column 1. An indented one still renders as a
+heading, so `check:product` reports it (C2) rather than leaving the entry silently
+out of the log.
+
 Add any of the optional fields from *Conventions* that carry real information, then
 cite the `D-NNN` from the relevant spec's **Decisions** section. The citation carries
 the same zero-padded `D-NNN` shape as the entry, and a spec may only cite a `D-id`

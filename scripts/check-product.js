@@ -19,7 +19,10 @@
  * Validates:
  *   - C1  exactly one roadmap row carries the `← we are here` marker;
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
- *         folded `<details>` index, unique, and gap-free from D-001;
+ *         folded `<details>` index, unique, and gap-free from D-001 — the
+ *         heading is read at column 1, and one indented far enough to still
+ *         render as a heading (one to three spaces) is reported rather than
+ *         dropped, so a visible entry cannot sit outside the checks;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists — a relation-shaped bullet that misses
  *         the canonical form is reported as malformed rather than dropped, and
@@ -59,8 +62,14 @@ const NO_TAG = '—';
 // Opening or closing marker of a fenced code block, capturing which marker it is
 // so a `~~~` inside a ``` block cannot close it.
 const FENCE_RE = /^\s*(```|~~~)/;
+// CommonMark lets an ATX heading carry up to three leading spaces; at four it is
+// an indented code block, where `### D-NNN` is not a heading at all and must stay
+// unread. So the candidate detector spans ` {0,3}`, not `\s*`, while the canonical
+// form stays anchored at column 1 — the indent probe is what turns a heading the
+// reader can see into a report instead of a silent drop.
 const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
-const DECISION_ANY_RE = /^###\s+D-/;
+const DECISION_ANY_RE = /^ {0,3}###\s+D-/;
+const DECISION_INDENT_RE = /^ {1,3}###/;
 const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
 const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
@@ -174,7 +183,9 @@ function parseDecisions(roadmap, errors) {
       const m = line.match(DECISION_HEADING_RE);
       if (!m) {
         errors.push(
-          `C2 malformed Decision Log heading: "${line.trim()}" (expected "### D-NNN — <title>")`,
+          DECISION_INDENT_RE.test(line)
+            ? `C2 indented Decision Log heading: "${line.trim()}" (a heading must start in column 1)`
+            : `C2 malformed Decision Log heading: "${line.trim()}" (expected "### D-NNN — <title>")`,
         );
         current = null;
         continue;

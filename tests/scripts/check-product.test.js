@@ -174,6 +174,25 @@ describe('check-product', () => {
       ];
       expect(run({ roadmap: { decisions } })).toEqual([]);
     });
+
+    it('reports an indented decision heading instead of skipping it', () => {
+      // Last on purpose: a skipped trailing entry is the one position the gap
+      // check cannot cover for, because nothing follows it to expose the hole.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        ['   ### D-002 — an indented entry', '- Status: Accepted', ''].join('\n'),
+      ];
+      const errors = of('C2', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/indented Decision Log heading/);
+    });
+
+    it('does not read a decision heading inside an indented code block', () => {
+      // Four spaces is an indented code block, not a heading — the widened
+      // detector stops at three so an illustration stays out of the log.
+      const decisions = [decision({ id: 'D-001' }), '    ### D-009 — an illustration\n'];
+      expect(run({ roadmap: { decisions } })).toEqual([]);
+    });
   });
 
   describe('C3 — a supersession carries its flip', () => {
