@@ -155,6 +155,11 @@ identically and a dropped line is a reversal that quietly left the checked histo
 label spelled differently enough (`Superseds:`) is not recognized at all, so the
 canonical spelling is the one that gets checked.
 
+Fenced code blocks are exempt from all of that: their contents are not read as part
+of the log, so an entry may show a worked example — a wrong form, or a whole
+illustrative `### D-NNN` — the way the few-shot below does, without the example
+being checked as if it were real.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

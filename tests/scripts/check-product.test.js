@@ -164,6 +164,16 @@ describe('check-product', () => {
       const fold = [decision({ id: 'D-002', status: 'Superseded-by: D-003' })];
       expect(of('C2', run({ roadmap: { decisions, fold } }))).toEqual([]);
     });
+
+    it('does not read a decision heading inside a fenced code block', () => {
+      // The illustration would otherwise enter the log as D-009 and open a
+      // D-002…D-008 gap, so an example entry could never be shown in the log.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        ['```markdown', '### D-009 — an illustration', '- Status: banana', '```', ''].join('\n'),
+      ];
+      expect(run({ roadmap: { decisions } })).toEqual([]);
+    });
   });
 
   describe('C3 — a supersession carries its flip', () => {
@@ -517,6 +527,17 @@ describe('check-product', () => {
       const decisions = [
         decision({ id: 'D-001' }),
         decision({ id: 'D-002', extra: ['- Superseds: D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('does not read a relation line inside a fenced code block', () => {
+      // A decision may show a worked example of the rules it is subject to, the
+      // way `product/AGENTS.md` does. The illustration is not a relation line,
+      // so a deliberately wrong form inside a fence must not hard-fail C3.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['```markdown', '- Supersedes : D-001', '```'] }),
       ];
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
     });

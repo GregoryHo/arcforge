@@ -56,6 +56,9 @@ const HERE_MARKER = '← we are here';
 const ROW_STATUSES = new Set(['next', 'building', 'shipped']);
 const NO_TAG = '—';
 
+// Opening or closing marker of a fenced code block, capturing which marker it is
+// so a `~~~` inside a ``` block cannot close it.
+const FENCE_RE = /^\s*(```|~~~)/;
 const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
 const DECISION_ANY_RE = /^###\s+D-/;
 const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
@@ -149,8 +152,21 @@ function parseRoadmapRows(roadmap, errors) {
 function parseDecisions(roadmap, errors) {
   const entries = [];
   let inFold = false;
+  let fenceMarker = null;
   let current = null;
   for (const line of roadmap.split('\n')) {
+    // A fenced block is an illustration, not part of the log. Without this a
+    // worked example showing a deliberately wrong `- Supersedes : D-001` would
+    // hard-fail C3 as a malformed relation line, so the log could not document
+    // its own rules the way `product/AGENTS.md` does.
+    const fence = line.match(FENCE_RE);
+    if (fence) {
+      if (!fenceMarker) fenceMarker = fence[1];
+      else if (fence[1] === fenceMarker) fenceMarker = null;
+      continue;
+    }
+    if (fenceMarker) continue;
+
     if (/^\s*<details\b/i.test(line)) inFold = true;
     if (/^\s*<\/details>/i.test(line)) inFold = false;
 
