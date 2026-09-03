@@ -22,15 +22,16 @@ const {
   readStdinSync,
   parseStdinJson,
   setSessionIdFromInput,
-  loadSession,
-  saveSession,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const {
   runDiaryCapture,
+  readCounts,
   getSuggesterStatePath,
   pruneUngatedProse,
+  applyTranscriptToSession,
 } = require('../../scripts/lib/diary-capture');
+const { shouldTrigger } = require('../../scripts/lib/thresholds');
 
 /**
  * Reset the compact-suggester state on every compaction.
@@ -50,18 +51,33 @@ function resetSuggesterState() {
 }
 
 /**
- * Update session file with compaction marker
+ * Update the session file with the compaction marker and, above the diary
+ * threshold, with the live metrics the draft is rendered from.
+ *
+ * Ordering is the point. The draft generator re-reads this file in a subprocess,
+ * so anything the draft must show has to land here BEFORE runDiaryCapture runs.
+ * Stamping afterwards is what produced a draft reporting the counts of whatever
+ * the record last held — 0 messages / 0 tool calls on a record no Stop had
+ * closed yet — while the record itself was corrected a moment later.
  *
  * @param {string} project
  * @param {string} date
  * @param {string} timestamp
  * @param {string} sessionId
- * @param {string} [projectRoot] - Project root whose learning opt-in governs
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose learning opt-in governs
  *   whether carried user prose may survive this rewrite. Omitted means no
  *   consent, so the prose is pruned.
+ * @param {number} [opts.userCount] - Live user-message count; stamped together
+ *   with toolCount and passed as a pair. Omitted (below the threshold, where no
+ *   draft is rendered) leaves the record's counts alone.
+ * @param {number} [opts.toolCount] - Live tool-call count, the pair of userCount.
+ * @param {string} [opts.transcriptPath] - Harness transcript to parse for the
+ *   tool names and touched paths of this compaction.
  * @returns {boolean}
  */
-function updateSessionFile(project, date, timestamp, sessionId, projectRoot) {
+function updateSessionFile(project, date, timestamp, sessionId, opts = {}) {
+  const { projectRoot, userCount, toolCount, transcriptPath } = opts;
   const sessionFile = path.join(getSessionDir(project, date), `${sessionId}.json`);
 
   const content = readFileSafe(sessionFile);
@@ -70,8 +86,21 @@ function updateSessionFile(project, date, timestamp, sessionId, projectRoot) {
   try {
     const session = JSON.parse(content);
     // The compaction marker rewrites the whole record, so the same opt-in that
-    // governs capture governs what survives here (D-010).
-    pruneUngatedProse(session, { projectRoot });
+    // governs capture governs what survives here (D-010) — and, when the
+    // metrics below are stamped, whether this compaction may write prose at all.
+    const learningOn = pruneUngatedProse(session, { projectRoot });
+
+    // Counts and paths are continuity and are stamped either way; verbatim
+    // prose only under the opt-in. A transcript the harness did not hand us (or
+    // one that parses to nothing) leaves the record's existing paths alone —
+    // blanking paths an earlier Stop wrote would make the draft worse, not
+    // fresher.
+    if (typeof userCount === 'number') {
+      session.userMessages = userCount;
+      session.toolCalls = toolCount;
+      applyTranscriptToSession(session, transcriptPath, { learningOn });
+    }
+
     session.compactions = session.compactions || [];
     session.compactions.push(timestamp);
     session.lastCompaction = timestamp;
@@ -106,8 +135,19 @@ function main() {
 
     const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-    // Update session file with compaction marker
-    updateSessionFile(project, date, timestamp, sessionId, projectRoot);
+    // One counter read serves the stamp, the notification and the log line.
+    const { userCount, toolCount } = readCounts();
+
+    // Above the threshold this compaction is about to render a draft, so the
+    // record it renders from is refreshed first. Below it there is no draft, so
+    // the transcript is not parsed at all — the compaction path keeps the same
+    // "don't parse what nothing reads" discipline the Stop hook does.
+    const metrics = shouldTrigger(userCount, toolCount)
+      ? { userCount, toolCount, transcriptPath: input?.transcript_path }
+      : undefined;
+
+    // Update session file with compaction marker (+ metrics, above threshold)
+    updateSessionFile(project, date, timestamp, sessionId, { projectRoot, ...metrics });
 
     // Reset the compact-suggester state on EVERY compaction (unconditional,
     // independent of the diary threshold) so suggestions don't survive the
@@ -118,7 +158,7 @@ function main() {
     // → counter reset. Enricher fires on PreCompact too (dual-path ON).
     // projectRoot is passed explicitly: runDiaryCapture reads the learning
     // opt-in from it, and the compaction cwd is not a reliable stand-in.
-    const { triggered, userCount, toolCount } = runDiaryCapture({
+    const { triggered } = runDiaryCapture({
       project,
       date,
       sessionId,
@@ -126,14 +166,6 @@ function main() {
     });
 
     if (triggered) {
-      // Stamp the current counts onto the session file.
-      const session = loadSession();
-      if (session) {
-        session.userMessages = userCount;
-        session.toolCalls = toolCount;
-        saveSession(session);
-      }
-
       // Queue notification for next SessionStart (PreCompact stdout doesn't render systemMessage)
       addPendingAction(project, 'diary-ready', {
         trigger: 'compaction',

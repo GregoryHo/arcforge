@@ -130,14 +130,20 @@ unconditionally and B-6 bounds. Its path and its safe read/write belong to
 `hooks/session-tracker/start.js` opens the record, `hooks/session-tracker/end.js`
 closes it with the counts and, above the diary threshold, with the summary
 `scripts/lib/transcript.js` parses out of the harness transcript (with no parsed
-transcript — below the threshold, or above it with none to read — `filesModified`
-is cleared while `toolsUsed` is neither written nor cleared, so a record an earlier
-parse filled keeps that turn's tool list until a later parse refreshes it;
+transcript — below the threshold, or above it with none to read — a Stop clears
+`filesModified` while `toolsUsed` is neither written nor cleared, so a record an
+earlier parse filled keeps that turn's tool list until a later parse refreshes it;
 `userMessageContent` follows a different lifetime, because the opt-in governs how
 long it may stay and not only whether it is written — every Stop, and every
 compaction that stamps the record, removes it whenever learning is off, so prose
 captured under the opt-in does not outlive it), and
-`hooks/pre-compact/main.js` appends each compaction. The diary is
+`hooks/pre-compact/main.js` appends each compaction and, above that same
+threshold, stamps the compaction's own counts and parsed summary *before* the
+draft is generated — the draft is rendered from the record, so a compaction that
+reaches the threshold before any Stop has closed it would otherwise report the
+previous turn's numbers and none of the paths it touched. A compaction stamps
+only what it can read: with no parsed transcript it leaves the record's paths as
+an earlier Stop wrote them rather than clearing them. The diary is
 not a hooks format but learning's ([learning](learning.md)); what this area owns is its
 trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`
 coordinates for both Stop and PreCompact. Everything else a hook handles — tool
