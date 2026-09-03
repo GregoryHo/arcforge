@@ -1218,6 +1218,45 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(materializationDirs()).toHaveLength(1);
     });
 
+    // Two manifests, one reusable: `materialize()` reuses A (candidate hash +
+    // render policy + intact drafts) while B is merely the newest on disk. A
+    // caller that re-derives the paths after the dispatch uses the newest-first
+    // lookup instead, and pairs A's `materialization_id` with B's path — a
+    // success exit naming a file that is not there.
+    it('pairs the accepted draft paths with the manifest it materialized', () => {
+      seed(makeRecord());
+      const first = runJson(['accept', CANDIDATE_ID, '--project']);
+      const draftA = first.draft_paths[0];
+      const bodyA = fs.readFileSync(draftA, 'utf8');
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      // Hand-edit A so the reuse lookup skips it: this accept writes manifest B.
+      fs.writeFileSync(draftA, 'hand-edited draft body\n', 'utf8');
+      const second = runJson(['accept', CANDIDATE_ID, '--project']);
+      const draftB = second.draft_paths[0];
+      expect(draftB).not.toBe(draftA);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      // Restore A byte-for-byte and lose B's draft. Now the reusable manifest
+      // is A and the newest manifest on disk is B.
+      fs.writeFileSync(draftA, bodyA, 'utf8');
+      fs.rmSync(draftB);
+
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+
+      // Pin that the two manifests are distinct, or the pairing assertion below
+      // passes vacuously.
+      expect(materializationDirs()).toHaveLength(2);
+      expect(accepted.materialization_id).toBeTruthy();
+      expect(accepted.draft_paths[0]).toContain(accepted.materialization_id);
+      expect(accepted.draft_paths[0]).toBe(draftA);
+      // `existsSync` alone is not the guard: it passes in the divergent state
+      // whenever the newest manifest happens to be intact.
+      expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+    });
+
     // What the next two pin: the `materialized` short-circuit dispatches nothing
     // and reports the draft the candidate already has, so when that draft is
     // gone or edited the only thing it can get wrong is the report — and a path
