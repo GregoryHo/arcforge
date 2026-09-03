@@ -79,8 +79,9 @@ was recorded about them.
   prints — and refuses `--global`: a candidate that would apply to every
   project on the machine is reviewed where the reviewer can see what it
   changes. Its reach is what the engine can
-  actually build — the instinct artifact — and it says so rather than offering
-  a step with nothing behind it. Hand-editing state files is the one path with
+  actually build — the instinct artifact. That narrowing is the curator's own
+  refusal, which the CLI renders rather than re-decides, so it too is audited;
+  the CLI says so up front rather than offering a step with nothing behind it. Hand-editing state files is the one path with
   no checks and no record; the product treats it as out of contract. The
   on-disk formats are append-only or atomically overwritten, owned by the
   engine per the curator schema (cited above).
@@ -144,11 +145,9 @@ queue record carrying it — including the `project` / `global` scope kind — i
 owned by `scripts/lib/learning-curator/schema.js` and appended only by
 `scripts/lib/learning-curator/queue-writer.js`. The instinct file, the diary path,
 and the operation record are the three formats pinned by
-`scripts/lib/learning-schemas.js`. The second, project-scoped CLI queue of B-5
-carries its own narrower vocabularies in `scripts/lib/learning.js` —
-`VALID_SCOPES`, and a `VALID_STATUSES` whose first state is `pending`, not
-`pending_review`; that divergence is why it is not a front end onto the canonical
-queue.
+`scripts/lib/learning-schemas.js`. There is no second candidate vocabulary:
+`scripts/lib/learning.js` retains only the opt-in config and its `VALID_SCOPES`,
+so the statuses above are the ones both the dashboard and the CLI speak (D-012).
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).

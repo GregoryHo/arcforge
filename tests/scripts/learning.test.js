@@ -475,6 +475,17 @@ describe('learn candidate commands over the canonical queue', () => {
     return JSON.parse(result.stdout);
   }
 
+  /** The one audit log both front ends append to, newest last. */
+  function auditEntries() {
+    const logPath = path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl');
+    if (!fs.existsSync(logPath)) return [];
+    return fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+
   /**
    * Retire an activated candidate. `deactivate` is a dashboard-only action —
    * the CLI has no verb for it — so drive the canonical handler in a child
@@ -835,6 +846,67 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(result.status).not.toBe(0);
       expect(JSON.parse(result.stdout).error).toMatch(
         /supports instinct candidates only.*is a skill candidate/s,
+      );
+      // B-5: the narrowing is the curator's refusal, so it lands in the shared
+      // audit log with its reason like every other one. A CLI-side pre-check
+      // would print the same sentence and record nothing.
+      expect(auditEntries()).toHaveLength(2);
+      expect(auditEntries()[1]).toMatchObject({
+        accepted: false,
+        action: 'materialize',
+        reason: 'artifact_type_mismatch',
+        candidate_id: CANDIDATE_ID,
+        actor: { layer: 6, actor_type: 'cli', reviewer: 'local_user' },
+      });
+    });
+
+    // `activate` on a candidate the curator cannot build is illegal from every
+    // status, because nothing ever materializes it — so the refusal is the
+    // matrix's, and the bare matrix answer would name a `materialize` that
+    // refuses in turn. Both facts print; both come off an audited refusal.
+    it('names the narrowing alongside the matrix when asked to activate another type', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/is approved.*allows: materialize/s);
+      expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
+      expect(auditEntries()[1]).toMatchObject({
+        accepted: false,
+        action: 'activate',
+        reason: 'policy_violation',
+        actor: { actor_type: 'cli' },
+      });
+    });
+
+    // `accept` used to refuse a non-instinct candidate before dispatching
+    // anything. It now does what a dashboard reviewer clicking approve then
+    // materialize gets: the approve lands and is audited, the materialize is
+    // refused and audited. The queue is append-only, so the approve is not
+    // rolled back — and unlike a transient failure, re-running never clears
+    // this one, so the candidate stays approved in the queue.
+    it('audits both halves when accept meets the narrowing, and leaves it approved', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(
+        /supports instinct candidates only.*is a skill candidate/s,
+      );
+      expect(auditEntries().map((e) => [e.action, e.accepted])).toEqual([
+        ['approve', true],
+        ['materialize', false],
+      ]);
+      expect(auditEntries()[1].reason).toBe('artifact_type_mismatch');
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('approved');
+      // The drafts root itself is created by the curator's failure log; what
+      // must not exist is a draft for this candidate.
+      expect(fs.existsSync(path.join(arcforgeHome, 'learning', 'drafts', CANDIDATE_ID))).toBe(
+        false,
       );
     });
 
