@@ -98,7 +98,9 @@ rules, or tests.
 
 ## Skill Set and Routing
 
-- 15 self-contained skills, no name prefix (D7); `name` == directory name.
+- Self-contained skills, no name prefix (D7); `name` == directory name. The
+  shipped set is enumerated in `product/specs/skill-system.md` B-1 and pinned by
+  `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py`.
 - Invocation is **prose**: a skill fires because its description register
   matches the situation and the router maps that condition to it. There is no
   skill-type taxonomy (no Workflow / Discipline / Meta tiers) and no mandatory

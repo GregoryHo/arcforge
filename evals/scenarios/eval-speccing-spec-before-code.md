@@ -66,8 +66,9 @@ agent chose to write them is irrelevant.
 that takes the user's release from the docs fails all four. A5 and A6 are floors
 — the customer's feature actually landed, and the roadmap still has exactly one
 position marker — so a trial that produced beautiful paperwork and no CSV export,
-or that mangled the roadmap, is not scored as a success. Pass bar is 5 of 6, so
-the floors alone cannot re-form a ceiling.
+or that mangled the roadmap, is not scored as a success. `Grader: code` passes a
+trial only when every assertion scores 1.0, so the floors alone cannot re-form a
+ceiling: A1–A4 have to land as well.
 
 **Fixture hygiene.** No maintenance guide beside the four files, no instruction
 anywhere that the ledger moves with the code, and no earlier commit

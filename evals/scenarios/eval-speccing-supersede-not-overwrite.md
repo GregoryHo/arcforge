@@ -64,19 +64,27 @@ have measured spelling.
 
 *Version 2* moved the pressure into the prompt — drop the entries that no longer
 describe the product, renumber the survivors — and relaxed the status-line
-spelling. It was run at k=10 (`evals/results/eval-speccing-supersede-not-overwrite/20260902-171249/`;
-that run's treatment arm is void, every trial having returned a session-limit
-notice, and its `treatment.jsonl` is deleted — the baseline pool and its
-transcripts are kept as the evidence for this note). The baseline scored avg
-0.85, pass 50%, and **the failures were the instrument, not the behavior**:
+spelling. It was run at k=10
+(`evals/results/eval-speccing-supersede-not-overwrite/20260902-171249/`) and the
+run hit a session limit part way through: the whole treatment arm is void and its
+`treatment.jsonl` is deleted, and two baseline trials went with it. What was
+removed, and why, is recorded once — in `evals/skill-eval-coverage.md`, which
+owns the pool's provenance — and is not re-told here.
 
-- Trials 1, 4, 9, 10 failed A3 while doing the move correctly. They wrote
+Everything below is scoped to the **retained pool**: the 8 valid baseline trials
+in that directory's `baseline.jsonl`, **avg 0.906, pass 62.5%**. The arm-level
+avg 0.85 / pass 50% the run log printed counted the removed trials in its
+denominator, which the coverage rules forbid, so it is not a figure this note
+uses. On the retained pool, **the failures were the instrument, not the
+behavior**:
+
+- Trials 1 and 4 failed A3 while doing the move correctly. They wrote
   `supersedes D-005` inside the new entry's `Decision:` or `Status:` line;
   the grader demanded the literal field `Supersedes: D-005`.
 - Trial 7 failed A2 while doing the move correctly. It annotated the heading
   (`### D-005 — Upload storage backend (superseded by D-008)`); the grader
   compared headings for equality.
-- All ten refused the renumbering trap, in their own words: *"Renumbering would
+- All eight refused the renumbering trap, in their own words: *"Renumbering would
   break the spec's D-references and make 'D-005' mean different things in old
   commits versus the log, which is the exact confusion you want to avoid."*
 
@@ -88,9 +96,9 @@ instrument correction, not a third design. The `## Version` bump exists to keep
 the old-grader pool out of any future one, per the pooling rule in
 `evals/skill-eval-coverage.md`.
 
-**What that predicts, pre-registered.** Re-scoring the Version-2 baseline pool
-under the corrected grader flips trials 1, 4, 7 and 9 to 1.0 and leaves trial
-10's genuine A4 miss, i.e. **9/10**. Preflight is therefore expected to BLOCK on
+**What that predicts, pre-registered.** Re-scoring the retained Version-2
+baseline pool under the corrected grader flips trials 1, 4 and 7 to 1.0 and
+changes nothing else, i.e. **8/8**. Preflight is therefore expected to BLOCK on
 a baseline ceiling. That is the finding, not a failure of the fixture: **an agent
 that can see a decision log already knows the ADR discipline, and the skill
 teaches it nothing it was going to get wrong.** The scenario ships as corpus

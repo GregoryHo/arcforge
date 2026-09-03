@@ -35,10 +35,12 @@ situations to skills.
   `writing-skills`, `evaluating`, `learning`. A skill's `name` equals its
   directory name, carries no prefix, and is namespaced at install time —
   `/arcforge:<name>` on Claude Code, `arcforge:<name>` (no leading slash) on
-  Codex CLI ([codex-harness](codex-harness.md) B-2). The count is not restated
-  here — `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py` is the
-  one place it is pinned, so a number in this clause could only ever drift from
-  it.
+  Codex CLI ([codex-harness](codex-harness.md) B-2). This clause enumerates the
+  set rather than counting it: `EXPECTED_SKILL_COUNT` in
+  `tests/skills/test_skill_structure.py` is the only *mechanical* pin on the
+  number, and a second copy here could only drift from it. Prose counts
+  elsewhere (README, guides, website) are maintained surface the release
+  doc-audit re-checks.
 - **B-2 The router is an index, not a gate.** `using` holds one table mapping
   situations to skills. It exists for the moment the user is unsure which
   workflow fits; it points at one skill and gets out of the way. No workflow is
