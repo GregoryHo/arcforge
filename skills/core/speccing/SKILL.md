@@ -94,13 +94,18 @@ moment a reviewer can see both halves at once.
 
 ## 5. Supersede, never overwrite
 
-Reversing a recorded decision is **two edits, and neither is a rewrite**:
+Reversing a recorded decision is **two edits in the log, and neither is a
+rewrite**:
 
 1. **Append** a new entry with the next free id, carrying `Supersedes: D-NNN`
    and the reason the direction changed.
 2. **Flip one line** on the old entry: `Status: Accepted` becomes
    `Status: Superseded-by: D-MMM`. Its `Decision:` and `Why:` stay byte for byte
    as written.
+
+A spec whose **Decisions** section cited the retired id swaps it for `D-MMM`
+and the one-line reason it now governs. Left alone, the spec goes on pinning
+the area to the choice that was reversed.
 
 Ids are never renumbered and never reused, not even for an entry that turned out
 wrong. The log then reads top to bottom as *chose X → changed to Y → because Z*;
