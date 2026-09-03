@@ -734,7 +734,7 @@ function Platforms({
     name: 'Codex CLI',
     tag: 'SKILLS ONLY',
     cmd: ['codex plugin marketplace add GregoryHo/arcforge', 'codex plugin add arcforge@arcforge-dev'],
-    note: 'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'
+    note: 'All 15 skills load from the same tree \u2014 8 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 15 before you install.'
   }, {
     name: 'Node.js',
     tag: 'THAT IS ALL',
