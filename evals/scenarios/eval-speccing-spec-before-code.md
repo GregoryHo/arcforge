@@ -70,6 +70,30 @@ or that mangled the roadmap, is not scored as a success. `Grader: code` passes a
 trial only when every assertion scores 1.0, so the floors alone cannot re-form a
 ceiling: A1–A4 have to land as well.
 
+A3 reads the decision id numerically and requires it beyond `004`, so an entry
+re-using or undercutting a fixture id cannot satisfy it. What A3 does *not*
+check is that the id is the next *free* one: numbering hygiene — reuse,
+renumbering, supersede direction — is `eval-speccing-supersede-not-overwrite`'s
+claim, and widening A3 into it would change what this scenario measures. The
+predicate is also body-scoped: the `### D-NNN` heading line is consumed as the
+block delimiter, so the word must appear in the entry's own body, not its title.
+
+Validated offline against six synthetic roadmaps, run through the as-shipped
+grader with the pre-fix set-difference predicate and the numeric one:
+
+| case | old | new |
+|---|---|---|
+| `### D-005` entry naming CSV in its body | PASS | PASS |
+| `### D-006` naming CSV, `D-005` an unrelated entry | PASS | PASS |
+| `### D-000` naming CSV | PASS | **FAIL** |
+| second `### D-004` heading with a CSV body | FAIL | FAIL |
+| `### D-0005` / `### D-05` naming CSV | FAIL | FAIL |
+| no new entry | FAIL | FAIL |
+
+Enumerating ids `000`–`999` against both predicates gives a difference set of
+exactly `{"000"}`, which is why `## Version` stays 2: the two graders score the
+published k=10 pool identically, so there is no pool to keep apart.
+
 **Fixture hygiene.** No maintenance guide beside the four files, no instruction
 anywhere that the ledger moves with the code, and no earlier commit
 demonstrating it. The Version-1 pool showed the baseline knows the sequence
@@ -170,9 +194,13 @@ for line in road.split("\n"):
             current = None
         else:
             blocks[current].append(line)
-ORIGINAL_IDS = {"001", "002", "003", "004"}
+# "beyond D-004" read numerically, not as "not one of the four ids the fixture
+# wrote". The two readings differ on exactly one id, `D-000`, and the assertion
+# says beyond. `int()` is total here: heading_re captures `(\d{3})`, so every
+# key is three digits.
+LAST_FIXTURE_ID = 4
 a3 = any(
-    i not in ORIGINAL_IDS and "csv" in "\n".join(body).lower()
+    int(i) > LAST_FIXTURE_ID and "csv" in "\n".join(body).lower()
     for i, body in blocks.items()
 )
 emit("A3", a3, "no decision entry beyond D-004 records the CSV export")

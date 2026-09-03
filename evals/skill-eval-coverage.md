@@ -268,6 +268,13 @@ treatment 10/10 全為 1.00，同樣零變異——技能把「帳本與程式�
 成本旗標：output tokens 4438 → 9362（COST REGRESSION）。這是四個帳本檔案的實際
 編輯成本，非空轉；記錄在案，不視為阻斷。
 
+review round 1 把 A3 的 id 判準從「不屬於 fixture 寫下的四個 id」改為
+`int(i) > 4`，以符合該 assertion 自己的措辭「an id beyond D-004」。`## Version`
+維持 2：對 `000`–`999` 逐一比對，兩個判準的差集恰為 `{"000"}`，兩者對本 k=10 池
+評分完全相同（baseline 10/10 本就 A3 全滅，收緊不可能拉高；treatment 留存的
+transcript 一律以 `### D-005` 起頭），因此沒有需要分離的池。未重評任何 trial，
+未動用 trial 額度，+0.67 CI[0.67, 0.67] 不變。
+
 ### `supersede-not-overwrite`：baseline 天花板，儀器修正後確認
 
 Version 1（無結構壓力）與 Version 2（加入「精簡日誌、丟掉過期條目、重新編號補齊
