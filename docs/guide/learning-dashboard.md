@@ -213,7 +213,7 @@ arcforge learn activate <candidate-id> --project
 | `learn accept` | Approve and materialize in one step — never activates |
 | `learn materialize` | Write the draft without activating it |
 | `learn activate` | Promote the materialized draft to an active instinct |
-| `learn drafts` | What is materialized and waiting for activation, with draft paths — and which entries have no draft left to review, because the file is missing, has changed since it was written, or its record is gone |
+| `learn drafts` | What is materialized and waiting for activation, with draft paths — and which of those files is missing or has changed since it was written. An entry with no draft left to review points at `learn inspect` instead, which says what became of it |
 
 Three things follow from these being one queue rather than two.
 
@@ -252,11 +252,12 @@ On a candidate that is already materialized, `accept` has nothing left to do,
 so it re-reports the draft it already wrote — but only while there is a draft to
 re-report. If the file has been deleted or edited, or the record that named it
 is gone, `accept` refuses and says which, instead of handing back a path that
-does not resolve or an empty list; `learn drafts` and `learn inspect` mark it
-the same way, and neither offers you the activation that would refuse — a marked
-entry points at `learn inspect` instead. Read a draft, but do not edit it in place: activation
-checks the draft against the content hash recorded when it was written, so an
-edited draft is one that `learn activate` will refuse.
+does not resolve or an empty list. In that state neither `learn drafts` nor
+`learn inspect` offers you the activation that would refuse: the drafts entry
+points at `learn inspect`, and `learn inspect` says what became of the draft.
+Read a draft, but do not edit it in place: activation checks the draft against
+the content hash recorded when it was written, so an edited draft is one that
+`learn activate` will refuse.
 
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.
