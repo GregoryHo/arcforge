@@ -8,7 +8,8 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 
 | Version | Tag | Milestone | Status | What & why | Spec |
 |---|---|---|---|---|---|
-| 6.0.0 | `v6.0.0` | v6 toolkit | **shipped ← we are here** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
+| 6.0.0 | `v6.0.0` | v6 toolkit | **shipped** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
+| 6.1.0 | — | learning trust · spec-driven method · Codex packaging | **building ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -213,3 +214,56 @@ reverse one, append a superseding entry (see AGENTS.md).
   and stays a reading task.
 - Verification: `npm run check:product` red on a partial flip, green on a complete
   one; the negative fixtures in `tests/scripts/check-product.test.js` cover both.
+
+### D-009 — Diary enrichment is opt-in, and the enricher loses blanket permissions
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: The background diary-enrichment run fires only when learning is
+  enabled in some scope, and it no longer runs the host CLI with
+  `--dangerously-skip-permissions` — it carries `--tools Read,Write`,
+  `--add-dir <the draft's directory>` and `--permission-mode acceptEdits`. With
+  learning off the draft is still written from session counts and simply keeps
+  its unfilled sections; that stub is the documented contract, and the
+  stale-draft warning is suppressed in that state rather than complaining about
+  intended behavior forever.
+- Why: Learning's core asset is its trust design — off by default, nothing
+  uninvited. An enrichment run that fires regardless of the opt-in contradicted
+  that in the one place it mattered most: it is the product's single outbound
+  path, and it was seeded with a summary of the user's session. Skipping every
+  permission check on top made the blast radius of a prompt-injected draft the
+  whole machine. A spike against the real CLI established the narrowest argv
+  that still enriches, and both surviving flags are load-bearing: the draft
+  lives outside the spawning cwd, so without `--add-dir` the write is refused
+  outright, and a detached run has nobody to answer a permission prompt, so
+  without `acceptEdits` the write hangs and the draft is never filled in. A
+  per-file `--allowed-tools` allowlist was probed and deliberately left out: it
+  pre-approves rather than denies, so it authorized nothing on its own and
+  would have read like a confinement it does not provide. What the result is
+  NOT, stated so the record does not overclaim: no `cwd` is passed to the
+  spawn, so the child still inherits the hook's working directory — the user's
+  project — and `--add-dir` adds the draft's directory alongside it rather than
+  restricting the run to it. With `acceptEdits` that means edits are
+  auto-approved across both. This is a narrowing of the blanket bypass, not a
+  sandbox, and the specs and guides say so in those terms.
+
+### D-010 — Session capture depth: counts always, user prose only under the opt-in
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: The durable session record stays always-on, and so does its
+  metadata — duration, message and tool counts, compactions, tool names, and
+  modified file paths — along with the diary draft, which is built from those
+  counts alone. Verbatim user-message text (`userMessageContent`) is the one
+  field that moves behind the learning opt-in. The transcript is still parsed
+  unconditionally above the threshold, because the diary's modified-files line
+  depends on it.
+- Why: Continuity is not a learning feature and should not require opting into
+  learning; a record of how long a session ran and what it touched is
+  bookkeeping the user already sees. Storing what the user actually *said* is a
+  different act, and it is the one that would surprise someone who never turned
+  learning on. Splitting on that boundary keeps the always-on record useful
+  while making the depth of it match what the user agreed to. Gating the
+  transcript parse instead of the single assignment was rejected: it would have
+  silently emptied the diary's "Files modified" line for every learning-off
+  user.
