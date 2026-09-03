@@ -180,13 +180,53 @@ function draftPathsFor(candidateId) {
   return record.draft_artifacts.map((artifact) => artifact.draft_path).filter(Boolean);
 }
 
+/**
+ * The subset of a card's legal actions the CLI will actually carry out.
+ *
+ * `available_actions` comes straight from the Action × Status matrix, which is
+ * keyed on status alone and knows nothing about artifact types. The CLI's reach
+ * is narrower on two axes: it has verbs for four of the seven actions
+ * (`promote`, `evolve` and `deactivate` are dashboard-only), and
+ * `materialize`/`activate` run through the curator, which renders the instinct
+ * artifact and nothing else. Suggesting anything outside this intersection
+ * advertises a command `assertSupportedArtifactType` then refuses — and a
+ * non-instinct candidate is reachable, since the dashboard's `evolve` action
+ * writes a project-scoped `skill` record into the same canonical queue.
+ */
+function cliActionsFor(card) {
+  return card.available_actions.filter((action) => {
+    if (!Object.hasOwn(VERB_FOR_ACTION, action)) return false;
+    if (action !== 'materialize' && action !== 'activate') return true;
+    return card.artifact_type === SUPPORTED_ARTIFACT_TYPE;
+  });
+}
+
 function nextCommandFor(card) {
-  const action = NEXT_ACTION_PREFERENCE.find((a) => card.available_actions.includes(a));
+  const runnable = cliActionsFor(card);
+  const action = NEXT_ACTION_PREFERENCE.find((a) => runnable.includes(a));
   const verb = action ? VERB_FOR_ACTION[action] : 'inspect';
   return `arcforge learn ${verb} ${card.candidate_id} --project`;
 }
 
+/**
+ * The status prose in `NEXT_ACTIONS` assumes the candidate is one the curator
+ * can build. For any other artifact type `materialize` and `activate` are not
+ * steps at all, so the narrowing itself is what is worth printing — the same
+ * fact `assertSupportedArtifactType` states when one of them is typed.
+ */
+function unsupportedTypeActions(card) {
+  const verbs = cliActionsFor(card).map((action) => VERB_FOR_ACTION[action]);
+  const open =
+    verbs.length > 0 ? `${verbs.join(' or ')} it, or leave it queued` : 'leave it queued';
+  return [
+    `arcforge materializes ${SUPPORTED_ARTIFACT_TYPE} candidates only, so this ` +
+      `${card.artifact_type} candidate has no materialize or activate step`,
+    `${open} — the whole queue is reviewable in: arcforge learn dashboard`,
+  ];
+}
+
 function nextActionsFor(card) {
+  if (card.artifact_type !== SUPPORTED_ARTIFACT_TYPE) return unsupportedTypeActions(card);
   return NEXT_ACTIONS[card.lifecycle_status] || [];
 }
 
