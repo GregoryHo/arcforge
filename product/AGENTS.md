@@ -160,6 +160,12 @@ of the log, so an entry may show a worked example — a wrong form, or a whole
 illustrative `### D-NNN` — the way the few-shot below does, without the example
 being checked as if it were real.
 
+Indentation is the second exemption, and a narrower one. A `### D-NNN` heading and a
+relation bullet both sit in column 1; indented four spaces or more, neither is read,
+so an illustration can be shown as an indented block rather than a fenced one. One to
+three spaces is not an exemption — the line still renders as the heading or the field
+a reader would trust, so it is reported like any other near-miss.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

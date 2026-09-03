@@ -81,9 +81,10 @@ const RELATION_FIELD_RE =
 // near-miss (`- Supersedes : D-001`, `* refines: D-001`) is rejected, not
 // silently dropped. A misspelled label stays out of reach: matching on the value
 // instead would false-fire on the prose fields that legitimately cite a `D-id`.
-// The indent is bounded the way the heading probe above is, and for the same
-// reason: a bullet four spaces deep is an indented code block, so an illustration
-// written without a fence stays unread instead of raising a bogus C3.
+// The indent is bounded the way the heading probe above is: a relation field sits
+// at column 1, so a bullet four or more spaces deep is a nested or illustrative
+// line rather than a field, and stays unread instead of raising a bogus C3 —
+// whatever markdown makes of it.
 const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
