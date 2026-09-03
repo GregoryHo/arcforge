@@ -56,7 +56,10 @@
  *         the row ↔ spec links resolve in both directions — every row links at
  *         least one spec, every spec is linked from some row, and every link
  *         names a spec that exists, so a version cannot be promoted without the
- *         spec it is built from. The header is read in the preamble above the
+ *         spec it is built from. Those links are read outside code spans, the
+ *         way sections are read outside fences, so a link wrapped in backticks
+ *         is text a reader cannot follow rather than a link the row carries.
+ *         The header is read in the preamble above the
  *         spec's first `##`, fence-aware, so a worked example or a quoted header
  *         line further down is neither mistaken for the header nor allowed to
  *         displace it;
@@ -202,6 +205,27 @@ function unfenced(lines) {
   return out;
 }
 
+/**
+ * `text` with its code spans removed — the inline counterpart of the fence
+ * exemption `unfenced()` applies to blocks. A backtick span renders its contents
+ * as literal text, so `` `[alpha](specs/alpha.md)` `` shows a link rather than
+ * being one, and C4 must not record a spec as linked from a row a reader cannot
+ * navigate from.
+ *
+ * Only C4 needs it, and the discriminator is what a span does to the cell it
+ * sits in: it keeps the text and kills the link. The `Version` and `Tag` cells
+ * are text, so their backticks are decoration the parser strips, and C1's marker
+ * still reads as `← we are here` inside a span. The `Spec` cell is the one cell
+ * whose content must be a link, so it is the one place a span changes the answer.
+ *
+ * The closing run must match the opening one, the way `FENCE_RE`'s marker does,
+ * so a doubled span is not closed by a single backtick inside it. Unbalanced
+ * backticks open no span in CommonMark either, and are left alone.
+ */
+function stripCodeSpans(text) {
+  return text.replace(/(`+)[^\n]*?\1/g, '');
+}
+
 /** The lines between `## Roadmap` and the next `##` heading. */
 function roadmapSection(roadmap) {
   return section(roadmap, ROADMAP_HEADING_RE);
@@ -255,7 +279,7 @@ function parseRoadmapRows(roadmap, errors) {
       );
     }
     const tag = cells[1].replace(/`/g, '').trim();
-    const specs = [...cells[5].matchAll(SPEC_LINK_RE)].map((m) => m[1]);
+    const specs = [...stripCodeSpans(cells[5]).matchAll(SPEC_LINK_RE)].map((m) => m[1]);
     rows.push({ version, tag, status, here, specs });
   }
   return rows;

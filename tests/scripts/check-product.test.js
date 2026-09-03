@@ -27,9 +27,9 @@ function row({
   specs = ['alpha'],
   tag = status === 'shipped' ? `\`v${version}\`` : '—',
   why = 'what & why',
+  specCell = specs.map((s) => `[${s}](specs/${s}.md)`).join(' · '),
 } = {}) {
   const statusCell = here ? `**${status} ${'← we are here'}**` : `**${status}**`;
-  const specCell = specs.map((s) => `[${s}](specs/${s}.md)`).join(' · ');
   return `| ${version} | ${tag} | milestone | ${statusCell} | ${why} | ${specCell} |`;
 }
 
@@ -869,6 +869,26 @@ describe('check-product', () => {
       const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/links specs\/ghost\.md, which does not exist/);
+    });
+
+    it('does not count a link wrapped in a code span as a link', () => {
+      // A backtick span keeps the text and kills the link: the rendered cell
+      // shows `[alpha](specs/alpha.md)` as literal code, so the row navigates
+      // nowhere. Read span-blind, both halves of C4 resolve off a table that
+      // links nothing.
+      const rows = [row({ specCell: '`[alpha](specs/alpha.md)`' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
+    it('still reads a link whose text is code-styled', () => {
+      // The false-positive direction: only the span is dropped, so a link
+      // labelled in code — a plausible authoring form — is still a link.
+      const rows = [row({ specCell: '[`alpha`](specs/alpha.md)' })];
+      const errors = validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] });
+      expect(of('C4', errors)).toEqual([]);
     });
 
     it('rejects a spec with no Status header line', () => {
