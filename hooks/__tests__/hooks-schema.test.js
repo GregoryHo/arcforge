@@ -16,11 +16,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const {
   validateHooksJson,
   validateManifestHooks,
+  findCodexDiscoverablePaths,
   validateNoCodexDiscoverablePaths,
   MANIFESTS,
   CODEX_DISCOVERED_PATHS,
@@ -157,8 +159,34 @@ describe('check-hooks-schema — the registration path', () => {
   });
 
   it('neither Codex-discovered path exists in the shipped tree', () => {
-    const present = CODEX_DISCOVERED_PATHS.filter((f) => fs.existsSync(path.join(repoRoot, f)));
-    assert.deepStrictEqual(present, []);
+    assert.deepStrictEqual(findCodexDiscoverablePaths(repoRoot), []);
+  });
+
+  // The discovery step is the half a typo silently disables: get the join wrong
+  // and it matches nothing, leaving the linter and every assertion above green
+  // while the leak guard is dead. So drive it against a tree that really does
+  // carry both files, rather than re-deriving the expression in the test body.
+  it('finds a planted file at each Codex-discovered path', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-codex-leak-'));
+    try {
+      fs.mkdirSync(path.join(root, 'hooks'));
+      fs.writeFileSync(path.join(root, 'hooks.json'), '{}');
+      fs.writeFileSync(path.join(root, 'hooks', 'hooks.json'), '{}');
+      assert.deepStrictEqual(findCodexDiscoverablePaths(root), ['hooks.json', 'hooks/hooks.json']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports nothing for a tree with neither file', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-codex-clean-'));
+    try {
+      fs.mkdirSync(path.join(root, 'hooks'));
+      fs.writeFileSync(path.join(root, 'hooks', 'claude-code.json'), '{}');
+      assert.deepStrictEqual(findCodexDiscoverablePaths(root), []);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('rejects a re-introduced hooks/hooks.json even though nothing references it', () => {

@@ -152,7 +152,10 @@ docs/             # Guides, design docs, plans
 ## Recognizing Stale References
 
 External material (old wiki pages, blog posts, cached docs) may still mention
-an SDD pipeline, a DAG engine, `agents/` or `templates/` directories, `.codex*`
-packaging, an `ARCFORGE_ROOT` variable, or `arc-`-prefixed skill names. None of
-those exist in this project — treat such a reference as stale, not as something
-to restore.
+an SDD pipeline, a DAG engine, `agents/` or `templates/` directories, an
+`ARCFORGE_ROOT` variable, or `arc-`-prefixed skill names. None of those exist in
+this project — treat such a reference as stale, not as something to restore.
+
+`.codex-plugin/` and `.agents/` are the exception that used to be on that list:
+they are shipped files as of 6.1.0 (see *Packaging Targets* above), so material
+calling them stale is itself the stale reference.

@@ -89,7 +89,8 @@ Differences that are deliberate, not oversights:
   registry lives at `hooks/claude-code.json`, which Codex never looks for. Same
   spike, same paid turn: the renamed fixture produced zero hook firings while
   the positive control produced sixteen. The Codex manifest therefore declares
-  no `hooks` key (its plugin validator rejects the field anyway), and
+  no `hooks` key — a statement of intent, not the guard, since the leak fires
+  from discovery whether a manifest names the path or not — and
   `npm run check:hooks` gates all three halves — the Claude Code declaration,
   the Codex silence, and the absence of `hooks.json` / `hooks/hooks.json`.
   Do not "simplify" this by moving the registry back to the conventional name:
