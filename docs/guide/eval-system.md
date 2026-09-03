@@ -115,8 +115,8 @@ k narrows the interval; it does not manufacture an effect that is not there.
 
 A scenario declaring `## Verdict Policy non-regression` is judged differently:
 there is no delta to interpret, and it passes only when **every** treatment trial
-that produced a score passes. That is the right policy for "this must keep
-working", the wrong one for "this should help".
+that produced a score passes and at least one did. That is the right policy for
+"this must keep working", the wrong one for "this should help".
 
 ## Scenario format
 
