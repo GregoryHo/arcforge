@@ -485,9 +485,12 @@ function checkRoadmapTags(rows, errors) {
  * preamble ran past such a heading, and a body blockquote below it stood in for
  * a header the spec does not have. That is the same bound `DECISION_ANY_RE` takes
  * and the same one `SECTION_END_RE` takes, for the same reason — every boundary a
- * heading *ends* fails open when it is read at column 1. The one column-1 read
- * left is the heading that *opens* a section, which fails closed and has C6
- * behind it. Four spaces is an indented code block, so an illustrative `##` in
+ * heading *ends* fails open when it is read at column 1. The one column-1
+ * *boundary* read left is the heading that *opens* a section, which fails closed
+ * and has C6 behind it — the field and entry forms (`STATUS_FIELD_RE`,
+ * `DECISION_HEADING_RE`'s canonical form, `SPEC_STATUS_HEADER_RE`) are anchored
+ * there for a different reason, which is that column 1 is where the form puts
+ * them. Four spaces is an indented code block, so an illustrative `##` in
  * the preamble still does not cut it short.
  */
 function specStatusHeader(content) {

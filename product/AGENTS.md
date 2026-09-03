@@ -264,9 +264,10 @@ That first `##` ends the preamble even when it carries one to three leading spac
 the same bound a `### D-NNN` heading is read at, and the same one that ends a section
 above. Every boundary a heading *ends* takes it, for the same reason: an indented
 `## Purpose` read at column 1 would leave the preamble running past it, so a body
-blockquote further down could stand in for a header the spec does not have. Column 1
-is reserved for the heading that *opens* a scope, where an indented one empties the
-scope instead and C6 catches it. Four spaces or more is an indented code block, and
+blockquote further down could stand in for a header the spec does not have. Of the
+boundaries, only the heading that *opens* a scope is read at column 1, where an
+indented one empties the scope instead and C6 catches it. Four spaces or more is an
+indented code block, and
 an illustrative `##` there does not end the preamble.
 
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
