@@ -171,8 +171,9 @@ one:
 - A `shipped` governing row collapses the header to `shipped v<that version>` — the
   earlier rows are history, and the roadmap already carries it.
 - An unshipped governing row over an already-shipped spec takes the **compound
-  form**, naming the last shipped version and the one extending it:
-  `shipped v6.0.0 · extended by 6.1.0 (building)`.
+  form**, naming the last shipped version and the one extending it, with that row's
+  own status in the parentheses: `shipped v6.0.0 · extended by 6.1.0 (building)`,
+  or `… (next)` while the extending row has not started.
 - With no shipped row at all, the header is just rule 1 applied to the governing row.
 
 Each version occupies **exactly one row** (C4), which is what makes "the
@@ -416,7 +417,11 @@ no estimate, no commitment. Low friction is the point.
    "what & why", and a link to its spec. Move `← we are here` onto it only when
    every row above it has shipped; a `building` row, or an earlier `next` row,
    keeps it.
-4. Write `specs/<slug>.md` from the template **before building**.
+4. Write the spec **before building** — `specs/<slug>.md` from the template for a
+   new area, or this version's behaviors added to the area's existing living spec,
+   never a second file for one area. An existing spec's header takes the compound
+   form of rule 2 the moment the new row links it: `shipped vX.Y.Z · extended by
+   <this version> (next)`.
 
 ### Record a decision
 Append to the Decision Log with the next free `D-NNN` (zero-padded, monotonic,

@@ -94,9 +94,12 @@ what runs, or what is being built?
 | `Status: shipped vX.Y.Z` | Merged and tagged; this describes what runs |
 
 A spec that a later version extends says both — `shipped vX.Y.Z · extended by
-vX.Y+1.Z (building)` — so a reader knows the shipped half is still true while
-the next half is not yet. The header and its roadmap row always agree; when they
-disagree, one of the two flips was forgotten at ship time.
+X.Y+1.Z (next)` from the promotion that adds the extending row, then
+`shipped vX.Y.Z · extended by X.Y+1.Z (building)` once that row starts — so a
+reader knows the shipped half is still true while the next half is not yet. The
+parenthetical is the extending row's own status, which is why the header and its
+roadmap row always agree; when they disagree, one of the two flips was forgotten
+at ship time.
 
 Name the code the spec tracks in its own header block when the mapping is not
 obvious from the slug. A spec nobody can connect to a directory gets updated by
