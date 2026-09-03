@@ -117,15 +117,19 @@ rules, or tests.
 
 One codebase, two manifests, no source split. Claude Code installs over
 `.claude-plugin/`; Codex CLI installs over `.codex-plugin/plugin.json` +
-`.agents/plugins/marketplace.json`. The manifest pair is the *entire* difference
-— there is no platform-agnostic / platform-specific source tree, no per-target
-copy of a skill, and no build step that emits one target from the other.
+`.agents/plugins/marketplace.json`. That manifest pair, plus the hook registry's
+filename (below), is the *entire* difference — there is no platform-agnostic /
+platform-specific source tree, no per-target copy of a skill, and no build step
+that emits one target from the other.
 
 What each target gets is not symmetric, and that asymmetry is the contract:
 
 - **Skills port; nothing else does.** All 15 skills load on both hosts. Hooks,
   learning, eval, and loop are Claude Code only — they depend on Claude Code's
   hook protocol and on `claude` being spawnable, neither of which Codex offers.
+  Hooks go further than "do not run": the registry is named
+  `hooks/claude-code.json` precisely so Codex's hook auto-discovery cannot see
+  it, and `check:hooks` keeps it that way.
 - **The D9 bare-`arcforge` boundary is Claude Code's.** Codex does not put a
   plugin's `bin/` on PATH (spike-verified), so on Codex the CLI-backed skills
   report `command not found` rather than silently misbehaving. D1/D9 do not
