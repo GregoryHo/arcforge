@@ -478,10 +478,22 @@ function handleDashboardAction({
     if (!matResult.ok) {
       return reject(matResult.failure.reason, { module_failure: matResult.failure });
     }
-    return accept({
+    const accepted = accept({
       next_status: 'materialized',
       materialization_id: matResult.record.materialization_id,
     });
+    // The paths travel with the id `materialize()` chose. A caller that
+    // re-derives them scans the manifests a second time with different criteria
+    // — `findExistingMaterialization` reuses by candidate hash, render policy
+    // and intact drafts, while `findLatestMaterialization` takes the newest
+    // `created_at` and checks nothing — so it can pair one manifest's id with
+    // another manifest's paths. Handing back what materialize() already
+    // computed makes that divergence structurally impossible.
+    //
+    // Deliberately outside `accept()`: its argument is written verbatim to the
+    // audit log, and the B-5 audit trail should not gain absolute filesystem
+    // paths on every materialize.
+    return { ...accepted, draft_paths: matResult.draftPaths };
   }
 
   // DH-2: activate — delegates to Layer 8 activate.js

@@ -661,7 +661,10 @@ function runAccept({ scope }, candidateId) {
   return {
     scope,
     candidate: findProjectCard(candidateId),
-    draft_paths: draftPathsFor(candidateId),
+    // The dispatch's own paths, not a second scan: the reuse lookup and the
+    // newest-manifest lookup have different criteria, so re-deriving them here
+    // could report one manifest's id beside another manifest's paths.
+    draft_paths: result.draft_paths ?? [],
     materialization_id: result.materialization_id,
   };
 }
@@ -677,9 +680,12 @@ function runTransition({ scope }, verb, candidateId) {
     next_status: result.next_status,
     ...(result.materialization_id ? { materialization_id: result.materialization_id } : {}),
     ...(result.activation_id ? { activation_id: result.activation_id } : {}),
-    ...(verb === 'materialize' || verb === 'activate'
-      ? { draft_paths: draftPathsFor(candidateId) }
-      : {}),
+    // `materialize` reports the paths its own dispatch chose, for the reason in
+    // `runAccept`. `activate` has no paths of its own to report, so it keeps the
+    // newest-manifest lookup — which is the selector DH-2 activation itself
+    // used, so what is printed is what was activated.
+    ...(verb === 'materialize' ? { draft_paths: result.draft_paths ?? [] } : {}),
+    ...(verb === 'activate' ? { draft_paths: draftPathsFor(candidateId) } : {}),
   };
 }
 
