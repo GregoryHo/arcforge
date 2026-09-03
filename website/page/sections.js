@@ -726,10 +726,15 @@ function Platforms({
 }) {
   const plats = [{
     name: 'Claude Code',
-    tag: 'THE TARGET',
+    tag: 'IN FULL',
     cmd: '/plugin install arcforge@arcforge-dev',
     note: 'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',
     primary: true
+  }, {
+    name: 'Codex CLI',
+    tag: 'SKILLS ONLY',
+    cmd: 'codex plugin add arcforge@arcforge-dev',
+    note: 'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'
   }, {
     name: 'Node.js',
     tag: 'THAT IS ALL',
@@ -742,20 +747,20 @@ function Platforms({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "09",
     kicker: "PLATFORM",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "One harness, ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "One tree, ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "done properly.")),
-    sub: "arcforge targets Claude Code and nothing else. No portability layer, no lowest-common-denominator features, no second packaging target to drift out of sync.",
+    }, "two manifests.")),
+    sub: "One codebase, no portability layer, no per-host copy of anything. Claude Code gets the whole toolkit; Codex CLI installs the skills. What each host gets is stated up front, and version parity across both manifests is a CI gate, not a habit.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
-    className: "af-grid-2col",
+    className: "af-grid-3col",
     style: {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
+      gridTemplateColumns: '1fr 1fr 1fr',
       gap: 24
     }
   }, plats.map(p => /*#__PURE__*/React.createElement("div", {

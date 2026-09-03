@@ -157,7 +157,7 @@ function Hero({
       maxWidth: 520,
       fontFamily: '"JetBrains Mono",ui-monospace,monospace'
     }
-  }, "A skill toolkit for Claude Code. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
+  }, "A skill toolkit for coding agents. Skills are tools, not laws \u2014 your agent picks the", ' ', /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.ink
     }

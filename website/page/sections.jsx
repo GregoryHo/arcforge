@@ -264,7 +264,8 @@ function SessionLearning({theme:t}) {
 // ─── Platforms ───
 function Platforms({theme:t}) {
   const plats = [
-    {name:'Claude Code',tag:'THE TARGET',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
+    {name:'Claude Code',tag:'IN FULL',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
+    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:'codex plugin add arcforge@arcforge-dev',note:'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'},
     {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
@@ -272,11 +273,11 @@ function Platforms({theme:t}) {
       <SectionHeader
         n="09"
         kicker="PLATFORM"
-        title={<>One harness, <em style={{color:t.brass,fontStyle:'italic'}}>done properly.</em></>}
-        sub="arcforge targets Claude Code and nothing else. No portability layer, no lowest-common-denominator features, no second packaging target to drift out of sync."
+        title={<>One tree, <em style={{color:t.brass,fontStyle:'italic'}}>two manifests.</em></>}
+        sub="One codebase, no portability layer, no per-host copy of anything. Claude Code gets the whole toolkit; Codex CLI installs the skills. What each host gets is stated up front, and version parity across both manifests is a CI gate, not a habit."
         theme={t}
       />
-      <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+      <div data-af-reveal className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}}>
         {plats.map(p=>(
           <div key={p.name} style={{
             background:t.card,border:`${p.primary?1.5:1}px solid ${p.primary?t.ember:t.line}`,
