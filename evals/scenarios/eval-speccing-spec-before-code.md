@@ -94,6 +94,39 @@ Enumerating ids `000`–`999` against both predicates gives a difference set of
 exactly `{"000"}`, which is why `## Version` stays 2: the two graders score the
 published k=10 pool identically, so there is no pool to keep apart.
 
+A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
+version the fixture shipped, because that is what the assertion's own second
+clause owes: a set difference against the three fixture rows also admits a row
+*below* them, so a stale `0.0.1` row left the roadmap ending at 0.3.0 and still
+scored A2. What A2 does *not* police is the size of the bump — the skill tells a
+trial to add the row recording which version and why now, never that the
+successor is `0.4.0`, so pinning an expected id would fail a trial that
+legitimately picks `1.0.0` or `0.3.1`. Nor does it police that `← we are here`
+lands on the new row: marker placement is A6's floor, and widening A2 into it
+would change what this scenario measures.
+
+Validated offline against eight synthetic roadmaps, run through the as-shipped
+grader with the pre-fix set-difference predicate and the numeric one:
+
+| case | old | new |
+|---|---|---|
+| `0.4.0` row | PASS | PASS |
+| `1.0.0` row | PASS | PASS |
+| `0.3.1` row | PASS | PASS |
+| `0.10.0` row | PASS | PASS |
+| `0.0.1` row | PASS | **FAIL** |
+| `0.2.5` row (stale, not a shipped id) | PASS | **FAIL** |
+| both `0.4.0` and `0.0.1` rows | PASS | PASS |
+| no new row | FAIL | FAIL |
+
+Unlike A3's, this difference set is not a singleton and cannot be enumerated —
+every version below `0.3.0` that is not one of the three shipped rows moves
+PASS → FAIL. So `## Version` stays 2 on the pool rather than on enumeration: the
+baseline arm's three retained transcripts write no version row at all, so A2
+failed there and a strictly narrower predicate cannot lift a failure, while every
+retained treatment transcript writes a `| 0.4.0 |` row, which both predicates
+pass.
+
 **Fixture hygiene.** No maintenance guide beside the four files, no instruction
 anywhere that the ledger moves with the code, and no earlier commit
 demonstrating it. The Version-1 pool showed the baseline knows the sequence
@@ -173,11 +206,18 @@ def csv_behavior(text):
 a1 = any(csv_behavior(read(f)) for f in sorted(specs_dir.glob("*.md"))) if specs_dir.exists() else False
 emit("A1", a1, "no spec under product/specs/ carries a numbered behavior item about CSV export")
 
-# A2 — a roadmap row beyond the three the fixture shipped with
-SHIPPED_ROWS = {"0.1.0", "0.2.0", "0.3.0"}
+# A2 — a roadmap row that advances past the latest version the fixture shipped.
+# "beyond the three it shipped with" read numerically, as the assertion's own
+# second clause requires: a set difference against the three fixture rows also
+# admits a row *below* them, so a stale `0.0.1` row scored A2 while the roadmap
+# still ended at 0.3.0. The parse is total — the regex captures three integer
+# groups — and comparing tuples rather than strings keeps `0.10.0` above
+# `0.3.0`. `any` (not `max`) keeps the predicate defined, emitting A2:FAIL
+# rather than raising, when a trial leaves no version rows at all.
+LATEST_SHIPPED = (0, 3, 0)
 row_versions = set(re.findall(r"^\|\s*`?v?(\d+\.\d+\.\d+)`?\s*\|", road, re.M))
-a2 = bool(row_versions - SHIPPED_ROWS)
-emit("A2", a2, "the roadmap table gained no row for the version being built")
+a2 = any(tuple(int(n) for n in v.split(".")) > LATEST_SHIPPED for v in row_versions)
+emit("A2", a2, "no roadmap row advances beyond 0.3.0")
 
 # A3 — a decision entry beyond D-004 that is about the CSV export
 heading_re = re.compile(r"^###\s+D-(\d{3})\b", re.M)
