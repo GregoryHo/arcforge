@@ -246,10 +246,13 @@ whether the candidate's name can be used as a draft filename. On a non-instinct
 candidate, or one the curator named with a path separator, `..`, a control
 character or nothing at all, it refuses without approving anything: no draft, no
 audit entry, the candidate exactly as it was — and the refusal names the move
-that is left, or the dashboard where the queue no longer allows that move. For a
-non-instinct candidate the move is recording the approval on its own; for a name
-the draft writer cannot use it is `learn reject`, because nothing the CLI offers
-renames a candidate. The single-step commands do the opposite, and dispatch
+that is left. The two name it differently. For a non-instinct candidate the move
+is recording the approval on its own, and the dashboard is named alongside it
+either way — the queue stays reviewable there whatever the CLI can run. For a
+name the draft writer cannot use it is `learn reject`, because nothing the CLI
+offers renames a candidate, and that one command is the whole recovery: where
+the queue no longer allows declining it, the dashboard is named instead of it.
+The single-step commands do the opposite, and dispatch
 first, so what you read is the engine's own refusal and the refusal is recorded.
 Accept is all-or-nothing because half of it cannot be undone — the queue is
 append-only, and an approval it could never build on would be a decision you are
@@ -275,8 +278,9 @@ report is the draft `learn activate` consumes.
 A retired candidate can lose its draft the same way, and `learn inspect` says so
 there too — but what it offers is different, because `deactivated` is the one
 status the matrix lets both materialize and activate. Activating it again is the
-half that refuses, on the same content hash; materializing it again writes a
-fresh draft and is what `learn inspect` points you at. `learn inbox` prints no
+half that refuses — on the recorded content hash when the file no longer matches
+it, and for want of a usable record when the manifest is gone; materializing it
+again writes a fresh draft and is what `learn inspect` points you at. `learn inbox` prints no
 paths and reads no drafts, so a retired entry there still names both moves —
 `learn inspect` is where the draft question is answered.
 
