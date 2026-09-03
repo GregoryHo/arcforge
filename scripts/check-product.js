@@ -54,7 +54,10 @@ const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
-const CITATION_RE = /\bD-(\d+)\b/g;
+// Matches a citation-shaped token and its trailing word characters, so a
+// suffixed id (`D-001a`) is reported as malformed rather than skipped. The
+// leading `\d` keeps ordinary prose (`D-Bus`) out of the scan.
+const CITATION_RE = /\bD-(\d+)(\w*)/g;
 
 /** Semver-ish ordering for roadmap Version cells (`X.Y.Z`). */
 function compareVersions(a, b) {
@@ -313,7 +316,7 @@ function checkSpecCitations(entries, specs, errors) {
     const section = decisionsSection(spec.content);
     if (section === null) continue;
     for (const m of section.matchAll(CITATION_RE)) {
-      if (m[1].length !== 3) {
+      if (m[1].length !== 3 || m[2] !== '') {
         errors.push(
           `C5 specs/${spec.name}.md: cites "${m[0]}", which is not a zero-padded D-NNN id`,
         );

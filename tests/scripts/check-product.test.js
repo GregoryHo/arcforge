@@ -355,6 +355,7 @@ describe('check-product', () => {
       'D-01',
       'D-0001',
       'D-9999',
+      'D-001a',
     ])('rejects the malformed citation %s instead of skipping it', (id) => {
       const errors = of('C5', run({ specs: [spec({ cites: [id] })] }));
       expect(errors).toHaveLength(1);
