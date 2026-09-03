@@ -131,6 +131,12 @@ one flipped line on the old one — and which flip depends on how much died:
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 
+All three relations point backwards: the named decision must already be in the log,
+so its `D-id` is lower than the entry naming it. The log is append-only — an entry
+cannot reverse or refine a choice that was not recorded yet, nor relate to itself —
+and `check:product` (C3) rejects both. Folding a superseded entry into the
+`<details>` index is unaffected: the rule compares `D-id`s, not positions.
+
 ## Conventions
 
 Fields beyond the base template, and where they are enforced. Everything marked

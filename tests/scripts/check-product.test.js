@@ -209,6 +209,42 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/malformed relation line/);
     });
 
+    it('rejects a Supersedes pointing at a later decision even when it carries the flip', () => {
+      const decisions = [
+        decision({ id: 'D-001', extra: ['- Supersedes: D-002'] }),
+        decision({ id: 'D-002', status: 'Superseded-by: D-001' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/"Supersedes: D-002" must name an earlier decision/);
+    });
+
+    it('rejects a Refines pointing at a later decision', () => {
+      const decisions = [
+        decision({ id: 'D-001', extra: ['- Refines: D-002'] }),
+        decision({ id: 'D-002' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/"Refines: D-002" must name an earlier decision/);
+    });
+
+    it('rejects an Extends naming its own entry', () => {
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Extends: D-002'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/"Extends: D-002" must name an earlier decision/);
+    });
+
+    it('accepts a supersession whose superseded entry is parked in the fold', () => {
+      const decisions = [decision({ id: 'D-002', extra: ['- Supersedes: D-001'] })];
+      const fold = [decision({ id: 'D-001', status: 'Superseded-by: D-002' })];
+      expect(of('C3', run({ roadmap: { decisions, fold } }))).toEqual([]);
+    });
+
     it('rejects a Supersedes naming a decision that does not exist', () => {
       const decisions = [
         decision({ id: 'D-001' }),

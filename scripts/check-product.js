@@ -21,8 +21,8 @@
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
  *         folded `<details>` index, unique, and gap-free from D-001;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
- *         a decision that exists, and every `Supersedes:` carries its flip on
- *         the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
+ *         an earlier decision that exists, and every `Supersedes:` carries its
+ *         flip on the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
  *         clause-scoped form ⇒ `partially superseded by D-NNN`. `Refines:` and
  *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
@@ -198,9 +198,11 @@ function checkDecisionNumbering(entries, errors) {
 }
 
 /**
- * C3 — every relation resolves, and a supersession is two edits: the flip on the
- * superseded entry is the second one. `Refines:` and `Extends:` sharpen or widen
- * a decision that stays in force, so they need a live target and nothing else.
+ * C3 — every relation resolves backwards, and a supersession is two edits: the
+ * flip on the superseded entry is the second one. `Refines:` and `Extends:`
+ * sharpen or widen a decision that stays in force, so they need an earlier live
+ * target and nothing else. The direction test compares `D-id`s, not positions,
+ * so parking a superseded entry in the folded index leaves it satisfied.
  */
 function checkRelations(entries, errors) {
   const byNum = new Map(entries.map((e) => [e.num, e]));
@@ -210,6 +212,12 @@ function checkRelations(entries, errors) {
       const victim = byNum.get(target);
       if (!victim) {
         errors.push(`C3 ${e.id}: "${kind}: ${targetId}" names a decision that does not exist`);
+        continue;
+      }
+      if (target >= e.num) {
+        errors.push(
+          `C3 ${e.id}: "${kind}: ${targetId}" must name an earlier decision — the log is append-only, so an entry cannot relate to itself or to one recorded after it`,
+        );
         continue;
       }
       if (kind !== 'Supersedes') continue;
