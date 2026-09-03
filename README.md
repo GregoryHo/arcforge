@@ -62,6 +62,8 @@ All 15 skills load, namespaced `arcforge:<name>`. **Skills are all that installs
 
 arcforge's hooks ship in the same tree, but Codex never loads them. The registry is named `hooks/claude-code.json` and Claude Code finds it through the plugin manifest; Codex only auto-discovers `hooks/hooks.json`, which arcforge deliberately leaves empty. So there is no hook-trust prompt to answer and nothing for you to decline. <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
 
+The three user-invoked skills — `learning`, `looping`, `writing-skills` — stay explicit-intent gates on Codex. Codex has no `disable-model-invocation`, so each ships a skill-local `skills/core/<name>/agents/openai.yaml` setting `policy.allow_implicit_invocation: false`: the skill is kept out of the list Codex offers the model, and still runs when you pick it yourself.
+
 If you want the whole toolkit, use Claude Code.
 
 ## Quick start

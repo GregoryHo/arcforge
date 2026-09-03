@@ -5,6 +5,7 @@
 > change in the ROADMAP Decision Log.
 > Tracks: `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
 > `.claude-plugin/plugin.json`, `hooks/claude-code.json`,
+> `skills/core/*/agents/openai.yaml`,
 > `scripts/check-version-sync.js`, `scripts/check-hooks-schema.js`
 
 ## Purpose
@@ -63,6 +64,26 @@ whole and fails halfway through a workflow.
   when nothing references it, because discovery does not need a reference. What
   is deliberately *not* relied on: Codex's hook-trust gate, which asks the user
   to hold a security boundary that one careless grant defeats.
+- **B-2a The explicit-intent gate is re-declared in Codex's own vocabulary.**
+  `disable-model-invocation: true` is Claude Code's mechanism and buys nothing on
+  Codex — verified against codex-cli 0.152.1, where `codex debug prompt-input`
+  listed all fifteen skills, the three user-invoked ones included, in the
+  `<skills_instructions>` block the model selects from. Codex's bundled validator
+  goes further and rejects the key outright — "frontmatter field
+  `disable-model-invocation` must be false". Codex spells the same intent
+  `policy.allow_implicit_invocation: false` in a skill-local
+  `skills/core/<name>/agents/openai.yaml`; with those three files in place the
+  same command listed twelve skills, the three gated ones absent, while staying
+  explicitly reachable — that is what `allow_implicit_invocation` gates, per
+  Codex's own field docs: "not injected into the model context by default, but can
+  still be invoked explicitly".
+
+  The file is skill-local, so D1 §4.3 holds and no manifest edit is involved. It
+  carries the `interface.display_name` and `interface.short_description` that
+  Codex's validator requires whenever the manifest exists, and nothing else —
+  Claude Code never reads it. The two mechanisms are asserted as one set in
+  `tests/skills/test_skill_structure.py`, in both directions, so a skill cannot
+  gain the flag without the policy or keep the policy after losing the flag.
 - **B-3 The CLI does not reach Codex, and says so at the call site.** The bare
   `arcforge` command is Claude Code's mechanism: it puts every loaded plugin's
   `bin/` on PATH, and Codex does not — verified twice with a fixture plugin,
@@ -114,6 +135,7 @@ The manifest pair — four hand-maintained files, each owned by one host:
 | `.claude-plugin/marketplace.json` | Claude Code | `owner`, `plugins[0].version`, `source: "./"` |
 | `.codex-plugin/plugin.json` | Codex CLI | mirrored `version`; `skills` as a string; `interface` block; no `hooks` |
 | `.agents/plugins/marketplace.json` | Codex CLI | `interface.displayName`; `plugins[0].source` object; `policy` |
+| `skills/core/<name>/agents/openai.yaml` | Codex CLI | `interface` (required when present); `policy.allow_implicit_invocation` for the three user-invoked skills |
 
 Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferred:
 
