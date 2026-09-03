@@ -14,7 +14,6 @@
  * for what that matches on.
  */
 
-const path = require('node:path');
 const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 
@@ -84,37 +83,54 @@ function requireProjectCandidateScope(args) {
   throw new Error('learn command requires --project or --global');
 }
 
-/** The scope the candidate subcommands run in: this project, named by its root. */
-function candidateContext(args, projectRoot) {
-  return { scope: requireProjectCandidateScope(args), projectRoot };
+/** The scope the candidate subcommands run in: this project. */
+function candidateContext(args) {
+  return { scope: requireProjectCandidateScope(args) };
 }
 
-/** The project name a record's `scope.project` has to equal to be ours. */
-function currentProjectName(projectRoot) {
-  return path.basename(path.resolve(projectRoot));
+/**
+ * The project slug a record's `scope.project` has to equal to be ours.
+ *
+ * `getProjectName()` in the engine's utils is the single owner of that
+ * derivation — every producer in the pipeline goes through it, so the CLI
+ * calls it rather than re-deriving from the project root it was handed.
+ * A local `path.basename(projectRoot)` was the same string only for a project
+ * directory that needs no sanitizing; anything else (`My Project` →
+ * `My-Project`) matched no record at all and emptied the whole front end.
+ */
+function currentProjectName() {
+  const { getProjectName } = require('../lib/utils');
+  return getProjectName();
 }
 
 /**
  * This project's candidates from the canonical queue, as dashboard cards.
  *
  * The canonical queue is home-global, so `--project` has to say *which*
- * project. It matches `scope.project` — the project directory name, which is
+ * project. It matches `scope.project` — the sanitized project slug, which is
  * the identity the rest of the pipeline already keys on
- * (`observations/<name>/`, `instincts/<name>/`) and the only one the sanitized
+ * (`observations/<slug>/`, `instincts/<slug>/`) and the only one the sanitized
  * card prints, so a row can be checked against the filter by eye.
- * `scope.project_id` is deliberately not the key: `batch-assembler.js` hashes
- * the absolute project path when an observation carries one and the project
- * name when none does, so matching on it would hide candidates silently.
+ *
+ * `scope.project_id` is deliberately not the key. `batch-assembler.js` takes it
+ * from the *first* observation in the batch that carries one and falls back to
+ * hashing the project name when none does, so a candidate carries whichever
+ * value that batch happened to see — matching on it would hide candidates
+ * silently. Activation keys its instinct output on `scope.project` too, so the
+ * slug is the identity that is actually enforced downstream. Two project roots
+ * whose basenames sanitize to the same slug are one project to the entire
+ * pipeline — observation store, instincts tree, and this filter alike — and
+ * that is decided upstream of the CLI, not here.
  *
  * A project-scoped record carrying no `scope.project` at all therefore belongs
  * to no project here and is invisible to the CLI. That is the safe direction —
  * the alternative is showing it from every project — and the dashboard serves
  * the whole queue, so it stays the escape hatch.
  */
-function readProjectCards(projectRoot) {
+function readProjectCards() {
   const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
   const { sanitizeDashboardCard } = require('../lib/learning-dashboard');
-  const project = currentProjectName(projectRoot);
+  const project = currentProjectName();
   return Object.values(readCurrentCandidates())
     .filter((record) => record.scope?.kind === 'project' && record.scope.project === project)
     .map(sanitizeDashboardCard);
@@ -125,14 +141,14 @@ function readProjectCards(projectRoot) {
  * other projects' candidates and the global ones too — so say which of those it
  * was rather than leaving the user to guess at a bare "not found".
  */
-function missingCandidateError(projectRoot, candidateId) {
+function missingCandidateError(candidateId) {
   const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
   const base = `candidate not found among this project's candidates: ${candidateId}`;
   const scope = readCurrentCandidates()[candidateId]?.scope;
   if (scope?.kind === 'project' && scope.project) {
     return new Error(
       `${base} — it belongs to the project "${scope.project}", not to ` +
-        `"${currentProjectName(projectRoot)}"; review it from there, or run: ` +
+        `"${currentProjectName()}"; review it from there, or run: ` +
         'arcforge learn dashboard',
     );
   }
@@ -144,9 +160,9 @@ function missingCandidateError(projectRoot, candidateId) {
   return new Error(`${base} — run: arcforge learn inbox --project`);
 }
 
-function findProjectCard(projectRoot, candidateId) {
-  const card = readProjectCards(projectRoot).find((c) => c.candidate_id === candidateId);
-  if (!card) throw missingCandidateError(projectRoot, candidateId);
+function findProjectCard(candidateId) {
+  const card = readProjectCards().find((c) => c.candidate_id === candidateId);
+  if (!card) throw missingCandidateError(candidateId);
   return card;
 }
 
@@ -238,8 +254,8 @@ function acknowledgeActivation(card) {
   return { reviewer_saw_behavior_change_warning: true, reviewer_saw_target_path_summary: true };
 }
 
-function runInbox({ scope, projectRoot }) {
-  const cards = readProjectCards(projectRoot);
+function runInbox({ scope }) {
+  const cards = readProjectCards();
   const counts = {};
   const groups = { by_status: {}, by_artifact_type: {} };
 
@@ -272,9 +288,9 @@ function runInbox({ scope, projectRoot }) {
   };
 }
 
-function runInspect({ scope, projectRoot }, candidateId) {
+function runInspect({ scope }, candidateId) {
   const { sanitizeDashboardDetail } = require('../lib/learning-dashboard');
-  const card = findProjectCard(projectRoot, candidateId);
+  const card = findProjectCard(candidateId);
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
@@ -283,8 +299,8 @@ function runInspect({ scope, projectRoot }, candidateId) {
   };
 }
 
-function runDrafts({ scope, projectRoot }) {
-  const drafts = readProjectCards(projectRoot)
+function runDrafts({ scope }) {
+  const drafts = readProjectCards()
     .filter((card) => card.lifecycle_status === 'materialized')
     .map((card) => ({
       ...card,
@@ -303,8 +319,8 @@ function runDrafts({ scope, projectRoot }) {
  * `expected_current_status` so a concurrent writer is caught rather than
  * overwritten.
  */
-function runAccept({ scope, projectRoot }, candidateId) {
-  const card = findProjectCard(projectRoot, candidateId);
+function runAccept({ scope }, candidateId) {
+  const card = findProjectCard(candidateId);
   if (card.lifecycle_status === 'materialized') {
     return { scope, candidate: card, draft_paths: draftPathsFor(candidateId) };
   }
@@ -322,20 +338,20 @@ function runAccept({ scope, projectRoot }, candidateId) {
   const result = dispatchAction({ verb: 'materialize', card, expectedStatus });
   return {
     scope,
-    candidate: findProjectCard(projectRoot, candidateId),
+    candidate: findProjectCard(candidateId),
     draft_paths: draftPathsFor(candidateId),
     materialization_id: result.materialization_id,
   };
 }
 
-function runTransition({ scope, projectRoot }, verb, candidateId) {
-  const card = findProjectCard(projectRoot, candidateId);
+function runTransition({ scope }, verb, candidateId) {
+  const card = findProjectCard(candidateId);
   if (verb === 'materialize' || verb === 'activate') assertSupportedArtifactType(card, verb);
   const safetyAck = verb === 'activate' ? acknowledgeActivation(card) : undefined;
   const result = dispatchAction({ verb, card, expectedStatus: card.lifecycle_status, safetyAck });
   return {
     scope,
-    candidate: findProjectCard(projectRoot, candidateId),
+    candidate: findProjectCard(candidateId),
     action_id: result.action_id,
     next_status: result.next_status,
     ...(result.materialization_id ? { materialization_id: result.materialization_id } : {}),
@@ -391,16 +407,16 @@ function runLearnCommand(args, { projectRoot, asJson }) {
       asJson,
     );
   } else if (subcommand === 'review') {
-    const { scope } = candidateContext(args, projectRoot);
-    const candidates = readProjectCards(projectRoot);
+    const { scope } = candidateContext(args);
+    const candidates = readProjectCards();
     output({ scope, count: candidates.length, candidates }, asJson);
   } else if (subcommand === 'inbox') {
-    output(runInbox(candidateContext(args, projectRoot)), asJson);
+    output(runInbox(candidateContext(args)), asJson);
   } else if (subcommand === 'inspect') {
     const candidateId = requireCandidateId(args, subcommand);
-    output(runInspect(candidateContext(args, projectRoot), candidateId), asJson);
+    output(runInspect(candidateContext(args), candidateId), asJson);
   } else if (subcommand === 'drafts') {
-    output(runDrafts(candidateContext(args, projectRoot)), asJson);
+    output(runDrafts(candidateContext(args)), asJson);
   } else if (subcommand === 'analyze') {
     console.error(
       'arc learn analyze is deprecated. The statistical analyzer has been retired; ' +
@@ -409,10 +425,10 @@ function runLearnCommand(args, { projectRoot, asJson }) {
     process.exit(1);
   } else if (subcommand === 'accept') {
     const candidateId = requireCandidateId(args, subcommand);
-    output(runAccept(candidateContext(args, projectRoot), candidateId), asJson);
+    output(runAccept(candidateContext(args), candidateId), asJson);
   } else if (Object.hasOwn(ACTION_FOR_VERB, subcommand)) {
     const candidateId = requireCandidateId(args, subcommand);
-    output(runTransition(candidateContext(args, projectRoot), subcommand, candidateId), asJson);
+    output(runTransition(candidateContext(args), subcommand, candidateId), asJson);
   } else {
     console.error(
       'Usage: arcforge learn [dashboard [--port N]|status|enable|disable] [--project|--global]',
