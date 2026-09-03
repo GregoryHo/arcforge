@@ -356,9 +356,20 @@ function refusalMessage(result, verb, card) {
  * refusal's business. `dismiss` is a verdict on the candidate's merit, and the
  * narrowing says nothing about merit — only that the type has no renderer yet,
  * which is why it ends in "leave it queued" rather than pushing the reviewer to
- * discard something a later renderer could build. The sibling has no such
- * option: approving a name the draft writer cannot use strands the candidate,
- * so declining really is the only way out there.
+ * discard something a later renderer could build.
+ *
+ * The asymmetry with the sibling below is temporal, not about stranding. Both
+ * obstacles strand the candidate in the CLI's own terms: from `approved` the
+ * matrix allows `materialize`, `promote` and `evolve`, and the CLI can run none
+ * of them — `materialize` meets the type refusal, the other two are
+ * dashboard-only — so the approval this message recommends is the last CLI move
+ * either candidate has. It is still worth recommending here and not there,
+ * because the type's obstacle can lift: a renderer arrives, and the approval is
+ * already recorded (and until then the dashboard still has `promote` and
+ * `evolve`, and the approval is a verdict on merit worth holding on its own).
+ * Nothing the CLI offers ever renames a candidate, so the name's obstacle never
+ * lifts — an approval there buys nothing a later release redeems, which is why
+ * declining really is the only way out for the sibling.
  */
 function acceptRefusalMessage(card) {
   const recovery = card.available_actions.includes('approve')
@@ -381,9 +392,12 @@ function acceptRefusalMessage(card) {
  * from `pending_review` and `needs_more_evidence`, so a candidate the matrix
  * would refuse to dismiss is sent to the dashboard rather than at a command
  * that would refuse in turn. Unlike its sibling it offers no "approve it on its
- * own" either: approving is exactly the move that would strand it, since an
- * `approved` candidate can be neither materialized (the name is refused) nor
- * dismissed.
+ * own" either. Not because approving is the move that strands the candidate and
+ * approving there is not: the `approved` row leaves both of them with no CLI
+ * move, as the sibling's comment sets out. It is because this obstacle is the
+ * one that never lifts — nothing the CLI offers renames a candidate, so an
+ * approval recorded here is a decision no later release redeems, while the
+ * sibling's is one a renderer eventually makes good on.
  *
  * It deliberately never echoes the name. The card redacts and truncates that
  * field for a reason, and the raw queue value — which is what was checked — is
