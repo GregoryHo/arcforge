@@ -59,13 +59,32 @@ function getLearningConfigPath({ scope, projectRoot = process.cwd(), homeDir } =
   return path.join(projectRoot, '.arcforge', 'learning', 'config.json');
 }
 
-function getCandidateQueuePath({ scope, projectRoot = process.cwd(), homeDir } = {}) {
+/**
+ * Path to the project's candidate queue.
+ *
+ * `--global` is refused, not resolved. The global path is the curator's
+ * canonical `queue.jsonl`, whose records are a different shape entirely
+ * (`candidate_id` / `lifecycle.status`, `scope` as an object) and carry
+ * `scope.project_id` and the raw proposal `body`. Reading it through the
+ * project-queue accessors matched nothing and printed everything, so the
+ * failure was silent one way and disclosing the other. The dashboard owns that
+ * queue; the CLI stays on the project side of the line.
+ */
+function getCandidateQueuePath({ scope, projectRoot = process.cwd() } = {}) {
   assertScope(scope);
-  const base =
-    scope === 'global'
-      ? path.join(arcforgeRoot(homeDir), 'learning')
-      : path.join(projectRoot, '.arcforge', 'learning');
-  return path.join(base, 'candidates', 'queue.jsonl');
+  assertProjectCandidateScope(scope, 'candidate queue access');
+  return path.join(projectRoot, '.arcforge', 'learning', 'candidates', 'queue.jsonl');
+}
+
+/** Fail closed on `--global` for anything that touches candidates. */
+function assertProjectCandidateScope(scope, what) {
+  if (scope !== 'project') {
+    throw new Error(
+      `only project ${what} is supported — the global queue is the curator's canonical ` +
+        'queue.jsonl, which the CLI neither replays nor sanitizes; review global candidates ' +
+        'with: arcforge learn dashboard',
+    );
+  }
 }
 
 function getObservationPath({ projectRoot = process.cwd(), homeDir } = {}) {
@@ -285,36 +304,6 @@ function validateCandidate(candidate) {
   }
 
   return { ok: errors.length === 0, errors };
-}
-
-function appendJsonLine(filePath, record) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
-}
-
-function appendCandidate(
-  candidate,
-  { scope = candidate?.scope || 'project', projectRoot = process.cwd(), homeDir } = {},
-) {
-  assertScope(scope);
-  const record = { ...candidate, scope };
-  const validation = validateCandidate(record);
-  if (!validation.ok) {
-    throw new Error(`invalid candidate: ${validation.errors.join('; ')}`);
-  }
-  const queuePath = getCandidateQueuePath({ scope, projectRoot, homeDir });
-  const existing = loadCandidates({ scope, projectRoot, homeDir }).find(
-    (candidate) =>
-      candidate.id === record.id ||
-      (record.pattern_key &&
-        candidate.scope === record.scope &&
-        candidate.pattern_key === record.pattern_key),
-  );
-  if (existing) {
-    return { path: queuePath, candidate: existing, duplicate: true };
-  }
-  appendJsonLine(queuePath, record);
-  return { path: queuePath, candidate: record, duplicate: false };
 }
 
 function loadCandidates({ scope = 'project', projectRoot = process.cwd(), homeDir } = {}) {
@@ -699,10 +688,8 @@ function inspectCandidate(id, { scope, projectRoot = process.cwd(), homeDir } = 
   });
 
   const artifacts = {};
-  if (scope === 'project') {
-    if (draftRel) artifacts.draft_paths = draftRel.map(toEntry);
-    if (activeRel) artifacts.active_paths = activeRel.map(toEntry);
-  }
+  if (draftRel) artifacts.draft_paths = draftRel.map(toEntry);
+  if (activeRel) artifacts.active_paths = activeRel.map(toEntry);
 
   return {
     scope,
@@ -721,16 +708,9 @@ function listMaterializedDrafts({ scope, projectRoot = process.cwd(), homeDir } 
   return { scope, count: drafts.length, drafts };
 }
 
-function commandScopeFlag(scope) {
-  return scope === 'global' ? '--global' : '--project';
-}
-
 function nextCommandFor(candidate) {
   const base = 'arc learn';
-  const scopeFlag = commandScopeFlag(candidate.scope);
-  if (candidate.scope === 'global' && candidate.status !== 'pending') {
-    return `${base} inspect ${candidate.id} ${scopeFlag}`;
-  }
+  const scopeFlag = '--project';
   switch (candidate.status) {
     case 'pending':
       return `${base} approve ${candidate.id} ${scopeFlag}`;
@@ -850,7 +830,6 @@ module.exports = {
   DRAFT_ONLY_ARTIFACT_TYPES,
   acceptCandidate,
   activateCandidate,
-  appendCandidate,
   assertCanMaterialize,
   getCandidateQueuePath,
   getLearningConfigPath,

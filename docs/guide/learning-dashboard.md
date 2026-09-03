@@ -191,6 +191,12 @@ is home-global. They are a scriptable project-scope path, not a second way to
 work the dashboard's inbox: review what you see in the dashboard from the
 dashboard.
 
+Every one of them is project-scope: passing `--global` is refused, and the
+error points you at `arcforge learn dashboard`. That includes the read
+commands, which used to accept it — `learn review --global` printed the
+curator's queue records raw, project id and proposal body included, and
+`inbox`/`inspect`/`drafts --global` quietly returned nothing at all.
+
 ```bash
 arcforge learn inbox --project
 arcforge learn inspect <candidate-id> --project
@@ -210,9 +216,11 @@ arcforge learn activate <candidate-id> --project
 | `learn activate` | Promote materialized drafts to active (project scope only) |
 | `learn drafts` | What is materialized and waiting for activation |
 
-The review/list commands take `--project` or `--global`; the
-candidate-transition commands (`approve`, `reject`, `materialize`, `accept`,
-`activate`) are **project-scope only**. Every one takes `--json` for scripting.
+Every candidate command is **project-scope only** — reads (`inbox`, `review`,
+`inspect`, `drafts`) as well as transitions (`approve`, `reject`,
+`materialize`, `accept`, `activate`). `learn status`, `learn enable` and
+`learn disable` still take either scope, because those are about the opt-in,
+not about candidates. Every command takes `--json` for scripting.
 
 ## Turning it off
 
