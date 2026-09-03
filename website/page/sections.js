@@ -769,7 +769,9 @@ function Platforms({
       background: t.card,
       border: `${p.primary ? 1.5 : 1}px solid ${p.primary ? t.ember : t.line}`,
       padding: '28px 32px',
-      position: 'relative'
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -805,7 +807,8 @@ function Platforms({
       color: p.primary ? t.ember : t.dim,
       background: t.bg,
       padding: '10px 14px',
-      border: `1px dashed ${t.line}`
+      border: `1px dashed ${t.line}`,
+      marginTop: 'auto'
     }
   }, Array.isArray(p.cmd) ? p.cmd.map(c => /*#__PURE__*/React.createElement("div", {
     key: c
