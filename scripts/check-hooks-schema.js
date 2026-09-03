@@ -27,8 +27,9 @@
  *     `hooks` path, and that declaration is the ONLY thing loading arcforge's
  *     hooks — the registry deliberately does not sit at the conventional name.
  *   - `.codex-plugin/plugin.json` must declare no `hooks` key. arcforge's hooks
- *     speak Claude Code's protocol and have nothing to say to Codex, whose
- *     plugin validator rejects the field anyway.
+ *     speak Claude Code's protocol and Codex must not run them. Silence here is
+ *     a statement of intent, not the guard: the guard is the registry's
+ *     filename plus the two absence checks below.
  *   - Nothing may sit at `hooks.json` or `hooks/hooks.json`. Those are the paths
  *     Codex auto-discovers plugin hooks at whether or not a manifest names them:
  *     a plugin whose manifest was silent still fired every hook it declared at
@@ -195,6 +196,18 @@ function validateManifestHooks(reads) {
 }
 
 /**
+ * Resolve every Codex-discovered path that actually exists under a tree. This is
+ * the filesystem half of the leak guard — the half a typo silently disables, so
+ * it is a named export rather than an expression inlined into main().
+ *
+ * @param {string} root - repo root to resolve CODEX_DISCOVERED_PATHS against
+ * @returns {string[]} the repo-relative paths that exist
+ */
+function findCodexDiscoverablePaths(root) {
+  return CODEX_DISCOVERED_PATHS.filter((f) => fs.existsSync(path.join(root, f)));
+}
+
+/**
  * Assert nothing sits at a path Codex auto-discovers plugin hooks at. Pure —
  * takes the subset of CODEX_DISCOVERED_PATHS that exist on disk.
  *
@@ -235,7 +248,7 @@ function main() {
     process.exit(1);
   }
 
-  const present = CODEX_DISCOVERED_PATHS.filter((f) => fs.existsSync(path.join(repoRoot, f)));
+  const present = findCodexDiscoverablePaths(repoRoot);
   const errors = [
     ...validateHooksJson(config),
     ...validateManifestHooks(MANIFESTS.map(readManifest)),
@@ -269,6 +282,7 @@ function main() {
 module.exports = {
   validateHooksJson,
   validateManifestHooks,
+  findCodexDiscoverablePaths,
   validateNoCodexDiscoverablePaths,
   ALLOWED_EVENTS,
   MANIFESTS,

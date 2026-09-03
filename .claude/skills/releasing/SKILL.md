@@ -195,8 +195,8 @@ git add product/
 git commit -m "docs(product): flip vX.Y.Z to shipped"
 ```
 
-Keeping it separate is deliberate — the release commit in step 7 stays exactly the 9
-version files, so reverting a bad bump does not drag the product history back with it.
+Keeping it separate is deliberate — the release commit in step 7 stays exactly the 10
+release files, so reverting a bad bump does not drag the product history back with it.
 
 ### 6. Bump the version in **all 9 canonical locations**
 
