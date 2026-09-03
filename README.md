@@ -52,7 +52,7 @@ codex plugin marketplace add GregoryHo/arcforge
 codex plugin add arcforge@arcforge-dev
 ```
 
-All 15 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. **Skills are all that installs.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
+All 15 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. The same mapping covers the handoffs skills write to each other: wherever a skill says `/<name>` — `/tdd`, `/finishing` — that is the `arcforge:<name>` skill on Codex, reached from the same picker. **Skills are all that installs.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
 
 | On Codex | Status |
 |---|---|

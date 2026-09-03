@@ -123,6 +123,25 @@ whole and fails halfway through a workflow.
   without being handed a security chore: because of B-2 there is no hook-trust
   prompt to answer and nothing to "leave untrusted".
 
+  The note is scoped to the whole toolkit, not to the table under it: **wherever
+  a skill says `/<name>` — including the handoffs skills write to each other
+  mid-workflow — that is the `arcforge:<name>` skill on Codex, reached the same
+  way.** Stating it once is the only available move, not a shortcut. The frozen
+  skill schema admits exactly two cross-skill spellings (`/<name>` and
+  `/arcforge:<name>`, §4.1/§5), and both cross-reference parsers resolve only
+  those, so a third notation inside skill bodies would drop every handoff out of
+  enforcement; a per-host table inside a skill is B-7's forbidden branch. What
+  the single statement buys is measurability: the instruction lives in the one
+  file an eval can target.
+
+  **Residual, pre-registered as unmeasured.** Whether a Codex agent actually
+  follows such a handoff is not measured and is not claimed. The eval harness
+  spawns `claude` and has no Codex runner — that is the
+  `harness-neutral-model-runner` Backlog wish — so the evidence on record is
+  Claude-side only: a non-regression A/B of `eval-router-skill-selection` over
+  the edited router, booked in `evals/skill-eval-coverage.md`. The Codex half
+  stays open until a harness can reach that host.
+
 ### What this must not become
 
 - **B-7 No source-level split.** No `platform/` directories, no per-host skill
