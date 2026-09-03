@@ -50,7 +50,7 @@ const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
 const DECISION_ANY_RE = /^###\s+D-/;
 const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
 const RELATION_FIELD_RE =
-  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+[^)]+\))?\s*$/;
+  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 

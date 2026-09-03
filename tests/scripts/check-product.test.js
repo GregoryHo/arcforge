@@ -199,6 +199,16 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/expected it to carry "partially superseded by D-002"/);
     });
 
+    it('rejects a clause id that is not a number', () => {
+      const decisions = supersedingLog(
+        '- Supersedes: D-001 (clause two)',
+        'Accepted · partially superseded by D-002',
+      );
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line/);
+    });
+
     it('rejects a Supersedes naming a decision that does not exist', () => {
       const decisions = [
         decision({ id: 'D-001' }),
