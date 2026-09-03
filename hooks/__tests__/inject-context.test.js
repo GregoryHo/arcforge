@@ -74,6 +74,126 @@ describe('loadPendingActions relay isolation (S7-1)', () => {
 });
 
 // ─────────────────────────────────────────────
+// reflect-ready delivery gate (D-009)
+//
+// The nudge is gated at queue time in end.js so it never accumulates while
+// learning is off. That cannot retract one already queued: disabling learning
+// between the queuing Stop and the next SessionStart must drop it too, or the
+// learning-off session gets the exact invitation hooks B-6 promises it will not.
+// ─────────────────────────────────────────────
+
+describe('reflect-ready delivery gate (D-009)', () => {
+  const originalEnv = { ...process.env };
+  let homeDir;
+  let projectDir;
+
+  beforeEach(() => {
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-reflect-home-'));
+    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-reflect-proj-'));
+    process.env.HOME = homeDir;
+    delete process.env.ARCFORGE_SPAWNED;
+    delete require.cache[require.resolve('../session-tracker/inject-context')];
+    delete require.cache[require.resolve('../../scripts/lib/pending-actions')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    fs.rmSync(projectDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  function seedAction(project, type, payload) {
+    const { addPendingAction } = require('../../scripts/lib/pending-actions');
+    return addPendingAction(project, type, payload);
+  }
+
+  function unconsumedCount(project) {
+    const { getPendingActions } = require('../../scripts/lib/pending-actions');
+    return getPendingActions(project).length;
+  }
+
+  /** Turn the project-scope learning opt-in on for the temp project root. */
+  function enableLearning() {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
+  it('learning off: a queued reflect-ready is suppressed and consumed, not deferred', () => {
+    const project = 'reflect-delivery-off';
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.strictEqual(result.text, null, 'no reflection line with learning off');
+    assert.strictEqual(result.summary, null, 'and nothing in the user summary either');
+    assert.strictEqual(unconsumedCount(project), 0, 'suppressed, not deferred to a later start');
+  });
+
+  it('learning off: diary-ready still renders and reflect-ready leaves no trace', () => {
+    const project = 'reflect-delivery-mixed';
+    seedAction(project, 'diary-ready', { trigger: 'compaction' });
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.ok(result.text.includes('Diary draft ready'), 'diary-ready is unaffected by the gate');
+    assert.ok(
+      !result.text.includes('reflect-ready'),
+      'a suppressed nudge must not fall through to the raw Pending line',
+    );
+    assert.ok(!result.text.includes('ready for reflection'), 'nor to the reflection line');
+    assert.strictEqual(unconsumedCount(project), 0, 'both actions consumed');
+  });
+
+  it('learning on: the queued nudge renders exactly as before', () => {
+    const project = 'reflect-delivery-on';
+    enableLearning();
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.ok(
+      result.text.includes('4 unprocessed diaries ready for reflection'),
+      `expected the reflection line: ${result.text}`,
+    );
+    assert.strictEqual(result.summary, '4 diaries pending reflection');
+    assert.strictEqual(unconsumedCount(project), 0, 'consumed as before');
+  });
+
+  // The gate fails closed on a missing projectRoot, so a main() that never
+  // threaded one through would suppress the nudge for opted-in users too — and
+  // every direct-call case above would still pass. This one spawns the real
+  // hook to pin the wiring.
+  it('main(): SessionStart delivers the nudge to an opted-in project', () => {
+    const project = path.basename(projectDir);
+    enableLearning();
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
+    delete env.ARCFORGE_SPAWNED;
+    delete env.ARCFORGE_HOME;
+    const res = spawnSync('node', [INJECT_CONTEXT], {
+      input: JSON.stringify({
+        cwd: projectDir,
+        hook_event_name: 'SessionStart',
+        source: 'startup',
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      res.stdout.includes('unprocessed diaries ready for reflection'),
+      `main() must pass the project root through: ${res.stdout}`,
+    );
+  });
+});
+
+// ─────────────────────────────────────────────
 // SessionStart child process (relay isolation, end-to-end)
 // ─────────────────────────────────────────────
 
