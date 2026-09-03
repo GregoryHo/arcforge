@@ -258,11 +258,13 @@ describe('diary-capture', () => {
       savedPath = process.env.PATH;
       process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
       // Stub `claude` so the REAL argv the enricher spawns with is recorded,
-      // one argument per line (paths contain no newlines).
+      // one argument per line (paths contain no newlines). The lines go to a
+      // temp file and are renamed into place, so the poller below can never
+      // read a half-written argv and miss a flag that is simply not there yet.
       const argvFile = path.join(binDir, 'argv.txt');
       fs.writeFileSync(
         path.join(binDir, 'claude'),
-        `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}"\n`,
+        `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}.tmp"\nmv "${argvFile}.tmp" "${argvFile}"\n`,
         { mode: 0o755 },
       );
     });
