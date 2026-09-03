@@ -246,9 +246,9 @@ whether the candidate's name can be used as a draft filename. On a non-instinct
 candidate, or one the curator named with a path separator, `..`, a control
 character or nothing at all, it refuses without approving anything: no draft, no
 audit entry, the candidate exactly as it was — and the refusal names the move
-that is left. For a non-instinct candidate that move is recording the approval on
-its own; for a name the draft writer cannot use it is `learn reject` — or, where
-the queue no longer allows that, the dashboard — because nothing the CLI offers
+that is left, or the dashboard where the queue no longer allows that move. For a
+non-instinct candidate the move is recording the approval on its own; for a name
+the draft writer cannot use it is `learn reject`, because nothing the CLI offers
 renames a candidate. The single-step commands do the opposite, and dispatch
 first, so what you read is the engine's own refusal and the refusal is recorded.
 Accept is all-or-nothing because half of it cannot be undone — the queue is
