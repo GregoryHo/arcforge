@@ -484,7 +484,7 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
 
 1. Materialization supports **`instinct` drafts** for both project-scoped and global-scoped candidates. Global drafts must carry promotion provenance and remain inactive until explicit Layer 8 activation.
 2. Draft roots live only under `~/.arcforge/learning/drafts/<candidate_id>/<materialization_id>/`. Project-local `.arcforge/` draft roots are deferred to avoid accidental runtime discovery or repo pollution.
-3. A duplicate materialization request returns the latest existing draft only when the candidate record hash and render policy version match. If either changed, Layer 7 creates a new `materialization_id` and draft record.
+3. A duplicate materialization request returns the latest existing draft only when the candidate record hash and render policy version match *and* the draft artifacts that manifest records are still on disk with their recorded content hashes. If any of the three fails, Layer 7 creates a new `materialization_id` and draft record; a draft that was deleted or edited is never reused, and never overwritten either.
 4. Draft previews are served through bounded Layer 7 read endpoints consumed by Layer 6. The dashboard must not read arbitrary local files and must not send raw draft paths to the browser by default.
 
 ## Deferred decisions

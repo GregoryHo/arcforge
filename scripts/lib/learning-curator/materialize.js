@@ -11,7 +11,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const { sanitizeFilename, atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const {
+  sanitizeFilename,
+  atomicWriteFile,
+  sha256Truncated,
+  getArcforgeHome,
+  readFileSafe,
+} = require('../utils');
 const { redactObservationText, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 
@@ -270,6 +276,42 @@ function makeFailure(opts) {
 // Idempotence — scan for existing materializations
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether every draft artifact a manifest records is still on disk and still
+ * hashes to what the manifest recorded.
+ *
+ * The first-slice default returns "the latest existing draft" for a duplicate
+ * request — an existing *draft*, not merely an existing manifest. A manifest
+ * whose draft was deleted or edited no longer describes one, so it is not
+ * reusable: reusing it would report success and hand `learn drafts` a stale
+ * path, while the later activation refuses on this very hash check (L8-3, see
+ * activate.js).
+ *
+ * @param {object} record MaterializationRecord
+ * @returns {boolean}
+ */
+function draftArtifactsIntact(record) {
+  const artifacts = record.draft_artifacts;
+  if (!Array.isArray(artifacts) || artifacts.length === 0) return false;
+  return artifacts.every((artifact) => {
+    if (!artifact || !artifact.draft_path) return false;
+    const content = readFileSafe(artifact.draft_path);
+    if (content === null) return false;
+    return sha256Truncated(content, 64) === artifact.content_hash;
+  });
+}
+
+/**
+ * The latest reusable materialization for a candidate, or null.
+ *
+ * Reusable means all three of: the candidate record hash matches, the render
+ * policy version matches, and the recorded drafts are still intact. A manifest
+ * failing any of those is skipped, so the caller materializes afresh — and a
+ * manifest left stale by a deleted or edited draft keeps failing the intactness
+ * check on every later call, so it can never be handed back once superseded.
+ * `created_at` only picks between manifests that are all still reusable, which
+ * is what the contract means by "the latest existing draft".
+ */
 function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, policyVersion) {
   const candidateDraftsDir = path.join(getDraftsBase(arcforgeRoot), candidateId);
   if (!fs.existsSync(candidateDraftsDir)) return null;
@@ -281,23 +323,22 @@ function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, p
     return null;
   }
 
+  let latest = null;
   for (const entry of entries) {
     const manifestPath = path.join(candidateDraftsDir, entry, 'materialization.json');
     if (!fs.existsSync(manifestPath)) continue;
+    let record;
     try {
-      const record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      if (
-        record.source_candidate &&
-        record.source_candidate.candidate_record_hash === candidateHash &&
-        record.render_policy_version === policyVersion
-      ) {
-        return record;
-      }
+      record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     } catch {
-      // Corrupted manifest — skip
+      continue; // Corrupted manifest — skip
     }
+    if (record.source_candidate?.candidate_record_hash !== candidateHash) continue;
+    if (record.render_policy_version !== policyVersion) continue;
+    if (!draftArtifactsIntact(record)) continue;
+    if (!latest || record.created_at > latest.created_at) latest = record;
   }
-  return null;
+  return latest;
 }
 
 // ---------------------------------------------------------------------------
@@ -376,6 +417,11 @@ function materialize({
     effectivePolicy.policy_version,
   );
   if (existingRecord) {
+    // Reaching here means `findExistingMaterialization` also confirmed every
+    // recorded draft is still on disk and still matches its content hash, so the
+    // paths handed back name real files. A manifest whose draft went missing or
+    // was edited is not returned at all — the fall-through below writes a fresh
+    // materialization instead of advancing the lifecycle on a stale path.
     const existingDraftPaths = existingRecord.draft_artifacts.map((a) => a.draft_path);
     // L7-8/AC-10: the report to Layer 5 is owed on this branch exactly as on the
     // fresh one — the manifest is already durable on disk, which is the condition
