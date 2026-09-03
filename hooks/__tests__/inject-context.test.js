@@ -16,6 +16,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const INJECT_CONTEXT = path.join(__dirname, '..', 'session-tracker', 'inject-context.js');
+const { loadStaleDraftWarning } = require(INJECT_CONTEXT);
 
 // ─────────────────────────────────────────────
 // loadPendingActions relay isolation (S7-1)
@@ -277,27 +278,35 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
     );
   });
 
+  // Direct call, not a spawn: only mtime can be backdated portably, and this
+  // case is about the CREATION stamp — so the draft is written now and the
+  // floor is placed after it, which is the same ordering a pre-opt-in stub has.
   it('keeps a pre-opt-in draft suppressed after it is hand-edited or touched', () => {
-    const draft = writeStaleDraft('diary-session-old-draft.md', 5 * DAY_MS);
-    enableLearning(3 * DAY_MS);
+    const previousHome = process.env.ARCFORGE_HOME;
+    process.env.ARCFORGE_HOME = path.join(homeDir, '.arcforge');
+    try {
+      const draft = writeStaleDraft('diary-session-old-draft.md', 0);
+      const enabledSince = Date.now() + DAY_MS;
 
-    const before = runInject();
-    assert.strictEqual(before.status, 0, before.stderr);
-    assert.ok(
-      !before.stdout.includes('unenriched'),
-      `the pre-opt-in stub must start out silent. stdout: ${before.stdout}`,
-    );
+      assert.strictEqual(
+        loadStaleDraftWarning(project, enabledSince),
+        null,
+        'a draft that existed before the opt-in must not be reported',
+      );
 
-    // Touching the stub moves mtime past the opt-in; creation time does not
-    // move, so the floor still recognizes it as a pre-opt-in stub.
-    const now = new Date();
-    fs.utimesSync(draft, now, now);
+      // A hand-edit or `touch` moves mtime past the floor. Creation time does
+      // not move, so the draft is still recognized as a pre-opt-in stub.
+      const after = new Date(Date.now() + 3 * DAY_MS);
+      fs.utimesSync(draft, after, after);
 
-    const after = runInject();
-    assert.strictEqual(after.status, 0, after.stderr);
-    assert.ok(
-      !after.stdout.includes('unenriched'),
-      `touching a pre-opt-in stub must not turn it into a reported failure. stdout: ${after.stdout}`,
-    );
+      assert.strictEqual(
+        loadStaleDraftWarning(project, enabledSince),
+        null,
+        'touching a pre-opt-in stub must not turn it into a reported failure',
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.ARCFORGE_HOME;
+      else process.env.ARCFORGE_HOME = previousHome;
+    }
   });
 });

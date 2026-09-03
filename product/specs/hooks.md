@@ -87,8 +87,11 @@ down, never block the user, and never observe them uninvited.
   has since failed to fill in, rather than the backlog of stubs from before it
   was ever asked to. The floor is the earlier of the draft's creation and
   last-write times, so hand-editing or touching a pre-opt-in stub does not lift
-  it above the floor; a copy that resets both stamps (a backup restore or
-  machine migration) does, and reports it. There is no
+  it above the floor. Two things still do, and are reported: a copy that
+  preserves neither stamp — a sync re-download or a naive unzip, where ordinary
+  restore tooling keeps the modification time and so stays below the floor — and
+  a filesystem that records no creation time, which leaves the floor resting on
+  last-write alone. There is no
   per-hook switch: the single opt-in covers the learning loop in either scope,
   disabling learning stops it, and uninstalling the plugin removes everything.
 
