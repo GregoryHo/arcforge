@@ -253,11 +253,14 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Status: Accepted
 - Decision: The durable session record stays always-on, and so does its
   metadata — duration, message and tool counts, compactions, tool names, and
-  modified file paths — along with the diary draft, which is built from those
-  counts alone. Verbatim user-message text (`userMessageContent`) is the one
-  field that moves behind the learning opt-in. The transcript is still parsed
-  unconditionally above the threshold, because the diary's modified-files line
-  depends on it.
+  modified file paths — along with the diary draft, which renders the counts
+  and the modified-file paths, plus a tool-usage aggregate whenever an
+  observations log already exists for the project. That aggregate is the only
+  place tool names reach a draft, and observation is itself gated, so with
+  learning off it can only be residue of a period when learning was on.
+  Verbatim user-message text (`userMessageContent`) is the one field that moves
+  behind the learning opt-in. The transcript is still parsed unconditionally
+  above the threshold, because the diary's modified-files line depends on it.
 - Why: Continuity is not a learning feature and should not require opting into
   learning; a record of how long a session ran and what it touched is
   bookkeeping the user already sees. Storing what the user actually *said* is a
