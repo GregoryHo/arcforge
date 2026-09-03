@@ -265,7 +265,7 @@ function SessionLearning({theme:t}) {
 function Platforms({theme:t}) {
   const plats = [
     {name:'Claude Code',tag:'IN FULL',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
-    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:'codex plugin add arcforge@arcforge-dev',note:'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'},
+    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'},
     {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
@@ -288,7 +288,7 @@ function Platforms({theme:t}) {
               <Stamp label={p.tag} color={p.primary?t.ember:t.brass} small/>
             </div>
             <div style={{color:t.mute,fontSize:13,lineHeight:1.55,marginBottom:18}}>{p.note}</div>
-            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{p.cmd}</div>
+            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c} style={{lineHeight:1.7}}>{c}</div>):p.cmd}</div>
           </div>
         ))}
       </div>

@@ -733,7 +733,7 @@ function Platforms({
   }, {
     name: 'Codex CLI',
     tag: 'SKILLS ONLY',
-    cmd: 'codex plugin add arcforge@arcforge-dev',
+    cmd: ['codex plugin marketplace add GregoryHo/arcforge', 'codex plugin add arcforge@arcforge-dev'],
     note: 'All 15 skills load from the same tree. Hooks, learning, eval and the loop stay Claude Code\u2019s \u2014 and the README says so before you install.'
   }, {
     name: 'Node.js',
@@ -807,7 +807,12 @@ function Platforms({
       padding: '10px 14px',
       border: `1px dashed ${t.line}`
     }
-  }, p.cmd)))));
+  }, Array.isArray(p.cmd) ? p.cmd.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c,
+    style: {
+      lineHeight: 1.7
+    }
+  }, c)) : p.cmd)))));
 }
 
 // ─── Skills Grid (all 15) ───
