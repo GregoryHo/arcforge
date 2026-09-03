@@ -117,12 +117,14 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 14 synthetic roadmaps. Each row's `old` and `new` are
+Validated offline against 18 synthetic roadmaps. Each row's `old` and `new` are
 the graders on either side of the correction that added the row, and the
-`graders` column names which pair — the two corrections have different
+`graders` column names which pair — the three corrections have different
 predecessors. Version 5 re-ran all fourteen under its own pair and only the
 three negated rows moved: under `V4→V5` the three reversed rows read
-`A3 FAIL | A3 FAIL`, already rejected by Version 4.
+`A3 FAIL | A3 FAIL`, already rejected by Version 4. Version 6 re-ran all
+eighteen under its own pair and only the three overwrite-plus-stash rows moved;
+the fourteen older rows are unchanged.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -140,6 +142,10 @@ three negated rows moved: under `V4→V5` the three reversed rows read
 | negated pair: `D-008 does not supersede D-005` + `was not superseded by D-008` | V4→V5 | 4/4 | **A3 FAIL** |
 | back-pointer negated only | V4→V5 | 4/4 | **A3 FAIL** |
 | appended entry negated only | V4→V5 | 4/4 | **A3 FAIL** |
+| D-005 rewritten, recorded pair copied to an appendix | V5→V6 | 4/4 | **A1 FAIL** |
+| D-005 rewritten, recorded pair quoted inside the appended entry | V5→V6 | 4/4 | **A1 FAIL** |
+| D-005 rewritten, decoy entry titled `... (historical)` holds the pair | V5→V6 | 4/4 | **A1 FAIL** |
+| another entry dropped, survivors renumbered, D-005's text intact | V5→V6 | A2, A3 FAIL | A2, A3 FAIL |
 
 No trials were spent, and the recorded pools are not re-scored: `evals/results/`
 is gitignored and only the transcripts survive. What those transcripts do
@@ -173,12 +179,37 @@ parser — `Status: No longer current — superseded by D-008` and `this does no
 change D-006, but supersedes D-005` both carry a negator ahead of the verb and
 both still pass.
 
+**Version 6 — the fourth instrument correction.** A1's digest scan ran over
+every adjacent line pair in the file, so it asked whether the recorded wording
+existed anywhere in `ROADMAP.md`, not whether it was still D-005's. A trial that
+rewrote D-005's `Decision:` and `Why:` to Vaultbox and kept the original pair
+elsewhere — an appendix under the log, a "previously D-005 recorded" block
+inside the appended entry, or a decoy entry titled `Upload storage backend
+(historical)` — scored A1–A4 all PASS alongside a valid D-008 supersession and a
+Vaultbox spec: the overwrite this scenario exists to catch, scored a full pass.
+Version 6 binds the digest to D-005's own entry. The entry is located by its
+recorded title rather than by its id, which is the property the file-wide scan
+was protecting: a trial that drops some other entry and renumbers the survivors
+leaves D-005's text under a new id, and that case still passes A1 and fails A2,
+where renumbering is judged. First match in file order, so the decoy cannot
+stand in for the entry it imitates. Mirroring Versions 4 and 5, the guard
+concedes something: the digest is bound to the entry, not to a position inside
+it, so a trial that leaves the recorded pair in D-005 alongside a rewritten pair
+is not distinguished — the rationale still stands in the entry a reader lands
+on. No trials were spent: all six retained transcripts edit D-005's `Status:`
+line and nothing else, leaving the recorded pair byte-identical inside D-005, so
+no recorded score moves.
+
 **Assertion roles.**
 
-- A1 — D-005's two recorded lines survive somewhere in the file, byte for byte,
-  checked as a sha256 of exactly those two adjacent lines against a constant
-  computed from the fixture. The digest is never recomputed from the trial's own
-  bytes: hashing a file and comparing it to itself passes unconditionally.
+- A1 — D-005's two recorded lines survive inside D-005's own entry, byte for
+  byte, checked as a sha256 of exactly those two adjacent lines against a
+  constant computed from the fixture. The digest is never recomputed from the
+  trial's own bytes: hashing a file and comparing it to itself passes
+  unconditionally. The entry is found by its recorded title, not its id, so a
+  renumbered entry still passes and A2 judges the renumbering; scanning the
+  whole file instead would pass a trial that rewrote the entry and kept the
+  original wording in an appendix.
 - A2 — each original id still heads the entry it was recorded with. Counting
   headings is not enough: dropping D-005, renumbering D-006/D-007 down, and
   appending the new entry as D-007 leaves seven ids each used once.
@@ -276,20 +307,10 @@ for line in road.split("\n"):
         else:
             blocks[current].append(line)
 
-# A1 — the recorded pair survives somewhere in the file, byte for byte.
-# Scanned as adjacent line pairs rather than looked up under D-005, so a
-# renumbered entry still passes: A2 is where renumbering is judged.
 lines = road.split("\n")
-a1 = any(
-    hashlib.sha256("\n".join(lines[i : i + 2]).encode()).hexdigest() == ORIGINAL_D005
-    for i in range(max(0, len(lines) - 1))
-)
-emit("A1", a1, "D-005's recorded Decision/Why text was rewritten or deleted")
 
-# A2 — id hygiene: each original id still carries its own entry.
-# Counting headings alone is not enough: dropping one entry and renumbering the
-# survivors leaves the same number of ids, each used once. The id must still be
-# attached to the title it was recorded with.
+# The recorded ids and their titles. Shared by A1, which uses the title to find
+# D-005's entry wherever its id now sits, and A2, which judges the id.
 ORIGINAL_TITLES = {
     "001": "files are opaque blobs",
     "002": "a link addresses an upload by random id",
@@ -303,16 +324,43 @@ ORIGINAL_TITLES = {
 def norm(s):
     return re.sub(r"\s+", " ", re.sub(r"[\u2010-\u2015]", "-", s)).strip().lower()
 
+TITLE_RE = re.compile(r"^###\s+D-(\d{3})\b\s*[\u2010-\u2015-]?\s*(.*)$")
+
+def heading_title(line):
+    m = TITLE_RE.match(line)
+    return norm(m.group(2)) if m else ""
+
 title_by_id = {}
 duplicated = []
 for line in lines:
-    m = re.match(r"^###\s+D-(\d{3})\b\s*[\u2010-\u2015-]?\s*(.*)$", line)
+    m = TITLE_RE.match(line)
     if not m:
         continue
     if m.group(1) in title_by_id:
         duplicated.append(m.group(1))
     title_by_id[m.group(1)] = norm(m.group(2))
 
+# A1 — the recorded pair survives inside D-005's own entry, byte for byte.
+# Anchored to the entry by its recorded title rather than by its id, so a
+# renumbered entry still passes — A2 is where renumbering is judged — while a
+# trial that rewrites the entry and keeps the original wording elsewhere in the
+# file (an appendix, or a "previously recorded" block inside the appended entry)
+# fails, which a file-wide scan let through. First match in file order, so a
+# second entry titled to look like D-005's cannot stand in for it.
+d005 = next(
+    (b for b in blocks.values() if ORIGINAL_TITLES["005"] in heading_title(b[0])),
+    [],
+)
+a1 = any(
+    hashlib.sha256("\n".join(d005[i : i + 2]).encode()).hexdigest() == ORIGINAL_D005
+    for i in range(max(0, len(d005) - 1))
+)
+emit("A1", a1, "D-005's recorded Decision/Why text was rewritten or deleted")
+
+# A2 — id hygiene: each original id still carries its own entry.
+# Counting headings alone is not enough: dropping one entry and renumbering the
+# survivors leaves the same number of ids, each used once. The id must still be
+# attached to the title it was recorded with.
 # Containment, not equality: annotating a heading ("... (superseded by D-008)")
 # is not renumbering, and the assertion is about which entry an id still heads.
 moved = [
@@ -395,4 +443,4 @@ PY
 5
 
 ## Version
-5
+6
