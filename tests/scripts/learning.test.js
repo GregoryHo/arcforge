@@ -487,6 +487,17 @@ describe('learn candidate commands over the canonical queue', () => {
     return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
   }
 
+  /** The whole on-disk record of a candidate's drafts — every manifest and file. */
+  function draftsDir(candidateId = CANDIDATE_ID) {
+    return path.join(arcforgeHome, 'learning', 'drafts', candidateId);
+  }
+
+  /** The manifest of a candidate's single materialization. */
+  function manifestPath(candidateId = CANDIDATE_ID) {
+    const [dir] = materializationDirs(candidateId);
+    return path.join(draftsDir(candidateId), dir, 'materialization.json');
+  }
+
   /** The one audit log both front ends append to, newest last. */
   function auditEntries() {
     const logPath = path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl');
@@ -866,6 +877,93 @@ describe('learn candidate commands over the canonical queue', () => {
         'already active — retire it by deactivating it from the dashboard',
       ]);
     });
+
+    // What the next four pin: the other way to have no draft. Not a recorded
+    // file that moved, but a manifest that is gone — `findLatestMaterialization`
+    // returns null when the drafts directory is deleted and silently skips a
+    // manifest it cannot parse. `draft_paths_stale` is then empty, because there
+    // is no recorded file left to call stale, and every surface used to read
+    // that empty list as a healthy draft.
+    it('sends drafts to inspect when the materialization record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      expect(runJson(['drafts', '--project']).drafts[0].next_command).toBe(
+        `arcforge learn activate ${CANDIDATE_ID} --project`,
+      );
+
+      fs.rmSync(draftsDir(), { recursive: true });
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(entry.draft_paths).toEqual([]);
+      expect(entry.draft_paths_stale).toEqual([]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = entry.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+      // …and the activation it stopped advertising is the one that refuses.
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    // The draft file is untouched here — only the manifest describing it is
+    // unreadable, which is the case `findLatestMaterialization`'s silent catch
+    // turns into "no record" without saying so.
+    it('sends drafts to inspect when the manifest cannot be parsed', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(manifestPath(), 'not json {', 'utf8');
+
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(fs.existsSync(draftPath)).toBe(true);
+      expect(entry.draft_paths).toEqual([]);
+      expect(entry.draft_paths_stale).toEqual([]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    it('stops telling inspect to review a draft whose record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /review the draft/,
+      );
+
+      fs.rmSync(draftsDir(), { recursive: true });
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths).toEqual([]);
+      expect(detail.draft_paths_stale).toEqual([]);
+      expect(detail.next_actions.join(' ')).not.toMatch(/review the draft/);
+      expect(detail.next_actions[0]).toMatch(/no materialization record remains/);
+    });
+
+    // The override is scoped to `materialized` for the record-absent case too:
+    // an activated candidate is already live whatever became of its drafts
+    // tree, and a deactivated one can still be materialized afresh.
+    it('keeps the activated and deactivated prose when the record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+
+      const activated = runJson(['inspect', CANDIDATE_ID, '--project']);
+      expect(activated.candidate.lifecycle_status).toBe('activated');
+      expect(activated.next_actions).toEqual([
+        'already active — retire it by deactivating it from the dashboard',
+      ]);
+
+      deactivate(CANDIDATE_ID);
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.next_actions).toEqual([
+        'materialize or activate it again, or leave it retired',
+      ]);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1156,6 +1254,45 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(error).toMatch(/has changed since it was written/);
       expect(error).toMatch(/nothing was applied/);
       expect(queueBytes()).toBe(before);
+    });
+
+    // The third way `accept`'s no-op branch can have nothing to hand back: the
+    // manifest itself is gone, so there is no recorded file to report as stale
+    // and the refusal has to name the missing record instead.
+    it('refuses to accept a materialized candidate whose record is gone', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/No materialization record remains/);
+      expect(error).toMatch(/nothing was applied/);
+      // Not the stale-file wording, which would name no file after its colon.
+      expect(error).not.toMatch(/is no longer what was written/);
+      expect(queueBytes()).toBe(before);
+    });
+
+    // `activate` is still the command the guide names for a materialized
+    // candidate, so a reviewer can reach this refusal by typing it after
+    // `drafts` stops advertising it. `materialization_missing` is rejected by
+    // the shared handler rather than by a curator module, so its detail never
+    // reaches `module_failure` — without prose it prints as the bare reason.
+    it('renders reviewer prose when activation finds no materialization record', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/no materialization record remains for/);
+      expect(error).toMatch(/arcforge learn dashboard/);
+      expect(error).not.toBe('arcforge learn activate refused: materialization_missing');
     });
 
     it('refuses to accept an activated candidate as a policy violation, not a race', () => {

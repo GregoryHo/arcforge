@@ -90,8 +90,8 @@ was recorded about them.
   contract. A draft is the exception that is still owed a report, because
   reviewing one is what the product asks of the user: no surface names a draft
   as ready to review, hands its path back as a success, or offers the
-  activation that would refuse, when the file it names is missing or has
-  changed since it was written. The on-disk formats are append-only or
+  activation that would refuse, when the draft it would name is not there —
+  the file missing, changed since it was written, or the record of it gone. The on-disk formats are append-only or
   atomically overwritten, owned by the engine per the curator schema (cited
   above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence

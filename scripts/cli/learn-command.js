@@ -228,6 +228,27 @@ function staleDraftsIn(record) {
   return staleDraftArtifacts(record);
 }
 
+/**
+ * Whether the candidate has no reviewable draft behind its manifest at all.
+ *
+ * `staleDraftsIn` cannot answer this. It is a per-recorded-file question, and a
+ * manifest that is absent, unparseable or structurally empty names no file to
+ * call stale — `findLatestMaterialization` returns `null` when the drafts
+ * directory is gone and silently skips a manifest it cannot parse, so an empty
+ * stale list means either "every recorded draft is intact" or "there is no
+ * record to check", which are opposite answers to the only question the draft
+ * surfaces ask.
+ *
+ * `draftArtifactsIntact` is Layer 7's own answer to "is there a reviewable
+ * draft" — it is the predicate the reuse branch screens manifests with, and it
+ * is false for a missing, empty or pathless record as well as a stale one — so
+ * this asks it rather than adding a second predicate here.
+ */
+function draftUnavailableIn(record) {
+  const { draftArtifactsIntact } = require('../lib/learning-curator/materialize');
+  return !draftArtifactsIntact(record);
+}
+
 /** The one-question form, for the callers that ask only about the paths. */
 function draftPathsFor(candidateId) {
   return draftPathsIn(latestMaterializationFor(candidateId));
@@ -250,6 +271,12 @@ function describeStaleDrafts(stale) {
  * as `unsupportedTypeActions` is: `nextActionsFor` is pure, and this answer
  * comes off disk.
  *
+ * Two arms, because there are two ways to have no draft and they refuse
+ * differently: recorded files that no longer match (activation refuses on the
+ * content hash) and no usable record at all (activation refuses with
+ * `materialization_missing`). The empty-list arm is not cosmetic —
+ * `describeStaleDrafts([])` would leave a dangling colon naming nothing.
+ *
  * `materialized` is the only status this may replace, for the same reason
  * `STATUSES_NAMING_A_BUILD` exists: it is the only one whose prose names the
  * draft, so it is the only one a stale draft contradicts. Every other status's
@@ -260,6 +287,13 @@ function describeStaleDrafts(stale) {
  * read and never removed by activation.
  */
 function staleDraftActions(stale) {
+  if (stale.length === 0) {
+    return [
+      'no materialization record remains for this candidate, so there is no draft to review',
+      'activation refuses without a record, so there is nothing to activate — ' +
+        'review the queue in: arcforge learn dashboard',
+    ];
+  }
   return [
     `the recorded draft is not what was written: ${describeStaleDrafts(stale)}`,
     'activation refuses on the recorded content hash, so there is nothing to activate — ' +
@@ -377,6 +411,19 @@ function refusalMessage(result, verb, card) {
       `running (it was ${result.expected}); re-run to act on the current state`
     );
   }
+  // `materialization_missing` is rejected by the shared handler itself rather
+  // than by a curator module, so its detail lands at the top level of the
+  // result and never reaches `module_failure` below — the bare reason string is
+  // what a reviewer would otherwise read. It is reachable by typing the command
+  // the guide documents for a materialized candidate, so it gets reviewer prose
+  // like the other handler-level refusals above, not a `result.detail`
+  // fallback, which would change how every other one renders.
+  if (result.reason === 'materialization_missing') {
+    return (
+      `${base} — no materialization record remains for ${card.candidate_id}, so there is no ` +
+      'recorded draft to activate. Review the queue in: arcforge learn dashboard'
+    );
+  }
   const detail = result.module_failure?.detail;
   return detail ? `${base} — ${detail}` : base;
 }
@@ -463,10 +510,14 @@ function runInspect({ scope }, candidateId) {
   const card = findProjectCard(candidateId);
   const materialization = latestMaterializationFor(card.candidate_id);
   const stale = staleDraftsIn(materialization);
-  // The staleness fact is reported for every status — it is a fact about disk,
-  // not about the lifecycle — but it only overrides the prose of the one
-  // status that names the draft. See `staleDraftActions`.
-  const overrideProse = stale.length > 0 && card.lifecycle_status === 'materialized';
+  // The disk fact is reported for every status — it is a fact about disk, not
+  // about the lifecycle — but it only overrides the prose of the one status
+  // that names the draft. See `staleDraftActions`. The predicate is
+  // "unavailable", not "stale": a candidate whose manifest is gone has no draft
+  // to review either, and reports an empty `draft_paths_stale` because there is
+  // no recorded file left to call stale.
+  const unavailable = draftUnavailableIn(materialization);
+  const overrideProse = unavailable && card.lifecycle_status === 'materialized';
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
@@ -490,11 +541,14 @@ function runDrafts({ scope }) {
         // `nextCommandFor` is keyed on status and artifact type, so for every
         // entry here it names `activate` — the one action the matrix allows a
         // materialized candidate. Activation refuses on the recorded content
-        // hash, so for a stale entry that is a command the CLI would then
-        // refuse, and this listing already carries the fact that disqualifies
-        // it. Same norm as the artifact-type narrowing: send it to `inspect`,
-        // which says why, rather than advertising a step with nothing behind it.
-        next_command: stale.length > 0 ? inspectCommandFor(card) : nextCommandFor(card),
+        // hash when a recorded draft is stale, and with `materialization_missing`
+        // when no usable manifest is left, so in either case that is a command
+        // the CLI would then refuse. Same norm as the artifact-type narrowing:
+        // send it to `inspect`, which says why, rather than advertising a step
+        // with nothing behind it.
+        next_command: draftUnavailableIn(materialization)
+          ? inspectCommandFor(card)
+          : nextCommandFor(card),
         draft_paths: draftPathsIn(materialization),
         draft_paths_stale: stale,
       };
@@ -529,18 +583,27 @@ function acceptRefusalMessage(card) {
  * literally true here — the refusal replaces a report, not a transition.
  *
  * It names no recovery command on purpose. `materialized` allows only
- * `activate`, and activation refuses on the recorded content hash, so every
- * command the CLI has would refuse in turn; inventing one would send the
- * reviewer around that loop. The dashboard is where the queue is reviewable,
- * so that is what it points at.
+ * `activate`, and activation refuses on the recorded content hash — or with
+ * `materialization_missing` when no usable manifest is left — so every command
+ * the CLI has would refuse in turn; inventing one would send the reviewer
+ * around that loop. The dashboard is where the queue is reviewable, so that is
+ * what it points at.
+ *
+ * `stale` is empty when the manifest itself is absent, unparseable or names no
+ * draft: there is no recorded file left to call stale, so the cause clause says
+ * the record is gone rather than emitting a colon with nothing after it.
  */
 function staleDraftAcceptMessage(card, stale) {
+  const cause =
+    stale.length > 0
+      ? `Its recorded draft is no longer what was written: ${describeStaleDrafts(stale)}.`
+      : 'No materialization record remains for it, so there is no draft to hand back.';
   return (
     `arcforge learn accept refused, and nothing was applied — ${card.candidate_id} is ` +
-    `already materialized and is unchanged. Its recorded draft is no longer what was ` +
-    `written: ${describeStaleDrafts(stale)}. There is nothing left to hand back: the canonical ` +
-    'Action × Status matrix allows a materialized candidate only to activate, and activation ' +
-    'refuses on the recorded content hash. Review the queue in: arcforge learn dashboard'
+    `already materialized and is unchanged. ${cause} There is nothing left to hand back: the ` +
+    'canonical Action × Status matrix allows a materialized candidate only to activate, and ' +
+    'activation refuses without an intact recorded draft. Review the queue in: ' +
+    'arcforge learn dashboard'
   );
 }
 
@@ -574,12 +637,14 @@ function runAccept({ scope }, candidateId) {
   if (card.lifecycle_status === 'materialized') {
     // The no-op branch dispatches nothing and reports the draft the candidate
     // already has. Reporting a path that is not there — or one whose file has
-    // been edited since the manifest recorded it — would be success over a
-    // draft that activation then refuses, so the report has to be checked even
-    // though there is no transition to guard.
+    // been edited since the manifest recorded it, or an empty list because the
+    // manifest itself is gone — would be success over a draft that activation
+    // then refuses, so the report has to be checked even though there is no
+    // transition to guard.
     const materialization = latestMaterializationFor(candidateId);
-    const stale = staleDraftsIn(materialization);
-    if (stale.length > 0) throw new Error(staleDraftAcceptMessage(card, stale));
+    if (draftUnavailableIn(materialization)) {
+      throw new Error(staleDraftAcceptMessage(card, staleDraftsIn(materialization)));
+    }
     return { scope, candidate: card, draft_paths: draftPathsIn(materialization) };
   }
   if (card.lifecycle_status === 'pending_review') {
