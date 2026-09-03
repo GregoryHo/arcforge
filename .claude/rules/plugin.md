@@ -73,6 +73,7 @@ one from the other.
 | `.claude-plugin/marketplace.json` | Claude Code | `owner`, `plugins[0].version`, `source: "./"` |
 | `.codex-plugin/plugin.json` | Codex CLI | mirrored `version`, `skills` **string**, `interface` block |
 | `.agents/plugins/marketplace.json` | Codex CLI | `interface.displayName`, `plugins[0].source` object, `policy` |
+| `skills/core/<name>/agents/openai.yaml` | Codex CLI | `interface` (required when the file exists), `policy.allow_implicit_invocation` |
 
 Differences that are deliberate, not oversights:
 
@@ -82,6 +83,18 @@ Differences that are deliberate, not oversights:
   array buys nothing.
 - **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
   `/arcforge:<name>`. All 15 load from one directory entry.
+- **User-invoked skills need a second declaration, and it is not a manifest
+  edit.** `disable-model-invocation: true` is Claude Code's key and does nothing
+  on Codex: spike-verified on codex-cli 0.152.1, `codex debug prompt-input`
+  listed all 15 skills — the 3 user-invoked ones included — and Codex's own
+  bundled validator rejects the key ("must be false"). Codex's equivalent is a
+  skill-local `skills/core/<name>/agents/openai.yaml` with
+  `policy.allow_implicit_invocation: false`; adding it to the 3 dropped the same
+  listing to 12. These files are **Codex-only metadata Claude Code ignores**, they
+  live inside the skill so D1 §4.3 holds, and Codex's validator requires a
+  non-empty `interface.display_name` + `interface.short_description` whenever the
+  file exists — a policy-only manifest is rejected. The two mechanisms are pinned
+  to one set, both directions, by `tests/skills/test_skill_structure.py`.
 - **Hooks are kept out of Codex's reach by the registry's filename, not by a
   manifest key.** Codex auto-discovers plugin hooks at `hooks/hooks.json`
   *whether or not a manifest names them* — spike-verified: a fixture whose
