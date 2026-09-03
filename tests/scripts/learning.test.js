@@ -400,6 +400,10 @@ describe('learn candidate commands over the canonical queue', () => {
   const BODY_CANARY = 'CANARY-BODY-must-never-be-printed-5f2a';
   const PROJECT_ID_CANARY = 'canaryprojectid0';
   const PROJECT_ID = 'proj_test';
+  // `--project` matches `scope.project` against the project directory's own
+  // name, so the temp project root is named for the project the records carry.
+  const PROJECT_NAME = 'arcforge';
+  const OTHER_PROJECT_CANDIDATE_ID = 'cand_instinct_20260901T030000Z_c3d4e5f6a1b2';
   const CANDIDATE_ID = 'cand_instinct_20260901T010000Z_a1b2c3d4e5f6';
   const GLOBAL_CANDIDATE_ID = 'cand_instinct_20260901T020000Z_b2c3d4e5f6a1';
 
@@ -417,7 +421,7 @@ describe('learn candidate commands over the canonical queue', () => {
       created_at: '2026-09-01T01:00:00.000Z',
       updated_at: '2026-09-01T01:00:00.000Z',
       artifact_type: 'instinct',
-      scope: { kind: 'project', project: 'arcforge', project_id: PROJECT_ID },
+      scope: { kind: 'project', project: PROJECT_NAME, project_id: PROJECT_ID },
       source: { source_type: 'layer4_llm_curator' },
       name: 'grep-before-editing',
       summary: 'Grep for existing patterns before making edits',
@@ -471,9 +475,31 @@ describe('learn candidate commands over the canonical queue', () => {
     return JSON.parse(result.stdout);
   }
 
+  /**
+   * Retire an activated candidate. `deactivate` is a dashboard-only action —
+   * the CLI has no verb for it — so drive the canonical handler in a child
+   * process that inherits the same ARCFORGE_HOME the CLI runs against.
+   */
+  function deactivate(candidateId) {
+    const dashboard = path.join(__dirname, '../../scripts/lib/learning-dashboard.js');
+    const script = `
+      const { handleDashboardAction } = require(${JSON.stringify(dashboard)});
+      const result = handleDashboardAction({
+        action: 'deactivate',
+        candidate_id: ${JSON.stringify(candidateId)},
+        expected_current_status: 'activated',
+        safety_ack: { reviewer_saw_behavior_change_warning: true },
+        actor: { layer: 8, actor_type: 'dashboard', reviewer: 'local_user' },
+      });
+      if (!result.accepted) { console.error(JSON.stringify(result)); process.exit(1); }
+    `;
+    const result = spawnSync('node', ['-e', script], { env, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+  }
+
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-candidates-'));
-    projectRoot = path.join(testDir, 'project');
+    projectRoot = path.join(testDir, PROJECT_NAME);
     arcforgeHome = path.join(testDir, 'home', '.arcforge');
     fs.mkdirSync(projectRoot, { recursive: true });
     fs.mkdirSync(arcforgeHome, { recursive: true });
@@ -516,7 +542,7 @@ describe('learn candidate commands over the canonical queue', () => {
       seed(
         makeRecord({
           body: BODY_CANARY,
-          scope: { kind: 'project', project: 'p', project_id: PROJECT_ID_CANARY },
+          scope: { kind: 'project', project: PROJECT_NAME, project_id: PROJECT_ID_CANARY },
         }),
       );
 
@@ -549,6 +575,44 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(result.status).not.toBe(0);
       expect(JSON.parse(result.stdout).error).toMatch(/candidate not found/);
+      expect(JSON.parse(result.stdout).error).toMatch(/global-scoped candidate/);
+    });
+
+    // The canonical queue is home-global, so `--project` has to say WHICH
+    // project: without this filter every project on the machine listed — and
+    // could activate — every other project's candidates.
+    it("shows only this project — another project's candidates stay out", () => {
+      seed(makeRecord());
+      seed(
+        makeRecord({
+          candidate_id: OTHER_PROJECT_CANDIDATE_ID,
+          scope: { kind: 'project', project: 'some-other-project', project_id: 'proj_other' },
+          created_at: '2026-09-01T03:00:00.000Z',
+        }),
+      );
+
+      const review = runJson(['review', '--project']);
+
+      expect(review.count).toBe(1);
+      expect(review.candidates[0].candidate_id).toBe(CANDIDATE_ID);
+      expect(runJson(['inbox', '--project']).count).toBe(1);
+    });
+
+    it("names the owning project when an id belongs to another project's queue", () => {
+      seed(
+        makeRecord({
+          candidate_id: OTHER_PROJECT_CANDIDATE_ID,
+          scope: { kind: 'project', project: 'some-other-project', project_id: 'proj_other' },
+        }),
+      );
+
+      const result = runCli(['activate', OTHER_PROJECT_CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(
+        /belongs to the project "some-other-project", not to "arcforge"/,
+      );
+      expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
     });
 
     it('groups the inbox by status and artifact type with the next command for each', () => {
@@ -723,6 +787,46 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(accepted.candidate.lifecycle_status).toBe('materialized');
       expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
       expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
+    });
+
+    // `accept` used to pin the materialize dispatch to a literal `approved`, so
+    // every starting status other than pending_review came back as a
+    // `stale_status` race that had not happened — and re-running, which is what
+    // that message tells you to do, could never clear it.
+    it('accepts a deactivated candidate, which the matrix allows to materialize', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+
+      // The dispatch goes through and hands back the draft.
+      expect(accepted.materialization_id).toBeTruthy();
+      expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+
+      // Pinned, not blessed. Pre-existing and outside this branch's diff:
+      // materialize.js's idempotence check (L7-11) returns the materialization
+      // it already wrote WITHOUT calling appendTransitionEvent, so the status
+      // does not move — and `learn drafts`, which filters on `materialized`,
+      // will not list it. Asserting it here trips this test the day
+      // materialize.js emits the transition.
+      expect(accepted.candidate.lifecycle_status).toBe('deactivated');
+    });
+
+    it('refuses to accept an activated candidate as a policy violation, not a race', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/policy_violation/);
+      expect(error).toMatch(/is activated.*allows: deactivate/);
+      expect(error).not.toMatch(/stale_status|re-run/);
     });
 
     it('reports an unknown candidate id rather than acting on nothing', () => {

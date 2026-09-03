@@ -187,8 +187,14 @@ one path where nothing checks the transition and nothing records it.
 
 The CLI works the **same queue** the dashboard does. It is the scriptable way
 into the same review loop, not a second one: it reads through the same event
-log, offers only the transitions the same legality matrix allows, asks for the
-same acknowledgement before activation, and writes to the same audit log.
+log, offers only the transitions the same legality matrix allows, prints the
+same behavior-change warning before activation, and writes to the same audit
+log. The one difference is who supplies the acknowledgement that gates
+activation: the dashboard asks you for it, while on the CLI typing
+`learn activate <id>` is itself that decision — the warning and the target path
+print to stderr, and the command carries its own acknowledgement. So a scripted
+`learn activate --json` activates with no further prompt; the command you typed
+was the gate.
 
 ```bash
 arcforge learn inbox --project
@@ -201,7 +207,7 @@ arcforge learn activate <candidate-id> --project
 | Command | Effect |
 |---------|--------|
 | `learn inbox` | The review queue, grouped, with the next command for each entry |
-| `learn review` | Every project-scoped candidate, as the dashboard's cards |
+| `learn review` | Every candidate for this project, as the dashboard's cards |
 | `learn inspect` | One candidate in detail: evidence summaries, body preview, next actions |
 | `learn approve` / `learn reject` | Record your decision |
 | `learn accept` | Approve and materialize in one step — never activates |
@@ -211,11 +217,17 @@ arcforge learn activate <candidate-id> --project
 
 Three things follow from these being one queue rather than two.
 
-**They are project-scope only.** `--global` is refused for every one of them,
-and the error points you at `arcforge learn dashboard`. A global candidate
-applies to every project on the machine, so it is reviewed where you can see
-what it would change. (`learn status`, `learn enable` and `learn disable` still
-take either scope — those are about the opt-in, not about candidates.)
+**They are project-scope only, and `--project` means *this* project.**
+`--global` is refused for every one of them, and the error points you at
+`arcforge learn dashboard`. A global candidate applies to every project on the
+machine, so it is reviewed where you can see what it would change. The queue
+itself is machine-wide, so `--project` also filters to the project you are
+standing in — matched on its directory name, which is the `scope.project` each
+card prints. Another project's candidates are not listed, and asking for one by
+id tells you which project it belongs to instead of acting on it. To see the
+whole machine at once, use the dashboard. (`learn status`, `learn enable` and
+`learn disable` still take either scope — those are about the opt-in, not about
+candidates.)
 
 **Only what is legal is offered.** Each entry carries its `available_actions`,
 straight from the matrix, and a transition outside them is refused with the
