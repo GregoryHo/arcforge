@@ -6,8 +6,14 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 
 ## Harness
 
-- **codex-harness** — wrap Codex as a second harness alongside Claude Code
-  (packaging + spike verification of skill discovery and invocation) · needs: D-002.
+- ~~**codex-harness**~~ — graduated into 6.1.0 (D-004).
+- **codex-cli-on-path** — get the bare `arcforge` CLI onto Codex's PATH, so the
+  seven CLI-backed skills stop reporting `command not found` there · needs: D-004.
+- **codex-hooks-adapter** — a Codex-shaped registry for the hooks worth porting,
+  so observation and injection are not Claude Code's alone · needs: D-004.
+- **harness-neutral-model-runner** — replace the `claude`-spawning runner the
+  learning, eval and loop subsystems share, so they can run on a second host ·
+  needs: D-004.
 
 ## Learning
 
