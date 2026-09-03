@@ -104,9 +104,7 @@ function describeStaleDrafts(stale) {
 /**
  * The two prose lines `inspect` prints in place of the `materialized` status
  * prose, which says "review the draft at draft_paths" — the draft it names is
- * not there to review. Layered over `nextActionsFor` at the call site, exactly
- * as `unsupportedTypeActions` is: `nextActionsFor` is pure, and this answer
- * comes off disk.
+ * not there to review.
  *
  * Two arms, because there are two ways to have no draft and they refuse
  * differently: recorded files that no longer match (activation refuses on the
@@ -114,14 +112,10 @@ function describeStaleDrafts(stale) {
  * `materialization_missing`). The empty-list arm is not cosmetic —
  * `describeStaleDrafts([])` would leave a dangling colon naming nothing.
  *
- * `materialized` is the only status this may replace, for the same reason
- * `STATUSES_NAMING_A_BUILD` exists: it is the only one whose prose names the
- * draft, so it is the only one a stale draft contradicts. Every other status's
- * prose is true whatever became of the recorded draft, and printing this
- * instead would replace it with something false — a `deactivated` candidate
- * can still be materialized afresh (the matrix allows it, and `accept` does
- * exactly that), and an `activated` one is already live, its draft only ever
- * read and never removed by activation.
+ * Neither arm names a recovery command, because from `materialized` there is
+ * none: the matrix allows only `activate`, and activation is exactly what
+ * refuses. That is what separates this from `retiredDraftActions` below, where
+ * the matrix still allows a `materialize` that runs.
  */
 function staleDraftActions(stale) {
   if (stale.length === 0) {
@@ -136,6 +130,69 @@ function staleDraftActions(stale) {
     'activation refuses on the recorded content hash, so there is nothing to activate — ' +
       'review the queue in: arcforge learn dashboard',
   ];
+}
+
+/**
+ * The two prose lines `inspect` prints in place of the `deactivated` status
+ * prose, which says "materialize or activate it again". Half of that stays
+ * true: `materialize` from `deactivated` writes a fresh draft and succeeds with
+ * the recorded one deleted, edited, or its whole manifest gone. The `activate`
+ * half does not — activation reads the recorded draft, so it refuses on the
+ * content hash when a recorded file no longer matches it, and with
+ * `materialization_missing` when no usable record is left.
+ *
+ * Two arms for the same two ways to have no draft as `staleDraftActions`, and
+ * the empty-list arm is not cosmetic there for the same reason. Unlike that
+ * one, both arms end in a command, because here there is one that runs.
+ *
+ * It names the stale path as evidence, never as something to go read: naming a
+ * draft to review is what the `materialized` prose does, and a lost draft is
+ * what makes that false.
+ */
+function retiredDraftActions(stale) {
+  if (stale.length === 0) {
+    return [
+      'no usable materialization record remains, so activating it again refuses',
+      'materialize it again to write a fresh draft, or leave it retired',
+    ];
+  }
+  return [
+    `the recorded draft is not what was written: ${describeStaleDrafts(stale)}, so activating ` +
+      'it again refuses on the recorded content hash',
+    'materialize it again to write a fresh draft, or leave it retired',
+  ];
+}
+
+/**
+ * `inspect`'s prose when the candidate has no reviewable draft on disk, or
+ * `null` when that disk fact changes nothing about what to say.
+ *
+ * Layered over `nextActionsFor` at the call site, exactly as
+ * `unsupportedTypeActions` is: `nextActionsFor` is pure over a card, and this
+ * answer comes off disk. `inspect` is the surface that carries it — `inbox`
+ * runs over every card and deliberately does no per-card disk work at all (see
+ * `runInbox`), so a `deactivated` entry there still reads "materialize or
+ * activate it again", whose first move is also the `next_command` it prints.
+ *
+ * Two statuses name the recorded draft, and a lost draft makes each wrong in a
+ * different way, so each gets its own replacement. Every other status is left
+ * alone: an `activated` candidate is already live and its draft was only ever
+ * read, an `approved` one has written none yet, and a terminal status names no
+ * draft at all — replacing their prose would say something false.
+ *
+ * The artifact-type narrowing outranks the disk fact, exactly as it does in
+ * `nextActionsFor`: for a type the curator cannot render there is no
+ * materialize or activate step for a missing draft to qualify, and both
+ * replacements name one. Nothing materializes a non-instinct candidate today,
+ * so no such candidate reaches either status — this is the precedence
+ * `STATUSES_NAMING_A_BUILD` already encodes for them, kept in the one other
+ * place that overrides the same prose, not a live branch.
+ */
+function draftUnavailableActions(card, stale) {
+  if (!isMaterializableType(card.artifact_type)) return null;
+  if (card.lifecycle_status === 'materialized') return staleDraftActions(stale);
+  if (card.lifecycle_status === 'deactivated') return retiredDraftActions(stale);
+  return null;
 }
 
 /**
@@ -376,7 +433,7 @@ module.exports = {
   STATUS_RANK,
   isMaterializableType,
   isMaterializableName,
-  staleDraftActions,
+  draftUnavailableActions,
   inspectCommandFor,
   nextCommandFor,
   nextActionsFor,

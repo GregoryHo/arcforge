@@ -833,12 +833,12 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.next_actions[0]).toMatch(/is missing/);
     });
 
-    // The override above answers `materialized`, whose prose names the draft.
-    // It must not reach a status whose prose names something else: the recorded
-    // draft is irrelevant there, and "there is nothing to activate" would be
-    // false. A `deactivated` candidate is the sharp case — the matrix lets it
-    // materialize afresh, and `accept` does exactly that.
-    it('keeps the deactivated prose when the retired draft is gone', () => {
+    // `deactivated` prose names two moves and a lost draft splits them: the
+    // matrix lets a retired candidate materialize afresh, which still runs, but
+    // activation reads the recorded draft and refuses on its content hash. So
+    // the status keeps a recovery — unlike `materialized`, where every command
+    // the CLI has would refuse — and the override says which half is left.
+    it('stops offering the activation a retired candidate no longer has', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);
       const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
@@ -850,13 +850,60 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(detail.candidate.lifecycle_status).toBe('deactivated');
       expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
-      expect(detail.next_actions).toEqual([
-        'materialize or activate it again, or leave it retired',
-      ]);
-      // The recovery the prose names is the one the engine actually runs. This
+      expect(detail.next_actions[0]).toContain(draftPath);
+      expect(detail.next_actions[0]).toMatch(/is missing.*activating it again refuses/s);
+      expect(detail.next_actions[1]).toMatch(/materialize it again/);
+      // The activation it stopped offering is the one that refuses…
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      // …and the recovery it names is the one the engine actually runs. This
       // writes a fresh, non-stale manifest, so it goes last — assert against
       // the deleted draft above this line, never below it.
       expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+    });
+
+    // An edited draft is the third way to reach the same override, and the arm
+    // above renders it from the same list — so what is pinned here is that the
+    // claim it makes is true of this reason too: activation refuses on the hash
+    // while re-materializing still runs.
+    it('stops offering the activation an edited retired draft would refuse', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.appendFileSync(draftPath, '\nedited by hand\n', 'utf8');
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'hash_mismatch' },
+      ]);
+      expect(detail.next_actions[0]).toMatch(/has changed since it was written/);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+    });
+
+    // The artifact-type narrowing outranks the disk fact: there is no
+    // materialize or activate step for a missing draft to qualify, so the
+    // override must not print "materialize it again" at a candidate the curator
+    // refuses to build. Not reachable through the engine — nothing materializes
+    // a non-instinct candidate, so the status has to be seeded — but it is the
+    // precedence `nextActionsFor` already applies to these statuses, and it
+    // decides the cell the day the supported-type list changes.
+    it('keeps the type narrowing ahead of the missing draft', () => {
+      seed(
+        makeRecord({
+          artifact_type: 'skill',
+          lifecycle: { status: 'deactivated', status_changed_at: '2026-09-01T02:00:00.000Z' },
+        }),
+      );
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.draft_paths).toEqual([]);
+      expect(detail.next_actions[0]).toMatch(/materializes instinct candidates only/);
+      expect(detail.next_actions.join(' ')).not.toMatch(/materialize it again/);
     });
 
     // Activation reads the draft and never removes it, so a user who tidies the
@@ -940,10 +987,10 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.next_actions[0]).toMatch(/no usable materialization record remains/);
     });
 
-    // The override is scoped to `materialized` for the record-absent case too:
-    // an activated candidate is already live whatever became of its drafts
-    // tree, and a deactivated one can still be materialized afresh.
-    it('keeps the activated and deactivated prose when the record is gone', () => {
+    // The record-absent case reaches both statuses whose prose names the draft,
+    // and only those: an activated candidate is already live whatever became of
+    // its drafts tree, so its prose stands unchanged.
+    it('keeps the activated prose but not the retired activation when the record is gone', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);
       runJson(['materialize', CANDIDATE_ID, '--project']);
@@ -959,10 +1006,14 @@ describe('learn candidate commands over the canonical queue', () => {
       deactivate(CANDIDATE_ID);
       const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
 
+      // A retired candidate keeps a recovery here, but not the activation: with
+      // no record left, activation refuses `materialization_missing` while
+      // materializing afresh still writes a draft.
       expect(detail.candidate.lifecycle_status).toBe('deactivated');
-      expect(detail.next_actions).toEqual([
-        'materialize or activate it again, or leave it retired',
-      ]);
+      expect(detail.next_actions[0]).toMatch(/no usable materialization record remains/);
+      expect(detail.next_actions[1]).toMatch(/materialize it again/);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
     });
   });
 
