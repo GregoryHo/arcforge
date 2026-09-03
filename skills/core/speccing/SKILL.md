@@ -107,8 +107,9 @@ and the entries that refine rather than reverse: `references/conventions.md`.
 
 On the merge that releases a version: flip its roadmap row to shipped, fill the
 tag cell, set each affected spec's status header to that version, and move the
-`← we are here` marker to the next row. Exactly one row carries the marker,
-before and after.
+`← we are here` marker onto the next row — or leave it on the row that just
+shipped, when nothing has been promoted after it yet. Exactly one row carries
+the marker, before and after; shipping never invents the row it would move to.
 
 ## Handing off
 
