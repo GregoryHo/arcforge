@@ -113,8 +113,10 @@ at ship time.
 
 The header is read off the **highest** row linking the spec, never off whichever
 version is being worked on, and it follows that row's own status: `shipped
-v<its version>` once the highest linking row has shipped, the compound form
-while it has not. So shipping collapses a header only when the version that
+v<its version>` once the highest linking row has shipped; the compound form
+while it has not and a lower row already has; and, with no shipped row at all,
+the table above's plain `draft` for a `next` row and `building vX.Y.Z` for a
+`building` one. So shipping collapses a header only when the version that
 shipped is the highest row linking that spec; ship one while a later row still
 links it and the header stays compound — its shipped half naming the highest row
 that has already shipped, its extended-by half naming the highest linking row and
