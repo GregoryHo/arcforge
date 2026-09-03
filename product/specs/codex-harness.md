@@ -14,7 +14,7 @@ arcforge installs on a second host. Codex CLI users get the skills — the part 
 the toolkit that is portable markdown — from the same source tree Claude Code
 installs from, with no second copy of anything to keep in sync.
 
-The point is not parity. It is that a Codex user gets the fifteen skills and an
+The point is not parity. It is that a Codex user gets the sixteen skills and an
 honest, up-front account of what they do not get, instead of a plugin that looks
 whole and fails halfway through a workflow.
 
@@ -43,7 +43,7 @@ whole and fails halfway through a workflow.
   engine, no per-host copy of any component, and no build step that emits one
   target from the other. Both Codex files are hand-maintained beside their
   Claude Code twins.
-- **B-2 Skills port; hooks are invisible to Codex by construction.** All fifteen
+- **B-2 Skills port; hooks are invisible to Codex by construction.** All sixteen
   skills load on Codex from a single `"skills": "./skills/core/"` entry and
   appear namespaced `arcforge:<name>`. Hooks, the learning subsystem, the eval
   harness and the unattended loop do not run there: they are built on Claude
@@ -171,7 +171,7 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
   with per-skill entries written relative to it. arcforge's root is
   `<codex-home>/plugins/cache/arcforge-dev/arcforge/<version>/skills/core`. A
   verification that counts absolute per-skill paths will read zero; count the
-  fifteen `arcforge:<name>` entries instead.
+  sixteen `arcforge:<name>` entries instead.
 - **`.codex-plugin/plugin.json` wins outright.** A fixture whose Codex manifest
   declared no components, while its `.claude-plugin/plugin.json` declared both a
   skills directory and a `hooks` path, loaded neither — the Claude Code manifest
