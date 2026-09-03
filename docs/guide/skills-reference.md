@@ -70,11 +70,12 @@ know what to change.
 **`speccing`** — for a repo that keeps its product intent in files: a living spec
 per area, a versioned roadmap, an append-only decision log, and a backlog of
 wishes. It applies when a wish needs capturing, when a version needs its spec
-written before the build starts, when a recorded decision is being reversed, or
-when a shipped version needs its roadmap row and spec header flipped. Two rules
-carry it: the spec and the code merge in the same PR, and a recorded decision is
-superseded rather than edited. It never creates product files in a repo whose
-user has not asked for them.
+written before the build starts, when a recorded decision is being reversed,
+when a shipped version needs its roadmap row and spec header flipped, or when
+the user asks to start keeping product state this way. Two rules carry it: the
+spec and the code merge in the same PR, and a recorded decision is superseded
+rather than edited. It never creates product files in a repo whose user has not
+asked for them.
 
 `brainstorming` settles what to build; `speccing` records what was settled.
 
