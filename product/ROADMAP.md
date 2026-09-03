@@ -113,9 +113,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   names an id the log does not carry, is rejected too (C3); every spec header
   agreeing with its governing roadmap row, with the links resolving both ways —
   every row links at least one spec, every spec is linked from some row, and every
-  link names a file that exists (C4); every D-id a spec cites well-formed as
-  `D-NNN` and existing (C5); a sanity floor of one row, one decision, one spec
-  (C6); and a `Tag` cell matching its row's Status —
+  link names a file that exists — and each version occupying exactly one row, so
+  "the highest-version one" names a row rather than whichever the table lists last
+  (C4); every D-id a spec cites well-formed as
+  `D-NNN` and existing (C5); a sanity floor of one row, one decision, one spec,
+  with the roadmap's rows sitting under a table GFM renders — a six-column header
+  opening on `Version` and a delimiter row of the same width beneath it — so an
+  unframed row cannot stand in for the table (C6); and a `Tag` cell matching its
+  row's Status —
   `vX.Y.Z` when shipped, `—` otherwise (C7).
 - Residual: C1 counts `← we are here` markers; it does not know which row deserves
   one, so a marker that should have moved and didn't passes green. Placement stays a
