@@ -130,15 +130,19 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
  * false alarm to the opt-in boundary instead of removing it.
  *
  * The source is `updated_at`, which `setLearningEnabled` writes and nothing
- * else in the engine touches. A config without it (hand-written, or older than
- * the field) falls back to the file's mtime; one that cannot be stat'd returns
- * 0, so an unreadable timestamp warns about everything rather than going quiet
- * on a real failure. When both scopes are enabled the EARLIEST wins — that is
- * the moment enrichment first became authorized.
+ * else in the engine touches. It stamps a state CHANGE, not a write, so
+ * re-running `learn enable` on an already-enabled scope leaves the floor where
+ * the real opt-in put it. A config without it (hand-written, or older than the
+ * field) falls back to the file's mtime; one that cannot be stat'd returns 0,
+ * so an unreadable timestamp warns about everything rather than going quiet on
+ * a real failure. When both scopes are enabled the EARLIEST wins — that is the
+ * moment enrichment first became authorized.
  *
  * Accepted cost: disabling and re-enabling moves the floor forward, so drafts
  * left stale before the toggle stop being reported. A missed warning is the
- * cheaper failure than a permanent one about intended behavior.
+ * cheaper failure than a permanent one about intended behavior. Since an
+ * idempotent re-run preserves the stamp, that toggle is the only way the floor
+ * moves — and it is a real consent boundary, which a repeated enable is not.
  *
  * @param {Object} [opts]
  * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
@@ -192,7 +196,15 @@ function setLearningEnabled({
   now = new Date().toISOString(),
 } = {}) {
   assertScope(scope);
-  const config = { scope, enabled: enabled === true, updated_at: now };
+  const next = enabled === true;
+  const previous = readScopeConfig({ scope, projectRoot, homeDir });
+  // `updated_at` stamps the TRANSITION, not the write. `learningEnabledSince`
+  // reads it as "when the opt-in took effect", so a command that changes
+  // nothing must not move it — advancing the floor there would silently retire
+  // stale-draft warnings for drafts written since the actual opt-in.
+  const keepStamp =
+    previous.enabled === next && !Number.isNaN(Date.parse(previous.updated_at ?? ''));
+  const config = { scope, enabled: next, updated_at: keepStamp ? previous.updated_at : now };
   writeJsonFile(getLearningConfigPath({ scope, projectRoot, homeDir }), config);
   return config;
 }

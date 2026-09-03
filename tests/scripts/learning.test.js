@@ -139,6 +139,31 @@ describe('learning subsystem MVP-1', () => {
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
     });
 
+    // `learn enable --project` is a copy-paste step in four user-facing
+    // surfaces, so re-running it on an already-enabled scope is routine. It
+    // stamps no transition and must not move the floor.
+    it('does not move when an already-enabled scope is enabled again', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: true,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      // The CLI prints this returned config, so it carries the same stamp.
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    // The documented accepted cost: a real consent toggle DOES move the floor.
+    it('moves when a scope is disabled and re-enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
     it('ignores a disabled scope, however recently it was written', () => {
       setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
       setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });
