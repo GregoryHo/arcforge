@@ -362,3 +362,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   not make. The same two-step path also prints the offending name verbatim —
   it is Layer 8's own `module_failure.detail`, which every single-step command
   renders deliberately, so `accept` alone is held to not echoing it.
+- Residual, second clause: the artifact-type narrowing strands a candidate at
+  the same `approved` dead end, and there the CLI recommends the move that
+  does it — `accept`'s type refusal names `learn approve` as the recovery, and
+  from `approved` the matrix allows only `materialize` (which meets the type
+  refusal), `promote` and `evolve` (both dashboard-only). The recommendation is
+  deliberate and stays: the approval is a verdict on merit worth recording, the
+  dashboard retains both its actions, and the obstacle lifts by itself the day
+  the curator gains a renderer — unlike the name, which nothing the CLI offers
+  ever changes. Recorded so the asymmetry is a decision on file rather than an
+  accident of the refusal's wording.
