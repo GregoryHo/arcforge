@@ -91,12 +91,16 @@ down, never block the user, and never observe them uninvited.
   preserves neither stamp — a sync re-download or a naive unzip, where ordinary
   restore tooling keeps the modification time and so stays below the floor — and
   a filesystem that records no creation time, which leaves the floor resting on
-  last-write alone. The floor cuts the other way once: a draft first written
-  before the opt-in and rewritten in place afterwards keeps its original
-  creation time, so a genuine post-opt-in enrichment failure over it is never
-  reported. There is no per-hook switch: the single opt-in covers the learning
-  loop in either scope, disabling learning stops it, and uninstalling the
-  plugin removes everything.
+  last-write alone. The floor cuts the other way twice, and both are silences
+  rather than false alarms: a draft first written before the opt-in and
+  rewritten in place afterwards keeps its original creation time, so a genuine
+  post-opt-in enrichment failure over it is never reported; and disabling the
+  scope that carries the earliest opt-in — global on, then project on, then
+  global off — advances the floor to the surviving scope's stamp even though
+  authorization never lapsed, because a scope's config records its latest
+  transition and not the enable it replaced. There is no per-hook switch: the
+  single opt-in covers the learning loop in either scope, disabling learning
+  stops it, and uninstalling the plugin removes everything.
 
 ### Performance
 - **B-7 The synchronous path stays small.** Observation writes and
