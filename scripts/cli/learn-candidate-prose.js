@@ -348,10 +348,17 @@ function refusalMessage(result, verb, card) {
  * rather than pointing at the dashboard twice.
  *
  * It deliberately does not fall back to `reject` the way its sibling below
- * does. `dismiss` is legal from `needs_more_evidence`, where `approve` is not,
- * so that status falls through to the dashboard with a legal command left
- * unnamed — on purpose: "the way out is to decline it" contradicts the "leave
- * it queued" this same narrowing gives the reviewer one sentence earlier.
+ * does, so `needs_more_evidence` — the one status where `dismiss` is legal and
+ * `approve` is not — falls through to the dashboard with a legal command left
+ * unnamed. Not because rejecting is wrong there: `NEXT_ACTIONS` names it for
+ * that status, and `inspect` still prints that for this very card, since the
+ * narrowing does not reach a status that names no build step. It is not this
+ * refusal's business. `dismiss` is a verdict on the candidate's merit, and the
+ * narrowing says nothing about merit — only that the type has no renderer yet,
+ * which is why it ends in "leave it queued" rather than pushing the reviewer to
+ * discard something a later renderer could build. The sibling has no such
+ * option: approving a name the draft writer cannot use strands the candidate,
+ * so declining really is the only way out there.
  */
 function acceptRefusalMessage(card) {
   const recovery = card.available_actions.includes('approve')
