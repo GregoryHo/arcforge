@@ -11,6 +11,10 @@ diary when the threshold is met.
 2. **Updates the current session file** with compaction markers
    - Adds timestamp to `compactions` array
    - Sets `lastCompaction` field
+   - Deletes `userMessageContent` when the learning opt-in reads off. Stamping
+     the marker rewrites the whole record, so the gate that governs capture
+     governs what survives the rewrite (D-010); an absent project root reads as
+     no consent and prunes.
 
 3. **Threshold-triggered behavior** (when `userCount >= 10 OR toolCount >= 50`):
    Delegates to the shared diary-capture core (`scripts/lib/diary-capture.js`),
