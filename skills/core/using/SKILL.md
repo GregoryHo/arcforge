@@ -31,8 +31,12 @@ If nothing matches, no arcforge skill applies — just do the work.
 **How a row is invoked, per host.** The `/<name>` spelling above is Claude Code's
 (`/arcforge:tdd` is the same row, namespaced). On Codex CLI the same skill is
 listed as `arcforge:<name>` and has no slash command — you reach it from the
-composer's `$` mention picker. The three rows marked *(user-invoked)* never fire
-on their own on either host; asking for them by name is the only way in.
+composer's `$` mention picker. That mapping is not local to this table: it is how
+every `/<name>` in this toolkit reads, including the mid-workflow handoffs skills
+write to each other, so a skill that hands off to `/<name>` names the
+`arcforge:<name>` skill on Codex and is reached the same way. The three rows
+marked *(user-invoked)* never fire on their own on either host; asking for them
+by name is the only way in.
 
 **Precedence when rows overlap.** Discipline rows outrank wrap-up rows: if a
 defect is reported or code is untested, `/tdd` or `/debugging` applies even when

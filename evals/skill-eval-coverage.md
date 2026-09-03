@@ -55,7 +55,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | finishing | +0.54 CI[0.46, 0.62] | P7 ab（P4 +0.58 同量級） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 分數面過 | P7 ab ×3 |
 | executing | +0.40 CI[0.03, 0.77] | P7 ab k=10 |
-| using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab |
+| using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
 | sessions | +0.29（吸收 compacting：non-reg 1.00） | P7 ab |
 | maintaining-obsidian | +0.28 CI[0.14, 0.42] | P7 ab |
@@ -66,6 +66,104 @@ p7-benchmark-evidence.md「協定修正案」）。
 | dispatching | unmet-but-covered（ceiling ×3） | 存廢建議書 |
 | writing-skills | unmet-but-covered（P7 ceiling ×2，新支無 delta 史） | 存廢建議書 |
 | evaluating | unmet-but-covered（P5）；P7 preflight 67% 恢復鑑別力 | 存廢建議書（傾向保留） |
+
+## v6.1.0 — Codex packaging: the router's per-host note (non-regression)
+
+`skills/core/using/SKILL.md` gained a per-host invocation note during Codex
+packaging: the Skill Map's `/<name>` rows are Claude Code's spelling, the same
+skill is `arcforge:<name>` on Codex, and — added in this round — that mapping
+also covers the handoffs skills write to each other mid-workflow. That is a
+**behavioral** edit under `.claude/rules/skills.md` (it changes how the agent is
+told to reach a skill), so it needs harness evidence, not a spike note.
+
+**Run.** `eval ab eval-router-skill-selection --k 10`, run id **`20260903-213804`**,
+default model, isolated, preflight hash `87dd77d26e724fb5` (PASS, baseline 0/3).
+Threshold was pre-registered before the run: non-regression, requiring both a CI
+lower bound > 0 and overlap with P7's +0.36 CI[0.25, 0.47].
+
+| | trials | avg | pass |
+|---|---|---|---|
+| baseline | 10 | 0.60 [0.6, 0.6] | 0% |
+| treatment | 10 | 0.78 [0.73, 0.83] | 90% |
+| **delta** | | **+0.18 CI[0.13, 0.23]** | verdict IMPROVED |
+
+**Verdict: non-regression PASS — but only after the instrument is read, and the
+raw comparison against P7 does not survive that reading.** +0.18 CI[0.13, 0.23]
+clears the first half of the threshold and misses the second: it does not overlap
+[0.25, 0.47]. The cause is a dead assertion, not a degraded router.
+
+**A2 (`[tool_before] Edit:re:test/ < Edit:re:src/`) scored 0 in 20 of 20 trials,
+both arms — because a contributor-local output style leaked into every trial.**
+A tool tally over this run's transcripts returns `Bash` 38× (treatment) / 32×
+(baseline) and **nothing else**: no `Edit`, `Write` or `Read` in either arm. P7's
+retained run (`20260815-054518`) tallies `Edit` 10× and `Read` 12–14× in *both*
+of its arms. The tools were available in both campaigns; what differed is an
+instruction.
+
+**Cause established, not inferred.** `runTrial` preserves the real `HOME` (so the
+trial can resolve `~/.claude` auth), and the trial-local settings it writes
+disable plugins and exclude `CLAUDE.md`/`rules/` — but nothing excludes the
+user-global `outputStyle` in `~/.claude/settings.json`. A probe run reproducing
+the harness's isolation settings and prompted to quote its own tool-selection
+instructions returned, verbatim: *"Do your work through the Bash tool wherever it
+can accomplish the job: read files with cat, head, or sed -n … rather than using
+the dedicated Read, Edit, or Write tools"* — and stated that this is why it used
+`cat` rather than `Read`. The same probe showed a user-level SessionStart hook
+reaching the trial as well. So the operator's personal output style is a live
+input to every eval trial, in both arms, on any machine that sets one.
+
+That is also the whole of the +0.36 → +0.18 gap. P7's treatment earned the A2
+point (4 of 5 trials scored a full 1.0); this run's treatment could not, because
+its agents were told to prefer heredocs. The two numbers are two instruments, not
+two readings of one, and **P7's interval is not a valid comparison target for
+this run's** — the pre-registered half-2 test is retired here rather than met on
+a rescaled axis.
+
+**What carries the non-regression claim: A5.** A5 is the model-graded read of the
+same behavior A2 chases mechanically, and is unaffected by tool choice. It
+reproduces P7 exactly:
+
+| | A5 baseline | A5 treatment |
+|---|---|---|
+| P7 (`20260815-054518`, k=5) | 0/5 | 5/5 |
+| this run (`20260903-213804`, k=10) | 0/10 | 10/10 |
+
+Full separation in both campaigns. A4 (the routing judgment itself) is 10/10 in
+both arms — at ceiling in this run, so what this scenario measures is the
+test-first discipline the routing selects rather than the routing statement in
+isolation. **The one adverse movement between arms is A1**, the `npm test`
+matcher: baseline 10/10, treatment 9/10, lost by treatment trial 3 alone (0.6),
+which still passed A5. One trial in ten against a matcher orthogonal to routing
+is not a regression signal, but it is not "nothing moved" either.
+
+On the four live assertions the arms read 0.75 vs 0.975 (**+0.225**). That is a
+descriptive statistic on a 4-assertion scale with no interval computed for it; it
+is **not comparable to P7's +0.36 CI[0.25, 0.47]**, computed on the 5-assertion
+scale, and is not offered as an overlap argument.
+
+**Findings for the maintainer, neither fixed here.**
+1. **The isolation gap is the important one.** `buildIsolationSettings()` covers
+   plugins and `CLAUDE.md`, not `outputStyle` or user-level hooks, while `HOME`
+   stays real by design. Any contributor with a personal output style silently
+   changes what every trial does, in both arms — so tool-keyed assertions can die
+   and cross-campaign benchmark comparisons can read instrument change as
+   behavior change. This run is the existence proof.
+2. A2 is dead under that condition. Repairing it (matching file creation through
+   `Bash` heredocs, or leaning on A5, which read the ordering correctly in all 20
+   trials) changes the scenario hash, voids the preflight record and needs a
+   `## Version` bump — a scenario-design decision outside a packaging PR's scope.
+   Every `[tool_before]`/`[tool_called]` assertion keyed to `Edit`, `Write` or
+   `Read` across the corpus is exposed to the same cause. Until (1) is closed,
+   read this row's raw delta as instrument-capped.
+
+### Codex-side coverage: pre-registered as UNMEASURED
+
+Whether a Codex agent follows a `/<name>` handoff after reading that mapping is
+**not measured, and no number above speaks to it.** The harness spawns `claude`
+and has no Codex runner; that is the `harness-neutral-model-runner` Backlog wish,
+and `product/specs/codex-harness.md` B-6 carries the same statement as a
+residual. The evidence on record for the note is Claude-side non-regression
+only. This gap closes when a harness can reach that host, not before.
 
 以下為歷史量測紀錄（P5/P6 逐 campaign 原帳，保留不改；其中引用的部分 scenario
 名與路徑為當時現狀）。
