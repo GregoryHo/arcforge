@@ -136,36 +136,41 @@ The row, if someone lands it, goes after `INSUFFICIENT_DATA`:
 The paragraph below the table then names `PASS` where it currently says "it passes",
 so the table and the prose introduce the token together.
 
-## 4. `scripts/lib/product-lint.js` sits one line under the size ceiling
+## 4. `scripts/lib/product-lint.js` sits one line under the size ceiling — **TAKEN in round 11**
 
-`.claude/rules/coding-standards.md` puts the hard limit at 700 lines. The file ends
+`.claude/rules/coding-standards.md` puts the hard limit at 700 lines. The file ended
 round 9 at **699**, and nothing counts lines in CI, so the next C-rule to land here
-breaches the standard silently instead of failing a check. Round 9's three fixes put
+would breach the standard silently instead of failing a check. Round 9's three fixes put
 +41 on it net (50 added, 9 removed); the rule code in them is a handful of lines each,
 and what grows alongside it is the C1–C7 docblock — some 80 lines before any code
 runs.
 
-Treat the next rule as landing *with* an extraction. The one this file is shaped for
-is mechanical, and no rule moves:
+Round 11 is the rule that forced it: C4's duplicate-`Version` clause. The extraction
+below landed first, as its own commit with the suite green across it, and
+`product-lint.js` came out at 617 lines. The section stays as the record of what moved
+and why; nothing here is left to do.
+
+The extraction was mechanical, and no rule moved:
 
 - **Out** — the markdown primitives that know nothing about product state:
   `FENCE_RE`, `section()`, `unfenced()` and `stripCodeSpans()`, with the fence and
   code-span comments that document them (~85 lines, `FENCE_RE` included — nothing
-  else in the file matches a fence), into a sibling
-  `scripts/lib/product-markdown.js`. All four are pure, and nothing outside this file
-  calls them today.
-- **Stays** — the C1–C7 docblock, the parsers, every `check*` rule, `validateProduct`
+  else in the file matched a fence), into a sibling
+  `scripts/lib/product-markdown.js`. All four are pure, and nothing outside
+  `product-lint.js` called them.
+- **Stayed** — the C1–C7 docblock, the parsers, every `check*` rule, `validateProduct`
   and `module.exports`, so `scripts/check-product.js` and
-  `tests/scripts/check-product.test.js` import exactly what they import now (~615
-  lines: still past the 400-line soft limit, as most of `scripts/lib/` is, but with
+  `tests/scripts/check-product.test.js` import exactly what they imported before
+  (617 lines: still past the 400-line soft limit, as most of `scripts/lib/` is, but with
   room for the rule that forced the split).
-- **The suite is the proof.** `check-product.test.js` requires only `validateProduct`,
-  so a green `npm run test:scripts` across the move shows the split changed no
-  behaviour, and the C-rule docblock's pointer at `section` is the only prose the
-  move touches.
+- **The suite was the proof.** `check-product.test.js` requires only `validateProduct`,
+  so a green `npm run test:scripts` across the move showed the split changed no
+  behaviour, and the C-rule docblock gained one paragraph naming where the primitives
+  went — the only prose the move touched.
 
-Not taken in round 9 on purpose: at 699 the standard is met, and a file split inside a
-review-fix round is churn a reviewer then has to re-read against no behaviour change.
+Not taken in round 9 on purpose: at 699 the standard was met, and a file split with no
+rule forcing it is churn a reviewer then has to re-read against no behaviour change.
+Round 11 had the rule.
 
 ## 5. `stripCodeSpans()` empties code-styled link text
 

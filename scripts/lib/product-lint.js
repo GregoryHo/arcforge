@@ -74,17 +74,20 @@
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
+ * The markdown primitives every rule reads with — the fence-aware `section()`,
+ * `unfenced()` and `stripCodeSpans()` — live in `product-markdown.js`, which
+ * knows nothing about product state. This file holds the rules.
+ *
  * Library tier: pure — no I/O of its own; every rule reads the corpus strings
  * its caller hands it, and a violation is an error string rather than a throw.
  */
+
+const { section, unfenced, stripCodeSpans } = require('./product-markdown');
 
 const HERE_MARKER = '← we are here';
 const ROW_STATUSES = new Set(['next', 'building', 'shipped']);
 const NO_TAG = '—';
 
-// Opening or closing marker of a fenced code block, capturing which marker it is
-// so a `~~~` inside a ``` block cannot close it.
-const FENCE_RE = /^\s*(```|~~~)/;
 // CommonMark lets an ATX heading carry up to three leading spaces; at four — as
 // measured from column 1, and the log nests no headings under list items — it is
 // an indented code block, where `### D-NNN` is not a heading at all and must stay
@@ -139,91 +142,6 @@ function compareVersions(a, b) {
     if (av[i] !== bv[i]) return av[i] - bv[i];
   }
   return 0;
-}
-
-/**
- * The lines between a `##` heading and the next one, or `[]` when it is absent.
- *
- * Both boundaries are found fence-aware: a `##` line inside a fenced block is an
- * illustration, so it neither opens the section early nor closes it — otherwise a
- * worked example in the log (the shape `product/AGENTS.md` itself uses) would cut
- * the slice short and silently drop every entry below it. Only the boundary scan
- * skips fenced lines; the returned slice is a raw index range, so the fence lines
- * stay in it and `unfenced()` drops them for every parser that reads a section.
- * An unclosed fence therefore swallows the heading and yields `[]` — fail-closed
- * for ROADMAP.md's two sections, which C6 rejects as a corpus with no rows or no
- * decisions, but silent for a spec's `## Decisions`, exactly as a spec that
- * renames or drops that section already is: nothing asserts a spec's headings.
- * The first matching heading wins: a second `## Decision Log` later in the file
- * is not read.
- */
-function section(md, heading) {
-  const lines = md.split('\n');
-  let fenceMarker = null;
-  let start = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const fence = lines[i].match(FENCE_RE);
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[1];
-      else if (fence[1] === fenceMarker) fenceMarker = null;
-      continue;
-    }
-    if (fenceMarker) continue;
-    if (start === -1) {
-      if (heading.test(lines[i])) start = i;
-      continue;
-    }
-    if (/^##\s+/.test(lines[i])) return lines.slice(start + 1, i);
-  }
-  return start === -1 ? [] : lines.slice(start + 1);
-}
-
-/**
- * The lines of a section that sit outside its fenced code blocks — the fence
- * exemption every parser applies to the raw slice `section()` hands back.
- *
- * A fenced block is an illustration, not product state. Without this a worked
- * example showing a deliberately wrong `- Supersedes : D-001` would hard-fail C3
- * as a malformed relation line, so the log could not document its own rules the
- * way `product/AGENTS.md` does — and, in the other direction, a fenced sample
- * table row would count as a roadmap row and a fenced `- **D-007**` as a spec's
- * citation. One implementation keeps `FENCE_RE`'s marker matching (a `~~~`
- * cannot close a ``` block) as the single fence rule.
- */
-function unfenced(lines) {
-  const out = [];
-  let fenceMarker = null;
-  for (const line of lines) {
-    const fence = line.match(FENCE_RE);
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[1];
-      else if (fence[1] === fenceMarker) fenceMarker = null;
-      continue;
-    }
-    if (!fenceMarker) out.push(line);
-  }
-  return out;
-}
-
-/**
- * `text` with its code spans removed — the inline counterpart of the fence
- * exemption `unfenced()` applies to blocks. A backtick span renders its contents
- * as literal text, so `` `[alpha](specs/alpha.md)` `` shows a link rather than
- * being one, and C4 must not record a spec as linked from a row a reader cannot
- * navigate from.
- *
- * Only C4 needs it, and the discriminator is what a span does to the cell it
- * sits in: it keeps the text and kills the link. The `Version` and `Tag` cells
- * are text, so their backticks are decoration the parser strips, and C1's marker
- * still reads as `← we are here` inside a span. The `Spec` cell is the one cell
- * whose content must be a link, so it is the one place a span changes the answer.
- *
- * The closing run must match the opening one, the way `FENCE_RE`'s marker does,
- * so a doubled span is not closed by a single backtick inside it. Unbalanced
- * backticks open no span in CommonMark either, and are left alone.
- */
-function stripCodeSpans(text) {
-  return text.replace(/(`+)[^\n]*?\1/g, '');
 }
 
 /** The lines between `## Roadmap` and the next `##` heading. */
