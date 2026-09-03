@@ -118,6 +118,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   one, so a marker that should have moved and didn't passes green. Placement stays a
   reading task, and the prose in `product/AGENTS.md` and the `releasing` skill says
   so rather than implying the gate covers it.
+- Residual: C3 is narrower than "the log is coherent". The closed status vocabulary
+  is read only on an entry something supersedes; a trailing `·` is tolerated; a
+  clause number is checked for shape but not for identity, so two decisions may
+  claim the same clause of one victim; and a `Refines:` / `Extends:` target is not
+  tested for liveness — deliberately, since the promise is existence and backward
+  direction only. Each is a widening that needs its own decision, and the
+  constraints on writing one are in
+  [`docs/plans/check-product-deferred.md`](../docs/plans/check-product-deferred.md).
 - Cost accepted: the check has to be named in seven places to be real —
   `package.json`, `.github/workflows/ci.yml`, `CLAUDE.md`, `AGENTS.md`'s verify
   block, `.claude/rules/testing.md`, `.claude/rules/git-workflow.md`, and the

@@ -16,7 +16,7 @@ A companion wiki lives at the [ArcForge Knowledge Base](https://publish.obsidian
 - `decisions/` — frozen mechanical contracts (skill schema, task-list format, the
   learning-curator layer specs) — the authorities other docs point at
 - `plans/` — historical process records (the v6 rebuild's plan, progress, and
-  evidence), contributor-facing provenance
+  evidence; what a review round deliberately deferred), contributor-facing provenance
 
 Product intent — living feature specs, roadmap, backlog, and the decision log —
 lives outside `docs/` in [`product/`](../product/AGENTS.md).
