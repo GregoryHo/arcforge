@@ -109,9 +109,12 @@ header of every spec it links:
 | `building` | `building vX.Y.Z` |
 | `shipped` | `shipped vX.Y.Z` |
 
-**2. The governing row (C4).** A spec must be linked from at least one roadmap row,
-and every spec a row links must exist. Where more than one row links a spec, its
-**governing row** is the highest-version one:
+**2. The governing row (C4).** Every roadmap row links at least one spec, every spec
+a row links must exist, and every spec must be linked from at least one row. A patch
+row is not exempt: a patch changes an area that already has a spec, and the row links
+that spec — the point of the rule is that no version is ever built without one.
+Where more than one row links a spec, its **governing row** is the highest-version
+one:
 
 - A `shipped` governing row collapses the header to `shipped v<that version>` — the
   earlier rows are history, and the roadmap already carries it.

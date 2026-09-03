@@ -53,10 +53,13 @@
  *         `STATUS_FIELD_RE` is anchored at column 1, so a line only counts where
  *         the entry form puts it. `Refines:` and `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
- *         the row ↔ spec links resolve in both directions — the header is read
- *         in the preamble above the spec's first `##`, fence-aware, so a worked
- *         example or a quoted header line further down is neither mistaken for
- *         the header nor allowed to displace it;
+ *         the row ↔ spec links resolve in both directions — every row links at
+ *         least one spec, every spec is linked from some row, and every link
+ *         names a spec that exists, so a version cannot be promoted without the
+ *         spec it is built from. The header is read in the preamble above the
+ *         spec's first `##`, fence-aware, so a worked example or a quoted header
+ *         line further down is neither mistaken for the header nor allowed to
+ *         displace it;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
  *         and exists in the log — that section is sliced the same fence-aware
  *         way, so an example `##` heading cannot carry citations out of reach,
@@ -557,6 +560,9 @@ function expectedSpecStatus(linking) {
 function checkSpecHeaders(rows, specs, errors) {
   const known = new Set(specs.map((s) => s.name));
   for (const row of rows) {
+    if (row.specs.length === 0) {
+      errors.push(`C4 roadmap row ${row.version}: links no spec, so nothing says what it builds`);
+    }
     for (const slug of row.specs) {
       if (!known.has(slug)) {
         errors.push(`C4 roadmap row ${row.version}: links specs/${slug}.md, which does not exist`);

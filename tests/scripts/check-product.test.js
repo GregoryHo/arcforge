@@ -849,6 +849,20 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/specs\/orphan\.md: no roadmap row links it/);
     });
 
+    it('rejects a row that links no spec', () => {
+      // The other half of "both ways": a promoted version with an em-dash Spec
+      // cell is a milestone nothing is written down for, and the spec-side loop
+      // never reaches it — the older rows keep every existing spec governed.
+      const rows = [
+        row({ version: '1.0.0', here: false }),
+        row({ version: '1.1.0', status: 'building', specs: [] }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0' })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/roadmap row 1\.1\.0: links no spec/);
+    });
+
     it('rejects a roadmap link to a spec that does not exist', () => {
       const rows = [row({ specs: ['alpha', 'ghost'] })];
       const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));

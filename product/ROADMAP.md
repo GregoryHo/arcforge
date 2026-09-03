@@ -79,11 +79,12 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Decision: Three rules are pinned in `product/AGENTS.md` in the exact form a linter
   can read: (1) row status → spec header — `next`→`draft`, `building`→`building
   vX.Y.Z`, `shipped`→`shipped vX.Y.Z`; (2) the governing row is the highest-version
-  row linking a spec, every spec has one and every row link resolves, an unshipped
-  governing row over a shipped spec takes the compound form `shipped v6.0.0 ·
-  extended by 6.1.0 (building)`, and a shipped governing row collapses it to
-  `shipped v<that version>`; (3) a supersession is two edits, in one of two forms —
-  bare `Supersedes: D-NNN` flips the old entry to `Status: Superseded-by: D-MMM`,
+  row linking a spec, every row links at least one spec, every spec has a governing
+  row and every row link resolves, an unshipped governing row over a shipped spec
+  takes the compound form `shipped v6.0.0 · extended by 6.1.0 (building)`, and a
+  shipped governing row collapses it to `shipped v<that version>`; (3) a
+  supersession is two edits, in one of two forms — bare
+  `Supersedes: D-NNN` flips the old entry to `Status: Superseded-by: D-MMM`,
   clause-scoped `Supersedes: D-NNN (clause 2)` flips it to `Accepted · partially
   superseded by D-MMM` — with `Refines:` and `Extends:` exempt from any flip.
 - Why: A vocabulary that exists only as prose has no answer for the first hard case.
@@ -110,9 +111,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   its clauses — and the pairing read back from the flip, so a `Superseded-by:` or
   `partially superseded by` clause whose named entry claims no supersession, or that
   names an id the log does not carry, is rejected too (C3); every spec header
-  agreeing with its governing roadmap row, links resolving both ways (C4); every
-  D-id a spec cites well-formed as `D-NNN` and existing (C5); a sanity floor of one
-  row, one decision, one spec (C6); and a `Tag` cell matching its row's Status —
+  agreeing with its governing roadmap row, with the links resolving both ways —
+  every row links at least one spec, every spec is linked from some row, and every
+  link names a file that exists (C4); every D-id a spec cites well-formed as
+  `D-NNN` and existing (C5); a sanity floor of one row, one decision, one spec
+  (C6); and a `Tag` cell matching its row's Status —
   `vX.Y.Z` when shipped, `—` otherwise (C7).
 - Residual: C1 counts `← we are here` markers; it does not know which row deserves
   one, so a marker that should have moved and didn't passes green. Placement stays a
