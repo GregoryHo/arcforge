@@ -9,5 +9,6 @@
   "repository": "https://github.com/GregoryHo/arcforge",
   "license": "MIT",
   "keywords": ["skills", "tdd", "workflows", "planning", "review", "worktrees", "arcforge"],
-  "skills": ["./skills/core/"]
+  "skills": ["./skills/core/"],
+  "hooks": "./hooks/claude-code.json"
 }

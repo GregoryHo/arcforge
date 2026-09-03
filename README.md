@@ -60,7 +60,7 @@ All 15 skills load, namespaced `arcforge:<name>`. **Skills are all that installs
 | The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
 | Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
 
-arcforge's hooks ship in the same tree, so Codex can see `hooks/hooks.json`. It will not execute anything there without an explicit persisted hook-trust grant, and arcforge never asks you for one — those hooks speak Claude Code's protocol and have nothing useful to say to Codex. Leave them untrusted.
+arcforge's hooks ship in the same tree, but Codex never loads them. The registry is named `hooks/claude-code.json` and Claude Code finds it through the plugin manifest; Codex only auto-discovers `hooks/hooks.json`, which arcforge deliberately leaves empty. So there is no hook-trust prompt to answer and nothing for you to decline. <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
 
 If you want the whole toolkit, use Claude Code.
 
@@ -195,7 +195,7 @@ Plus six static checks, all of which run in CI:
 npm run check:versions        # version strings in sync
 npm run check:docs            # docs don't promise what the engine lacks
 npm run check:cli-consumers   # CLI callers match the CLI surface
-npm run check:hooks           # hooks.json schema
+npm run check:hooks           # hook registry schema + manifest wiring
 npm run check:eval-targets    # eval scenarios target things that exist
 npm run check:product         # product/ roadmap, decisions, and specs agree
 npm run lint                  # Biome

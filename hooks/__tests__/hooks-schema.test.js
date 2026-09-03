@@ -1,16 +1,16 @@
 /**
  * hooks-schema validator tests — scripts/check-hooks-schema.js.
  *
- * Proves the shipped hooks.json passes the schema linter, and that the linter
- * actually catches the failure classes it exists to guard (unknown event,
- * duplicate id, missing ${CLAUDE_PLUGIN_ROOT}, and an async guard sneaking onto
- * the blocking path).
+ * Proves the shipped hooks/claude-code.json passes the schema linter, and that
+ * the linter actually catches the failure classes it exists to guard (unknown
+ * event, duplicate id, missing ${CLAUDE_PLUGIN_ROOT}, and an async guard
+ * sneaking onto the blocking path).
  *
- * Also proves the manifest half: neither shipped plugin manifest declares a
- * `hooks` key, and the validator catches one that does. That guard exists
- * because Codex's manifest schema rejects the field outright and a `hooks`
- * entry cannot suppress its hook discovery anyway — the tempting "fix" for the
- * leak breaks the manifest without closing it.
+ * Also proves the registration-path half, which is the leak guard: the Claude
+ * Code manifest declares exactly `./hooks/claude-code.json` (the only thing that
+ * loads the registry now that it is off the conventional name), the Codex
+ * manifest declares nothing, and neither `hooks.json` nor `hooks/hooks.json`
+ * exists for Codex to auto-discover.
  */
 
 const { describe, it } = require('node:test');
@@ -20,8 +20,10 @@ const path = require('node:path');
 
 const {
   validateHooksJson,
-  validateManifestsHaveNoHooks,
+  validateManifestHooks,
+  validateNoCodexDiscoverablePaths,
   MANIFESTS,
+  CODEX_DISCOVERED_PATHS,
 } = require('../../scripts/check-hooks-schema');
 
 // The literal placeholder every valid command must contain. Kept in one const so
@@ -34,8 +36,10 @@ function group(id, extra = {}) {
 }
 
 describe('check-hooks-schema', () => {
-  it('the shipped hooks.json is valid (zero violations)', () => {
-    const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'hooks.json'), 'utf-8'));
+  it('the shipped hook registry is valid (zero violations)', () => {
+    const config = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'claude-code.json'), 'utf-8'),
+    );
     assert.deepStrictEqual(validateHooksJson(config), []);
   });
 
@@ -71,51 +75,95 @@ describe('check-hooks-schema', () => {
   });
 });
 
-describe('check-hooks-schema — plugin manifests declare no hooks', () => {
-  it('both shipped manifests exist and are silent about hooks', () => {
-    const repoRoot = path.join(__dirname, '..', '..');
-    const reads = MANIFESTS.map((file) => ({
+describe('check-hooks-schema — the registration path', () => {
+  const repoRoot = path.join(__dirname, '..', '..');
+
+  it('both shipped manifests declare exactly what they owe', () => {
+    const reads = MANIFESTS.map(({ file, expectedHooks }) => ({
       file,
+      expectedHooks,
       status: 'ok',
       manifest: JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf-8')),
     }));
-    assert.deepStrictEqual(validateManifestsHaveNoHooks(reads), []);
+    assert.deepStrictEqual(validateManifestHooks(reads), []);
   });
 
-  it('covers both the Claude Code and the Codex manifest', () => {
-    assert.deepStrictEqual(MANIFESTS, ['.claude-plugin/plugin.json', '.codex-plugin/plugin.json']);
+  it('pins the Claude Code manifest to the renamed registry and the Codex one to silence', () => {
+    assert.deepStrictEqual(MANIFESTS, [
+      { file: '.claude-plugin/plugin.json', expectedHooks: './hooks/claude-code.json' },
+      { file: '.codex-plugin/plugin.json', expectedHooks: null },
+    ]);
   });
 
-  it('rejects a manifest that declares a hooks key', () => {
-    const errors = validateManifestsHaveNoHooks([
-      { file: '.codex-plugin/plugin.json', status: 'ok', manifest: { hooks: './hooks.json' } },
+  it('rejects a Claude Code manifest that stops declaring the registry', () => {
+    const errors = validateManifestHooks([
+      {
+        file: '.claude-plugin/plugin.json',
+        expectedHooks: './hooks/claude-code.json',
+        status: 'ok',
+        manifest: {},
+      },
     ]);
     assert.strictEqual(errors.length, 1);
-    assert.ok(errors[0].includes('declares a "hooks" key'));
+    assert.ok(errors[0].includes('only thing that loads'));
   });
 
-  it('rejects a hooks key even when it points at an empty neutralizer', () => {
-    const errors = validateManifestsHaveNoHooks([
+  it('rejects a Claude Code manifest pointing at the conventional name', () => {
+    const errors = validateManifestHooks([
       {
-        file: '.codex-plugin/plugin.json',
+        file: '.claude-plugin/plugin.json',
+        expectedHooks: './hooks/claude-code.json',
         status: 'ok',
-        manifest: { hooks: './.codex-plugin/no-hooks.json' },
+        manifest: { hooks: './hooks/hooks.json' },
       },
     ]);
     assert.strictEqual(errors.length, 1);
   });
 
+  it('rejects a Codex manifest that declares a hooks key', () => {
+    const errors = validateManifestHooks([
+      {
+        file: '.codex-plugin/plugin.json',
+        expectedHooks: null,
+        status: 'ok',
+        manifest: { hooks: './hooks/claude-code.json' },
+      },
+    ]);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0].includes('must stay silent'));
+  });
+
   it('reports a missing manifest rather than passing vacuously', () => {
-    const errors = validateManifestsHaveNoHooks([
-      { file: '.codex-plugin/plugin.json', status: 'missing' },
+    const errors = validateManifestHooks([
+      { file: '.codex-plugin/plugin.json', expectedHooks: null, status: 'missing' },
     ]);
     assert.ok(errors.some((e) => e.includes('manifest missing')));
   });
 
   it('reports an unparseable manifest', () => {
-    const errors = validateManifestsHaveNoHooks([
-      { file: '.claude-plugin/plugin.json', status: 'unreadable', error: 'Unexpected token' },
+    const errors = validateManifestHooks([
+      {
+        file: '.claude-plugin/plugin.json',
+        expectedHooks: './hooks/claude-code.json',
+        status: 'unreadable',
+        error: 'Unexpected token',
+      },
     ]);
     assert.ok(errors.some((e) => e.includes('cannot read/parse')));
+  });
+
+  it('guards both paths Codex auto-discovers hooks at', () => {
+    assert.deepStrictEqual(CODEX_DISCOVERED_PATHS, ['hooks.json', 'hooks/hooks.json']);
+  });
+
+  it('neither Codex-discovered path exists in the shipped tree', () => {
+    const present = CODEX_DISCOVERED_PATHS.filter((f) => fs.existsSync(path.join(repoRoot, f)));
+    assert.deepStrictEqual(present, []);
+  });
+
+  it('rejects a re-introduced hooks/hooks.json even though nothing references it', () => {
+    const errors = validateNoCodexDiscoverablePaths(['hooks/hooks.json']);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0].includes('leaks'));
   });
 });
