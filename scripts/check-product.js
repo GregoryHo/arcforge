@@ -65,8 +65,9 @@
  *         way, so an example `##` heading cannot carry citations out of reach,
  *         and the citation scan skips its fenced lines, so a `D-NNN` inside a
  *         worked example is an illustration rather than a citation;
- *   - C6  sanity floor — at least one roadmap row, one decision, one spec, each
- *         counted outside fenced blocks, so an illustration never meets it;
+ *   - C6  sanity floor — at least one roadmap row, one decision, one spec; rows
+ *         and decisions are read outside fenced blocks, so an illustration
+ *         never meets the floor on their behalf;
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
