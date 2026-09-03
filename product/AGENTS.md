@@ -414,8 +414,8 @@ no estimate, no commitment. Low friction is the point.
 2. Record a Decision Log entry (next `D-id`) — *which version, why now*.
 3. Add the roadmap row: next free `X.Y.Z`, `Status: next`, `Tag: —`, a one-line
    "what & why", and a link to its spec. Move `← we are here` onto it only when
-   the marker was left on a shipped row; a `building` row, or an earlier `next`
-   row, keeps it.
+   every row above it has shipped; a `building` row, or an earlier `next` row,
+   keeps it.
 4. Write `specs/<slug>.md` from the template **before building**.
 
 ### Record a decision

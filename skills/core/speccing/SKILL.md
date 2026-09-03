@@ -56,7 +56,7 @@ A wish becomes work in three edits, made **before** the first line of code:
    (`references/conventions.md`).
 2. Append a decision recording *which version, and why now*.
 3. Add the roadmap row and write that version's spec from the template. The new
-   row takes `← we are here` only when the marker was left on a shipped row; a
+   row takes `← we are here` only when every row above it has shipped; a
    `building` row, or an earlier `next` row, keeps it.
 
 The spec goes first because it is what the build gets reviewed against. Written

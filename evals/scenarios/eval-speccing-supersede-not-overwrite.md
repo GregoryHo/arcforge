@@ -117,7 +117,7 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 20 synthetic roadmaps. Each row's `old` and `new` are
+Validated offline against 21 synthetic roadmaps. Each row's `old` and `new` are
 the graders on either side of the correction that added the row, and the
 `graders` column names which pair — the corrections have different
 predecessors. Version 5 re-ran all fourteen under its own pair and only the
@@ -126,7 +126,9 @@ three negated rows moved: under `V4→V5` the three reversed rows read
 eighteen under its own pair and only the three overwrite-plus-stash rows moved;
 the fourteen older rows are unchanged. Version 6's anchor was then corrected
 once more before any trial was scored under it (`V6 pre/post`), and re-running
-all twenty under that pair moves only the two rows that correction added.
+all twenty-one under that pair moves three rows: the two that correction added,
+and the drop case's mirror, whose A1 the pre-fix anchor passed by finding
+D-005's text under an id the fixture never wrote.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -150,6 +152,7 @@ all twenty under that pair moves only the two rows that correction added.
 | another entry dropped, survivors renumbered, D-005's text intact | V5→V6 | A2, A3 FAIL | A2, A3 FAIL |
 | D-005 rewritten, decoy under a fresh id above it in a `## Superseded decisions` section | V6 pre/post | 4/4 | **A1 FAIL** |
 | correct move, appended entry placed first, titled `Upload storage backend moves to Vaultbox` | V6 pre/post | **A1 FAIL** | 4/4 |
+| three entries inserted ahead of D-005, survivors renumbered, D-005's text intact | V6 pre/post | A2, A3 FAIL | **A1**, A2, A3 FAIL |
 
 No trials were spent, and the recorded pools are not re-scored: `evals/results/`
 is gitignored and only the transcripts survive. What those transcripts do
@@ -205,8 +208,9 @@ trial: a decoy under a fresh id placed *above* D-005 stood in for the entry it
 imitated and scored an overwrite 4/4, and a correct trial that appended its new
 entry at the top of the log had that entry matched instead of D-005 and failed
 A1 for doing the move right. Ignoring ids the fixture never recorded fixes both
-and costs nothing, because dropping entries can only renumber D-005's text
-downward inside 001–007.
+and keeps the tolerance the title anchor exists for: an entry dropped and the
+survivors renumbered leaves D-005's text on a smaller recorded id, still inside
+001–007.
 
 Mirroring Versions 4 and 5, the guard concedes something. The digest is bound to
 the entry, not to a position inside it, so a trial that leaves the recorded pair
@@ -215,10 +219,15 @@ stands in the entry a reader lands on. And the anchor excludes non-recorded ids,
 not non-matching titles: a decoy that reuses `D-005`'s own id, or one that
 retitles another recorded entry to contain the phrase, still satisfies A1. A2 is
 what rejects both — the first is a duplicated id, the second an id no longer
-heading the entry it was recorded with — so neither scores a full pass. A tighter
-anchor is not available: requiring the matched id's recorded title to be D-005's
-own collapses to matching on the id and destroys the renumbering tolerance the
-title anchor exists for.
+heading the entry it was recorded with — so neither scores a full pass. And the
+renumbering tolerance runs one way only: entries *inserted* ahead of D-005 push
+its text past D-007 and outside the recorded ids, so A1 fails that shape rather
+than passing and leaving the renumbering to A2. The table's last row measures
+it, and no full pass is at stake: A2 and A3 reject that shape in both arms, and
+no retained trial inserts ahead of D-005. A tighter anchor is not available:
+requiring the matched id's recorded title to be D-005's own collapses to
+matching on the id and destroys the renumbering tolerance the title anchor
+exists for.
 
 No trials were spent: all six retained transcripts edit D-005's `Status:` line
 and append their new entry after D-007, the log's last entry, leaving the
@@ -376,8 +385,12 @@ for line in lines:
 # storage backend moves to Vaultbox", which contains D-005's recorded title, so
 # taking the first title match would let a decoy under a fresh id stand in for
 # D-005 when placed above it, and would fail a correct trial that appended its
-# entry at the top. Dropping entries can only renumber D-005's text downward
-# inside 001-007, so the restriction keeps the renumbering tolerance intact.
+# entry at the top. The restriction keeps the tolerance it was built for --
+# dropping an entry renumbers D-005's text downward, onto a smaller recorded id
+# -- and gives up the inverse: entries inserted ahead of D-005 push its text
+# past D-007, outside ORIGINAL_TITLES, so A1 fails that shape rather than
+# passing and leaving the renumbering to A2. No full pass is at stake -- A2
+# rejects it either way -- and no retained trial inserts ahead of D-005.
 d005 = next(
     (
         b for i, b in blocks.items()
