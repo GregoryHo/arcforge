@@ -52,7 +52,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   straddling zero is `INCONCLUSIVE` — a real answer, not a failure to get one.
   Under 5 trials per arm the harness returns `INSUFFICIENT_DATA` rather than
   guessing. A `non-regression` verdict policy replaces the delta with a strict
-  bar: every treatment trial must pass.
+  bar: the verdict is `PASS` when every treatment trial passes and `REGRESSED`
+  otherwise.
 - **B-5 A trial is pass or fail, never partial credit.** Behavioral assertions
   (graded deterministically from the log of what the agent actually did) are
   the preferred evidence — they cost nothing, never drift, and cannot be
@@ -91,10 +92,15 @@ A **scenario** is markdown with a fixed section set; `scripts/lib/eval-scenario.
 owns its parsing, discovery, and evidence claim types. A **result** is a JSONL row
 under `evals/results/` that records the scenario version it ran under — the field
 that makes a pool version-scoped (B-8) — and a **benchmark** is the snapshot
-`eval report` writes under `evals/benchmarks/` (B-9). The A/B verdict vocabulary
-(`IMPROVED`, `REGRESSED`, `INCONCLUSIVE`, `INSUFFICIENT_DATA`) and the interval
-arithmetic that produces it belong to `scripts/lib/eval-stats.js`; no other module
-invents a verdict.
+`eval report` writes under `evals/benchmarks/` (B-9). The A/B verdict vocabulary and
+the arithmetic that produces it belong to `scripts/lib/eval-stats.js`; no other
+module invents a verdict. Delta-CI judging returns `IMPROVED`, `REGRESSED`,
+`INCONCLUSIVE`, or `INSUFFICIENT_DATA` from the interval; a scenario declaring the
+`non-regression` verdict policy is judged by the strict bar instead and returns
+`PASS` or `REGRESSED` — never `INSUFFICIENT_DATA`, because an empty treatment arm
+fails the bar rather than deferring. That `PASS` is a distinct token from the
+preflight `PASS` in B-3, which is a discriminability outcome (`PASS` / `BLOCK`), not
+an A/B verdict.
 
 ## Decisions
 
