@@ -93,6 +93,37 @@ describe('diary-capture', () => {
     });
   });
 
+  // D-010's retention half: the opt-in decides how long verbatim prose may stay
+  // in the session record, not only whether it is written there.
+  describe('pruneUngatedProse', () => {
+    it('deletes carried prose when the opt-in is off and reports no consent', () => {
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+      const session = { userMessageContent: ['a secret sentence'], toolsUsed: ['Edit'] };
+
+      expect(pruneUngatedProse(session, { projectRoot })).toBe(false);
+      expect(session.userMessageContent).toBeUndefined();
+      expect(session.toolsUsed).toEqual(['Edit']);
+    });
+
+    it('leaves the record alone when the opt-in is on', () => {
+      enableLearning();
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+      const session = { userMessageContent: ['a secret sentence'] };
+
+      expect(pruneUngatedProse(session, { projectRoot })).toBe(true);
+      expect(session.userMessageContent).toEqual(['a secret sentence']);
+    });
+
+    it('fails closed on a missing projectRoot and tolerates a null session', () => {
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+
+      expect(pruneUngatedProse(null)).toBe(false);
+      const session = { userMessageContent: ['a secret sentence'] };
+      expect(pruneUngatedProse(session, {})).toBe(false);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+  });
+
   describe('runDiaryCapture threshold gating', () => {
     it('does NOT trigger or reset below threshold', () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');

@@ -27,7 +27,7 @@ const { addPendingAction } = require('../../scripts/lib/pending-actions');
 const {
   runDiaryCapture,
   readCounts,
-  learningCaptureEnabled,
+  pruneUngatedProse,
 } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
 const { parseTranscript } = require('../../scripts/lib/transcript');
@@ -149,11 +149,19 @@ function main() {
   const transcriptData =
     shouldTrigger(userCount, toolCount) && transcriptPath ? parseTranscript(transcriptPath) : null;
 
+  // D-010 governs both halves: the opt-in decides whether prose is written AND
+  // whether prose an earlier, opted-in Stop wrote may stay. Pruning before the
+  // branch is what makes the second half true — the record is reloaded and
+  // rewritten on every Stop, so an ungated field would otherwise be
+  // re-serialized forever. The returned answer is the opt-in itself, so the
+  // reflect-ready gate below (D-009) reuses this one config read rather than
+  // asking again.
+  const learningOn = pruneUngatedProse(session, { projectRoot });
+
   if (transcriptData) {
     // Counts, tool names and paths are the continuity record and are kept
-    // either way. Verbatim user prose is not — it only lands in the session
-    // file once the learning opt-in is on (D-010).
-    if (learningCaptureEnabled({ projectRoot })) {
+    // either way. Verbatim user prose is not (D-010).
+    if (learningOn) {
       session.userMessageContent = transcriptData.userMessages;
     }
     session.toolsUsed = transcriptData.toolsUsed;
@@ -187,7 +195,7 @@ function main() {
     // that loop does not run when learning is off — and the diaries it counts
     // are permanent stubs in that state, so an ungated nudge would recur at
     // every Stop above the threshold, forever, about work the user declined.
-    if (learningCaptureEnabled({ projectRoot })) {
+    if (learningOn) {
       const reflectStatus = checkReflectReady(session.project);
       if (reflectStatus?.ready) {
         addPendingAction(session.project, 'reflect-ready', {

@@ -115,16 +115,21 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
   const originalEnv = { ...process.env };
   let tmpDir;
   let homeDir;
+  let binDir;
   const sessionId = 'v5-transcript-gate';
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v5-tg-tmp-'));
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v5-tg-home-'));
+    binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v5-tg-bin-'));
+    // Stub `claude` so an opted-in Stop never launches the real enricher.
+    fs.writeFileSync(path.join(binDir, 'claude'), '#!/bin/sh\ncat > /dev/null\n', { mode: 0o755 });
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    fs.rmSync(homeDir, { recursive: true, force: true });
+    for (const dir of [tmpDir, homeDir, binDir]) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
     for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, originalEnv);
   });
@@ -140,6 +145,37 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
     fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
   }
 
+  /** Turn the project-scope learning opt-in explicitly OFF for a project dir. */
+  function disableLearning(projectDir) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: false }));
+  }
+
+  /** Reseed the shared counters so a second Stop lands where the test wants it. */
+  function seedCounts(toolCount, userCount) {
+    fs.writeFileSync(counterPath('tool-count'), String(toolCount));
+    fs.writeFileSync(counterPath('user-count'), String(userCount));
+  }
+
+  /** A transcript with one user sentence and one Edit tool call. */
+  function writeTranscript(name, sentence) {
+    const transcript = path.join(tmpDir, name);
+    fs.writeFileSync(
+      transcript,
+      `${[
+        JSON.stringify({ type: 'user', content: sentence }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/tmp/foo.ts' } }],
+          },
+        }),
+      ].join('\n')}\n`,
+    );
+    return transcript;
+  }
+
   function runStop(projectDir, transcriptPath) {
     return spawnSync('node', [END], {
       input: JSON.stringify({
@@ -149,7 +185,13 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
         transcript_path: transcriptPath,
       }),
       encoding: 'utf-8',
-      env: { ...process.env, HOME: homeDir, TMPDIR: tmpDir, CLAUDE_PROJECT_DIR: projectDir },
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        TMPDIR: tmpDir,
+        CLAUDE_PROJECT_DIR: projectDir,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      },
     });
   }
 
@@ -252,6 +294,89 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
       session.filesModified,
       ['/tmp/foo.ts'],
       'filesModified still recorded — the diary Files-modified line depends on it',
+    );
+  });
+
+  // -------------------------------------------------------------------
+  // D-010 retention: the opt-in governs how long prose may STAY, not only
+  // whether it is written. The session record is reloaded and rewritten on
+  // every Stop, so a gate that only skipped the assignment would keep
+  // re-serializing prose captured before the user opted out.
+  // -------------------------------------------------------------------
+  it('learning ON above threshold, then OFF above threshold: prose is removed, not merely not rewritten', () => {
+    const projectDir = path.join(homeDir, 'v5tg-optout-high');
+    fs.mkdirSync(projectDir, { recursive: true });
+    enableLearning(projectDir);
+
+    seedCounts(60, 0);
+    const first = runStop(projectDir, writeTranscript('t1.jsonl', 'a secret sentence'));
+    assert.strictEqual(first.status, 0, first.stderr);
+    assert.deepStrictEqual(savedSession(projectDir).userMessageContent, ['a secret sentence']);
+
+    disableLearning(projectDir);
+    seedCounts(60, 0);
+    const second = runStop(projectDir, writeTranscript('t2.jsonl', 'another sentence'));
+    assert.strictEqual(second.status, 0, second.stderr);
+
+    const session = savedSession(projectDir);
+    assert.strictEqual(
+      session.userMessageContent,
+      undefined,
+      'prose captured under the opt-in must be deleted once it is withdrawn',
+    );
+    assert.deepStrictEqual(
+      session.toolsUsed,
+      ['Edit'],
+      'tool names are continuity, still recorded',
+    );
+    assert.deepStrictEqual(session.filesModified, ['/tmp/foo.ts'], 'paths still recorded');
+  });
+
+  it('learning ON above threshold, then OFF below threshold: prose is removed, tool names carry forward', () => {
+    const projectDir = path.join(homeDir, 'v5tg-optout-low');
+    fs.mkdirSync(projectDir, { recursive: true });
+    enableLearning(projectDir);
+
+    seedCounts(60, 0);
+    const first = runStop(projectDir, writeTranscript('t1.jsonl', 'a secret sentence'));
+    assert.strictEqual(first.status, 0, first.stderr);
+    assert.deepStrictEqual(savedSession(projectDir).userMessageContent, ['a secret sentence']);
+
+    disableLearning(projectDir);
+    seedCounts(3, 2);
+    const second = runStop(projectDir, writeTranscript('t2.jsonl', 'another sentence'));
+    assert.strictEqual(second.status, 0, second.stderr);
+
+    const session = savedSession(projectDir);
+    assert.strictEqual(
+      session.userMessageContent,
+      undefined,
+      'a below-threshold Stop must prune too — it rewrites the record just the same',
+    );
+    assert.deepStrictEqual(
+      session.toolsUsed,
+      ['Edit'],
+      'toolsUsed keeps its documented carry-forward — it is continuity, not prose',
+    );
+  });
+
+  it('learning stays ON: a below-threshold Stop keeps the prose an earlier parse wrote', () => {
+    const projectDir = path.join(homeDir, 'v5tg-stays-on');
+    fs.mkdirSync(projectDir, { recursive: true });
+    enableLearning(projectDir);
+
+    seedCounts(60, 0);
+    const first = runStop(projectDir, writeTranscript('t1.jsonl', 'a secret sentence'));
+    assert.strictEqual(first.status, 0, first.stderr);
+
+    seedCounts(3, 2);
+    const second = runStop(projectDir, writeTranscript('t2.jsonl', 'another sentence'));
+    assert.strictEqual(second.status, 0, second.stderr);
+
+    assert.deepStrictEqual(
+      savedSession(projectDir).userMessageContent,
+      ['a secret sentence'],
+      'with learning on the carry-forward hooks.md documents is unchanged',
     );
   });
 });

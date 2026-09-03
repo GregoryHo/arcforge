@@ -44,8 +44,10 @@ across sessions until the threshold is met; reset is owned exclusively by
 - Saves session metrics (duration, tool calls)
 - Records modified files and tool names from transcript parsing (parseTranscript)
 - Stores verbatim recent user messages (`userMessageContent`) **only when
-  learning is enabled in some scope** — the parse itself is unconditional, so
-  the metadata above is recorded either way
+  learning is enabled in some scope**, and removes the field from the record when
+  it is not, so prose captured under an earlier opt-in does not survive the
+  opt-out — the parse itself is unconditional, so the metadata above is recorded
+  either way
 - Runs diary-capture (threshold-gated draft + counter reset; the enricher spawn
   is behind the same learning opt-in)
 - Queues the `reflect-ready` nudge **only when learning is enabled in some
@@ -96,7 +98,9 @@ Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
 
 Every field above is continuity and is written regardless of the learning
 opt-in. One field is not: `userMessageContent` — the last 10 user messages,
-each truncated — is added only when learning is enabled in some scope.
+each truncated — is added only when learning is enabled in some scope, and is
+removed again the first time a Stop or a compaction stamps the record with
+learning off.
 
 ## Output Examples
 

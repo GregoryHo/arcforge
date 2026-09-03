@@ -26,7 +26,11 @@ const {
   saveSession,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const { runDiaryCapture, getSuggesterStatePath } = require('../../scripts/lib/diary-capture');
+const {
+  runDiaryCapture,
+  getSuggesterStatePath,
+  pruneUngatedProse,
+} = require('../../scripts/lib/diary-capture');
 
 /**
  * Reset the compact-suggester state on every compaction.
@@ -47,8 +51,17 @@ function resetSuggesterState() {
 
 /**
  * Update session file with compaction marker
+ *
+ * @param {string} project
+ * @param {string} date
+ * @param {string} timestamp
+ * @param {string} sessionId
+ * @param {string} [projectRoot] - Project root whose learning opt-in governs
+ *   whether carried user prose may survive this rewrite. Omitted means no
+ *   consent, so the prose is pruned.
+ * @returns {boolean}
  */
-function updateSessionFile(project, date, timestamp, sessionId) {
+function updateSessionFile(project, date, timestamp, sessionId, projectRoot) {
   const sessionFile = path.join(getSessionDir(project, date), `${sessionId}.json`);
 
   const content = readFileSafe(sessionFile);
@@ -56,6 +69,9 @@ function updateSessionFile(project, date, timestamp, sessionId) {
 
   try {
     const session = JSON.parse(content);
+    // The compaction marker rewrites the whole record, so the same opt-in that
+    // governs capture governs what survives here (D-010).
+    pruneUngatedProse(session, { projectRoot });
     session.compactions = session.compactions || [];
     session.compactions.push(timestamp);
     session.lastCompaction = timestamp;
@@ -88,8 +104,10 @@ function main() {
     const sessionId = getSessionId();
     const timestamp = getTimestamp();
 
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
     // Update session file with compaction marker
-    updateSessionFile(project, date, timestamp, sessionId);
+    updateSessionFile(project, date, timestamp, sessionId, projectRoot);
 
     // Reset the compact-suggester state on EVERY compaction (unconditional,
     // independent of the diary threshold) so suggestions don't survive the
@@ -100,7 +118,6 @@ function main() {
     // → counter reset. Enricher fires on PreCompact too (dual-path ON).
     // projectRoot is passed explicitly: runDiaryCapture reads the learning
     // opt-in from it, and the compaction cwd is not a reliable stand-in.
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const { triggered, userCount, toolCount } = runDiaryCapture({
       project,
       date,

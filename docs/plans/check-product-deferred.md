@@ -62,55 +62,21 @@ Two constraints on any rule that hardens it:
   superseded entry still governs the rest of itself, which is exactly what a
   refinement would sharpen.
 
-## 2. `hooks/session-tracker/end.js` — the carry-forward, for the learning-gates PR
+## 2. `hooks/session-tracker/end.js` — the carry-forward (landed)
 
-Not this PR's to fix: the branch that gates session capture behind the learning
-opt-in already rewrites the block, and the product-method PR is process-only.
-Recorded here so the direction is not lost between the two.
+The prose half landed on `fix/learning-gates-146-147` as `pruneUngatedProse` in
+`scripts/lib/diary-capture.js`, called from `hooks/session-tracker/end.js` and
+`hooks/pre-compact/main.js` — the two hooks that reload the whole session record
+and write it back, and therefore the two that could re-serialize prose captured
+before an opt-out. With learning off, either event now deletes
+`userMessageContent` rather than carrying it forward.
 
-`main()` reloads the existing session record, assigns the three transcript-derived
-fields only when the diary threshold fired **and** a transcript actually parsed, and
-otherwise clears `filesModified` alone. Stop fires once per turn and the diary
-capture resets the counters on a hit, so the very next turn is below threshold by
-construction: fresh counters end up beside the previous turn's `userMessageContent`
-and `toolsUsed`, and `scripts/lib/session-utils.js` reads exactly those fields as
-the fallback for the diary's "Tools Used" and "Conversation Trail" sections. The
-record is internally inconsistent rather than newly leaky — the text was written
-legitimately above the threshold — but a later render can label a previous turn's
-prose as this turn's.
-
-Gating only the `userMessageContent` *assignment* does not close it. Once the gates
-PR promises that verbatim user text is absent from the session record with learning
-off, a record written while learning was on keeps re-serializing that text on every
-subsequent Stop. The direction, in `end.js` `main()` — the gate here stands in for
-whichever opt-in helper that PR settles on (`isLearningEnabled` in
-`scripts/lib/learning.js` today):
-
-```js
-if (learningGateOn) {
-  session.userMessageContent = transcriptData.userMessages;
-} else {
-  delete session.userMessageContent;
-}
-```
-
-plus `delete session.userMessageContent; delete session.toolsUsed;` in the
-no-transcript branch alongside the existing `filesModified = []`, so the three
-transcript-derived fields have one lifetime instead of three.
-
-Two cases to add in `hooks/__tests__/session-tracker-end.test.js` — its existing
-cases all start from *no* session file and therefore cannot see this:
-
-- An above-threshold Stop followed by a below-threshold one with no counter reseed,
-  asserting `userMessageContent` and `toolsUsed` are `undefined` after the second.
-- An above-threshold Stop with learning enabled followed by one with learning
-  disabled, asserting the field is gone rather than stale.
-
-`product/specs/hooks.md`'s domain-model section describes today's behavior; whichever
-PR lands the change owns that sentence and the decision entry that covers capture
-depth — either its text says the three fields share one lifetime, or it carries a
-`Residual:` recording that a pre-opt-out record keeps its prose. Delete this section
-once that lands.
+The other half this section proposed — also deleting `toolsUsed` in the
+no-transcript branch, so the three transcript-derived fields share one lifetime —
+was deliberately **not** taken. D-010 makes tool names always-on continuity, so
+dropping them would be a continuity regression rather than a privacy fix.
+`product/specs/hooks.md`'s domain-model note now states the two lifetimes
+separately instead of describing them as one.
 
 ## 3. `docs/guide/eval-system.md` — the verdict table has no `PASS` row
 
