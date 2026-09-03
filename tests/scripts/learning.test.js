@@ -833,13 +833,14 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(accepted.materialization_id).toBeTruthy();
       expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
 
-      // Pinned, not blessed. Pre-existing and outside this branch's diff:
-      // materialize.js's idempotence check (L7-11) returns the materialization
-      // it already wrote WITHOUT calling appendTransitionEvent, so the status
-      // does not move — and `learn drafts`, which filters on `materialized`,
-      // will not list it. Asserting it here trips this test the day
-      // materialize.js emits the transition.
-      expect(accepted.candidate.lifecycle_status).toBe('deactivated');
+      // The re-materialization transition lands even though L7-11 hands back the
+      // manifest it already wrote, so the candidate re-enters the drafts queue
+      // rather than reporting success while still reading `deactivated`.
+      expect(accepted.candidate.lifecycle_status).toBe('materialized');
+
+      const drafts = runJson(['drafts', '--project']);
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].candidate_id).toBe(CANDIDATE_ID);
     });
 
     it('refuses to accept an activated candidate as a policy violation, not a race', () => {

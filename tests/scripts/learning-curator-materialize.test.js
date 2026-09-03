@@ -509,6 +509,59 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(result2.record.materialization_id).toBe(result1.record.materialization_id);
   });
 
+  // The matrix allows `deactivated → materialized`, and replaying
+  // `candidate.transitioned` rewrites only `lifecycle`, so a re-materialized
+  // candidate carries the same record hash it had the first time and lands on
+  // the idempotence branch. AC-10 still owes Layer 5 the report there — the
+  // manifest is already durable — or the candidate reports success while
+  // staying `deactivated`.
+  it('reports the transition to Layer 5 when re-materializing a deactivated candidate', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).toBe(first.record.materialization_id);
+
+    const queuePath = path.join(arcforgeRoot, 'learning', 'candidates', 'queue.jsonl');
+    const transitions = fs
+      .readFileSync(queuePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .filter(
+        (event) =>
+          event.event_type === 'candidate.transitioned' &&
+          event.candidate_id === approved.candidate_id &&
+          event.action === 'materialize' &&
+          event.next_status === 'materialized',
+      );
+
+    expect(transitions).toHaveLength(2);
+  });
+
   it('creates a new materialization_id when candidate_record_hash changes', () => {
     const arcforgeRoot = path.join(tmpDir, '.arcforge');
     const policy = defaultRenderPolicy();
