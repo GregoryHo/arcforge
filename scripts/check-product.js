@@ -23,8 +23,11 @@
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists, and every `Supersedes:` carries its
  *         flip on the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
- *         clause-scoped form ⇒ `partially superseded by D-NNN`. `Refines:` and
- *         `Extends:` require no flip;
+ *         clause-scoped form ⇒ `partially superseded by D-NNN`. A superseded
+ *         entry's whole `Status:` is then read clause by clause against the
+ *         closed vocabulary, so a totally superseded entry is no longer
+ *         `Accepted` and no entry dies twice. `Refines:` and `Extends:` require
+ *         no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
@@ -53,6 +56,11 @@ const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
 const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
+// The closed vocabulary a decision's `Status:` clauses are drawn from. A live
+// clause says the decision still governs; a flip clause says how much of it died.
+const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
+const TOTAL_FLIP_RE = /^Superseded-by: D-\d{3}$/;
+const PARTIAL_FLIP_RE = /^partially superseded by D-\d{3}$/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
@@ -197,15 +205,63 @@ function checkDecisionNumbering(entries, errors) {
   });
 }
 
+/** A decision `Status:` split into its `·`-separated clauses. */
+function statusClauses(status) {
+  return status
+    .split('·')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * C3 — a superseded entry's `Status:` as a whole has to stay coherent, not just
+ * contain the right phrase somewhere: every clause comes from the closed
+ * vocabulary, a decision dies at most once, a totally superseded one has stopped
+ * being live, and a partially superseded one keeps the live clause that still
+ * governs the rest of it.
+ */
+function checkSupersededStatus(victim, errors) {
+  const clauses = statusClauses(victim.status);
+  const unknown = clauses.find(
+    (c) => !DECISION_LIVE_STATUS.has(c) && !TOTAL_FLIP_RE.test(c) && !PARTIAL_FLIP_RE.test(c),
+  );
+  if (unknown) {
+    errors.push(
+      `C3 ${victim.id}: Status carries "${unknown}", which is not one of Accepted | Proposed | Superseded-by: D-NNN | partially superseded by D-NNN`,
+    );
+    return;
+  }
+  const totals = clauses.filter((c) => TOTAL_FLIP_RE.test(c));
+  const live = clauses.filter((c) => DECISION_LIVE_STATUS.has(c));
+  if (totals.length > 1) {
+    errors.push(
+      `C3 ${victim.id}: Status is "${victim.status}" — a decision dies once, so it carries at most one "Superseded-by:"`,
+    );
+  } else if (totals.length === 1 && live.length > 0) {
+    errors.push(
+      `C3 ${victim.id}: Status is "${victim.status}" — a totally superseded decision is no longer "${live[0]}"`,
+    );
+  } else if (totals.length === 0 && live.length !== 1) {
+    errors.push(
+      `C3 ${victim.id}: Status is "${victim.status}" — a partially superseded decision still governs the rest of itself, so it keeps exactly one "Accepted" (or "Proposed")`,
+    );
+  }
+}
+
 /**
  * C3 — every relation resolves backwards, and a supersession is two edits: the
  * flip on the superseded entry is the second one. `Refines:` and `Extends:`
  * sharpen or widen a decision that stays in force, so they need an earlier live
  * target and nothing else. The direction test compares `D-id`s, not positions,
  * so parking a superseded entry in the folded index leaves it satisfied.
+ *
+ * Coherence is a property of the superseded entry's `Status:`, not of one edge,
+ * so it runs once per victim — two decisions superseding one entry report one
+ * incoherent status, not two.
  */
 function checkRelations(entries, errors) {
   const byNum = new Map(entries.map((e) => [e.num, e]));
+  const victims = new Map();
   for (const e of entries) {
     for (const { kind, target, clause } of e.relations) {
       const targetId = `D-${String(target).padStart(3, '0')}`;
@@ -225,14 +281,16 @@ function checkRelations(entries, errors) {
         errors.push(`C3 ${targetId}: no "Status:" line to carry the flip that ${e.id} requires`);
         continue;
       }
+      victims.set(target, victim);
       const expected = clause ? `partially superseded by ${e.id}` : `Superseded-by: ${e.id}`;
-      if (!victim.status.includes(expected)) {
+      if (!statusClauses(victim.status).includes(expected)) {
         errors.push(
           `C3 ${targetId}: Status is "${victim.status}" but ${e.id} supersedes it — expected it to carry "${expected}"`,
         );
       }
     }
   }
+  for (const victim of victims.values()) checkSupersededStatus(victim, errors);
 }
 
 /** C7 — the `Tag` cell is the row's Status said a second way; a release fills it. */

@@ -128,6 +128,15 @@ one flipped line on the old one — and which flip depends on how much died:
 | `Supersedes: D-NNN` | `Superseded-by: D-MMM` | the whole decision is replaced |
 | `Supersedes: D-NNN (clause 2)` | `Accepted · partially superseded by D-MMM` | only that clause died; the rest still governs |
 
+C3 reads the flipped entry's whole `Status:` as `·`-separated clauses drawn from a
+closed vocabulary — `Accepted`, `Proposed`, `Superseded-by: D-NNN`, `partially
+superseded by D-NNN` — not as a string that merely contains the flip somewhere. A
+totally superseded entry stops being `Accepted`; a partially superseded one keeps
+exactly one live clause, because the rest of it still governs. That is what lets one
+entry carry two clause-scoped flips from different decisions, or a partial flip
+alongside the later total one that finished it off — and what rejects the
+self-contradicting `Accepted · Superseded-by: D-MMM`.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

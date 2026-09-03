@@ -199,6 +199,96 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/expected it to carry "partially superseded by D-002"/);
     });
 
+    it('rejects a total flip that left the entry Accepted as well', () => {
+      const decisions = supersedingLog('- Supersedes: D-001', 'Accepted · Superseded-by: D-002');
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/no longer "Accepted"/);
+    });
+
+    it('rejects a flip buried in a longer sentence', () => {
+      const decisions = supersedingLog(
+        '- Supersedes: D-001',
+        'Superseded-by: D-002 but not really',
+      );
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      // The trailing words make it neither the flip nor a clause the vocabulary
+      // knows, so both halves of C3 report it.
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toMatch(/expected it to carry "Superseded-by: D-002"/);
+      expect(errors[1]).toMatch(/is not one of Accepted \| Proposed/);
+    });
+
+    it('rejects a clause outside the status vocabulary', () => {
+      const decisions = supersedingLog('- Supersedes: D-001', 'Superseded-by: D-002 · lol');
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/is not one of Accepted \| Proposed/);
+    });
+
+    it('rejects a partial flip that dropped the live clause', () => {
+      const decisions = supersedingLog(
+        '- Supersedes: D-001 (clause 2)',
+        'partially superseded by D-002',
+      );
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/keeps exactly one "Accepted"/);
+    });
+
+    it('rejects an entry superseded outright twice', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-002 · Superseded-by: D-003' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a decision dies once/);
+    });
+
+    it('reports an incoherent status once, not once per superseding entry', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Accepted · Superseded-by: D-002' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors.filter((e) => /no longer "Accepted"/.test(e))).toHaveLength(1);
+    });
+
+    it('accepts a Proposed entry carrying a partial flip', () => {
+      const decisions = supersedingLog(
+        '- Supersedes: D-001 (clause 2)',
+        'Proposed · partially superseded by D-002',
+      );
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('accepts two clause-scoped flips from different decisions', () => {
+      const decisions = [
+        decision({
+          id: 'D-001',
+          status: 'Accepted · partially superseded by D-002 · partially superseded by D-003',
+        }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001 (clause 1)'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001 (clause 2)'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('accepts a partially superseded entry that a later decision then killed outright', () => {
+      const decisions = [
+        decision({
+          id: 'D-001',
+          status: 'Superseded-by: D-003 · partially superseded by D-002',
+        }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001 (clause 1)'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('rejects a clause id that is not a number', () => {
       const decisions = supersedingLog(
         '- Supersedes: D-001 (clause two)',
