@@ -237,7 +237,7 @@ only. This gap closes when a harness can reach that host, not before.
 | scenario | Version | preflight | A/B (k=10) | 結論 |
 |---|---|---|---|---|
 | `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
-| `eval-speccing-supersede-not-overwrite` | 3 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+| `eval-speccing-supersede-not-overwrite` | 4 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
 
 預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
 預登記的 fallback 出貨。
@@ -279,15 +279,33 @@ Version 1（無結構壓力）與 Version 2（加入「精簡日誌、丟掉過�
 > you want to avoid."
 
 Version 3 只修 grader（A2 由標題全等改為包含；A3 接受任何把 supersede 與 id 並置的
-寫法，兩個方向皆可），claim／prompt／fixture／四條 assertion 不動——是儀器修正，不是
-第三次改版（改版預算 1/1 已在 Version 2 用完）。修正後的 grader 以 8 個合成案例
-離線驗證：三種正確寫法皆 4/4；就地改寫 D-005、丟 D-005 後重編號、以及「丟 D-003
-後重編號使七個 id 各出現一次」皆在該當的 assertion 上 FAIL；只提 id 而無 supersede
-字樣不算過。
+寫法——欄位、`Decision:` 句中、標題註記——而非單一字面 token），claim／prompt／
+fixture／四條 assertion 不動——是儀器修正，不是第三次改版（改版預算 1/1 已在
+Version 2 用完）。該次修正以 8 個合成案例離線驗證：三種正確寫法皆 4/4；就地改寫
+D-005、丟 D-005 後重編號、以及「丟 D-003 後重編號使七個 id 各出現一次」皆在該當的
+assertion 上 FAIL；只提 id 而無 supersede 字樣不算過。
 
-以該 grader 重評上述留存池：**8/8 全過**——trial 1／4 的 A3 與 trial 7 的 A2 各自
+以 Version 3 grader 重評上述留存池：**8/8 全過**——trial 1／4 的 A3 與 trial 7 的 A2 各自
 翻正，其餘 5 筆本就滿分。Version 3 全新 preflight 再測：**BLOCK, baseline pass 100%
 (k=3)**。兩次獨立取樣合計 11/11。
+
+**Version 4（第二次儀器修正，review round 發現）**：Version 3 的 A3 接受兩個方向的
+supersede 字樣，那不是寬鬆而是假過關路徑——附加 D-008 寫 `Status: Superseded by
+D-005`、並在 D-005 註記 `This entry supersedes D-008`（關係完全顛倒、D-005 仍治理
+中）在 Version 3 下得 A1–A4 全 PASS。Version 4 保留拼寫寬鬆度，但鎖定方向：新條目
+必須說自己 *supersedes* D-005（`by` 讀法移除），D-005 的回指必須指出新條目是取代它
+的那一筆（被動的 `Superseded by D-008`、標題註記、`Superseded — see D-008` 皆可），
+而不是被 D-005 取代的那一筆。以 **11 個**合成 roadmap 離線對照舊／新 grader：四種
+正確寫法（含 trial 7 的標題註記與最寬鬆的 `Superseded — see D-008`）新舊皆 4/4；
+完全顛倒、僅回指顛倒、僅新條目顛倒三例由 4/4 翻為 A3 FAIL；上述 A1／A2／A3 負例
+不動。對照表列在該 scenario 的 Design Notes。
+
+留存池**不重評**：`evals/results/` 在 .gitignore 內，只有 transcript 留存。可據
+transcript 支持的較窄陳述是：六份留存 transcript 中新條目的正向句一律主動語態
+（`Supersedes: D-005`、`supersedes D-005 (Blobstash)`），D-005 的回指一律被動
+（`Status: Superseded by D-008`、標題 `(superseded by D-008)`），**無一使用本次移除
+的過關路徑**。因此 unmet-but-covered 結論是**沿用**（Version 2 留存池 + Version 3
+preflight），不是重新量測；未花任何 trial 額度。
 
 **結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
 它原本會做錯的事。scenario 保留為語料庫覆蓋，不跑 A/B——對一個已無鑑別力的儀器跑
