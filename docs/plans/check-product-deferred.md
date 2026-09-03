@@ -1,12 +1,12 @@
 # Deferred from the `check:product` review rounds
 
 Process record from the review of the product-method alignment PR — the round that
-built `scripts/check-product.js` and its falsifiability suite. Five things came out
-of it that were deliberately **not** landed — three widenings and carry-forwards the
-rounds argued down, plus two standing constraints on the linter's own code — and each
-would otherwise have survived only in a review thread. They are written down here so
-the next person hardening the linter starts from the constraints rather than
-rediscovering them.
+built `scripts/check-product.js` and its falsifiability suite. Six things came out
+of it that were deliberately **not** landed — four widenings and carry-forwards the
+rounds argued down, plus two standing constraints on the linter's own code, one of
+which has since been taken — and each would otherwise have survived only in a review
+thread. They are written down here so the next person hardening the linter starts
+from the constraints rather than rediscovering them.
 
 Nothing here is a promise. `product/ROADMAP.md`'s D-006 is the entry that records
 what `check:product` actually asserts, and its `Residual:` points at this file.
@@ -198,3 +198,45 @@ Whoever tightens `SPEC_LINK_RE` owns one of two fixes:
 No code was written for this in round 9: the behaviour is correct under today's
 rules, and changing what `stripCodeSpans()` means with no rule asking for it trades a
 latent coupling for a live one.
+
+## 6. The roadmap table's framing is not asserted
+
+Every rule that reads the table — C1, C4, C6, C7 — reads a *row*: `parseRoadmapRows`
+accepts any six-cell pipe line inside `## Roadmap` and nothing above it is required.
+Three inputs therefore lint green:
+
+- a `## Roadmap` holding only a data row, with no header row and no delimiter;
+- a header row plus a data row, with no delimiter between them;
+- a header row, a two-column delimiter, and a six-cell data row — `parseRoadmapRows`
+  skips an all-dash line unconditionally, and that `continue` runs *before* the arity
+  check, so an off-arity delimiter is dropped rather than reported.
+
+It stayed out because GFM renders none of the three as a table. A delimiter row is
+required, and one whose arity differs from the header's un-recognizes the table, so
+each input reaches a reader as a paragraph of literal pipes — loud corruption rather
+than the plausible-looking lie the linter exists to catch. Neither D-006 nor
+`product/AGENTS.md` promises framing: a roadmap row is defined there as a six-cell
+pipe line, and C6's "the roadmap table has no rows" is the only surface that implies a
+table at all.
+
+Closing it is an **eighth rule**, which needs a decision refining D-006 — whose
+recorded text enumerates seven. That is the same gate `check-product-spec-sections`
+sits behind (no rule asserts a spec's headings either), and the reason both are
+backlog wishes rather than half-landed code.
+
+Two constraints on the rule, if someone lands it:
+
+- It must assert a `Version` header row **and** a delimiter whose arity matches it. A
+  bare "some header exists" check still passes the third input above.
+- The unconditional all-dash `continue` must move *after* the arity check, so an
+  off-arity delimiter is reported instead of skipped.
+
+The silent sibling of this family was fixed rather than deferred, and is not part of
+the rule above: `parseRoadmapRows` trimmed before testing for a leading `|`, with no
+indent bound, so a four-space-indented six-cell row — an indented code block, i.e. an
+illustration — was read as product state and could become a spec's governing row. That
+one needed no decision: it made the linter's own indentation exemption cover rows the
+way it already covered `### D-NNN` headings and relation bullets. The scan now spans
+` {0,3}`, `product/AGENTS.md`'s indentation paragraph names the roadmap row as the
+third form it covers, and two cases in `tests/scripts/check-product.test.js` pin both
+directions of the bound.

@@ -168,13 +168,21 @@ function roadmapSection(roadmap) {
  * what catches the one input the escape rule cannot see through: a cell ending
  * in a literal backslash makes the delimiter after it look escaped.
  *
+ * The scan is indent-bounded the way the log's heading and relation probes are:
+ * a row indented four spaces or more is an indented code block, so it is an
+ * illustration rather than product state. Read indent-blind, such a row still
+ * became a spec's governing row and forced its `Status:` header to a version
+ * that exists only in the example — the honest header rejected, the phantom one
+ * accepted. One to three spaces is not an exemption: the row still renders in
+ * the table.
+ *
  * @returns {{version: string, tag: string, status: string, here: boolean, specs: string[]}[]}
  */
 function parseRoadmapRows(roadmap, errors) {
   const rows = [];
   for (const raw of unfenced(roadmapSection(roadmap))) {
+    if (!/^ {0,3}\|/.test(raw)) continue;
     const line = raw.trim();
-    if (!line.startsWith('|')) continue;
     const cells = line
       .replace(/^\|/, '')
       .replace(/(?<!\\)\|$/, '')

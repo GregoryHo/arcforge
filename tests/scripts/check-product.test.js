@@ -195,6 +195,23 @@ describe('check-product', () => {
       expect(run({ roadmap: { note } })).toEqual([]);
     });
 
+    it('does not read a row indented into a code block inside `## Roadmap`', () => {
+      // The silent sibling of the fenced case: read indent-blind, this
+      // illustration governs specs/alpha.md and the honest `shipped v1.0.0`
+      // header is rejected in favour of a version only the example carries.
+      const note = ['', `    ${row({ version: '2.0.0', status: 'building', here: false })}`];
+      expect(run({ roadmap: { note } })).toEqual([]);
+    });
+
+    it('still reads a row indented one to three spaces, which the table renders', () => {
+      // The bound is ` {0,3}`, not column 1: three spaces is not an exemption,
+      // so the row is product state and governs the spec it links.
+      const note = ['', `   ${row({ version: '2.0.0', status: 'building', here: false })}`];
+      const errors = of('C4', run({ roadmap: { note } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/extended by 2\.0\.0 \(building\)/);
+    });
+
     it('rejects two marked rows', () => {
       const rows = [row({ version: '1.0.0' }), row({ version: '1.1.0', status: 'building' })];
       const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.1.0 (building)' })];

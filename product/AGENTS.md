@@ -181,11 +181,14 @@ of the log, so an entry may show a worked example — a wrong form, or a whole
 illustrative `### D-NNN` — the way the few-shot below does, without the example
 being checked as if it were real.
 
-Indentation is the second exemption, and a narrower one. A `### D-NNN` heading and a
-relation bullet both sit in column 1; indented four spaces or more, neither is read,
-so an illustration can be shown as an indented block rather than a fenced one. One to
-three spaces is not an exemption — the line still renders as the heading or the field
-a reader would trust, so it is reported like any other near-miss.
+Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
+relation bullet and a roadmap row all sit in column 1; indented four spaces or more,
+none is read, so an illustration can be shown as an indented block rather than a
+fenced one. One to three spaces is not an exemption — the line still renders as the
+heading, the field or the row a reader would trust, so it is read or reported like any
+other near-miss. The roadmap row is why this matters beyond the log: an indented
+six-cell row read as product state can become a spec's governing row and force its
+`Status:` header to a version that exists only in the illustration.
 
 Both exemptions apply inside a scope. The Decision Log is the `## Decision
 Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
