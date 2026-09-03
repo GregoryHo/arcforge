@@ -16,7 +16,7 @@ If nothing matches, no arcforge skill applies — just do the work.
 | `/writing-skills` | you are authoring or revising an arcforge skill (user-invoked) |
 | `/brainstorming` | a request is underspecified, several designs are plausible, or the user is thinking out loud rather than asking for code |
 | `/executing` | work needs more than one step, a task list is waiting to be run, or you are choosing between attended and unattended execution |
-| `/speccing` | a project keeps its product intent under `product/` — a wish needs capturing, a version needs its spec before it is built, a recorded decision is being reversed, or a shipped version needs its roadmap and spec flipped — or the user asks to start keeping it |
+| `/speccing` | the user asks to start keeping product intent under `product/`; or a project already keeps it there and one of these applies — a wish needs capturing, a version needs its spec before it is built, a recorded decision is being reversed, or a shipped version needs its roadmap and spec flipped |
 | `/tdd` | you are about to write implementation code, fix a bug, or found code with no test |
 | `/debugging` | a test fails, a bug is reported, behavior surprises you, a build breaks, or a fix you tried did not hold |
 | `/code-review` | a change is ready to hand off — the diff needs review before it merges, or review feedback just came back |
