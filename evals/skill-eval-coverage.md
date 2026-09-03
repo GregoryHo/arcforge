@@ -268,24 +268,63 @@ treatment 10/10 全為 1.00，同樣零變異——技能把「帳本與程式�
 成本旗標：output tokens 4438 → 9362（COST REGRESSION）。這是四個帳本檔案的實際
 編輯成本，非空轉；記錄在案，不視為阻斷。
 
+**本池的來歷——哪一次 k=10。** Version 2 的文本跑過兩次 k=10 A/B，上面發表的是
+第二次：2026-09-03T00:37Z 那一次，其 preflight 記錄即
+`evals/preflight/afb5f3da7d729aca-default.json`（時間戳 00:37:00.971Z）。第一次
+是 2026-09-02T17:10Z，scenario 文本相同（preflight hash 同為
+`afb5f3da7d729aca`），但 treatment 臂自第 4 筆起被 session limit 打斷：4–10 這
+7 筆 A1–A5 全滅、只有 fixture 自帶的 A6 過（0.17 分），該臂 output token 平均
+3238，對照發表那次的 9362。這與下方 `supersede-not-overwrite` 的 Version-2 池是
+同一起 session limit——兩次執行相隔兩分鐘、汙染特徵相同（refusal、零產出、只有
+fixture 自身檔案讓部分 assertion 過）；「同一起」是由時間相鄰與特徵推得，不是另
+有記錄。處理方式與那邊不同：那邊逐筆剔除，這邊**整次作廢**，兩臂一起丟——排除因此
+是對稱的，且依據是原因（基礎設施）而非分數。這件事記在這裡，是因為作廢那次的
+verdict 是 INCONCLUSIVE（+0.10）、重跑後是 IMPROVED，而「看到分數再決定丟不丟」
+正是本檔評分規則要防的事；該次的作廢理由在分數之外可獨立查核（7 筆零產出）。兩次
+之間 git 沒有任何 commit 動過 `skills/core/speccing/SKILL.md`（30ec80e 作者時間
+2026-09-02T16:42:45Z，下一筆 fce82ac 在 2026-09-03T06:03:28Z），所以兩次跑的是同
+一份技能文本，差別在那 7 筆空轉。兩次的 run 目錄都已不存在（`evals/results/*` 在
+.gitignore 內）。
+
 review round 1 把 A3 的 id 判準從「不屬於 fixture 寫下的四個 id」改為
-`int(i) > 4`，以符合該 assertion 自己的措辭「an id beyond D-004」。`## Version`
-維持 2：對 `000`–`999` 逐一比對，兩個判準的差集恰為 `{"000"}`，兩者對本 k=10 池
-評分完全相同（baseline 10/10 本就 A3 全滅，收緊不可能拉高；treatment 留存的
-transcript 一律以 `### D-005` 起頭），因此沒有需要分離的池。未重評任何 trial，
-未動用 trial 額度，+0.67 CI[0.67, 0.67] 不變。
+`int(i) > 4`，以符合該 assertion 自己的措辭「an id beyond D-004」。對 `000`–`999`
+逐一比對，兩個判準的差集恰為 `{"000"}`——唯一會改判的 id。收緊對本池的影響，與
+A2 的收緊合併在下一段一次處理。未重評任何 trial，未動用 trial 額度。
 
 同一輪 review 也把 A2 的版本判準從「不屬於 fixture 那三列」改為與 `0.3.0` 數值
 比較（`any(... > (0, 3, 0))`），理由同樣是該 assertion 自己的後半句「不讓 roadmap
 落後程式一個版本」——一個 `0.0.1` 的過期列在舊判準下可拿滿分（以出貨中的 grader
 實測，A1–A6 全 PASS、exit 0）。與 A3 不同，這裡的差集不是單一元素而是無界的
-（所有低於 `0.3.0` 且非既有三列的版本），因此 `## Version` 維持 2 的理由落在池
-本身：baseline 臂留存 transcript 沒有任何寫入版本列的指令（trial-3 只在結語建議
-`0.4.0` 列），A2 本就全滅，收緊不可能拉高；treatment 臂留存 transcript 一律寫
-`| 0.4.0 |`，兩判準評分相同。此結論也不必單靠對 baseline 臂的判讀：收緊判準只會
-拉低分數，而 treatment 臂已直接觀察到兩判準皆過，因此新判準下的差值只會等於或高於
-已發表的 +0.67，IMPROVED 的判定在收緊後仍然成立。未重評任何 trial，未動用 trial
-額度。
+（所有低於 `0.3.0` 且非既有三列的版本）。
+
+兩次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
+不是任何 transcript：
+
+- **baseline 臂已定。** 10 筆全為 0.33、A1–A4 全滅；A2 與 A3 都在 A1–A4 之內，
+  因此在舊判準下已是 10/10 全滅，而收緊只會讓過的變不過，不可能把不過的拉成過。
+  兩種讀法下 baseline 臂都是 0.33 / 0%。
+- **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。兩處
+  收緊不影響其餘 assertion，因此若以出貨判準重評這個池——實際上重評不了，見下——
+  一筆 treatment trial 只會是 1.00、掉一項的 0.83、或兩項都掉的 0.67。差值因而落在
+  **+0.33** 與已量測的 +0.67 之間；baseline 臂變異數為 0、treatment 值全部落在
+  [0.67, 1.00]，該區間內的任何信賴區間都碰不到 0。
+
+整個區間內判定都是 IMPROVED：本 scenario 的 `## Verdict Policy` 是 `delta`，只讀
+分數差的信賴區間（`verdictFromDeltaCI`，`scripts/lib/eval-stats.js:382`）。真正會
+被重評動到的是**通過率**——`Grader: code` 要六條 assertion 全為 1.0 才算 pass，因此
+掉了 A2 或 A3 的 treatment trial 分數仍有 0.83、但不再 pass——而通過率不是判定所讀
+的數字。兩種讀法因此不會把這個池切成兩次實驗，沒有需要分離的池。已量測的結果不因此
+改寫，仍以量測值陳述：**+0.67 CI[0.67, 0.67]，k=10，treatment pass 100%**。
+
+**不宣稱的部分。** 不宣稱出貨判準能原樣重現 +0.67——那要看 treatment 臂寫下的版本
+列與 decision id，而這個池已無法重讀：`evals/results/` 在 .gitignore 內，該次 run
+目錄已不存在。`evals/results/eval-speccing-spec-before-code/` 底下留存的
+transcript **不是這個池的臂**：`20260902-164317/` 與 `20260902-170634/` 兩個目錄
+裡都是 `trial-N.txt`，而 `saveTranscript` 只在單條件執行時寫這個檔名
+（`condition === 'results'`，`scripts/lib/eval.js:314`）；A/B 的臂寫成
+`baseline-trial-N.txt` / `treatment-trial-N.txt`，全樹搜尋不存在任何一份。這兩個
+目錄名對得上兩次 k=3 preflight 的起始時間，但那是時間相鄰，不是檔名本身的保證。
+未重評任何 trial，未動用 trial 額度。
 
 ### `supersede-not-overwrite`：baseline 天花板，儀器修正後確認
 
