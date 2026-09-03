@@ -117,7 +117,7 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 11 synthetic roadmaps, old grader against new:
+Validated offline against 14 synthetic roadmaps, old grader against new:
 
 | case | old | new |
 |---|---|---|
@@ -132,6 +132,9 @@ Validated offline against 11 synthetic roadmaps, old grader against new:
 | prose citation only ("the two reasons D-005 gave") | A3 FAIL | A3 FAIL |
 | D-005 rewritten in place | A1, A3 FAIL | A1, A3 FAIL |
 | D-005 dropped, survivors renumbered | A1, A2, A3 FAIL | A1, A2, A3 FAIL |
+| negated pair: `D-008 does not supersede D-005` + `was not superseded by D-008` | 4/4 | **A3 FAIL** |
+| back-pointer negated only | 4/4 | **A3 FAIL** |
+| appended entry negated only | 4/4 | **A3 FAIL** |
 
 No trials were spent, and the recorded pools are not re-scored: `evals/results/`
 is gitignored and only the transcripts survive. What those transcripts do
@@ -146,6 +149,25 @@ direction-proof — `Superseded: D-005` on an appended entry matches it — but 
 pair is, because a reversed record needs D-005 to claim it supersedes the new
 entry, which A3 now rejects.
 
+**Version 5 — the third instrument correction.** Version 4 constrained the
+direction of the pair but not its polarity, so a record that *denies* the
+relationship on both sides — an appended entry whose `Decision:` line reads
+`D-008 does not supersede D-005`, with D-005 annotated `This entry was not
+superseded by D-008` — scored A1–A4 all PASS, with the original entries
+preserved and the spec on Vaultbox. Version 5 keeps the spelling looseness and
+the direction constraint and adds a negation guard: a negator that directly
+governs the supersede verb denies the claim, on the appended entry's forward
+line and on D-005's back-pointer alike. Both call sites are load-bearing — a
+back-pointer negated on its own is caught only by `points_back`, an appended
+entry negated on its own only by the forward comprehension. The four correct
+spellings and the four pre-existing negatives are unchanged. No trials were
+spent: the tightening can only remove passes, and no retained transcript used
+the removed path. Mirroring Version 4's own concession, the guard is scoped to a
+negator adjacent to the verb on the same line and is not a general polarity
+parser — `Status: No longer current — superseded by D-008` and `this does not
+change D-006, but supersedes D-005` both carry a negator ahead of the verb and
+both still pass.
+
 **Assertion roles.**
 
 - A1 — D-005's two recorded lines survive somewhere in the file, byte for byte,
@@ -159,7 +181,10 @@ entry, which A3 now rejects.
   and a line on D-005 naming that entry as the one that superseded it. The
   reverse claim is not a spelling of the move: an appended entry saying it is
   superseded *by* D-005, or a D-005 annotation saying D-005 supersedes the new
-  entry, is the same edit performed backwards, with D-005 still governing.
+  entry, is the same edit performed backwards, with D-005 still governing. Nor
+  is a denied relationship: `D-008 does not supersede D-005`, or `was not
+  superseded by D-008` on D-005, is the move denied rather than performed, and
+  fails.
 - A4 — a floor on the spec naming the backend now in use. The user asked for it
   explicitly, so both arms should pass; it exists so a trial that fixed the log
   and left the spec lying is not scored as a success.
@@ -307,9 +332,30 @@ emit(
 # saying it is superseded *by* D-005, annotated on D-005 as an entry D-005
 # supersedes, states the relationship backwards and leaves D-005 governing —
 # the move under test, inverted, so it fails rather than scoring a full pass.
+# And the pair has to read affirmatively: a denial of the relationship is not a
+# spelling of it.
 SUPERSEDES = re.compile(r"supersede[sd]?\b[:\s]*D-0*005\b", re.I)
+# Polarity. A negator that directly governs the supersede verb denies the
+# claim: "D-008 does not supersede D-005", annotated on D-005 as "was not
+# superseded by D-008", says no supersession happened — the move under test,
+# denied. Deliberately narrow and adjacent: "Status: No longer current —
+# superseded by D-008" is a legitimate back-pointer and "this does not change
+# D-006, but supersedes D-005" a legitimate forward line, and a window-based
+# negation scan would reject both.
+NEGATED = re.compile(
+    r"(?:\bnot\b|\bnever\b|n't|\bno\b)\s+(?:yet\s+|been\s+|actually\s+)?supersede", re.I
+)
+
+
+def affirmative(line):
+    return not NEGATED.search(line)
+
+
 new_ids = [i for i in dict.fromkeys(ids) if i not in ORIGINAL_TITLES]
-supersedes = [i for i in new_ids if any(SUPERSEDES.search(l) for l in blocks.get(i, []))]
+supersedes = [
+    i for i in new_ids
+    if any(SUPERSEDES.search(l) and affirmative(l) for l in blocks.get(i, []))
+]
 
 
 # Does this line on D-005 name `new_id` as the entry that superseded it? Passive
@@ -318,6 +364,8 @@ supersedes = [i for i in new_ids if any(SUPERSEDES.search(l) for l in blocks.get
 # match "Superseded", so those keep passing. Active voice aimed at the new id
 # ("this entry supersedes D-008") is the reversed claim, and is rejected.
 def points_back(line, new_id):
+    if not affirmative(line):
+        return False
     if not re.search(rf"\bD-0*{new_id}\b", line):
         return False
     if not re.search(r"supersede", line, re.I):
@@ -342,4 +390,4 @@ PY
 5
 
 ## Version
-4
+5

@@ -237,7 +237,7 @@ only. This gap closes when a harness can reach that host, not before.
 | scenario | Version | preflight | A/B (k=10) | 結論 |
 |---|---|---|---|---|
 | `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
-| `eval-speccing-supersede-not-overwrite` | 4 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+| `eval-speccing-supersede-not-overwrite` | 5 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
 
 預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
 預登記的 fallback 出貨。
@@ -306,6 +306,20 @@ transcript 支持的較窄陳述是：六份留存 transcript 中新條目的正
 （`Status: Superseded by D-008`、標題 `(superseded by D-008)`），**無一使用本次移除
 的過關路徑**。因此 unmet-but-covered 結論是**沿用**（Version 2 留存池 + Version 3
 preflight），不是重新量測；未花任何 trial 額度。
+
+**Version 5（第三次儀器修正，再一次 review round 發現）**：Version 4 鎖定了方向，
+但沒有鎖定極性——一筆在兩側都**否認**該關係的紀錄（附加條目的 `Decision:` 寫
+`D-008 does not supersede D-005`、D-005 註記 `This entry was not superseded by
+D-008`），在原始條目完好、spec 已改為 Vaultbox 的情況下仍得 A1–A4 全 PASS。
+Version 5 保留拼寫寬鬆度與方向約束，另加極性守衛：直接支配 supersede 動詞的否定詞
+即視為否認該主張，正向句與回指兩處同時檢查——兩個呼叫點都不可省，僅回指否認只有
+`points_back` 攔得到，僅附加條目否認只有正向 comprehension 攔得到。以 **14 個**
+合成 roadmap 離線對照舊／新 grader：四種正確寫法與四個既有負例皆不動，三個方向顛倒
+的案例維持 A3 FAIL，只有三個否認案例由 4/4 翻為 A3 FAIL。守衛刻意窄化為同一行內
+與動詞相鄰的否定詞，不是通用的極性剖析器：`Status: No longer current — superseded
+by D-008` 與 `this does not change D-006, but supersedes D-005` 兩種合法寫法皆經
+驗證仍為 4/4。留存池同樣**不重評**（收緊只會移除過關路徑，六份留存 transcript
+無一使用被移除的路徑），**未花任何 trial 額度**，unmet-but-covered 結論沿用。
 
 **結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
 它原本會做錯的事。scenario 保留為語料庫覆蓋，不跑 A/B——對一個已無鑑別力的儀器跑
