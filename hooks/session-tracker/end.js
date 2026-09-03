@@ -28,9 +28,9 @@ const {
   runDiaryCapture,
   readCounts,
   pruneUngatedProse,
+  applyTranscriptToSession,
 } = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
-const { parseTranscript } = require('../../scripts/lib/transcript');
 const { checkReflectReady: reflectReady } = require('../../scripts/lib/learning-workflow');
 
 /**
@@ -141,34 +141,29 @@ function main() {
   session.userMessages = userCount;
   session.toolCalls = toolCount;
 
+  // D-010 governs both halves: the opt-in decides whether prose is written AND
+  // whether prose an earlier, opted-in Stop wrote may stay. Pruning before the
+  // stamp is what makes the second half true — the record is reloaded and
+  // rewritten on every Stop, so an ungated field would otherwise be
+  // re-serialized forever. The returned answer is the opt-in itself, so both
+  // the stamp below and the reflect-ready gate further down (D-009) reuse this
+  // one config read rather than asking again.
+  const learningOn = pruneUngatedProse(session, { projectRoot });
+
   // Enrich with transcript data ONLY when the diary threshold fired. Below
   // threshold, parsing the transcript is wasted work (the diary won't capture),
   // so it is skipped entirely (documented delta: below-threshold session JSON
-  // loses userMessageContent/toolsUsed/filesModified enrichment).
-  const transcriptPath = input?.transcript_path;
-  const transcriptData =
-    shouldTrigger(userCount, toolCount) && transcriptPath ? parseTranscript(transcriptPath) : null;
+  // loses userMessageContent/toolsUsed/filesModified enrichment). Counts, tool
+  // names and paths are the continuity record and are stamped either way;
+  // verbatim user prose only under the opt-in (D-010) — the shared helper the
+  // PreCompact path also calls owns that split.
+  const stamped =
+    shouldTrigger(userCount, toolCount) &&
+    applyTranscriptToSession(session, input?.transcript_path, { learningOn });
 
-  // D-010 governs both halves: the opt-in decides whether prose is written AND
-  // whether prose an earlier, opted-in Stop wrote may stay. Pruning before the
-  // branch is what makes the second half true — the record is reloaded and
-  // rewritten on every Stop, so an ungated field would otherwise be
-  // re-serialized forever. The returned answer is the opt-in itself, so the
-  // reflect-ready gate below (D-009) reuses this one config read rather than
-  // asking again.
-  const learningOn = pruneUngatedProse(session, { projectRoot });
-
-  if (transcriptData) {
-    // Counts, tool names and paths are the continuity record and are kept
-    // either way. Verbatim user prose is not (D-010).
-    if (learningOn) {
-      session.userMessageContent = transcriptData.userMessages;
-    }
-    session.toolsUsed = transcriptData.toolsUsed;
-    session.filesModified = transcriptData.filesModified;
-  } else {
-    session.filesModified = [];
-  }
+  // Nothing parsed: Stop clears the paths rather than carrying the previous
+  // turn's into a record it just closed.
+  if (!stamped) session.filesModified = [];
 
   saveSessionJson(session);
 

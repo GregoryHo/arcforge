@@ -178,6 +178,47 @@ function pruneUngatedProse(session, { projectRoot } = {}) {
   return allowed;
 }
 
+/**
+ * Stamp a parsed harness transcript's summary onto a session record.
+ *
+ * Shared by the two hooks that write the record above the diary threshold —
+ * Stop (session-tracker/end.js) and PreCompact (pre-compact/main.js) — so both
+ * render their draft from the same fields instead of one path re-deriving them.
+ *
+ * `./transcript` is required LAZILY for the same reason `./learning` is:
+ * compact-suggester imports this module on the synchronous PostToolUse path
+ * (hooks B-7), and only the Stop/PreCompact paths ever parse a transcript.
+ *
+ * The consent split (D-010) is the caller's: counts, tool names and paths are
+ * continuity and are stamped either way, verbatim prose only under the opt-in.
+ * The caller has already read that gate (pruneUngatedProse returns it), so it is
+ * passed in rather than read a second time here.
+ *
+ * A missing or unparseable transcript leaves the record's existing fields
+ * untouched and reports false. Refreshing what can be read is this function's
+ * job; CLEARING what cannot is the caller's call, and the two callers differ —
+ * Stop clears the paths, a compaction keeps the ones an earlier Stop wrote
+ * rather than blanking a record it cannot refresh.
+ *
+ * @param {Object} session - Session record, mutated in place.
+ * @param {string} [transcriptPath] - Harness transcript to parse.
+ * @param {Object} [opts]
+ * @param {boolean} [opts.learningOn=false] - Whether verbatim prose may be written.
+ * @returns {boolean} true when a transcript was parsed and stamped.
+ */
+function applyTranscriptToSession(session, transcriptPath, { learningOn = false } = {}) {
+  if (!session || !transcriptPath) return false;
+
+  const { parseTranscript } = require('./transcript');
+  const data = parseTranscript(transcriptPath);
+  if (!data) return false;
+
+  if (learningOn) session.userMessageContent = data.userMessages;
+  session.toolsUsed = data.toolsUsed;
+  session.filesModified = data.filesModified;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Draft generation + background enrichment
 // ---------------------------------------------------------------------------
@@ -366,6 +407,7 @@ module.exports = {
   draftIsStale,
   learningCaptureEnabled,
   pruneUngatedProse,
+  applyTranscriptToSession,
   tryGenerateAutoDiary,
   spawnDiaryEnricher,
   runDiaryCapture,

@@ -124,6 +124,79 @@ describe('diary-capture', () => {
     });
   });
 
+  // The stamp both hooks run above the threshold: Stop closes the record with
+  // it, PreCompact refreshes the record the draft is about to be rendered from.
+  describe('applyTranscriptToSession', () => {
+    /** A transcript carrying user prose plus Edit/Write/Bash tool uses. */
+    function writeTranscript() {
+      const transcriptPath = path.join(tmpDir, 'transcript.jsonl');
+      fs.writeFileSync(
+        transcriptPath,
+        `${[
+          JSON.stringify({
+            type: 'user',
+            message: { role: 'user', content: [{ type: 'text', text: 'ship the fix' }] },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            message: {
+              content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/repo/a.js' } }],
+            },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            message: { content: [{ type: 'tool_use', name: 'Bash', input: {} }] },
+          }),
+        ].join('\n')}\n`,
+      );
+      return transcriptPath;
+    }
+
+    it('stamps tool names and paths but no prose when the opt-in is off', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript(), { learningOn: false })).toBe(
+        true,
+      );
+      expect(session.toolsUsed).toEqual(['Edit', 'Bash']);
+      expect(session.filesModified).toEqual(['/repo/a.js']);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+
+    it('stamps the verbatim prose when the opt-in is on', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript(), { learningOn: true })).toBe(true);
+      expect(session.userMessageContent).toEqual(['ship the fix']);
+    });
+
+    it('defaults to no prose when the gate is not passed at all', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript())).toBe(true);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+
+    it('leaves the record untouched when there is nothing to parse', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const carried = { toolsUsed: ['Edit'], filesModified: ['/repo/carried.js'] };
+      const empty = path.join(tmpDir, 'empty.jsonl');
+      fs.writeFileSync(empty, '');
+
+      // Missing path, unreadable path, and a file that parses to nothing all
+      // report false — a compaction keeps the paths an earlier Stop wrote
+      // rather than blanking a record it cannot refresh.
+      expect(applyTranscriptToSession(carried, undefined, { learningOn: true })).toBe(false);
+      expect(applyTranscriptToSession(carried, path.join(tmpDir, 'nope.jsonl'))).toBe(false);
+      expect(applyTranscriptToSession(carried, empty)).toBe(false);
+      expect(carried).toEqual({ toolsUsed: ['Edit'], filesModified: ['/repo/carried.js'] });
+      expect(applyTranscriptToSession(null, writeTranscript())).toBe(false);
+    });
+  });
+
   describe('runDiaryCapture threshold gating', () => {
     it('does NOT trigger or reset below threshold', () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');
