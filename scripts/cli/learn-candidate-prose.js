@@ -277,18 +277,33 @@ function refusalMessage(result, verb, card) {
  * The refusal `accept` prints instead of dispatching, when the curator has no
  * renderer for the candidate's artifact type.
  *
- * It names the type, states that nothing was applied, and offers the two moves
- * that still exist: leave it queued (the dashboard reviews the whole queue) or
- * record the approval on its own. It deliberately does not claim the candidate
- * is otherwise ready — a `dismissed` or `activated` candidate has a nearer
- * obstacle, and this message would be the wrong one to answer it with.
+ * It names the type and states that nothing was applied. It deliberately does
+ * not claim the candidate is otherwise ready — a `dismissed` or `activated`
+ * candidate has a nearer obstacle, and this message would be the wrong one to
+ * answer it with. For the same reason the recovery it names is conditional:
+ * `approve` is legal only from `pending_review`, so from any other status
+ * naming it would send the reviewer at a command the matrix refuses with
+ * `policy_violation`. `approved` is the sharp case — the dashboard's `evolve`
+ * writes a project-scoped `skill` record, `learn approve` moves it, and from
+ * there `materialize` refuses on the type while `approve` refuses on the
+ * matrix. Dropped, the message still ends in `narrowingMessage`'s own "leave it
+ * queued, or review it in: arcforge learn dashboard", so it names no command
+ * rather than pointing at the dashboard twice.
+ *
+ * It deliberately does not fall back to `reject` the way its sibling below
+ * does. `dismiss` is legal from `needs_more_evidence`, where `approve` is not,
+ * so that status falls through to the dashboard with a legal command left
+ * unnamed — on purpose: "the way out is to decline it" contradicts the "leave
+ * it queued" this same narrowing gives the reviewer one sentence earlier.
  */
 function acceptRefusalMessage(card) {
+  const recovery = card.available_actions.includes('approve')
+    ? ' To record the approval on its own, run: ' +
+      `arcforge learn approve ${card.candidate_id} --project`
+    : '';
   return (
     `arcforge learn accept refused, and nothing was applied — no approval, no draft, ` +
-    `${card.candidate_id} is unchanged. It ${narrowingMessage(card)}. ` +
-    'To record the approval on its own, run: ' +
-    `arcforge learn approve ${card.candidate_id} --project`
+    `${card.candidate_id} is unchanged. It ${narrowingMessage(card)}.${recovery}`
   );
 }
 

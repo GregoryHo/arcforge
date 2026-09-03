@@ -1150,9 +1150,19 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(result.status).not.toBe(0);
       expect(JSON.parse(result.stdout).error).toMatch(/nothing was applied/);
+      // …and it does not send the reviewer at the approval it already has.
+      // `approve` is legal only from `pending_review`, so from here the matrix
+      // refuses it with `policy_violation` — a loop the refusal would otherwise
+      // open, since `materialize` refuses on the type in turn. `check:docs`
+      // cannot catch this: it resolves that a command and flag exist, not which
+      // refusal may recommend them. This assertion is the guard.
+      expect(JSON.parse(result.stdout).error).not.toMatch(/arcforge learn approve/);
       expect(queueBytes()).toBe(queueBefore);
       expect(auditEntries()).toHaveLength(auditBefore);
       expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('approved');
+      // The command it stopped naming is the one the matrix refuses. Last,
+      // because a refused dispatch appends its own audited rejection.
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
     });
 
     // A name Layer 7 can never write to disk is as non-transient as an artifact
