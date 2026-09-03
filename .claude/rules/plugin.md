@@ -9,7 +9,7 @@ each target actually loads.
 
 - Required field: `name` (kebab-case, becomes namespace prefix)
 - Optional metadata: `version`, `description`, `author`, `homepage`, `repository`, `license`, `keywords`
-- Component path fields available: `commands`, `agents`, `skills`, `mcpServers`, `outputStyles`, `lspServers`
+- Component path fields available: `commands`, `agents`, `skills`, `hooks`, `mcpServers`, `outputStyles`, `lspServers`
 - `hooks`: declare it as `"./hooks/claude-code.json"`. It is not optional and
   not conventional — see *Hook Registration* below
 
@@ -113,13 +113,16 @@ Product-level rationale — why Codex gets skills and nothing else — is
 
 - `hooks/claude-code.json`, declared by `.claude-plugin/plugin.json` as
   `"hooks": "./hooks/claude-code.json"`. Claude Code honours a manifest `hooks`
-  path — verified on 2.1.258 against a negative control (key removed ⇒ no hooks
-  ran), so the filename is genuinely free. The conventional `hooks/hooks.json`
-  is left empty on purpose; see *The Codex manifest pair* above
+  path — verified on 2.1.258 via `--plugin-dir` against a negative control (key
+  removed ⇒ no hooks ran), so the filename is genuinely free. The conventional
+  `hooks/hooks.json` is left empty on purpose; see *The Codex manifest pair* above
 - **Residual:** that manifest key is now the ONLY thing loading the registry. If
   a future Claude Code stops honouring it, every hook goes silent and no static
   check can tell — `check:hooks` proves the wiring is self-consistent, not that
-  the host reads it. A live session is the only proof
+  the host reads it. A live session is the only proof. The verification above
+  loaded the plugin from a source tree with `--plugin-dir`; a marketplace-installed
+  copy resolving components out of the version-keyed cache is untested, and cannot
+  be tested before the branch is pushed — check it on the first 6.1.0 install
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references in hooks
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)
 - Supported events: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SubagentStop, SubagentStart, SessionEnd, PermissionRequest, Notification, TeammateIdle, TaskCompleted
