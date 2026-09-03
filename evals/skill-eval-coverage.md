@@ -245,10 +245,13 @@ only. This gap closes when a harness can reach that host, not before.
 `supersede-not-overwrite` 的 BLOCK 來自
 `evals/preflight/f759c2828746652f-default.json`，而 `computeScenarioHash`
 （`scripts/lib/eval-preflight.js:43`）雜湊的是整份 scenario 檔，該 hash 對應的是
-Version 3 的文本；現行文本雜湊為 `573f327d2e2347c4`，沒有對應的 preflight 記錄。
-該 scenario 的 `## Preflight` 為 `run`，因此再跑 `eval ab` 會重新量測 preflight，
-不會沿用這筆 BLOCK。Version 4–6 的 grader 從未評過任何 trial——詳見下方 Version 6
-段落末的殘留未檢項。
+Version 3 的文本。現行（Version 6）文本則沒有任何一筆對應的 preflight 記錄——查證
+方式是對 scenario 檔重算 `computeScenarioHash`，再看 `evals/preflight/` 有沒有同名
+檔案。此處刻意不寫下那個雜湊值：任何寫進本檔的「現行文本雜湊」，都會被下一次對
+scenario 檔的編輯作廢（同一個 commit 內的編輯也算），因此 literal hash 只留在指向
+歷史文本的位置。該 scenario 的 `## Preflight` 為 `run`，因此再跑 `eval ab` 會重新
+量測 preflight，不會沿用這筆 BLOCK。Version 4–6 的 grader 從未評過任何 trial——詳見
+下方 Version 6 段落末的殘留未檢項。
 
 ### `spec-before-code`：+0.67，兩臂皆為確定性
 
@@ -327,6 +330,13 @@ D-005`、並在 D-005 註記 `This entry supersedes D-008`（關係完全顛倒�
 語句——前三份則一次都沒有）。以下凡稱「六份 preflight transcript」者，指的都是這六
 份，與留存池的 8 筆是不同母體。
 
+「preflight」這個歸屬本身是推論，不是檔名保證：`saveTranscript` 對**任何**單條件
+執行都寫成 `trial-N.txt`（`scripts/lib/eval.js` 的 `condition === 'results'`
+分支），一次普通的 `arcforge eval run` 產出的檔案與 preflight 的無從分辨。歸屬依據
+是時間戳相鄰，加上第一組的文本比對——而 `e5062598f5e496e7` 只證明那次跑的是哪一份
+文本，不證明那次執行是 preflight。這不影響下面任何一項以這六份為證的陳述：它們談的
+是 transcript 的內容，不是它的來源。
+
 可據這六份支持的較窄陳述是：新條目的正向句一律主動語態（`Supersedes: D-005`、
 `supersedes D-005 (Blobstash)`），六份皆有，且無一份出現反向的 `superseded by
 D-005`；D-005 的回指一律是被動的 `Status: Superseded by D-008` 行，**無一使用本次移
@@ -361,10 +371,11 @@ Version 6 把摘要綁到 D-005 自己的條目上，並以**標題**、且**只
 D-005 的原文會落在新 id 底下，該案仍 A1 PASS／A2 FAIL，重編號由 A2 判。限制在
 fixture 寫過的七個 id 內，則是同一版初稿（取檔案順序第一個標題相符者）漏掉的另一半：
 六份 preflight transcript 的新條目標題全是 `Upload storage backend moves to
-Vaultbox`（4 份）／`... is Vaultbox`（2 份），都含 D-005 的原標題，因此檔案順序第一個相符者在真實 trial 裡不等於
-D-005——誘餌條目放在 D-005 之上就能頂替（覆寫仍得 4/4），而把新條目插在日誌最前面的
-**正確** trial 反而 A1 FAIL。忽略 fixture 沒寫過的 id 同時修掉兩邊，並保住標題錨點本
-來要的重編號容忍度——丟掉別的條目、其餘條目重編號時，D-005 的原文會落在 001–007 內較
+Vaultbox`（4 份）／`... is Vaultbox`（2 份），都含 D-005 的原標題，因此
+檔案順序第一個相符者在真實 trial 裡不等於 D-005——誘餌條目放在 D-005 之上
+就能頂替（覆寫仍得 4/4），而把新條目插在日誌最前面的 **正確** trial 反而
+A1 FAIL。忽略 fixture 沒寫過的 id 同時修掉兩邊，並保住標題錨點本來要的重編號
+容忍度——丟掉別的條目、其餘條目重編號時，D-005 的原文會落在 001–007 內較
 小的 id 上。以 **21 個**合成 roadmap 離線對照：原有 14 列全部不動，三個抄存案例由
 4/4 翻為 A1 FAIL，「丟條目、重編號但原文完好」案例新舊皆 A1 PASS／A2 FAIL；這次修正
 移動三列——誘餌置頂、正確但新條目置頂，以及「丟條目」的鏡像（在 D-005 之前插入三筆條
@@ -379,7 +390,9 @@ D-005 的寫法不被區分；錨點排除的是非原始 id，不是不相符�
 **未花任何 trial 額度**，但要說清楚這句話能保證什麼。已登記的 8 筆分數**無從重評**
 （池目錄已不存在），所以「無一筆分數改變」不是一句能成立的陳述，本檔不再作此宣稱。
 能查證的是六份 preflight transcript：每一份對 D-005 的編輯都是逐字 old→new 取代，
-變動範圍只到 `Status:` 行，`Decision:`／`Why:` 兩行不在被改動的區段內；新條目一律接
+且 D-005 條目內的 `Decision:`／`Why:` 兩行取代前後**逐位元不變**——三份
+的變動區段只到 `Status:` 行，另三份把 `Decision:` 行一併納入區段，但新
+舊兩側該行完全相同；六份都沒有出現任何改寫過的 `Why:` 行。新條目一律接
 在 D-007 之後（四份以 D-007 的 `Why:` 行為錨點，一份直接 append 到檔尾，一份先
 assert 檔案結尾正是 D-007 的 `Why:` 行再接上）。也就是說，六份都沒有走 Version 6
 移除的那條路徑。

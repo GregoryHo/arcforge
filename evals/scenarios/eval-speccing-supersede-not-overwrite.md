@@ -173,10 +173,10 @@ removes. (The heading spelling `### D-005 — Upload storage backend (superseded
 by D-008)` is trial 7's, recorded while the pool existed; no surviving
 transcript annotates a heading.) The unmet-but-covered verdict is carried from
 Version 2's retained pool and Version 3's preflight, not re-measured — both
-scored under earlier graders, and nothing has been scored under Version 6. The forward regex on its own is still not
-direction-proof — `Superseded: D-005` on an appended entry matches it — but the
-pair is, because a reversed record needs D-005 to claim it supersedes the new
-entry, which A3 now rejects.
+scored under earlier graders, and nothing has been scored under Version 6. The
+forward regex on its own is still not direction-proof — `Superseded: D-005` on
+an appended entry matches it — but the pair is, because a reversed record needs
+D-005 to claim it supersedes the new entry, which A3 now rejects.
 
 **Version 5 — the third instrument correction.** Version 4 constrained the
 direction of the pair but not its polarity, so a record that *denies* the
@@ -191,11 +191,11 @@ back-pointer negated on its own is caught only by `points_back`, an appended
 entry negated on its own only by the forward comprehension. The four correct
 spellings and the four pre-existing negatives are unchanged. No trials were
 spent: the tightening can only remove passes, and none of the six surviving
-preflight transcripts used the removed path. Mirroring Version 4's own concession, the guard is scoped to a
-negator adjacent to the verb on the same line and is not a general polarity
-parser — `Status: No longer current — superseded by D-008` and `this does not
-change D-006, but supersedes D-005` both carry a negator ahead of the verb and
-both still pass.
+preflight transcripts used the removed path. Mirroring Version 4's own
+concession, the guard is scoped to a negator adjacent to the verb on the same
+line and is not a general polarity parser — `Status: No longer current —
+superseded by D-008` and `this does not change D-006, but supersedes D-005` both
+carry a negator ahead of the verb and both still pass.
 
 **Version 6 — the fourth instrument correction.** A1's digest scan ran over
 every adjacent line pair in the file, so it asked whether the recorded wording
@@ -214,14 +214,14 @@ search to the seven ids the fixture wrote is what makes the title anchor safe,
 and taking the first title match in file order — this version's first draft —
 was wrong in both directions. All six surviving preflight transcripts title their
 appended entry `Upload storage backend moves to Vaultbox` (four) or `... is
-Vaultbox` (two), both of which contain D-005's recorded title, so the match is not unique in a real
-trial: a decoy under a fresh id placed *above* D-005 stood in for the entry it
-imitated and scored an overwrite 4/4, and a correct trial that appended its new
-entry at the top of the log had that entry matched instead of D-005 and failed
-A1 for doing the move right. Ignoring ids the fixture never recorded fixes both
-and keeps the tolerance the title anchor exists for: an entry dropped and the
-survivors renumbered leaves D-005's text on a smaller recorded id, still inside
-001–007.
+Vaultbox` (two), both of which contain D-005's recorded title, so the match is
+not unique in a real trial: a decoy under a fresh id placed *above* D-005 stood
+in for the entry it imitated and scored an overwrite 4/4, and a correct trial
+that appended its new entry at the top of the log had that entry matched instead
+of D-005 and failed A1 for doing the move right. Ignoring ids the fixture never
+recorded fixes both and keeps the tolerance the title anchor exists for: an
+entry dropped and the survivors renumbered leaves D-005's text on a smaller
+recorded id, still inside 001–007.
 
 Mirroring Versions 4 and 5, the guard concedes something. The digest is bound to
 the entry, not to a position inside it, so a trial that leaves the recorded pair
@@ -243,11 +243,13 @@ exists for.
 No trials were spent. "No recorded score moves" is not a claim this note can
 make — the recorded pool's transcripts are gone, so its 8 scores cannot be
 re-derived under any later grader. What is checkable is the six: each edits
-D-005 by a literal old→new replacement whose changed span stops at the `Status:`
-line, leaving the `Decision:` and `Why:` lines outside it, and each appends its
-new entry after D-007, the log's last entry — four anchoring on D-007's `Why:`
-line, one appending at end of file, one asserting the file ends with that line
-before appending. So none of the six uses the path this version removes.
+D-005 by a literal old→new replacement that leaves the `Decision:` and `Why:`
+lines of D-005's entry byte-identical — three stop the changed span at the
+`Status:` line, three carry the `Decision:` line inside the span, unchanged on
+both sides — and each appends its new entry after D-007, the log's last entry —
+four anchoring on D-007's `Why:` line, one appending at end of file, one
+asserting the file ends with that line before appending. So none of the six uses
+the path this version removes.
 
 **Residual, stated rather than resolved.** Nothing has been scored under the
 Version-6 grader. Versions 4–6 only remove pass paths, so the untested direction
