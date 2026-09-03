@@ -237,10 +237,18 @@ only. This gap closes when a harness can reach that host, not before.
 | scenario | Version | preflight | A/B (k=10) | 結論 |
 |---|---|---|---|---|
 | `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
-| `eval-speccing-supersede-not-overwrite` | 6 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+| `eval-speccing-supersede-not-overwrite` | 6 | **BLOCK（baseline 100%, k=3；以 Version 3 文本量測）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
 
 預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
 預登記的 fallback 出貨。
+
+`supersede-not-overwrite` 的 BLOCK 來自
+`evals/preflight/f759c2828746652f-default.json`，而 `computeScenarioHash`
+（`scripts/lib/eval-preflight.js:43`）雜湊的是整份 scenario 檔，該 hash 對應的是
+Version 3 的文本；現行文本雜湊為 `573f327d2e2347c4`，沒有對應的 preflight 記錄。
+該 scenario 的 `## Preflight` 為 `run`，因此再跑 `eval ab` 會重新量測 preflight，
+不會沿用這筆 BLOCK。Version 4–6 的 grader 從未評過任何 trial——詳見下方 Version 6
+段落末的殘留未檢項。
 
 ### `spec-before-code`：+0.67，兩臂皆為確定性
 
@@ -285,9 +293,16 @@ Version 2 用完）。該次修正以 8 個合成案例離線驗證：三種正�
 D-005、丟 D-005 後重編號、以及「丟 D-003 後重編號使七個 id 各出現一次」皆在該當的
 assertion 上 FAIL；只提 id 而無 supersede 字樣不算過。
 
-以 Version 3 grader 重評上述留存池：**8/8 全過**——trial 1／4 的 A3 與 trial 7 的 A2 各自
-翻正，其餘 5 筆本就滿分。Version 3 全新 preflight 再測：**BLOCK, baseline pass 100%
-(k=3)**。兩次獨立取樣合計 11/11。
+以 Version 3 grader 對留存池的 **8/8 全過**是**預登記的預測，不是執行過的重評**
+——trial 1／4 的 A3 與 trial 7 的 A2 會各自翻正，其餘 5 筆本就滿分。該 scenario 的
+Design Notes 也是這樣寫的（"What that predicts, pre-registered"），兩處一致。引擎
+並沒有 regrade／rescore 子命令（`arcforge eval` 只有 run／preflight／lint／ab／
+compare／report／history／audit／dashboard），這個數字是依 baseline.jsonl 當時記錄
+的逐筆失敗原因推出來的，沒有真的重跑過 grader；如今池目錄已不存在，也無從補做。
+
+實際執行過的只有一次取樣：Version 3 全新 preflight，**BLOCK, baseline pass 100%
+(k=3)**。因此**不能**把預測與這次取樣合計成「11/11 兩次獨立取樣」——預測不是樣本，
+本檔不再作此宣稱。
 
 **Version 4（第二次儀器修正，review round 發現）**：Version 3 的 A3 接受兩個方向的
 supersede 字樣，那不是寬鬆而是假過關路徑——附加 D-008 寫 `Status: Superseded by
@@ -300,12 +315,25 @@ D-005`、並在 D-005 註記 `This entry supersedes D-008`（關係完全顛倒�
 完全顛倒、僅回指顛倒、僅新條目顛倒三例由 4/4 翻為 A3 FAIL；上述 A1／A2／A3 負例
 不動。對照表列在該 scenario 的 Design Notes。
 
-留存池**不重評**：`evals/results/` 在 .gitignore 內，只有 transcript 留存。可據
-transcript 支持的較窄陳述是：六份留存 transcript 中新條目的正向句一律主動語態
-（`Supersedes: D-005`、`supersedes D-005 (Blobstash)`），D-005 的回指一律被動
-（`Status: Superseded by D-008`、標題 `(superseded by D-008)`），**無一使用本次移除
-的過關路徑**。因此 unmet-but-covered 結論是**沿用**（Version 2 留存池 + Version 3
-preflight），不是重新量測；未花任何 trial 額度。
+留存池**無法重評，也不只是「不重評」**：`evals/results/` 在 .gitignore 內，而 k=10 的
+池目錄 `20260902-171249/` 本身已不存在。A/B 臂的 transcript 命名為
+`baseline-trial-N.txt`（`scripts/lib/eval.js:314`），全樹搜尋不存在任何一份，因此那
+8 筆的 transcript 一份都調不出來。**現存的六份不是留存池的子集**，而是兩次 k=3
+單條件 preflight 的 transcript：`20260902-164317/transcripts/trial-1..3.txt`（Version 1
+文本，hash `e5062598f5e496e7` 與首版 commit 相符，preflight 記錄 16:47:30Z、pass 0%）
+與 `20260902-170634/transcripts/trial-1..3.txt`（preflight 記錄
+`475a8b46b6060f86`，17:12:49Z、pass 33%；該文本未曾以此形態 commit，歸屬 Version 2
+的依據是時間戳緊接 `20260902-171249` 這次 A/B，且三份 transcript 都出現重新編號的
+語句——前三份則一次都沒有）。以下凡稱「六份 preflight transcript」者，指的都是這六
+份，與留存池的 8 筆是不同母體。
+
+可據這六份支持的較窄陳述是：新條目的正向句一律主動語態（`Supersedes: D-005`、
+`supersedes D-005 (Blobstash)`），六份皆有，且無一份出現反向的 `superseded by
+D-005`；D-005 的回指一律是被動的 `Status: Superseded by D-008` 行，**無一使用本次移
+除的過關路徑**。（Version 2 留存池裡 trial 7 的標題註記
+`### D-005 — Upload storage backend (superseded by D-008)` 是**當時**的紀錄，不在這六
+份之內——六份沒有任何一份把回指寫進標題。）因此 unmet-but-covered 結論是**沿用**
+（Version 2 留存池 + Version 3 preflight），不是重新量測；未花任何 trial 額度。
 
 **Version 5（第三次儀器修正，再一次 review round 發現）**：Version 4 鎖定了方向，
 但沒有鎖定極性——一筆在兩側都**否認**該關係的紀錄（附加條目的 `Decision:` 寫
@@ -318,8 +346,9 @@ Version 5 保留拼寫寬鬆度與方向約束，另加極性守衛：直接支�
 的案例維持 A3 FAIL，只有三個否認案例由 4/4 翻為 A3 FAIL。守衛刻意窄化為同一行內
 與動詞相鄰的否定詞，不是通用的極性剖析器：`Status: No longer current — superseded
 by D-008` 與 `this does not change D-006, but supersedes D-005` 兩種合法寫法皆經
-驗證仍為 4/4。留存池同樣**不重評**（收緊只會移除過關路徑，六份留存 transcript
-無一使用被移除的路徑），**未花任何 trial 額度**，unmet-but-covered 結論沿用。
+驗證仍為 4/4。留存池同樣**無法重評**（收緊只會移除過關路徑，而六份 preflight
+transcript 無一使用被移除的路徑），**未花任何 trial 額度**，unmet-but-covered 結論
+沿用。
 
 **Version 6（第四次儀器修正，第三個 review round 發現）**：A1 的摘要比對掃的是整份
 檔案的相鄰行對，問的是「原文還在不在這個檔案裡」，不是「還在不在 D-005 裡」。一筆
@@ -331,8 +360,8 @@ Version 6 把摘要綁到 D-005 自己的條目上，並以**標題**、且**只
 該條目——以標題而非 id 定位正是原本全檔掃描要保住的性質：丟掉別的條目並重編號時，
 D-005 的原文會落在新 id 底下，該案仍 A1 PASS／A2 FAIL，重編號由 A2 判。限制在
 fixture 寫過的七個 id 內，則是同一版初稿（取檔案順序第一個標題相符者）漏掉的另一半：
-六份留存 transcript 的新條目標題全是 `Upload storage backend moves to Vaultbox`／
-`... is Vaultbox`，都含 D-005 的原標題，因此檔案順序第一個相符者在真實 trial 裡不等於
+六份 preflight transcript 的新條目標題全是 `Upload storage backend moves to
+Vaultbox`（4 份）／`... is Vaultbox`（2 份），都含 D-005 的原標題，因此檔案順序第一個相符者在真實 trial 裡不等於
 D-005——誘餌條目放在 D-005 之上就能頂替（覆寫仍得 4/4），而把新條目插在日誌最前面的
 **正確** trial 反而 A1 FAIL。忽略 fixture 沒寫過的 id 同時修掉兩邊，並保住標題錨點本
 來要的重編號容忍度——丟掉別的條目、其餘條目重編號時，D-005 的原文會落在 001–007 內較
@@ -345,10 +374,21 @@ D-005 的寫法不被區分；錨點排除的是非原始 id，不是不相符�
 的誘餌、或把另一個原始條目改標題成含該詞的誘餌，都仍能過 A1，由 A2（重複 id／id 不再
 領原條目）擋下，兩者都拿不到滿分；重編號容忍度也只保住單向——在 D-005 之前**插入**條
 目會把它的原文推到 D-007 之後、原始 id 範圍之外，該案 A1 直接 FAIL 而非交給 A2 判，
-同樣不影響任何滿分（A2、A3 新舊皆 FAIL），留存 transcript 也無一筆這樣做。
-**未花任何 trial 額度**：六份留存 transcript 全部只改 D-005 的 `Status:` 行、並把新
-條目接在最後一條 D-007 之後，`Decision:`／`Why:` 兩行在 D-005 條目內逐位元不變，無一
-筆分數改變，unmet-but-covered 結論沿用。
+同樣不影響任何滿分（A2、A3 新舊皆 FAIL），六份 preflight transcript 也無一筆這樣做。
+
+**未花任何 trial 額度**，但要說清楚這句話能保證什麼。已登記的 8 筆分數**無從重評**
+（池目錄已不存在），所以「無一筆分數改變」不是一句能成立的陳述，本檔不再作此宣稱。
+能查證的是六份 preflight transcript：每一份對 D-005 的編輯都是逐字 old→new 取代，
+變動範圍只到 `Status:` 行，`Decision:`／`Why:` 兩行不在被改動的區段內；新條目一律接
+在 D-007 之後（四份以 D-007 的 `Why:` 行為錨點，一份直接 append 到檔尾，一份先
+assert 檔案結尾正是 D-007 的 `Why:` 行再接上）。也就是說，六份都沒有走 Version 6
+移除的那條路徑。
+
+**殘留的未檢項**：迄今**沒有任何 trial 在 Version 6 grader 下被評過分**。Version 4–6
+只移除過關路徑、不新增，因此未受檢的方向是 baseline 通過率**下降**——即鑑別力可能反
+而回升、A/B 的問題重新打開。最便宜的決定性複查是以 Version 6 文本跑一次 k=3
+preflight；此處**刻意不跑**，因為它會消耗實際的 trial 額度。unmet-but-covered 結論
+維持不變。
 
 **結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
 它原本會做錯的事。scenario 保留為語料庫覆蓋，不跑 A/B——對一個已無鑑別力的儀器跑
