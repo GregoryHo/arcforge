@@ -98,6 +98,14 @@ A roadmap row carries exactly six cells, and a literal pipe inside a cell is
 written `\|` — the only form the table has for one. A row that resolves to any
 other number of cells is rejected rather than read from shifted columns.
 
+Those rows sit under a table (C6): the `## Roadmap` section opens on a six-column
+header row starting with `Version`, and a delimiter row of the same width sits
+directly beneath it. Both are what GFM needs to render a table at all — drop the
+delimiter, or narrow it to fewer columns than the header, and every row below
+reaches a reader as a paragraph of literal pipes while the checks above would go
+on reading it as product state. A wrong-width delimiter is reported as a row of
+the wrong arity, not skipped for looking like dashes.
+
 ## The three mechanical rules
 
 These three are pinned in exactly this form because `npm run check:product` reads

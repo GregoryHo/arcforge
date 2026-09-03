@@ -51,7 +51,9 @@ function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra
  * `intro` and `appendix` sit outside the `## Decision Log` section — before it
  * and after it — so a fixture can put decision-shaped prose where the log is not.
  * `note` sits *inside* the `## Roadmap` section, below the table, so a fixture
- * can put row-shaped lines where the roadmap is.
+ * can put row-shaped lines where the roadmap is. `header` is the table's frame —
+ * its header and delimiter rows — so a fixture can serve rows under a broken
+ * frame, or none at all.
  */
 function roadmap({
   rows = [row()],
@@ -60,6 +62,7 @@ function roadmap({
   intro = [],
   note = [],
   appendix = [],
+  header = TABLE_HEADER,
 } = {}) {
   const folded =
     fold.length === 0
@@ -72,7 +75,7 @@ function roadmap({
     ...intro,
     '## Roadmap',
     '',
-    ...TABLE_HEADER,
+    ...header,
     ...rows,
     ...note,
     '',
@@ -1160,6 +1163,55 @@ describe('check-product', () => {
       expect(of('C6', validateProduct({ roadmap: roadmap(), specs: [] }))).toEqual([
         'C6 sanity floor: specs/ holds no spec',
       ]);
+    });
+
+    // The rows are only the roadmap while they sit under a table. GFM needs a
+    // header and a delimiter of matching width; without them the section renders
+    // as a paragraph of literal pipes that every row rule still reads as
+    // product state.
+    describe("the table's frame", () => {
+      it('accepts rows under a six-column header and delimiter', () => {
+        expect(of('C6', run())).toEqual([]);
+      });
+
+      it('rejects a roadmap holding a data row and no header at all', () => {
+        const errors = of(
+          'C6',
+          validateProduct({ roadmap: roadmap({ header: [] }), specs: [spec()] }),
+        );
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/not a 6-column header row starting with "Version"/);
+      });
+
+      it('rejects a header with no delimiter row beneath it', () => {
+        const header = [TABLE_HEADER[0]];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toEqual([
+          'C6 the roadmap table has no delimiter row under its header, so GFM renders no table',
+        ]);
+      });
+
+      it('rejects a delimiter narrower than its header', () => {
+        // The third input of the family, and the one that used to slip past
+        // twice over: the all-dash skip ran before the arity check, so an
+        // off-arity delimiter was dropped rather than reported.
+        const header = [TABLE_HEADER[0], '|---|---|'];
+        const errors = validateProduct({ roadmap: roadmap({ header }), specs: [spec()] });
+        expect(of('C6', errors)).toEqual([
+          "C6 the roadmap table's delimiter row carries 2 column(s) against a 6-column header, so GFM renders no table",
+        ]);
+        expect(of('C4', errors)).toEqual([
+          'C4 roadmap row "|---|---|": expected 6 columns, found 2',
+        ]);
+      });
+
+      it('accepts a single-dash delimiter, which GFM renders', () => {
+        // `|-|-|` is a legal delimiter row. Read as `-{2,}` this frame would be
+        // rejected as no delimiter at all — a rule that fires on a table every
+        // renderer draws.
+        const header = [TABLE_HEADER[0], '|-|-|-|-|-|-|'];
+        expect(validateProduct({ roadmap: roadmap({ header }), specs: [spec()] })).toEqual([]);
+      });
     });
   });
 

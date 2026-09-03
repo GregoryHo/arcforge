@@ -3,8 +3,8 @@
 Process record from the review of the product-method alignment PR — the round that
 built `scripts/check-product.js` and its falsifiability suite. Six things came out
 of it that were deliberately **not** landed — four widenings and carry-forwards the
-rounds argued down, plus two standing constraints on the linter's own code, one of
-which has since been taken — and each would otherwise have survived only in a review
+rounds argued down, plus two standing constraints on the linter's own code, two of
+which have since been taken — and each would otherwise have survived only in a review
 thread. They are written down here so the next person hardening the linter starts
 from the constraints rather than rediscovering them.
 
@@ -199,37 +199,55 @@ No code was written for this in round 9: the behaviour is correct under today's
 rules, and changing what `stripCodeSpans()` means with no rule asking for it trades a
 latent coupling for a live one.
 
-## 6. The roadmap table's framing is not asserted
+## 6. The roadmap table's framing is not asserted — **TAKEN in round 13**
 
 Every rule that reads the table — C1, C4, C6, C7 — reads a *row*: `parseRoadmapRows`
-accepts any six-cell pipe line inside `## Roadmap` and nothing above it is required.
-Three inputs therefore lint green:
+accepted any six-cell pipe line inside `## Roadmap` and nothing above it was
+required. Three inputs therefore linted green:
 
 - a `## Roadmap` holding only a data row, with no header row and no delimiter;
 - a header row plus a data row, with no delimiter between them;
 - a header row, a two-column delimiter, and a six-cell data row — `parseRoadmapRows`
-  skips an all-dash line unconditionally, and that `continue` runs *before* the arity
-  check, so an off-arity delimiter is dropped rather than reported.
+  skipped an all-dash line unconditionally, and that `continue` ran *before* the
+  arity check, so an off-arity delimiter was dropped rather than reported.
 
-It stayed out because GFM renders none of the three as a table. A delimiter row is
-required, and one whose arity differs from the header's un-recognizes the table, so
-each input reaches a reader as a paragraph of literal pipes — loud corruption rather
-than the plausible-looking lie the linter exists to catch. Neither D-006 nor
-`product/AGENTS.md` promises framing: a roadmap row is defined there as a six-cell
-pipe line, and C6's "the roadmap table has no rows" is the only surface that implies a
-table at all.
+It stayed out for several rounds because GFM renders none of the three as a table. A
+delimiter row is required, and one whose arity differs from the header's
+un-recognizes the table, so each input reaches a reader as a paragraph of literal
+pipes — loud corruption rather than the plausible-looking lie the linter exists to
+catch. **That half of the reasoning stands and is why this waited; the other half was
+wrong and is corrected here.** Round 11 called the rule an *eighth* one, needing a
+decision refining D-006 — whose recorded text enumerates seven — and parked it beside
+`check-product-spec-sections` as a backlog wish. But framing is not a widening of
+what the linter promises: it is the unchecked precondition of one it already made.
+C6's floor is stated over "the roadmap table", and the rows it counts are rows only
+while a table frames them, so an unframed row already stood in for a table the same
+way a fenced one did — the case C1's own docblock says it must not.
 
-Closing it is an **eighth rule**, which needs a decision refining D-006 — whose
-recorded text enumerates seven. That is the same gate `check-product-spec-sections`
-sits behind (no rule asserts a spec's headings either), and the reason both are
-backlog wishes rather than half-landed code.
+Landed in round 13 as a **clause of C6**, the way round 11's duplicate-`Version` rule
+landed as a clause of C4, so the rule count stays at seven:
+`checkRoadmapFraming()` in `scripts/lib/product-lint.js`, the framing paragraph in
+`product/AGENTS.md`'s roadmap-row section, and four cases in
+`tests/scripts/check-product.test.js`.
 
-Two constraints on the rule, if someone lands it:
+Both recorded constraints held. One was satisfied differently than written:
 
 - It must assert a `Version` header row **and** a delimiter whose arity matches it. A
-  bare "some header exists" check still passes the third input above.
+  bare "some header exists" check still passes the third input above. Taken as
+  written: the frame is the first two pipe lines of the section, read the way GFM
+  reads one — a six-cell header opening on `Version`, then a delimiter of the same
+  width directly beneath it.
 - The unconditional all-dash `continue` must move *after* the arity check, so an
-  off-arity delimiter is reported instead of skipped.
+  off-arity delimiter is reported instead of skipped. Taken, and the third input is
+  now reported twice over — once by C6 as a frame that renders no table, once by C4
+  as a row of the wrong arity. The delimiter predicate widened from `-{2,}` to `-+`
+  in the same change: `|-|-|` is a legal GFM delimiter, and a rule whose job is to
+  reject has to accept every frame a renderer draws.
+
+What is left is controller-owned. D-006 still enumerates C6 as "a sanity floor of one
+row, one decision, one spec"; the exact replacement naming the frame is in the review
+handoff for the controller to apply, because `product/ROADMAP.md` is not a file this
+work owns.
 
 The silent sibling of this family was fixed rather than deferred, and is not part of
 the rule above: `parseRoadmapRows` trimmed before testing for a leading `|`, with no
