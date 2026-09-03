@@ -19,11 +19,13 @@
  * Validates:
  *   - C1  exactly one roadmap row carries the `← we are here` marker;
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
- *         folded `<details>` index, unique, and gap-free from D-001 — the
- *         heading is read at column 1, and one indented far enough to still
- *         render as a heading (one to three spaces) is reported rather than
- *         dropped, so a stray indent cannot hide an entry in the log's flat
- *         structure;
+ *         folded `<details>` index, unique, and gap-free from D-001 — read
+ *         inside the `## Decision Log` section, so a `### D-NNN` heading
+ *         elsewhere in `ROADMAP.md` is prose rather than an entry, and a missing
+ *         log section is C6's job rather than a silent zero. The heading is read
+ *         at column 1, and one indented far enough to still render as a heading
+ *         (one to three spaces) is reported rather than dropped, so a stray
+ *         indent cannot hide an entry in the log's flat structure;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists — a relation-shaped bullet that misses
  *         the canonical form is reported as malformed rather than dropped, and
@@ -97,6 +99,11 @@ const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
 const TOTAL_FLIP_RE = /^Superseded-by: D-(\d{3})$/;
 const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
+// The two `##` sections of ROADMAP.md this linter reads. Each is sliced out
+// before it is parsed, so a table row or a `### D-NNN` heading anywhere else in
+// the file is prose, not product state.
+const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
+const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
@@ -113,14 +120,19 @@ function compareVersions(a, b) {
   return 0;
 }
 
-/** The lines between `## Roadmap` and the next `##` heading. */
-function roadmapSection(roadmap) {
-  const lines = roadmap.split('\n');
-  const start = lines.findIndex((l) => /^##\s+Roadmap\s*$/.test(l));
+/** The lines between a `##` heading and the next one, or `[]` when it is absent. */
+function section(md, heading) {
+  const lines = md.split('\n');
+  const start = lines.findIndex((l) => heading.test(l));
   if (start === -1) return [];
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => /^##\s+/.test(l));
   return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** The lines between `## Roadmap` and the next `##` heading. */
+function roadmapSection(roadmap) {
+  return section(roadmap, ROADMAP_HEADING_RE);
 }
 
 /**
@@ -166,16 +178,19 @@ function parseRoadmapRows(roadmap, errors) {
 }
 
 /**
- * Parse the Decision Log into entries. `inFold` marks the entries parked in the
- * folded `<details>` index at the bottom of the log — they keep their place in
- * the numbering but sit outside the ascending-order requirement.
+ * Parse the Decision Log into entries. The log is the `## Decision Log` section,
+ * not the whole file — the section is sliced out first, so a `### D-NNN` heading
+ * in an intro or a later appendix is prose, never an entry. `inFold` marks the
+ * entries parked in the folded `<details>` index at the bottom of the log — they
+ * keep their place in the numbering but sit outside the ascending-order
+ * requirement.
  */
 function parseDecisions(roadmap, errors) {
   const entries = [];
   let inFold = false;
   let fenceMarker = null;
   let current = null;
-  for (const line of roadmap.split('\n')) {
+  for (const line of section(roadmap, DECISION_LOG_HEADING_RE)) {
     // A fenced block is an illustration, not part of the log. Without this a
     // worked example showing a deliberately wrong `- Supersedes : D-001` would
     // hard-fail C3 as a malformed relation line, so the log could not document
@@ -207,10 +222,6 @@ function parseDecisions(roadmap, errors) {
       continue;
     }
     if (!current) continue;
-    if (/^##\s/.test(line)) {
-      current = null;
-      continue;
-    }
     const status = line.match(STATUS_FIELD_RE);
     if (status) {
       // Last-wins on purpose. First-wins would report the duplicate *and* claim

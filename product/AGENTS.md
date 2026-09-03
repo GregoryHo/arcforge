@@ -171,6 +171,12 @@ so an illustration can be shown as an indented block rather than a fenced one. O
 three spaces is not an exemption — the line still renders as the heading or the field
 a reader would trust, so it is reported like any other near-miss.
 
+Both exemptions apply inside a scope. The Decision Log is the `## Decision
+Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
+`### D-NNN` heading in an intro, an appendix, or any other section of the file is
+prose or illustration, not an entry, and is not checked as one. Rename or drop the
+section and the log reads as empty, which C6's sanity floor rejects.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

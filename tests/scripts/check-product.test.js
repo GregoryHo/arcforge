@@ -45,14 +45,26 @@ function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra
   ].join('\n');
 }
 
-function roadmap({ rows = [row()], decisions = [decision()], fold = [] } = {}) {
+/**
+ * `intro` and `appendix` sit outside the `## Decision Log` section — before it
+ * and after it — so a fixture can put decision-shaped prose where the log is not.
+ */
+function roadmap({
+  rows = [row()],
+  decisions = [decision()],
+  fold = [],
+  intro = [],
+  appendix = [],
+} = {}) {
   const folded =
     fold.length === 0
       ? []
       : ['<details>', '<summary>Superseded</summary>', '', ...fold, '</details>', ''];
+  const appended = appendix.length === 0 ? [] : ['## Appendix', '', ...appendix];
   return [
     '# Roadmap — fixture',
     '',
+    ...intro,
     '## Roadmap',
     '',
     ...TABLE_HEADER,
@@ -62,6 +74,7 @@ function roadmap({ rows = [row()], decisions = [decision()], fold = [] } = {}) {
     '',
     ...decisions,
     ...folded,
+    ...appended,
   ].join('\n');
 }
 
@@ -192,6 +205,48 @@ describe('check-product', () => {
       // detector stops at three so an illustration stays out of the log.
       const decisions = [decision({ id: 'D-001' }), '    ### D-009 — an illustration\n'];
       expect(run({ roadmap: { decisions } })).toEqual([]);
+    });
+
+    it('does not read a decision heading before the Decision Log', () => {
+      // The log is the `## Decision Log` section, not the file. Read whole-file,
+      // an intro heading would satisfy C2, C6 and a spec citation on a log that
+      // is actually empty.
+      const errors = run({
+        roadmap: { intro: [decision({ id: 'D-001' })], decisions: [] },
+        specs: [spec({ cites: ['D-001'] })],
+      });
+      expect(errors).toContainEqual(
+        expect.stringMatching(/C6 sanity floor: the Decision Log has no entries/),
+      );
+      expect(of('C5', errors)).toContainEqual(
+        expect.stringMatching(/cites D-001, which is not in the Decision Log/),
+      );
+    });
+
+    it('does not read a decision heading in a section after the log', () => {
+      const errors = run({
+        roadmap: {
+          decisions: [decision({ id: 'D-001' })],
+          appendix: [decision({ id: 'D-002', title: 'illustrative, not a real decision' })],
+        },
+        specs: [spec({ cites: ['D-002'] })],
+      });
+      expect(of('C2', errors)).toEqual([]);
+      expect(of('C5', errors)).toContainEqual(
+        expect.stringMatching(/cites D-002, which is not in the Decision Log/),
+      );
+    });
+
+    it('does not report a duplicate for a decision heading re-listed outside the log', () => {
+      // The false-positive half: an appendix that re-shows a real entry must not
+      // make it a duplicate or put the log out of order.
+      const errors = run({
+        roadmap: {
+          decisions: [decision({ id: 'D-001' })],
+          appendix: [decision({ id: 'D-001', title: 'the same entry, quoted' })],
+        },
+      });
+      expect(of('C2', errors)).toEqual([]);
     });
   });
 
