@@ -223,7 +223,7 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
     const transcript = path.join(tmpDir, 'transcript.jsonl');
     fs.writeFileSync(
       transcript,
-      [
+      `${[
         JSON.stringify({ type: 'user', content: 'a secret sentence' }),
         JSON.stringify({
           type: 'assistant',
@@ -231,7 +231,7 @@ describe('Stop transcript-parse threshold gate (v5)', () => {
             content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/tmp/foo.ts' } }],
           },
         }),
-      ].join('\n') + '\n',
+      ].join('\n')}\n`,
     );
 
     const projectDir = path.join(homeDir, 'v5tg-off');
