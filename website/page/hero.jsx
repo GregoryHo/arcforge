@@ -41,7 +41,7 @@ function Hero({theme}) {
             agents.
           </h1>
           <p style={{marginTop:32,fontSize:16,lineHeight:1.7,color:t.mute,maxWidth:520,fontFamily:'"JetBrains Mono",ui-monospace,monospace'}}>
-            A skill toolkit for Claude Code. Skills are tools, not laws — your agent picks the{' '}
+            A skill toolkit for coding agents. Skills are tools, not laws — your agent picks the{' '}
             <span style={{color:t.ink}}>smallest useful workflow</span> for the task and runs direct when nothing more is needed.
           </p>
           <p style={{marginTop:14,fontSize:14,lineHeight:1.7,color:t.dim,maxWidth:520,fontFamily:'"Fraunces",serif',fontStyle:'italic'}}>
