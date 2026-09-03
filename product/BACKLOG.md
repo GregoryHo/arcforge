@@ -30,6 +30,15 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   Claude-Code-shaped: give the Claude Code card its two-command form and add a
   Codex CLI skills-only block to the install section, so the site carries both
   install paths the README already documents.
+- **host-neutral-skill-handoffs** — every cross-skill handoff is written in the
+  slash form (`/<skill>`), which is Claude Code's spelling; Codex resolves the same skill as
+  `arcforge:name` from the `$` picker and has no slash commands. Today one
+  sentence in `using` maps the two, and whether an agent follows that mapping
+  mid-workflow on Codex is unmeasured. A notation that reads correctly on both
+  hosts without per-host branching (codex-harness B-7) would need
+  `docs/decisions/skill-schema.md` §4.1/§5 reopened and both cross-reference
+  parsers taught the new shape — a maintainer decision about a frozen contract,
+  not a cleanup · needs: harness-neutral-model-runner.
 
 ## Learning
 
