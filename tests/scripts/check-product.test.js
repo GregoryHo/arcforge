@@ -843,6 +843,55 @@ describe('check-product', () => {
       expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
     });
 
+    it('accepts two rows whose versions differ', () => {
+      // The positive side of the uniqueness clause below: a spec extended by a
+      // later row is the shape the compound header exists for, and nothing in
+      // it is a duplicate.
+      const rows = [
+        row({ version: '1.0.0', here: false }),
+        row({ version: '1.1.0', status: 'building' }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.1.0 (building)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
+    });
+
+    it('rejects two rows carrying the same Version', () => {
+      // "The highest-version one" names a row only while versions are unique.
+      // Read without this clause, both cases below are green — the *same* pair
+      // of rows accepting two contradictory headers.
+      const rows = [
+        row({ version: '1.0.0', here: false }),
+        row({ version: '1.0.0', status: 'building' }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.0.0 (building)' })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second row carries this Version/);
+    });
+
+    it('rejects the same duplicate pair written the other way round', () => {
+      // The tie is broken by table order, so the collapsed header is what the
+      // reversed pair accepted. One rule has to reject both orders, or the
+      // corpus has two truths.
+      const rows = [
+        row({ version: '1.0.0', status: 'building', here: false }),
+        row({ version: '1.0.0' }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0' })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second row carries this Version/);
+    });
+
+    it('keeps a duplicate row, so its marker still counts for C1', () => {
+      // Reported and kept, the way C2 keeps a duplicate `D-id`. Dropped
+      // instead, this corpus would pass C1 at one marker while carrying two.
+      const rows = [row({ version: '1.0.0' }), row({ version: '1.0.0' })];
+      const errors = of('C1', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/found 2/);
+    });
+
     it('rejects a spec no roadmap row links', () => {
       const specs = [spec(), spec({ name: 'orphan' })];
       const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));

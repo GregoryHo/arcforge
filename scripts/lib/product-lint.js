@@ -62,7 +62,10 @@
  *         The header is read in the preamble above the
  *         spec's first `##`, fence-aware, so a worked example or a quoted header
  *         line further down is neither mistaken for the header nor allowed to
- *         displace it;
+ *         displace it. Each version occupies exactly one row, which is what
+ *         makes "the highest-version one" name a row at all: two rows for one
+ *         version leave the governing row decided by table order, and the same
+ *         pair then accepts two contradictory headers;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
  *         and exists in the log — that section is sliced the same fence-aware
  *         way, so an example `##` heading cannot carry citations out of reach,
@@ -509,6 +512,35 @@ function expectedSpecStatus(linking) {
   return governing.status === 'next' ? 'draft' : `building v${governing.version}`;
 }
 
+/**
+ * C4 — one row per version: the precondition the governing-row rule rests on.
+ *
+ * `product/AGENTS.md` calls a spec's governing row "the highest-version one",
+ * which names a row only while versions are unique. With two rows for one
+ * version the sort in `checkSpecHeaders` is a tie, and `expectedSpecStatus`
+ * takes whichever the table happens to list last — so a `shipped 1.0.0` and a
+ * `building 1.0.0` linking one spec accept `shipped v1.0.0 · extended by 1.0.0
+ * (building)` written one way round and `shipped v1.0.0` the other. Two
+ * contradictory green verdicts over one corpus, decided by typing order.
+ *
+ * The duplicate is reported and the row kept, the way `checkDecisionNumbering`
+ * keeps a duplicate `D-id`. Dropping it would take its `← we are here` with it
+ * and let a corpus whose two same-version rows are both marked pass C1 at one
+ * marker — failing open on the marker rule while closing this one.
+ */
+function checkRoadmapVersions(rows, errors) {
+  const seen = new Set();
+  for (const row of rows) {
+    if (seen.has(row.version)) {
+      errors.push(
+        `C4 roadmap row ${row.version}: a second row carries this Version, so the specs it links have no single highest-version governing row`,
+      );
+    } else {
+      seen.add(row.version);
+    }
+  }
+}
+
 /** C4 — row ↔ spec links resolve both ways and the header matches the governing row. */
 function checkSpecHeaders(rows, specs, errors) {
   const known = new Set(specs.map((s) => s.name));
@@ -596,6 +628,7 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
   checkDecisionNumbering(entries, errors);
   checkStatusPresence(entries, errors);
   checkRelations(entries, errors);
+  checkRoadmapVersions(rows, errors);
   checkSpecHeaders(rows, specs, errors);
   checkSpecCitations(entries, specs, errors);
   checkRoadmapTags(rows, errors);

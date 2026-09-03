@@ -127,6 +127,13 @@ one:
   `shipped v6.0.0 · extended by 6.1.0 (building)`.
 - With no shipped row at all, the header is just rule 1 applied to the governing row.
 
+Each version occupies **exactly one row** (C4), which is what makes "the
+highest-version one" name a row. A version listed twice — a shipped row and a
+`building` one for the same `X.Y.Z`, say — leaves the governing row decided by
+which is typed first, so the same pair of rows would accept both
+`shipped v1.0.0` and `shipped v1.0.0 · extended by 1.0.0 (building)`. Record an
+extension as the next version, never as a second row for the one that shipped.
+
 **3. The two supersession forms (C3).** A reversal is two edits — the new entry and
 one flipped line on the old one — and which flip depends on how much died:
 
