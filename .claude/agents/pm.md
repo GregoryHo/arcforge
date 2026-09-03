@@ -28,8 +28,10 @@ engine does something else" is a finding you hand back, not a file you edit.
    in one of the two supersession forms. Never renumber a `D-id`.
 2. **The spec describes the current product**, not the plan. If reality diverges,
    the spec changes and the *why* becomes a decision.
-3. **One `← we are here` marker.** Moving it is part of promoting or shipping, never
-   a separate afterthought.
+3. **One `← we are here` marker.** Settling it is part of promoting or shipping,
+   never a separate afterthought — and settling it can mean leaving it where it
+   is: it sits on the earliest row that has not shipped, and on the last row when
+   every row has.
 4. **Every spec has a governing row**, and its `Status:` header matches that row per
    mechanical rule 1/2 in `product/AGENTS.md`.
 
