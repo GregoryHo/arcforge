@@ -1,0 +1,49 @@
+[Assistant] Looking at the repo layout and the slugify source first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-BoQMfb" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print | sort && echo "--- package.json ---" && cat package.json && echo "--- git log ---" && git log --oneline --all && echo "--- diff main..HEAD ---" && git diff main..HEAD
+
+[Assistant] Baseline first: confirm the current suite passes and reproduce the throw.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-BoQMfb" && npm test 2>&1 | tail -15; echo "--- repro ---"; node -e "const {slugify}=require('./src/slugify'); try { console.log(JSON.stringify(slugify(null))) } catch(e) { console.log('THROWS:', e.message) }"; echo "--- settings ---"; cat .claude/settings.json
+
+[Assistant] Reproduced: `str.trim()` on null. Applying the guard and a regression test together, then rerunning the suite.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-BoQMfb" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null', () => {
+  assert.strictEqual(slugify(null), '');
+});
+
+test('returns an empty string for undefined', () => {
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+git diff --stat && echo "--- tests ---" && npm test 2>&1 | tail -12
+
+[Assistant] `slugify(null)` now returns `''`. Suite passes, 4 of 4.
+
+**Changed**
+- `src/slugify.js:2` adds a nullish guard, so `null` and `undefined` both return an empty string. Strings behave exactly as before.
+- `test/slugify.test.js` gains two regression tests, one each for `null` and `undefined`.
+
+**Verified**
+```
+✔ slugifies a title
+✔ collapses runs of punctuation
+✔ returns an empty string for null
+✔ returns an empty string for undefined
+```
+
+The change is uncommitted on `feat-slugify`. Next: run `git commit -am "fix: slugify returns '' for nullish input"` if you want it on the branch.

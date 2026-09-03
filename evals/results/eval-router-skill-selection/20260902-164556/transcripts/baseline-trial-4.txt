@@ -1,0 +1,57 @@
+[Assistant] Fixing `slugify(null)` on `feat-slugify`. First, a look at the code and tests.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t4-0hDKxG" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print && echo "---" && cat package.json && echo "---" && git log --oneline main..feat-slugify && git diff main..feat-slugify --stat
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t4-0hDKxG" && cat src/slugify.js && echo "--- test ---" && cat test/slugify.test.js && echo "--- settings ---" && cat .claude/settings.json && echo "--- npm test ---" && npm test 2>&1 | tail -20
+
+[Assistant] Cause found: `str.trim()` runs on `null` in `src/slugify.js:2`. Adding a null guard plus tests.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t4-0hDKxG" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null', () => {
+  assert.strictEqual(slugify(null), '');
+});
+
+test('returns an empty string for undefined', () => {
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+npm test 2>&1 | tail -12 && echo "--- diff ---" && git diff
+
+[Assistant] Fixed. `slugify(null)` now returns `''`, and all 4 tests pass.
+
+**Cause:** `src/slugify.js:2` called `.trim()` directly on the input, so `null` threw a TypeError.
+
+**Change:** one guard line at the top of `slugify`. It also covers `undefined`, since the loose `== null` check matches both.
+
+```js
+if (str == null) return '';
+```
+
+**Tests added** in `test/slugify.test.js`: one for `null`, one for `undefined`. Suite result:
+
+```
+ℹ tests 4
+ℹ pass 4
+ℹ fail 0
+```
+
+The changes are on the working tree of `feat-slugify`, not yet committed.
+
+Next: commit them.
+
+```
+git add src/slugify.js test/slugify.test.js && git commit -m "fix: slugify returns empty string for null/undefined"
+```

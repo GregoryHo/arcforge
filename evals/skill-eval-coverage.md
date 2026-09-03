@@ -290,6 +290,16 @@ Version 3 只修 grader（A2 由標題全等改為包含；A3 接受任何把 su
 40 個 trial 不會產生資訊。真正未被覆蓋的是「帳本在壓力下是否與程式碼同時移動」，
 那正是 `spec-before-code` 量到的 +0.67。
 
+### 第 16 支技能的相鄰風險：router 回歸
+
+`speccing` 的 description register 與 `brainstorming` 相鄰（D-014 已列為 accepted
+cost），因此本 PR 另跑 `eval-router-skill-selection` 作回歸：**+0.16 CI[0.05, 0.27]
+IMPROVED**（k=5；baseline avg 0.60 / pass 0%，treatment avg 0.76 / pass 80%）。
+加入第 16 列後 router 未退化，P7 的 +0.36 仍為該支的現行證據，本次僅作 non-regression
+用。註：`check-skill-eval-annotation` 仍會對 `skills/core/using/SKILL.md` 發 warning
+——該啟發式以檔名子字串比對，而 `using` 的 scenario 名為 `eval-router-skill-selection`，
+本質上比不到；此為非阻斷提示，證據見本節與 `evals/results/eval-router-skill-selection/`。
+
 **已知 runner 缺陷（非本 PR 修正範圍）**：session-limit 回應未被歸為 error trial，
 會以 fixture 自身檔案得分入分母，使配額耗盡讀起來像行為回歸。任何長跑 A/B 之後
 應先掃 `grep -rl "session limit"` 與 <200 bytes 的 transcript 再取用數字。

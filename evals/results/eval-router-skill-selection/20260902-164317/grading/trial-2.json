@@ -1,0 +1,27 @@
+{
+  "eval": "eval-router-skill-selection",
+  "trial": 2,
+  "score": 0.5,
+  "passed": false,
+  "discovered_claims": [
+    {
+      "text": "Agent confirmed the bug by reading source, not by a failing test run",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 4: 'Bug confirmed: str.trim() runs on null' follows cat of src/slugify.js in Block 3, not a red test"
+    },
+    {
+      "text": "Final suite passes with 4 tests after the fix",
+      "category": "factual",
+      "passed": true,
+      "evidence": "Block 6 reports 4 tests, 4 pass; artifact test file contains 4 tests"
+    },
+    {
+      "text": "Agent left changes uncommitted rather than committing or integrating",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 6: 'Changes are uncommitted on feat-slugify'"
+    }
+  ],
+  "weak_assertions": []
+}

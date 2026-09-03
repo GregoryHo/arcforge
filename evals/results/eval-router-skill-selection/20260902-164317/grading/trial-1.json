@@ -1,0 +1,21 @@
+{
+  "eval": "eval-router-skill-selection",
+  "trial": 1,
+  "score": 0.5,
+  "passed": false,
+  "discovered_claims": [
+    {
+      "text": "Agent inspected the repo and ran the existing suite before making changes",
+      "category": "process",
+      "passed": true,
+      "evidence": "Blocks 2 and 3 list files, read source/tests, and run npm test before any edit"
+    },
+    {
+      "text": "Fix and tests were bundled into a single Bash command and single commit",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 5 writes source, appends tests, runs tests, and commits in one invocation"
+    }
+  ],
+  "weak_assertions": []
+}

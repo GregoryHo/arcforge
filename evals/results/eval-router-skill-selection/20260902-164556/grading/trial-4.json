@@ -1,0 +1,33 @@
+{
+  "eval": "eval-router-skill-selection-treatment",
+  "trial": 4,
+  "score": 1,
+  "passed": true,
+  "discovered_claims": [
+    {
+      "text": "Agent ran the baseline suite before touching any file",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 3 runs `npm test` before edits; Block 4 reports 2 passing"
+    },
+    {
+      "text": "Agent added a second test for `undefined` beyond the reported null case",
+      "category": "quality",
+      "passed": true,
+      "evidence": "Block 5 adds both null and undefined tests; the `== null` guard in Block 7 covers both"
+    },
+    {
+      "text": "Agent left the fix uncommitted and named commit as the single next action",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 8: 'Changes are on `feat-slugify`, uncommitted' followed by one git commit command"
+    },
+    {
+      "text": "Raw npm test output is not shown in the transcript; red status is relayed via the assistant's Block 6 statement",
+      "category": "factual",
+      "passed": true,
+      "evidence": "Block 5 shows the run command with a grep filter; Block 6 reports the TypeError result. Pre-fix source per Block 4 called `.trim()` unguarded, consistent with the reported failure"
+    }
+  ],
+  "weak_assertions": []
+}
