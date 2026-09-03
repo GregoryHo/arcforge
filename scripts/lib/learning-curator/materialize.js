@@ -21,6 +21,20 @@ const { appendTransitionEvent } = require('./dashboard-events');
 
 const FIRST_SLICE_SUPPORTED_TYPES = ['instinct'];
 
+/**
+ * Whether Layer 7 has a renderer for an artifact type.
+ *
+ * Exported so the CLI can describe the narrowing without keeping a second copy
+ * of the list. The refusal itself still happens here — `materialize()` calls
+ * this too, so there is exactly one predicate behind both.
+ *
+ * @param {string} artifactType
+ * @returns {boolean}
+ */
+function isMaterializableType(artifactType) {
+  return FIRST_SLICE_SUPPORTED_TYPES.includes(artifactType);
+}
+
 // ---------------------------------------------------------------------------
 // candidate_record_hash — stable hash over semantic fields
 // Fields chosen to be stable: changing any of these means a new materialization.
@@ -332,10 +346,7 @@ function materialize({
   // Reject if candidate artifact_type is not supported (regardless of requestedArtifactType)
   const artifactType = requestedArtifactType || candidate.artifact_type;
   const candidateArtifactType = candidate.artifact_type;
-  if (
-    !FIRST_SLICE_SUPPORTED_TYPES.includes(candidateArtifactType) ||
-    !FIRST_SLICE_SUPPORTED_TYPES.includes(artifactType)
-  ) {
+  if (!isMaterializableType(candidateArtifactType) || !isMaterializableType(artifactType)) {
     return fail(
       'artifact_type_mismatch',
       `First-slice supports instinct only; got: ${candidateArtifactType}`,
@@ -496,4 +507,6 @@ module.exports = {
   buildDraftContent,
   getDraftRoot,
   defaultRenderPolicy,
+  FIRST_SLICE_SUPPORTED_TYPES,
+  isMaterializableType,
 };

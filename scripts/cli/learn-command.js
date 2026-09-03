@@ -19,12 +19,24 @@ const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 
 // Layer 7/8 render and activate the instinct artifact and nothing else, and
 // `materialize.js` is where that narrowing is enforced — it refuses any other
-// artifact type with `artifact_type_mismatch`. The CLI keeps the same constant
-// only to describe the narrowing: which commands are worth suggesting, and what
-// to say when the engine refuses one. It does not re-decide it. The other types
-// do have a producer — the dashboard's `evolve` action writes a `skill` record
-// into the same queue — so this is a live branch, not a defensive one.
-const SUPPORTED_ARTIFACT_TYPE = 'instinct';
+// artifact type with `artifact_type_mismatch`. The CLI reads that module's own
+// list rather than keeping a second copy, and uses it to describe the
+// narrowing: which commands are worth suggesting, and what to say when the
+// engine refuses one. Every single-transition command dispatches and renders
+// the engine's refusal; `accept` is the one exception, and `runAccept` says
+// why. The other types do have a producer — the dashboard's `evolve` action
+// writes a `skill` record into the same queue — so this is a live branch, not
+// a defensive one.
+//
+// Lazily required, like every other `../lib` import in this file: a `learn
+// diary` run should not pay for the curator's module graph.
+function supportedArtifactTypes() {
+  return require('../lib/learning-curator/materialize').FIRST_SLICE_SUPPORTED_TYPES;
+}
+
+function isMaterializableType(artifactType) {
+  return supportedArtifactTypes().includes(artifactType);
+}
 
 // Every action the CLI dispatches is attributed to the CLI, so the audit log
 // distinguishes a typed command from a dashboard click.
@@ -206,7 +218,7 @@ function cliActionsFor(card) {
   return card.available_actions.filter((action) => {
     if (!Object.hasOwn(VERB_FOR_ACTION, action)) return false;
     if (action !== 'materialize' && action !== 'activate') return true;
-    return card.artifact_type === SUPPORTED_ARTIFACT_TYPE;
+    return isMaterializableType(card.artifact_type);
   });
 }
 
@@ -229,7 +241,7 @@ function nextCommandFor(card) {
  */
 function unsupportedTypeActions(card) {
   return [
-    `arcforge materializes ${SUPPORTED_ARTIFACT_TYPE} candidates only, so this ` +
+    `arcforge materializes ${supportedArtifactTypes().join(', ')} candidates only, so this ` +
       `${card.artifact_type} candidate has no materialize or activate step`,
     'leave it queued — the whole queue is reviewable in: arcforge learn dashboard',
   ];
@@ -237,8 +249,7 @@ function unsupportedTypeActions(card) {
 
 function nextActionsFor(card) {
   const unbuildable =
-    card.artifact_type !== SUPPORTED_ARTIFACT_TYPE &&
-    STATUSES_NAMING_A_BUILD.has(card.lifecycle_status);
+    !isMaterializableType(card.artifact_type) && STATUSES_NAMING_A_BUILD.has(card.lifecycle_status);
   if (unbuildable) return unsupportedTypeActions(card);
   return NEXT_ACTIONS[card.lifecycle_status] || [];
 }
@@ -248,14 +259,17 @@ function nextActionsFor(card) {
  *
  * The narrowing belongs to Layer 7: `materialize.js` refuses any other artifact
  * type with `artifact_type_mismatch`, which the shared action handler turns into
- * an audited rejection. All the CLI does is render that reason in reviewer-facing
- * prose instead of the engine's internal detail string — a CLI-side pre-check
- * would be a second copy of a gate the engine already owns, and it would refuse
- * before the audit log ever saw the request.
+ * an audited rejection. For a single-transition command all the CLI does is
+ * render that reason in reviewer-facing prose instead of the engine's internal
+ * detail string — a pre-check there would be a second copy of a gate the engine
+ * already owns, and it would refuse before the audit log ever saw the request.
+ * `accept` is the documented exception: it is two transitions, so it has to
+ * decide before the first one lands (see `runAccept`). This function supplies
+ * the prose for both, and reads the curator's list for the type it names.
  */
 function narrowingMessage(card) {
   return (
-    `supports ${SUPPORTED_ARTIFACT_TYPE} candidates only — ${card.candidate_id} is a ` +
+    `supports ${supportedArtifactTypes().join(', ')} candidates only — ${card.candidate_id} is a ` +
     `${card.artifact_type} candidate. Materialization and activation run through the ` +
     'curator, which renders the instinct artifact and nothing else today; the other ' +
     'artifact types the queue schema names have no renderer behind them. Leave it queued, ' +
@@ -279,8 +293,7 @@ function refusalMessage(result, verb, card) {
     // materializes it. Say the narrowing too rather than sending the reviewer
     // around that loop. Prose on an already-audited refusal, not a second gate.
     const narrowed =
-      (verb === 'materialize' || verb === 'activate') &&
-      card.artifact_type !== SUPPORTED_ARTIFACT_TYPE;
+      (verb === 'materialize' || verb === 'activate') && !isMaterializableType(card.artifact_type);
     return narrowed ? `${matrix}. arcforge learn ${verb} also ${narrowingMessage(card)}` : matrix;
   }
   if (result.reason === 'stale_status') {
@@ -384,18 +397,51 @@ function runDrafts({ scope }) {
 }
 
 /**
+ * The refusal `accept` prints instead of dispatching, when the curator has no
+ * renderer for the candidate's artifact type.
+ *
+ * It names the type, states that nothing was applied, and offers the two moves
+ * that still exist: leave it queued (the dashboard reviews the whole queue) or
+ * record the approval on its own. It deliberately does not claim the candidate
+ * is otherwise ready — a `dismissed` or `activated` candidate has a nearer
+ * obstacle, and this message would be the wrong one to answer it with.
+ */
+function acceptRefusalMessage(card) {
+  return (
+    `arcforge learn accept refused, and nothing was applied — no approval, no draft, ` +
+    `${card.candidate_id} is unchanged. It ${narrowingMessage(card)}. ` +
+    'To record the approval on its own, run: ' +
+    `arcforge learn approve ${card.candidate_id} --project`
+  );
+}
+
+/**
  * Approve (when still pending) and materialize in one step — never activates.
  *
- * The queue is an append-only event log, so a failure after the approve landed
- * is not rolled back: the candidate stays `approved`, which the matrix allows
- * to materialize, so re-running is the recovery — except when the refusal is the
- * artifact-type narrowing, which no re-run clears, so the candidate is left
- * approved and stays queued. The second dispatch carries
- * `expected_current_status` so a concurrent writer is caught rather than
- * overwritten.
+ * `accept` is the CLI's one compound command, and that is why it — alone —
+ * decides the artifact-type narrowing itself instead of rendering the curator's
+ * refusal. The queue is an append-only event log, so the approve is not rolled
+ * back when the materialize is refused. For a transient refusal that is fine:
+ * the candidate stays `approved`, which the matrix allows to materialize, so
+ * re-running is the recovery. The artifact-type narrowing is not transient — no
+ * re-run clears it — and the matrix allows an `approved` candidate neither to
+ * materialize nor to dismiss, so half-landing strands it in a status with no
+ * way out. Refusing before the first dispatch is the only outcome that keeps
+ * the command all-or-nothing.
+ *
+ * The guard is on the command, not on the dispatch count: `accept` refuses an
+ * unbuildable type from every status, including the ones where it would have
+ * dispatched materialize alone. One rule for one command name beats a refusal
+ * that depends on where the candidate happened to be. `approve`, `materialize`
+ * and `activate` are single transitions and keep rendering the curator's own
+ * audited refusal — do not add a pre-check to them.
+ *
+ * The second dispatch carries `expected_current_status` so a concurrent writer
+ * is caught rather than overwritten.
  */
 function runAccept({ scope }, candidateId) {
   const card = findProjectCard(candidateId);
+  if (!isMaterializableType(card.artifact_type)) throw new Error(acceptRefusalMessage(card));
   if (card.lifecycle_status === 'materialized') {
     return { scope, candidate: card, draft_paths: draftPathsFor(candidateId) };
   }

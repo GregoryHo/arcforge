@@ -80,14 +80,15 @@ was recorded about them.
   project on the machine is reviewed where the reviewer can see what it
   changes. Its reach is what the engine can actually build — the instinct
   artifact. That narrowing is the curator's own refusal, which the CLI renders
-  rather than re-decides, so it too is audited; the advisory commands say so up
-  front rather than offering a step with nothing behind it. The one compound
-  command, `accept`, cannot: it approves before it meets the refusal, so it
-  leaves a non-instinct candidate approved — neither buildable nor, from that
-  status, rejectable. Hand-editing state files is the one path with
-  no checks and no record; the product treats it as out of contract. The
-  on-disk formats are append-only or atomically overwritten, owned by the
-  engine per the curator schema (cited above).
+  rather than re-decides, so it too is audited; every single-step command
+  renders that refusal rather than pre-empting it. `accept`, the one compound
+  command, is the exception that proves the rule: it would approve before
+  meeting the refusal, and the queue is append-only, so it decides the
+  narrowing itself and refuses before its first move — nothing applied,
+  nothing recorded, the candidate untouched. Hand-editing state files is the
+  one path with no checks and no record; the product treats it as out of
+  contract. The on-disk formats are append-only or atomically overwritten,
+  owned by the engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
   Its ceiling depends on source: a rule the user stated outright can climb

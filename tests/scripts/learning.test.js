@@ -475,6 +475,12 @@ describe('learn candidate commands over the canonical queue', () => {
     return JSON.parse(result.stdout);
   }
 
+  /** The canonical queue verbatim — every transition appends an event to it. */
+  function queueBytes() {
+    const queuePath = path.join(arcforgeHome, 'learning', 'candidates', 'queue.jsonl');
+    return fs.existsSync(queuePath) ? fs.readFileSync(queuePath, 'utf8') : null;
+  }
+
   /** The one audit log both front ends append to, newest last. */
   function auditEntries() {
     const logPath = path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl');
@@ -882,32 +888,50 @@ describe('learn candidate commands over the canonical queue', () => {
       });
     });
 
-    // `accept` used to refuse a non-instinct candidate before dispatching
-    // anything. It now does what a dashboard reviewer clicking approve then
-    // materialize gets: the approve lands and is audited, the materialize is
-    // refused and audited. The queue is append-only, so the approve is not
-    // rolled back — and unlike a transient failure, re-running never clears
-    // this one, so the candidate stays approved in the queue.
-    it('audits both halves when accept meets the narrowing, and leaves it approved', () => {
+    // `accept` is the CLI's one compound command, and the one place it decides
+    // the artifact-type narrowing itself rather than rendering the curator's
+    // refusal. Dispatching would land the approve — the queue is append-only,
+    // so it is not rolled back — and then meet a materialize refusal no re-run
+    // clears, stranding the candidate in `approved`, which the matrix allows
+    // neither to materialize nor to dismiss. So it refuses before it starts.
+    it('refuses accept up front for a type the curator cannot build, changing nothing', () => {
       seed(makeRecord({ artifact_type: 'skill' }));
+      const queueBefore = queueBytes();
 
       const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
 
       expect(result.status).not.toBe(0);
-      expect(JSON.parse(result.stdout).error).toMatch(
-        /supports instinct candidates only.*is a skill candidate/s,
-      );
-      expect(auditEntries().map((e) => [e.action, e.accepted])).toEqual([
-        ['approve', true],
-        ['materialize', false],
-      ]);
-      expect(auditEntries()[1].reason).toBe('artifact_type_mismatch');
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
+      expect(error).toMatch(/nothing was applied/);
+      expect(error).toMatch(new RegExp(`arcforge learn approve ${CANDIDATE_ID} --project`));
+
+      // Zero state change: `approve` appends a transition event to the queue,
+      // so a byte-identical queue is what proves no half-dispatch happened.
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+      expect(fs.existsSync(path.join(arcforgeHome, 'learning', 'drafts'))).toBe(false);
+    });
+
+    // The guard is on the command, not on the dispatch count. From `approved`,
+    // `accept` would have dispatched materialize alone — but the refusal it
+    // would render is one no re-run clears, so accept still answers up front
+    // and still logs nothing. `materialize` typed directly from here does
+    // dispatch, and its audited refusal is asserted above.
+    it('refuses accept up front from a status where it would dispatch one action', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const queueBefore = queueBytes();
+      const auditBefore = auditEntries().length;
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/nothing was applied/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toHaveLength(auditBefore);
       expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('approved');
-      // The drafts root itself is created by the curator's failure log; what
-      // must not exist is a draft for this candidate.
-      expect(fs.existsSync(path.join(arcforgeHome, 'learning', 'drafts', CANDIDATE_ID))).toBe(
-        false,
-      );
     });
 
     it('warns on stderr before activating, so the safety ack it sends is true', () => {
