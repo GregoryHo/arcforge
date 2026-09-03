@@ -1,10 +1,12 @@
 # Deferred from the `check:product` review rounds
 
 Process record from the review of the product-method alignment PR — the round that
-built `scripts/check-product.js` and its falsifiability suite. Three things came out
-of it that were deliberately **not** landed, and each would otherwise have survived
-only in a review thread. They are written down here so the next person hardening the
-linter starts from the constraints rather than rediscovering them.
+built `scripts/check-product.js` and its falsifiability suite. Five things came out
+of it that were deliberately **not** landed — three widenings and carry-forwards the
+rounds argued down, plus two standing constraints on the linter's own code — and each
+would otherwise have survived only in a review thread. They are written down here so
+the next person hardening the linter starts from the constraints rather than
+rediscovering them.
 
 Nothing here is a promise. `product/ROADMAP.md`'s D-006 is the entry that records
 what `check:product` actually asserts, and its `Residual:` points at this file.
@@ -133,3 +135,61 @@ The row, if someone lands it, goes after `INSUFFICIENT_DATA`:
 
 The paragraph below the table then names `PASS` where it currently says "it passes",
 so the table and the prose introduce the token together.
+
+## 4. `scripts/lib/product-lint.js` sits one line under the size ceiling
+
+`.claude/rules/coding-standards.md` puts the hard limit at 700 lines. The file ends
+round 9 at **699**, and nothing counts lines in CI, so the next C-rule to land here
+breaches the standard silently instead of failing a check. Round 9's three fixes put
++41 on it net (50 added, 9 removed); the rule code in them is a handful of lines each,
+and what grows alongside it is the C1–C7 docblock — some 80 lines before any code
+runs.
+
+Treat the next rule as landing *with* an extraction. The one this file is shaped for
+is mechanical, and no rule moves:
+
+- **Out** — the markdown primitives that know nothing about product state:
+  `FENCE_RE`, `section()`, `unfenced()` and `stripCodeSpans()`, with the fence and
+  code-span comments that document them (~85 lines, `FENCE_RE` included — nothing
+  else in the file matches a fence), into a sibling
+  `scripts/lib/product-markdown.js`. All four are pure, and nothing outside this file
+  calls them today.
+- **Stays** — the C1–C7 docblock, the parsers, every `check*` rule, `validateProduct`
+  and `module.exports`, so `scripts/check-product.js` and
+  `tests/scripts/check-product.test.js` import exactly what they import now (~615
+  lines: still past the 400-line soft limit, as most of `scripts/lib/` is, but with
+  room for the rule that forced the split).
+- **The suite is the proof.** `check-product.test.js` requires only `validateProduct`,
+  so a green `npm run test:scripts` across the move shows the split changed no
+  behaviour, and the C-rule docblock's pointer at `section` is the only prose the
+  move touches.
+
+Not taken in round 9 on purpose: at 699 the standard is met, and a file split inside a
+review-fix round is churn a reviewer then has to re-read against no behaviour change.
+
+## 5. `stripCodeSpans()` empties code-styled link text
+
+C4 reads a `Spec` cell with its code spans removed, and a span is dropped whole —
+contents included. `` [`alpha`](specs/alpha.md) `` reaches `SPEC_LINK_RE` as
+`[](specs/alpha.md)`.
+
+Harmless as the rules stand, and pinned from both sides in
+`tests/scripts/check-product.test.js` ("does not count a link wrapped in a code span
+as a link", "still reads a link whose text is code-styled"): the pattern anchors on
+`](specs/<slug>.md)` and never looks at the link text, so the emptied label costs
+nothing.
+
+It turns into a bug the moment the pattern is tightened. A rule that required
+non-empty link text — to reject `[](specs/alpha.md)`, a link a reader cannot see —
+would start rejecting the code-styled label, which is a legitimate authoring form.
+Whoever tightens `SPEC_LINK_RE` owns one of two fixes:
+
+- keep the span's contents rather than dropping them — replacing with `$2` from
+  `` /(`+)([^\n]*?)\1/g `` — which then needs its own answer for a *fully* spanned
+  link, the case the current form gets right for free; or
+- ban the code-styled label in `product/AGENTS.md` and say so in the C4 docblock,
+  which makes the emptying intended rather than incidental.
+
+No code was written for this in round 9: the behaviour is correct under today's
+rules, and changing what `stripCodeSpans()` means with no rule asking for it trades a
+latent coupling for a live one.
