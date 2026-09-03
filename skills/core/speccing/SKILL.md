@@ -112,10 +112,13 @@ and the entries that refine rather than reverse: `references/conventions.md`.
 ## 6. Ship
 
 On the merge that releases a version: flip its roadmap row to shipped, fill the
-tag cell, set each affected spec's status header to that version, and move the
-`← we are here` marker onto the next row — or leave it on the row that just
-shipped, when nothing has been promoted after it yet. Exactly one row carries
-the marker, before and after; shipping never invents the row it would move to.
+tag cell, reset each affected spec's status header from the **highest row that
+links it**, following that row's own status — `shipped v<its version>` once it
+has shipped, the compound form in `references/conventions.md` while it has not —
+and move the `← we are here` marker onto the next row, or leave it on the row
+that just shipped when nothing has been promoted after it yet. Exactly one row
+carries the marker, before and after; shipping never invents the row it would
+move to.
 
 ## Handing off
 

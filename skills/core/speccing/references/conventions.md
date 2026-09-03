@@ -101,6 +101,17 @@ parenthetical is the extending row's own status, which is why the header and its
 roadmap row always agree; when they disagree, one of the two flips was forgotten
 at ship time.
 
+The header is read off the **highest** row linking the spec, never off whichever
+version is being worked on, and it follows that row's own status: `shipped
+v<its version>` once the highest linking row has shipped, the compound form
+while it has not. So shipping collapses a header only when the version that
+shipped is the highest row linking that spec; ship one while a later row still
+links it and the header stays compound — its shipped half naming the highest row
+that has already shipped, its extended-by half naming the highest linking row and
+that row's own status: `shipped vX.Y.Z · extended by X.Y+1.Z (next)`. Shipping a
+backport under a later version that already shipped does not move the shipped
+half. Collapsing the header anyway retires a row that has not shipped.
+
 Name the code the spec tracks in its own header block when the mapping is not
 obvious from the slug. A spec nobody can connect to a directory gets updated by
 nobody.
