@@ -327,15 +327,23 @@ by D-008` 與 `this does not change D-006, but supersedes D-005` 兩種合法寫
 後的附錄、附加條目內的「previously D-005 recorded」段落、或一個標題為 `Upload
 storage backend (historical)` 的誘餌條目——在附帶合法 D-008 supersession、spec 已改
 為 Vaultbox 的情況下仍得 A1–A4 全 PASS：本 scenario 存在的理由（就地覆寫）被判滿分。
-Version 6 把摘要綁到 D-005 自己的條目上，並以**標題**而非 id 定位該條目——這正是原
-本全檔掃描要保住的性質：丟掉別的條目並重編號時，D-005 的原文會落在新 id 底下，該案
-仍 A1 PASS／A2 FAIL，重編號由 A2 判。取檔案順序第一個相符的條目，誘餌條目頂替不了。
-以 **18 個**合成 roadmap 離線對照舊／新 grader：原有 14 列全部不動，三個抄存案例由
-4/4 翻為 A1 FAIL，新增的「重編號但原文完好」案例新舊皆 A1 PASS／A2 FAIL。守衛的讓步
-（比照 Version 4、5）：摘要綁到條目而非條目內的位置，把原文與改寫後的行並存於 D-005
-的寫法不被區分。**未花任何 trial 額度**：六份留存 transcript 全部只改 D-005 的
-`Status:` 行，`Decision:`／`Why:` 兩行在 D-005 條目內逐位元不變，無一筆分數改變，
-unmet-but-covered 結論沿用。
+Version 6 把摘要綁到 D-005 自己的條目上，並以**標題**、且**只在原始 id 範圍內**定位
+該條目——以標題而非 id 定位正是原本全檔掃描要保住的性質：丟掉別的條目並重編號時，
+D-005 的原文會落在新 id 底下，該案仍 A1 PASS／A2 FAIL，重編號由 A2 判。限制在
+fixture 寫過的七個 id 內，則是同一版初稿（取檔案順序第一個標題相符者）漏掉的另一半：
+六份留存 transcript 的新條目標題全是 `Upload storage backend moves to Vaultbox`／
+`... is Vaultbox`，都含 D-005 的原標題，因此檔案順序第一個相符者在真實 trial 裡不等於
+D-005——誘餌條目放在 D-005 之上就能頂替（覆寫仍得 4/4），而把新條目插在日誌最前面的
+**正確** trial 反而 A1 FAIL。忽略 fixture 沒寫過的 id 同時修掉兩邊，且不損重編號容忍度
+（丟條目只會把 D-005 的原文往 001–007 內較小的 id 推）。以 **20 個**合成 roadmap 離線
+對照：原有 14 列全部不動，三個抄存案例由 4/4 翻為 A1 FAIL，「重編號但原文完好」案例新
+舊皆 A1 PASS／A2 FAIL，最後兩列（誘餌置頂、正確但新條目置頂）是這次修正唯一移動的兩
+列。守衛的讓步（比照 Version 4、5）：摘要綁到條目而非條目內的位置，把原文與改寫後的行
+並存於 D-005 的寫法不被區分；錨點排除的是非原始 id，不是不相符的標題——沿用 `D-005`
+本身 id 的誘餌、或把另一個原始條目改標題成含該詞的誘餌，都仍能過 A1，由 A2（重複 id／
+id 不再領原條目）擋下，兩者都拿不到滿分。**未花任何 trial 額度**：六份留存 transcript
+全部只改 D-005 的 `Status:` 行、並把新條目接在最後一條 D-007 之後，`Decision:`／`Why:`
+兩行在 D-005 條目內逐位元不變，無一筆分數改變，unmet-but-covered 結論沿用。
 
 **結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
 它原本會做錯的事。scenario 保留為語料庫覆蓋，不跑 A/B——對一個已無鑑別力的儀器跑
