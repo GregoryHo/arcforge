@@ -27,7 +27,8 @@
  *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
- *   - C5  every D-id a spec cites in `## Decisions` exists in the log;
+ *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
+ *         and exists in the log;
  *   - C6  sanity floor — at least one roadmap row, one decision, one spec;
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
@@ -53,6 +54,7 @@ const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
+const CITATION_RE = /\bD-(\d+)\b/g;
 
 /** Semver-ish ordering for roadmap Version cells (`X.Y.Z`). */
 function compareVersions(a, b) {
@@ -304,15 +306,21 @@ function decisionsSection(content) {
   return (end === -1 ? rest : rest.slice(0, end)).join('\n');
 }
 
-/** C5 — a spec may only cite D-ids the log actually carries. */
+/** C5 — a spec may only cite well-formed `D-NNN` ids the log actually carries. */
 function checkSpecCitations(entries, specs, errors) {
   const known = new Set(entries.map((e) => e.id));
   for (const spec of specs) {
     const section = decisionsSection(spec.content);
     if (section === null) continue;
-    for (const m of section.matchAll(/\bD-(\d{3})\b/g)) {
-      if (!known.has(`D-${m[1]}`)) {
-        errors.push(`C5 specs/${spec.name}.md: cites D-${m[1]}, which is not in the Decision Log`);
+    for (const m of section.matchAll(CITATION_RE)) {
+      if (m[1].length !== 3) {
+        errors.push(
+          `C5 specs/${spec.name}.md: cites "${m[0]}", which is not a zero-padded D-NNN id`,
+        );
+        continue;
+      }
+      if (!known.has(m[0])) {
+        errors.push(`C5 specs/${spec.name}.md: cites ${m[0]}, which is not in the Decision Log`);
       }
     }
   }

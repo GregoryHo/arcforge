@@ -349,6 +349,17 @@ describe('check-product', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/cites D-009/);
     });
+
+    it.each([
+      'D-1',
+      'D-01',
+      'D-0001',
+      'D-9999',
+    ])('rejects the malformed citation %s instead of skipping it', (id) => {
+      const errors = of('C5', run({ specs: [spec({ cites: [id] })] }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/not a zero-padded D-NNN id/);
+    });
   });
 
   describe('C6 — sanity floor', () => {

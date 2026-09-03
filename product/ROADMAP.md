@@ -105,8 +105,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   `Extends:` well-formed and naming a decision that exists, with every `Supersedes:`
   carrying its flip in the matching form (C3); every spec header agreeing with its
   governing roadmap row, links resolving both ways (C4); every D-id a spec cites
-  existing (C5); a sanity floor of one row, one decision, one spec (C6); and a `Tag`
-  cell matching its row's Status — `vX.Y.Z` when shipped, `—` otherwise (C7).
+  well-formed as `D-NNN` and existing (C5); a sanity floor of one row, one decision,
+  one spec (C6); and a `Tag` cell matching its row's Status — `vX.Y.Z` when shipped,
+  `—` otherwise (C7).
 - Residual: C1 counts `← we are here` markers; it does not know which row deserves
   one, so a marker that should have moved and didn't passes green. Placement stays a
   reading task, and the prose in `product/AGENTS.md` and the `releasing` skill says

@@ -175,8 +175,9 @@ never renumbered):
 - Why: <the rationale — enough that a future reader understands the tradeoff>
 ```
 Add any of the optional fields from *Conventions* that carry real information, then
-cite the `D-NNN` from the relevant spec's **Decisions** section. A spec may only
-cite a `D-id` the log actually carries (C5).
+cite the `D-NNN` from the relevant spec's **Decisions** section. The citation carries
+the same zero-padded `D-NNN` shape as the entry, and a spec may only cite a `D-id`
+the log actually carries (C5).
 
 ### Change a decision — the supersede move
 Requirements change; that is normal. **Never delete or rewrite the old entry.**
