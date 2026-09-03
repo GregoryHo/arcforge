@@ -80,3 +80,33 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   while the dashboard's detail wire redacts the same path. Reject at ingestion or
   normalize at the Layer-5 write is the product call D-012 leaves open; either
   moves `candidate_record_hash` · issue: [#175](https://github.com/GregoryHo/arcforge/issues/175).
+- **cli-draft-path-redaction** — `learn drafts` and `learn inspect` print
+  `draft_paths` verbatim while the dashboard's detail wire redacts the same
+  path; draft files are named for the candidate, so a keyword-shaped name reaches
+  the terminal through the path. B-9 says commands print the absolute path of
+  anything they write, so this is a product call between the two promises, not
+  a review fix.
+## Product method
+- **product-cli** — an `arcforge product check` command that verifies a
+  project's own product state: dense monotonic decision ids, every
+  `Supersedes:` paired with its status flip, spec headers agreeing with their
+  roadmap rows, exactly one `← we are here` · needs: D-016.
+- **speccing-spec-in-sync-eval** — a third `speccing` scenario for the
+  mid-build case: a behavior item diverges while the code is being written, and
+  the measured question is whether the spec moves in the same change or is left
+  for later. Held back from 6.1.0 on ceiling risk — the two shipped scenarios
+  spent the redesign budget — so it needs its own trap designed from a fresh
+  baseline observation. The 6.1.0 pools say where to aim it: the baseline knows
+  ADR discipline cold, and only bends when a user tells it to defer the ledger.
+- **speccing-router-adjacency-eval** — the scenario that would actually measure
+  D-014's accepted cost: one turn genuinely ambiguous between settling a design
+  and recording a settled one, put in front of the router, scored on which of
+  `brainstorming` / `speccing` it picks. 6.1.0 ships the adjacency unmeasured —
+  `eval-router-skill-selection` asks a `tdd` vs `finishing` question and says
+  nothing about this pair · needs: D-014.
+- **eval-void-trial-detection** — the trial runner scores a provider refusal
+  (`You've hit your session limit`, 0 tokens, a 72-byte transcript) as a real
+  trial. The fixture's own files satisfy some assertions with no agent action,
+  so an exhausted quota reads as a behavioral regression rather than an error
+  trial excluded from the denominator, which the coverage rules already require.
+  Cost one false REGRESSED verdict during 6.1.0.
