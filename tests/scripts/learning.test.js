@@ -1216,6 +1216,36 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
     });
 
+    // `needs_more_evidence` is the one status where `dismiss` is legal and
+    // `approve` is not, so it is the only place this refusal ends up naming no
+    // command at all. Deliberate, and not because rejecting is wrong there:
+    // the narrowing is about a renderer that does not exist yet, not about the
+    // candidate's merit, so it leaves the reject call to the status prose —
+    // which still makes it, for this very card. Layer 5 writes this status; no
+    // CLI verb reaches it, so it is seeded.
+    it('names no command from the one status that allows only dismiss', () => {
+      seed(
+        makeRecord({
+          artifact_type: 'skill',
+          lifecycle: {
+            status: 'needs_more_evidence',
+            status_changed_at: '2026-09-01T02:00:00.000Z',
+          },
+        }),
+      );
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/nothing was applied/);
+      expect(error).not.toMatch(/arcforge learn approve/);
+      expect(error).not.toMatch(/arcforge learn reject/);
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /reject it, or leave it for the curator/,
+      );
+    });
+
     // A name Layer 7 can never write to disk is as non-transient as an artifact
     // type it cannot render, and it strands the candidate the same way: approve
     // is legal, materialize then refuses `path_policy_rejected` forever, and the
