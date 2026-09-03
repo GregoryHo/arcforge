@@ -87,7 +87,10 @@ was recorded about them.
   narrowing itself and refuses before its first move — nothing applied,
   nothing recorded, the candidate untouched. Hand-editing state files is the
   one path with no checks and no record; the product treats it as out of
-  contract. The on-disk formats are append-only or atomically overwritten,
+  contract. A draft is the exception that is still owed a report, because
+  reviewing one is what the product asks of the user: no surface names a draft
+  as ready to review or hands its path back as a success when the file it names
+  is missing or has changed since it was written. The on-disk formats are append-only or atomically overwritten,
   owned by the engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
