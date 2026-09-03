@@ -63,6 +63,12 @@ agrees with the code no matter what the code does.
 
 ## 4. Build with the spec in sync
 
+Starting the build is one edit with two halves: the roadmap row flips `next` →
+`building`, and the spec header flips to `building vX.Y.Z` — or to the compound
+form in `references/conventions.md` when an earlier version already shipped this
+spec. The tag cell stays `—` until the version ships. A row still reading
+`next` while implementation merges is a ledger claiming work has not started.
+
 Work the spec's numbered behaviors (`B-1`, `B-2`, …) one at a time;
 implementation code goes through `/tdd`. Reality will diverge from some behavior
 item, and the divergence is resolved in the same PR:
