@@ -56,7 +56,10 @@
  *         `STATUS_FIELD_RE` is anchored at column 1, so a line only counts where
  *         the entry form puts it. `Refines:` and `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
- *         the row ↔ spec links resolve in both directions;
+ *         the row ↔ spec links resolve in both directions — the header is read
+ *         in the preamble above the spec's first `##`, fence-aware, so a worked
+ *         example or a quoted header line further down is neither mistaken for
+ *         the header nor allowed to displace it;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
  *         and exists in the log — that section is sliced the same fence-aware
  *         way, so an example `##` heading cannot carry citations out of reach,
@@ -122,6 +125,9 @@ const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
 // The one `##` section of a spec this linter reads, sliced the same way.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
+// The spec header line, matched per line rather than against the whole file, so
+// the scope in `specStatusHeader` is what decides which line is the header.
+const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
 // leading `\d` keeps ordinary prose (`D-Bus`) out of the scan.
@@ -511,15 +517,32 @@ function checkRoadmapTags(rows, errors) {
   }
 }
 
-/** The `Status:` text of a spec header, with the trailing ROADMAP link dropped. */
+/**
+ * The `Status:` text of a spec header, with the trailing ROADMAP link dropped.
+ *
+ * The header is the blockquote of the *preamble* — the lines above the spec's
+ * first `##`, where the template puts it — so a `> Status:` further down is
+ * prose that neither stands in for a missing header nor displaces the real one
+ * above it. Read whole-document, C4 both passed a spec with no header that
+ * quoted one later, and failed a spec whose header was right while an example
+ * above it was not, quoting text the header does not contain. Fenced lines are
+ * dropped here as everywhere else, so a fenced copy of the template is an
+ * illustration and a fenced `##` does not end the preamble. An unclosed fence
+ * above the header swallows it and C4 reports it missing — fail-closed, the way
+ * `section()` is.
+ */
 function specStatusHeader(content) {
-  const m = content.match(/^>\s*Status:\s*(.+?)\s*$/m);
-  if (!m) return null;
-  return m[1]
-    .split('·')
-    .map((s) => s.trim())
-    .filter((s) => s && !s.startsWith('['))
-    .join(' · ');
+  for (const line of unfenced(content.split('\n'))) {
+    if (/^##\s+/.test(line)) break;
+    const m = line.match(SPEC_STATUS_HEADER_RE);
+    if (!m) continue;
+    return m[1]
+      .split('·')
+      .map((s) => s.trim())
+      .filter((s) => s && !s.startsWith('['))
+      .join(' · ');
+  }
+  return null;
 }
 
 /**

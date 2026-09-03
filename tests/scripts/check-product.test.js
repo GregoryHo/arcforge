@@ -86,12 +86,15 @@ function roadmap({
 /**
  * `intro` sits above `## Purpose`, outside the `## Decisions` section; `extra`
  * is appended inside it, below the citations — so a fixture can put
- * decisions-shaped prose on either side of the section boundary.
+ * decisions-shaped prose on either side of the section boundary. `preamble`
+ * sits above the header line, so a fixture can put header-shaped prose there
+ * too.
  */
 function spec({
   name = 'alpha',
   status = 'shipped v1.0.0',
   cites = [],
+  preamble = [],
   intro = [],
   extra = [],
 } = {}) {
@@ -102,6 +105,7 @@ function spec({
     content: [
       `# ${name} — spec`,
       '',
+      ...preamble,
       header,
       ...intro,
       '## Purpose',
@@ -856,6 +860,31 @@ describe('check-product', () => {
       const errors = of('C4', run({ specs: [spec({ status: null })] }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/missing the "> Status:" header line/);
+    });
+
+    it('does not let a fenced copy of the template stand in for a missing header', () => {
+      const specs = [
+        spec({ status: null, extra: ['```markdown', '> Status: shipped v1.0.0', '```'] }),
+      ];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/missing the "> Status:" header line/);
+    });
+
+    it('does not read a quoted Status line below the first `##` as the header', () => {
+      // Not only fences: the header is the preamble's blockquote, so ordinary
+      // quoted prose further down is prose.
+      const specs = [spec({ status: null, extra: ['> Status: shipped v1.0.0'] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/missing the "> Status:" header line/);
+    });
+
+    it('reads the real header below a fenced illustration of a different one', () => {
+      // The false-positive direction: read whole-document, the fenced example
+      // wins and C4 rejects a correct header, quoting text it does not contain.
+      const specs = [spec({ preamble: ['```markdown', '> Status: draft', '```', ''] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
     });
   });
 

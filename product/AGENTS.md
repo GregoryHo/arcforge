@@ -197,6 +197,12 @@ and it does not stand in for a table that is not there (C1, C4, C6, C7) — and 
 `D-NNN` inside one in a spec's `## Decisions` is an example citation, not one C5
 resolves.
 
+A spec's `Status:` header has a scope of its own: it is read in the preamble above
+the spec's first `##` heading, and it honours the fence exemption there, so a fenced
+copy of the template is an illustration. Keep the header where the template puts it,
+directly under the H1 — a `> Status:` line below the first `##` is prose, and C4
+reports the header as missing.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 
