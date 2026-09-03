@@ -287,3 +287,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   transcript parse instead of the single assignment was rejected: it would have
   silently emptied the diary's "Files modified" line for every learning-off
   user.
+- Residual: the opt-in governs how long verbatim prose may stay, not only
+  whether it is written — the session record is reloaded and rewritten on every
+  Stop and on every compaction, so the field is deleted whenever the gate reads
+  off. Tool names are not: they are always-on continuity under this decision, so
+  a record an earlier parse filled keeps that turn's `toolsUsed` until a later
+  parse refreshes it, and the two fields have different lifetimes by design
+  (hooks B-6, and the domain-model note in product/specs/hooks.md). The prose
+  written before an opt-out survives until the first Stop or compaction after
+  it, which is the same event that removes it.
