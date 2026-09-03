@@ -10,7 +10,8 @@ each target actually loads.
 - Required field: `name` (kebab-case, becomes namespace prefix)
 - Optional metadata: `version`, `description`, `author`, `homepage`, `repository`, `license`, `keywords`
 - Component path fields available: `commands`, `agents`, `skills`, `mcpServers`, `outputStyles`, `lspServers`
-- Do NOT add a `hooks` field — `hooks/hooks.json` is auto-loaded by convention
+- `hooks`: declare it as `"./hooks/claude-code.json"`. It is not optional and
+  not conventional — see *Hook Registration* below
 
 ## Skill Discovery and the `skills` Whitelist
 
@@ -81,14 +82,19 @@ Differences that are deliberate, not oversights:
   array buys nothing.
 - **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
   `/arcforge:<name>`. All 15 load from one directory entry.
-- **The Codex manifest declares no `hooks` key, and must not gain one.**
-  `npm run check:hooks` asserts its absence. Two independent reasons: Codex's
-  documented schema *rejects* a `hooks` field outright, and its component
-  discovery treats manifest paths as **supplements to** default discovery rather
-  than replacements — so an empty hooks file cannot suppress `hooks/hooks.json`
-  either. Codex finds that file regardless; what stops it running is Codex's own
-  hook-trust gate (`codex exec --dangerously-bypass-hook-trust` exists precisely
-  because untrusted hooks do not run). arcforge never asks for that grant.
+- **Hooks are kept out of Codex's reach by the registry's filename, not by a
+  manifest key.** Codex auto-discovers plugin hooks at `hooks/hooks.json`
+  *whether or not a manifest names them* — spike-verified: a fixture whose
+  manifest was silent still fired every event it declared there. So arcforge's
+  registry lives at `hooks/claude-code.json`, which Codex never looks for. Same
+  spike, same paid turn: the renamed fixture produced zero hook firings while
+  the positive control produced sixteen. The Codex manifest therefore declares
+  no `hooks` key (its plugin validator rejects the field anyway), and
+  `npm run check:hooks` gates all three halves — the Claude Code declaration,
+  the Codex silence, and the absence of `hooks.json` / `hooks/hooks.json`.
+  Do not "simplify" this by moving the registry back to the conventional name:
+  that re-opens the leak, and no hook-trust prompt stands in the way of a user
+  who grants trust once for some other plugin.
 - **`.claude-plugin/marketplace.json` stays.** Codex tolerates it and prefers
   `.agents/plugins/marketplace.json` when both exist — spike-verified with two
   distinguishable marketplace names, no warning either way.
@@ -105,7 +111,15 @@ Product-level rationale — why Codex gets skills and nothing else — is
 
 ## Hook Registration
 
-- `hooks/hooks.json` at plugin root — auto-loaded by Claude Code v2.1+
+- `hooks/claude-code.json`, declared by `.claude-plugin/plugin.json` as
+  `"hooks": "./hooks/claude-code.json"`. Claude Code honours a manifest `hooks`
+  path — verified on 2.1.258 against a negative control (key removed ⇒ no hooks
+  ran), so the filename is genuinely free. The conventional `hooks/hooks.json`
+  is left empty on purpose; see *The Codex manifest pair* above
+- **Residual:** that manifest key is now the ONLY thing loading the registry. If
+  a future Claude Code stops honouring it, every hook goes silent and no static
+  check can tell — `check:hooks` proves the wiring is self-consistent, not that
+  the host reads it. A live session is the only proof
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references in hooks
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)
 - Supported events: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SubagentStop, SubagentStart, SessionEnd, PermissionRequest, Notification, TeammateIdle, TaskCompleted

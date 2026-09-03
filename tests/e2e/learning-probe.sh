@@ -92,7 +92,7 @@ step "2. Observe — drive the hook to produce a repeated workflow shape"
 #
 #   1. The phase argument. `hooks/observe/main.js` takes the phase from
 #      `process.argv[2]` ('pre' | 'post'), NOT from `hook_event_name` — see
-#      hooks/hooks.json, which registers `main.js pre` and `main.js post` as two
+#      hooks/claude-code.json, which registers `main.js pre` and `main.js post` as two
 #      separate entries. Invoked with no argv the hook records NEITHER the
 #      pre-phase evidence patch NOR the post-phase outcome, so every record is
 #      content-free. Always pass the phase.
