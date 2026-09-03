@@ -280,9 +280,12 @@ transcript 一律以 `### D-005` 起頭），因此沒有需要分離的池。�
 落後程式一個版本」——一個 `0.0.1` 的過期列在舊判準下可拿滿分（以出貨中的 grader
 實測，A1–A6 全 PASS、exit 0）。與 A3 不同，這裡的差集不是單一元素而是無界的
 （所有低於 `0.3.0` 且非既有三列的版本），因此 `## Version` 維持 2 的理由落在池
-本身：baseline 臂三份留存 transcript 都沒寫任何版本列（A2 全滅，收緊不可能拉高），
-treatment 臂留存 transcript 一律寫 `| 0.4.0 |`，兩判準評分相同。未重評任何 trial，
-未動用 trial 額度。
+本身：baseline 臂留存 transcript 沒有任何寫入版本列的指令（trial-3 只在結語建議
+`0.4.0` 列），A2 本就全滅，收緊不可能拉高；treatment 臂留存 transcript 一律寫
+`| 0.4.0 |`，兩判準評分相同。此結論也不必單靠對 baseline 臂的判讀：收緊判準只會
+拉低分數，而 treatment 臂已直接觀察到兩判準皆過，因此新判準下的差值只會等於或高於
+已發表的 +0.67，IMPROVED 的判定在收緊後仍然成立。未重評任何 trial，未動用 trial
+額度。
 
 ### `supersede-not-overwrite`：baseline 天花板，儀器修正後確認
 
