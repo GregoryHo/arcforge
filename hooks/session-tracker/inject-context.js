@@ -151,11 +151,23 @@ function loadInstinctFiles(dir) {
 
 /**
  * Whether a draft was written before enrichment was ever authorized.
+ *
+ * The floor is the EARLIER of creation and last-write time, so hand-editing or
+ * touching a pre-opt-in stub does not lift it above the floor — mtime alone
+ * would, and every later session would then report a by-design stub as an
+ * enricher failure. A copy that resets both stamps (a backup restore, a machine
+ * migration) still does, because the learning config's `updated_at` is embedded
+ * and survives the same copy while file stamps do not.
+ *
  * Fails open — an unreadable timestamp lets the stub probe decide.
  */
 function draftPredatesOptIn(filePath, enabledSince) {
   try {
-    return fs.statSync(filePath).mtimeMs < enabledSince;
+    const { mtimeMs, birthtimeMs } = fs.statSync(filePath);
+    // birthtime is 0 on filesystems that don't record it; fall back to mtime
+    // there rather than collapsing the floor to 0 and going quiet forever.
+    const writtenAt = birthtimeMs > 0 ? Math.min(mtimeMs, birthtimeMs) : mtimeMs;
+    return writtenAt < enabledSince;
   } catch {
     return false;
   }

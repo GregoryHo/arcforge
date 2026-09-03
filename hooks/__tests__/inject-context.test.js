@@ -276,4 +276,28 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
       `only the post-opt-in draft should be counted. stdout: ${second.stdout}`,
     );
   });
+
+  it('keeps a pre-opt-in draft suppressed after it is hand-edited or touched', () => {
+    const draft = writeStaleDraft('diary-session-old-draft.md', 5 * DAY_MS);
+    enableLearning(3 * DAY_MS);
+
+    const before = runInject();
+    assert.strictEqual(before.status, 0, before.stderr);
+    assert.ok(
+      !before.stdout.includes('unenriched'),
+      `the pre-opt-in stub must start out silent. stdout: ${before.stdout}`,
+    );
+
+    // Touching the stub moves mtime past the opt-in; creation time does not
+    // move, so the floor still recognizes it as a pre-opt-in stub.
+    const now = new Date();
+    fs.utimesSync(draft, now, now);
+
+    const after = runInject();
+    assert.strictEqual(after.status, 0, after.stderr);
+    assert.ok(
+      !after.stdout.includes('unenriched'),
+      `touching a pre-opt-in stub must not turn it into a reported failure. stdout: ${after.stdout}`,
+    );
+  });
 });

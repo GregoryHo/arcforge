@@ -77,10 +77,13 @@ down, never block the user, and never observe them uninvited.
 
   So with learning off the draft is written but never filled in: its unfilled
   sections are the contract, not a failed enrichment, and the hooks do not
-  report them as one — at any point, including afterwards. The stale-draft
-  healthcheck counts only drafts written since the opt-in took effect, so
-  turning learning on reports what the enricher has since failed to fill in,
-  never the backlog of stubs from before it was ever asked to. There is no
+  report them as one. The stale-draft healthcheck counts only drafts written
+  since the opt-in took effect, so turning learning on reports what the enricher
+  has since failed to fill in, rather than the backlog of stubs from before it
+  was ever asked to. The floor is the earlier of the draft's creation and
+  last-write times, so hand-editing or touching a pre-opt-in stub does not lift
+  it above the floor; a copy that resets both stamps (a backup restore or
+  machine migration) does, and reports it. There is no
   per-hook switch: the single opt-in covers the learning loop in either scope,
   disabling learning stops it, and uninstalling the plugin removes everything.
 
