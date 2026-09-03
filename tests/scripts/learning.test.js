@@ -688,6 +688,18 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(runCli([...argv, '--json']).status).toBe(0);
     });
 
+    // The narrowing only has something to say where the status prose names a
+    // build step. A terminal status names none, so it keeps its own prose.
+    it('leaves a status that names no build step on its own prose', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['reject', CANDIDATE_ID, '--project']);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+
+      expect(card.lifecycle_status).toBe('dismissed');
+      expect(card.next_actions).toEqual(['dismissed — no action available']);
+    });
+
     it('inspects one candidate with a redacted body preview and no project id', () => {
       seed(makeRecord());
 
