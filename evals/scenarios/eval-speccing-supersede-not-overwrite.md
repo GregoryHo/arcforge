@@ -71,12 +71,17 @@ run hit a session limit part way through: the whole treatment arm is void and it
 removed, and why, is recorded once — in `evals/skill-eval-coverage.md`, which
 owns the pool's provenance — and is not re-told here.
 
-Everything below is scoped to the **retained pool**: the 8 valid baseline trials
-in that directory's `baseline.jsonl`, **avg 0.906, pass 62.5%**. The arm-level
-avg 0.85 / pass 50% the run log printed counted the removed trials in its
-denominator, which the coverage rules forbid, so it is not a figure this note
-uses. On the retained pool, **the failures were the instrument, not the
-behavior**:
+The Version-2 findings in this section are scoped to the **retained pool**: the 8
+valid baseline trials in that directory's `baseline.jsonl`, **avg 0.906, pass
+62.5%**. The arm-level avg 0.85 / pass 50% the run log printed counted the
+removed trials in its denominator, which the coverage rules forbid, so it is not
+a figure this note uses. They are what was **recorded while the pool existed** —
+that run directory is now gone, so nothing about those 8 trials can be
+re-inspected, and the later instrument corrections below are checked against a
+different, surviving set of transcripts, named where they are used. Keeping the
+two populations apart is the point: a claim of the form "the transcripts show X"
+must say *which* transcripts, and only the surviving ones can be re-read today.
+On the retained pool, **the failures were the instrument, not the behavior**:
 
 - Trials 1 and 4 failed A3 while doing the move correctly. They wrote
   `supersedes D-005` inside the new entry's `Decision:` or `Status:` line;
@@ -154,15 +159,21 @@ D-005's text under an id the fixture never wrote.
 | correct move, appended entry placed first, titled `Upload storage backend moves to Vaultbox` | V6 pre/post | **A1 FAIL** | 4/4 |
 | three entries inserted ahead of D-005, survivors renumbered, D-005's text intact | V6 pre/post | A2, A3 FAIL | **A1**, A2, A3 FAIL |
 
-No trials were spent, and the recorded pools are not re-scored: `evals/results/`
-is gitignored and only the transcripts survive. What those transcripts do
-support is the narrower claim, checked here: every forward line on a new entry
-in the six retained transcripts is active voice (`Supersedes: D-005`,
-`supersedes D-005 (Blobstash)`) and every back-pointer on D-005 is passive
-(`Status: Superseded by D-008`, `### D-005 — Upload storage backend (superseded
-by D-008)`), so none of them used the pass path this version removes. The
-unmet-but-covered verdict is carried from Version 2's retained pool and Version
-3's preflight, not re-measured. The forward regex on its own is still not
+No trials were spent, and the recorded pool cannot be re-scored: its k=10 run
+directory is gone, so none of those 8 transcripts can be re-read. The six
+transcripts that do survive are **not that pool** — they are two k=3
+single-condition preflight runs, three under the Version-1 prompt and three
+under the renumbering prompt; `evals/skill-eval-coverage.md` owns that
+provenance and states it once. What the six do support is the narrower claim,
+checked here: every forward line on a new entry is active voice
+(`Supersedes: D-005`, `supersedes D-005 (Blobstash)`), none carries the reversed
+`superseded by D-005`, and every back-pointer on D-005 is a passive `Status:
+Superseded by D-008` line — so none of them used the pass path this version
+removes. (The heading spelling `### D-005 — Upload storage backend (superseded
+by D-008)` is trial 7's, recorded while the pool existed; no surviving
+transcript annotates a heading.) The unmet-but-covered verdict is carried from
+Version 2's retained pool and Version 3's preflight, not re-measured — both
+scored under earlier graders, and nothing has been scored under Version 6. The forward regex on its own is still not
 direction-proof — `Superseded: D-005` on an appended entry matches it — but the
 pair is, because a reversed record needs D-005 to claim it supersedes the new
 entry, which A3 now rejects.
@@ -179,8 +190,8 @@ line and on D-005's back-pointer alike. Both call sites are load-bearing — a
 back-pointer negated on its own is caught only by `points_back`, an appended
 entry negated on its own only by the forward comprehension. The four correct
 spellings and the four pre-existing negatives are unchanged. No trials were
-spent: the tightening can only remove passes, and no retained transcript used
-the removed path. Mirroring Version 4's own concession, the guard is scoped to a
+spent: the tightening can only remove passes, and none of the six surviving
+preflight transcripts used the removed path. Mirroring Version 4's own concession, the guard is scoped to a
 negator adjacent to the verb on the same line and is not a general polarity
 parser — `Status: No longer current — superseded by D-008` and `this does not
 change D-006, but supersedes D-005` both carry a negator ahead of the verb and
@@ -201,9 +212,9 @@ and renumbers the survivors leaves D-005's text under a new id, and that case
 still passes A1 and fails A2, where renumbering is judged. Restricting the
 search to the seven ids the fixture wrote is what makes the title anchor safe,
 and taking the first title match in file order — this version's first draft —
-was wrong in both directions. All six retained transcripts title their appended
-entry `Upload storage backend moves to Vaultbox` or `... is Vaultbox`, both of
-which contain D-005's recorded title, so the match is not unique in a real
+was wrong in both directions. All six surviving preflight transcripts title their
+appended entry `Upload storage backend moves to Vaultbox` (four) or `... is
+Vaultbox` (two), both of which contain D-005's recorded title, so the match is not unique in a real
 trial: a decoy under a fresh id placed *above* D-005 stood in for the entry it
 imitated and scored an overwrite 4/4, and a correct trial that appended its new
 entry at the top of the log had that entry matched instead of D-005 and failed
@@ -224,14 +235,26 @@ renumbering tolerance runs one way only: entries *inserted* ahead of D-005 push
 its text past D-007 and outside the recorded ids, so A1 fails that shape rather
 than passing and leaving the renumbering to A2. The table's last row measures
 it, and no full pass is at stake: A2 and A3 reject that shape in both arms, and
-no retained trial inserts ahead of D-005. A tighter anchor is not available:
+none of the six inserts ahead of D-005. A tighter anchor is not available:
 requiring the matched id's recorded title to be D-005's own collapses to
 matching on the id and destroys the renumbering tolerance the title anchor
 exists for.
 
-No trials were spent: all six retained transcripts edit D-005's `Status:` line
-and append their new entry after D-007, the log's last entry, leaving the
-recorded pair byte-identical inside D-005, so no recorded score moves.
+No trials were spent. "No recorded score moves" is not a claim this note can
+make — the recorded pool's transcripts are gone, so its 8 scores cannot be
+re-derived under any later grader. What is checkable is the six: each edits
+D-005 by a literal old→new replacement whose changed span stops at the `Status:`
+line, leaving the `Decision:` and `Why:` lines outside it, and each appends its
+new entry after D-007, the log's last entry — four anchoring on D-007's `Why:`
+line, one appending at end of file, one asserting the file ends with that line
+before appending. So none of the six uses the path this version removes.
+
+**Residual, stated rather than resolved.** Nothing has been scored under the
+Version-6 grader. Versions 4–6 only remove pass paths, so the untested direction
+is a *lower* baseline pass rate — the instrument becoming more discriminative,
+which would reopen the A/B question rather than settle it. A k=3 preflight under
+the Version-6 text is the cheap definitive re-check; it is deliberately not run
+here because it spends real trial quota.
 
 **Assertion roles.**
 
