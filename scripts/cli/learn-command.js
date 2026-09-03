@@ -289,8 +289,8 @@ function describeStaleDrafts(stale) {
 function staleDraftActions(stale) {
   if (stale.length === 0) {
     return [
-      'no materialization record remains for this candidate, so there is no draft to review',
-      'activation refuses without a record, so there is nothing to activate — ' +
+      'no usable materialization record remains for this candidate, so there is no draft to review',
+      'activation refuses without a usable record, so there is nothing to activate — ' +
         'review the queue in: arcforge learn dashboard',
     ];
   }
@@ -411,17 +411,25 @@ function refusalMessage(result, verb, card) {
       `running (it was ${result.expected}); re-run to act on the current state`
     );
   }
-  // `materialization_missing` is rejected by the shared handler itself rather
-  // than by a curator module, so its detail lands at the top level of the
-  // result and never reaches `module_failure` below — the bare reason string is
-  // what a reviewer would otherwise read. It is reachable by typing the command
-  // the guide documents for a materialized candidate, so it gets reviewer prose
-  // like the other handler-level refusals above, not a `result.detail`
-  // fallback, which would change how every other one renders.
-  if (result.reason === 'materialization_missing') {
+  // `materialization_missing` has two origins and only one of them wants this
+  // prose, so the guard is the absence of a module failure rather than the
+  // reason alone. The shared handler rejects with it when nothing resolved at
+  // all, and puts its detail at the top level of the result where the
+  // `module_failure` fallback below never sees it — the bare reason string is
+  // what a reviewer would otherwise read. Layer 8 fails with the same reason
+  // for a manifest that DID resolve but does not describe this candidate's
+  // draft; that one arrives with a real `module_failure.detail` saying which,
+  // and printing "no usable materialization record remains" over it would
+  // assert something false about a record still on disk.
+  //
+  // The handler arm is reachable by typing the command the guide documents for
+  // a materialized candidate, so it gets reviewer prose like the other
+  // handler-level refusals above, not a `result.detail` fallback, which would
+  // change how every other one renders.
+  if (result.reason === 'materialization_missing' && !result.module_failure) {
     return (
-      `${base} — no materialization record remains for ${card.candidate_id}, so there is no ` +
-      'recorded draft to activate. Review the queue in: arcforge learn dashboard'
+      `${base} — no usable materialization record remains for ${card.candidate_id}, so there ` +
+      'is no recorded draft to activate. Review the queue in: arcforge learn dashboard'
     );
   }
   const detail = result.module_failure?.detail;
@@ -594,13 +602,16 @@ function acceptRefusalMessage(card) {
  *
  * `stale` is empty when the manifest itself is absent, unparseable or names no
  * draft: there is no recorded file left to call stale, so the cause clause says
- * the record is gone rather than emitting a colon with nothing after it.
+ * there is no usable record rather than emitting a colon with nothing after it.
+ * "Usable", not "gone", because a manifest whose `draft_artifacts` list is
+ * empty or pathless is still on disk — `draftArtifactsIntact` is false for it
+ * all the same, and it is Layer 8 that then names the specific defect.
  */
 function staleDraftAcceptMessage(card, stale) {
   const cause =
     stale.length > 0
       ? `Its recorded draft is no longer what was written: ${describeStaleDrafts(stale)}.`
-      : 'No materialization record remains for it, so there is no draft to hand back.';
+      : 'No usable materialization record remains for it, so there is no draft to hand back.';
   return (
     `arcforge learn accept refused, and nothing was applied — ${card.candidate_id} is ` +
     `already materialized and is unchanged. ${cause} There is nothing left to hand back: the ` +
