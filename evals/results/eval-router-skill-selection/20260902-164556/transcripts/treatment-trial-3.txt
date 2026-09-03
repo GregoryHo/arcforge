@@ -1,0 +1,49 @@
+[Assistant] Reproducing the bug with a test first, then fixing it. Looking at the code now.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-aylS1V" && ls -la && cat package.json && echo "=== files ===" && find . -type f -not -path './.git/*' -not -path './node_modules/*' | sort && echo "=== log ===" && git log --oneline main..HEAD && git status --short
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-aylS1V" && echo "=== src/slugify.js ===" && cat -n src/slugify.js && echo "=== test/slugify.test.js ===" && cat -n test/slugify.test.js && echo "=== npm test (baseline) ===" && npm test 2>&1 | tail -20 && echo "=== repro ===" && node -e "const s=require('./src/slugify.js'); const f=typeof s==='function'?s:s.slugify; try{console.log('result:', JSON.stringify(f(null)))}catch(e){console.log('THROWS:', e.message)}"
+
+[Assistant] Cause confirmed: `str.trim()` runs on `null`. Adding the failing test first (red), then the fix (green).
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-aylS1V" && cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null', () => {
+  assert.strictEqual(slugify(null), '');
+});
+
+test('returns an empty string for undefined', () => {
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+echo "=== npm test (expect RED: 2 new failures) ===" && npm test 2>&1 | grep -E '^(✔|✖|ℹ (tests|pass|fail))|TypeError' 
+
+[Assistant] Red confirmed for both. Applying the fix and re-running.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-aylS1V" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+echo "=== npm test (expect GREEN: 4 pass) ===" && npm test 2>&1 | grep -E '^(✔|✖|ℹ (tests|pass|fail))' && echo "=== diff ===" && git --no-pager diff --stat && git --no-pager diff
+
+[Assistant] `slugify(null)` now returns `''`. Suite is green: 4 tests pass, up from 2. Changes are uncommitted on `feat-slugify`.
+
+**What was wrong.** `src/slugify.js` called `.trim()` on the input with no guard, so `null` threw `TypeError: Cannot read properties of null`.
+
+**What I did**, following the reported-defect path from the router (`/debugging` to explain the failure, then `/tdd` for the change):
+
+1. Reproduced the throw directly against the module.
+2. Added two tests to `test/slugify.test.js`, for `null` and `undefined`, and confirmed both fail with the TypeError.
+3. Added a one-line guard at the top of `slugify`, `if (str == null) return '';`, and confirmed all 4 tests pass.
+
+**One judgment call.** You named only `null`. The guard also covers `undefined`, since it is the same nullish class and would throw the same way. Strings and everything else behave exactly as before.
+
+Next: run `git diff` to eyeball the 9-line change, then commit it if it looks right.

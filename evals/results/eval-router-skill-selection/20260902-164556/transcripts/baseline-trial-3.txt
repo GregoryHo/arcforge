@@ -1,0 +1,43 @@
+[Assistant] Fixing `slugify(null)` on `feat-slugify`. First, a look at the code and tests.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-uT9dnC" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print && echo "---" && cat package.json && echo "---" && git log --oneline main..feat-slugify && git diff main..feat-slugify --stat
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-uT9dnC" && cat -n src/slugify.js && echo "--- test ---" && cat -n test/slugify.test.js && echo "--- settings ---" && cat .claude/settings.json && echo "--- npm test ---" && npm test 2>&1 | tail -20
+
+[Assistant] Confirmed: `slugify(null)` throws `TypeError` at the `.trim()` call. Adding a nullish guard plus a regression test, then running the suite.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t3-uT9dnC" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null or undefined', () => {
+  assert.strictEqual(slugify(null), '');
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+npm test 2>&1 | tail -12 && echo "--- diff ---" && git diff
+
+[Assistant] Done. `slugify(null)` and `slugify(undefined)` now return `''`. Suite passes, 3 of 3.
+
+**What changed**
+
+- `src/slugify.js:2`: added `if (str == null) return '';` before the `.trim()` chain. Loose equality covers both `null` and `undefined`.
+- `test/slugify.test.js`: added a regression test covering both inputs.
+
+Changes are uncommitted on `feat-slugify`. Non-string, non-nullish inputs such as numbers still throw, which I left alone since it was outside the ask.
+
+Next: commit it.
+
+```
+git add src/slugify.js test/slugify.test.js && git commit -m "fix: slugify returns empty string for null/undefined"
+```

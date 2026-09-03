@@ -1,0 +1,50 @@
+[Assistant] Checking the repo layout and the failing behavior first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t1-2PsevC" && ls -la && echo "---" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print && echo "--- package.json" && cat package.json && echo "--- git log" && git log --oneline -5 && git diff main --stat
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t1-2PsevC" && echo "--- src/slugify.js" && cat src/slugify.js && echo "--- test/slugify.test.js" && cat test/slugify.test.js && echo "--- .claude/settings.json" && cat .claude/settings.json && echo "--- npm test" && npm test 2>&1 | tail -20 && echo "--- repro" && node -e "const s=require('./src/slugify.js'); try { console.log(JSON.stringify(s(null))) } catch(e) { console.log('THROWS:', e.message) }"
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t1-2PsevC" && node -e "const {slugify}=require('./src/slugify.js'); try { console.log(JSON.stringify(slugify(null))) } catch(e) { console.log('THROWS:', e.constructor.name, e.message) }"
+
+[Assistant] Confirmed: TypeError on `.trim()`. Adding the failing test (red step).
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t1-2PsevC" && cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null', () => {
+  assert.strictEqual(slugify(null), '');
+});
+
+test('returns an empty string for undefined', () => {
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+npm test 2>&1 | grep -E "^(✔|✖|ℹ (tests|pass|fail))" 
+
+[Assistant] Red confirmed (2 failing). Applying the fix and re-running.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t1-2PsevC" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+echo "--- npm test" && npm test 2>&1 | grep -E "^(✔|✖|ℹ (tests|pass|fail))" && echo "--- git diff" && git diff && echo "--- git status" && git status --short
+
+[Assistant] Fixed. `slugify(null)` now returns `''`, and all 4 tests pass.
+
+**Route taken:** `/tdd`, not `/finishing`. The router puts discipline rows above wrap-up rows when a defect is reported, and `/debugging` was unnecessary because the cause was visible in the source. The arcforge plugin is disabled in this repo's settings, so I followed the TDD discipline by hand rather than invoking the skill.
+
+**What changed** (uncommitted, on `feat-slugify`):
+
+- `src/slugify.js`: added a guard that returns an empty string when the input is null or undefined. The old code called `.trim()` on `null` and threw a TypeError.
+- `test/slugify.test.js`: added two tests, one for `null` and one for `undefined`. Both failed before the fix and pass after.
+
+The `undefined` case is a judgment call. The `== null` guard covers it for free, so I pinned it with a test rather than leave it unspecified.
+
+Next: run `git add -p && git commit` if you want this on the branch, then `/finishing` to merge it.

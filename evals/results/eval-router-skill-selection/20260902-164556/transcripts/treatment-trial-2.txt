@@ -1,0 +1,48 @@
+[Assistant] Fixing the `slugify(null)` bug on `feat-slugify`. First, reading the package to see the current code and tests.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-eLarO2" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print | sort && echo "--- package.json ---" && cat package.json && echo "--- git log ---" && git log --oneline --all && echo "--- diff main..HEAD ---" && git diff main..HEAD --stat
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-eLarO2" && echo "--- src/slugify.js ---" && cat -n src/slugify.js && echo "--- test/slugify.test.js ---" && cat -n test/slugify.test.js && echo "--- .claude/settings.json ---" && cat .claude/settings.json && echo "--- npm test (before) ---" && npm test 2>&1 | tail -20 && echo "--- repro ---" && node -e "const s=require('./src/slugify.js'); try { console.log(JSON.stringify(s(null))) } catch(e) { console.log('THROWS:', e.message) }"
+
+[Assistant] Repro was wrong: the module exports `{ slugify }`, not the function itself. Re-running the repro and adding the failing test in one pass.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-eLarO2" && echo "--- repro ---" && node -e "const {slugify}=require('./src/slugify.js'); for (const v of [null, undefined]) { try { console.log(String(v), '=>', JSON.stringify(slugify(v))) } catch(e) { console.log(String(v), 'THROWS:', e.constructor.name + ': ' + e.message) } }" && cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null', () => {
+  assert.strictEqual(slugify(null), '');
+});
+
+test('returns an empty string for undefined', () => {
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+echo "--- npm test (red) ---" && npm test 2>&1 | grep -E "^(✔|✖|ℹ (tests|pass|fail))" 
+
+[Assistant] Cause confirmed: `str.trim()` on a nullish input. Two red tests in place. Applying the guard and re-running.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-eLarO2" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+echo "--- npm test (green) ---" && npm test 2>&1 | grep -E "^(✔|✖|ℹ (tests|pass|fail))" && echo "--- git status ---" && git status --short && echo "--- diff ---" && git diff
+
+[Assistant] `slugify(null)` and `slugify(undefined)` now return `''`. Suite is green: 4 tests, 4 pass.
+
+**Routing.** The arcforge router sends a reported defect to `/debugging` over `/finishing`, even when the branch is described as done. The cause was immediate, so I moved to `/tdd`: failing tests first, then the fix.
+
+**What changed** on `feat-slugify`, uncommitted:
+
+- `src/slugify.js:2` adds a nullish guard that returns an empty string before `.trim()` is called. Cause was a TypeError reading `trim` on null.
+- `test/slugify.test.js` gains two tests, one each for null and undefined. Both were red before the fix and green after.
+
+I treated undefined the same as null. Other non-string inputs such as numbers still throw, unchanged from before.
+
+Next: run `git add -A src test && git commit -m "fix: slugify returns '' for nullish input"` to lock it in.

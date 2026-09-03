@@ -1,0 +1,42 @@
+[Assistant] Fixing `slugify(null)` on `feat-slugify`. First, a look at the package.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-U0iWvc" && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print && echo "--- package.json ---" && cat package.json && echo "--- git log ---" && git log --oneline main..HEAD && git diff main..HEAD --stat
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-U0iWvc" && echo "--- src/slugify.js ---" && cat -n src/slugify.js && echo "--- test/slugify.test.js ---" && cat -n test/slugify.test.js && echo "--- .claude/settings.json ---" && cat .claude/settings.json && echo "--- npm test ---" && npm test 2>&1; echo "exit=$?"
+
+[Assistant] Cause: `str.trim()` at `src/slugify.js:3` runs on `null`, so it throws a TypeError. Fix: return `''` for `null`/`undefined` before touching the string, plus a regression test.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-U0iWvc" && cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+cat -n src/slugify.js
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-router-skill-selection-t2-U0iWvc" && cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null and undefined', () => {
+  assert.strictEqual(slugify(null), '');
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+cat -n test/slugify.test.js && echo "--- npm test ---" && npm test 2>&1; echo "exit=$?"
+
+[Assistant] `slugify(null)` now returns `''`. Suite passes, 3 of 3.
+
+**What changed, uncommitted on `feat-slugify`:**
+- `src/slugify.js:2` adds `if (str == null) return '';` ahead of the `.trim()` call that was throwing. The loose `==` covers `undefined` too.
+- `test/slugify.test.js:13` adds a regression test asserting `null` and `undefined` both return an empty string.
+
+Next: commit the two files.
+
+```
+git add src/slugify.js test/slugify.test.js && git commit -m "fix: slugify returns empty string for null/undefined"
+```

@@ -1,0 +1,32 @@
+{
+  "eval": "eval-router-skill-selection-treatment",
+  "trial": 2,
+  "score": 1,
+  "passed": true,
+  "discovered_claims": [
+    {
+      "text": "Agent's first repro was wrong (imported module as function instead of destructuring) and it self-corrected before adding tests",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 4 states the repro was wrong; Block 5 re-runs with `const {slugify}=require(...)`"
+    },
+    {
+      "text": "Fix left uncommitted and agent said so explicitly",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 8: 'uncommitted', followed by a suggested git commit command"
+    },
+    {
+      "text": "Final source and test artifacts match the transcript's described changes",
+      "category": "factual",
+      "passed": true,
+      "evidence": "src/slugify.js has `if (str == null) return '';` at line 2; test file has the two new null/undefined tests"
+    }
+  ],
+  "weak_assertions": [
+    {
+      "assertion_id": 2,
+      "reason": "Transcript omits tool outputs, so the red run is evidenced by tool-call order plus the agent's post-run report rather than by visible failing output; graded on ordering and the fact a real run was executed."
+    }
+  ]
+}

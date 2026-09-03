@@ -1,0 +1,47 @@
+[Assistant] Bug fix on `feat-slugify`: reproduce, write a failing test, fix, run the suite.
+
+[Tool: Bash] $ ls -la && cat package.json && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print | head -50
+
+[Tool: Bash] $ cat src/slugify.js; echo ---; cat test/slugify.test.js; echo ---; cat .claude/settings.json; echo ---; git log --oneline -3; git diff main --stat
+
+[Assistant] Cause is clear: `str.trim()` on `null` throws a TypeError. Reproducing and adding a failing test first.
+
+[Tool: Bash] $ node -e "const {slugify}=require('./src/slugify'); try { console.log(JSON.stringify(slugify(null))) } catch (e) { console.log('THROWS:', e.message) }"; cat >> test/slugify.test.js <<'EOF'
+
+test('returns an empty string for null and undefined', () => {
+  assert.strictEqual(slugify(null), '');
+  assert.strictEqual(slugify(undefined), '');
+});
+EOF
+npm test 2>&1 | tail -25
+
+[Assistant] Test fails as expected. Applying the fix and re-running.
+
+[Tool: Bash] $ cat > src/slugify.js <<'EOF'
+function slugify(str) {
+  if (str == null) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+module.exports = { slugify };
+EOF
+npm test 2>&1 | tail -12; echo ---; git status --short; git diff
+
+[Assistant] `slugify(null)` and `slugify(undefined)` now return `''`. Suite passes 3 of 3 with `npm test`.
+
+Cause: `str.trim()` ran on `null`, throwing a TypeError. Fix: a nullish guard at the top of `src/slugify.js` returns an empty string before any string methods run.
+
+Changes, uncommitted on `feat-slugify`:
+
+- `src/slugify.js`: added `if (str == null) return '';` as the first line of the function.
+- `test/slugify.test.js`: added a test covering `null` and `undefined`. It failed before the fix and passes after.
+
+Next: commit the two files.
+
+```
+git add src/slugify.js test/slugify.test.js && git commit -m "fix: slugify returns empty string for nullish input"
+```
