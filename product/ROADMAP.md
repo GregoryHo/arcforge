@@ -296,3 +296,58 @@ reverse one, append a superseding entry (see AGENTS.md).
   (hooks B-6, and the domain-model note in product/specs/hooks.md). The prose
   written before an opt-out survives until the first Stop or compaction after
   it, which is the same event that removes it.
+
+### D-011 — The CLI's candidate read commands fail closed on `--global`
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: `arcforge learn review|inbox|inspect|drafts --global` is refused by
+  the engine, with an error naming `arcforge learn dashboard`; the candidate
+  commands are project-scope in both directions now, reads as well as
+  transitions.
+- Why: `getCandidateQueuePath({ scope: 'global' })` resolved to the same file
+  as the curator's canonical Layer-5 queue. The lifecycle commands already
+  refused `--global`; the read commands did not, and the two halves failed as
+  mirror images. `learn review --global --json` applied no scope filter, so it
+  printed the raw curator event records verbatim — `scope.project_id` and the
+  proposal `body` included. `inbox`, `inspect` and `drafts` compared `c.scope`
+  and `c.id` against records keyed `scope.kind` and `candidate_id`, so they
+  matched nothing and always reported zero. One path disclosed what it should
+  not have; the other reported nothing and looked like an empty queue. The
+  dashboard is the reviewed surface for that queue — sanitized wire model,
+  legality matrix, audit log — and the CLI had none of it.
+
+### D-012 — The `learn` candidate commands become a front end onto the canonical queue
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Decision: the `learn` candidate commands read the canonical Layer-5 queue
+  through `readCurrentCandidates()` and dispatch every transition through
+  `handleDashboardAction`, so the CLI and the dashboard work one queue under
+  one Action × Status matrix, one `safety_ack` gate and one audit log. The
+  project-scoped queue under `.arcforge/learning/candidates/` and the engine
+  code that managed it are deleted; `--project` becomes a view filter over the
+  canonical queue — this project's records in it, matched on `scope.project`
+  against the project directory's own name — and `--global` stays refused per
+  D-011.
+- Why: the project-scoped queue had zero producers. Its writer had no shipped
+  caller, so the transition commands managed a file nothing ever filled, while
+  the curator filled a different file the CLI could not read. The frozen
+  Layer-5 contract already required this — it types the reviewer as
+  `"dashboard" | "cli"` and says CLI lifecycle actions must consult the
+  canonical matrix. Two queues could not satisfy that; one can.
+- Cost accepted: the CLI's artifact reach narrows to what Layer 7/8 support
+  today — `instinct` only. The six-type path (`skill`, `command`, `agent`,
+  `eval`, `repo_convention_patch`) had no producer either, so nothing that
+  worked is lost, but the CLI now says so instead of rendering a draft for a
+  candidate that could not have existed. Drafts move with it: Layer 7 writes
+  them under the arcforge home tree, not into the project tree, so they no
+  longer appear in `git status`. The canonical matrix is stricter than the old
+  ad-hoc status check in two places — `reject` is refused after `approve`
+  (`approved` has no legal `dismiss`), and `approve` is refused from
+  `needs_more_evidence`. In one place it is looser: the dashboard collects the
+  activation `safety_ack` from the reviewer, while the CLI treats the typed
+  `learn activate <id>` as that act and supplies the ack itself after printing
+  both warnings — so a scripted `learn activate --json` activates with no
+  second human in the loop. That matches the pre-unification CLI, which had no
+  confirmation either, and the deliberate typed command is the gate.
