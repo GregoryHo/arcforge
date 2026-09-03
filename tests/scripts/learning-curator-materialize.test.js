@@ -509,13 +509,21 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(result2.record.materialization_id).toBe(result1.record.materialization_id);
   });
 
-  // The matrix allows `deactivated → materialized`, and replaying
-  // `candidate.transitioned` rewrites only `lifecycle`, so a re-materialized
-  // candidate carries the same record hash it had the first time and lands on
-  // the idempotence branch. AC-10 still owes Layer 5 the report there — the
-  // manifest is already durable — or the candidate reports success while
-  // staying `deactivated`.
-  it('reports the transition to Layer 5 when re-materializing a deactivated candidate', () => {
+  // What this pins: the idempotence branch owes Layer 5 the same report the fresh
+  // path makes — AC-10 attaches that report to the manifest being durable, and on
+  // this branch it already is. A re-materialized candidate reaches it because
+  // replaying `candidate.transitioned` rewrites only `lifecycle`, so its record
+  // hash is the one recorded at the first materialization.
+  //
+  // It is deliberately NOT the guard for the `deactivated → materialized` scenario
+  // the review reported: `materialize()` reads `lifecycle.status` only to gate entry
+  // (approved | deactivated) and to record it, so this case passes identically with
+  // an `approved` second call — as the L7-11 case above, which now emits two
+  // transitions as well, already shows. That scenario's guard is end-to-end, in
+  // tests/scripts/learning.test.js ('accepts a deactivated candidate, which the
+  // matrix allows to materialize'): it asserts the CLI hands back `materialized`
+  // and that `learn drafts --project` then lists the candidate.
+  it('reports the transition to Layer 5 on the idempotence branch, at any entry status', () => {
     const arcforgeRoot = path.join(tmpDir, '.arcforge');
     const policy = defaultRenderPolicy();
     const approved = makeCandidateRecord({});
