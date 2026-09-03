@@ -95,12 +95,26 @@ was recorded about them.
 ## Data / domain model
 
 The area's formats are frozen layer by layer in
-`docs/decisions/learning-curator-schema/` and pinned mechanically by
-`scripts/lib/learning-schemas.js`, which validates what each writer emits rather
-than restating the shapes. The entities are the observation, the candidate, the
-instinct, the diary, and the audit record. The candidate is the one with a
-lifecycle — `pending_review → approved → materialized → activated`, the three gates
-of B-3 — and its state and scope vocabularies live in `scripts/lib/learning.js`.
+`docs/decisions/learning-curator-schema/`, and each has a single owner in
+`scripts/lib/` that validates what its writer emits rather than restating the
+shape. The entities are the observation, the candidate, the instinct, the diary,
+and the audit record.
+
+The candidate is the one with a lifecycle — `pending_review → approved →
+materialized → activated`, the three gates of B-3. That canonical status
+vocabulary is `LIFECYCLE_STATUS` in `scripts/lib/learning-curator/lifecycle.js`,
+frozen in
+`docs/decisions/learning-curator-schema/layer-5-candidate-queue-lifecycle.md`; the
+queue record carrying it — including the `project` / `global` scope kind — is
+owned by `scripts/lib/learning-curator/schema.js` and appended only by
+`scripts/lib/learning-curator/queue-writer.js`. The instinct file, the diary path,
+and the operation record are the three formats pinned by
+`scripts/lib/learning-schemas.js`. The second, project-scoped CLI queue of B-5
+carries its own narrower vocabularies in `scripts/lib/learning.js` —
+`VALID_SCOPES`, and a `VALID_STATUSES` whose first state is `pending`, not
+`pending_review`; that divergence is why it is not a front end onto the canonical
+queue.
+
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).
 

@@ -91,7 +91,7 @@ A **scenario** is markdown with a fixed section set; `scripts/lib/eval-scenario.
 owns its parsing, discovery, and evidence claim types. A **result** is a JSONL row
 under `evals/results/` that records the scenario version it ran under — the field
 that makes a pool version-scoped (B-8) — and a **benchmark** is the snapshot
-`eval report` writes under `evals/benchmarks/` (B-9). The verdict vocabulary
+`eval report` writes under `evals/benchmarks/` (B-9). The A/B verdict vocabulary
 (`IMPROVED`, `REGRESSED`, `INCONCLUSIVE`, `INSUFFICIENT_DATA`) and the interval
 arithmetic that produces it belong to `scripts/lib/eval-stats.js`; no other module
 invents a verdict.
