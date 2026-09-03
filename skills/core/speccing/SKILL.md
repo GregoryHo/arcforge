@@ -56,9 +56,10 @@ Promotion is three edits — two, absent a wish — made **before** any code:
    naming where it went (`references/conventions.md`). Work the user asked for
    directly never had a line, and skips this edit alone.
 2. Append a decision recording *which version, and why now*.
-3. Add the roadmap row and write that version's spec from the template. The new
-   row takes `← we are here` only when every row above it has shipped; a
-   `building` row, or an earlier `next` row, keeps it.
+3. Add the roadmap row and its spec — written from the template for a new area,
+   or this version's behaviors added to the area's existing living spec, never a
+   second file. The new row takes `← we are here` only when every row above it
+   has shipped; a `building` row, or an earlier `next` row, keeps it.
 
 The spec goes first because it is what the build gets reviewed against. Written
 afterwards it describes whatever got built — a summary, not a contract, and it
