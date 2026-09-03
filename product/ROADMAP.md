@@ -9,7 +9,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | Version | Tag | Milestone | Status | What & why | Spec |
 |---|---|---|---|---|---|
 | 6.0.0 | `v6.0.0` | v6 toolkit | **shipped** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
-| 6.1.0 | — | learning trust · spec-driven method · Codex packaging | **building ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [learning](specs/learning.md) · [hooks](specs/hooks.md) |
+| 6.1.0 | — | learning trust · spec-driven method · Codex packaging | **building ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -376,3 +376,48 @@ reverse one, append a superseding entry (see AGENTS.md).
   the curator gains a renderer — unlike the name, which nothing the CLI offers
   ever changes. Recorded so the asymmetry is a decision on file rather than an
   accident of the refusal's wording.
+
+### D-013 — Codex packaging ships at 6.1.0, skills only
+- Date: 2026-09-03
+- Version: 6.1.0
+- Status: Accepted
+- Extends: D-002
+- Decision: arcforge ships as a Codex CLI plugin over the same source tree: a
+  second manifest pair (`.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json`),
+  version parity enforced as a ninth `check:versions` row, and skills as the only
+  component that loads. The Claude Code hook registry is renamed
+  `hooks/claude-code.json` and named by `.claude-plugin/plugin.json`, so Codex's
+  hook auto-discovery never finds it.
+- Why: The rebuild left the second harness cheap on purpose — skills are portable
+  markdown — so the work is packaging plus verification, not redesign. Shipping
+  skills-only now gets Codex users the fifteen skills and an honest boundary,
+  instead of holding the whole port hostage to the two subsystems that cannot
+  cross (hooks, and anything that spawns `claude`).
+- Symptom: A Codex install of the pre-rename tree ran arcforge's Claude Code
+  hooks. Codex auto-discovers plugin hooks at `hooks/hooks.json` with or without <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
+  a manifest key: in one `codex exec` turn a fixture whose manifest was silent
+  about hooks still fired every event it declared there, and its SessionStart
+  `additionalContext` reached the model.
+- Verification: Same turn, four plugins installed — the declared control fired 16
+  hook dumps, the silent-manifest control reproduced the leak with 6, and the
+  renamed fixture (`hooks/claude-code.json`) fired 0. On the Claude Code side,
+  2.1.258 with the manifest key declared wrote the session file and with the key
+  removed wrote nothing, so the key is what loads the registry (loaded via
+  `--plugin-dir`; see the Residual). A separate free
+  fixture proved Codex ignores `.claude-plugin/plugin.json` entirely when
+  `.codex-plugin/plugin.json` exists, so the new `hooks` key cannot reach Codex.
+  `npm run check:hooks` fails if any of the three conditions regresses; the
+  fifteen `arcforge:<name>` entries render in `codex debug prompt-input`.
+- Residual: The manifest `hooks` key is now the only thing loading arcforge's
+  hooks. If a future Claude Code stops honouring it, every hook goes silent and no
+  static check can tell — `check:hooks` proves the wiring is self-consistent, not
+  that the host reads it. Only a live session catches that. The verification loaded
+  the plugin from a source tree with `--plugin-dir`; the marketplace-install path,
+  which resolves components out of the version-keyed cache, could not be tested
+  before push and should be confirmed on the first 6.1.0 install.
+- Cost accepted: The seven CLI-backed skills report `command not found` on Codex,
+  because Codex does not put a plugin's `bin/` on PATH and D1/D9 forbid a skill
+  routing around the bare-CLI boundary. Documented in the README rather than
+  papered over. Also accepted: the registry no longer sits at the name every
+  other Claude Code plugin uses, which is a discoverability cost paid to close a
+  cross-host leak.
