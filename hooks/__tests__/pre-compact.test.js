@@ -40,7 +40,7 @@ describe('pre-compact: updateSessionFile', () => {
       '2025-01-15T10:30:00Z',
       'session-123',
     );
-    assert.strictEqual(result, true);
+    assert.ok(result, 'the stamped record is returned');
 
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
     assert.strictEqual(updated.compactions.length, 1);
@@ -57,7 +57,7 @@ describe('pre-compact: updateSessionFile', () => {
       '2025-01-15T10:30:00Z',
       'nonexistent',
     );
-    assert.strictEqual(result, false);
+    assert.strictEqual(result, null, 'no record to update reports null');
   });
 
   it('should append multiple compaction markers', () => {
@@ -119,7 +119,7 @@ describe('pre-compact: updateSessionFile', () => {
       'session-prune-off',
       { projectRoot: projectRootWithLearning(false) },
     );
-    assert.strictEqual(result, true);
+    assert.ok(result, 'the stamped record is returned');
 
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
     assert.strictEqual(
@@ -477,9 +477,13 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
     return transcriptPath;
   }
 
-  /** Spawn the real hook on an above-threshold PreCompact carrying a transcript. */
-  function compactAboveThreshold(projectDir) {
-    fs.writeFileSync(path.join(binDir, 'claude'), '#!/bin/sh\ncat > /dev/null\nexit 0\n', {
+  /**
+   * Spawn the real hook on an above-threshold PreCompact carrying a transcript.
+   * With `promptFile`, the stub enricher writes the prompt it was handed there.
+   */
+  function compactAboveThreshold(projectDir, promptFile) {
+    const sink = promptFile ? `"${promptFile}"` : '/dev/null';
+    fs.writeFileSync(path.join(binDir, 'claude'), `#!/bin/sh\ncat > ${sink}\nexit 0\n`, {
       mode: 0o755,
     });
     fs.writeFileSync(counterPath('user-count'), '12');
@@ -616,6 +620,39 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
       );
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  // The enricher's prompt is the other half of the draft: it fills the prose
+  // sections. A compaction used to hand it {} while Stop handed it the parsed
+  // summary, so those sections were enriched from nothing even once the metrics
+  // above were correct.
+  it('hands the enricher the same populated summary Stop does — and only under the opt-in', async () => {
+    const onDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-summary-on-'));
+    const offDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-summary-off-'));
+    const onPrompt = path.join(binDir, 'prompt-on.txt');
+    const offPrompt = path.join(binDir, 'prompt-off.txt');
+
+    try {
+      enableLearning(onDir);
+      seedStaleRecord(path.basename(onDir));
+      assert.strictEqual(compactAboveThreshold(onDir, onPrompt).status, 0);
+
+      // Detached spawn — poll, as the sibling enricher cases do.
+      assert.ok(await waitFor(onPrompt, 5000), 'enricher stub invoked');
+      const prompt = fs.readFileSync(onPrompt, 'utf-8');
+      assert.match(prompt, /alpha\.js/, 'the summary carries the touched paths');
+      assert.match(prompt, /"Edit"/, 'and the tool names');
+      assert.match(prompt, /ship the fix/, 'and, under the opt-in, the user prose');
+      assert.match(prompt, /12 messages, 55 tool calls/, 'and a populated stats line');
+
+      // Learning off: no summary reaches a model at all, because no enricher runs.
+      seedStaleRecord(path.basename(offDir));
+      assert.strictEqual(compactAboveThreshold(offDir, offPrompt).status, 0);
+      assert.strictEqual(await waitFor(offPrompt, 1000), false, 'enricher must NOT spawn');
+    } finally {
+      fs.rmSync(onDir, { recursive: true, force: true });
+      fs.rmSync(offDir, { recursive: true, force: true });
     }
   });
 });

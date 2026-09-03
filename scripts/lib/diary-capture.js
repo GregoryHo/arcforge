@@ -220,6 +220,70 @@ function applyTranscriptToSession(session, transcriptPath, { learningOn = false 
 }
 
 // ---------------------------------------------------------------------------
+// The enricher's session summary — built once, from the record both hooks write
+// ---------------------------------------------------------------------------
+
+/**
+ * Duration in minutes between two ISO timestamps, or null if either is missing.
+ * Moved here verbatim from the Stop hook when PreCompact needed the same stats
+ * line; it is a pure function of the record, never Stop-specific.
+ *
+ * @param {string} startISO
+ * @param {string} endISO
+ * @returns {number|null}
+ */
+function calculateDurationMinutes(startISO, endISO) {
+  if (!startISO || !endISO) return null;
+  const durationMs = new Date(endISO) - new Date(startISO);
+  return Math.round(durationMs / 60000);
+}
+
+/**
+ * Format the session's activity as the one-liner the enricher prompt carries.
+ * @param {Object} session
+ * @returns {string}
+ */
+function formatSessionStats(session) {
+  const duration = calculateDurationMinutes(session.started, session.lastUpdated);
+
+  let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
+  if (duration > 0) {
+    stats = `~${duration} min, ${stats}`;
+  }
+  if (session.filesModified?.length > 0) {
+    stats += `, ${session.filesModified.length} files modified`;
+  }
+  return stats;
+}
+
+/**
+ * Build the session summary handed to the background enricher — the shape
+ * spawnDiaryEnricher serializes into its prompt and runDiaryCapture documents.
+ *
+ * Both event paths build it from the same place: Stop from the record it just
+ * closed, PreCompact from the record it just stamped. A compaction used to hand
+ * the enricher `{}`, so the draft's prose sections were enriched from nothing
+ * even after its metrics were correct.
+ *
+ * The opt-in needs no check here and deliberately gets none: `userMessageContent`
+ * is only ever in the record while learning is on (pruneUngatedProse removes it
+ * otherwise, and applyTranscriptToSession never writes it), so with learning off
+ * this yields `userMessages: []` by construction — and runDiaryCapture does not
+ * spawn the enricher at all in that state.
+ *
+ * @param {Object} session - Session record.
+ * @returns {{ userMessages: string[], toolsUsed: string[], filesModified: string[], stats: string }}
+ */
+function buildSessionSummary(session) {
+  return {
+    userMessages: session.userMessageContent || [],
+    toolsUsed: session.toolsUsed || [],
+    filesModified: session.filesModified || [],
+    stats: formatSessionStats(session),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Draft generation + background enrichment
 // ---------------------------------------------------------------------------
 
@@ -408,6 +472,8 @@ module.exports = {
   learningCaptureEnabled,
   pruneUngatedProse,
   applyTranscriptToSession,
+  calculateDurationMinutes,
+  buildSessionSummary,
   tryGenerateAutoDiary,
   spawnDiaryEnricher,
   runDiaryCapture,

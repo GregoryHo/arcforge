@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
-const { calculateDurationMinutes } = require('../session-tracker/end');
+const { calculateDurationMinutes } = require('../../scripts/lib/diary-capture');
 
 const END = path.join(__dirname, '..', 'session-tracker', 'end.js');
 
