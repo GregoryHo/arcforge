@@ -52,7 +52,8 @@ here has to stay near zero, or the good ideas go into a chat window instead.
 
 A wish becomes work in three edits, made **before** the first line of code:
 
-1. Remove its line from the backlog.
+1. Replace its backlog line with a graduation tombstone naming where it went
+   (`references/conventions.md`).
 2. Append a decision recording *which version, and why now*.
 3. Add the roadmap row and write that version's spec from the template.
 
@@ -137,4 +138,4 @@ Stop if you catch yourself:
 - `references/templates.md` — the shapes of the four files, and the spec
   template to write a new one from (steps 1 and 3).
 - `references/conventions.md` — decision-entry fields, the two supersede forms,
-  backlog graduation, and how a spec header tracks its version (steps 4–6).
+  backlog graduation, and how a spec header tracks its version (steps 3–6).
