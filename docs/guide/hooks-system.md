@@ -68,8 +68,9 @@ learning loop reads later, and what a diary is built from.
 
 Once a session passes the diary threshold — ten of your messages, or fifty tool
 calls — `session-end` also writes a diary draft under `~/.arcforge/diaries/`.
-The draft is built from the counts above, and its interpretive sections are
-left as `TO BE ENRICHED` stubs.
+The draft is built from the session record above — the counts, the tools used,
+and the files the session touched — and its interpretive sections are left as
+`TO BE ENRICHED` stubs.
 
 Three further things happen at that same threshold, and **only if you have
 turned learning on**: your ten most recent messages (truncated) are stored in

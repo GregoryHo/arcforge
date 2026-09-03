@@ -238,10 +238,10 @@ though: it still starts in your project directory, and edits inside those places
 are approved automatically, because a background run has nobody to ask. What it
 no longer has is a blanket pass over your whole machine.
 
-Turn learning off and the enrichment stops: diary
-drafts are still written from your session counts, but their `TO BE ENRICHED`
-sections stay unfilled, which is what an un-enriched draft is supposed to look
-like. The same opt-in decides whether your recent message text is stored in the
+Turn learning off and the enrichment stops: diary drafts are still written from
+your session record — the counts, the tools used, and the files you touched —
+but their `TO BE ENRICHED` sections stay unfilled, which is what an un-enriched
+draft is supposed to look like. The same opt-in decides whether your recent message text is stored in the
 session record at all.
 
 State sits in two places, split by scope:
