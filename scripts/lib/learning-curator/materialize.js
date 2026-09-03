@@ -366,6 +366,19 @@ function materialize({
   );
   if (existingRecord) {
     const existingDraftPaths = existingRecord.draft_artifacts.map((a) => a.draft_path);
+    // L7-8/AC-10: the report to Layer 5 is owed on this branch exactly as on the
+    // fresh one — the manifest is already durable on disk, which is the condition
+    // AC-10 attaches the report to, and only a FAILED materialization (AC-11) is
+    // allowed to leave no `materialized` lifecycle event. Skipping it is what let
+    // `deactivated → materialize` report success while the candidate stayed
+    // `deactivated` and `learn drafts` listed nothing.
+    //
+    // This cannot double-log: `handleDashboardAction` delegates the materialize
+    // action to this module and returns before its own appendTransitionEvent, so
+    // this is the sole appender for the action; and the matrix forbids
+    // `materialized → materialize`, so only `approved` and `deactivated` reach
+    // here, both of which legally become `materialized`.
+    appendTransitionEvent(candidate.candidate_id, 'materialize', 'materialized', actor);
     return { ok: true, record: existingRecord, draftPaths: existingDraftPaths };
   }
 
