@@ -82,7 +82,7 @@ Differences that are deliberate, not oversights:
   `<skills_instructions>` blocks — so the string is the documented shape and the
   array buys nothing.
 - **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
-  `/arcforge:<name>`. All 15 load from one directory entry. Codex has no
+  `/arcforge:<name>`. All 16 load from one directory entry. Codex has no
   slash commands for skills — the user reaches one through the composer's `$`
   mention picker — so the router and the README label the `/` rows as Claude
   Code's. Whether that mention token carries the `arcforge:` namespace was NOT
@@ -92,11 +92,11 @@ Differences that are deliberate, not oversights:
 - **User-invoked skills need a second declaration, and it is not a manifest
   edit.** `disable-model-invocation: true` is Claude Code's key and does nothing
   on Codex: spike-verified on codex-cli 0.152.1, `codex debug prompt-input`
-  listed all 15 skills — the 3 user-invoked ones included — and Codex's own
+  listed every shipped skill — the 3 user-invoked ones included — and Codex's own
   bundled validator rejects the key ("must be false"). Codex's equivalent is a
   skill-local `skills/core/<name>/agents/openai.yaml` with
-  `policy.allow_implicit_invocation: false`; adding it to the 3 dropped the same
-  listing to 12. These files are **Codex-only metadata Claude Code ignores**, they
+  `policy.allow_implicit_invocation: false`; adding it to the 3 dropped exactly those three
+  from the same listing. These files are **Codex-only metadata Claude Code ignores**, they
   live inside the skill so D1 §4.3 holds, and Codex's validator requires a
   non-empty `interface.display_name` + `interface.short_description` whenever the
   file exists — a policy-only manifest is rejected. The two mechanisms are pinned

@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "arcforge",
     "shortDescription": "Skills for disciplined coding work, quiet until the work needs them",
-    "longDescription": "arcforge gives an agent 15 self-contained skills — design exploration, task execution, test-first implementation, root-cause debugging, code review, session continuity. Each fires from its own description when the situation matches and stays out of the way otherwise, so there is no mandatory pipeline to enter through. On Codex all 15 skills load and 8 work in full; the other 7 shell out to the arcforge CLI, and those steps report command not found because Codex does not put a plugin's bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop are Claude Code only.",
+    "longDescription": "arcforge gives an agent 16 self-contained skills — design exploration, task execution, test-first implementation, root-cause debugging, code review, session continuity. Each fires from its own description when the situation matches and stays out of the way otherwise, so there is no mandatory pipeline to enter through. On Codex all 16 skills load and 9 work in full; the other 7 shell out to the arcforge CLI, and those steps report command not found because Codex does not put a plugin's bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop are Claude Code only.",
     "developerName": "Gregory Ho",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Write"],

@@ -52,11 +52,11 @@ codex plugin marketplace add GregoryHo/arcforge
 codex plugin add arcforge@arcforge-dev
 ```
 
-All 15 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. The same mapping covers the handoffs skills write to each other: wherever a skill says `/<name>` — `/tdd`, `/finishing` — that is the `arcforge:<name>` skill on Codex, reached from the same picker. **Skills are all that loads.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
+All 16 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. The same mapping covers the handoffs skills write to each other: wherever a skill says `/<name>` — `/tdd`, `/finishing` — that is the `arcforge:<name>` skill on Codex, reached from the same picker. **Skills are all that loads.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
 
 | On Codex | Status |
 |---|---|
-| The 8 skills that need no engine — `using`, `brainstorming`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
+| The 9 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
 | The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
 | Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
 
