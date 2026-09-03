@@ -137,6 +137,12 @@ entry carry two clause-scoped flips from different decisions, or a partial flip
 alongside the later total one that finished it off — and what rejects the
 self-contradicting `Accepted · Superseded-by: D-MMM`.
 
+C3 checks that pairing from both ends. A `Supersedes:` with no flip on its target is
+rejected, and so is a flip with nothing behind it — a `Superseded-by:` or `partially
+superseded by` clause whose named entry carries no `Supersedes:` back, or that names a
+`D-id` the log does not have. Both are the same half-done reversal seen from opposite
+sides, and only one of them is the edit people remember to make.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

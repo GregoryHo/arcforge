@@ -23,11 +23,13 @@
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists, and every `Supersedes:` carries its
  *         flip on the entry it supersedes — bare form ⇒ `Superseded-by: D-NNN`,
- *         clause-scoped form ⇒ `partially superseded by D-NNN`. A superseded
- *         entry's whole `Status:` is then read clause by clause against the
- *         closed vocabulary, so a totally superseded entry is no longer
- *         `Accepted` and no entry dies twice. `Refines:` and `Extends:` require
- *         no flip;
+ *         clause-scoped form ⇒ `partially superseded by D-NNN`. The pairing is
+ *         checked from both ends, so a flip clause with no superseding entry
+ *         behind it, or one naming a decision the log does not carry, is
+ *         rejected too. A superseded entry's whole `Status:` is then read clause
+ *         by clause against the closed vocabulary, so a totally superseded entry
+ *         is no longer `Accepted` and no entry dies twice. `Refines:` and
+ *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
@@ -59,8 +61,8 @@ const RELATION_ANY_RE = /^-\s+(?:Supersedes|Refines|Extends):/;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
-const TOTAL_FLIP_RE = /^Superseded-by: D-\d{3}$/;
-const PARTIAL_FLIP_RE = /^partially superseded by D-\d{3}$/;
+const TOTAL_FLIP_RE = /^Superseded-by: D-(\d{3})$/;
+const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
 const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
@@ -249,6 +251,42 @@ function checkSupersededStatus(victim, errors) {
 }
 
 /**
+ * C3 — the mirror of the pairing below. Walking only from `Supersedes:` outward
+ * validates the half-done edit in one direction; the other half — a flip clause
+ * with no superseding entry behind it, or one naming a decision that is not in
+ * the log — never reaches a check, so it passes green. A flip is only half of
+ * the two-edit reversal, so it has to find its other half.
+ *
+ * The *form* correspondence (bare vs. clause-scoped) stays owned by the forward
+ * pass, so a mismatched pair is reported once, from the `Supersedes:` side.
+ */
+function checkFlipsAreClaimed(entries, byNum, errors) {
+  for (const e of entries) {
+    if (e.status === null) continue;
+    for (const clause of statusClauses(e.status)) {
+      const m = clause.match(TOTAL_FLIP_RE) ?? clause.match(PARTIAL_FLIP_RE);
+      if (!m) continue;
+      const targetId = `D-${m[1]}`;
+      const superseder = byNum.get(Number(m[1]));
+      if (!superseder) {
+        errors.push(
+          `C3 ${e.id}: Status carries "${clause}", but ${targetId} is not in the Decision Log`,
+        );
+        continue;
+      }
+      const claimed = superseder.relations.some(
+        (r) => r.kind === 'Supersedes' && r.target === e.num,
+      );
+      if (!claimed) {
+        errors.push(
+          `C3 ${e.id}: Status carries "${clause}" but ${targetId} carries no "Supersedes: ${e.id}" — a reversal is two edits, and this is only one`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * C3 — every relation resolves backwards, and a supersession is two edits: the
  * flip on the superseded entry is the second one. `Refines:` and `Extends:`
  * sharpen or widen a decision that stays in force, so they need an earlier live
@@ -290,6 +328,7 @@ function checkRelations(entries, errors) {
       }
     }
   }
+  checkFlipsAreClaimed(entries, byNum, errors);
   for (const victim of victims.values()) checkSupersededStatus(victim, errors);
 }
 

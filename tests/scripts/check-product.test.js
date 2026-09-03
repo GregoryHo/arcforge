@@ -295,8 +295,12 @@ describe('check-product', () => {
         'Accepted · partially superseded by D-002',
       );
       const errors = of('C3', run({ roadmap: { decisions } }));
-      expect(errors).toHaveLength(1);
+      // The malformed line is dropped, so the log no longer records the
+      // supersession at all — D-001's flip is then genuinely unclaimed and the
+      // mirror half of C3 reports it too.
+      expect(errors).toHaveLength(2);
       expect(errors[0]).toMatch(/malformed relation line/);
+      expect(errors[1]).toMatch(/carries no "Supersedes: D-001"/);
     });
 
     it('rejects a Supersedes pointing at a later decision even when it carries the flip', () => {
@@ -333,6 +337,46 @@ describe('check-product', () => {
       const decisions = [decision({ id: 'D-002', extra: ['- Supersedes: D-001'] })];
       const fold = [decision({ id: 'D-001', status: 'Superseded-by: D-002' })];
       expect(of('C3', run({ roadmap: { decisions, fold } }))).toEqual([]);
+    });
+
+    it('rejects a flip whose named decision never claimed the supersession', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-002' }),
+        decision({ id: 'D-002' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/carries no "Supersedes: D-001" — a reversal is two edits/);
+    });
+
+    it('rejects a partial flip whose named decision never claimed it', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Accepted · partially superseded by D-002' }),
+        decision({ id: 'D-002' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/carries no "Supersedes: D-001"/);
+    });
+
+    it('rejects a flip naming a decision the log does not carry', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-009' }),
+        decision({ id: 'D-002' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/D-009 is not in the Decision Log/);
+    });
+
+    it('rejects an entry flipped as superseded by itself', () => {
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-001' }),
+        decision({ id: 'D-002' }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/carries no "Supersedes: D-001"/);
     });
 
     it('rejects a Supersedes naming a decision that does not exist', () => {
