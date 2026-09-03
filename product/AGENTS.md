@@ -106,6 +106,13 @@ reaches a reader as a paragraph of literal pipes while the checks above would go
 on reading it as product state. A wrong-width delimiter is reported as a row of
 the wrong arity, not skipped for looking like dashes.
 
+"Opens on" is literal: the table is the first thing in the section, so a pipe line
+above the header is reported even when the table below it would render. That is
+deliberate rather than incidental — a data row written above the frame renders as a
+paragraph while the checks would still read it as product state, which is the whole
+defect this rule exists to close. Prose above the table belongs above `## Roadmap`,
+and the section's note goes below it, where the corpus already puts it.
+
 ## The three mechanical rules
 
 These three are pinned in exactly this form because `npm run check:product` reads

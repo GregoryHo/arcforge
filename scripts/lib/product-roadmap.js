@@ -85,9 +85,18 @@ function rowCells(line) {
  *
  * The frame is the first two pipe lines of the section, the way GFM reads one:
  * a header of six cells opening on `Version`, then a delimiter of the same
- * width. Reported and the rows kept, the way a duplicate `Version` and a
- * duplicate `D-id` are — dropping them would take the `← we are here` marker
- * with them and trade this rule's error for C1's.
+ * width. Positional on purpose, and `product/AGENTS.md` says so: the table is
+ * the first thing in `## Roadmap`. The tradeoff is a pipe line *above* the
+ * header — a second table, say — being reported although what follows it
+ * renders. Searching for the header instead would accept that, and would also
+ * accept a data row written above the frame: GFM shows such a row as a
+ * paragraph while every rule here would go on reading it as product state,
+ * which is the defect this rule exists to close. Prose belongs above the
+ * heading, and the section's note below the table, where the corpus puts it.
+ *
+ * Reported and the rows kept, the way a duplicate `Version` and a duplicate
+ * `D-id` are — dropping them would take the `← we are here` marker with them
+ * and trade this rule's error for C1's.
  */
 function checkRoadmapFraming(table, errors) {
   // An empty `## Roadmap` is the row floor's to report, not this rule's.

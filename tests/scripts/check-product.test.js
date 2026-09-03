@@ -1216,6 +1216,18 @@ describe('check-product', () => {
         expect(errors[0]).toMatch(/not a 6-column header row starting with "Version"/);
       });
 
+      it('rejects a pipe line above the header, though what follows renders', () => {
+        // "Opens on" is literal, and the cost is priced: a second table above
+        // the roadmap is reported. Searching for the header instead would
+        // accept it — and would accept a data row written above the frame,
+        // which GFM shows as a paragraph while every rule here reads it as
+        // product state. That is the defect the rule exists to close.
+        const header = ['| Legend | Meaning |', '|---|---|', ...TABLE_HEADER];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/opens on "\| Legend \| Meaning \|"/);
+      });
+
       it('rejects a header with no delimiter row beneath it', () => {
         const header = [TABLE_HEADER[0]];
         const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));

@@ -146,7 +146,9 @@ const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
 const CITATION_RE = /\bD-(\d+)(\w*)/g;
 
 /**
- * The three numbers a roadmap `Version` cell orders by. The ordering below and
+ * The three numbers a roadmap `Version` cell orders by — callers hand it a cell
+ * `parseRoadmapRows` already validated as `X.Y.Z`, so there is no fourth
+ * component and no `NaN` to reason about. The ordering below and
  * C4's uniqueness key both read this one parse, so no pair of cells can be
  * distinct to one and equal to the other — which is exactly what a leading zero
  * did while uniqueness keyed on the raw string: `01.0.0` and `1.0.0` are two Set
