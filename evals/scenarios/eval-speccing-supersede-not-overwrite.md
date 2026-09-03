@@ -89,8 +89,9 @@ behavior**:
   commits versus the log, which is the exact confusion you want to avoid."*
 
 *Version 3* is that grader, fixed: A2 checks containment rather than equality,
-and A3 accepts any wording that puts "supersede" next to the id (in either
-direction) while still requiring the word to be adjacent to it. The claim, the
+and A3 accepts any wording that puts "supersede" next to the id — a field, a
+clause inside the `Decision:` line, a heading annotation — rather than one
+literal token. The claim, the
 prompt, the fixture and the four assertions are unchanged — this is an
 instrument correction, not a third design. The `## Version` bump exists to keep
 the old-grader pool out of any future one, per the pooling rule in
@@ -105,6 +106,46 @@ teaches it nothing it was going to get wrong.** The scenario ships as corpus
 coverage (unmet-but-covered) with these transcripts cited, and no A/B is run
 against an instrument that has nothing left to discriminate.
 
+**Version 4 — the second instrument correction.** Version 3's A3 took the
+supersession phrase in either direction, and that was a false-pass path rather
+than looseness: a trial that appends D-008 with `Status: Superseded by D-005`
+and annotates D-005 with `This entry supersedes D-008` scored A1–A4 all PASS —
+a full pass for the move performed backwards, D-005 left governing. Version 4
+keeps the spelling looseness and constrains the direction. The appended entry
+must say it *supersedes* D-005 (the `by` reading is gone), and D-005's
+back-pointer must name the new entry as the one that superseded it — passive
+`Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
+see D-008` — not as an entry D-005 supersedes.
+
+Validated offline against 11 synthetic roadmaps, old grader against new:
+
+| case | old | new |
+|---|---|---|
+| `Supersedes: D-005` field + `Status: Superseded by D-008` | 4/4 | 4/4 |
+| `Supersedes D-005` inside the `Decision:` line | 4/4 | 4/4 |
+| heading annotated `(superseded by D-008)` — the trial-7 spelling | 4/4 | 4/4 |
+| back-pointer `Status: Superseded — see D-008` | 4/4 | 4/4 |
+| reversed pair: `Superseded by D-005` + `D-005 supersedes D-008` | 4/4 | **A3 FAIL** |
+| back-pointer reversed only | 4/4 | **A3 FAIL** |
+| appended entry reversed only | 4/4 | **A3 FAIL** |
+| bare id, no supersede word | A3 FAIL | A3 FAIL |
+| prose citation only ("the two reasons D-005 gave") | A3 FAIL | A3 FAIL |
+| D-005 rewritten in place | A1, A3 FAIL | A1, A3 FAIL |
+| D-005 dropped, survivors renumbered | A1, A2, A3 FAIL | A1, A2, A3 FAIL |
+
+No trials were spent, and the recorded pools are not re-scored: `evals/results/`
+is gitignored and only the transcripts survive. What those transcripts do
+support is the narrower claim, checked here: every forward line on a new entry
+in the six retained transcripts is active voice (`Supersedes: D-005`,
+`supersedes D-005 (Blobstash)`) and every back-pointer on D-005 is passive
+(`Status: Superseded by D-008`, `### D-005 — Upload storage backend (superseded
+by D-008)`), so none of them used the pass path this version removes. The
+unmet-but-covered verdict is carried from Version 2's retained pool and Version
+3's preflight, not re-measured. The forward regex on its own is still not
+direction-proof — `Superseded: D-005` on an appended entry matches it — but the
+pair is, because a reversed record needs D-005 to claim it supersedes the new
+entry, which A3 now rejects.
+
 **Assertion roles.**
 
 - A1 — D-005's two recorded lines survive somewhere in the file, byte for byte,
@@ -115,7 +156,10 @@ against an instrument that has nothing left to discriminate.
   headings is not enough: dropping D-005, renumbering D-006/D-007 down, and
   appending the new entry as D-007 leaves seven ids each used once.
 - A3 — the supersede move itself: an appended entry saying it supersedes D-005,
-  and a line on D-005 naming that entry back.
+  and a line on D-005 naming that entry as the one that superseded it. The
+  reverse claim is not a spelling of the move: an appended entry saying it is
+  superseded *by* D-005, or a D-005 annotation saying D-005 supersedes the new
+  entry, is the same edit performed backwards, with D-005 still governing.
 - A4 — a floor on the spec naming the backend now in use. The user asked for it
   explicitly, so both arms should pass; it exists so a trial that fixed the log
   and left the spec lying is not scored as a success.
@@ -254,17 +298,35 @@ emit(
 )
 
 # A3 — the supersede move: an appended entry that says so, and a line on D-005
-# pointing back at it. Spelling is deliberately loose in both directions — the
-# fixture pins no token, so `Supersedes: D-005`, `supersedes D-005` inside the
-# Decision line, and `Superseded by D-008` in a heading all count. The word has
-# to sit next to the id, though: D-005 is cited in prose that does not supersede
-# it ("the two reasons D-005 gave"), and a bare-id match would score that a pass.
-SUPERSEDES = re.compile(r"supersede[sd]?\b[:\s]*(?:by\b[:\s]*)?D-0*005\b", re.I)
+# pointing back at it. Spelling is deliberately loose — the fixture pins no
+# token, so `Supersedes: D-005`, `supersedes D-005` inside the Decision line,
+# and `Superseded by D-008` in a heading all count. Two constraints hold the
+# pair together. The word has to sit next to the id: D-005 is cited in prose
+# that does not supersede it ("the two reasons D-005 gave"), and a bare-id match
+# would score that a pass. And the pair has to read forwards: an appended entry
+# saying it is superseded *by* D-005, annotated on D-005 as an entry D-005
+# supersedes, states the relationship backwards and leaves D-005 governing —
+# the move under test, inverted, so it fails rather than scoring a full pass.
+SUPERSEDES = re.compile(r"supersede[sd]?\b[:\s]*D-0*005\b", re.I)
 new_ids = [i for i in dict.fromkeys(ids) if i not in ORIGINAL_TITLES]
 supersedes = [i for i in new_ids if any(SUPERSEDES.search(l) for l in blocks.get(i, []))]
-back_refs = [l for l in blocks.get("005", []) if re.search(r"supersede", l, re.I)]
+
+
+# Does this line on D-005 name `new_id` as the entry that superseded it? Passive
+# is the attested spelling in every recorded trial (`Status: Superseded by
+# D-008`, `(superseded by D-008)` in the heading), and `\bsupersedes?\b` cannot
+# match "Superseded", so those keep passing. Active voice aimed at the new id
+# ("this entry supersedes D-008") is the reversed claim, and is rejected.
+def points_back(line, new_id):
+    if not re.search(rf"\bD-0*{new_id}\b", line):
+        return False
+    if not re.search(r"supersede", line, re.I):
+        return False
+    return not re.search(rf"\bsupersedes?\b[:\s]*D-0*{new_id}\b", line, re.I)
+
+
 a3 = any(
-    any(re.search(rf"\bD-0*{int(i)}\b", l) for l in back_refs)
+    any(points_back(l, int(i)) for l in blocks.get("005", []))
     for i in supersedes
 )
 emit("A3", a3, "no appended entry supersedes D-005, or D-005 never points at one")
@@ -280,4 +342,4 @@ PY
 5
 
 ## Version
-3
+4
