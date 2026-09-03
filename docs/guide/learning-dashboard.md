@@ -185,17 +185,10 @@ one path where nothing checks the transition and nothing records it.
 
 ### The candidate commands in the CLI
 
-The CLI has its own candidate commands. They work the project's own queue under
-`.arcforge/learning/` — **not** the curator queue the dashboard reviews, which
-is home-global. They are a scriptable project-scope path, not a second way to
-work the dashboard's inbox: review what you see in the dashboard from the
-dashboard.
-
-Every one of them is project-scope: passing `--global` is refused, and the
-error points you at `arcforge learn dashboard`. That includes the read
-commands, which used to accept it — `learn review --global` printed the
-curator's queue records raw, project id and proposal body included, and
-`inbox`/`inspect`/`drafts --global` quietly returned nothing at all.
+The CLI works the **same queue** the dashboard does. It is the scriptable way
+into the same review loop, not a second one: it reads through the same event
+log, offers only the transitions the same legality matrix allows, asks for the
+same acknowledgement before activation, and writes to the same audit log.
 
 ```bash
 arcforge learn inbox --project
@@ -208,19 +201,35 @@ arcforge learn activate <candidate-id> --project
 | Command | Effect |
 |---------|--------|
 | `learn inbox` | The review queue, grouped, with the next command for each entry |
-| `learn review` | The queued candidates awaiting a decision |
-| `learn inspect` | Read-only summary of one candidate: evidence, paths, next actions |
+| `learn review` | Every project-scoped candidate, as the dashboard's cards |
+| `learn inspect` | One candidate in detail: evidence summaries, body preview, next actions |
 | `learn approve` / `learn reject` | Record your decision |
 | `learn accept` | Approve and materialize in one step — never activates |
-| `learn materialize` | Write the drafts without activating them |
-| `learn activate` | Promote materialized drafts to active (project scope only) |
-| `learn drafts` | What is materialized and waiting for activation |
+| `learn materialize` | Write the draft without activating it |
+| `learn activate` | Promote the materialized draft to an active instinct |
+| `learn drafts` | What is materialized and waiting for activation, with draft paths |
 
-Every candidate command is **project-scope only** — reads (`inbox`, `review`,
-`inspect`, `drafts`) as well as transitions (`approve`, `reject`,
-`materialize`, `accept`, `activate`). `learn status`, `learn enable` and
-`learn disable` still take either scope, because those are about the opt-in,
-not about candidates. Every command takes `--json` for scripting.
+Three things follow from these being one queue rather than two.
+
+**They are project-scope only.** `--global` is refused for every one of them,
+and the error points you at `arcforge learn dashboard`. A global candidate
+applies to every project on the machine, so it is reviewed where you can see
+what it would change. (`learn status`, `learn enable` and `learn disable` still
+take either scope — those are about the opt-in, not about candidates.)
+
+**Only what is legal is offered.** Each entry carries its `available_actions`,
+straight from the matrix, and a transition outside them is refused with the
+list of what is allowed instead. So `reject` works on a pending candidate but
+not on one you already approved — approving it is a decision, and undoing it is
+not one of the moves.
+
+**`materialize` and `activate` handle instinct candidates.** That is what the
+engine can build today. A candidate of any other artifact type stays in the
+queue and the command says so, rather than offering a step with nothing behind
+it.
+
+Every command takes `--json` for scripting; with `--json`, a refusal comes back
+as `{"error": "..."}` and a non-zero exit.
 
 ## Turning it off
 
@@ -252,22 +261,17 @@ your session record — the counts and the files you touched — but their
 supposed to look like. The same opt-in decides whether your recent message text
 is stored in the session record at all.
 
-State sits in two places, split by scope:
+Almost everything sits under `~/.arcforge/`: diaries in
+`diaries/<project>/<date>/`, raw observations in `observations/<project>/`, the
+candidate queue and the review audit log in `learning/`, the drafts
+materialization writes in `learning/drafts/<candidate-id>/`, and activated
+instincts in `instincts/<project>/` (or `instincts/global/`). The project's own
+`.arcforge/learning/` holds one thing: that scope's opt-in.
 
-- **Home-global** — under `~/.arcforge/`: diaries in `diaries/<project>/<date>/`,
-  raw observations in `observations/<project>/`, activated global instincts in
-  `instincts/<project>/`, and the global learning config and candidate queue in
-  `learning/`.
-- **Project-scoped** — under `.arcforge/learning/` inside the project itself:
-  that scope's config, its candidate queue, and the instincts and patches
-  materialized for it.
-
-Materialization and activation additionally write into the project tree. A skill
-candidate materializes as `skills/<name>/SKILL.md.draft` inside your project and
-activation renames it to `SKILL.md`; command, agent, and eval candidates follow
-the same draft-then-rename pattern in their own directories. So an accepted
-candidate becomes a real file in your repository, which you review and commit
-like any other change.
+Nothing in the loop writes into your repository. A materialized candidate is a
+draft under the arcforge home, and activating it writes an instinct there too —
+so a review you are midway through never shows up in `git status`, and nothing
+is committed on your behalf.
 
 The commands above print the absolute path of anything they write, so you can
 always read exactly what was recorded and where it went.

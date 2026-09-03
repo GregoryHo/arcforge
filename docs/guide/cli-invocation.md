@@ -140,10 +140,14 @@ arcforge learn dashboard [--port N]
 
 `learn status`, `learn enable` and `learn disable` take `--project` or
 `--global`. The candidate commands — `inbox`, `review`, `inspect`, `drafts`,
-`approve`, `reject`, `materialize`, `accept`, `activate` — are
-**project-scope only**: the engine refuses `--global` and points at
-`arcforge learn dashboard`, which is the surface for the home-global curator
-queue. Every command takes `--json` for machine-readable output. There are four
+`approve`, `reject`, `materialize`, `accept`, `activate` — work the same queue
+the dashboard does, and are **project-scope only**: the engine refuses
+`--global` and points at `arcforge learn dashboard`, where a candidate that
+applies to every project is reviewed. They offer only the transitions legal
+from a candidate's current state, and `materialize`/`activate` handle instinct
+candidates — the artifact the engine can build today. Every command takes
+`--json` for machine-readable output; with it, a refusal comes back as
+`{"error": "..."}` and a non-zero exit. There are four
 further subgroups — `learn diary`, `learn reflect`, `learn instinct`, and
 `learn recall` — which the `/learning` skill drives. The
 [learning guide](learning-dashboard.md) walks the whole loop.
