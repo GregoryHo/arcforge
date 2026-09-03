@@ -49,12 +49,15 @@ function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra
 /**
  * `intro` and `appendix` sit outside the `## Decision Log` section — before it
  * and after it — so a fixture can put decision-shaped prose where the log is not.
+ * `note` sits *inside* the `## Roadmap` section, below the table, so a fixture
+ * can put row-shaped lines where the roadmap is.
  */
 function roadmap({
   rows = [row()],
   decisions = [decision()],
   fold = [],
   intro = [],
+  note = [],
   appendix = [],
 } = {}) {
   const folded =
@@ -70,6 +73,7 @@ function roadmap({
     '',
     ...TABLE_HEADER,
     ...rows,
+    ...note,
     '',
     '## Decision Log',
     '',
@@ -170,6 +174,20 @@ describe('check-product', () => {
         ].join('\n'),
       ];
       expect(run({ roadmap: { intro } })).toEqual([]);
+    });
+
+    it('does not read a fenced table row inside `## Roadmap`', () => {
+      // The section boundary is fence-aware, but the rows inside it are read by
+      // `unfenced` too — read fence-blind, this illustration would add a second
+      // `← we are here` and a link to a spec that does not exist.
+      const note = [
+        '',
+        '```markdown',
+        ...TABLE_HEADER,
+        row({ version: '9.9.9', status: 'building', specs: ['beta'] }),
+        '```',
+      ];
+      expect(run({ roadmap: { note } })).toEqual([]);
     });
 
     it('rejects two marked rows', () => {
@@ -885,6 +903,18 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/cites D-009/);
     });
 
+    it('does not read a citation inside a fenced code block', () => {
+      // The neighbouring fenced-`##` case could not reach this: its fenced body
+      // carries no D-id, so only the citation below the fence was ever scanned.
+      const specs = [
+        spec({
+          cites: ['D-001'],
+          extra: ['```markdown', '- **D-007** — an example citation.', '```'],
+        }),
+      ];
+      expect(of('C5', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
     it('does not let a fenced `## Decisions` illustration stand in for the section', () => {
       const specs = [
         spec({
@@ -906,6 +936,21 @@ describe('check-product', () => {
     it('fails when the roadmap table has no rows', () => {
       expect(
         of('C6', validateProduct({ roadmap: roadmap({ rows: [] }), specs: [spec()] })),
+      ).toEqual(['C6 sanity floor: the roadmap table has no rows']);
+    });
+
+    it('is not met by a fenced table row', () => {
+      // The floor is a floor of real rows: read fence-blind, an illustration
+      // would stand in for a roadmap that has no table at all.
+      const note = [
+        '',
+        '```markdown',
+        ...TABLE_HEADER,
+        row({ version: '9.9.9', status: 'building', specs: ['beta'] }),
+        '```',
+      ];
+      expect(
+        of('C6', validateProduct({ roadmap: roadmap({ rows: [], note }), specs: [spec()] })),
       ).toEqual(['C6 sanity floor: the roadmap table has no rows']);
     });
 

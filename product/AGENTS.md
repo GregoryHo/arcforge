@@ -190,6 +190,13 @@ without that backstop: no rule asserts a spec's headings, so a spec whose sectio
 renamed, dropped, or swallowed by an unclosed fence cites nothing and is checked for
 nothing. Keep the heading as the template writes it.
 
+The fence exemption is not the log's alone. Every section `check:product` reads is
+parsed the same way, so a fenced block is an illustration wherever it sits: a `|` row
+inside one in `## Roadmap` is not a roadmap row — it adds no second `← we are here`,
+and it does not stand in for a table that is not there (C1, C4, C6, C7) — and a
+`D-NNN` inside one in a spec's `## Decisions` is an example citation, not one C5
+resolves.
+
 `Refines:` and `Extends:` never require a flip — they sharpen or widen a decision
 that stays in force. Use them instead of a supersede when nothing is being reversed.
 

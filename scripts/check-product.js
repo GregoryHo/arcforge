@@ -17,7 +17,10 @@
  * scripts/check-*.js family.
  *
  * Validates:
- *   - C1  exactly one roadmap row carries the `← we are here` marker;
+ *   - C1  exactly one roadmap row carries the `← we are here` marker — rows are
+ *         read outside fenced blocks, so an illustrative table row inside
+ *         `## Roadmap` is not a roadmap row: it carries no second marker and it
+ *         does not stand in for a table that is not there;
  *   - C2  Decision Log ids are `D-NNN` (zero-padded), ascending outside the
  *         folded `<details>` index, unique, and gap-free from D-001 — read
  *         inside the `## Decision Log` section, so a `### D-NNN` heading
@@ -56,8 +59,11 @@
  *         the row ↔ spec links resolve in both directions;
  *   - C5  every D-id a spec cites in `## Decisions` is a zero-padded `D-NNN`
  *         and exists in the log — that section is sliced the same fence-aware
- *         way, so an example `##` heading cannot carry citations out of reach;
- *   - C6  sanity floor — at least one roadmap row, one decision, one spec;
+ *         way, so an example `##` heading cannot carry citations out of reach,
+ *         and the citation scan skips its fenced lines, so a `D-NNN` inside a
+ *         worked example is an illustration rather than a citation;
+ *   - C6  sanity floor — at least one roadmap row, one decision, one spec, each
+ *         counted outside fenced blocks, so an illustration never meets it;
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
@@ -139,7 +145,8 @@ function compareVersions(a, b) {
  * worked example in the log (the shape `product/AGENTS.md` itself uses) would cut
  * the slice short and silently drop every entry below it. Only the boundary scan
  * skips fenced lines; the returned slice is a raw index range, so the fence lines
- * stay in it and each parser applies its own fence exemption. An unclosed fence
+ * stay in it and `unfenced()` drops them for every parser that reads a section.
+ * An unclosed fence
  * therefore swallows the heading and yields `[]` — fail-closed for ROADMAP.md's two
  * sections, which C6 rejects as a corpus with no rows or no decisions, but silent
  * for a spec's `## Decisions`, exactly as a spec that renames or drops that section
@@ -167,6 +174,33 @@ function section(md, heading) {
   return start === -1 ? [] : lines.slice(start + 1);
 }
 
+/**
+ * The lines of a section that sit outside its fenced code blocks — the fence
+ * exemption every parser applies to the raw slice `section()` hands back.
+ *
+ * A fenced block is an illustration, not product state. Without this a worked
+ * example showing a deliberately wrong `- Supersedes : D-001` would hard-fail C3
+ * as a malformed relation line, so the log could not document its own rules the
+ * way `product/AGENTS.md` does — and, in the other direction, a fenced sample
+ * table row would count as a roadmap row and a fenced `- **D-007**` as a spec's
+ * citation. One implementation keeps `FENCE_RE`'s marker matching (a `~~~`
+ * cannot close a ``` block) as the single fence rule.
+ */
+function unfenced(lines) {
+  const out = [];
+  let fenceMarker = null;
+  for (const line of lines) {
+    const fence = line.match(FENCE_RE);
+    if (fence) {
+      if (!fenceMarker) fenceMarker = fence[1];
+      else if (fence[1] === fenceMarker) fenceMarker = null;
+      continue;
+    }
+    if (!fenceMarker) out.push(line);
+  }
+  return out;
+}
+
 /** The lines between `## Roadmap` and the next `##` heading. */
 function roadmapSection(roadmap) {
   return section(roadmap, ROADMAP_HEADING_RE);
@@ -174,13 +208,14 @@ function roadmapSection(roadmap) {
 
 /**
  * Parse the roadmap table. Pushes structural errors onto `errors` and returns
- * the rows it could read.
+ * the rows it could read. Read outside fenced blocks, so an illustrative table
+ * row inside `## Roadmap` is not a roadmap row.
  *
  * @returns {{version: string, tag: string, status: string, here: boolean, specs: string[]}[]}
  */
 function parseRoadmapRows(roadmap, errors) {
   const rows = [];
-  for (const raw of roadmapSection(roadmap)) {
+  for (const raw of unfenced(roadmapSection(roadmap))) {
     const line = raw.trim();
     if (!line.startsWith('|')) continue;
     const cells = line
@@ -225,21 +260,8 @@ function parseRoadmapRows(roadmap, errors) {
 function parseDecisions(roadmap, errors) {
   const entries = [];
   let inFold = false;
-  let fenceMarker = null;
   let current = null;
-  for (const line of section(roadmap, DECISION_LOG_HEADING_RE)) {
-    // A fenced block is an illustration, not part of the log. Without this a
-    // worked example showing a deliberately wrong `- Supersedes : D-001` would
-    // hard-fail C3 as a malformed relation line, so the log could not document
-    // its own rules the way `product/AGENTS.md` does.
-    const fence = line.match(FENCE_RE);
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[1];
-      else if (fence[1] === fenceMarker) fenceMarker = null;
-      continue;
-    }
-    if (fenceMarker) continue;
-
+  for (const line of unfenced(section(roadmap, DECISION_LOG_HEADING_RE))) {
     if (/^\s*<details\b/i.test(line)) inFold = true;
     if (/^\s*<\/details>/i.test(line)) inFold = false;
 
@@ -552,11 +574,13 @@ function checkSpecHeaders(rows, specs, errors) {
  * The body of a spec's `## Decisions` section, empty when it has none. It takes
  * the same fence-aware slice the roadmap's sections do, so a fenced `## …` in a
  * worked example neither stands in for the section nor cuts it short and drops
- * the citations below it. A spec with no such section cites nothing, which is
- * what an empty body already says.
+ * the citations below it — and its fenced lines are dropped from the body too,
+ * so a `D-NNN` shown inside one is an example citation rather than one C5
+ * resolves. A spec with no such section cites nothing, which is what an empty
+ * body already says.
  */
 function decisionsSection(content) {
-  return section(content, SPEC_DECISIONS_HEADING_RE).join('\n');
+  return unfenced(section(content, SPEC_DECISIONS_HEADING_RE)).join('\n');
 }
 
 /** C5 — a spec may only cite well-formed `D-NNN` ids the log actually carries. */
