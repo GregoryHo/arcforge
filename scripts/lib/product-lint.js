@@ -151,7 +151,9 @@ const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
 // catches it; the heading that closes it is read at ` {0,3}` by `SECTION_END_RE`,
 // where column 1 would fail open — see `section`.
 const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
-// The one `##` section of a spec this linter reads, sliced the same way.
+// The one `##` section of a spec this linter reads, sliced the same way — but no
+// rule asserts a spec's headings, so an indented or renamed one empties the slice
+// silently, where C6 catches the same read on `ROADMAP.md`.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 // The spec header line, matched per line rather than against the whole file, so
 // the scope in `specStatusHeader` is what decides which line is the header.
@@ -487,12 +489,14 @@ function checkRoadmapTags(rows, errors) {
  * `SECTION_END_RE`, the same boundary that ends a section, at the bound
  * `DECISION_ANY_RE` also takes and for the same reason — every boundary a heading
  * *ends* fails open when it is read at column 1. The one column-1 *boundary* read
- * left is the heading that *opens* a section, which fails closed and has C6 behind
- * it — the field and entry forms (`STATUS_FIELD_RE`, `DECISION_HEADING_RE`'s
- * canonical form, `SPEC_STATUS_HEADER_RE`) are anchored there for a different
- * reason, which is that column 1 is where the form puts them. Four spaces is an
- * indented code block, so an illustrative `##` in the preamble still does not cut
- * it short.
+ * left is the heading that *opens* a section, which fails closed — and C6 rejects
+ * the empty slice that read yields for `ROADMAP.md`'s two sections, though not for
+ * a spec's `## Decisions`, which has no such backstop and is then checked for
+ * nothing (`product/AGENTS.md` states that exception). The field and entry forms
+ * (`STATUS_FIELD_RE`, `DECISION_HEADING_RE`'s canonical form,
+ * `SPEC_STATUS_HEADER_RE`) are anchored there for a different reason, which is
+ * that column 1 is where the form puts them. Four spaces is an indented code
+ * block, so an illustrative `##` in the preamble still does not cut it short.
  */
 function specStatusHeader(content) {
   for (const line of unfenced(content.split('\n'))) {

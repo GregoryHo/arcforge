@@ -1,8 +1,8 @@
 # Deferred from the `check:product` review rounds
 
 Process record from the review of the product-method alignment PR — the round that
-built `scripts/check-product.js` and its falsifiability suite. Six things came out
-of it that were deliberately **not** landed — four widenings and carry-forwards the
+built `scripts/check-product.js` and its falsifiability suite. Seven things came out
+of it that were deliberately **not** landed — five widenings and carry-forwards the
 rounds argued down, plus two standing constraints on the linter's own code, two of
 which have since been taken — and each would otherwise have survived only in a review
 thread. They are written down here so the next person hardening the linter starts
@@ -274,3 +274,31 @@ way it already covered `### D-NNN` headings and relation bullets. The scan now s
 ` {0,3}`, `product/AGENTS.md`'s indentation paragraph names the roadmap row as the
 third form it covers, and two cases in `tests/scripts/check-product.test.js` pin both
 directions of the bound.
+
+## 7. `section()`'s two indent bounds stay different — the widening argued down in round 14
+
+Round 14 widened the heading that **closes** a slice from column 1 to ` {0,3}`
+(`SECTION_END_RE`). The obvious tidy-up that follows — widening the heading that
+**opens** one to match, so one bound serves both ends — was argued down, and stays
+argued down.
+
+The two reads fail in opposite directions:
+
+- The **closing** read fails *open* at column 1. An indented `## Appendix` never ended
+  `## Decision Log`, so the appendix's `### D-NNN` headings became entries C2 numbered
+  and a spec's citation resolved — the plausible-looking lie the linter exists to
+  catch. That is why it was widened.
+- The **opening** read fails *closed* at column 1. An indented `## Decision Log` yields
+  an empty slice, and C6 rejects a corpus with no decisions the same way it rejects a
+  renamed heading. Widening it deletes that live rule and buys nothing, because a
+  reader of the rendered file sees the heading either way.
+
+The asymmetry has one exception, and it is why the "and C6 catches it" half must never
+be written unqualified — which it twice was, and was twice corrected. A spec's
+`## Decisions` (`SPEC_DECISIONS_HEADING_RE`) is read at column 1 like the other two,
+but **no rule asserts a spec's headings**: an indented one empties the slice, C5
+resolves nothing, and the spec is checked for nothing — the fail-closed slice reaching
+the fail-open outcome. `product/AGENTS.md` states the exception once, and the two
+docblocks that make the C6 claim qualify it against that statement rather than
+restating it. Whoever adds a rule over a spec's headings is the one who gets to delete
+the qualification.
