@@ -106,7 +106,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   `Supersedes:` carrying its flip in the matching form on a superseded entry whose
   whole `Status:` stays coherent — every clause from the closed vocabulary, at most
   one death, a total flip leaving nothing live, a partial one keeping exactly one
-  live clause — and the pairing read back from the flip, so a `Superseded-by:` or
+  live clause, and no decision both replacing an entry whole and reversing one of
+  its clauses — and the pairing read back from the flip, so a `Superseded-by:` or
   `partially superseded by` clause whose named entry claims no supersession, or that
   names an id the log does not carry, is rejected too (C3); every spec header
   agreeing with its governing roadmap row, links resolving both ways (C4); every
