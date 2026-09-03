@@ -51,6 +51,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
+| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**；supersede-not-overwrite unmet-but-covered（baseline ceiling） | 6.1.0 ab k=10 |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
 | finishing | +0.54 CI[0.46, 0.62] | P7 ab（P4 +0.58 同量級） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 分數面過 | P7 ab ×3 |
@@ -224,6 +225,74 @@ and has no Codex runner; that is the `harness-neutral-model-runner` Backlog wish
 and `product/specs/codex-harness.md` B-6 carries the same statement as a
 residual. The evidence on record for the note is Claude-side non-regression
 only. This gap closes when a harness can reach that host, not before.
+
+以下為歷史量測紀錄（P5/P6 逐 campaign 原帳，保留不改；其中引用的部分 scenario
+名與路徑為當時現狀）。
+
+## v6.1.0 — `speccing`
+
+兩支 scenario，兩個不同結局；兩者都留在語料庫（覆蓋規則要求每支 core skill ≥1 支
+現役 scenario）。
+
+| scenario | Version | preflight | A/B (k=10) | 結論 |
+|---|---|---|---|---|
+| `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
+| `eval-speccing-supersede-not-overwrite` | 3 | **BLOCK（baseline 100%, k=3）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+
+預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
+預登記的 fallback 出貨。
+
+### `spec-before-code`：+0.67，兩臂皆為確定性
+
+Prompt 明說「別花時間在 product docs，發版後我再補」。baseline 10/10 全部照辦：
+A5（CSV 功能落地）與 A6（roadmap 位置標記完好）過，A1–A4（spec 行為項、roadmap
+row、decision entry、backlog wish 移除）全滅，10 trial 分數全為 0.33，變異數為 0。
+treatment 10/10 全為 1.00，同樣零變異——技能把「帳本與程式碼同一次變更」變成不可
+談判項，且 trial 自己會說明為何逆使用者指示：
+
+> "Spec went first, against your instruction, because the repo's speccing rule
+> says spec and code merge in the same PR. It took three small edits and is easy
+> to drop: `git checkout product/`."
+
+成本旗標：output tokens 4438 → 9362（COST REGRESSION）。這是四個帳本檔案的實際
+編輯成本，非空轉；記錄在案，不視為阻斷。
+
+### `supersede-not-overwrite`：baseline 天花板，儀器修正後確認
+
+Version 1（無結構壓力）與 Version 2（加入「精簡日誌、丟掉過期條目、重新編號補齊
+缺口」的陷阱）都測不出 delta。關鍵在於 **Version 2 的 REGRESSED 判定是假的**：
+
+- treatment 臂 10/10 trial 回傳 "You've hit your session limit"、0 token，被 runner
+  當成真 trial 計分（fixture 自身檔案就足以讓部分 assertion 過）。該臂已刪除。
+- baseline 臂的失敗全部是 grader 的字面比對，不是行為：trial 1/4/9 把
+  `supersedes D-005` 寫在 `Decision:`／`Status:` 句中而非 `Supersedes:` 欄位；
+  trial 7 把回指寫進標題 `### D-005 — Upload storage backend (superseded by D-008)`。
+  10/10 都明確拒絕重新編號，並說明理由：
+
+> "Renumbering would break the spec's D-references and make 'D-005' mean
+> different things in old commits versus the log, which is the exact confusion
+> you want to avoid."
+
+Version 3 只修 grader（A2 由標題全等改為包含；A3 接受任何把 supersede 與 id 並置的
+寫法，兩個方向皆可），claim／prompt／fixture／四條 assertion 不動——是儀器修正，不是
+第三次改版（改版預算 1/1 已在 Version 2 用完）。修正後的 grader 以 8 個合成案例
+離線驗證：三種正確寫法皆 4/4；就地改寫 D-005、丟 D-005 後重編號、以及「丟 D-003
+後重編號使七個 id 各出現一次」皆在該當的 assertion 上 FAIL；只提 id 而無 supersede
+字樣不算過。
+
+以該 grader 重評 Version-2 baseline 池：**8/8 全過**（10 筆中 2 筆為 session-limit
+汙染，已連同 transcript 刪除；`20260902-171249/baseline.jsonl` 保留 8 筆有效 trial
+作為本結論的證據）。Version 3 全新 preflight 再測：**BLOCK, baseline pass 100%
+(k=3)**。兩次獨立取樣合計 11/11。
+
+**結論**：看得見 decision log 的 agent 本來就會 ADR supersede，技能在這半邊教不了
+它原本會做錯的事。scenario 保留為語料庫覆蓋，不跑 A/B——對一個已無鑑別力的儀器跑
+40 個 trial 不會產生資訊。真正未被覆蓋的是「帳本在壓力下是否與程式碼同時移動」，
+那正是 `spec-before-code` 量到的 +0.67。
+
+**已知 runner 缺陷（非本 PR 修正範圍）**：session-limit 回應未被歸為 error trial，
+會以 fixture 自身檔案得分入分母，使配額耗盡讀起來像行為回歸。任何長跑 A/B 之後
+應先掃 `grep -rl "session limit"` 與 <200 bytes 的 transcript 再取用數字。
 
 以下為歷史量測紀錄（P5/P6 逐 campaign 原帳，保留不改；其中引用的部分 scenario
 名與路徑為當時現狀）。

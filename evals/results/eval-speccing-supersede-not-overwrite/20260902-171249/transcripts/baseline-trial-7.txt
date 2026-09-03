@@ -1,0 +1,79 @@
+[Assistant] Reading the product directory first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-ORfVQ7" && find . -type f -not -path './.git/*' | sort && echo "---" && cat .claude/* 2>/dev/null; find .claude -type f 2>/dev/null | head
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-ORfVQ7" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "===== $f ====="; cat -n "$f"; echo; done; echo "===== git log ====="; git log --oneline --stat | head -30
+
+[Assistant] Plan: supersede D-005 with a new D-008, update the spec's B-4 and decision list. Applying the edits now.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-ORfVQ7" && python3 - <<'PY'
+import pathlib
+
+def edit(path, pairs):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    for old, new in pairs:
+        assert s.count(old) == 1, (path, old[:40], s.count(old))
+        s = s.replace(old, new)
+    p.write_text(s)
+
+edit("product/ROADMAP.md", [
+    (
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Accepted
+""",
+"""### D-005 — Upload storage backend (superseded by D-008)
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Superseded by D-008 on 2026-09-03. Kept for the record only — uploads no longer go to Blobstash; do not build against this entry.
+"""),
+    (
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+""",
+"""- Why: Without key recovery it turns every forgotten password into lost data; encryption at rest covers the threat the product actually has.
+
+### D-008 — Upload storage backend moves to Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Vaultbox migration branch
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is no longer a storage target: nothing new is written there, and no code path holds a Blobstash client once the migration branch lands.
+- Why: _Not recorded yet. Fill in before the branch lands: what changed since D-005's cost and one-vendor reasoning?_
+"""),
+])
+
+edit("product/specs/uploads.md", [
+    (
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.
+""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.
+  Blobstash is not a storage target (D-008 supersedes D-005; lands with the
+  Vaultbox migration branch).
+"""),
+    (
+"""- **D-005** — the storage backend is Blobstash.
+""",
+"""- **D-008** — the storage backend is Vaultbox (supersedes D-005, Blobstash).
+"""),
+])
+print("ok")
+PY
+git --no-pager diff --stat && grep -rn "Blobstash" product/ && echo "--- D-numbers in log:" && grep -n "^### D-" product/ROADMAP.md
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-ORfVQ7" && git --no-pager diff
+
+[Assistant] Next: fill in the empty Why line on D-008 at `product/ROADMAP.md:69`. I did not know the reason for the move and did not invent one.
+
+What changed, 2 files, uncommitted:
+
+1. **D-005 kept, marked superseded.** Heading and Status now say "superseded by D-008", with a "do not build against this" note. Its text stays as the historical record.
+2. **D-008 added.** Uploads go to Vaultbox, Blobstash is no longer a target, version is "unreleased, lands with the migration branch".
+3. **Spec B-4 now says Vaultbox**, notes the change lands with the branch. The spec's decision list points at D-008 instead of D-005.
+
+**Not done: dropping entries and renumbering.** On inspection every entry D-001 to D-007 still describes the product as shipped, and the only stale one is D-005, which superseding handles. Renumbering would break the spec's D-references and make "D-005" mean different things in old commits versus the log, which is the exact confusion you want to avoid. The log already runs D-001 to D-008 with no gaps. If you still want entries removed, name them and I will do it.
+
+Separately: `src/uploads.js` still imports the Blobstash client. Left for the migration branch.

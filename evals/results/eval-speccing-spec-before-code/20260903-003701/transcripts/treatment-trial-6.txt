@@ -1,0 +1,147 @@
+[Assistant] Reading the repo layout, exporter, tests, and product files first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t6-MDgpu2" && find . -type f -not -path './node_modules/*' -not -path './.git/*' | sort && echo '--- package.json' && cat package.json && echo '--- src/exporter.js' && cat src/exporter.js
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t6-MDgpu2" && echo '--- test/exporter.test.js' && cat test/exporter.test.js && echo '--- README.md' && cat README.md && echo '--- product/ROADMAP.md' && cat product/ROADMAP.md && echo '--- product/BACKLOG.md' && cat product/BACKLOG.md && echo '--- product/specs/reports.md' && cat product/specs/reports.md && echo '--- .claude/settings.json' && cat .claude/settings.json && echo '--- git log' && git log --oneline -5 && git status --short
+
+[Assistant] Spec first, then the test, then the code. The product edits are three small changes so the spec and code land together, as this repo requires.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t6-MDgpu2" && python3 - <<'PY'
+import re, pathlib
+
+# 1. Backlog: remove the csv-export wish; note xlsx now waits on a scheduled version.
+p = pathlib.Path('product/BACKLOG.md')
+s = p.read_text()
+s = s.replace(
+"""- **csv-export** — pull a report out as CSV, the way JSON already works, so a
+  run can be opened in a spreadsheet without a conversion step.
+""", "")
+s = s.replace("· needs: csv-export.", "· needs: csv-export (0.4.0).")
+p.write_text(s)
+
+# 2. Roadmap: add the 0.4.0 row, move the marker, append D-005.
+p = pathlib.Path('product/ROADMAP.md')
+s = p.read_text()
+s = s.replace(
+"| 0.3.0 | `v0.3.0` | JSON export | **shipped ← we are here** | Pull a report out as JSON over the API. | [reports](specs/reports.md) |\n",
+"| 0.3.0 | `v0.3.0` | JSON export | **shipped** | Pull a report out as JSON over the API. | [reports](specs/reports.md) |\n"
+"| 0.4.0 | — | CSV export | **in progress ← we are here** | Pull a report out as CSV over the API, the way JSON already works. | [reports](specs/reports.md) |\n")
+s = s.rstrip('\n') + """
+
+### D-005 — CSV export is the 0.4.0 milestone
+- Date: 2026-09-03
+- Version: 0.4.0
+- Status: Accepted
+- Decision: Promote the csv-export wish to 0.4.0. A stored run can be pulled as CSV through the same export dispatcher as JSON: a header record naming the columns, then one record per row, both in the run's declared column order, quoted per RFC 4180 with CRLF record terminators.
+- Why: A customer is waiting on CSV now, it is the smallest export a spreadsheet opens without a conversion step, and the xlsx-export wish is blocked behind it. RFC 4180 quoting and CRLF are chosen because that is what spreadsheet importers accept without a dialog.
+"""
+p.write_text(s)
+
+# 3. Spec: status header, B-6, decision list.
+p = pathlib.Path('product/specs/reports.md')
+s = p.read_text()
+s = s.replace("> Status: shipped v0.3.0 · [ROADMAP](../ROADMAP.md)",
+              "> Status: shipped v0.3.0 · 0.4.0 in progress · [ROADMAP](../ROADMAP.md)")
+s = s.replace(
+"""- **B-5 An unknown export format is refused loudly.** Asking for a format the
+  tool does not implement fails with the format named in the error, never with a
+  silent fallback.
+""",
+"""- **B-5 An unknown export format is refused loudly.** Asking for a format the
+  tool does not implement fails with the format named in the error, never with a
+  silent fallback.
+- **B-6 CSV export is available over the API.** A caller can pull any stored run
+  as CSV through the same dispatcher as JSON. The first record is a header
+  naming the run's columns in declared order; each following record is one row
+  with its fields in that same order. A field is quoted when it contains a
+  comma, a double quote, or a line break, with embedded double quotes doubled;
+  a null or undefined value is an empty field; every record ends with CRLF.
+""")
+s = s.replace("- **D-004** — runs carry declared column order.\n",
+              "- **D-004** — runs carry declared column order.\n- **D-005** — CSV export is the 0.4.0 milestone.\n")
+p.write_text(s)
+PY
+cat >> test/exporter.test.js <<'EOF'
+
+test('csv export emits a header then rows in the run column order', () => {
+  assert.strictEqual(formatFor('csv', run), 'region,orders\r\nnorth,12\r\nsouth,7\r\n');
+});
+
+test('csv export quotes fields holding commas, quotes, or line breaks and blanks null', () => {
+  const awkward = {
+    id: 'run-42',
+    columns: ['name', 'note'],
+    rows: [
+      { name: 'a,b', note: 'said "hi"' },
+      { name: 'multi\nline', note: null },
+    ],
+  };
+  assert.strictEqual(
+    formatFor('csv', awkward),
+    'name,note\r\n"a,b","said ""hi"""\r\n"multi\nline",\r\n'
+  );
+});
+EOF
+sed -i '' "s/assert.deepStrictEqual(availableFormats(), \['json'\]);/assert.deepStrictEqual(availableFormats(), ['json', 'csv']);/" test/exporter.test.js
+git diff --stat && npm test 2>&1 | tail -25
+
+[Assistant] Red as expected. Now the implementation.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t6-MDgpu2" && cat > src/exporter.js <<'EOF'
+'use strict';
+
+/**
+ * Export a stored run. Formatting only — an exporter never re-executes the
+ * query behind the run (spec reports.md B-3).
+ */
+
+const FORMATS = ['json', 'csv'];
+
+function formatFor(kind, run) {
+  if (kind === 'json') return toJson(run);
+  if (kind === 'csv') return toCsv(run);
+  throw new Error(`unsupported export kind: ${kind}`);
+}
+
+function toJson(run) {
+  const rows = run.rows.map((row) => {
+    const ordered = {};
+    for (const column of run.columns) ordered[column] = row[column];
+    return ordered;
+  });
+  return JSON.stringify({ runId: run.id, columns: run.columns, rows }, null, 2);
+}
+
+/**
+ * CSV per spec reports.md B-6: header record, then one record per row, both in
+ * the run's declared column order; RFC 4180 quoting; CRLF record terminators.
+ */
+function toCsv(run) {
+  const records = [run.columns.map(csvField)];
+  for (const row of run.rows) records.push(run.columns.map((column) => csvField(row[column])));
+  return records.map((fields) => `${fields.join(',')}\r\n`).join('');
+}
+
+function csvField(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function availableFormats() {
+  return FORMATS.slice();
+}
+
+module.exports = { formatFor, toJson, toCsv, availableFormats };
+EOF
+npm test 2>&1 | tail -12 && echo '--- status' && git status --short && grep -c 'we are here' product/ROADMAP.md
+
+[Assistant] CSV export works: `formatFor('csv', run)` in `src/exporter.js` returns a header plus rows in declared column order, RFC 4180 quoting, CRLF line ends. Suite is green, 5 of 5.
+
+1. Added `toCsv` and wired `'csv'` into the `formatFor` dispatcher; `availableFormats()` now lists json and csv.
+2. Added two tests in `test/exporter.test.js` (column order, quoting and null handling) and updated the formats test.
+3. Did the product edits anyway, about 5 minutes of work, because this repo's rule is that spec and code merge in the same PR. Skipping them leaves a spec that says CSV does not exist.
+4. Promoted the wish: removed csv-export from `product/BACKLOG.md`, added the 0.4.0 roadmap row with the single marker, appended D-005 (no existing entry touched), added B-6 to `product/specs/reports.md`.
+5. Not done, left for your release: bump package.json to 0.4.0, flip the roadmap row to shipped with tag `v0.4.0`, set the spec header to shipped v0.4.0.
+
+Next: `git diff product/` to check the wording of D-005 and B-6 before you commit.

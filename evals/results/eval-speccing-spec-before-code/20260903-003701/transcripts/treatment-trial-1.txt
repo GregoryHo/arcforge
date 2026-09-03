@@ -1,0 +1,141 @@
+[Assistant] Reading the repo layout, exporter, tests, and product state first.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t1-vRfO5S" && find . -type f -not -path './node_modules/*' -not -path './.git/*' | sort && echo ---- && cat package.json && echo ---- && cat src/exporter.js && echo ---- && ls test tests 2>/dev/null; for f in $(find . -path ./node_modules -prune -o -name '*.test.js' -print -o -name '*.spec.js' -print 2>/dev/null | grep -v node_modules); do echo "== $f"; cat "$f"; done
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t1-vRfO5S" && echo "== ROADMAP" && cat product/ROADMAP.md && echo "== BACKLOG" && cat product/BACKLOG.md && echo "== SPEC" && cat product/specs/reports.md && echo "== README" && cat README.md && echo "== settings" && cat .claude/settings.json && ls -la .claude && find .claude -type f | sort && git log --oneline -5 && node --version
+
+[Assistant] Ledger has a `csv-export` wish and no 0.4.0 row. Promoting it first (backlog line out, decision in, roadmap row and spec B-6), then failing tests, then code.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t1-vRfO5S" && node - <<'EOF'
+const fs = require('fs');
+
+// 1. Backlog: remove the csv-export wish (two-line entry).
+let backlog = fs.readFileSync('product/BACKLOG.md', 'utf8');
+const wish = '- **csv-export** — pull a report out as CSV, the way JSON already works, so a\n  run can be opened in a spreadsheet without a conversion step.\n';
+if (!backlog.includes(wish)) throw new Error('csv-export wish not found');
+backlog = backlog.replace(wish, '');
+fs.writeFileSync('product/BACKLOG.md', backlog);
+
+// 2. Roadmap: move the marker to a new 0.4.0 row, append D-005 and D-006.
+let roadmap = fs.readFileSync('product/ROADMAP.md', 'utf8');
+const oldRow = '| 0.3.0 | `v0.3.0` | JSON export | **shipped ← we are here** | Pull a report out as JSON over the API. | [reports](specs/reports.md) |\n';
+if (!roadmap.includes(oldRow)) throw new Error('0.3.0 row not found');
+roadmap = roadmap.replace(oldRow,
+  '| 0.3.0 | `v0.3.0` | JSON export | **shipped** | Pull a report out as JSON over the API. | [reports](specs/reports.md) |\n' +
+  '| 0.4.0 | — | CSV export | **in progress ← we are here** | Pull a report out as CSV so a run opens in a spreadsheet without a conversion step. | [reports](specs/reports.md) |\n');
+roadmap = roadmap.replace(/\s*$/, '\n') + `
+### D-005 — CSV export ships in 0.4.0
+- Date: 2026-09-03
+- Version: 0.4.0
+- Status: Accepted
+- Decision: The \`csv-export\` wish is promoted to 0.4.0 and goes through the same \`formatFor\` dispatcher as JSON.
+- Why: A customer is waiting on it now, and it is the smallest export the existing dispatcher can carry without new plumbing.
+
+### D-006 — CSV follows RFC 4180
+- Date: 2026-09-03
+- Version: 0.4.0
+- Status: Accepted
+- Decision: CSV output is a header row of the run's declared columns followed by one line per row, CRLF-terminated, with a field quoted only when it contains a comma, a double quote, or a line break, quotes doubled inside, and null or undefined written as an empty field.
+- Why: RFC 4180 is what spreadsheets open without a dialect prompt, and quoting only when needed keeps the common case diff-friendly.
+`;
+fs.writeFileSync('product/ROADMAP.md', roadmap);
+
+// 3. Spec: status header, B-6, decision ids.
+let spec = fs.readFileSync('product/specs/reports.md', 'utf8');
+const header = '> Status: shipped v0.3.0 · [ROADMAP](../ROADMAP.md)';
+if (!spec.includes(header)) throw new Error('spec header not found');
+spec = spec.replace(header, '> Status: shipped v0.3.0 · building v0.4.0 · [ROADMAP](../ROADMAP.md)');
+const b5 = '- **B-5 An unknown export format is refused loudly.** Asking for a format the\n  tool does not implement fails with the format named in the error, never with a\n  silent fallback.\n';
+if (!spec.includes(b5)) throw new Error('B-5 not found');
+spec = spec.replace(b5, b5 +
+  '- **B-6 CSV export is available over the API.** A caller can pull any stored run\n' +
+  '  as CSV the same way as JSON. The first line is the run\'s declared columns in\n' +
+  '  order; each following line is one row in that order. Lines end in CRLF. A\n' +
+  '  field is quoted only when it holds a comma, a double quote, or a line break,\n' +
+  '  with inner quotes doubled; null and undefined become an empty field.\n');
+const d4 = '- **D-004** — runs carry declared column order.\n';
+if (!spec.includes(d4)) throw new Error('D-004 line not found');
+spec = spec.replace(d4, d4 +
+  '- **D-005** — CSV export ships in 0.4.0.\n' +
+  '- **D-006** — CSV follows RFC 4180.\n');
+fs.writeFileSync('product/specs/reports.md', spec);
+
+// 4. Tests first (B-6, and B-5's format list).
+let t = fs.readFileSync('test/exporter.test.js', 'utf8');
+t = t.replace("assert.deepStrictEqual(availableFormats(), ['json']);", "assert.deepStrictEqual(availableFormats(), ['json', 'csv']);");
+t += `
+test('csv export leads with the declared columns and keeps their order (B-6)', () => {
+  const lines = formatFor('csv', run).split('\\r\\n');
+  assert.deepStrictEqual(lines, ['region,orders', 'north,12', 'south,7']);
+});
+
+test('csv export quotes only fields that need it, doubling inner quotes (B-6)', () => {
+  const awkward = {
+    id: 'run-42',
+    columns: ['name', 'note', 'count'],
+    rows: [{ name: 'a,b', note: 'said "hi"', count: 3 }, { name: 'plain', note: 'line\\nbreak', count: null }],
+  };
+  assert.strictEqual(
+    formatFor('csv', awkward),
+    'name,note,count\\r\\n"a,b","said ""hi""",3\\r\\nplain,"line\\nbreak",\\r\\n',
+  );
+});
+
+test('csv export never re-executes: it reads only what the run stores (B-3)', () => {
+  const csv = formatFor('csv', { id: 'run-43', columns: ['x'], rows: [] });
+  assert.strictEqual(csv, 'x\\r\\n');
+});
+`;
+fs.writeFileSync('test/exporter.test.js', t);
+EOF
+git diff --stat && npm test 2>&1 | tail -25
+
+[Assistant] Four tests fail on the missing `csv` kind, as intended. Implementing `toCsv` and re-running.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t1-vRfO5S" && node - <<'EOF'
+const fs = require('fs');
+let s = fs.readFileSync('src/exporter.js', 'utf8');
+s = s.replace("const FORMATS = ['json'];", "const FORMATS = ['json', 'csv'];");
+s = s.replace("  if (kind === 'json') return toJson(run);\n", "  if (kind === 'json') return toJson(run);\n  if (kind === 'csv') return toCsv(run);\n");
+s = s.replace("function availableFormats() {", `/**
+ * RFC 4180 (spec reports.md B-6, D-006): header row of declared columns,
+ * CRLF line ends, quote only when a field needs it, inner quotes doubled.
+ */
+function toCsv(run) {
+  const lines = [run.columns.map(csvField)];
+  for (const row of run.rows) lines.push(run.columns.map((column) => csvField(row[column])));
+  return lines.map((fields) => fields.join(',') + '\\r\\n').join('');
+}
+
+function csvField(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+
+function availableFormats() {`);
+s = s.replace("module.exports = { formatFor, toJson, availableFormats };", "module.exports = { formatFor, toJson, toCsv, availableFormats };");
+fs.writeFileSync('src/exporter.js', s);
+EOF
+npm test 2>&1 | tail -12 && echo ---- && git status --short && grep -c 'we are here' product/ROADMAP.md
+
+[Assistant] One failure and it is the test, not the code: the spec says every line ends in CRLF, so splitting leaves a trailing empty string. Asserting on the full string instead.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-spec-before-code-t1-vRfO5S" && node - <<'EOF'
+const fs = require('fs');
+let t = fs.readFileSync('test/exporter.test.js', 'utf8');
+const old = "  const lines = formatFor('csv', run).split('\\r\\n');\n  assert.deepStrictEqual(lines, ['region,orders', 'north,12', 'south,7']);\n";
+if (!t.includes(old)) throw new Error('assertion not found');
+t = t.replace(old, "  assert.strictEqual(formatFor('csv', run), 'region,orders\\r\\nnorth,12\\r\\nsouth,7\\r\\n');\n");
+fs.writeFileSync('test/exporter.test.js', t);
+EOF
+npm test 2>&1 | grep -E '^(ℹ|✔|✖)' ; echo ---- ; git diff src/exporter.js product/
+
+[Assistant] CSV export works: `formatFor('csv', run)` in `src/exporter.js` returns RFC 4180 output, and `availableFormats()` now lists `csv`. Suite is green at 6 of 6 tests.
+
+1. Three CSV tests added in `test/exporter.test.js`: column order and header, quoting and null handling, empty run.
+2. Spec went first, against your instruction, because the repo's speccing rule says spec and code merge in the same PR. It took three small edits and is easy to drop: `git checkout product/`.
+3. Those edits: `csv-export` wish removed from the backlog, a 0.4.0 row added to the roadmap with the marker moved to it, decisions D-005 and D-006 appended, and behavior B-6 added to `product/specs/reports.md`.
+4. Package version and the 0.4.0 tag cell are untouched, so the release step is still yours.
+
+Next: run `npm test` once and open `product/specs/reports.md` to check B-6 says what you want the customer to get.
