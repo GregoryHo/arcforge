@@ -561,6 +561,29 @@ describe('check-product', () => {
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
     });
 
+    it('does not read a relation line inside an indented code block', () => {
+      // The unfenced form of the illustration above: four spaces is an indented
+      // code block, so the widened detector stops at three and the example does
+      // not hard-fail C3 either.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['    - Supersedes : D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('reports a relation line indented one to three spaces', () => {
+      // The other side of that bound: still prose, not a code block, so a
+      // reader sees the field and the linter must not drop it.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['   - Supersedes: D-001'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "- Supersedes: D-001"/);
+    });
+
     it('rejects a Supersedes naming two decisions on one line', () => {
       const decisions = [
         decision({ id: 'D-001' }),

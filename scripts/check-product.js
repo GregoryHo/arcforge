@@ -22,7 +22,8 @@
  *         folded `<details>` index, unique, and gap-free from D-001 — the
  *         heading is read at column 1, and one indented far enough to still
  *         render as a heading (one to three spaces) is reported rather than
- *         dropped, so a visible entry cannot sit outside the checks;
+ *         dropped, so a stray indent cannot hide an entry in the log's flat
+ *         structure;
  *   - C3  every `Supersedes:` / `Refines:` / `Extends:` is well-formed and names
  *         an earlier decision that exists — a relation-shaped bullet that misses
  *         the canonical form is reported as malformed rather than dropped, and
@@ -62,7 +63,8 @@ const NO_TAG = '—';
 // Opening or closing marker of a fenced code block, capturing which marker it is
 // so a `~~~` inside a ``` block cannot close it.
 const FENCE_RE = /^\s*(```|~~~)/;
-// CommonMark lets an ATX heading carry up to three leading spaces; at four it is
+// CommonMark lets an ATX heading carry up to three leading spaces; at four — as
+// measured from column 1, and the log nests no headings under list items — it is
 // an indented code block, where `### D-NNN` is not a heading at all and must stay
 // unread. So the candidate detector spans ` {0,3}`, not `\s*`, while the canonical
 // form stays anchored at column 1 — the indent probe is what turns a heading the
@@ -79,7 +81,10 @@ const RELATION_FIELD_RE =
 // near-miss (`- Supersedes : D-001`, `* refines: D-001`) is rejected, not
 // silently dropped. A misspelled label stays out of reach: matching on the value
 // instead would false-fire on the prose fields that legitimately cite a `D-id`.
-const RELATION_ANY_RE = /^\s*[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
+// The indent is bounded the way the heading probe above is, and for the same
+// reason: a bullet four spaces deep is an indented code block, so an illustration
+// written without a fence stays unread instead of raising a bogus C3.
+const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
