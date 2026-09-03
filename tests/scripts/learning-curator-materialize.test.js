@@ -683,8 +683,8 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
 
     // The manifest `learn drafts` reads is the fresh one, and its paths are real.
-    const { findLatestMaterialization } = require('../../scripts/lib/learning-curator/activate');
-    const latest = findLatestMaterialization(arcforgeRoot, approved.candidate_id);
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findUsableMaterialization(arcforgeRoot, approved.candidate_id);
     expect(latest.materialization_id).toBe(second.record.materialization_id);
     for (const artifact of latest.draft_artifacts) {
       expect(fs.existsSync(artifact.draft_path)).toBe(true);
@@ -731,8 +731,8 @@ describe('L7-11: duplicate materialization handling', () => {
     // false holds without anything having to overwrite-guard.
     expect(fs.readFileSync(first.draftPaths[0], 'utf8')).toBe(tampered);
 
-    const { findLatestMaterialization } = require('../../scripts/lib/learning-curator/activate');
-    const latest = findLatestMaterialization(arcforgeRoot, approved.candidate_id);
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findUsableMaterialization(arcforgeRoot, approved.candidate_id);
     expect(latest.materialization_id).toBe(second.record.materialization_id);
     const artifact = latest.draft_artifacts[0];
     expect(sha256Truncated(fs.readFileSync(artifact.draft_path, 'utf8'), 64)).toBe(
@@ -771,6 +771,112 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(second.draftPaths).toEqual(first.draftPaths);
     expect(materializationDirs(arcforgeRoot, approved.candidate_id)).toHaveLength(1);
     expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findUsableMaterialization — the manifest the draft surfaces resolve to
+// ---------------------------------------------------------------------------
+
+// The other end of the reuse branch above. Once Layer 7 began skipping a stale
+// manifest, a candidate could hold an older intact manifest beside a newer stale
+// one — a state that did not exist while reuse ignored the files — and the
+// newest-first lookup activation used then resolved to the manifest reuse had
+// just refused. Activation refuses on that record's missing draft, and it
+// refuses from `materialized`, the one status the matrix allows neither another
+// materialize nor a dismiss from: the candidate is stranded with an intact draft
+// beside it. Both selections have to land on one manifest.
+describe('findUsableMaterialization', () => {
+  function findUsable(arcforgeRoot, candidateId) {
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    return findUsableMaterialization(arcforgeRoot, candidateId);
+  }
+
+  /**
+   * Two manifests for one candidate: an older A whose draft is intact, and a
+   * newer B. Reuse skips A while its draft is gone, which is what writes B; the
+   * caller decides what happens to each draft afterwards.
+   */
+  function twoManifests(arcforgeRoot) {
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    const bodyA = fs.readFileSync(first.draftPaths[0], 'utf8');
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    // A comes back byte-for-byte — a restored file, or one that was unreadable
+    // when the second materialization ran.
+    fs.writeFileSync(first.draftPaths[0], bodyA, 'utf8');
+    return { candidate: deactivated, first, second };
+  }
+
+  it('resolves the intact manifest, not the newer one whose draft is gone', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, first, second } = twoManifests(arcforgeRoot);
+    fs.rmSync(second.draftPaths[0]);
+
+    // The manifest Layer 7 reuses, and the one every draft surface resolves to,
+    // are now the same record.
+    const reused = materialize({
+      candidate,
+      sourceActionId: 'act_003',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(reused.record.materialization_id).toBe(first.record.materialization_id);
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      first.record.materialization_id,
+    );
+  });
+
+  it('resolves the newest manifest while its draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, second } = twoManifests(arcforgeRoot);
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  // The fall-back is what keeps a candidate with nothing left to review refusing
+  // the way it always has: its newest manifest still names the file that is
+  // gone, so `learn drafts` reports it and activation refuses on that record
+  // rather than on an absent one.
+  it('falls back to the newest manifest when no draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, first, second } = twoManifests(arcforgeRoot);
+    fs.rmSync(first.draftPaths[0]);
+    fs.rmSync(second.draftPaths[0]);
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  it('returns null when the candidate has no manifest at all', () => {
+    expect(findUsable(path.join(tmpDir, '.arcforge'), 'cand_never_materialized')).toBeNull();
   });
 });
 

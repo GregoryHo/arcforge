@@ -26,7 +26,7 @@ const {
   readProjectCards,
   findProjectCandidate,
   findProjectCard,
-  latestMaterializationFor,
+  materializationFor,
   draftPathsIn,
   staleDraftsIn,
   draftUnavailableIn,
@@ -148,7 +148,7 @@ function runInbox({ scope }) {
 function runInspect({ scope }, candidateId) {
   const { sanitizeDashboardDetail } = require('../lib/learning-dashboard');
   const card = findProjectCard(candidateId);
-  const materialization = latestMaterializationFor(card.candidate_id);
+  const materialization = materializationFor(card.candidate_id);
   const stale = staleDraftsIn(materialization);
   // The disk fact is reported for every status — it is a fact about disk, not
   // about the lifecycle — but it only overrides the prose of the one status
@@ -177,7 +177,7 @@ function runDrafts({ scope }) {
       // recorded draft, worth it on the command whose whole subject is the
       // drafts, and cheaper than a local predicate that could drift from
       // Layer 7's.
-      const materialization = latestMaterializationFor(card.candidate_id);
+      const materialization = materializationFor(card.candidate_id);
       const stale = staleDraftsIn(materialization);
       return {
         ...card,
@@ -246,7 +246,7 @@ function runAccept({ scope }, candidateId) {
     // manifest itself is gone — would be success over a draft that activation
     // then refuses, so the report has to be checked even though there is no
     // transition to guard.
-    const materialization = latestMaterializationFor(candidateId);
+    const materialization = materializationFor(candidateId);
     if (draftUnavailableIn(materialization)) {
       throw new Error(staleDraftAcceptMessage(card, staleDraftsIn(materialization)));
     }
@@ -266,9 +266,10 @@ function runAccept({ scope }, candidateId) {
   return {
     scope,
     candidate: findProjectCard(candidateId),
-    // The dispatch's own paths, not a second scan: the reuse lookup and the
-    // newest-manifest lookup have different criteria, so re-deriving them here
-    // could report one manifest's id beside another manifest's paths.
+    // The dispatch's own paths, not a second scan: the reuse lookup screens on
+    // the candidate hash and the render policy as well as on intact drafts, so
+    // re-deriving them here could report one manifest's id beside another
+    // manifest's paths.
     draft_paths: result.draft_paths ?? [],
     materialization_id: result.materialization_id,
   };
@@ -287,8 +288,8 @@ function runTransition({ scope }, verb, candidateId) {
     ...(result.activation_id ? { activation_id: result.activation_id } : {}),
     // `materialize` reports the paths its own dispatch chose, for the reason in
     // `runAccept`. `activate` has no paths of its own to report, so it keeps the
-    // newest-manifest lookup — which is the selector DH-2 activation itself
-    // used, so what is printed is what was activated.
+    // manifest lookup — which is the selector DH-2 activation itself used, so
+    // what is printed is what was activated.
     ...(verb === 'materialize' ? { draft_paths: result.draft_paths ?? [] } : {}),
     ...(verb === 'activate' ? { draft_paths: draftPathsFor(candidateId) } : {}),
   };

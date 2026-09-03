@@ -879,7 +879,7 @@ describe('learn candidate commands over the canonical queue', () => {
     });
 
     // What the next four pin: the other way to have no draft. Not a recorded
-    // file that moved, but a manifest that is gone — `findLatestMaterialization`
+    // file that moved, but a manifest that is gone — `findUsableMaterialization`
     // returns null when the drafts directory is deleted and silently skips a
     // manifest it cannot parse. `draft_paths_stale` is then empty, because there
     // is no recorded file left to call stale, and every surface used to read
@@ -906,7 +906,7 @@ describe('learn candidate commands over the canonical queue', () => {
     });
 
     // The draft file is untouched here — only the manifest describing it is
-    // unreadable, which is the case `findLatestMaterialization`'s silent catch
+    // unreadable, which is the case `findUsableMaterialization`'s silent catch
     // turns into "no record" without saying so.
     it('sends drafts to inspect when the manifest cannot be parsed', () => {
       seed(makeRecord());
@@ -1284,13 +1284,14 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(materializationDirs()).toHaveLength(1);
     });
 
-    // Two manifests, one reusable: `materialize()` reuses A (candidate hash +
-    // render policy + intact drafts) while B is merely the newest on disk. A
-    // caller that re-derives the paths after the dispatch uses the newest-first
-    // lookup instead, and pairs A's `materialization_id` with B's path — a
-    // success exit naming a file that is not there.
-    it('pairs the accepted draft paths with the manifest it materialized', () => {
-      seed(makeRecord());
+    /**
+     * Two manifests, one reusable: an older A whose draft is intact, and a newer
+     * B whose draft is gone. `materialize()` reuses A — candidate hash, render
+     * policy and intact drafts — while B is merely the newest on disk. Two full
+     * review cycles put the candidate there without touching anything but the
+     * draft files.
+     */
+    function divergentManifests() {
       const first = runJson(['accept', CANDIDATE_ID, '--project']);
       const draftA = first.draft_paths[0];
       const bodyA = fs.readFileSync(draftA, 'utf8');
@@ -1309,6 +1310,15 @@ describe('learn candidate commands over the canonical queue', () => {
       // is A and the newest manifest on disk is B.
       fs.writeFileSync(draftA, bodyA, 'utf8');
       fs.rmSync(draftB);
+      return { draftA, draftB };
+    }
+
+    // A caller that re-derives the paths after the dispatch resolves the
+    // manifest on its own criteria, and pairs A's `materialization_id` with B's
+    // path — a success exit naming a file that is not there.
+    it('pairs the accepted draft paths with the manifest it materialized', () => {
+      seed(makeRecord());
+      const { draftA } = divergentManifests();
 
       const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
 
@@ -1321,6 +1331,35 @@ describe('learn candidate commands over the canonical queue', () => {
       // `existsSync` alone is not the guard: it passes in the divergent state
       // whenever the newest manifest happens to be intact.
       expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+    });
+
+    // One step past the pairing above: the state has to stay ACTIVATABLE. While
+    // activation resolved the newest manifest, it refused on B's missing draft
+    // — from `materialized`, the one status the matrix allows neither another
+    // materialize nor a dismiss from — so a candidate that had just been
+    // re-materialized onto an intact draft could never be reviewed again.
+    it('activates the draft it re-materialized, with a newer manifest lost', () => {
+      seed(makeRecord());
+      const { draftA } = divergentManifests();
+      expect(runJson(['accept', CANDIDATE_ID, '--project']).draft_paths).toEqual([draftA]);
+
+      const activated = runJson(['activate', CANDIDATE_ID, '--project']);
+
+      expect(activated.next_status).toBe('activated');
+      // What was activated is what accept reported, and the reviewer is told so.
+      expect(activated.draft_paths).toEqual([draftA]);
+      expect(
+        fs.existsSync(path.join(arcforgeHome, 'instincts', PROJECT_NAME, `${CANDIDATE_ID}.md`)),
+      ).toBe(true);
+      // The record names the manifest that was consumed: A, whose directory the
+      // reported path sits under — not B, the newest one.
+      const activationsDir = path.join(arcforgeHome, 'learning', 'activations');
+      const [activation] = fs
+        .readdirSync(activationsDir)
+        .map((entry) => JSON.parse(fs.readFileSync(path.join(activationsDir, entry), 'utf8')))
+        .filter((record) => record.action === 'activate')
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      expect(draftA).toContain(activation.materialization_id);
     });
 
     // The other half of that pairing's contract. DH-1 attaches the paths to the

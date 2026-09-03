@@ -20,6 +20,7 @@ const {
 } = require('../utils');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
+const { draftArtifactsIntact } = require('./materialize');
 
 // ---------------------------------------------------------------------------
 // First-slice supported target kinds
@@ -794,18 +795,35 @@ function listActivatedCandidateIds(arcforgeRoot) {
 }
 
 // ---------------------------------------------------------------------------
-// findLatestMaterialization — scan candidate drafts dir for the latest record
+// findUsableMaterialization — the manifest a candidate's draft surfaces resolve to
 // ---------------------------------------------------------------------------
 
 /**
- * Scan candidateId sub-directories under learning/drafts and return the most
- * recent MaterializationRecord by created_at.
+ * The materialization every surface that names a candidate's draft resolves to,
+ * activation included — the newest manifest whose recorded drafts are still
+ * intact, or, when none of them is, the newest manifest.
+ *
+ * The newest alone is not enough, because Layer 7 stopped reusing a stale
+ * manifest: `findExistingMaterialization` screens on the same intactness
+ * predicate this does, so a candidate whose draft went missing gets a second
+ * manifest rather than a reused one, and it can then hold an older intact
+ * manifest beside a newer stale one. Selecting the newest there picks the
+ * manifest `materialize()` refused to reuse: it hands activation a draft that
+ * is not on disk, which L8-3 refuses — and the refusal lands on a `materialized`
+ * candidate, the one status the matrix allows neither another materialize nor a
+ * dismiss from, so the candidate is stranded with an intact draft sitting
+ * beside it. Screening the same way keeps both selections on one manifest.
+ *
+ * The fall-back to the newest is what keeps a candidate with no intact draft
+ * refusing exactly as before — its lone manifest still names itself, so
+ * `learn drafts` still reports the file as missing or changed and activation
+ * still refuses on that record rather than on an absent one.
  *
  * @param {string} arcforgeRoot
  * @param {string} candidateId
  * @returns {object|null} MaterializationRecord or null if none found
  */
-function findLatestMaterialization(arcforgeRoot, candidateId) {
+function findUsableMaterialization(arcforgeRoot, candidateId) {
   const candidateDraftsDir = path.join(arcforgeRoot, 'learning', 'drafts', candidateId);
   if (!fs.existsSync(candidateDraftsDir)) return null;
 
@@ -816,20 +834,22 @@ function findLatestMaterialization(arcforgeRoot, candidateId) {
     return null;
   }
 
-  let latest = null;
+  let newest = null;
+  let newestIntact = null;
   for (const entry of entries) {
     const manifestPath = path.join(candidateDraftsDir, entry, 'materialization.json');
     if (!fs.existsSync(manifestPath)) continue;
+    let record;
     try {
-      const record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      if (!latest || record.created_at > latest.created_at) {
-        latest = record;
-      }
+      record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     } catch {
-      // Corrupted manifest — skip
+      continue; // Corrupted manifest — skip
     }
+    if (!newest || record.created_at > newest.created_at) newest = record;
+    if (!draftArtifactsIntact(record)) continue;
+    if (!newestIntact || record.created_at > newestIntact.created_at) newestIntact = record;
   }
-  return latest;
+  return newestIntact || newest;
 }
 
 module.exports = {
@@ -841,5 +861,5 @@ module.exports = {
   initialConfidenceFor,
   findLatestActivation,
   listActivatedCandidateIds,
-  findLatestMaterialization,
+  findUsableMaterialization,
 };

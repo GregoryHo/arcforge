@@ -114,17 +114,20 @@ function findProjectCard(candidateId) {
 }
 
 /**
- * The newest materialization manifest for a candidate, or `null`.
+ * The materialization manifest a candidate's draft resolves to, or `null`.
+ *
+ * The engine's own selection — the newest manifest with its drafts intact, else
+ * the newest — so what the CLI prints is what activation will consume.
  *
  * Both draft questions the CLI asks — which paths, and which of them are
  * stale — are answered from this one record, so the surfaces that ask both
  * resolve it once and read it twice rather than scanning the manifest
  * directory per question.
  */
-function latestMaterializationFor(candidateId) {
-  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
+function materializationFor(candidateId) {
+  const { findUsableMaterialization } = require('../lib/learning-curator/activate');
   const { getArcforgeHome } = require('../lib/utils');
-  return findLatestMaterialization(getArcforgeHome(), candidateId);
+  return findUsableMaterialization(getArcforgeHome(), candidateId);
 }
 
 /**
@@ -142,11 +145,11 @@ function draftPathsIn(record) {
  * The recorded drafts that are no longer what the manifest describes — deleted,
  * or edited since it was written.
  *
- * `findLatestMaterialization` picks the newest manifest by `created_at` and
- * checks nothing about the files it names, so every surface that prints
- * `draft_paths` can print a path that does not resolve. Layer 7 already owns
- * the comparison — `staleDraftArtifacts` is the same predicate the reuse branch
- * screens manifests with — so this asks it rather than re-hashing here.
+ * `findUsableMaterialization` prefers a manifest whose drafts are intact but
+ * falls back to the newest when none is, so a surface that prints
+ * `draft_paths` can still print a path that does not resolve. Layer 7 already
+ * owns the comparison — `staleDraftArtifacts` is the same predicate the reuse
+ * branch screens manifests with — so this asks it rather than re-hashing here.
  */
 function staleDraftsIn(record) {
   if (!record) return [];
@@ -159,7 +162,7 @@ function staleDraftsIn(record) {
  *
  * `staleDraftsIn` cannot answer this. It is a per-recorded-file question, and a
  * manifest that is absent, unparseable or structurally empty names no file to
- * call stale — `findLatestMaterialization` returns `null` when the drafts
+ * call stale — `findUsableMaterialization` returns `null` when the drafts
  * directory is gone and silently skips a manifest it cannot parse, so an empty
  * stale list means either "every recorded draft is intact" or "there is no
  * record to check", which are opposite answers to the only question the draft
@@ -177,14 +180,14 @@ function draftUnavailableIn(record) {
 
 /** The one-question form, for the callers that ask only about the paths. */
 function draftPathsFor(candidateId) {
-  return draftPathsIn(latestMaterializationFor(candidateId));
+  return draftPathsIn(materializationFor(candidateId));
 }
 
 module.exports = {
   readProjectCards,
   findProjectCandidate,
   findProjectCard,
-  latestMaterializationFor,
+  materializationFor,
   draftPathsIn,
   staleDraftsIn,
   draftUnavailableIn,
