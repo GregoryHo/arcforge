@@ -139,7 +139,7 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
 
 - **D-002** — Codex as a wrapped second harness was directionally decided at
   6.0.0 and left unscheduled.
-- **D-013** — Codex packaging ships at 6.1.0, skills only, with the hook registry
+- **D-004** — Codex packaging ships at 6.1.0, skills only, with the hook registry
   renamed out of Codex's discovery path.
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
