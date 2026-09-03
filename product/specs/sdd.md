@@ -79,6 +79,15 @@ want it.
   CLI group, no schema file, no linter, no state under `.arcforge/`. The four
   artifacts are plain markdown a human edits and reads, and every mechanical
   check over them belongs to the project that adopts the method, not to arcforge.
+- **B-9 A spec cites the decisions in force, and says why each governs.** The
+  link from a spec to the log is maintained in both directions: a decision
+  recorded mid-build is filed into the affected spec's **Decisions** section with
+  the one-line reason it is cited, and a supersession swaps the retired id there
+  for the one now governing. The clause-scoped form is the exception — the old
+  entry still governs its other clauses, so the spec gains the new id and keeps
+  the old citation. A spec left pinned to a retired id goes on promising the
+  choice that was reversed, which is the failure B-3 forbids in the other
+  direction.
 
 ## Data / domain model
 
@@ -91,7 +100,8 @@ want it.
 
 The invariants: ids are dense, ascending, and never reused; every `Supersedes:`
 has its matching flip; a spec's status header agrees with its governing roadmap
-row; exactly one roadmap row carries the marker.
+row and its citations name the decisions still in force (B-9); exactly one
+roadmap row carries the marker.
 
 ## Decisions
 
