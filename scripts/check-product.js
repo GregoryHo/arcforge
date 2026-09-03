@@ -153,12 +153,12 @@ function compareVersions(a, b) {
  * the slice short and silently drop every entry below it. Only the boundary scan
  * skips fenced lines; the returned slice is a raw index range, so the fence lines
  * stay in it and `unfenced()` drops them for every parser that reads a section.
- * An unclosed fence
- * therefore swallows the heading and yields `[]` — fail-closed for ROADMAP.md's two
- * sections, which C6 rejects as a corpus with no rows or no decisions, but silent
- * for a spec's `## Decisions`, exactly as a spec that renames or drops that section
- * already is: nothing asserts a spec's headings. The first matching heading wins: a
- * second `## Decision Log` later in the file is not read.
+ * An unclosed fence therefore swallows the heading and yields `[]` — fail-closed
+ * for ROADMAP.md's two sections, which C6 rejects as a corpus with no rows or no
+ * decisions, but silent for a spec's `## Decisions`, exactly as a spec that
+ * renames or drops that section already is: nothing asserts a spec's headings.
+ * The first matching heading wins: a second `## Decision Log` later in the file
+ * is not read.
  */
 function section(md, heading) {
   const lines = md.split('\n');
