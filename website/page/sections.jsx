@@ -281,14 +281,14 @@ function Platforms({theme:t}) {
         {plats.map(p=>(
           <div key={p.name} style={{
             background:t.card,border:`${p.primary?1.5:1}px solid ${p.primary?t.ember:t.line}`,
-            padding:'28px 32px',position:'relative'
+            padding:'28px 32px',position:'relative',display:'flex',flexDirection:'column'
           }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
               <h3 style={{fontFamily:'"Fraunces",serif',fontSize:28,margin:0,color:t.ink,fontWeight:400,letterSpacing:-.5}}>{p.name}</h3>
               <Stamp label={p.tag} color={p.primary?t.ember:t.brass} small/>
             </div>
             <div style={{color:t.mute,fontSize:13,lineHeight:1.55,marginBottom:18}}>{p.note}</div>
-            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c}>{c}</div>):p.cmd}</div>
+            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`,marginTop:'auto'}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c}>{c}</div>):p.cmd}</div>
           </div>
         ))}
       </div>
