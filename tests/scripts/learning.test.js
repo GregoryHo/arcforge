@@ -861,6 +861,33 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
     });
 
+    // The divergence the override creates, pinned from both sides at once.
+    // `runInbox` does no per-card disk work, so it cannot know the draft is
+    // gone and keeps naming both moves; `inspect` reads the disk and drops the
+    // half that refuses. Asserting the inbox string alone would prove nothing —
+    // a retired candidate with an intact draft prints it on both surfaces — so
+    // what is pinned is the contrast on one candidate with one lost draft.
+    // The guide documents it (docs/guide/learning-dashboard.md, "learn inbox
+    // prints no paths and reads no drafts"); this is the check behind it.
+    it('keeps the inbox naming both moves where inspect has stopped', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.rmSync(draftPath);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(card.lifecycle_status).toBe('deactivated');
+      expect(card.next_actions[0]).toMatch(/materialize or activate it again/);
+      expect(card.next_command).toBe(`arcforge learn materialize ${CANDIDATE_ID} --project`);
+      // Same candidate, same moment, the surface that read the disk:
+      expect(detail.next_actions.join(' ')).not.toMatch(/materialize or activate it again/);
+      expect(detail.next_actions[0]).toMatch(/activating it again refuses/);
+    });
+
     // An edited draft is the third way to reach the same override, and the arm
     // above renders it from the same list — so what is pinned here is that the
     // claim it makes is true of this reason too: activation refuses on the hash
