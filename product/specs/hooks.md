@@ -64,7 +64,7 @@ down, never block the user, and never observe them uninvited.
   |---|---|---|
   | Session record: duration, message and tool counts, compactions | yes | yes |
   | Tool names used, files modified (paths) | yes | yes |
-  | Diary draft (renders the two rows above) | yes | yes |
+  | Diary draft (renders row 1 and the paths from row 2) | yes | yes |
   | Verbatim recent user messages, in the session record | **no** | yes |
   | Background enrichment run over a session summary | **no** | yes |
   | Reflection nudge ("N diaries ready for reflection") | **no** | yes |
@@ -77,9 +77,9 @@ down, never block the user, and never observe them uninvited.
 
   So with learning off the draft is written but never filled in: its unfilled
   sections are the contract, not a failed enrichment, and the hooks do not
-  report them as one. What the draft does fill in is the two rows above — the
-  counts, the tool names, and the paths of the files the session touched — plus
-  a tool-usage aggregate whenever an observations log already exists for the
+  report them as one. What the draft does fill in is the counts and the paths
+  of the files the session touched, plus a tool-usage aggregate — the only
+  place tool names appear — whenever an observations log already exists for the
   project; since observation is itself gated, with learning off that aggregate
   can only be residue of a period when learning was on, and nothing new is
   observed to build it. The stale-draft healthcheck counts only drafts written
