@@ -65,13 +65,20 @@ was recorded about them.
   canonical queue, and both surfaces onto it — the dashboard and the CLI's
   `learn` candidate commands — are front ends over that one store. Neither
   keeps its own state machine: both offer only the transitions legal from a
-  candidate's current state, both require the same explicit acknowledgement
-  before anything that changes future behavior, and every action either takes —
+  candidate's current state, both name the behavior change before anything that
+  changes future behavior takes effect, and every action either takes —
   accepted or refused — lands in the same audit log with its reason and with
-  who asked for it. What the CLI adds is scriptability, not a second store. It
-  works the project-scoped candidates in that queue and refuses `--global`:
-  a candidate that would apply to every project on the machine is reviewed
-  where the reviewer can see what it changes. Its reach is what the engine can
+  who asked for it. Where the two differ is who supplies the acknowledgement
+  that gates activation: the dashboard collects it from the reviewer, while on
+  the CLI the typed `learn activate <id>` **is** the deliberate act, so the
+  warnings print and the command carries its own acknowledgement. A scripted
+  activation therefore has no second human in the loop — the typed command was
+  the human. What the CLI adds is scriptability, not a second store. It works
+  the candidates of the project it is run in — the queue is machine-wide, so
+  `--project` means *this* project, matched on the project name each card
+  prints — and refuses `--global`: a candidate that would apply to every
+  project on the machine is reviewed where the reviewer can see what it
+  changes. Its reach is what the engine can
   actually build — the instinct artifact — and it says so rather than offering
   a step with nothing behind it. Hand-editing state files is the one path with
   no checks and no record; the product treats it as out of contract. The
@@ -112,7 +119,9 @@ was recorded about them.
   scope's opt-in. Nothing in the review loop writes into the user's repository,
   so a half-finished review never turns up in their `git status`. Commands
   print the absolute path of anything they write. The candidate commands are
-  project-scope only — reads as well as transitions — and what they print is
+  project-scope only — reads as well as transitions — and scoped to the project
+  they are run in, so a machine-wide store never lets one project list or
+  activate another's candidates; what they print is
   the same allowlisted view the dashboard serves: never the hashed project id,
   never a raw proposal body. A `--global` read would have printed the canonical
   queue's records as they sit on disk; a global transition would have flipped

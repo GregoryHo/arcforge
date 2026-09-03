@@ -143,7 +143,9 @@ arcforge learn dashboard [--port N]
 `approve`, `reject`, `materialize`, `accept`, `activate` — work the same queue
 the dashboard does, and are **project-scope only**: the engine refuses
 `--global` and points at `arcforge learn dashboard`, where a candidate that
-applies to every project is reviewed. They offer only the transitions legal
+applies to every project is reviewed. That queue is machine-wide, so
+`--project` also means *this* project — another project's candidates are not
+listed and cannot be acted on from here. They offer only the transitions legal
 from a candidate's current state, and `materialize`/`activate` handle instinct
 candidates — the artifact the engine can build today. Every command takes
 `--json` for machine-readable output; with it, a refusal comes back as
