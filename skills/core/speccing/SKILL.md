@@ -50,10 +50,11 @@ here has to stay near zero, or the good ideas go into a chat window instead.
 
 ## 3. Promote before building
 
-A wish becomes work in three edits, made **before** the first line of code:
+Promotion is three edits — two, absent a wish — made **before** any code:
 
-1. Replace its backlog line with a graduation tombstone naming where it went
-   (`references/conventions.md`).
+1. If it started as a wish, replace its backlog line with a graduation tombstone
+   naming where it went (`references/conventions.md`). Work the user asked for
+   directly never had a line, and skips this edit alone.
 2. Append a decision recording *which version, and why now*.
 3. Add the roadmap row and write that version's spec from the template. The new
    row takes `← we are here` only when every row above it has shipped; a
