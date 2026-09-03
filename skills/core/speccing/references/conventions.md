@@ -52,8 +52,16 @@ the log's status column — which is the only fast way to read it.
   consolidates onto the platform already deployed to.
 ```
 
-Two edits. D-007 keeps its text and gains one line; D-011 carries the new choice
-and the reason it changed. Nothing was deleted, and the pair reads as a story.
+Two edits in the log. D-007 keeps its text and gains one line; D-011 carries the
+new choice and the reason it changed. Nothing was deleted, and the pair reads as
+a story.
+
+The spec that cited D-007 moves with them — its **Decisions** section swaps the
+retired id for the one now in force:
+
+```markdown
+- **D-011** — image storage is <service-Y>.
+```
 
 ## Reversing one clause, not a whole entry
 
@@ -67,7 +75,9 @@ supersession to the clause:
 The old entry's status then reads `Status: Accepted · partially superseded by
 D-011`. The `Accepted` clause is what records that its other clauses still
 govern; the clause marker stays on the new entry's `Supersedes:` line. Without
-it you have quietly retired two decisions nobody re-made.
+it you have quietly retired two decisions nobody re-made. A clause-scoped
+reversal is the exception to that swap: the entry still governs its other
+clauses, so the spec gains the new id and keeps the old citation.
 
 ## Backlog graduation leaves a tombstone
 
