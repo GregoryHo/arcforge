@@ -128,6 +128,13 @@ function getLockPath(arcforgeRoot, candidateId) {
  */
 function defaultRenderPolicy() {
   return {
+    // Bumping this reopens a divergence the two manifest selectors were aligned
+    // to close. `findExistingMaterialization` below screens on the policy
+    // version; `findUsableMaterialization` (activate.js) screens on intact
+    // drafts alone. With one version in play they cannot disagree — with two, a
+    // candidate could hold an intact v1 manifest beside a lost v2 one, and
+    // activation would resolve the manifest reuse had just refused. Align the
+    // two screens before moving off 'v1'.
     policy_version: 'v1',
     allowed_artifact_types: FIRST_SLICE_SUPPORTED_TYPES,
     draft_root: path.join(getArcforgeHome(), 'learning', 'drafts'),

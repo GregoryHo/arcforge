@@ -819,6 +819,18 @@ function listActivatedCandidateIds(arcforgeRoot) {
  * `learn drafts` still reports the file as missing or changed and activation
  * still refuses on that record rather than on an absent one.
  *
+ * Intact drafts are the only dimension screened here.
+ * `findExistingMaterialization` screens on two more — the candidate record hash
+ * and the render policy version — and both are invariant per candidate in the
+ * shipped engine, so the two selectors cannot disagree today. The marker on
+ * `policy_version` in `defaultRenderPolicy()` says what to do if that changes.
+ *
+ * The screen costs one stat and one hash per recorded draft per manifest, on
+ * every surface that resolves a candidate's draft. Drafts are small markdown
+ * and a candidate holds one or two manifests, so that is cheaper than the
+ * stranding it prevents; it is the loop to bound if manifests per candidate
+ * ever grow.
+ *
  * @param {string} arcforgeRoot
  * @param {string} candidateId
  * @returns {object|null} MaterializationRecord or null if none found

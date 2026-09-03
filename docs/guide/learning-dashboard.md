@@ -264,10 +264,13 @@ does not resolve or an empty list. In that state neither `learn drafts` nor
 points at `learn inspect`, and `learn inspect` says what became of the draft.
 Read a draft, but do not edit it in place: activation checks the draft against
 the content hash recorded when it was written, so an edited draft is one that
-`learn activate` will refuse. Materializing again after that writes a second
-draft rather than overwriting your edit, and from then on the commands agree on
-which one counts: the draft `learn drafts` and `learn accept` report is the
-draft `learn activate` consumes.
+`learn activate` will refuse — and from `materialized` activation is the only
+move the matrix allows, so there is no second `learn materialize` and no
+`learn reject` waiting behind the refusal. Restoring the file to what the
+manifest recorded is what clears it. A candidate holds a second draft only by
+being materialized again after the dashboard deactivated it, and there the
+commands agree on which one counts: the draft `learn drafts` and `learn accept`
+report is the draft `learn activate` consumes.
 
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.

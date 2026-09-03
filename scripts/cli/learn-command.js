@@ -171,12 +171,12 @@ function runDrafts({ scope }) {
   const drafts = readProjectCards()
     .filter((card) => card.lifecycle_status === 'materialized')
     .map((card) => {
-      // One manifest read per entry answers all three draft questions. The disk
-      // work behind them is `staleDraftArtifacts`, run once for the reported
-      // list and once inside `draftUnavailableIn` — two stats and two hashes per
-      // recorded draft, worth it on the command whose whole subject is the
-      // drafts, and cheaper than a local predicate that could drift from
-      // Layer 7's.
+      // One manifest lookup per entry answers all three draft questions. The
+      // disk work behind them is `staleDraftArtifacts`: once inside
+      // `materializationFor` to pick the manifest, then once for the reported
+      // list and once inside `draftUnavailableIn`. Small markdown files on the
+      // command whose whole subject is the drafts, and cheaper than a local
+      // predicate that could drift from Layer 7's.
       const materialization = materializationFor(card.candidate_id);
       const stale = staleDraftsIn(materialization);
       return {
