@@ -88,8 +88,10 @@ describe('auto-diary', () => {
     });
 
     // The always-on draft carries more than counts: the file paths the session
-    // touched, and a tool-usage aggregate when observations already exist.
-    // product/specs/hooks.md B-6 documents both — these pin them.
+    // touched, and a tool-usage aggregate when observations already exist. What
+    // it does NOT carry is the session record's tool NAMES — those reach a draft
+    // only through the aggregate, which is itself gated on observation.
+    // product/specs/hooks.md B-6 documents all three — these pin them.
     describe('what the always-on draft actually renders (hooks B-6)', () => {
       const project = 'draft-content-project';
       const date = '2026-02-08';
@@ -110,6 +112,7 @@ describe('auto-diary', () => {
             toolCalls: 5,
             userMessages: 2,
             compactions: [],
+            toolsUsed: ['Read', 'Edit', 'Bash'],
             filesModified: ['src/billing.ts', 'notes/private.md'],
           }),
         );
@@ -125,6 +128,18 @@ describe('auto-diary', () => {
         expect(draft).toContain('**Files modified**:');
         expect(draft).toContain('src/billing.ts');
         expect(draft).toContain('notes/private.md');
+      });
+
+      // The session record holds toolsUsed either way, but the draft never reads
+      // it. With no observations log — a fresh learning-off install — a draft
+      // therefore names no tool at all. Pinning the absence keeps the spec
+      // honest: nothing else in the gate can evaluate that claim.
+      it('renders no tool names when there is no observations log', () => {
+        const draft = generateDraft(project, date, sessionId);
+        expect(draft).not.toContain('Tools Used');
+        for (const tool of ['Read', 'Edit', 'Bash']) {
+          expect(draft).not.toContain(tool);
+        }
       });
 
       it('includes the tool-usage aggregate only when an observations log exists', () => {
