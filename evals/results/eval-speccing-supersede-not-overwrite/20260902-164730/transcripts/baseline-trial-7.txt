@@ -1,0 +1,78 @@
+[Assistant] Reading the product directory first, then updating the decision log and uploads spec.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-PNbaDp" && find . -type f -not -path './.git/*' | sort && echo "-----" && cat .claude/* 2>/dev/null; find .claude -type f 2>/dev/null | head
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-PNbaDp" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "===== $f ====="; cat -n "$f"; echo; done && echo "===== git log =====" && git log --stat --oneline | head -30
+
+[Assistant] Plan: mark D-005 as superseded (keep its text), append D-008 for Vaultbox, and point the spec's B-4 and decision list at D-008. Code stays untouched since the migration branch owns it.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t7-PNbaDp" && python3 - <<'PY'
+import pathlib
+
+def sub(path, old, new):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    assert s.count(old) == 1, (path, old)
+    p.write_text(s.replace(old, new))
+
+# --- ROADMAP.md: supersede D-005, append D-008 ---
+sub("product/ROADMAP.md",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Accepted
+""",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Superseded by D-008 (2026-09-03) — do not build against this entry
+""")
+
+p = pathlib.Path("product/ROADMAP.md")
+s = p.read_text().rstrip("\n") + "\n"
+s += """
+### D-008 — Upload storage backend moves to Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Blobstash→Vaultbox migration branch
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is no longer a storage target for Pileup; nothing new is wired to it, and the Blobstash client is removed once the migration branch merges.
+- Why: Not recorded here — the reason for leaving Blobstash was not stated when this entry was written. Fill in before the migration branch merges.
+"""
+p.write_text(s)
+
+# --- specs/uploads.md: B-4 and decision list ---
+sub("product/specs/uploads.md",
+"""> Status: shipped v0.4.0 · [ROADMAP](../ROADMAP.md)""",
+"""> Status: shipped v0.4.0 · B-4 changes to Vaultbox with the pending migration branch (D-008) · [ROADMAP](../ROADMAP.md)""")
+
+sub("product/specs/uploads.md",
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.
+""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.
+  Blobstash is superseded (D-005 → D-008) and must not be wired back up.
+""")
+
+sub("product/specs/uploads.md",
+"""- **D-005** — the storage backend is Blobstash.
+- **D-006** — streaming, not buffering.
+""",
+"""- **D-005** — superseded by D-008; kept for history only.
+- **D-006** — streaming, not buffering.
+- **D-008** — the storage backend is Vaultbox; supersedes D-005.
+""")
+print("edits applied")
+PY
+echo "===== diff =====" && git --no-pager diff && echo "===== remaining Blobstash mentions =====" && grep -rn "Blobstash\|blobstash" --exclude-dir=.git .
+
+[Assistant] Fill in the "Why" line of D-008 in `product/ROADMAP.md:68` before Thursday. You never said why Blobstash is being dropped, so I left an explicit placeholder rather than invent a reason.
+
+What changed:
+1. D-005 is now marked "Superseded by D-008" with its original decision and rationale kept intact, so history stays readable.
+2. New D-008 records the Vaultbox decision, names D-005 as superseded, and states Blobstash is no longer a target.
+3. Spec B-4 now says uploads are stored in Vaultbox and that Blobstash must not be wired back up. The decisions list points at D-008, with D-005 kept as history only.
+4. The spec status line notes B-4 takes effect with the pending migration branch, since 0.4.0 code still runs Blobstash.
+
+Untouched on purpose: `src/uploads.js` still imports the Blobstash client. The migration branch owns that change.

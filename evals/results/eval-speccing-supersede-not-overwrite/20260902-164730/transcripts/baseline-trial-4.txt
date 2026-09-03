@@ -1,0 +1,72 @@
+[Assistant] Reading the product directory first, then rewriting the decision record and uploads spec.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-dNCWt6" && find . -path ./.git -prune -o -type f -print | sort && echo "---README/CLAUDE---" && cat .claude/* 2>/dev/null; ls -la .claude 2>/dev/null; cat CLAUDE.md README.md 2>/dev/null
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-dNCWt6" && echo "=== product/ROADMAP.md ===" && cat -n product/ROADMAP.md && echo && echo "=== product/specs/uploads.md ===" && cat -n product/specs/uploads.md && echo && echo "=== src/uploads.js ===" && cat -n src/uploads.js && echo && echo "=== package.json ===" && cat package.json && echo && echo "=== grep Blobstash/Vaultbox/D-0 ===" && grep -rn -i "blobstash\|vaultbox\|D-00" --exclude-dir=.git . && echo && echo "=== git log ===" && git log --stat --oneline -5
+
+[Assistant] All facts are in hand. Applying the edits: mark D-005 superseded, append D-008, repoint the spec.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t4-dNCWt6" && python3 - <<'PY'
+import pathlib, sys
+
+def sub(path, old, new):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    if s.count(old) != 1:
+        sys.exit(f"{path}: expected exactly one match for {old!r}, found {s.count(old)}")
+    p.write_text(s.replace(old, new))
+
+# --- ROADMAP.md: D-005 stays as history, status flips to Superseded ---
+sub("product/ROADMAP.md",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Accepted
+- Decision: Store uploaded files in Blobstash.
+""",
+"""### D-005 — Upload storage backend
+- Date: 2026-03-11
+- Version: 0.4.0
+- Status: Superseded by D-008 (2026-09-03). Kept for history — do not wire Blobstash back up.
+- Decision: Store uploaded files in Blobstash.
+""")
+
+# --- ROADMAP.md: append D-008 at the end of the log ---
+p = pathlib.Path("product/ROADMAP.md")
+s = p.read_text().rstrip("\n") + "\n"
+s += """
+### D-008 — Upload storage backend moves to Vaultbox
+- Date: 2026-09-03
+- Version: unreleased — lands with the Vaultbox migration branch
+- Status: Accepted
+- Supersedes: D-005
+- Decision: Store uploaded files in Vaultbox. Blobstash is no longer a supported backend; no new code may depend on it.
+- Why: TODO (decision owner) — the reason for leaving Blobstash was not recorded when this entry was created. D-005's rationale (cheapest tier at projected volume, one fewer vendor for a three-person team) no longer governs.
+"""
+p.write_text(s)
+
+# --- specs/uploads.md: B-4 and the Decisions list ---
+sub("product/specs/uploads.md",
+"""- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash
+  client, writes the blob under its random id, and stores nothing on local disk.
+""",
+"""- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox
+  client, writes the blob under its random id, and stores nothing on local disk.
+  Blobstash is not a supported backend (D-005 is superseded by D-008).
+""")
+sub("product/specs/uploads.md",
+"- **D-005** — the storage backend is Blobstash.\n",
+"- **D-008** — the storage backend is Vaultbox; supersedes D-005 (Blobstash).\n")
+PY
+echo "=== diff ===" && git --no-pager diff && echo "=== remaining Blobstash mentions in product/ ===" && grep -rn -i blobstash product/
+
+[Assistant] Done. Decision record and spec now point at Vaultbox; D-005 stays as history, not overwritten.
+
+1. `product/ROADMAP.md:44` D-005 status is now "Superseded by D-008", with its original decision and rationale kept intact.
+2. `product/ROADMAP.md:62` New D-008 records the Vaultbox decision, marks Blobstash unsupported, and lists D-005 as superseded.
+3. `product/specs/uploads.md:25` B-4 now promises Vaultbox and states Blobstash is not a supported backend.
+4. `product/specs/uploads.md:39` Decisions list swaps D-005 for D-008, with the supersession noted.
+
+D-008's Why is a TODO because you gave no reason for leaving Blobstash and I did not invent one. Version is "unreleased" since the roadmap table has no row for the migration.
+
+Next: fill in the Why line at `product/ROADMAP.md:68` before Thursday.

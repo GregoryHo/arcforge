@@ -1,0 +1,84 @@
+[Assistant] Reading the product directory first, then editing the decision log and uploads spec.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-7Z8pWg" && find . -type f -not -path './.git/*' | sort && echo "---" && ls -la .claude 2>/dev/null && find .claude -type f -exec sh -c 'echo "=== $1 ==="; cat "$1"' _ {} \;
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-7Z8pWg" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "=================== $f ==================="; cat -A "$f" | sed 's/\$$//' ; echo; done; echo "=== git log ==="; git log --stat --format='%H %s' | head -30
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-7Z8pWg" && for f in README.md package.json product/ROADMAP.md product/specs/uploads.md src/uploads.js; do echo "=================== $f ==================="; cat -n "$f"; echo; done; echo "=== trailing-newline / CRLF check ==="; for f in product/ROADMAP.md product/specs/uploads.md; do printf '%s: ' "$f"; tail -c1 "$f" | od -c | head -1; grep -c $'\r' "$f" || true; done
+
+[Assistant] Plan: mark D-005 superseded (keep its text), append D-008 for Vaultbox, then point the spec's B-4 and Decisions list at D-008.
+
+[Tool: Bash] $ cd "/private/tmp/claude-501/-Users-gregho-GitHub-AI-arcforge/d2b0ec07-91c2-48cb-9d0d-029ba2bf5375/scratchpad/wt/T5/.eval-trials/eval-speccing-supersede-not-overwrite-t8-7Z8pWg" && command -v python3 && python3 - <<'PY'
+import io, sys
+
+def edit(path, replacements, append=None):
+    with io.open(path, encoding="utf-8") as f:
+        s = f.read()
+    for old, new in replacements:
+        if s.count(old) != 1:
+            sys.exit(f"{path}: expected exactly 1 match for {old!r}, found {s.count(old)}")
+        s = s.replace(old, new)
+    if append:
+        if not s.endswith("\n"):
+            s += "\n"
+        s += append
+    with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(s)
+
+# --- ROADMAP.md: supersede D-005, append D-008 -------------------------
+edit("product/ROADMAP.md",
+    [(
+        "### D-005 — Upload storage backend\n"
+        "- Date: 2026-03-11\n"
+        "- Version: 0.4.0\n"
+        "- Status: Accepted\n",
+        "### D-005 — Upload storage backend\n"
+        "- Date: 2026-03-11\n"
+        "- Version: 0.4.0\n"
+        "- Status: Superseded by D-008 (2026-09-03). Blobstash is being retired; do not add anything new that targets it.\n",
+    )],
+    append=(
+        "\n"
+        "### D-008 — Upload storage backend moves to Vaultbox\n"
+        "- Date: 2026-09-03\n"
+        "- Version: unreleased — ships with the Vaultbox migration branch\n"
+        "- Status: Accepted\n"
+        "- Supersedes: D-005\n"
+        "- Decision: Store uploaded files in Vaultbox. Blobstash is retired once the migration branch lands, and nothing new targets it.\n"
+        "- Why: Not yet recorded — the migration owner to state here what changed since D-005 before the branch lands.\n"
+    ),
+)
+
+# --- specs/uploads.md: B-4 and Decisions point at Vaultbox / D-008 -----
+edit("product/specs/uploads.md", [
+    (
+        "> Status: shipped v0.4.0 · [ROADMAP](../ROADMAP.md)\n",
+        "> Status: shipped v0.4.0 · storage moving to Vaultbox per D-008, migration branch pending · [ROADMAP](../ROADMAP.md)\n",
+    ),
+    (
+        "- **B-4 Uploads are stored in Blobstash.** The API process holds a Blobstash\n"
+        "  client, writes the blob under its random id, and stores nothing on local disk.\n",
+        "- **B-4 Uploads are stored in Vaultbox.** The API process holds a Vaultbox\n"
+        "  client, writes the blob under its random id, and stores nothing on local disk.\n",
+    ),
+    (
+        "- **D-005** — the storage backend is Blobstash.\n"
+        "- **D-006** — streaming, not buffering.\n",
+        "- **D-006** — streaming, not buffering.\n"
+        "- **D-008** — the storage backend is Vaultbox (supersedes D-005).\n",
+    ),
+])
+print("edits applied")
+PY
+echo "=== diff ==="; git --no-pager diff
+echo "=== remaining Blobstash mentions ==="; grep -rn "Blobstash\|blobstash" --exclude-dir=.git .
+
+[Assistant] Next: fill in the "Why" line on D-008 in `product/ROADMAP.md:68` before Thursday. It is the one thing I could not write honestly, since the request did not say why Blobstash is being left.
+
+What changed:
+1. `product/ROADMAP.md`: D-005 kept intact but its Status now reads "Superseded by D-008" with a do-not-target-Blobstash note.
+2. `product/ROADMAP.md`: new D-008 appended, dated today, Accepted, "Supersedes: D-005", decision is Vaultbox, version marked unreleased pending the migration branch.
+3. `product/specs/uploads.md`: B-4 now says uploads are stored in Vaultbox with a Vaultbox client.
+4. `product/specs/uploads.md`: Decisions list swaps the D-005 Blobstash line for D-008 Vaultbox, and the status line notes the migration is pending.
+
+Untouched on purpose: `src/uploads.js` still imports the Blobstash client, which the Thursday branch replaces. Roadmap table has no row for the migration because no version was assigned.

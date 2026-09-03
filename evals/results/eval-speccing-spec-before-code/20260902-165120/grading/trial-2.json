@@ -1,0 +1,27 @@
+{
+  "eval": "eval-speccing-spec-before-code-baseline",
+  "trial": 2,
+  "score": 1,
+  "passed": true,
+  "discovered_claims": [
+    {
+      "text": "Spec and product docs were written before implementation code",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 5 edits product/ files; Block 7 writes src/exporter.js and tests afterward"
+    },
+    {
+      "text": "Tests pass after implementation",
+      "category": "factual",
+      "passed": true,
+      "evidence": "Block 9 reports 6 of 6 tests green after npm test in Block 8"
+    },
+    {
+      "text": "package.json bumped to 0.4.0 without being asked",
+      "category": "process",
+      "passed": true,
+      "evidence": "Block 5 edits version to 0.4.0; Block 9 flags it as revertable"
+    }
+  ],
+  "weak_assertions": []
+}
