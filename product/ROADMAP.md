@@ -106,10 +106,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   `Supersedes:` carrying its flip in the matching form on a superseded entry whose
   whole `Status:` stays coherent — every clause from the closed vocabulary, at most
   one death, a total flip leaving nothing live, a partial one keeping exactly one
-  live clause (C3); every spec header agreeing with its governing roadmap row, links
-  resolving both ways (C4); every D-id a spec cites well-formed as `D-NNN` and
-  existing (C5); a sanity floor of one row, one decision, one spec (C6); and a `Tag`
-  cell matching its row's Status — `vX.Y.Z` when shipped, `—` otherwise (C7).
+  live clause — and the pairing read back from the flip, so a `Superseded-by:` or
+  `partially superseded by` clause whose named entry claims no supersession, or that
+  names an id the log does not carry, is rejected too (C3); every spec header
+  agreeing with its governing roadmap row, links resolving both ways (C4); every
+  D-id a spec cites well-formed as `D-NNN` and existing (C5); a sanity floor of one
+  row, one decision, one spec (C6); and a `Tag` cell matching its row's Status —
+  `vX.Y.Z` when shipped, `—` otherwise (C7).
 - Residual: C1 counts `← we are here` markers; it does not know which row deserves
   one, so a marker that should have moved and didn't passes green. Placement stays a
   reading task, and the prose in `product/AGENTS.md` and the `releasing` skill says
