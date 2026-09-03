@@ -157,7 +157,7 @@ no estimate, no commitment. Low friction is the point.
 
 ### Promote a backlog item
 1. Replace its line in `BACKLOG.md` with a graduation tombstone:
-   `- ~~**<slug>**~~ — graduated into 6.1.0 (D-0NN).`
+   `- ~~**<slug>**~~ — graduated into <X.Y.Z> (D-NNN).`
 2. Record a Decision Log entry (next `D-id`) — *which version, why now*.
 3. Add the roadmap row: next free `X.Y.Z`, `Status: next`, `Tag: —`, a one-line
    "what & why", and a link to its spec. Move `← we are here` onto it.
