@@ -40,6 +40,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**gate-diary-enricher**~~ — graduated into 6.1.0 (D-009).
 - **stale-draft-floor-overlapping-opt-in** — `learningEnabledSince`
   (scripts/lib/learning.js) derives the floor only from scopes that are
+- **stale-draft-floor-overlapping-opt-in** — `learningEnabledSince`
+  (scripts/lib/learning.js:150) derives the floor only from scopes that are
   enabled *now*, and `setLearningEnabled` keeps one `updated_at` per scope, so
   disabling the scope that opted in first advances the floor even though
   any-scope authorization was continuous; genuine enricher failures in the
@@ -57,6 +59,11 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   nothing. Fix direction: merge over the previous config instead of replacing it
   (it is already in hand as `previous`). Pre-existing — the same full-replacement
   object predates the #146/#147 branch; surfaced during its review.
+
+- **unify-candidate-queues** — point the `learn` transition commands at the
+  canonical Layer-5 candidate queue, so the CLI and the dashboard manage the
+  same candidates instead of two disjoint queues · issue: [#148](https://github.com/GregoryHo/arcforge/issues/148).
+  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0 · issue: [#164](https://github.com/GregoryHo/arcforge/issues/164).
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
