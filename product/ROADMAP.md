@@ -246,6 +246,23 @@ reverse one, append a superseding entry (see AGENTS.md).
   restricting the run to it. With `acceptEdits` that means edits are
   auto-approved across both. This is a narrowing of the blanket bypass, not a
   sandbox, and the specs and guides say so in those terms.
+- Residual: the stale-draft floor is the earlier of the draft's creation and
+  last-write timestamps. In-place edits and `touch` no longer lift a pre-opt-in
+  stub above it; two things still do, and report it — a copy that preserves
+  neither stamp (a sync re-download or a naive unzip; ordinary restore tooling
+  keeps mtime and stays below the floor), and a filesystem that records no
+  creation time, which leaves the floor on last-write alone. The floor also
+  cuts the other way twice, and both are silences rather than false alarms: a
+  draft first written before the opt-in and rewritten in place afterwards keeps
+  its original creation time, so a genuine post-opt-in enrichment failure over
+  it is never reported; and disabling the scope that carries the earliest
+  opt-in — global on, project on, global off — advances the floor to the
+  surviving scope's stamp even though any-scope authorization never lapsed,
+  because a scope's `updated_at` records its latest transition and the enable it
+  replaced is not recoverable. The learning config's `updated_at` is embedded and
+  survives the same copy, which is what makes the first mismatch possible.
+  Creation time is read from the stat call the check already makes, so the check
+  stays bounded (hooks B-7).
 
 ### D-010 — Session capture depth: counts always, user prose only under the opt-in
 - Date: 2026-09-03
