@@ -82,7 +82,13 @@ Differences that are deliberate, not oversights:
   `<skills_instructions>` blocks — so the string is the documented shape and the
   array buys nothing.
 - **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
-  `/arcforge:<name>`. All 15 load from one directory entry.
+  `/arcforge:<name>`. All 15 load from one directory entry. Codex has no
+  slash commands for skills — the user reaches one through the composer's `$`
+  mention picker — so the router and the README label the `/` rows as Claude
+  Code's. Whether that mention token carries the `arcforge:` namespace was NOT
+  established: every bundled `default_prompt` writes a bare `$name`, but those are
+  prose examples (two use a display name, `$Presentations`), and no free probe
+  resolves a mention. Do not assert a literal `$` token until someone measures it.
 - **User-invoked skills need a second declaration, and it is not a manifest
   edit.** `disable-model-invocation: true` is Claude Code's key and does nothing
   on Codex: spike-verified on codex-cli 0.152.1, `codex debug prompt-input`

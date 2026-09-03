@@ -113,7 +113,12 @@ whole and fails halfway through a workflow.
   both.
 - **B-6 The boundary is documented before install, not discovered after.** The
   README's Codex section names which eight skills work fully, which seven degrade
-  to `command not found`, and which subsystems do not run at all. A Codex user
+  to `command not found`, which subsystems do not run at all, and how a skill is
+  actually reached on each host — a `/arcforge:<name>` slash command on Claude
+  Code, the composer's `$` mention picker on Codex, which has no slash commands for
+  skills. The router carries that same per-host note above its Skill Map, whose
+  rows are written in the Claude Code spelling; without it the index reads as a
+  list of commands a Codex user cannot run. A Codex user
   should be able to decide whether to install without running anything — and
   without being handed a security chore: because of B-2 there is no hook-trust
   prompt to answer and nothing to "leave untrusted".
