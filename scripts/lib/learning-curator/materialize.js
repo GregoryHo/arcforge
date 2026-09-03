@@ -277,8 +277,7 @@ function makeFailure(opts) {
 // ---------------------------------------------------------------------------
 
 /**
- * Whether every draft artifact a manifest records is still on disk and still
- * hashes to what the manifest recorded.
+ * The draft artifacts a manifest records that are no longer what it recorded.
  *
  * The first-slice default returns "the latest existing draft" for a duplicate
  * request — an existing *draft*, not merely an existing manifest. A manifest
@@ -287,18 +286,47 @@ function makeFailure(opts) {
  * path, while the later activation refuses on this very hash check (L8-3, see
  * activate.js).
  *
+ * Exported because the same question is asked one layer up: the `learn`
+ * candidate commands print draft paths, and a path they print must resolve to
+ * the file the manifest describes. They ask here rather than re-implementing
+ * the hash comparison (Canonical Source Rule).
+ *
+ * @param {object} record MaterializationRecord
+ * @returns {Array<{draft_path: string, reason: 'missing'|'hash_mismatch'}>}
+ */
+function staleDraftArtifacts(record) {
+  const artifacts = record?.draft_artifacts;
+  if (!Array.isArray(artifacts)) return [];
+  const stale = [];
+  for (const artifact of artifacts) {
+    if (!artifact || !artifact.draft_path) continue;
+    const content = readFileSafe(artifact.draft_path);
+    if (content === null) {
+      stale.push({ draft_path: artifact.draft_path, reason: 'missing' });
+    } else if (sha256Truncated(content, 64) !== artifact.content_hash) {
+      stale.push({ draft_path: artifact.draft_path, reason: 'hash_mismatch' });
+    }
+  }
+  return stale;
+}
+
+/**
+ * Whether every draft artifact a manifest records is still on disk and still
+ * hashes to what the manifest recorded.
+ *
+ * A manifest with no `draft_artifacts` array, an empty one, or an entry that
+ * names no path describes no draft at all, so it is not intact either — it has
+ * nothing to hand back. `staleDraftArtifacts` reports only the entries it can
+ * name a file for, so those structural checks belong here.
+ *
  * @param {object} record MaterializationRecord
  * @returns {boolean}
  */
 function draftArtifactsIntact(record) {
-  const artifacts = record.draft_artifacts;
+  const artifacts = record?.draft_artifacts;
   if (!Array.isArray(artifacts) || artifacts.length === 0) return false;
-  return artifacts.every((artifact) => {
-    if (!artifact || !artifact.draft_path) return false;
-    const content = readFileSafe(artifact.draft_path);
-    if (content === null) return false;
-    return sha256Truncated(content, 64) === artifact.content_hash;
-  });
+  if (!artifacts.every((artifact) => artifact?.draft_path)) return false;
+  return staleDraftArtifacts(record).length === 0;
 }
 
 /**
@@ -555,4 +583,6 @@ module.exports = {
   defaultRenderPolicy,
   FIRST_SLICE_SUPPORTED_TYPES,
   isMaterializableType,
+  staleDraftArtifacts,
+  draftArtifactsIntact,
 };

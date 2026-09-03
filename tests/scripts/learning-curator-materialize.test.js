@@ -77,6 +77,7 @@ let materialize;
 let buildDraftContent;
 let getDraftRoot;
 let defaultRenderPolicy;
+let staleDraftArtifacts;
 
 beforeEach(() => {
   jest.resetModules();
@@ -88,6 +89,7 @@ beforeEach(() => {
     buildDraftContent,
     getDraftRoot,
     defaultRenderPolicy,
+    staleDraftArtifacts,
   } = require('../../scripts/lib/learning-curator/materialize'));
 });
 
@@ -767,6 +769,50 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(second.draftPaths).toEqual(first.draftPaths);
     expect(materializationDirs(arcforgeRoot, approved.candidate_id)).toHaveLength(1);
     expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// staleDraftArtifacts — the draft-integrity predicate, as cross-module API
+// ---------------------------------------------------------------------------
+
+// The reuse branch above screens manifests with this, and the `learn` candidate
+// commands ask it before printing a manifest's draft paths. One owner for the
+// comparison, so the CLI never re-implements the hashing.
+describe('staleDraftArtifacts', () => {
+  function materializedRecord() {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const result = materialize({
+      candidate: makeCandidateRecord({}),
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(result.ok).toBe(true);
+    return result.record;
+  }
+
+  it('reports nothing for a draft still on disk and still matching its hash', () => {
+    expect(staleDraftArtifacts(materializedRecord())).toEqual([]);
+  });
+
+  it('reports a deleted draft as missing', () => {
+    const record = materializedRecord();
+    const draftPath = record.draft_artifacts[0].draft_path;
+    fs.rmSync(draftPath);
+
+    expect(staleDraftArtifacts(record)).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+  });
+
+  it('reports an edited draft as a hash mismatch', () => {
+    const record = materializedRecord();
+    const draftPath = record.draft_artifacts[0].draft_path;
+    fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+
+    expect(staleDraftArtifacts(record)).toEqual([
+      { draft_path: draftPath, reason: 'hash_mismatch' },
+    ]);
   });
 });
 

@@ -481,6 +481,12 @@ describe('learn candidate commands over the canonical queue', () => {
     return fs.existsSync(queuePath) ? fs.readFileSync(queuePath, 'utf8') : null;
   }
 
+  /** One directory per materialization the curator actually wrote. */
+  function materializationDirs(candidateId = CANDIDATE_ID) {
+    const dir = path.join(arcforgeHome, 'learning', 'drafts', candidateId);
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  }
+
   /** The one audit log both front ends append to, newest last. */
   function auditEntries() {
     const logPath = path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl');
@@ -742,6 +748,55 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(drafts.drafts[0].draft_paths[0]).toContain(
         path.join('learning', 'drafts', CANDIDATE_ID),
       );
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([]);
+    });
+
+    // What the next three pin: a draft is the artifact the reviewer is told to
+    // read, so no surface may report one as ready to review when the file it
+    // names is missing or has changed since the manifest recorded it. The
+    // activation that would follow refuses on that very hash (activate.js L8-3).
+    it('marks a recorded draft that was deleted, instead of listing it as ready', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.rmSync(draftPath);
+
+      const drafts = runJson(['drafts', '--project']);
+
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'missing' },
+      ]);
+    });
+
+    it('marks a recorded draft that was hand-edited', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+
+      const drafts = runJson(['drafts', '--project']);
+
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'hash_mismatch' },
+      ]);
+    });
+
+    it('stops telling inspect to review a draft that is not there', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /review the draft/,
+      );
+
+      fs.rmSync(draftPath);
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions.join(' ')).not.toMatch(/review the draft/);
+      expect(detail.next_actions[0]).toContain(draftPath);
+      expect(detail.next_actions[0]).toMatch(/is missing/);
     });
   });
 
@@ -954,6 +1009,13 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(accepted.candidate.lifecycle_status).toBe('materialized');
       expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
       expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
+
+      // Re-accepting an already-materialized candidate stays the no-op it has
+      // always been: the intact draft is reported again, nothing is dispatched,
+      // and no second materialization directory is allocated.
+      const again = runJson(['accept', CANDIDATE_ID, '--project']);
+      expect(again.draft_paths).toEqual(accepted.draft_paths);
+      expect(materializationDirs()).toHaveLength(1);
     });
 
     // `accept` used to pin the materialize dispatch to a literal `approved`, so
@@ -981,6 +1043,51 @@ describe('learn candidate commands over the canonical queue', () => {
       const drafts = runJson(['drafts', '--project']);
       expect(drafts.count).toBe(1);
       expect(drafts.drafts[0].candidate_id).toBe(CANDIDATE_ID);
+
+      // The intact draft is reused, so re-accepting from `materialized` is
+      // still the reporting no-op and allocates no second draft directory.
+      expect(runJson(['accept', CANDIDATE_ID, '--project']).draft_paths).toEqual(
+        accepted.draft_paths,
+      );
+      expect(materializationDirs()).toHaveLength(1);
+    });
+
+    // What the next two pin: the `materialized` short-circuit dispatches nothing
+    // and reports the draft the candidate already has, so when that draft is
+    // gone or edited the only thing it can get wrong is the report — and a path
+    // that does not resolve is exactly what the activation behind it refuses on.
+    it('refuses to accept a materialized candidate whose draft is gone', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.rmSync(draftPath);
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toContain(draftPath);
+      expect(error).toMatch(/is missing/);
+      expect(error).toMatch(/nothing was applied/);
+      // The refusal replaces a report, not a transition — so it is provably
+      // state-free: the append-only queue is byte-identical.
+      expect(queueBytes()).toBe(before);
+    });
+
+    it('refuses to accept a materialized candidate whose draft was hand-edited', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toContain(draftPath);
+      expect(error).toMatch(/has changed since it was written/);
+      expect(error).toMatch(/nothing was applied/);
+      expect(queueBytes()).toBe(before);
     });
 
     it('refuses to accept an activated candidate as a policy violation, not a race', () => {

@@ -213,7 +213,7 @@ arcforge learn activate <candidate-id> --project
 | `learn accept` | Approve and materialize in one step — never activates |
 | `learn materialize` | Write the draft without activating it |
 | `learn activate` | Promote the materialized draft to an active instinct |
-| `learn drafts` | What is materialized and waiting for activation, with draft paths |
+| `learn drafts` | What is materialized and waiting for activation, with draft paths — and which of those files is missing or has changed since it was written |
 
 Three things follow from these being one queue rather than two.
 
@@ -247,6 +247,15 @@ it was. The single-step commands do the opposite, and dispatch first, so what
 you read is the engine's own refusal and the refusal is recorded. Accept is
 all-or-nothing because half of it cannot be undone — the queue is append-only,
 and an approval it could never build on would be a decision you are stuck with.
+
+On a candidate that is already materialized, `accept` has nothing left to do,
+so it re-reports the draft it already wrote — but only while that file is still
+there and still says what the engine wrote. If the draft has been deleted or
+edited, `accept` refuses and names the file instead of handing back a path that
+does not resolve; `learn drafts` and `learn inspect` mark it the same way. Read
+a draft, but do not edit it in place: activation checks the draft against the
+content hash recorded when it was written, so an edited draft is one that
+`learn activate` will refuse.
 
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.

@@ -202,6 +202,50 @@ function draftPathsFor(candidateId) {
 }
 
 /**
+ * The recorded drafts that are no longer what the manifest describes — deleted,
+ * or edited since it was written.
+ *
+ * `findLatestMaterialization` picks the newest manifest by `created_at` and
+ * checks nothing about the files it names, so every surface that prints
+ * `draft_paths` can print a path that does not resolve. Layer 7 already owns
+ * the comparison — `staleDraftArtifacts` is the same predicate the reuse branch
+ * screens manifests with — so this asks it rather than re-hashing here.
+ */
+function staleDraftsFor(candidateId) {
+  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
+  const { staleDraftArtifacts } = require('../lib/learning-curator/materialize');
+  const { getArcforgeHome } = require('../lib/utils');
+  const record = findLatestMaterialization(getArcforgeHome(), candidateId);
+  if (!record) return [];
+  return staleDraftArtifacts(record);
+}
+
+/** Each stale draft named with what went wrong with it. */
+function describeStaleDrafts(stale) {
+  return stale
+    .map(
+      (entry) =>
+        `${entry.draft_path} ${entry.reason === 'missing' ? 'is missing' : 'has changed since it was written'}`,
+    )
+    .join('; ');
+}
+
+/**
+ * The two prose lines `inspect` prints in place of the `materialized` status
+ * prose, which says "review the draft at draft_paths" — the draft it names is
+ * not there to review. Layered over `nextActionsFor` at the call site, exactly
+ * as `unsupportedTypeActions` is: `nextActionsFor` is pure, and this answer
+ * comes off disk.
+ */
+function staleDraftActions(stale) {
+  return [
+    `the recorded draft is not what was written: ${describeStaleDrafts(stale)}`,
+    'activation refuses on the recorded content hash, so there is nothing to activate — ' +
+      'review the queue in: arcforge learn dashboard',
+  ];
+}
+
+/**
  * The subset of a card's legal actions the CLI will actually carry out.
  *
  * `available_actions` comes straight from the Action × Status matrix, which is
@@ -340,6 +384,15 @@ function acknowledgeActivation(card) {
   return { reviewer_saw_behavior_change_warning: true, reviewer_saw_target_path_summary: true };
 }
 
+/**
+ * The whole queue, grouped and ordered.
+ *
+ * Deliberately says nothing about draft integrity: the inbox prints no paths,
+ * and it is the one candidate command that runs over every card, so a manifest
+ * read and a draft hash per row would put per-candidate disk work on the
+ * cheapest, most-run surface. `drafts` and `inspect` — the two that do print a
+ * path — are where that question is answered.
+ */
 function runInbox({ scope }) {
   const cards = readProjectCards();
   const counts = {};
@@ -377,11 +430,13 @@ function runInbox({ scope }) {
 function runInspect({ scope }, candidateId) {
   const { sanitizeDashboardDetail } = require('../lib/learning-dashboard');
   const card = findProjectCard(candidateId);
+  const stale = staleDraftsFor(card.candidate_id);
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
-    next_actions: nextActionsFor(card),
+    next_actions: stale.length > 0 ? staleDraftActions(stale) : nextActionsFor(card),
     draft_paths: draftPathsFor(card.candidate_id),
+    draft_paths_stale: stale,
   };
 }
 
@@ -392,6 +447,10 @@ function runDrafts({ scope }) {
       ...card,
       next_command: nextCommandFor(card),
       draft_paths: draftPathsFor(card.candidate_id),
+      // The listing already reads the manifest off disk for `draft_paths`, so
+      // saying whether those files are still there costs one stat and one hash
+      // per entry — worth it on the command whose whole subject is the drafts.
+      draft_paths_stale: staleDraftsFor(card.candidate_id),
     }));
   return { scope, count: drafts.length, drafts };
 }
@@ -412,6 +471,29 @@ function acceptRefusalMessage(card) {
     `${card.candidate_id} is unchanged. It ${narrowingMessage(card)}. ` +
     'To record the approval on its own, run: ' +
     `arcforge learn approve ${card.candidate_id} --project`
+  );
+}
+
+/**
+ * The refusal `accept` prints instead of re-reporting a draft that is not there.
+ *
+ * An already-`materialized` candidate is `accept`'s no-op: it dispatches
+ * nothing and hands back the draft it already has. So "nothing was applied" is
+ * literally true here — the refusal replaces a report, not a transition.
+ *
+ * It names no recovery command on purpose. `materialized` allows only
+ * `activate`, and activation refuses on the recorded content hash, so every
+ * command the CLI has would refuse in turn; inventing one would send the
+ * reviewer around that loop. The dashboard is where the queue is reviewable,
+ * so that is what it points at.
+ */
+function staleDraftAcceptMessage(card, stale) {
+  return (
+    `arcforge learn accept refused, and nothing was applied — ${card.candidate_id} is ` +
+    `already materialized and is unchanged. Its recorded draft is no longer what was ` +
+    `written: ${describeStaleDrafts(stale)}. There is nothing left to hand back: the canonical ` +
+    'Action × Status matrix allows a materialized candidate only to activate, and activation ' +
+    'refuses on the recorded content hash. Review the queue in: arcforge learn dashboard'
   );
 }
 
@@ -443,6 +525,13 @@ function runAccept({ scope }, candidateId) {
   const card = findProjectCard(candidateId);
   if (!isMaterializableType(card.artifact_type)) throw new Error(acceptRefusalMessage(card));
   if (card.lifecycle_status === 'materialized') {
+    // The no-op branch dispatches nothing and reports the draft the candidate
+    // already has. Reporting a path that is not there — or one whose file has
+    // been edited since the manifest recorded it — would be success over a
+    // draft that activation then refuses, so the report has to be checked even
+    // though there is no transition to guard.
+    const stale = staleDraftsFor(candidateId);
+    if (stale.length > 0) throw new Error(staleDraftAcceptMessage(card, stale));
     return { scope, candidate: card, draft_paths: draftPathsFor(candidateId) };
   }
   if (card.lifecycle_status === 'pending_review') {
