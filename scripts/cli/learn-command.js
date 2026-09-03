@@ -17,12 +17,13 @@
 const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 
-// Layer 7/8 render and activate the instinct artifact and nothing else. The
-// other artifact types the queue schema names have no renderer behind them, so
-// the CLI says which one it can act on rather than failing deep inside the
-// curator. They do have a producer — the dashboard's `evolve` action writes a
-// `skill` record into the same queue — so this is a live branch, not a
-// defensive one.
+// Layer 7/8 render and activate the instinct artifact and nothing else, and
+// `materialize.js` is where that narrowing is enforced — it refuses any other
+// artifact type with `artifact_type_mismatch`. The CLI keeps the same constant
+// only to describe the narrowing: which commands are worth suggesting, and what
+// to say when the engine refuses one. It does not re-decide it. The other types
+// do have a producer — the dashboard's `evolve` action writes a `skill` record
+// into the same queue — so this is a live branch, not a defensive one.
 const SUPPORTED_ARTIFACT_TYPE = 'instinct';
 
 // Every action the CLI dispatches is attributed to the CLI, so the audit log
@@ -197,8 +198,8 @@ function draftPathsFor(candidateId) {
  * (`promote`, `evolve` and `deactivate` are dashboard-only), and
  * `materialize`/`activate` run through the curator, which renders the instinct
  * artifact and nothing else. Suggesting anything outside this intersection
- * advertises a command `assertSupportedArtifactType` then refuses — and a
- * non-instinct candidate is reachable, since the dashboard's `evolve` action
+ * advertises a command the curator then refuses — and a non-instinct candidate
+ * is reachable, since the dashboard's `evolve` action
  * writes a project-scoped `skill` record into the same canonical queue.
  */
 function cliActionsFor(card) {
@@ -220,8 +221,8 @@ function nextCommandFor(card) {
  * The `NEXT_ACTIONS` prose for the three statuses in `STATUSES_NAMING_A_BUILD`
  * names the build step that status allows. For a candidate type the curator
  * cannot render, that step does not exist, so the narrowing itself is what is
- * worth printing — the same fact `assertSupportedArtifactType` states when one
- * of those commands is typed. Nothing else is left for the CLI to run from
+ * worth printing — the same fact the curator's refusal states when one of those
+ * commands is typed. Nothing else is left for the CLI to run from
  * those three statuses (besides the build step the matrix allows only `promote`
  * and `evolve`, both dashboard-only), so the second line says where the
  * candidate can still be looked at.
@@ -242,25 +243,45 @@ function nextActionsFor(card) {
   return NEXT_ACTIONS[card.lifecycle_status] || [];
 }
 
-function assertSupportedArtifactType(card, verb) {
-  if (card.artifact_type === SUPPORTED_ARTIFACT_TYPE) return;
-  throw new Error(
-    `arcforge learn ${verb} supports ${SUPPORTED_ARTIFACT_TYPE} candidates only — ` +
-      `${card.candidate_id} is a ${card.artifact_type} candidate. Materialization and ` +
-      'activation run through the curator, which renders the instinct artifact and nothing ' +
-      'else today; the other artifact types the queue schema names have no renderer behind ' +
-      'them. Leave it queued, or review it in: arcforge learn dashboard',
+/**
+ * The instinct-only narrowing, in the words the CLI has always used for it.
+ *
+ * The narrowing belongs to Layer 7: `materialize.js` refuses any other artifact
+ * type with `artifact_type_mismatch`, which the shared action handler turns into
+ * an audited rejection. All the CLI does is render that reason in reviewer-facing
+ * prose instead of the engine's internal detail string — a CLI-side pre-check
+ * would be a second copy of a gate the engine already owns, and it would refuse
+ * before the audit log ever saw the request.
+ */
+function narrowingMessage(card) {
+  return (
+    `supports ${SUPPORTED_ARTIFACT_TYPE} candidates only — ${card.candidate_id} is a ` +
+    `${card.artifact_type} candidate. Materialization and activation run through the ` +
+    'curator, which renders the instinct artifact and nothing else today; the other ' +
+    'artifact types the queue schema names have no renderer behind them. Leave it queued, ' +
+    'or review it in: arcforge learn dashboard'
   );
 }
 
 function refusalMessage(result, verb, card) {
   const base = `arcforge learn ${verb} refused: ${result.reason}`;
+  if (result.reason === 'artifact_type_mismatch') {
+    return `${base} — ${narrowingMessage(card)}`;
+  }
   if (result.reason === 'policy_violation') {
     const legal = card.available_actions.join(', ') || 'nothing';
-    return (
+    const matrix =
       `${base} — ${card.candidate_id} is ${card.lifecycle_status}, and the canonical ` +
-      `Action × Status matrix allows: ${legal}`
-    );
+      `Action × Status matrix allows: ${legal}`;
+    // The matrix is keyed on status alone, so for a candidate the curator cannot
+    // build it can name a `materialize` that refuses in turn — and `activate` on
+    // such a candidate is illegal from every status, because nothing ever
+    // materializes it. Say the narrowing too rather than sending the reviewer
+    // around that loop. Prose on an already-audited refusal, not a second gate.
+    const narrowed =
+      (verb === 'materialize' || verb === 'activate') &&
+      card.artifact_type !== SUPPORTED_ARTIFACT_TYPE;
+    return narrowed ? `${matrix}. arcforge learn ${verb} also ${narrowingMessage(card)}` : matrix;
   }
   if (result.reason === 'stale_status') {
     return (
@@ -367,7 +388,9 @@ function runDrafts({ scope }) {
  *
  * The queue is an append-only event log, so a failure after the approve landed
  * is not rolled back: the candidate stays `approved`, which the matrix allows
- * to materialize, so re-running is the recovery. The second dispatch carries
+ * to materialize, so re-running is the recovery — except when the refusal is the
+ * artifact-type narrowing, which no re-run clears, so the candidate is left
+ * approved and stays queued. The second dispatch carries
  * `expected_current_status` so a concurrent writer is caught rather than
  * overwritten.
  */
@@ -376,7 +399,6 @@ function runAccept({ scope }, candidateId) {
   if (card.lifecycle_status === 'materialized') {
     return { scope, candidate: card, draft_paths: draftPathsFor(candidateId) };
   }
-  assertSupportedArtifactType(card, 'accept');
   if (card.lifecycle_status === 'pending_review') {
     dispatchAction({ verb: 'approve', card, expectedStatus: 'pending_review' });
   }
@@ -398,7 +420,6 @@ function runAccept({ scope }, candidateId) {
 
 function runTransition({ scope }, verb, candidateId) {
   const card = findProjectCard(candidateId);
-  if (verb === 'materialize' || verb === 'activate') assertSupportedArtifactType(card, verb);
   const safetyAck = verb === 'activate' ? acknowledgeActivation(card) : undefined;
   const result = dispatchAction({ verb, card, expectedStatus: card.lifecycle_status, safetyAck });
   return {
