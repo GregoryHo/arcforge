@@ -19,7 +19,8 @@
  * imported by inject-context and the curator batch-assembler.
  *
  * Consent split (D-009 / D-010): the draft is continuity and is written either
- * way, from counts alone. ENRICHMENT is not — it hands a session summary to a
+ * way, from the session record's counts, tool names and modified paths.
+ * ENRICHMENT is not — it hands a session summary to a
  * model — so it runs only when learning is enabled in some scope. With learning
  * off the draft therefore keeps its `TO BE ENRICHED` stubs permanently; that is
  * the contract, not a failure.
