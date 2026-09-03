@@ -189,15 +189,20 @@ of the log, so an entry may show a worked example — a wrong form, or a whole
 illustrative `### D-NNN` — the way the few-shot below does, without the example
 being checked as if it were real.
 
-A block starts and ends where CommonMark says it does. Three or more backticks or
-tildes open one, info string and all — ` ```markdown `, as the few-shots here are
-written. Only a line of the same marker, at least as long as the opening run and
-carrying nothing but whitespace after it, closes one. Two consequences worth knowing
-before writing an example: a fence line with text after its backticks closes nothing,
-and an example that itself shows a fenced block needs a longer outer fence — four
-backticks around three — or the inner one ends the outer block and the illustration
-below it is read as product state. A fence line indented four spaces or more is no
-delimiter at all: at that depth it is content, which is the next exemption.
+Three rules decide where a block starts and ends. Three or more backticks or tildes
+open one, info string and all — ` ```markdown `, as the few-shots here are written —
+*unless* the marker is a backtick and the info string carries a backtick of its own,
+which opens nothing. Only a line of the same marker, at least as long as the opening
+run and carrying nothing but whitespace after it, closes one. And a fence line
+indented four spaces or more is no delimiter at all: at that depth it is content,
+which is the next exemption.
+
+Three consequences worth knowing before writing an example: a fence line with text
+after its backticks closes nothing; an example that itself shows a fenced block needs
+a longer outer fence — four backticks around three — or the inner one ends the outer
+block and the illustration below it is read as product state; and a prose line that
+opens with three backticks and then quotes a `code span` is not a fence, so it opens
+no block and hides nothing below it.
 
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
 relation bullet and a roadmap row all sit in column 1; indented four spaces or more,

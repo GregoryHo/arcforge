@@ -18,12 +18,13 @@
  * returns strings or arrays.
  */
 
-// A fence delimiter, per CommonMark: a run of three or more backticks or tildes
+// A fence-delimiter *candidate*: a run of three or more backticks or tildes
 // indented at most three spaces, plus whatever follows it on the line. The run
-// and the trailing text are both captured because a *closing* fence is
-// constrained in ways an opening one is not — see `fenceTracker`. The indent
-// bound matches the one the linter's heading and relation probes use: at four
-// spaces the line is an indented code block rather than a delimiter.
+// and the trailing text are both captured because CommonMark constrains that
+// text differently at each end of a block — see `fenceTracker`, which is what
+// decides whether a candidate is a delimiter at all. The indent bound matches
+// the one the linter's heading and relation probes use: at four spaces the line
+// is an indented code block rather than a delimiter.
 const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
 
 /**
@@ -34,18 +35,29 @@ const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
  *
  * A delimiter of three or more backticks or tildes **opens** a block, info
  * string and all (` ```markdown ` is how every example in `product/AGENTS.md`
- * opens one). It **closes** only on a line whose run is the same character, at
- * least as long as the opening run, and carries nothing but whitespace after it
- * — the two constraints CommonMark puts on a closing fence and nothing else
- * does.
+ * opens one) — with one exception: CommonMark bars a *backtick* opening fence's
+ * info string from carrying a backtick, so ` ```js use `foo` here ` opens
+ * nothing and is the paragraph it renders as. Tildes carry no such restriction.
+ * A block **closes** only on a line whose run is the same character, at least as
+ * long as the opening run, and carrying nothing but whitespace after it.
  *
- * Both were needed, in opposite directions. Read marker-only, a ` ```not-a-close `
- * line ended the block early and the illustrative table row below it became a
- * roadmap row — a row no renderer shows, standing in for a table that is not
- * there. And a four-backtick block wrapping a three-backtick one — the ordinary
- * way to document a fenced example, which is what `product/AGENTS.md` teaches —
- * was closed by its own inner fence, so the worked example's body was read live
- * and its deliberately wrong `### D-009` became a Decision Log entry.
+ * Those are the three constraints this tracker applies. It is not a CommonMark
+ * parser: the indent bound is measured from column 1 rather than from a list
+ * container, so a fence nested inside a list item is read at its absolute
+ * indent. Nothing in `product/` nests one that deep.
+ *
+ * Each was needed, and they leak in opposite directions. Read marker-only, a
+ * ` ```not-a-close ` line ended the block early and the illustrative table row
+ * below it became a roadmap row — a row no renderer shows, standing in for a
+ * table that is not there. A four-backtick block wrapping a three-backtick one —
+ * the ordinary way to document a fenced example, which is what
+ * `product/AGENTS.md` teaches — was closed by its own inner fence, so the worked
+ * example's body was read live and its deliberately wrong `### D-009` became a
+ * Decision Log entry. And read without the info-string rule, a prose line that
+ * merely opens with three backticks and quotes a code span opened a block that
+ * nothing then closed, so the rest of the log was swallowed and the malformed
+ * relation and missing `- Status:` below it went unreported — a fence exemption
+ * suppressing real errors rather than illustrations.
  *
  * A fence-shaped line that is neither is block content: `~~~` inside a backtick
  * block does not close it, and a run shorter than the opening one does not
@@ -62,6 +74,8 @@ function fenceTracker() {
     if (!m) return open !== null;
     const [, run, info] = m;
     if (open === null) {
+      // Not a fence at all, so it opens nothing and is not itself fenced.
+      if (run[0] === '`' && info.includes('`')) return false;
       open = { char: run[0], length: run.length };
     } else if (run[0] === open.char && run.length >= open.length && info.trim() === '') {
       open = null;

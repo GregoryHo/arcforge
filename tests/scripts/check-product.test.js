@@ -1276,6 +1276,47 @@ describe('check-product', () => {
       expect(run({ roadmap: { note } })).toEqual([]);
     });
 
+    /**
+     * A `D-002` that is wrong twice over — a malformed relation line and no
+     * `- Status:` — so a scope that swallows it turns two C3 errors into
+     * silence. `bogus(fence)` puts that entry under whatever fence-shaped line
+     * is passed, which is what separates a line that opens a block from one
+     * that only looks like it does.
+     */
+    function bogus(...lines) {
+      return roadmap({
+        decisions: [
+          decision({ id: 'D-001' }),
+          [
+            ...lines,
+            ...decision({ id: 'D-002', status: null, extra: ['- Supersedes : D-001'] }).split('\n'),
+          ].join('\n'),
+        ],
+      });
+    }
+
+    it('opens no block on a backtick fence whose info string carries a backtick', () => {
+      // CommonMark bars a backtick opening fence's info string from carrying a
+      // backtick, so this is a paragraph, not a fence. Read as one, it opened a
+      // block nothing closed and the rest of the log went unread — the fence
+      // exemption suppressing real errors rather than illustrations.
+      const errors = of(
+        'C3',
+        validateProduct({ roadmap: bogus('```js use `foo` here'), specs: [spec()] }),
+      );
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toMatch(/malformed relation line "- Supersedes : D-001"/);
+      expect(errors[1]).toMatch(/no "- Status:" line/);
+    });
+
+    it('still opens a block on a tilde fence whose info string carries a backtick', () => {
+      // The restriction is the backtick marker's alone: a tilde fence's info
+      // string may carry anything, so this really is an illustration.
+      expect(validateProduct({ roadmap: bogus('~~~js use `foo` here'), specs: [spec()] })).toEqual(
+        [],
+      );
+    });
+
     it('does not let an inner three-backtick block close a four-backtick one', () => {
       // The ordinary way to document a fenced example, which is the shape
       // `product/AGENTS.md` itself teaches by. Read marker-only the inner fence
