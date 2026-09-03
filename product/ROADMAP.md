@@ -351,3 +351,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   both warnings — so a scripted `learn activate --json` activates with no
   second human in the loop. That matches the pre-unification CLI, which had no
   confirmation either, and the deliberate typed command is the gate.
+- Residual: a path-hostile candidate name still strands a candidate through
+  the two-step path — `learn approve` then `learn materialize`, or the
+  dashboard's equivalent clicks. Approve is legal, materialize refuses
+  `path_policy_rejected` permanently, and the matrix allows an approved
+  candidate neither dismiss nor any other exit. `accept` is guarded because it
+  alone promises all-or-nothing; closing the two-step path means either
+  rejecting such names at Layer-5 ingestion or normalizing the name at
+  materialization, and reject-vs-normalize is a product decision this PR does
+  not make. The same two-step path also prints the offending name verbatim —
+  it is Layer 8's own `module_failure.detail`, which every single-step command
+  renders deliberately, so `accept` alone is held to not echoing it.
