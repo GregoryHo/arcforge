@@ -598,6 +598,33 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(runJson(['inbox', '--project']).count).toBe(1);
     });
 
+    // Every producer keys the project on the SANITIZED basename (`getProjectName()`
+    // — the same slug as `observations/<slug>/` and `instincts/<slug>/`). The CLI
+    // used to take the raw basename, so from any project root the sanitizer
+    // rewrites (`My Project` → `My-Project`) the whole front end came back empty.
+    it('matches the sanitized project slug, not the raw directory name', () => {
+      const rawRoot = path.join(testDir, 'My Project');
+      fs.mkdirSync(rawRoot, { recursive: true });
+      seed(
+        makeRecord({ scope: { kind: 'project', project: 'My-Project', project_id: PROJECT_ID } }),
+      );
+      const rawRootEnv = { ...env, CLAUDE_PROJECT_DIR: rawRoot };
+
+      const run = (args) => {
+        const result = spawnSync('node', [cli, 'learn', ...args, '--json'], {
+          env: rawRootEnv,
+          encoding: 'utf8',
+        });
+        expect(result.status).toBe(0);
+        return JSON.parse(result.stdout);
+      };
+
+      const inbox = run(['inbox', '--project']);
+      expect(inbox.count).toBe(1);
+      expect(inbox.candidates[0].candidate_id).toBe(CANDIDATE_ID);
+      expect(run(['review', '--project']).count).toBe(1);
+    });
+
     it("names the owning project when an id belongs to another project's queue", () => {
       seed(
         makeRecord({
