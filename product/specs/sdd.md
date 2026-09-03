@@ -61,7 +61,11 @@ want it.
   Shipping flips the row, fills the tag cell, sets each affected spec's status
   header, and settles the marker — moved onto the next row, or left on the row
   that just shipped when nothing has been promoted after it. The four are one
-  act, not four chores; shipping never invents the row it would move to.
+  act, not four chores; shipping never invents the row it would move to. Both
+  conditionals fall out of one invariant: the marker sits on the earliest row
+  that has not shipped, and on the last row when every row has. Promotion reads
+  the same way — a new row takes the marker only when every row above it has
+  shipped; a `building` row, or an earlier `next` row, keeps it.
 - **B-6 The skill never bootstraps unasked.** In a repo with no product state and
   no user request for any, `speccing` does not apply. Creating the four files is
   offered once and started only on a yes. Product state is a maintenance
