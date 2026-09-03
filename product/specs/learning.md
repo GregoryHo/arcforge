@@ -78,10 +78,13 @@ was recorded about them.
   `--project` means *this* project, matched on the project name each card
   prints — and refuses `--global`: a candidate that would apply to every
   project on the machine is reviewed where the reviewer can see what it
-  changes. Its reach is what the engine can
-  actually build — the instinct artifact. That narrowing is the curator's own
-  refusal, which the CLI renders rather than re-decides, so it too is audited;
-  the CLI says so up front rather than offering a step with nothing behind it. Hand-editing state files is the one path with
+  changes. Its reach is what the engine can actually build — the instinct
+  artifact. That narrowing is the curator's own refusal, which the CLI renders
+  rather than re-decides, so it too is audited; the advisory commands say so up
+  front rather than offering a step with nothing behind it. The one compound
+  command, `accept`, cannot: it approves before it meets the refusal, so it
+  leaves a non-instinct candidate approved — neither buildable nor, from that
+  status, rejectable. Hand-editing state files is the one path with
   no checks and no record; the product treats it as out of contract. The
   on-disk formats are append-only or atomically overwritten, owned by the
   engine per the curator schema (cited above).

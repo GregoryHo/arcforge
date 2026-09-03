@@ -210,7 +210,7 @@ arcforge learn activate <candidate-id> --project
 | `learn review` | Every candidate for this project, as the dashboard's cards |
 | `learn inspect` | One candidate in detail: evidence summaries, body preview, next actions |
 | `learn approve` / `learn reject` | Record your decision |
-| `learn accept` | Approve and materialize in one step — never activates |
+| `learn accept` | Approve and materialize in one step — never activates; instinct candidates only, see below |
 | `learn materialize` | Write the draft without activating it |
 | `learn activate` | Promote the materialized draft to an active instinct |
 | `learn drafts` | What is materialized and waiting for activation, with draft paths |
@@ -239,6 +239,15 @@ not one of the moves.
 engine can build today. A candidate of any other artifact type stays in the
 queue and the command says so, rather than offering a step with nothing behind
 it.
+
+`learn accept` is the one exception, because it is two moves in one: it
+approves first and only then meets the refusal. Run it on a pending
+non-instinct candidate and the approve lands — audited, and not rolled back,
+because the queue is append-only — while the materialize is refused for a
+reason no re-run clears. The candidate is left `approved`: it can never be
+built, and per the rule above it can no longer be rejected either. Check
+`artifact_type` with `learn inspect` before accepting a candidate you did not
+queue yourself.
 
 Every command takes `--json` for scripting; with `--json`, a refusal comes back
 as `{"error": "..."}` and a non-zero exit.
