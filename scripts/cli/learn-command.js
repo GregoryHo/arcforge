@@ -188,15 +188,26 @@ function findProjectCard(candidateId) {
 }
 
 /**
- * Absolute draft paths from the latest materialization manifest.
+ * The newest materialization manifest for a candidate, or `null`.
+ *
+ * Both draft questions the CLI asks — which paths, and which of them are
+ * stale — are answered from this one record, so the surfaces that ask both
+ * resolve it once and read it twice rather than scanning the manifest
+ * directory per question.
+ */
+function latestMaterializationFor(candidateId) {
+  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
+  const { getArcforgeHome } = require('../lib/utils');
+  return findLatestMaterialization(getArcforgeHome(), candidateId);
+}
+
+/**
+ * Absolute draft paths from a materialization manifest.
  *
  * Deliberately not `active_target_hint.target_path_summary`: that string
  * embeds `scope.project_id`, which no CLI or dashboard surface prints.
  */
-function draftPathsFor(candidateId) {
-  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
-  const { getArcforgeHome } = require('../lib/utils');
-  const record = findLatestMaterialization(getArcforgeHome(), candidateId);
+function draftPathsIn(record) {
   if (!record || !Array.isArray(record.draft_artifacts)) return [];
   return record.draft_artifacts.map((artifact) => artifact.draft_path).filter(Boolean);
 }
@@ -211,13 +222,20 @@ function draftPathsFor(candidateId) {
  * the comparison — `staleDraftArtifacts` is the same predicate the reuse branch
  * screens manifests with — so this asks it rather than re-hashing here.
  */
-function staleDraftsFor(candidateId) {
-  const { findLatestMaterialization } = require('../lib/learning-curator/activate');
-  const { staleDraftArtifacts } = require('../lib/learning-curator/materialize');
-  const { getArcforgeHome } = require('../lib/utils');
-  const record = findLatestMaterialization(getArcforgeHome(), candidateId);
+function staleDraftsIn(record) {
   if (!record) return [];
+  const { staleDraftArtifacts } = require('../lib/learning-curator/materialize');
   return staleDraftArtifacts(record);
+}
+
+/** The one-question form, for the callers that ask only about the paths. */
+function draftPathsFor(candidateId) {
+  return draftPathsIn(latestMaterializationFor(candidateId));
+}
+
+/** The one-question form, for the callers that ask only about staleness. */
+function staleDraftsFor(candidateId) {
+  return staleDraftsIn(latestMaterializationFor(candidateId));
 }
 
 /** Each stale draft named with what went wrong with it. */
@@ -430,12 +448,13 @@ function runInbox({ scope }) {
 function runInspect({ scope }, candidateId) {
   const { sanitizeDashboardDetail } = require('../lib/learning-dashboard');
   const card = findProjectCard(candidateId);
-  const stale = staleDraftsFor(card.candidate_id);
+  const materialization = latestMaterializationFor(card.candidate_id);
+  const stale = staleDraftsIn(materialization);
   return {
     scope,
     candidate: sanitizeDashboardDetail(card.candidate_id),
     next_actions: stale.length > 0 ? staleDraftActions(stale) : nextActionsFor(card),
-    draft_paths: draftPathsFor(card.candidate_id),
+    draft_paths: draftPathsIn(materialization),
     draft_paths_stale: stale,
   };
 }
@@ -443,15 +462,18 @@ function runInspect({ scope }, candidateId) {
 function runDrafts({ scope }) {
   const drafts = readProjectCards()
     .filter((card) => card.lifecycle_status === 'materialized')
-    .map((card) => ({
-      ...card,
-      next_command: nextCommandFor(card),
-      draft_paths: draftPathsFor(card.candidate_id),
-      // The listing already reads the manifest off disk for `draft_paths`, so
-      // saying whether those files are still there costs one stat and one hash
-      // per entry — worth it on the command whose whole subject is the drafts.
-      draft_paths_stale: staleDraftsFor(card.candidate_id),
-    }));
+    .map((card) => {
+      // One manifest read per entry answers both draft questions, so the
+      // staleness check adds one stat and one hash per recorded draft — worth
+      // it on the command whose whole subject is the drafts.
+      const materialization = latestMaterializationFor(card.candidate_id);
+      return {
+        ...card,
+        next_command: nextCommandFor(card),
+        draft_paths: draftPathsIn(materialization),
+        draft_paths_stale: staleDraftsIn(materialization),
+      };
+    });
   return { scope, count: drafts.length, drafts };
 }
 
