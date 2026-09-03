@@ -213,7 +213,7 @@ arcforge learn activate <candidate-id> --project
 | `learn accept` | Approve and materialize in one step — never activates |
 | `learn materialize` | Write the draft without activating it |
 | `learn activate` | Promote the materialized draft to an active instinct |
-| `learn drafts` | What is materialized and waiting for activation, with draft paths — and which of those files is missing or has changed since it was written |
+| `learn drafts` | What is materialized and waiting for activation, with draft paths — and which entries have no draft left to review, because the file is missing, has changed since it was written, or its record is gone |
 
 Three things follow from these being one queue rather than two.
 
@@ -249,12 +249,12 @@ all-or-nothing because half of it cannot be undone — the queue is append-only,
 and an approval it could never build on would be a decision you are stuck with.
 
 On a candidate that is already materialized, `accept` has nothing left to do,
-so it re-reports the draft it already wrote — but only while that file is still
-there and still says what the engine wrote. If the draft has been deleted or
-edited, `accept` refuses and names the file instead of handing back a path that
-does not resolve; `learn drafts` and `learn inspect` mark it the same way, and
-neither offers you the activation that would refuse — a marked entry points at
-`learn inspect` instead. Read a draft, but do not edit it in place: activation
+so it re-reports the draft it already wrote — but only while there is a draft to
+re-report. If the file has been deleted or edited, or the record that named it
+is gone, `accept` refuses and says which, instead of handing back a path that
+does not resolve or an empty list; `learn drafts` and `learn inspect` mark it
+the same way, and neither offers you the activation that would refuse — a marked
+entry points at `learn inspect` instead. Read a draft, but do not edit it in place: activation
 checks the draft against the content hash recorded when it was written, so an
 edited draft is one that `learn activate` will refuse.
 
