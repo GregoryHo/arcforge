@@ -289,9 +289,12 @@ function checkFlipsAreClaimed(entries, byNum, errors) {
 /**
  * C3 — every relation resolves backwards, and a supersession is two edits: the
  * flip on the superseded entry is the second one. `Refines:` and `Extends:`
- * sharpen or widen a decision that stays in force, so they need an earlier live
- * target and nothing else. The direction test compares `D-id`s, not positions,
- * so parking a superseded entry in the folded index leaves it satisfied.
+ * sharpen or widen a decision that stays in force, so they need an earlier
+ * target that exists and nothing else — the target's later status is not the
+ * edge's business, because a refinement written while its target was live stays
+ * a correct record after some third decision supersedes that target. The
+ * direction test compares `D-id`s, not positions, so parking a superseded entry
+ * in the folded index leaves it satisfied.
  *
  * Coherence is a property of the superseded entry's `Status:`, not of one edge,
  * so it runs once per victim — two decisions superseding one entry report one

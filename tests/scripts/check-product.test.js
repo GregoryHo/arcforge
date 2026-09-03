@@ -398,6 +398,30 @@ describe('check-product', () => {
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
     });
 
+    it('accepts a Refines: or Extends: naming a decision that has since been superseded', () => {
+      // C3 tests a relation edge, never its target's current status: the target
+      // has to exist and be earlier, and that is the whole promise.
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-002' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001'] }),
+        decision({ id: 'D-003', extra: ['- Refines: D-001'] }),
+        decision({ id: 'D-004', extra: ['- Extends: D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('accepts a Refines: written while its target was still live', () => {
+      // D-002 refined a live D-001; D-003 killed D-001 afterwards. The log is
+      // append-only, so D-002 cannot be edited in hindsight — any future
+      // tightening here has to stay order-sensitive and keep this case green.
+      const decisions = [
+        decision({ id: 'D-001', status: 'Superseded-by: D-003' }),
+        decision({ id: 'D-002', extra: ['- Refines: D-001'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
+      ];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('rejects a Refines naming a decision that does not exist', () => {
       const decisions = [
         decision({ id: 'D-001' }),
