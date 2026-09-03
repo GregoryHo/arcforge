@@ -245,11 +245,15 @@ starts it checks the two things no re-run can change: the artifact type, and
 whether the candidate's name can be used as a draft filename. On a non-instinct
 candidate, or one the curator named with a path separator, `..`, a control
 character or nothing at all, it refuses without approving anything: no draft, no
-audit entry, the candidate exactly as it was, and `learn reject` is the way out.
-The single-step commands do the opposite, and dispatch first, so what you read is
-the engine's own refusal and the refusal is recorded. Accept is all-or-nothing
-because half of it cannot be undone — the queue is append-only, and an approval
-it could never build on would be a decision you are stuck with.
+audit entry, the candidate exactly as it was — and the refusal names the move
+that is left. For a non-instinct candidate that move is recording the approval on
+its own; for a name the draft writer cannot use it is `learn reject` — or, where
+the queue no longer allows that, the dashboard — because nothing the CLI offers
+renames a candidate. The single-step commands do the opposite, and dispatch
+first, so what you read is the engine's own refusal and the refusal is recorded.
+Accept is all-or-nothing because half of it cannot be undone — the queue is
+append-only, and an approval it could never build on would be a decision you are
+stuck with.
 
 On a candidate that is already materialized, `accept` has nothing left to do,
 so it re-reports the draft it already wrote — but only while there is a draft to
