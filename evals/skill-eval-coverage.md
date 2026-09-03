@@ -275,6 +275,15 @@ review round 1 把 A3 的 id 判準從「不屬於 fixture 寫下的四個 id」
 transcript 一律以 `### D-005` 起頭），因此沒有需要分離的池。未重評任何 trial，
 未動用 trial 額度，+0.67 CI[0.67, 0.67] 不變。
 
+同一輪 review 也把 A2 的版本判準從「不屬於 fixture 那三列」改為與 `0.3.0` 數值
+比較（`any(... > (0, 3, 0))`），理由同樣是該 assertion 自己的後半句「不讓 roadmap
+落後程式一個版本」——一個 `0.0.1` 的過期列在舊判準下可拿滿分（以出貨中的 grader
+實測，A1–A6 全 PASS、exit 0）。與 A3 不同，這裡的差集不是單一元素而是無界的
+（所有低於 `0.3.0` 且非既有三列的版本），因此 `## Version` 維持 2 的理由落在池
+本身：baseline 臂三份留存 transcript 都沒寫任何版本列（A2 全滅，收緊不可能拉高），
+treatment 臂留存 transcript 一律寫 `| 0.4.0 |`，兩判準評分相同。未重評任何 trial，
+未動用 trial 額度。
+
 ### `supersede-not-overwrite`：baseline 天花板，儀器修正後確認
 
 Version 1（無結構壓力）與 Version 2（加入「精簡日誌、丟掉過期條目、重新編號補齊
