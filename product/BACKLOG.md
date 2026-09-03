@@ -92,6 +92,15 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   `scope.project_id` would hide candidates (the id is taken from whichever
   observation wrote first, or a name hash). Separating them is a keyspace
   decision (ICL-3 territory), not a CLI filter.
+
+- **learn-enable-erases-config** — `setLearningEnabled` (scripts/lib/learning.js)
+  writes a fresh `{ scope, enabled, updated_at }` object, so every other key on
+  the learning config is dropped; the only such key today is
+  `inject_activated_instincts`, which has no CLI setter, so a hand-written
+  `inject_activated_instincts: false` followed by `arcforge learn enable --global`
+  gets default-on injection back with no notice. Fix: merge over the previous
+  config instead of replacing it. Pre-existing; surfaced during the #146/#147
+  review.
 ## Product method
 - **product-cli** — an `arcforge product check` command that verifies a
   project's own product state: dense monotonic decision ids, every
