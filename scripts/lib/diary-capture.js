@@ -154,6 +154,30 @@ function learningCaptureEnabled({ projectRoot } = {}) {
   }
 }
 
+/**
+ * D-010's retention half: verbatim user prose lives in the session record only
+ * while the learning opt-in is on. The record outlives a single event — Stop
+ * fires once per turn and PreCompact once per compaction, both reloading and
+ * rewriting the whole record — so a gate that only skipped the write would keep
+ * re-serializing prose captured before the user opted out.
+ *
+ * Mutates `session` in place and returns whether capture is currently allowed,
+ * so a caller that also writes prose reuses this one gate read.
+ *
+ * @param {Object|null} session - Session record, mutated in place.
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Omitted or blank means no consent
+ *   (learningCaptureEnabled fails closed), which prunes.
+ * @returns {boolean} true when the opt-in allows verbatim prose.
+ */
+function pruneUngatedProse(session, { projectRoot } = {}) {
+  const allowed = learningCaptureEnabled({ projectRoot });
+  if (!allowed && session && session.userMessageContent !== undefined) {
+    delete session.userMessageContent;
+  }
+  return allowed;
+}
+
 // ---------------------------------------------------------------------------
 // Draft generation + background enrichment
 // ---------------------------------------------------------------------------
@@ -341,6 +365,7 @@ module.exports = {
   getSuggesterStatePath,
   draftIsStale,
   learningCaptureEnabled,
+  pruneUngatedProse,
   tryGenerateAutoDiary,
   spawnDiaryEnricher,
   runDiaryCapture,

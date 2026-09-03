@@ -129,9 +129,12 @@ unconditionally and B-6 bounds. Its path and its safe read/write belong to
 closes it with the counts and, above the diary threshold, with the summary
 `scripts/lib/transcript.js` parses out of the harness transcript (with no parsed
 transcript — below the threshold, or above it with none to read — `filesModified`
-is cleared while `userMessageContent` and `toolsUsed` are neither written nor
-cleared, so a record an earlier parse filled keeps that turn's prose and tool list
-until a later parse refreshes them), and
+is cleared while `toolsUsed` is neither written nor cleared, so a record an earlier
+parse filled keeps that turn's tool list until a later parse refreshes it;
+`userMessageContent` follows a different lifetime, because the opt-in governs how
+long it may stay and not only whether it is written — every Stop, and every
+compaction that stamps the record, removes it whenever learning is off, so prose
+captured under the opt-in does not outlive it), and
 `hooks/pre-compact/main.js` appends each compaction. The diary is
 not a hooks format but learning's ([learning](learning.md)); what this area owns is its
 trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`

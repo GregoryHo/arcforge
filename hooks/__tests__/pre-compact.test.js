@@ -74,6 +74,82 @@ describe('pre-compact: updateSessionFile', () => {
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
     assert.strictEqual(updated.compactions.length, 2);
   });
+
+  // -------------------------------------------------------------------
+  // D-010 retention: stamping the compaction marker rewrites the whole
+  // record, so the same opt-in that governs capture governs what survives
+  // here. Without the prune, a compaction re-serializes prose captured
+  // before the user opted out.
+  // -------------------------------------------------------------------
+
+  /** A session record carrying prose an earlier, opted-in Stop wrote. */
+  function seedRecordWithProse(sessionId) {
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', 'test-project', '2025-01-15');
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({
+        toolCalls: 10,
+        compactions: [],
+        userMessageContent: ['carried prose'],
+        toolsUsed: ['Edit'],
+      }),
+    );
+    return sessionFile;
+  }
+
+  /** A project root whose project-scope learning config is written as `enabled`. */
+  function projectRootWithLearning(enabled) {
+    const projectRoot = path.join(testDir, `proj-${enabled ? 'on' : 'off'}`);
+    const configPath = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled }));
+    return projectRoot;
+  }
+
+  it('prunes carried user prose when the opt-in is off', () => {
+    const { updateSessionFile } = require('../pre-compact/main');
+    const sessionFile = seedRecordWithProse('session-prune-off');
+
+    const result = updateSessionFile(
+      'test-project',
+      '2025-01-15',
+      '2025-01-15T10:30:00Z',
+      'session-prune-off',
+      projectRootWithLearning(false),
+    );
+    assert.strictEqual(result, true);
+
+    const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    assert.strictEqual(
+      updated.userMessageContent,
+      undefined,
+      'a compaction must not re-serialize prose captured before the opt-out',
+    );
+    assert.deepStrictEqual(updated.toolsUsed, ['Edit'], 'tool names are continuity, kept');
+    assert.strictEqual(updated.compactions.length, 1, 'the compaction marker still lands');
+  });
+
+  it('keeps carried user prose while the opt-in is on', () => {
+    const { updateSessionFile } = require('../pre-compact/main');
+    const sessionFile = seedRecordWithProse('session-prune-on');
+
+    updateSessionFile(
+      'test-project',
+      '2025-01-15',
+      '2025-01-15T10:30:00Z',
+      'session-prune-on',
+      projectRootWithLearning(true),
+    );
+
+    const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    assert.deepStrictEqual(
+      updated.userMessageContent,
+      ['carried prose'],
+      'with learning on the record keeps what an earlier parse wrote',
+    );
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -282,6 +358,59 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
         fs.readFileSync(counterPath('tool-count'), 'utf-8'),
         '3',
         'tool preserved',
+      );
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+  // D-010 retention, end-to-end: updateSessionFile fails closed on a missing
+  // projectRoot, so a main() that never threaded it through would delete prose
+  // even for an opted-in user — and every direct-call test would still pass.
+  // This case spawns the real hook to pin the wiring.
+  it('main(): a compaction with learning ON keeps the prose an earlier Stop wrote', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-keep-proj-'));
+    const project = path.basename(projectDir);
+    enableLearning(projectDir);
+
+    const date = new Date().toISOString().split('T')[0];
+    const sessionDir = path.join(homeDir, '.arcforge', 'sessions', project, date);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `session-${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({ compactions: [], userMessageContent: ['carried prose'] }),
+    );
+
+    // Below the diary threshold, so this compaction only stamps the record.
+    fs.writeFileSync(counterPath('user-count'), '1');
+    fs.writeFileSync(counterPath('tool-count'), '1');
+
+    const env = {
+      ...process.env,
+      HOME: homeDir,
+      TMPDIR: tmpDir,
+      CLAUDE_PROJECT_DIR: projectDir,
+    };
+    delete env.CLAUDE_SESSION_ID;
+
+    const res = spawnSync('node', [PRE_COMPACT], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'PreCompact',
+        cwd: projectDir,
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+      assert.strictEqual(updated.compactions.length, 1, 'the compaction marker landed');
+      assert.deepStrictEqual(
+        updated.userMessageContent,
+        ['carried prose'],
+        'main() must pass the project root through — an opted-in record keeps its prose',
       );
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
