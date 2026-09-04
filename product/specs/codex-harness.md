@@ -91,9 +91,9 @@ whole and fails halfway through a workflow.
   policy: `command -v <plugin bin>` was empty both times, and the same turn's
   `PATH` dump carried no Codex plugin `bin/` entry while the Claude Code plugin
   `bin/` directories inherited from the parent shell were plainly visible in it.
-  On Codex the eight engine-free skills work in full; the seven CLI-backed ones
-  load and read correctly but report `command not found` at their first engine
-  step. That failure is loud and located, which is the accepted cost — the
+  On Codex the engine-free skills work in full; the CLI-backed ones load and
+  read correctly but report `command not found` at their first engine step.
+  That failure is loud and located, which is the accepted cost — the
   alternative, a skill that constructs its own path to the engine, would break
   the black-box boundary that makes the engine safe to change (D1/D9 in
   `.claude/rules/architecture.md`).
@@ -112,8 +112,8 @@ whole and fails halfway through a workflow.
   footnote on the other; the README documents both, and the release audit checks
   both.
 - **B-6 The boundary is documented before install, not discovered after.** The
-  README's Codex section names which eight skills work fully, which seven degrade
-  to `command not found`, which subsystems do not run at all, and how a skill is
+  README's Codex section names which skills work fully, which degrade to
+  `command not found`, which subsystems do not run at all, and how a skill is
   actually reached on each host — a `/arcforge:<name>` slash command on Claude
   Code, the composer's `$` mention picker on Codex, which has no slash commands for
   skills. The router carries that same per-host note above its Skill Map, whose
