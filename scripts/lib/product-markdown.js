@@ -34,7 +34,7 @@ const FENCE_RE = /^ {0,3}((?:`{3,})|(?:~{3,}))(.*)$/;
 // open — an indented `## Appendix` left the Decision Log running into it, and the
 // appendix's `### D-NNN` headings became entries C2 numbered and C5 resolved. At
 // four spaces the line is an indented code block, which is content, not a
-// heading, and closes nothing. Exported because `specStatusHeader` in
+// heading, and closes nothing. Exported because `specStatusHeaders` in
 // `product-lint.js` ends a spec's preamble at this same boundary, and two copies
 // of the bound are two things to widen.
 const SECTION_END_RE = /^ {0,3}##\s+/;

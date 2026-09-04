@@ -269,6 +269,14 @@ copy of the template is an illustration. Keep the header where the template puts
 directly under the H1 — a `> Status:` line below the first `##` is prose, and C4
 reports the header as missing.
 
+A spec carries exactly one such header, and C4 counts them the way C3 counts an
+entry's `Status:` lines. A second `> Status:` line in the preamble is reported rather
+than losing silently to the one above it — two headers are the same contradiction the
+log's two `- Status:` lines are, spelled in a different scope, and read first-wins the
+verdict over one visibly two-state spec was decided by which line was typed first.
+The header flips in *Build a milestone* and *Ship a version* **replace** that one
+line; neither adds a second below it.
+
 That first `##` ends the preamble even when it carries one to three leading spaces —
 the same bound a `### D-NNN` heading is read at, and the same one that ends a section
 above. Every boundary a heading *ends* takes it, for the same reason: an indented

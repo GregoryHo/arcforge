@@ -1135,6 +1135,48 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/missing the "> Status:" header line/);
     });
 
+    it('rejects a stale second Status header left below the real one', () => {
+      // Read first-wins the correct header returned and the contradiction below
+      // it was never seen, so `check:product` passed a spec rendering two states.
+      const specs = [spec({ intro: ['> Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line \("> Status: draft"\)/);
+    });
+
+    it('rejects the same pair with the stale header first', () => {
+      // The order that made the defect visible: first-wins reported the *mismatch*
+      // here and nothing in the case above, so one corpus got two verdicts decided
+      // by typing order. Both orders are the same defect and get the same error.
+      const specs = [spec({ preamble: ['> Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('rejects a second header separated from the first by a blank line', () => {
+      // The most visibly two-state render: two blockquotes rather than one.
+      const specs = [spec({ intro: ['', '> Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('does not count a fenced illustration of the header as a second header', () => {
+      // The false-positive direction the missing-header case cannot reach:
+      // collecting every header makes a fenced copy a duplicate candidate for the
+      // first time, and the fence exemption is what keeps it an illustration.
+      const specs = [spec({ preamble: ['```markdown', '> Status: draft', '```', ''] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
+    it('does not count a quoted Status line below the first `##` as a second header', () => {
+      // Same direction, the other exemption: the count is preamble-scoped, so
+      // quoted prose in the body is prose whether or not a header exists above it.
+      const specs = [spec({ extra: ['> Status: shipped v1.0.0'] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
     it('does not end the preamble at a `##` inside an indented code block', () => {
       // The bound is ` {0,3}`, not `\s*`: at four spaces the line is an indented
       // code block, so an illustrative heading above the header is not a boundary.
@@ -1559,7 +1601,7 @@ describe('check-product', () => {
 
     it('tracks each scan on its own, so an unclosed fence does not bleed into the next', () => {
       // Fence state belongs to a scan, not to the module: the roadmap and every
-      // spec are read by separate calls, and `specStatusHeader` reads a whole
+      // spec are read by separate calls, and `specStatusHeaders` reads a whole
       // document where the others read a section slice. Held in one shared
       // tracker, this unclosed fence would still be open when the spec is read
       // and its header would come back missing.

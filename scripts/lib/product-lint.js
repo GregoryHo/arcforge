@@ -69,7 +69,9 @@
  *         The header is read in the preamble above the
  *         spec's first `##`, fence-aware, so a worked example or a quoted header
  *         line further down is neither mistaken for the header nor allowed to
- *         displace it. Each version occupies exactly one row, which is what
+ *         displace it, and that preamble carries exactly one such header — read
+ *         first-wins, a stale header left beside its replacement decided the
+ *         verdict by typing order. Each version occupies exactly one row, which is what
  *         makes "the highest-version one" name a row at all: two rows for one
  *         version leave the governing row decided by table order, and the same
  *         pair then accepts two contradictory headers;
@@ -156,7 +158,7 @@ const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
 // silently, where C6 catches the same read on `ROADMAP.md`.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 // The spec header line, matched per line rather than against the whole file, so
-// the scope in `specStatusHeader` is what decides which line is the header.
+// the scope in `specStatusHeaders` is what decides which line is the header.
 const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
@@ -497,19 +499,30 @@ function checkRoadmapTags(rows, errors) {
  * `SPEC_STATUS_HEADER_RE`) are anchored there for a different reason, which is
  * that column 1 is where the form puts them. Four spaces is an indented code
  * block, so an illustrative `##` in the preamble still does not cut it short.
+ *
+ * Every header in that scope is collected, not the first one: read first-wins, a
+ * stale `> Status:` left beside the line meant to replace it decided the verdict
+ * by typing order, and the order that reported nothing shipped a spec rendering
+ * two states. C3 picks a winner among an entry's duplicate `- Status:` lines
+ * because `current.status` feeds the relation and vocabulary checks downstream;
+ * C4's header feeds one comparison in `checkSpecHeaders`, so skipping that
+ * comparison is available and keeps the appended header a single-error mutant in
+ * either order.
  */
-function specStatusHeader(content) {
+function specStatusHeaders(content) {
+  const headers = [];
   for (const line of unfenced(content.split('\n'))) {
     if (SECTION_END_RE.test(line)) break;
     const m = line.match(SPEC_STATUS_HEADER_RE);
     if (!m) continue;
-    return m[1]
+    const status = m[1]
       .split('·')
       .map((s) => s.trim())
       .filter((s) => s && !s.startsWith('['))
       .join(' · ');
+    headers.push({ status, raw: line.trim() });
   }
-  return null;
+  return headers;
 }
 
 /**
@@ -590,11 +603,18 @@ function checkSpecHeaders(rows, specs, errors) {
       errors.push(`C4 specs/${spec.name}.md: no roadmap row links it, so it has no governing row`);
       continue;
     }
-    const actual = specStatusHeader(spec.content);
-    if (actual === null) {
+    const headers = specStatusHeaders(spec.content);
+    if (headers.length === 0) {
       errors.push(`C4 specs/${spec.name}.md: missing the "> Status:" header line`);
       continue;
     }
+    if (headers.length > 1) {
+      errors.push(
+        `C4 specs/${spec.name}.md: a second "> Status:" header line ("${headers[1].raw}") — a spec carries exactly one, so a second header is reported rather than one silently winning by position`,
+      );
+      continue;
+    }
+    const actual = headers[0].status;
     const expected = expectedSpecStatus(linking);
     if (actual !== expected) {
       errors.push(
@@ -672,5 +692,5 @@ module.exports = {
   validateProduct,
   parseDecisions,
   expectedSpecStatus,
-  specStatusHeader,
+  specStatusHeaders,
 };
