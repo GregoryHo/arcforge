@@ -47,12 +47,18 @@ across sessions until the threshold is met; reset is owned exclusively by
 
 ### On Session End (Stop) — `end.js`
 - Saves session metrics (duration, tool calls)
-- Records modified files and tool names from transcript parsing (parseTranscript)
-- Stores verbatim recent user messages (`userMessageContent`) **only when
-  learning is enabled in some scope**, and removes the field from the record when
-  it is not, so prose captured under an earlier opt-in does not survive the
-  opt-out — the parse itself is unconditional, so the metadata above is recorded
-  either way
+- **Above the diary threshold**, parses the transcript (`parseTranscript`) and
+  records the tool names and modified-file paths it yields. With nothing parsed
+  — below the threshold, or above it with no readable transcript — a Stop clears
+  `filesModified`, while `toolsUsed` is neither written nor cleared: a record an
+  earlier parse filled keeps that turn's tool list until a later parse refreshes
+  it
+- Stores verbatim recent user messages (`userMessageContent`) on that same
+  threshold hit, and then **only when learning is enabled in some scope**.
+  Removal is the half that is unconditional: every Stop drops the field when
+  learning reads off, above or below the threshold, so prose captured under an
+  earlier opt-in does not survive the opt-out, and an opt-out takes effect on the
+  next Stop either way
 - Runs diary-capture (threshold-gated draft + counter reset; the enricher spawn
   is behind the same learning opt-in)
 - Queues the `reflect-ready` nudge **only when learning is enabled in some
@@ -101,11 +107,15 @@ Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
 }
 ```
 
-Every field above is continuity and is written regardless of the learning
-opt-in. One field is not: `userMessageContent` — the last 10 user messages,
-each truncated — is added only when learning is enabled in some scope, and is
-removed again the first time a Stop or a compaction stamps the record with
-learning off.
+Every field above is continuity: the learning opt-in never gates any of them.
+The diary threshold does gate the two the transcript supplies — `toolsUsed` and
+`filesModified` are refreshed only on a Stop or compaction that hits the
+threshold, and below it a Stop clears `filesModified` and leaves `toolsUsed` as
+an earlier parse wrote it. One field is missing from the block above because it
+is not continuity: `userMessageContent` — the last 10 user messages, each
+truncated — is written on that same threshold hit and only when learning is
+enabled in some scope, and is removed again, at any threshold, the first time a
+Stop or a compaction stamps the record with learning off.
 
 ## Output Examples
 
