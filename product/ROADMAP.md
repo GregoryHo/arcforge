@@ -364,7 +364,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   renders deliberately — but the CLI now renders it through the same redactor
   `sanitizeDashboardCard` applies to a card's `name`, so B-9's allowlisted-view
   promise holds on the refusal path too. `accept` remains held to not echoing
-  the name at all.
+  the name in its prose; the `draft_paths` it returns still carry it in the
+  basename, which is the stored-name channel below.
 - Residual, second clause: the artifact-type narrowing strands a candidate at
   the same `approved` dead end, and there the CLI recommends the move that
   does it — `accept`'s type refusal names `learn approve` as the recovery, and
