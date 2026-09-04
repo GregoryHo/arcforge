@@ -519,3 +519,53 @@ Three directions stay open, and all three were scoped deliberately:
   becoming the CommonMark parser `hiddenTracker()`'s docblock says it is not — so it is
   a decision about how much of the grammar the linter owns, not a review fix. No line
   under `product/` writes one, and `product/AGENTS.md` states the scope.
+
+## 10. Where a fold ends — the closer's position was **TAKEN** in the round that reported it
+
+`FOLD_CLOSE_RE` was `/^ {0,3}<\/details>/i`, anchored the way `FOLD_OPEN_RE` is, so the
+fold ended only at a line that *begins* with the closing tag. Both directions of that
+anchor leaked, and both leak the same way — `inFold` sticks true, and every entry below
+is silently exempt from C2's ascending clause:
+
+- **A same-line pair.** `<details></details>` sets `inFold` and the anchored closer
+  never sees the closing tag on the opener's own line, so a log reading `### D-001` /
+  `<details></details>` / `### D-003` / `### D-002` produced no C2 error at all. Remove
+  the empty element and the identical log reports `C2 Decision Log is out of order:
+  D-002 follows D-003`.
+- **A trailing closer.** Inside a real fold, a line `that is all </details>` never
+  cleared `inFold`, so every entry after the element actually closed stayed exempt.
+
+Confirmed against GitHub's `/markdown` endpoint, the evidentiary bar §9 records for the
+comment-block fix, rather than argued from the spec: `<details></details>` comes back as
+an empty closed element with both `<h3>`s outside it, and a line ending `</details>`
+closes the element before the `<h3>` under it. The linter's verdict disagreed with the
+render in both.
+
+Taken rather than deferred, for the reason §9's fix was: parity with a rule this file
+already implements. `hiddenTracker()` closes a comment on any line that *contains*
+`-->`, the opening line included, and `product/AGENTS.md` documents that. The fold
+reader not doing the same is the "identical invisibility, opposite verdicts"
+inconsistency, not a new promise — no `D-id` was added and the rule count stays seven.
+It is also the sibling bound to round 18's fold-tag fix in the same regex pair, whose
+own record stays in §4 where the size crossing put it.
+
+The delimiters now take deliberately different positions, and the asymmetry is the
+point — the same shape §7 records for `section()`'s two headings. The **opener** stays
+anchored, because a missed opener fails *closed*: a genuinely folded entry is reported
+rather than exempted. The **closer** reads the whole line, because a missed closer fails
+*open*, which is the direction a gate must not leak in. The indent bound is unchanged on
+both: at four columns the line is an indented code block, and `(?![ \t])` is what holds
+that bound on the line's start now that `.*` precedes the tag.
+
+Two things stay deliberately unwidened:
+
+- **An inline `text <details>` opens no fold.** The renderer opens the element; the
+  anchored opener does not see it, so the entries below stay checked. That is the
+  fail-closed direction — the linter reports rather than exempts — and closing it would
+  buy a real risk with no real gain, since the log's fold is written at the margin.
+- **The closer's code-span strip inherits §5's costs.** The close test runs against
+  `stripCodeSpans(line)`, because `` `</details>` `` renders as `<code>&lt;/details&gt;</code>`
+  and leaves the element open, so naming the delimiter in prose must not end a real
+  fold. The strip is escape-blind and joins its neighbours, so `` <`x`/details> `` closes
+  a fold the reader watched stay open. That fails closed too, nothing under `product/`
+  writes either shape, and the price is already written up in §5.

@@ -331,6 +331,65 @@ describe('check-product', () => {
       expect(of('C2', run({ roadmap: { decisions, fold } }))).toEqual([]);
     });
 
+    it('closes the fold at a same-line `<details></details>`', () => {
+      // The element opens and closes in place, so both headings below it render
+      // outside it. Read at an anchored closer the opener won and nothing ever
+      // cleared `inFold`, so every entry below an empty element went unchecked —
+      // the fail-open direction, where the linter stops checking silently.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '<details></details>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toContainEqual(
+        expect.stringMatching(/out of order: D-002 follows D-003/),
+      );
+    });
+
+    it('closes the fold at a `</details>` trailing text on a rendering line', () => {
+      // The same leak inside a real fold: the element closes where the reader
+      // watches it close, wherever on the line the tag lands. Anchored, the tag
+      // was invisible and every entry after the fold ended stayed exempt.
+      const decisions = [decision({ id: 'D-001' })];
+      const fold = [
+        decision({ id: 'D-050', status: 'Superseded-by: D-004' }),
+        'that is all </details>\n',
+        decision({ id: 'D-004' }),
+        decision({ id: 'D-003' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions, fold } }))).toContainEqual(
+        expect.stringMatching(/out of order: D-003 follows D-004/),
+      );
+    });
+
+    it('does not close the fold at a code-span `</details>` mention', () => {
+      // A span keeps the text and kills the markup: GitHub renders this line as
+      // `<code>&lt;/details&gt;</code>` and leaves the element open. Reading the
+      // closer anywhere on the line has to skip spans, or naming the delimiter in
+      // prose ends a real fold and reports the entries below it.
+      const decisions = [decision({ id: 'D-001' })];
+      const fold = [
+        '- Note: the `</details>` delimiter closes this index.\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions, fold } }))).toEqual([]);
+    });
+
+    it('still opens the fold at a one-line `<details><summary>…</summary>`', () => {
+      // The opener's side of the position split, pinned because every other fold
+      // fixture gives `<details>` a line to itself: it opens the fold from the
+      // line's first content, whatever markup shares the line after it.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '<details><summary>Superseded</summary>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('still opens the fold at a `<details>` indented one to three spaces', () => {
       // The lower bound, pinned so a regression to `\s*` trips on more than the
       // four-space case: an HTML block opens at three leading spaces at most, and

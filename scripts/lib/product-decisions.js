@@ -18,7 +18,7 @@
  * leaves as an error string pushed onto the caller's list.
  */
 
-const { section, unfenced } = require('./product-markdown');
+const { section, unfenced, stripCodeSpans } = require('./product-markdown');
 
 // CommonMark lets an ATX heading carry up to three leading spaces; at four — as
 // measured from column 1, and the log nests no headings under list items — it is
@@ -59,8 +59,23 @@ const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 // names is not `details` and opens no collapsible block, leaving the entries
 // below it exempt from C2's ascending clause while the log renders in the order
 // it is written.
+//
+// The two delimiters take different *positions* on the line, and only the indent
+// bound is shared. The opener stays anchored: it must be the line's first content,
+// because a missed opener fails closed — a genuinely folded entry is reported
+// rather than exempted. The closer is found anywhere on a rendering line, the
+// opener's own line included, because a missed closer fails open: `inFold` sticks
+// and every entry below the element the reader watched close goes unchecked. Read
+// anchored, `<details></details>` opened a fold that never existed for the render
+// and `that is all </details>` never ended one that did. This mirrors the comment
+// rule in `product-markdown.js`, which closes on any line *containing* `-->`,
+// including the opening line itself.
+//
+// `(?![ \t])` is what holds the indent bound on the line's start, and is not
+// removable: without it `.*` eats the leading whitespace and a four-space
+// `</details>` illustration closes a real fold again.
 const FOLD_OPEN_RE = /^ {0,3}<details(?=[\s/>]|$)/i;
-const FOLD_CLOSE_RE = /^ {0,3}<\/details>/i;
+const FOLD_CLOSE_RE = /^ {0,3}(?![ \t]).*<\/details>/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
 const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
@@ -89,7 +104,9 @@ const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
  * everything below it, and `product/AGENTS.md` puts the fold at the bottom of the
  * log, so a fold running to the end of the section is the documented shape — this
  * file reads what markdown renders, and a rule against it would flag a document
- * whose render really is a fold. The indent bound is what the leak needed.
+ * whose render really is a fold. What the leaks needed was the indent bound on
+ * both delimiters and, on the closer alone, the whole line rather than its
+ * opening columns.
  */
 function parseDecisions(roadmap, errors) {
   const entries = [];
@@ -104,8 +121,17 @@ function parseDecisions(roadmap, errors) {
     // as an example exempted every live entry below it from C2's ascending
     // clause, and an indented `</details>` shown as one closed a real fold early,
     // reporting entries that are genuinely folded as out of order.
+    //
+    // The close test runs second, so a line carrying both delimiters nets out
+    // closed — which is what `<details></details>` renders as. It reads the line
+    // with its code spans stripped, because a span keeps the text and kills the
+    // markup: `` `</details>` `` renders as literal text inside an element that
+    // stays open. That strip is escape-blind and joins its neighbours the way
+    // `docs/plans/check-product-deferred.md` §5 prices, so `` <`x`/details> ``
+    // closes a fold the reader watched stay open — the fail-closed direction,
+    // where a folded entry is reported rather than exempted.
     if (FOLD_OPEN_RE.test(line)) inFold = true;
-    if (FOLD_CLOSE_RE.test(line)) inFold = false;
+    if (FOLD_CLOSE_RE.test(stripCodeSpans(line))) inFold = false;
 
     if (DECISION_ANY_RE.test(line)) {
       const m = line.match(DECISION_HEADING_RE);
