@@ -89,7 +89,8 @@ was recorded about them.
   what the engine can actually build — the instinct artifact. That narrowing is
   the curator's own refusal, which the CLI renders rather than re-decides, so it
   too is audited; every single-step command renders that refusal rather than
-  pre-empting it. `accept`, the one compound command, is the exception that proves the rule: it would approve before
+  pre-empting it. `accept`, the one compound command, is the exception that
+  proves the rule: it would approve before
   meeting the refusal, and the queue is append-only, so it decides for itself
   the two things that no re-run clears — the artifact type, and whether the
   candidate's name is one the draft writer can use as a filename — and refuses
