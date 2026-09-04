@@ -72,7 +72,8 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // a link labelled in code arrives here as `[](specs/alpha.md)`. The trade is
 // fail-closed, in the two forms CommonMark allows inside link text that a
 // bracket-blind class cannot cross: balanced brackets, `[see [alpha]](...)`, and
-// an escaped one, `[a\]b](...)`. Both are links this pattern reports. Every plausible
+// an escaped one, `[a\]b](...)`. Both are links this pattern reports as linking no
+// spec — the miss is the report, not a silent pass. Every plausible
 // authoring form — plain text, code-styled text, several links joined by `·` —
 // matches. (The image form `![...](specs/x.md)` still counts, though it embeds
 // rather than links — not a Spec cell anyone writes, so it buys no rule.)
@@ -81,6 +82,13 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // here — a non-link read as a link, where the two forms above are real links missed.
 // Every way of shutting it prices a real link as fail-closed in exchange, so it is
 // recorded in `docs/plans/check-product-deferred.md` §8 rather than half-fixed.
+// A third miss is owed to the strip rather than to this pattern: `stripCodeSpans` is
+// escape-blind, so a cell writing an escaped backtick has a span cut out of it that
+// CommonMark never opened, and the text either side is joined — which can leave a
+// stray backslash against a real link's opening bracket for the prefix above to read
+// as escaping it. Fail-closed like the two named forms, and no `Spec` cell anyone
+// writes carries an escaped backtick; the fix belongs to `stripCodeSpans`, so it is
+// recorded in that file's §5 with the rest of the strip's cost.
 const SPEC_LINK_RE = /(?<!\\)(?:\\\\)*\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 
 /** The lines between `## Roadmap` and the next `##` heading. */

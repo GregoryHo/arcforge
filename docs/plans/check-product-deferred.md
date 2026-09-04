@@ -217,32 +217,54 @@ this round's to land — it needs a grandfathered-file allowlist for the engine 
 is a maintainer call about which files stay exempt. The proposal is written up in the
 review handoff for the controller.
 
-## 5. `stripCodeSpans()` empties code-styled link text
+## 5. `stripCodeSpans()` is escape-blind, and empties code-styled link text
 
 C4 reads a `Spec` cell with its code spans removed, and a span is dropped whole —
 contents included. `` [`alpha`](specs/alpha.md) `` reaches `SPEC_LINK_RE` as
 `[](specs/alpha.md)`.
 
-Harmless as the rules stand, and pinned from both sides in
+The emptying itself still costs nothing, and is pinned from both sides in
 `tests/scripts/check-product.test.js` ("does not count a link wrapped in a code span
 as a link", "still reads a link whose text is code-styled"): the pattern anchors on
-`](specs/<slug>.md)` and never looks at the link text, so the emptied label costs
-nothing.
+`](specs/<slug>.md)` and never looks at the link text, so an emptied label is invisible
+to it.
 
-It turns into a bug the moment the pattern is tightened. A rule that required
-non-empty link text — to reject `[](specs/alpha.md)`, a link a reader cannot see —
-would start rejecting the code-styled label, which is a legitimate authoring form.
-Whoever tightens `SPEC_LINK_RE` owns one of two fixes:
+What the strip does cost is a *neighbour*, and §8's tightening made the cost real.
+A run of backticks opens a span here wherever it appears, while CommonMark's `` \` ``
+opens none — so a cell writing an escaped backtick has a span cut out of it that no
+renderer ever opened, and the text either side is joined. `` A\`x`[alpha](specs/alpha.md) ``
+reaches `SPEC_LINK_RE` as `A\[alpha](specs/alpha.md)`, where the stray backslash now
+sits against a real link's opening bracket and the unescaped-bracket prefix reads it as
+escaping that bracket. C4 reports a row a reader can navigate from as linking no spec.
+Confirmed against the shipped reader rather than reasoned: the pre-tightening pattern
+matched that cell, the current one does not.
+
+It is recorded rather than fixed on three grounds. It fails **closed** and loudly —
+a wrong "links no spec" is a message someone reads, not the phantom governing row §8's
+direction produces. No authoring form yields it: an escaped backtick in a `Spec` cell
+has no reason to be written. And the fix is not in `SPEC_LINK_RE` at all — teaching the
+strip about escapes is a change to what `stripCodeSpans()` means, owed to whoever writes
+a rule that needs it, which is the same conclusion this section reached in round 9.
+
+The tightening this section warned about has, so far, only half arrived. The rule it
+anticipated was one requiring **non-empty link text** — to reject `[](specs/alpha.md)`,
+a link a reader cannot see — which would start rejecting the code-styled label, a
+legitimate authoring form. That rule is still unwritten; §8 tightened the *bracket*
+instead, which is why the pins above still hold and why neither fix below has come due.
+Whoever tightens `SPEC_LINK_RE`'s link text owns one of them:
 
 - keep the span's contents rather than dropping them — replacing with `$2` from
   `` /(`+)([^\n]*?)\1/g `` — which then needs its own answer for a *fully* spanned
-  link, the case the current form gets right for free; or
+  link, the case the current form gets right for free, and is the natural place to make
+  the strip escape-aware while the file is open; or
 - ban the code-styled label in `product/AGENTS.md` and say so in the C4 docblock,
-  which makes the emptying intended rather than incidental.
+  which makes the emptying intended rather than incidental — and leaves the
+  escape-blindness above untouched, since it is a separate read.
 
-No code was written for this in round 9: the behaviour is correct under today's
-rules, and changing what `stripCodeSpans()` means with no rule asking for it trades a
-latent coupling for a live one.
+No code was written for this in round 9, and none when §8 exposed the neighbour: the
+emptying is still correct under today's rules, the neighbour is fail-closed and
+unwritable, and changing what `stripCodeSpans()` means with no rule asking for it trades
+a latent coupling for a live one.
 
 ## 6. The roadmap table's framing is not asserted — **TAKEN in round 13**
 

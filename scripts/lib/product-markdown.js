@@ -200,6 +200,14 @@ function unfencedEntries(lines) {
  * The closing run must match the opening one, the way a fence's does,
  * so a doubled span is not closed by a single backtick inside it. Unbalanced
  * backticks open no span in CommonMark either, and are left alone.
+ *
+ * What it does not read is an escape: `` \` `` opens no span in CommonMark but one
+ * here, so a cell writing one is joined around a span that never existed, and the
+ * join can hand `SPEC_LINK_RE` a backslash sitting against a real link's opening
+ * bracket. Fail-closed, and no `Spec` cell anyone writes carries an escaped backtick;
+ * the cost and the two ways of paying it are in
+ * `docs/plans/check-product-deferred.md` §5, and belong to whoever needs the strip to
+ * mean something different.
  */
 function stripCodeSpans(text) {
   return text.replace(/(`+)[^\n]*?\1/g, '');
