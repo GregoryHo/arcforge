@@ -35,9 +35,6 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   nothing. Fix direction: merge over the previous config instead of replacing it
   (it is already in hand as `previous`). Pre-existing — the same full-replacement
   object predates the #146/#147 branch; surfaced during its review.
-- **unify-candidate-queues** — point the `learn` transition commands at the
-  canonical Layer-5 candidate queue, so the CLI and the dashboard manage the
-  same candidates instead of two disjoint queues · issue: [#148](https://github.com/GregoryHo/arcforge/issues/148).
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
