@@ -1373,9 +1373,16 @@ describe('learn candidate commands over the canonical queue', () => {
 
       const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
 
+      // The ack asserts the reviewer saw the target path, so the path printed
+      // has to be the file activation writes — pinned against the file that
+      // actually appeared, not against a shape a regex would also match while
+      // naming some other file.
+      const activePath = path.join(arcforgeHome, 'instincts', PROJECT_NAME, `${CANDIDATE_ID}.md`);
       expect(result.status).toBe(0);
       expect(result.stderr).toMatch(/changes how future sessions behave/);
-      expect(result.stderr).toMatch(/target: the draft at .*becomes an active instinct/s);
+      expect(result.stderr).toContain(activePath);
+      expect(fs.existsSync(activePath)).toBe(true);
+      expect(result.stderr).not.toContain(PROJECT_ID);
     });
 
     it('accepts by approving and materializing, and never activates', () => {
