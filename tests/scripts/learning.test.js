@@ -1362,9 +1362,10 @@ describe('learn candidate commands over the canonical queue', () => {
 
     // The refusal is built from the raw queue name's verdict, never from the
     // name. Interpolating the value back in would put a field the card redacts
-    // and truncates onto stdout unsanitized. Scoped to `accept`: the engine's
-    // own `path_policy_rejected` detail does name it, and `learn materialize`
-    // renders that audited refusal deliberately.
+    // and truncates onto stdout unsanitized. `accept` is held to the strict
+    // form — it does not echo the name at all. The single-step commands still
+    // render the engine's own `path_policy_rejected` detail, which does name
+    // it, but through the same redactor the card applies (see below).
     it('never prints the name it refused', () => {
       seed(makeRecord({ name: 'some/path/traversal' }));
 
@@ -1373,6 +1374,56 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(result.status).not.toBe(0);
       expect(result.stdout).not.toContain('some/path/traversal');
       expect(result.stderr).not.toContain('some/path/traversal');
+    });
+
+    // The other half of that boundary. A refusal detail is the one value the
+    // prose module renders that no card sanitized, and several engine modules
+    // build theirs out of the raw `name` — so a name the card shows redacted
+    // has to stay redacted when the transition refuses, or the reviewer safely
+    // reads `[REDACTED]` while the very next command puts the secret in a shell
+    // log. Parity with the card is asserted here, not just absence.
+    it('redacts the engine detail it renders, as the card does', () => {
+      seed(makeRecord({ name: 'api_key=SUPERSECRETVALUE1234/x' }));
+
+      expect(runJson(['inbox', '--project']).candidates[0].name).toBe('api_key=[REDACTED]');
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+
+      const result = runCli(['materialize', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).not.toContain('SUPERSECRETVALUE1234');
+      expect(result.stderr).not.toContain('SUPERSECRETVALUE1234');
+      // Redaction, not suppression: the audited reason still reaches the reviewer.
+      expect(JSON.parse(result.stdout).error).toMatch(/path_policy_rejected/);
+      expect(JSON.parse(result.stdout).error).toContain('api_key=[REDACTED]');
+    });
+
+    // The class is wider than the one reason the end-to-end case can reach:
+    // `activate.js` refuses `target_path_rejected` with a path it builds from
+    // the same name, and a name that is path-legal but secret-bearing gets
+    // there. Pinned on the exported function so a refusal reason with no
+    // reachable CLI fixture is still covered.
+    it('redacts every module failure detail, not one reason string', () => {
+      const { refusalMessage } = require('../../scripts/cli/learn-candidate-prose');
+      const card = { candidate_id: CANDIDATE_ID, lifecycle_status: 'materialized' };
+
+      const message = refusalMessage(
+        {
+          accepted: false,
+          reason: 'target_path_rejected',
+          module_failure: {
+            detail:
+              'Active path not within allowed roots: ' +
+              '/home/u/.arcforge/learning/active/api_key=SECRETVAL1234.md',
+          },
+        },
+        'activate',
+        card,
+      );
+
+      expect(message).not.toContain('SECRETVAL1234');
+      expect(message).toContain('[REDACTED]');
+      expect(message).toContain('target_path_rejected');
     });
 
     // Nothing the CLI offers renames a candidate, so declining it is the only
