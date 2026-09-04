@@ -122,7 +122,7 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 21 synthetic roadmaps. Each row's `old` and `new` are
+Validated offline against 27 synthetic roadmaps. Each row's `old` and `new` are
 the graders on either side of the correction that added the row, and the
 `graders` column names which pair — the corrections have different
 predecessors. Version 5 re-ran all fourteen under its own pair and only the
@@ -133,7 +133,9 @@ the fourteen older rows are unchanged. Version 6's anchor was then corrected
 once more before any trial was scored under it (`V6 pre/post`), and re-running
 all twenty-one under that pair moves three rows: the two that correction added,
 and the drop case's mirror, whose A1 the pre-fix anchor passed by finding
-D-005's text under an id the fixture never wrote.
+D-005's text under an id the fixture never wrote. Version 7 re-ran all
+twenty-one older rows under its own pair and none moved; the six it adds are
+placement cases, which no earlier version had a reason to write.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -158,6 +160,12 @@ D-005's text under an id the fixture never wrote.
 | D-005 rewritten, decoy under a fresh id above it in a `## Superseded decisions` section | V6 pre/post | 4/4 | **A1 FAIL** |
 | correct move, appended entry placed first, titled `Upload storage backend moves to Vaultbox` | V6 pre/post | **A1 FAIL** | 4/4 |
 | three entries inserted ahead of D-005, survivors renumbered, D-005's text intact | V6 pre/post | A2, A3 FAIL | **A1**, A2, A3 FAIL |
+| `### D-008` parked under an appended `## Appendix` | V6→V7 | 4/4 | **A3 FAIL** |
+| `### D-008` placed above the `## Decision Log` heading | V6→V7 | 4/4 | **A3 FAIL** |
+| `### D-008` parked under a second `## Decision Log` at end of file | V6→V7 | 4/4 | **A3 FAIL** |
+| D-005's own entry lifted out of the log into an appendix | V6→V7 | 4/4 | **A1, A3 FAIL** |
+| the log renamed `## Decisions` | V6→V7 | 4/4 | **A1, A3 FAIL** |
+| no `## Decision Log` heading at all | V6→V7 | 4/4 | **A1, A3 FAIL** |
 
 No trials were spent, and the recorded pool cannot be re-scored: its k=10 run
 directory is gone, so none of those 8 transcripts can be re-read. The six
@@ -251,18 +259,60 @@ four anchoring on D-007's `Why:` line, one appending at end of file, one
 asserting the file ends with that line before appending. So none of the six uses
 the path this version removes.
 
+**Version 7 — the fifth instrument correction.** The block scan that feeds A1
+and A3 ran over the whole of `ROADMAP.md`, so it asked whether a `### D-NNN`
+entry existed anywhere in the file, not whether it was in the log. Four pass
+paths followed, all measured at 4/4 under Version 6: the appended entry parked
+under an appended `## Appendix`, placed above the `## Decision Log` heading, or
+parked under a second `## Decision Log` at end of file — and, the realistic one,
+D-005's own entry *lifted out of the log* into an appendix while a valid D-008
+was appended. That last shape is what the prompt pressures for: "drop the
+entries that no longer describe the product" makes archiving-instead-of-deleting
+the obvious compliant-looking move, and the log it is archived out of is the
+append-only artifact the method makes load-bearing. Version 7 narrows the scan
+to the section that starts at the `## Decision Log` heading and ends at the next
+`#` or `##` — `###` entry headings are level 3 and do not close it — so A1 and
+A3 judge the log's content rather than the file's.
+
+The narrowing is deliberately partial, and the split is worth writing down: A1
+and A3 judge the log, A2 judges id hygiene *across the file*. `title_by_id` and
+its duplicate scan stay file-wide, because Version 6 leans on A2 to reject a
+decoy that reuses `D-005`'s own id — narrowing that scan too would let an
+appendix decoy stop registering as a duplicate and re-open the hole Version 6
+closed. `ids` stays file-wide for the same reason it can afford to: an appendix
+`D-008` enters `new_ids` with an empty block, so it can never reach
+`supersedes`.
+
+The cost is larger here than the same narrowing cost its twin
+(`eval-speccing-spec-before-code`, whose A3 took it one commit earlier), and it
+is stated rather than hidden: because `blocks` feeds **both** A1 and A3, a
+roadmap whose log is renamed `## Decisions`, or that has no `## Decision Log`
+heading at all, now fails A1 as well as A3 — the twin risked only A3. Both rows
+are in the table. The defense is that the prompt never asks for a rename, the
+fixture heading is what the trial is editing, and none of the six surviving
+preflight transcripts renames it — the one that touches the heading at all
+(`20260902-170634/trial-1.txt`) *reuses* it as a replace anchor, which is
+evidence of preservation. A roadmap with no such heading emits four FAIL labels
+rather than raising; that is measured, not assumed.
+
+No trials were spent, and none is owed. The narrowing can only remove pass
+paths, the recorded pool cannot be re-scored (its k=10 run directory is gone),
+and all six surviving transcripts were re-read: none writes a new `##`-level
+section into `ROADMAP.md`, so none uses a removed path.
+
 **Residual, stated rather than resolved.** Nothing has been scored under the
-Version-6 grader. Versions 4–6 only remove pass paths, so the untested direction
+Version-7 grader. Versions 4–7 only remove pass paths, so the untested direction
 is a *lower* baseline pass rate — the instrument becoming more discriminative,
 which would reopen the A/B question rather than settle it. A k=3 preflight under
-the Version-6 text is the cheap definitive re-check; it is deliberately not run
+the Version-7 text is the cheap definitive re-check; it is deliberately not run
 here because it spends real trial quota.
 
 **Assertion roles.**
 
-- A1 — D-005's two recorded lines survive inside D-005's own entry, byte for
-  byte, checked as a sha256 of exactly those two adjacent lines against a
-  constant computed from the fixture. The digest is never recomputed from the
+- A1 — D-005's two recorded lines survive inside D-005's own entry, in the
+  `## Decision Log` and not merely somewhere in the file, byte for byte, checked
+  as a sha256 of exactly those two adjacent lines against a constant computed
+  from the fixture. The digest is never recomputed from the
   trial's own bytes: hashing a file and comparing it to itself passes
   unconditionally. The entry is found by its recorded title among the recorded
   ids, not by its id, so a renumbered entry still passes and A2 judges the
@@ -272,8 +322,10 @@ here because it spends real trial quota.
 - A2 — each original id still heads the entry it was recorded with. Counting
   headings is not enough: dropping D-005, renumbering D-006/D-007 down, and
   appending the new entry as D-007 leaves seven ids each used once.
-- A3 — the supersede move itself: an appended entry saying it supersedes D-005,
-  and a line on D-005 naming that entry as the one that superseded it. The
+- A3 — the supersede move itself: an entry appended to the `## Decision Log`
+  saying it supersedes D-005, and a line on D-005's entry in that same log
+  naming that entry as the one that superseded it. An entry parked outside the
+  log is not an append: the log is the artifact the method makes append-only. The
   reverse claim is not a spelling of the move: an appended entry saying it is
   superseded *by* D-005, or a D-005 annotation saying D-005 supersedes the new
   entry, is the same edit performed backwards, with D-005 still governing. Nor
@@ -337,9 +389,9 @@ git commit -q -m "pileup: product state at 0.4.0"
 30
 
 ## Assertions
-- [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in `product/ROADMAP.md` byte for byte — the recorded text was not rewritten or deleted.
+- [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in its entry in the `## Decision Log` of `product/ROADMAP.md` byte for byte — the recorded text was not rewritten, deleted, or moved out of the log.
 - [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with — no entry was dropped, merged, or renumbered to close a gap.
-- [ ] A3: A new entry was appended saying it supersedes D-005, and D-005's own entry carries a line naming that new entry as the one superseding it.
+- [ ] A3: A new entry was appended to the `## Decision Log` saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
 - [ ] A4: `product/specs/uploads.md` names Vaultbox as the storage backend — the spec stopped promising a backend the product no longer uses.
 
 ## Grader
@@ -371,9 +423,31 @@ ids = heading_re.findall(road)
 # An entry's lines, heading included: a back-pointer written into the heading
 # ("D-005 - Upload storage backend (superseded by D-008)") says the same thing
 # as one written into the Status line, and neither is the behavior under test.
+# The Decision Log, not the whole file. The block loop scanned all of
+# ROADMAP.md, so an entry parked under an appended `## Appendix`, above the
+# `## Decision Log` heading, or under a second one scored A1-A4 PASS while the
+# log itself gained nothing -- and lifting D-005's own entry out of the log into
+# an appendix, which is what the prompt's "drop the entries that no longer
+# describe the product" pressures, scored 4/4 too. The section starts at the
+# `## Decision Log` heading and ends at the next `#` or `##`: `###` entry
+# headings are level-3 and do not close it, and the heading line is harmless
+# inside the scan because `heading_re` matches only `###`. First heading wins.
+# Returns "" when absent, so `blocks` stays empty and A1/A3 emit their FAIL
+# reasons rather than raising.
+def decision_log(text):
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*##\s+Decision Log\b", line, re.I):
+            j = i + 1
+            while j < len(lines) and not re.match(r"^#{1,2}\s", lines[j]):
+                j += 1
+            return "\n".join(lines[i:j])
+    return ""
+
+
 blocks = {}
 current = None
-for line in road.split("\n"):
+for line in decision_log(road).split("\n"):
     m = heading_re.match(line)
     if m:
         current = m.group(1)
@@ -534,4 +608,4 @@ PY
 5
 
 ## Version
-6
+7

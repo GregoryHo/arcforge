@@ -237,7 +237,7 @@ only. This gap closes when a harness can reach that host, not before.
 | scenario | Version | preflight | A/B (k=10) | 結論 |
 |---|---|---|---|---|
 | `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
-| `eval-speccing-supersede-not-overwrite` | 6 | **BLOCK（baseline 100%, k=3；以 Version 3 文本量測）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+| `eval-speccing-supersede-not-overwrite` | 7 | **BLOCK（baseline 100%, k=3；以 Version 3 文本量測）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
 
 預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
 預登記的 fallback 出貨。
@@ -245,13 +245,13 @@ only. This gap closes when a harness can reach that host, not before.
 `supersede-not-overwrite` 的 BLOCK 來自
 `evals/preflight/f759c2828746652f-default.json`，而 `computeScenarioHash`
 （`scripts/lib/eval-preflight.js:43`）雜湊的是整份 scenario 檔，該 hash 對應的是
-Version 3 的文本。現行（Version 6）文本則沒有任何一筆對應的 preflight 記錄——查證
+Version 3 的文本。現行（Version 7）文本則沒有任何一筆對應的 preflight 記錄——查證
 方式是對 scenario 檔重算 `computeScenarioHash`，再看 `evals/preflight/` 有沒有同名
 檔案。此處刻意不寫下那個雜湊值：任何寫進本檔的「現行文本雜湊」，都會被下一次對
 scenario 檔的編輯作廢（同一個 commit 內的編輯也算），因此 literal hash 只留在指向
 歷史文本的位置。該 scenario 的 `## Preflight` 為 `run`，因此再跑 `eval ab` 會重新
-量測 preflight，不會沿用這筆 BLOCK。Version 4–6 的 grader 從未評過任何 trial——詳見
-下方 Version 6 段落末的殘留未檢項。
+量測 preflight，不會沿用這筆 BLOCK。Version 4–7 的 grader 從未評過任何 trial——詳見
+下方 Version 7 段落末的殘留未檢項。
 
 ### `spec-before-code`：+0.67，兩臂皆為確定性
 
@@ -498,9 +498,40 @@ D-005 的寫法不被區分；錨點排除的是非原始 id，不是不相符�
 assert 檔案結尾正是 D-007 的 `Why:` 行再接上）。也就是說，六份都沒有走 Version 6
 移除的那條路徑。
 
-**殘留的未檢項**：迄今**沒有任何 trial 在 Version 6 grader 下被評過分**。Version 4–6
+**Version 7（第五次儀器修正，第四個 review round 發現）**：餵給 A1 與 A3 的條目切
+塊掃的是整份 `ROADMAP.md`，問的是「這個 `### D-NNN` 條目在不在檔案裡」，不是「在不
+在 Decision Log 裡」。由此產生四條過關路徑，Version 6 下全部量到 4/4：新條目被停在
+附加的 `## Appendix` 下、放在 `## Decision Log` 標題之上、停在檔尾第二個
+`## Decision Log` 下——以及最貼近真實行為的一種，**把 D-005 自己的條目搬出日誌**移進
+附錄，同時正常附加 D-008。最後這種正是 prompt 施壓的方向：「drop the entries that no
+longer describe the product」讓「歸檔而非刪除」成為看起來合規的動作，而它被搬出的那
+份日誌，正是本方法賴以只增不改的產物。Version 7 把掃描範圍收到「從
+`## Decision Log` 標題起、到下一個 `#` 或 `##` 止」的段落——`###` 條目標題是第三層、
+不會終止該段——因此 A1 與 A3 判的是日誌的內容，而非檔案的內容。
+
+收斂刻意只做一半，這條界線值得寫下來：**A1、A3 判日誌，A2 判全檔的 id 衛生**。
+`title_by_id` 與重複 id 掃描維持全檔，因為 Version 6 正是靠 A2 擋下「沿用 `D-005`
+本身 id 的誘餌」——一併收斂會讓附錄裡的誘餌不再算重複 id，反而把 Version 6 關掉的洞
+重新打開。`ids` 維持全檔則是因為它負擔得起：附錄裡的 `D-008` 會進 `new_ids`，但切塊
+是空的，永遠到不了 `supersedes`。
+
+讓步比孿生 scenario（`eval-speccing-spec-before-code`，其 A3 早一個 commit 做了同樣
+的收斂）更大，且明講而非藏起來：因為 `blocks` **同時**餵 A1 與 A3，日誌被改名成
+`## Decisions`、或整份沒有 `## Decision Log` 標題時，現在會**同時**損失 A1 與 A3，
+孿生 scenario 只賠上 A3。兩列都在對照表裡。理由是：prompt 從未要求改名；fixture 的
+標題正是 trial 正在編輯的對象；六份留存 transcript 無一改名——唯一碰到該標題的
+（`20260902-170634/trial-1.txt`）是把它當作取代錨點**重用**，反而是保留的證據。沒有
+`## Decision Log` 標題的 roadmap 會照常吐四個 FAIL 標籤而非拋例外，這一點是量到的、
+不是假設的。
+
+**未花任何 trial 額度**，也不欠一次。收斂只會移除過關路徑；已登記的池無從重評（k=10
+執行目錄已不存在）；六份留存 transcript 全部重讀過——無一在 `ROADMAP.md` 內寫入新的
+`##` 層級段落，因此無一走被移除的路徑。以 **27 個**合成 roadmap 離線對照：原有 21 列
+在本次的新舊 grader 下逐列重跑、無一移動，新增的六列全部由 4/4 翻為 FAIL。
+
+**殘留的未檢項**：迄今**沒有任何 trial 在 Version 7 grader 下被評過分**。Version 4–7
 只移除過關路徑、不新增，因此未受檢的方向是 baseline 通過率**下降**——即鑑別力可能反
-而回升、A/B 的問題重新打開。最便宜的決定性複查是以 Version 6 文本跑一次 k=3
+而回升、A/B 的問題重新打開。最便宜的決定性複查是以 Version 7 文本跑一次 k=3
 preflight；此處**刻意不跑**，因為它會消耗實際的 trial 額度。unmet-but-covered 結論
 維持不變。
 
