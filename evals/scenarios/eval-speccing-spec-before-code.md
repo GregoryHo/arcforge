@@ -92,7 +92,7 @@ grader with the pre-fix set-difference predicate and the numeric one:
 
 Enumerating ids `000`–`999` against both predicates gives a difference set of
 exactly `{"000"}` — the one entry id that scores differently. What that does to
-the published pool is settled below, once A2's two narrowings are on the table
+the published pool is settled below, once A2's narrowings are on the table
 too.
 
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
