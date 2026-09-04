@@ -110,16 +110,19 @@ reverse one, append a superseding entry (see AGENTS.md).
   live clause, and no decision both replacing an entry whole and reversing one of
   its clauses — and the pairing read back from the flip, so a `Superseded-by:` or
   `partially superseded by` clause whose named entry claims no supersession, or that
-  names an id the log does not carry, is rejected too (C3); every spec header
-  agreeing with its governing roadmap row, with the links resolving both ways —
+  names an id the log does not carry, is rejected too (C3); every spec carrying
+  exactly one `Status:` header in its preamble and that header agreeing with its
+  governing roadmap row, with the links resolving both ways —
   every row links at least one spec, every spec is linked from some row, and every
   link names a file that exists — and each version occupying exactly one row, so
   "the highest-version one" names a row rather than whichever the table lists last
   (C4); every D-id a spec cites well-formed as
   `D-NNN` and existing (C5); a sanity floor of one row, one decision, one spec,
   with the roadmap's rows sitting under a table GFM renders — a six-column header
-  opening on `Version` and a delimiter row of the same width beneath it — so an
-  unframed row cannot stand in for the table (C6); and a `Tag` cell matching its
+  opening on `Version`, a delimiter row of the same width, and the rows themselves,
+  all on consecutive lines, since a blank line or a fenced block between any two of
+  them ends the table there — so an unframed row cannot stand in for the table (C6);
+  and a `Tag` cell matching its
   row's Status —
   `vX.Y.Z` when shipped, `—` otherwise (C7).
 - Residual: C1 counts `← we are here` markers; it does not know which row deserves
