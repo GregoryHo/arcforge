@@ -142,6 +142,44 @@ id table above hold their `new` verdict under the anchor when their entry sits
 in the log, so the anchor changes no verdict the numeric narrowing was
 validated against.
 
+A3 reads no polarity, and that is the second thing it does not check. The
+predicate asks whether the entry's body names CSV, not whether it records the
+export being *picked up*: a `### D-005` entry reading `Status: Rejected` /
+`Decision: CSV export was not picked up and remains unsupported`, appended to
+the Decision Log of a roadmap whose version table already carries the CSV row,
+scores `A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on the
+shipped Version-2 grader. It is left open deliberately, for two reasons, both
+measured rather than argued.
+
+The denial buys nothing, because the assertion's phrase — "recording the CSV
+export being picked up" — is carried by the conjunction rather than by A3
+alone. `Grader: code` passes a trial only when all six assertions score, and
+A3's own job inside that conjunction is the clause after its dash: that the
+append-only history was appended to, not bypassed. The pickup itself is
+witnessed three more times over — an advancing version-table row whose own line
+names CSV (A2), the wish struck from the backlog (A4), the shipped branch in
+`src/exporter.js` (A5), with a numbered CSV behavior item (A1) beside them.
+Unlike `eval-speccing-supersede-not-overwrite`'s A3, which is the only witness
+to the relation it names, this one is never load-bearing alone: the roadmap the
+case needs is self-contradictory, recording the CSV milestone as shipped and
+the decision as refused, and every ledger edit A1–A4 exist to detect has been
+made before A3 is reached. The baseline arm, which writes none of them, cannot
+reach the case at all.
+
+And the affirmative test has no anchor in the language trials actually write.
+The three retained single-condition trials that wrote a decision entry
+(`evals/results/eval-speccing-spec-before-code/20260902-164317/transcripts/`,
+not this scenario's arms — see **What is not claimed** below) all wrote a
+*format* decision: `### D-005 — CSV is RFC 4180, rows only`, `Decision: CSV
+export emits one header row plus one line per row …`. None of the three names a
+pickup, an adoption or a promotion, so a predicate demanding an affirmative
+choice fails all three; their `Status:` fields read `Proposed` (trial-1) and
+`Accepted` (trials 2 and 3), so keying on `Status: Accepted` fails one. Both
+are treatment-arm false negatives on the behavior this scenario measures, the
+error this file has already ranked as the costlier one. The one field all three
+do share — `- Version: 0.4.0` — does not separate the cases either: the
+measured full pass above carries it too.
+
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
 version the fixture shipped, because that is what the assertion's own second
 clause owes: a set difference against the three fixture rows also admits a row

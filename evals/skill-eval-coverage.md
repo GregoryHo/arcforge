@@ -339,6 +339,28 @@ pipe 行」——錨在表頭而非 `## Roadmap` 標題，因為 fixture 根本�
 的 log 一路到檔尾，要碰到這個案例得刻意在 D-004 內文後面另寫一個重複標題）。上面
 那六份 id 案例在錨定之下判定全不變。未重評任何 trial，未動用 trial 額度。
 
+本輪 review 檢視 A3 的**極性**後決定**不收緊**，並把它記為 A3 的第二項不檢事項。
+A3 只問 entry 內文有沒有 `csv`，不問那筆 decision 記的是採納還是不採納：在
+Decision Log 內追加一個 `### D-005`、`Status: Rejected`、
+`Decision: CSV export was not picked up and remains unsupported`，而 roadmap 的
+version 表格已有 CSV 推進列，在出貨中的 Version-2 grader 下即可拿到 A1–A6 全
+PASS、exit 0（已實測）。不收緊的理由有兩個，都可獨立查核。其一，這筆否認換不到
+任何東西：assertion 那句「recording the CSV export being picked up」是由六條的
+連言承擔，不是 A3 一條；A3 在連言裡的職責是破折號之後那句——log 是被追加而非被
+繞過。與 `supersede-not-overwrite` 的 A3 是該關係的唯一證人不同，這裡 A1、
+A2、A4、A5 各自獨立見證同一件事——要走到那個全 PASS，trial 得先寫出指名 CSV 的
+推進列、劃掉 backlog wish、補上 behavior item 並出貨 CSV 分支，得到的是一份自相
+矛盾的 roadmap；baseline 臂 A1–A4 全滅，根本走不到這個案例。其二，「肯定的採納」
+在真實 trial 的語言裡沒有錨點：留存且有寫 decision entry 的三筆單條件 trial
+（`evals/results/eval-speccing-spec-before-code/20260902-164317/transcripts/`，
+非本池的臂）寫的都是**格式**決策（`### D-005 — CSV is RFC 4180, rows only`），
+無一出現採納動詞，因此要求肯定動詞會三筆全 FAIL；其 `Status` 分別為 `Proposed`
+（trial-1）與 `Accepted`（trial-2、3），改鎖 `Status: Accepted` 則會 FAIL 一筆。
+兩者都是 treatment 臂的 false negative，而本節既有的取捨是：treatment 臂的 false
+negative 會壓低量測到的 delta，比不合理的 false positive 更貴。三筆共有的
+`- Version: 0.4.0` 也分不開兩者——上面那個實測的全 PASS 同樣帶著它。grader 未動，
+`## Version` 維持 2，未重評任何 trial，未動用 trial 額度。
+
 歷次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
 
