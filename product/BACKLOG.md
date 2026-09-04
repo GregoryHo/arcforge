@@ -49,14 +49,12 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**gate-diary-enricher**~~ — graduated into 6.1.0 (D-009).
 - **stale-draft-floor-overlapping-opt-in** — `learningEnabledSince`
   (scripts/lib/learning.js) derives the floor only from scopes that are
-- **stale-draft-floor-overlapping-opt-in** — `learningEnabledSince`
-  (scripts/lib/learning.js:150) derives the floor only from scopes that are
   enabled *now*, and `setLearningEnabled` keeps one `updated_at` per scope, so
   disabling the scope that opted in first advances the floor even though
   any-scope authorization was continuous; genuine enricher failures in the
   window between the two opt-ins stop being reported. Fix direction: persist the
   enable stamp across a disable and take the start of the continuous effective
-  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0.
+  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0 · issue: [#164](https://github.com/GregoryHo/arcforge/issues/164).
 - **learn-enable-erases-config** — `setLearningEnabled`
   (scripts/lib/learning.js) writes a fresh `{ scope, enabled, updated_at }`
   object, so every other key on the learning config is dropped. The only such
@@ -149,8 +147,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   the CSV branch, so a trial can pass the floor without the feature working; the
   repair is a grader-owned `node -e` probe of `formatFor('csv', run)` and must
   ride the next `## Version` bump + k=10 rerun of the scenario · issue: [#156](https://github.com/GregoryHo/arcforge/issues/156).
-- **supersede-v6-preflight** — `eval-speccing-supersede-not-overwrite` ships at
-  `## Version` 6 with no preflight ever scored under its current grader (the
+- **supersede-v7-preflight** — `eval-speccing-supersede-not-overwrite` ships at
+  `## Version` 7 with no preflight ever scored under its current grader (the
   recorded BLOCK is the k=3 Version-3 sample); run one k=3 preflight under the
-  Version-6 text so the ceiling claim rests on the shipped instrument · cost:
+  Version-7 text so the ceiling claim rests on the shipped instrument · cost:
   three baseline trials.
