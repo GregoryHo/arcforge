@@ -27,3 +27,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **unify-candidate-queues** — point the `learn` transition commands at the
   canonical Layer-5 candidate queue, so the CLI and the dashboard manage the
   same candidates instead of two disjoint queues · issue: [#148](https://github.com/GregoryHo/arcforge/issues/148).
+- **bound-transcript-parse** — `parseTranscript` reads and splits the whole
+  session transcript on every above-threshold Stop and PreCompact even though
+  every output it returns is a capped tail (about 5 ms per MB on real transcripts);
+  bound the read, and correct the hooks spec's B-7 cost enumeration, which already
+  omits this parse and the diary subprocess · issue: [#172](https://github.com/GregoryHo/arcforge/issues/172).
