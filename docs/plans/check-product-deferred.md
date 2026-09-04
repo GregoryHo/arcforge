@@ -186,6 +186,33 @@ every rule that reads the parsed state. The same proof applied: the suite requir
 rather than through a re-export, per the no-barrel rule in
 `.claude/rules/coding-standards.md`.
 
+**Round 19 bound it a third time**, and the third cut exhausts the formats. Round 18's
+row-run clause and the review prose around it left `product-lint.js` at **703** — three
+lines over, and still nothing counts lines in CI, so all six gate commands passed
+green over a file that breached the standard. The cut follows round 13's axis exactly:
+`scripts/lib/product-decisions.js` takes the Decision Log's reader — `parseDecisions`,
+`checkDecisionNumbering`, `checkStatusPresence`, `statusClauses`,
+`checkSupersededStatus`, `checkFlipsAreClaimed`, `checkRelations` and the log's
+constants (the `### D-NNN` and relation forms, the `<details>` delimiters, the status
+vocabulary, the two flip patterns and `DECISION_LOG_HEADING_RE`) — so the second of
+`ROADMAP.md`'s two formats has one owner, and the rules about the log's own shape
+(C2's numbering invariants, C3's relation and status coherence) travel with it.
+`product-lint.js` came out at **400** and keeps C1, C4's row↔spec pairing, C5, C6's
+sanity floor, C7 and `validateProduct`. `product-decisions.js` is 343 lines,
+`product-roadmap.js` 312 and `product-markdown.js` 208. Same proof, same import rule:
+the suite requires only `validateProduct`, so a green run across the move showed no
+behaviour changed, and `scripts/check-product.js` now imports `parseDecisions` from the
+new module directly — `product-lint.js` stopped re-exporting it rather than keeping a
+barrel.
+
+The standing constraint, stated once so the fourth crossing does not need re-deriving:
+**nothing mechanically counts lines**, so this ceiling is invisible to every gate and
+is caught only by a reviewer running `wc -l`. A size lint would close that, and is not
+this round's to land — it needs a grandfathered-file allowlist for the engine files
+`.claude/rules/coding-standards.md` already says exceed the limit, and that allowlist
+is a maintainer call about which files stay exempt. The proposal is written up in the
+review handoff for the controller.
+
 ## 5. `stripCodeSpans()` empties code-styled link text
 
 C4 reads a `Spec` cell with its code spans removed, and a span is dropped whole —

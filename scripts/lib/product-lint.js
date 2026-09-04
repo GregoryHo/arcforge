@@ -57,8 +57,9 @@
  *         replace. Both existing exemptions already cover the counting and need
  *         no new code: an illustration inside a fence or an indented code block
  *         never becomes an entry at all, so it is never counted, and
- *         `STATUS_FIELD_RE` is anchored at column 1, so a line only counts where
- *         the entry form puts it. `Refines:` and `Extends:` require no flip;
+ *         `product-decisions.js`'s `STATUS_FIELD_RE` is anchored at column 1, so
+ *         a line only counts where the entry form puts it. `Refines:` and
+ *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions — every row links at
  *         least one spec, every spec is linked from some row, and every link
@@ -91,14 +92,18 @@
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
  *         carries `vX.Y.Z` for its own version, any other row carries `—`.
  *
- * Two siblings hold what this file is not about. The markdown primitives every
- * rule reads with — the fence-aware `section()`, `unfenced()` and
- * `stripCodeSpans()` — live in `product-markdown.js`, which knows nothing about
- * product state (`stripCodeSpans()` is read from there by `product-roadmap.js`,
- * the one rule whose answer a code span changes). The roadmap table's reader lives in `product-roadmap.js`, and
- * the two rules about the table's own shape rather than about what its rows say
- * travel with it: C4's arity check and C6's framing clause. This file holds the
- * rules that read the parsed state.
+ * Three siblings hold what this file is not about, cut one per format. The
+ * markdown primitives every rule reads with — the fence-aware `section()`,
+ * `unfenced()` and `stripCodeSpans()` — live in `product-markdown.js`, which
+ * knows nothing about product state (`stripCodeSpans()` is read from there by
+ * `product-roadmap.js`, the one rule whose answer a code span changes). The
+ * roadmap table's reader lives in `product-roadmap.js`, and the two rules about
+ * the table's own shape rather than about what its rows say travel with it: C4's
+ * arity check and C6's framing clause. The Decision Log's reader lives in
+ * `product-decisions.js`, and the rules about the log's own shape travel with it
+ * too: C2's numbering invariants and C3's relation and status coherence. This
+ * file holds the rules that read the parsed state — C1, C4's row↔spec pairing,
+ * C5, C6's sanity floor and C7 — plus `validateProduct`, which runs them all.
  *
  * Library tier: pure — no I/O of its own; every rule reads the corpus strings
  * its caller hands it, and a violation is an error string rather than a throw.
@@ -106,61 +111,17 @@
 
 const { SECTION_END_RE, section, unfenced } = require('./product-markdown');
 const { parseRoadmapRows, HERE_MARKER, ROW_STATUSES } = require('./product-roadmap');
+const {
+  parseDecisions,
+  checkDecisionNumbering,
+  checkStatusPresence,
+  checkRelations,
+} = require('./product-decisions');
 
 // The `Tag` cell an unshipped row carries.
 const NO_TAG = '—';
-// CommonMark lets an ATX heading carry up to three leading spaces; at four — as
-// measured from column 1, and the log nests no headings under list items — it is
-// an indented code block, where `### D-NNN` is not a heading at all and must stay
-// unread. So the candidate detector spans ` {0,3}`, not `\s*`, while the canonical
-// form stays anchored at column 1 — the indent probe is what turns a heading the
-// reader can see into a report instead of a silent drop.
-const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
-const DECISION_ANY_RE = /^ {0,3}###\s+D-/;
-const DECISION_INDENT_RE = /^ {1,3}###/;
-const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
-const RELATION_FIELD_RE =
-  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
-// Candidate-shaped: any markdown bullet whose field label is one of the three
-// relation labels, however it is cased or spaced around the colon. Wider than
-// RELATION_FIELD_RE on purpose — the strict form is what reports these, so a
-// near-miss (`- Supersedes : D-001`, `* refines: D-001`) is rejected, not
-// silently dropped. A misspelled label stays out of reach: matching on the value
-// instead would false-fire on the prose fields that legitimately cite a `D-id`.
-// The indent is bounded the way the heading probe above is: a relation field sits
-// at column 1, so a bullet four or more spaces deep is a nested or illustrative
-// line rather than a field, and stays unread instead of raising a bogus C3 —
-// whatever markdown makes of it.
-const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
-// The folded index's delimiters, bounded the way the two probes above are: an
-// HTML block opens at three leading spaces at most, and at four the line is an
-// indented code block rather than HTML. See `parseDecisions` for both directions
-// this leaked in when it was read at `\s*`.
-//
-// The opener also has to end where an HTML tag name ends — at whitespace, `/`,
-// `>` or the line's end. Read at `\b`, it ended at any non-word character, so
-// `<details-open>` opened the fold: a hyphen is a word boundary, but the tag it
-// names is not `details` and opens no collapsible block, leaving the entries
-// below it exempt from C2's ascending clause while the log renders in the order
-// it is written.
-const FOLD_OPEN_RE = /^ {0,3}<details(?=[\s/>]|$)/i;
-const FOLD_CLOSE_RE = /^ {0,3}<\/details>/i;
-// The closed vocabulary a decision's `Status:` clauses are drawn from. A live
-// clause says the decision still governs; a flip clause says how much of it died.
-const DECISION_LIVE_STATUS = new Set(['Accepted', 'Proposed']);
-const TOTAL_FLIP_RE = /^Superseded-by: D-(\d{3})$/;
-const PARTIAL_FLIP_RE = /^partially superseded by D-(\d{3})$/;
-// The Decision Log section of ROADMAP.md — the second of the two this linter
-// reads, the roadmap table's being `product-roadmap.js`'s. It is sliced out
-// before it is parsed, so a `### D-NNN` heading anywhere else in the file is
-// prose, not product state. It is matched at column 1, and the slice's
-// boundaries are found fence-aware (see `section`), so a fenced illustration can
-// neither stand in for the section nor cut it short. Column 1 is the bound of the
-// heading that *opens* the slice, where an indented one fails closed and C6
-// catches it; the heading that closes it is read at ` {0,3}` by `SECTION_END_RE`,
-// where column 1 would fail open — see `section`.
-const DECISION_LOG_HEADING_RE = /^##\s+Decision Log\s*$/;
-// The one `##` section of a spec this linter reads, sliced the same way — but no
+// The one `##` section of a spec this linter reads, sliced the way the two
+// sections of `ROADMAP.md` are by their own owners — but no
 // rule asserts a spec's headings, so an indented or renamed one empties the slice
 // silently, where C6 catches the same read on `ROADMAP.md`.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
@@ -201,269 +162,6 @@ function versionKey(version) {
   return versionParts(version).join('.');
 }
 
-/**
- * Parse the Decision Log into entries. The log is the `## Decision Log` section,
- * not the whole file — the section is sliced out first, so a `### D-NNN` heading
- * in an intro or a later appendix is prose, never an entry. `inFold` marks the
- * entries parked in the folded `<details>` index at the bottom of the log — they
- * keep their place in the numbering but sit outside the ascending-order
- * requirement.
- *
- * An unclosed `<details>` at column 1 is not reported. GFM genuinely folds
- * everything below it, and `product/AGENTS.md` puts the fold at the bottom of the
- * log, so a fold running to the end of the section is the documented shape — this
- * file reads what markdown renders, and a rule against it would flag a document
- * whose render really is a fold. The indent bound is what the leak needed.
- */
-function parseDecisions(roadmap, errors) {
-  const entries = [];
-  let inFold = false;
-  let current = null;
-  for (const line of unfenced(section(roadmap, DECISION_LOG_HEADING_RE))) {
-    // The fold's delimiters are read at the bound every other structural line
-    // is: at four columns or more — and a leading tab is four — the line is an
-    // indented code block, where `<details>` is literal text rather than the
-    // HTML block that opens a fold, so it neither opens one nor closes one. Read
-    // at `\s*` both leaked, in opposite directions: an indented `<details>` shown
-    // as an example exempted every live entry below it from C2's ascending
-    // clause, and an indented `</details>` shown as one closed a real fold early,
-    // reporting entries that are genuinely folded as out of order.
-    if (FOLD_OPEN_RE.test(line)) inFold = true;
-    if (FOLD_CLOSE_RE.test(line)) inFold = false;
-
-    if (DECISION_ANY_RE.test(line)) {
-      const m = line.match(DECISION_HEADING_RE);
-      if (!m) {
-        errors.push(
-          DECISION_INDENT_RE.test(line)
-            ? `C2 indented Decision Log heading: "${line.trim()}" (a heading must start in column 1)`
-            : `C2 malformed Decision Log heading: "${line.trim()}" (expected "### D-NNN — <title>")`,
-        );
-        current = null;
-        continue;
-      }
-      current = { id: `D-${m[1]}`, num: Number(m[1]), inFold, status: null, relations: [] };
-      entries.push(current);
-      continue;
-    }
-    if (!current) continue;
-    const status = line.match(STATUS_FIELD_RE);
-    if (status) {
-      // Last-wins on purpose. First-wins would report the duplicate *and* claim
-      // the flip is missing on an entry that carries it one line down, which
-      // invites a third `Status:` line; last-wins keeps the appended flip a
-      // single-error mutant.
-      if (current.status !== null) {
-        errors.push(
-          `C3 ${current.id}: a second "- Status:" line ("${line.trim()}") — an entry carries exactly one, so a flip appended beside the line it replaces is reported rather than silently winning`,
-        );
-      }
-      current.status = status[1];
-    }
-    if (RELATION_ANY_RE.test(line)) {
-      const rel = line.match(RELATION_FIELD_RE);
-      if (!rel) {
-        errors.push(
-          `C3 ${current.id}: malformed relation line "${line.trim()}" (expected "- Supersedes|Refines|Extends: D-NNN", optionally "(clause N)")`,
-        );
-        continue;
-      }
-      current.relations.push({ kind: rel[1], target: Number(rel[2]), clause: !!rel[3] });
-    }
-  }
-  return entries;
-}
-
-/** C2 — zero-padded, unique, ascending outside the fold, gap-free from D-001. */
-function checkDecisionNumbering(entries, errors) {
-  const seen = new Map();
-  for (const e of entries) {
-    if (seen.has(e.num)) {
-      errors.push(`C2 duplicate Decision Log id ${e.id}`);
-    } else {
-      seen.set(e.num, e);
-    }
-  }
-  let prev = 0;
-  for (const e of entries.filter((x) => !x.inFold)) {
-    if (e.num <= prev) {
-      errors.push(
-        `C2 Decision Log is out of order: ${e.id} follows D-${String(prev).padStart(3, '0')}`,
-      );
-    }
-    prev = Math.max(prev, e.num);
-  }
-  const nums = [...seen.keys()].sort((a, b) => a - b);
-  nums.forEach((num, i) => {
-    if (num !== i + 1) {
-      errors.push(
-        `C2 Decision Log has a gap: expected D-${String(i + 1).padStart(3, '0')}, found D-${String(num).padStart(3, '0')}`,
-      );
-    }
-  });
-}
-
-/**
- * C3 — the other half of the one-`Status:`-line count. Rejecting a second line
- * while accepting none applies the same structural rule in one direction only:
- * an entry with no `Status:` records nothing about whether it still governs, and
- * a later reversal finds no line to flip. Counting needs no vocabulary, so this
- * runs on every entry — unlike the *value* check below, which stays scoped to
- * entries something supersedes (D-006 records that scope as a deliberate residual).
- */
-function checkStatusPresence(entries, errors) {
-  for (const e of entries) {
-    if (e.status !== null) continue;
-    errors.push(
-      `C3 ${e.id}: no "- Status:" line — an entry carries exactly one, so a decision that never records whether it still governs is reported rather than read as live`,
-    );
-  }
-}
-
-/** A decision `Status:` split into its `·`-separated clauses. */
-function statusClauses(status) {
-  return status
-    .split('·')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-/**
- * C3 — a superseded entry's `Status:` as a whole has to stay coherent, not just
- * contain the right phrase somewhere: every clause comes from the closed
- * vocabulary, a decision dies at most once, a totally superseded one has stopped
- * being live, a partially superseded one keeps the live clause that still
- * governs the rest of it, and one decision does not both replace it whole and
- * reverse a clause of it — the two forms mean different things, so they cannot
- * both hold for one superseder/victim pair.
- */
-function checkSupersededStatus(victim, errors) {
-  const clauses = statusClauses(victim.status);
-  const unknown = clauses.find(
-    (c) => !DECISION_LIVE_STATUS.has(c) && !TOTAL_FLIP_RE.test(c) && !PARTIAL_FLIP_RE.test(c),
-  );
-  if (unknown) {
-    errors.push(
-      `C3 ${victim.id}: Status carries "${unknown}", which is not one of Accepted | Proposed | Superseded-by: D-NNN | partially superseded by D-NNN`,
-    );
-    return;
-  }
-  const totals = clauses.filter((c) => TOTAL_FLIP_RE.test(c));
-  const live = clauses.filter((c) => DECISION_LIVE_STATUS.has(c));
-  // Each relation edge only ever asks whether its own flip clause is present, so
-  // a bare and a clause-scoped supersession from one decision both go green
-  // independently. The contradiction is a property of the pair, so it is caught
-  // here. Keys on the flip's `D-id`, never on a clause number — two clause-scoped
-  // flips from *different* decisions stay legal.
-  const partialIds = new Set(
-    clauses.filter((c) => PARTIAL_FLIP_RE.test(c)).map((c) => c.match(PARTIAL_FLIP_RE)[1]),
-  );
-  const bothForms = totals.map((c) => c.match(TOTAL_FLIP_RE)[1]).find((n) => partialIds.has(n));
-  if (bothForms) {
-    errors.push(
-      `C3 ${victim.id}: Status is "${victim.status}" — D-${bothForms} cannot both replace it whole and reverse one clause of it; the two supersession forms are exclusive for one superseder/victim pair`,
-    );
-  }
-  if (totals.length > 1) {
-    errors.push(
-      `C3 ${victim.id}: Status is "${victim.status}" — a decision dies once, so it carries at most one "Superseded-by:"`,
-    );
-  } else if (totals.length === 1 && live.length > 0) {
-    errors.push(
-      `C3 ${victim.id}: Status is "${victim.status}" — a totally superseded decision is no longer "${live[0]}"`,
-    );
-  } else if (totals.length === 0 && live.length !== 1) {
-    errors.push(
-      `C3 ${victim.id}: Status is "${victim.status}" — a partially superseded decision still governs the rest of itself, so it keeps exactly one "Accepted" (or "Proposed")`,
-    );
-  }
-}
-
-/**
- * C3 — the mirror of the pairing below. Walking only from `Supersedes:` outward
- * validates the half-done edit in one direction; the other half — a flip clause
- * with no superseding entry behind it, or one naming a decision that is not in
- * the log — never reaches a check, so it passes green. A flip is only half of
- * the two-edit reversal, so it has to find its other half.
- *
- * The *form* correspondence (bare vs. clause-scoped) stays owned by the forward
- * pass, so a mismatched pair is reported once, from the `Supersedes:` side.
- */
-function checkFlipsAreClaimed(entries, byNum, errors) {
-  for (const e of entries) {
-    if (e.status === null) continue;
-    for (const clause of statusClauses(e.status)) {
-      const m = clause.match(TOTAL_FLIP_RE) ?? clause.match(PARTIAL_FLIP_RE);
-      if (!m) continue;
-      const targetId = `D-${m[1]}`;
-      const superseder = byNum.get(Number(m[1]));
-      if (!superseder) {
-        errors.push(
-          `C3 ${e.id}: Status carries "${clause}", but ${targetId} is not in the Decision Log`,
-        );
-        continue;
-      }
-      const claimed = superseder.relations.some(
-        (r) => r.kind === 'Supersedes' && r.target === e.num,
-      );
-      if (!claimed) {
-        errors.push(
-          `C3 ${e.id}: Status carries "${clause}" but ${targetId} carries no "Supersedes: ${e.id}" — a reversal is two edits, and this is only one`,
-        );
-      }
-    }
-  }
-}
-
-/**
- * C3 — every relation resolves backwards, and a supersession is two edits: the
- * flip on the superseded entry is the second one. `Refines:` and `Extends:`
- * sharpen or widen a decision that stays in force, so they need an earlier
- * target that exists and nothing else — the target's later status is not the
- * edge's business, because a refinement written while its target was live stays
- * a correct record after some third decision supersedes that target. The
- * direction test compares `D-id`s, not positions, so parking a superseded entry
- * in the folded index leaves it satisfied.
- *
- * Coherence is a property of the superseded entry's `Status:`, not of one edge,
- * so it runs once per victim — two decisions superseding one entry report one
- * incoherent status, not two.
- */
-function checkRelations(entries, errors) {
-  const byNum = new Map(entries.map((e) => [e.num, e]));
-  const victims = new Map();
-  for (const e of entries) {
-    for (const { kind, target, clause } of e.relations) {
-      const targetId = `D-${String(target).padStart(3, '0')}`;
-      const victim = byNum.get(target);
-      if (!victim) {
-        errors.push(`C3 ${e.id}: "${kind}: ${targetId}" names a decision that does not exist`);
-        continue;
-      }
-      if (target >= e.num) {
-        errors.push(
-          `C3 ${e.id}: "${kind}: ${targetId}" must name an earlier decision — the log is append-only, so an entry cannot relate to itself or to one recorded after it`,
-        );
-        continue;
-      }
-      if (kind !== 'Supersedes') continue;
-      // A victim with no `Status:` is already reported once by
-      // `checkStatusPresence`; saying it again per superseding edge would turn
-      // one missing line into N errors.
-      if (victim.status === null) continue;
-      victims.set(target, victim);
-      const expected = clause ? `partially superseded by ${e.id}` : `Superseded-by: ${e.id}`;
-      if (!statusClauses(victim.status).includes(expected)) {
-        errors.push(
-          `C3 ${targetId}: Status is "${victim.status}" but ${e.id} supersedes it — expected it to carry "${expected}"`,
-        );
-      }
-    }
-  }
-  checkFlipsAreClaimed(entries, byNum, errors);
-  for (const victim of victims.values()) checkSupersededStatus(victim, errors);
-}
-
 /** C7 — the `Tag` cell is the row's Status said a second way; a release fills it. */
 function checkRoadmapTags(rows, errors) {
   for (const row of rows) {
@@ -496,14 +194,14 @@ function checkRoadmapTags(rows, errors) {
  * preamble ran past such a heading, and a body blockquote below it stood in for
  * a header the spec does not have. The preamble therefore ends at the shared
  * `SECTION_END_RE`, the same boundary that ends a section, at the bound
- * `DECISION_ANY_RE` also takes and for the same reason — every boundary a heading
- * *ends* fails open when it is read at column 1. The one column-1 *boundary* read
+ * `DECISION_ANY_RE` in `product-decisions.js` also takes and for the same reason
+ * — every boundary a heading *ends* fails open when it is read at column 1. The one column-1 *boundary* read
  * left is the heading that *opens* a section, which fails closed — and C6 rejects
  * the empty slice that read yields for `ROADMAP.md`'s two sections, though not for
  * a spec's `## Decisions`, which has no such backstop and is then checked for
  * nothing (`product/AGENTS.md` states that exception). The field and entry forms
- * (`STATUS_FIELD_RE`, `DECISION_HEADING_RE`'s canonical form,
- * `SPEC_STATUS_HEADER_RE`) are anchored there for a different reason, which is
+ * (`product-decisions.js`'s `STATUS_FIELD_RE` and `DECISION_HEADING_RE`'s
+ * canonical form, `SPEC_STATUS_HEADER_RE`) are anchored there for a different reason, which is
  * that column 1 is where the form puts them. Four spaces is an indented code
  * block, so an illustrative `##` in the preamble still does not cut it short.
  *
@@ -697,7 +395,6 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
 
 module.exports = {
   validateProduct,
-  parseDecisions,
   expectedSpecStatus,
   specStatusHeaders,
 };
