@@ -536,16 +536,37 @@ PASS——一份被打成非單調的日誌拿到滿分，而技能的規則是�
 非「下一個未用的 id」；技能第 4 步本來就可能在 supersede 之前先記一筆決策，所以
 D-009、甚至 D-020 都可能是對的，A3 不量測 id 是否無缺口。
 
-**未花任何 trial 額度**，也不欠一次。兩項收斂都只會移除過關路徑；已登記的池無從重評
+同一輪的第三項修正落在 A4：原本是 `"vaultbox" in spec_text.lower()`，而 assertion 承
+諾的是「spec 不再承諾產品已不再使用的後端」。子字串買不到那道底線。Version 6 下量到：
+roadmap supersede 完全正確、spec 卻只在 `## Decisions` 清單加一行
+`- **D-008** — the storage backend is Vaultbox.`、`- **B-4 Uploads are stored in
+Blobstash.**` 原封不動，仍得 4/4；把 `Vaultbox is not the backend yet.` 加在檔案任何
+位置也一樣（reviewer 自己舉的例）。修正後 A4 只讀 `## Behavior` 段，每個項目取一條
+**claim line**——從 `B-n` token 到 `**`、`. `、空行三者最早者；必須有一條未被否定地
+指名 Vaultbox，且不得有任何一條仍說 uploads 存在 Blobstash。以 `B-n` token 而非粗體
+區段切分是關鍵且經量測：id 就在粗體引言**之內**，改抓 token 之後的 `**...**` 會抓到
+項目本文，並把「在 B-4 本文補一句 Blobstash 已退役」的那份留存 transcript 誤判為
+FAIL。三項讓步照例明講：claim line 是引言而非整段本文（引言宣告 Vaultbox、本文自相
+矛盾者仍過，與 A1 摘要綁條目而非條目內位置同型）；`STORES_BLOBSTASH` 以 `stor` 詞幹
+為鍵，寫成「uploads are *kept* in Blobstash」可以繞過那一半（但 Vaultbox 那一半仍須
+過關，因此沒有 trial 能只靠 Blobstash 承諾拿到 A4，而 assertion 的用字正是
+「stored」，述詞與文字對齊在同一個較窄的主張上）；刪掉 B-4、只在 `## Decisions` 提
+Vaultbox 者現在 A4 FAIL——六份留存 transcript 無一如此。以 **13 個** spec 變體離線對
+照（roadmap 固定在正確的 supersede，因此只有 A4 會動）：九列不動、四列由 4/4 翻為
+A4 FAIL；六份留存 transcript 全數把 B-4 的 claim line 改寫成
+`- **B-4 Uploads are stored in Vaultbox.**`，因此全數通過收緊後的底線。
+
+**未花任何 trial 額度**，也不欠一次。三項收斂都只會移除過關路徑；已登記的池無從重評
 （k=10 執行目錄已不存在）；六份留存 transcript 全部重讀過——無一在 `ROADMAP.md` 內寫
 入新的 `##` 層級段落，且 `grep -rn "D-000"` 掃過 `evals/results/` 與 `evals/preflight/`
 無任何命中，因此無一走被移除的路徑。以 **28 個**合成 roadmap 離線對照：原有 21 列在
 本次的新舊 grader 下逐列重跑、無一移動，新增的七列（六個放置位置、一個編號）全部由
-4/4 翻為 FAIL。
+4/4 翻為 FAIL；spec 側另有 13 列變體對照，見上。
 
 **殘留的未檢項**：迄今**沒有任何 trial 在 Version 7 grader 下被評過分**。Version 4–7
 只移除過關路徑、不新增，因此未受檢的方向是 baseline 通過率**下降**——即鑑別力可能反
-而回升、A/B 的問題重新打開。最便宜的決定性複查是以 Version 7 文本跑一次 k=3
+而回升、A/B 的問題重新打開。A4 從「檔案任一處提到 Vaultbox」收緊成「`## Behavior` 有
+一條肯定的項目、且無任何一條仍說存在 Blobstash」之後，同樣未被實測過。最便宜的決定性複查是以 Version 7 文本跑一次 k=3
 preflight；此處**刻意不跑**，因為它會消耗實際的 trial 額度。unmet-but-covered 結論
 維持不變。
 
