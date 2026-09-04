@@ -17,7 +17,7 @@
  * leaves as an error string pushed onto the caller's list.
  */
 
-const { section, unfenced, stripCodeSpans } = require('./product-markdown');
+const { section, unfencedEntries, stripCodeSpans } = require('./product-markdown');
 
 // The `← we are here` marker C1 counts, read off the `Status` cell here because
 // this is the only place a cell is cut.
@@ -87,16 +87,29 @@ function rowCells(line) {
  * a floor rather than a widening, because "the roadmap table has no rows"
  * already promised a table.
  *
- * The frame is the first two pipe lines of the section, the way GFM reads one:
- * a header of six cells opening on `Version`, then a delimiter of the same
- * width. Positional on purpose, and `product/AGENTS.md` says so: the table is
- * the first thing in `## Roadmap`. The tradeoff is a pipe line *above* the
- * header — a second table, say — being reported although what follows it
- * renders. Searching for the header instead would accept that, and would also
- * accept a data row written above the frame: GFM shows such a row as a
- * paragraph while every rule here would go on reading it as product state,
- * which is the defect this rule exists to close. Prose belongs above the
- * heading, and the section's note below the table, where the corpus puts it.
+ * The frame is the section's first two pipe lines, the way GFM reads one: a
+ * header of six cells opening on `Version`, then a delimiter of the same width.
+ * Positional on purpose, and `product/AGENTS.md` says so: the table is the first
+ * thing in `## Roadmap`. The tradeoff is a pipe line *above* the header — a
+ * second table, say — being reported although what follows it renders.
+ * Searching for the header instead would accept that, and would also accept a
+ * data row written above the frame: GFM shows such a row as a paragraph while
+ * every rule here would go on reading it as product state, which is the defect
+ * this rule exists to close. Prose belongs above the heading, and the section's
+ * note below the table, where the corpus puts it.
+ *
+ * "First two pipe lines" is not the whole frame, and reading it as the whole
+ * frame was a hole: GFM ends a table at the first blank line or block-level
+ * structure, so the header, the delimiter and every row are one table only while
+ * they sit on *consecutive* lines. The pipe lines arrive here already sifted out
+ * of the section, so a blank line, a paragraph or a fenced block between any two
+ * of them is invisible unless their positions come with them — which is why they
+ * do (`unfencedEntries`). Both halves were confirmed against GitHub's own
+ * renderer: a break inside the frame renders the whole section as one paragraph
+ * of literal pipes, and a break below the delimiter renders an empty table with
+ * the rows as a paragraph under it. Each linted green while C1, C4, C6 and C7
+ * read those rows as product state — the same defect as a missing delimiter,
+ * reached one line later.
  *
  * Reported and the rows kept, the way a duplicate `Version` and a duplicate
  * `D-id` are — dropping them would take the `← we are here` marker with them
@@ -105,6 +118,16 @@ function rowCells(line) {
 function checkRoadmapFraming(table, errors) {
   // An empty `## Roadmap` is the row floor's to report, not this rule's.
   if (table.length === 0) return;
+  // Adjacency first: a break anywhere in the run means the lines below it are
+  // not in the table at all, so judging the frame's shape past one would be
+  // reporting on a table the reader never sees.
+  const broken = table.find((entry, i) => i > 0 && entry.index !== table[i - 1].index + 1);
+  if (broken) {
+    errors.push(
+      `C6 the roadmap table breaks above "${broken.line}": a blank line, a paragraph or a fenced block sits between it and the pipe line before it, so GFM ends the table there and what follows renders as a paragraph of pipes`,
+    );
+    return;
+  }
   const [header, delimiter] = table;
   if (header.cells[0] !== HEADER_FIRST_CELL || header.cells.length !== ROW_COLUMNS) {
     errors.push(
@@ -150,10 +173,13 @@ function checkRoadmapFraming(table, errors) {
  */
 function parseRoadmapRows(roadmap, errors) {
   const table = [];
-  for (const raw of unfenced(roadmapSection(roadmap))) {
+  // `index` is the line's position in the section slice, which is what C6's
+  // adjacency clause reads; a fenced line is dropped rather than renumbered, so
+  // a fenced block between two pipe lines shows up as the break it is.
+  for (const { line: raw, index } of unfencedEntries(roadmapSection(roadmap))) {
     if (!/^ {0,3}\|/.test(raw)) continue;
     const line = raw.trim();
-    table.push({ line, cells: rowCells(line) });
+    table.push({ line, cells: rowCells(line), index });
   }
   checkRoadmapFraming(table, errors);
 

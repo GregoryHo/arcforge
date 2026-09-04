@@ -250,9 +250,9 @@ Both recorded constraints held. One was satisfied differently than written:
 
 - It must assert a `Version` header row **and** a delimiter whose arity matches it. A
   bare "some header exists" check still passes the third input above. Taken as
-  written: the frame is the first two pipe lines of the section, read the way GFM
-  reads one — a six-cell header opening on `Version`, then a delimiter of the same
-  width directly beneath it.
+  written: the frame is the section's first two pipe lines, read the way GFM reads
+  one — a six-cell header opening on `Version`, then a delimiter of the same width
+  directly beneath it.
 - The unconditional all-dash `continue` must move *after* the arity check, so an
   off-arity delimiter is reported instead of skipped. Taken, and the third input is
   now reported twice over — once by C6 as a frame that renders no table, once by C4
@@ -260,10 +260,34 @@ Both recorded constraints held. One was satisfied differently than written:
   in the same change: `|-|-|` is a legal GFM delimiter, and a rule whose job is to
   reject has to accept every frame a renderer draws.
 
-What is left is controller-owned. D-006 still enumerates C6 as "a sanity floor of one
-row, one decision, one spec"; the exact replacement naming the frame is in the review
-handoff for the controller to apply, because `product/ROADMAP.md` is not a file this
-work owns.
+D-006's C6 clause caught up to the frame in `e40c862`; a further one-clause
+amendment naming the adjacency below is in the review handoff for the controller to
+apply, because `product/ROADMAP.md` is not a file this work owns.
+
+**Round 15 — "the first two pipe lines" was a shorthand, and taking it literally was a
+hole.** The rule collected the section's pipe lines and read the frame off *that*
+list, so every non-pipe line between them was erased before the check ran. GFM ends a
+table at the first blank line or block-level structure, so four more inputs linted
+green while rendering as prose — verified through GitHub's own GFM endpoint rather
+than argued from the spec:
+
+- a blank line between the header and the delimiter, and the same with a paragraph or
+  a fenced block in that gap: GitHub renders the entire section as one paragraph of
+  literal pipes, and the linter reported nothing;
+- a blank line between the delimiter and the rows: GitHub renders an empty table with
+  the rows as a paragraph beneath it, while C1 still counted the detached row's
+  `← we are here` and C4 still let it govern a spec.
+
+It is the same defect as a missing delimiter, reached one line later, so it landed the
+same way — a clause of C6, no new `D-id`, the rule count still seven. The fix is
+positional: `unfencedEntries()` in `scripts/lib/product-markdown.js` hands each
+surviving line its index in the section slice (a fenced line is dropped rather than
+renumbered, so a fenced block reads as the break it is), `checkRoadmapFraming()`
+asserts the collected pipe lines sit at consecutive indices before it judges their
+shape, `product/AGENTS.md`'s framing paragraph says "directly beneath" is literal, and
+four mutation-checked cases in `tests/scripts/check-product.test.js` pin each input.
+The prose above keeps the shorthand it was written with; this paragraph is what it
+means.
 
 The silent sibling of this family was fixed rather than deferred, and is not part of
 the rule above: `parseRoadmapRows` trimmed before testing for a leading `|`, with no

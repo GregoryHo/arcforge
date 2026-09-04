@@ -106,6 +106,15 @@ reaches a reader as a paragraph of literal pipes while the checks above would go
 on reading it as product state. A wrong-width delimiter is reported as a row of
 the wrong arity, not skipped for looking like dashes.
 
+"Directly beneath" is literal, and so is "sit under": GFM ends a table at the
+first blank line or block-level structure, so the header, its delimiter and every
+row are one table only while they occupy consecutive lines. A blank line, a
+paragraph or a fenced block anywhere in that run is reported (C6). Between the
+header and the delimiter it costs the whole section — GitHub renders it as one
+paragraph of literal pipes; below the delimiter it renders an empty table with
+the rows as a paragraph beneath it. Either way the rows are not in a table, which
+is the only thing this rule is about.
+
 "Opens on" is literal: the table is the first thing in the section, so a pipe line
 above the header is reported even when the table below it would render. That is
 deliberate rather than incidental — a data row written above the frame renders as a

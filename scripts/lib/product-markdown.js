@@ -155,8 +155,33 @@ function section(md, heading) {
  * each is a scan of its own.
  */
 function unfenced(lines) {
+  return unfencedEntries(lines).map((entry) => entry.line);
+}
+
+/**
+ * The same lines, each paired with its **index in the slice it came from** — the
+ * form a rule needs when it is about where lines sit rather than only what they
+ * say.
+ *
+ * C6's framing clause is the one such rule, and it is why this exists. GFM ends
+ * a table at the first blank line or block-level structure, so a header, its
+ * delimiter and the rows beneath render as one table only while they occupy
+ * consecutive lines. Read off the compressed list `unfenced()` returns, those
+ * positions are gone: a blank line, a paragraph or a fenced block between the
+ * header and the delimiter closes up, the frame reads as adjacent, and a
+ * `## Roadmap` that GitHub itself renders as a paragraph of literal pipes lints
+ * green while C1, C4, C6 and C7 go on reading its rows as product state.
+ *
+ * `unfenced()` is this with the indices dropped rather than a second scan, so
+ * the fence rule keeps the single implementation this file exists to give it.
+ */
+function unfencedEntries(lines) {
   const fenced = fenceTracker();
-  return lines.filter((line) => !fenced(line));
+  const entries = [];
+  lines.forEach((line, index) => {
+    if (!fenced(line)) entries.push({ line, index });
+  });
+  return entries;
 }
 
 /**
@@ -180,4 +205,4 @@ function stripCodeSpans(text) {
   return text.replace(/(`+)[^\n]*?\1/g, '');
 }
 
-module.exports = { SECTION_END_RE, section, unfenced, stripCodeSpans };
+module.exports = { SECTION_END_RE, section, unfenced, unfencedEntries, stripCodeSpans };

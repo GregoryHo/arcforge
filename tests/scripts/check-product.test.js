@@ -213,9 +213,13 @@ describe('check-product', () => {
 
     it('still reads a row indented one to three spaces, which the table renders', () => {
       // The bound is ` {0,3}`, not column 1: three spaces is not an exemption,
-      // so the row is product state and governs the spec it links.
-      const note = ['', `   ${row({ version: '2.0.0', status: 'building', here: false })}`];
-      const errors = of('C4', run({ roadmap: { note } }));
+      // so the row is product state and governs the spec it links. It sits in
+      // `rows`, directly under the one above it, because that is the only place
+      // the table does render it — moved below the blank line that opens `note`,
+      // GFM ends the table before it and C6's adjacency clause reports it
+      // instead, which would test the wrong thing.
+      const rows = [row(), `   ${row({ version: '2.0.0', status: 'building', here: false })}`];
+      const errors = of('C4', run({ roadmap: { rows } }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/extended by 2\.0\.0 \(building\)/);
     });
@@ -1362,6 +1366,47 @@ describe('check-product', () => {
         expect(of('C4', errors)).toEqual([
           'C4 roadmap row "|---|---|": expected 6 columns, found 2',
         ]);
+      });
+
+      // GFM ends a table at the first blank line or block-level structure, so
+      // the frame and its rows are one table only while they occupy consecutive
+      // lines. Each input below was rendered through GitHub's own GFM endpoint:
+      // a break inside the frame yields one paragraph of literal pipes, and a
+      // break under the delimiter yields an empty table with the rows as a
+      // paragraph beneath it. All four linted green before this clause.
+      it('rejects a blank line between the header and its delimiter', () => {
+        const header = [TABLE_HEADER[0], '', TABLE_HEADER[1]];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/breaks above "\|---\|---\|---\|---\|---\|---\|"/);
+      });
+
+      it('rejects a paragraph between the header and its delimiter', () => {
+        const header = [TABLE_HEADER[0], 'a note that broke the table', TABLE_HEADER[1]];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/breaks above "\|---\|---\|---\|---\|---\|---\|"/);
+      });
+
+      it('rejects a fenced block between the header and its delimiter', () => {
+        // The case the positions have to survive the fence exemption to catch:
+        // `unfenced()` drops these three lines, so read off its compressed list
+        // the delimiter looks adjacent to the header. A fence is a block-level
+        // structure, and GFM ends the table at it.
+        const header = [TABLE_HEADER[0], '```markdown', 'an illustration', '```', TABLE_HEADER[1]];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/breaks above "\|---\|---\|---\|---\|---\|---\|"/);
+      });
+
+      it('rejects a row detached from the delimiter by a blank line', () => {
+        // The break one line lower: the frame renders, as an empty table, and
+        // the row below it is a paragraph — while C1 still counted its `← we
+        // are here` and C4 still let it govern a spec.
+        const header = [...TABLE_HEADER, ''];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/breaks above "\| 1\.0\.0 \|/);
       });
 
       it('accepts a single-dash delimiter, which GFM renders', () => {
