@@ -183,6 +183,27 @@ function draftPathsFor(candidateId) {
   return draftPathsIn(materializationFor(candidateId));
 }
 
+/**
+ * The file activation will create or overwrite.
+ *
+ * Layer 8's own derivation, not a second one: `buildActiveInstinctPath` is what
+ * `activate()` computes its write target with, and `getArcforgeHome()` is the
+ * root the dashboard handler hands it, so this resolves to the same path the
+ * write lands on rather than to a CLI-local guess at it.
+ *
+ * Safe to print where `active_target_hint.target_path_summary` is not: that
+ * string embeds `scope.project_id`, while this keys on `scope.project`, the
+ * slug the sanitized card already carries and prints. Layer 8 falls back to
+ * `getProjectName()` when `scope.project` is absent, which cannot diverge from
+ * the real target here — `readProjectCandidates` yields only records whose
+ * `scope.project` is that same slug.
+ */
+function activeTargetFor(card) {
+  const { buildActiveInstinctPath } = require('../lib/learning-curator/activate');
+  const { getArcforgeHome } = require('../lib/utils');
+  return buildActiveInstinctPath(getArcforgeHome(), card);
+}
+
 module.exports = {
   readProjectCards,
   findProjectCandidate,
@@ -192,4 +213,5 @@ module.exports = {
   staleDraftsIn,
   draftUnavailableIn,
   draftPathsFor,
+  activeTargetFor,
 };

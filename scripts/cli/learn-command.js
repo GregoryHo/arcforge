@@ -31,6 +31,7 @@ const {
   staleDraftsIn,
   draftUnavailableIn,
   draftPathsFor,
+  activeTargetFor,
 } = require('./learn-candidate-queue');
 const {
   ACTION_FOR_VERB,
@@ -82,10 +83,17 @@ function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
 }
 
 /**
- * The `safety_ack` the dashboard collects from two checkboxes. A typed
- * `learn activate <id>` is the equivalent deliberate act, so the CLI prints
- * both warnings to stderr — leaving `--json` stdout clean — and then asserts
- * what the reviewer has just been shown.
+ * The `safety_ack` Layer 6 gates activation on, supplied by the typed command.
+ *
+ * A typed `learn activate <id>` is itself the deliberate act, so the CLI prints
+ * the two facts the gate names — that behavior changes, and which file is
+ * written — to stderr, leaving `--json` stdout clean, and then asserts what the
+ * reviewer has just been shown.
+ *
+ * The target line is the path Layer 8 writes, resolved through Layer 8's own
+ * derivation. Naming anything else would make the acknowledgement false: the
+ * draft is the source that was reviewed, not the file activation creates or
+ * overwrites, so it prints under its own label.
  */
 function acknowledgeActivation(card) {
   const draftPaths = draftPathsFor(card.candidate_id);
@@ -94,11 +102,12 @@ function acknowledgeActivation(card) {
       'is injected at SessionStart until it is deactivated.',
   );
   console.error(
-    draftPaths.length > 0
-      ? `target: the draft at ${draftPaths.join(', ')} becomes an active instinct under the ` +
-          'arcforge home instincts tree.'
-      : 'target: an active instinct under the arcforge home instincts tree.',
+    `target: ${activeTargetFor(card)} — created, or overwritten with the file currently ` +
+      'there kept under .backups/.',
   );
+  if (draftPaths.length > 0) {
+    console.error(`source: the reviewed draft at ${draftPaths.join(', ')}.`);
+  }
   return { reviewer_saw_behavior_change_warning: true, reviewer_saw_target_path_summary: true };
 }
 
