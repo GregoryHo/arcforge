@@ -24,7 +24,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   window between the two opt-ins stop being reported. Fix direction: persist the
   enable stamp across a disable and take the start of the continuous effective
   any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0.
-- **`learn enable` erases `inject_activated_instincts`** — `setLearningEnabled`
+- **learn-enable-erases-config** — `setLearningEnabled`
   (scripts/lib/learning.js) writes a fresh `{ scope, enabled, updated_at }`
   object, so every other key on the learning config is dropped. The only such
   key today is `inject_activated_instincts`, which
