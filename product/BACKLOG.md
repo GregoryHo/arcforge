@@ -67,10 +67,6 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   (it is already in hand as `previous`). Pre-existing — the same full-replacement
   object predates the #146/#147 branch; surfaced during its review.
 
-- **unify-candidate-queues** — point the `learn` transition commands at the
-  canonical Layer-5 candidate queue, so the CLI and the dashboard manage the
-  same candidates instead of two disjoint queues · issue: [#148](https://github.com/GregoryHo/arcforge/issues/148).
-  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0 · issue: [#164](https://github.com/GregoryHo/arcforge/issues/164).
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
@@ -94,12 +90,6 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   while the dashboard's detail wire redacts the same path. Reject at ingestion or
   normalize at the Layer-5 write is the product call D-012 leaves open; either
   moves `candidate_record_hash` · issue: [#175](https://github.com/GregoryHo/arcforge/issues/175).
-- **cli-draft-path-redaction** — `learn drafts` and `learn inspect` print
-  `draft_paths` verbatim while the dashboard's detail wire redacts the same
-  path; draft files are named for the candidate, so a keyword-shaped name reaches
-  the terminal through the path. B-9 says commands print the absolute path of
-  anything they write, so this is a product call between the two promises, not
-  a review fix.
 - **project-keyspace-collision** — two project roots whose basenames sanitize to
   the same slug share one observation store, one instincts tree and therefore one
   candidate set; `learn --project` keys on that slug (D-012) because filtering on
