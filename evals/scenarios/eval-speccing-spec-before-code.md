@@ -95,6 +95,53 @@ exactly `{"000"}` — the one entry id that scores differently. What that does t
 the published pool is settled below, once A2's narrowings are on the table
 too.
 
+A3 finally requires the entry to be an entry *of the Decision Log*, not any
+`### D-NNN` heading in the file. The block loop scanned the whole of
+ROADMAP.md, so a trial that appended `## Appendix` with a `### D-005` block
+naming CSV under it — or wrote the same block above the `## Decision Log`
+heading — scored `A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on
+the shipped grader carrying the numeric predicate, while the log itself gained
+nothing. That is the append-only history the assertion exists to check
+(`skills/core/speccing/references/templates.md:37` puts `## Decision Log` in
+ROADMAP.md, and `product/AGENTS.md:44` makes a recorded decision's text
+immutable and appended to), so an entry parked outside it was never the
+behavior A3 was written to detect. `decision_log()` narrows the scan to the
+section starting at the `## Decision Log` heading and ending at the next `#` or
+`##` heading — the same shape as `version_table()` for A2, and for the same
+reason.
+
+Its costs, two of them, accepted rather than hidden — both measured on the
+shipped grader, and both the direct analogue of a cost A2's anchor already
+carries. A trial that renames the heading (`## Decisions`) scores A3:FAIL,
+because nothing anchors the scan. And a trial that leaves the fixture log
+intact but writes its entry under a *second* `## Decision Log` heading appended
+at the file's end scores A3:FAIL, because the first heading wins. The second is
+narrow — the fixture's log runs to EOF, so an entry appended at the bottom of
+the file lands inside it, and reaching this case takes a deliberate duplicate
+heading written directly after D-004's body.
+
+Validated offline against five synthetic roadmaps — the placement cases the
+anchor is about, the id cases being the table above's — run through the grader
+carrying the numeric predicate alone, then with the section anchor as shipped:
+
+| case | numeric | +log anchor |
+|---|---|---|
+| `### D-005` naming CSV, appended to the Decision Log | PASS | PASS |
+| `### D-005` naming CSV under an appended `## Appendix` | PASS | **FAIL** |
+| `### D-005` naming CSV above the `## Decision Log` heading | PASS | **FAIL** |
+| `### D-005` naming CSV under a second `## Decision Log` | PASS | **FAIL** |
+| log renamed `## Decisions`, `### D-005` appended to it | PASS | **FAIL** |
+
+Separately measured and not tabulated: a roadmap with no `## Decision Log`
+heading at all emits six labels and
+`A3:FAIL:no decision entry beyond D-004 records the CSV export` rather than
+raising, which is what `decision_log()` returning `""` buys; an entry that is
+the last thing in the file with no trailing newline still passes, and one
+followed by a further `## Notes` section still passes; and all six cases of the
+id table above hold their `new` verdict under the anchor when their entry sits
+in the log, so the anchor changes no verdict the numeric narrowing was
+validated against.
+
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
 version the fixture shipped, because that is what the assertion's own second
 clause owes: a set difference against the three fixture rows also admits a row
@@ -222,11 +269,13 @@ any transcript:
   failure. The baseline arm scores 0.33 / 0% under either reading.
 - *Treatment, bounded.* All ten treatment trials scored 1.00, so A2 and A3 both
   passed under the old predicates. The narrowings touch only those two
-  assertions — the row tie and the table anchor both live *inside* A2, so the
-  set a re-scored trial can lose is still {A2, A3}. Each is narrowing by
-  construction, not just on the cases tabulated above: the anchor feeds
-  `row_re` a substring of the text it used to scan, so its match set can only
-  shrink. Were the pool re-scored under the shipped predicates
+  assertions — the row tie and the table anchor both live *inside* A2, the log
+  anchor *inside* A3, so the set a re-scored trial can lose is still {A2, A3}.
+  Each is narrowing by construction, not just on the cases tabulated above:
+  both anchors feed their predicate a substring of the text it used to scan
+  (`row_re` a substring of the file, the block loop a substring of the file), so
+  either match set can only shrink. Were the pool re-scored under the shipped
+  predicates
   — it cannot be, see below — a treatment trial would score 1.00, or 0.83
   having lost one of the two, or 0.67 having lost both. The delta would land
   between **+0.33** and the +0.67 that was measured, and with a zero-variance
@@ -293,7 +342,7 @@ git commit -q -m "tallyhouse: 0.3.0, JSON export"
 ## Assertions
 - [ ] A1: A numbered behavior item under `product/specs/` states what the CSV export must do — the spec moved with the code instead of being deferred.
 - [ ] A2: `product/ROADMAP.md` gained a version row beyond the three it shipped with, and that row is the CSV export's own milestone — so the roadmap does not end a version behind the code, and the work that landed has a row.
-- [ ] A3: `product/ROADMAP.md` gained a decision entry, with an id beyond D-004, recording the CSV export being picked up.
+- [ ] A3: The `## Decision Log` in `product/ROADMAP.md` gained a decision entry, with an id beyond D-004, recording the CSV export being picked up — the append-only history was appended to, not bypassed.
 - [ ] A4: The `csv-export` wish is no longer an open line in `product/BACKLOG.md` — it was removed or struck through, not left wishing for a feature that now exists.
 - [ ] A5: `src/exporter.js` implements the CSV branch — the customer's feature actually landed, not just the paperwork.
 - [ ] A6: `product/ROADMAP.md` carries exactly one `← we are here` marker.
@@ -378,11 +427,34 @@ a2 = any(
 )
 emit("A2", a2, "no roadmap row beyond 0.3.0 carries the CSV export milestone")
 
-# A3 — a decision entry beyond D-004 that is about the CSV export
+# A3 — a decision entry beyond D-004, in the Decision Log, about the CSV export
+
+# The Decision Log, not the whole file. The block loop scanned all of
+# ROADMAP.md, so a `### D-005` block naming CSV written under an appended
+# `## Appendix` — or above the `## Decision Log` heading entirely — scored A3
+# while the log itself gained nothing, and the append-only history the
+# assertion exists to check was bypassed rather than appended to. Narrow to the
+# section that starts at the `## Decision Log` heading and ends at the next `#`
+# or `##` heading: `###` entry headings are level-3 and so do not close it, and
+# the heading line itself is harmless inside the scan because `heading_re`
+# matches only `###`. Same shape as `version_table()` above, for the same
+# reason — first heading wins, so a renamed heading or a second appended log
+# scores A3:FAIL. Returns "" when no such heading is found, so `blocks` stays
+# empty and A3 emits its FAIL reason rather than raising.
+def decision_log(text):
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*##\s+Decision Log\b", line, re.I):
+            j = i + 1
+            while j < len(lines) and not re.match(r"^#{1,2}\s", lines[j]):
+                j += 1
+            return "\n".join(lines[i:j])
+    return ""
+
 heading_re = re.compile(r"^###\s+D-(\d{3})\b", re.M)
 blocks = {}
 current = None
-for line in road.split("\n"):
+for line in decision_log(road).split("\n"):
     m = heading_re.match(line)
     if m:
         current = m.group(1)
