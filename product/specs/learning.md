@@ -78,24 +78,25 @@ was recorded about them.
   `--project` means *this* project, matched on the project name each card
   prints — and refuses `--global`: a candidate that would apply to every
   project on the machine is reviewed where the reviewer can see what it
-  changes. Scope is the one thing the CLI decides alone, and so the one refusal
-  class that leaves no audit entry: neither `--global` nor an id this project
-  does not own — another project's, a global one, or one naming no project at
-  all — is a gate the engine models, so there is no refusal of its own to
-  dispatch and render; dispatching would *accept* the action and move a
+  changes. Scope is a refusal class the engine does not model, and so one the
+  CLI decides alone and leaves unaudited: neither `--global` nor an id this
+  project does not own — another project's, a global one, or one naming no
+  project at all — is a gate the engine models, so there is no refusal of its
+  own to dispatch and render; dispatching would *accept* the action and move a
   candidate this project may not touch. An id that names no candidate anywhere
   is not a scope question: that refusal the engine does model, so a transition
   naming one is dispatched, refused and audited like every other. Its reach is
   what the engine can actually build — the instinct artifact. That narrowing is
-  the curator's own refusal, which the CLI renders rather than re-decides, so it
-  too is audited; every single-step command renders that refusal rather than
+  the curator's own refusal, which the CLI renders rather than re-decides, so
+  it too is audited; every single-step command renders that refusal rather than
   pre-empting it. `accept`, the one compound command, is the exception that
-  proves the rule: it would approve before
-  meeting the refusal, and the queue is append-only, so it decides for itself
-  the two things that no re-run clears — the artifact type, and whether the
-  candidate's name is one the draft writer can use as a filename — and refuses
-  before its first move: nothing applied, nothing recorded, the candidate
-  untouched. Hand-editing state files is the
+  proves the rule, and refuses unaudited too — for the opposite reason, since
+  the engine does model both of its checks: it would approve before meeting the
+  refusal, and the queue is append-only, so it decides for itself the two
+  things that no re-run clears — the artifact type, and whether the candidate's
+  name is one the draft writer can use as a filename — and refuses before its
+  first move: nothing applied, nothing recorded, the candidate untouched.
+  Hand-editing state files is the
   one path with no checks and no record; the product treats it as out of
   contract. A draft is the exception that is still owed a report, because
   reviewing one is what the product asks of the user: no surface names a draft
