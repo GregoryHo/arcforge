@@ -227,9 +227,9 @@ this project does not own is the CLI's own call and leaves no audit entry —
 there is no queue action to record, and the machine-wide dashboard would have
 run the command. A mistyped id is different: it names no candidate anywhere,
 which is a refusal the queue itself makes, so it is logged like any other. To
-see the whole machine at once, use the dashboard. (`learn status`, `learn enable` and
-`learn disable` still take either scope — those are about the opt-in, not about
-candidates.)
+see the whole machine at once, use the dashboard.
+(`learn status`, `learn enable` and `learn disable` still take either scope —
+those are about the opt-in, not about candidates.)
 
 **Only what is legal is offered.** Each entry carries its `available_actions`,
 straight from the matrix, and a transition outside them is refused with the
