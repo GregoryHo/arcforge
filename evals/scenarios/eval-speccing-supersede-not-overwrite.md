@@ -136,7 +136,10 @@ and the drop case's mirror, whose A1 the pre-fix anchor passed by finding
 D-005's text under an id the fixture never wrote. Version 7 re-ran all
 twenty-one older rows under its own pair and none moved; the seven it adds are
 six placement cases and one numbering case, which no earlier version had a
-reason to write.
+reason to write. Version 7's A4 was likewise corrected once more before any
+trial was scored under it (`V7 pre/post`), without moving the version, for the
+reason `V6 pre/post` records; that correction touches the spec side only, so its
+rows live in the A4 table further down rather than here.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -350,20 +353,69 @@ lead broken across two lines and an un-bolded `B-4 Uploads are stored in
 Vaultbox.` both read correctly — mirroring the same "split on the B-id token so
 an item is found however it is formatted" the twin scenario's A1 documents.
 
-Three concessions, all stated rather than hidden. The claim line is the item's
-lead, not the item's whole body, so an item that affirms Vaultbox and
-contradicts itself further down still passes — the same shape as A1's digest,
-which is bound to the entry rather than to a position inside it.
-`STORES_BLOBSTASH` keys on the `stor` stem, so an item reading "uploads are
-*kept* in Blobstash" escapes that half; the Vaultbox half still has to pass, so
-no trial earns A4 on a Blobstash promise alone, and the assertion says "stored",
-so predicate and prose agree on the narrower claim. And a trial that deletes B-4
-outright and names Vaultbox only in `## Decisions` now fails A4 — a shape no
-surviving transcript uses, and one that leaves the spec's behavior section
-silent about where uploads go.
+**Version 7 continued, corrected before scoring — A4's two windows read
+proximity, not stance.** As first drafted this assertion measured co-occurrence:
+`STORES_BLOBSTASH` fired on a `stor` stem within 40 non-period characters of the
+vendor in either order, and `NEG_VAULTBOX`'s postposed arm on a negated verb
+within 20 of it. Neither carries a polarity or a clause boundary, so both
+false-FAIL correct answers — and the prompt invites exactly those answers, since
+it says the spec "should not still be promising Blobstash", which is naturally
+written by naming the vendor being dropped. Four leads measured at A4 FAIL
+against the as-shipped first draft, with the roadmap held at a correct
+supersede: `- **B-4 Uploads are stored in Vaultbox, not Blobstash.**`,
+`... in Vaultbox (Blobstash retired).`, `- **B-4 Blobstash is replaced by
+Vaultbox for upload storage.**` and `... in Vaultbox; the API does not hold a
+Blobstash client.` The first three lose the Blobstash half; the fourth loses the
+Vaultbox half, its negation of *hold* reaching back across a semicolon to cancel
+the affirmation.
 
-Validated offline against 13 spec variants, the roadmap held at a correct
-supersede so only A4 can move:
+Both windows are now scoped to a grammatical relation. `STORES_BLOBSTASH` wants
+the vendor as the object of a storage verb (`stored … in Blobstash`, at most two
+words between) or as the subject of one (`Blobstash stores`, `Blobstash is the
+storage backend`, at most three); `NEG_VAULTBOX`'s postposed window closes on
+`,` and `;` as well as `.`, because the attested false pass ("Vaultbox is not
+the backend yet") carries no punctuation between vendor and negator while a
+correct lead that negates a different verb further along does.
+
+`## Version` stays 7. Nothing has ever been scored under the Version-7 grader,
+so there is no pool to keep apart, and this is a defect in the change Version 7
+itself made rather than a correction of an earlier version — the same shape as
+`V6 pre/post`, which did not move the version either for the same stated reason.
+The rows below are labelled `V7 pre/post` accordingly. Unlike Versions 4–7 this
+correction is a *loosening*, so "it can only remove passes" is not available as
+an argument: all thirteen rows the first draft was validated against were
+re-scored under the corrected grader and none moved — the four that read A4 FAIL
+still do, the untouched fixture included — and five live-promise shapes the
+40-character window used to catch were added to check the tightened arms did not
+give one up.
+
+Four costs, all stated rather than hidden. The claim line is the item's lead,
+not the item's whole body, so an item that affirms Vaultbox and contradicts
+itself further down still passes — the same shape as A1's digest, which is bound
+to the entry rather than to a position inside it. `STORES_BLOBSTASH` still keys
+on the `stor` stem, so an item reading "uploads are *kept* in Blobstash" escapes
+that half, and the relation scoping adds one more escape of the same kind: a
+promise phrased outside both shapes, such as "uploads are stored *using*
+Blobstash", whose preposition is outside the set. The Vaultbox half still has to
+pass, so no trial earns A4 on a Blobstash promise alone, and the assertion says
+"stored", so predicate and prose agree on the narrower claim. A trial that
+deletes B-4 outright and names Vaultbox only in `## Decisions` fails A4 — a
+shape no surviving transcript uses, and one that leaves the spec's behavior
+section silent about where uploads go. And `BEHAVIOR_SEC` is a literal
+`## Behavior` heading, so a spec that renames the section, suffixes the heading,
+or drops it yields no claim lines and fails A4 — the same heading dependency A1
+and A3 carry on `## Decision Log`, with the same defense: the prompt never asks
+for a rename, the fixture heading is what the trial is editing, and all six
+surviving preflight transcripts patch B-4 in place by a literal old→new
+replacement without touching a heading. Every one of the four has a measured row
+below, the `using` escape included — it is the one pass path this correction
+opens, and tabulating it is the price of calling the list complete.
+
+Validated offline against 26 spec variants, the roadmap held at a correct
+supersede so only A4 can move. The `graders` column names which pair each row
+was scored under, as the roadmap table above does; the thirteen `V6→V7` rows
+were re-scored under the corrected grader as well, and their `new` column is
+what the shipped heredoc emits today:
 
 | spec | graders | old | new |
 |---|---|---|---|
@@ -380,20 +432,39 @@ supersede so only A4 can move:
 | `Vaultbox is not the backend yet.` appended outside `## Behavior` | V6→V7 | 4/4 | **A4 FAIL** |
 | the same sentence as a behavior item, B-4 untouched | V6→V7 | 4/4 | **A4 FAIL** |
 | B-4 deleted, Vaultbox named only in `## Decisions` — the third concession | V6→V7 | 4/4 | **A4 FAIL** |
+| lead reading `stored in Vaultbox, not Blobstash` | V7 pre/post | **A4 FAIL** | 4/4 |
+| lead reading `stored in Vaultbox (Blobstash retired)` | V7 pre/post | **A4 FAIL** | 4/4 |
+| lead reading `Blobstash is replaced by Vaultbox for upload storage` | V7 pre/post | **A4 FAIL** | 4/4 |
+| lead reading `stored in Vaultbox; the API does not hold a Blobstash client` | V7 pre/post | **A4 FAIL** | 4/4 |
+| lead reading `Blobstash stores uploads` | V7 pre/post | A4 FAIL | A4 FAIL |
+| lead reading `Blobstash is the storage backend` | V7 pre/post | A4 FAIL | A4 FAIL |
+| lead reading `Blobstash storage holds every upload` | V7 pre/post | A4 FAIL | A4 FAIL |
+| lead reading `stored durably in Blobstash` | V7 pre/post | A4 FAIL | A4 FAIL |
+| lead reading `stored, as before, in Blobstash` | V7 pre/post | A4 FAIL | A4 FAIL |
+| lead reading `stored using Blobstash`, Vaultbox named in another item | V7 pre/post | A4 FAIL | **4/4** |
+| the `## Behavior` heading spelled `## Behaviour` | V7 pre/post | A4 FAIL | A4 FAIL |
+| the heading suffixed `## Behavior (v0.5.0)` | V7 pre/post | A4 FAIL | A4 FAIL |
+| the `## Behavior` section renamed away entirely | V7 pre/post | A4 FAIL | A4 FAIL |
 
 No trials were spent, and "no score moves" is again not the claim: the recorded
 pool is gone. What is checkable is the six surviving transcripts, and all six
 replace B-4's claim line with `- **B-4 Uploads are stored in Vaultbox.**`, so
-all six pass the tightened floor — trial 1 of `20260902-164317` additionally
-appends the retired-Blobstash sentence to the item body, which the claim-line
-split keeps out of the Blobstash half.
+all six pass the tightened floor, and pass it under the corrected windows too —
+trial 1 of `20260902-164317` additionally appends the retired-Blobstash sentence
+to the item body, which the claim-line split keeps out of the Blobstash half,
+and none of the six touches a section heading in the spec.
 
 **Residual, stated rather than resolved.** Nothing has been scored under the
 Version-7 grader. Versions 4–7 only remove pass paths, so the untested direction
 is a *lower* baseline pass rate — the instrument becoming more discriminative,
-which would reopen the A/B question rather than settle it. A k=3 preflight under
-the Version-7 text is the cheap definitive re-check; it is deliberately not run
-here because it spends real trial quota.
+which would reopen the A/B question rather than settle it. A4's `V7 pre/post`
+correction runs the other way, restoring four correct-answer paths its first
+draft rejected, and it does not settle that question either: it removes a
+false-FAIL that would have depressed the very preflight the residual asks for,
+and produced exactly the spurious "more discriminative, reopen the A/B" reading
+this paragraph names. A k=3 preflight under the Version-7 text is the cheap
+definitive re-check; it is deliberately not run here because it spends real
+trial quota.
 
 **Assertion roles.**
 
@@ -712,26 +783,54 @@ emit("A3", a3, "no appended entry beyond D-007 supersedes D-005, or D-005 never 
 # Splitting on the token rather than on the bold span is what makes it
 # wrap-tolerant and format-tolerant -- the id sits inside the bold lead, so
 # searching for `**...**` after the token captures the item's body instead.
-# Two concessions. The claim line is the item's lead, not the item's whole body,
+# One concession: the claim line is the item's lead, not the item's whole body,
 # so an item that affirms Vaultbox and contradicts itself further down still
 # passes -- mirroring A1's digest, which is bound to the entry rather than to a
-# position inside it. And STORES_BLOBSTASH keys on the `stor` stem, so an item
-# reading "uploads are kept in Blobstash" escapes that half; the Vaultbox half
-# still has to pass, so no trial earns A4 on a Blobstash promise alone.
+# position inside it.
+#
+# Both windows are scoped to a grammatical relation, not to a character
+# distance. This assertion's first draft measured co-occurrence -- a `stor` stem
+# within 40 non-period characters of the vendor, a negator within 20 of it --
+# which reads stance out of proximity and gets it wrong in both directions. The
+# prompt says the spec "should not still be promising Blobstash", which invites
+# naming the retired vendor, and four such leads -- `stored in Vaultbox, not
+# Blobstash`, `stored in Vaultbox (Blobstash retired)`, `Blobstash is replaced
+# by Vaultbox for upload storage`, `stored in Vaultbox; the API does not hold a
+# Blobstash client` -- are correct answers that scored A4 FAIL. So
+# STORES_BLOBSTASH wants the vendor to be the object of a storage verb
+# (`stored ... in Blobstash`) or the subject of one (`Blobstash stores`,
+# `Blobstash is the storage backend`), and NEG_VAULTBOX's postposed arm stays
+# inside its own clause. What escapes STORES_BLOBSTASH is a live promise
+# phrased outside both shapes -- the `stor` stem is still the key, so "uploads
+# are kept in Blobstash" is missed as before, and so now is "stored using
+# Blobstash", whose preposition is outside the set. The Vaultbox half still has
+# to pass, so no trial earns A4 on a Blobstash promise alone.
 BEHAVIOR_SEC = re.compile(r"^##\s+Behavior\s*$", re.M)
 STORES_BLOBSTASH = re.compile(
-    r"\bstor\w*\b[^.]{0,40}\bblobstash\b|\bblobstash\b[^.]{0,40}\bstor\w*", re.I
+    r"\bstor\w*\b\W+(?:\w+\W+){0,2}?(?:in|on|at|to|into)\s+(?:the\s+)?blobstash\b"
+    r"|\bblobstash\b\W+(?:\w+\W+){0,3}?\bstor\w*",
+    re.I,
 )
 # Scoped like A3's NEGATED, and just as deliberately not a polarity parser. The
 # postposed form is here because the attested false pass puts the negator after
 # the vendor ("Vaultbox is not the backend yet"), which A3's shape alone misses.
-# "stored in Vaultbox, not on local disk" and "stored in Vaultbox and never
-# buffered" both carry a negator and both still pass.
+# `,` and `;` close its window along with `.`: the attested shape carries no
+# punctuation between vendor and negator, while a correct lead that negates a
+# different verb in a following clause does ("stored in Vaultbox; the API does
+# not hold a Blobstash client"). "stored in Vaultbox, not on local disk" and
+# "stored in Vaultbox and never buffered" both carry a negator and both pass.
 NEG_VAULTBOX = re.compile(
     r"(?:\bnot\b|\bnever\b|n't|\bno\b)\s+(?:yet\s+|been\s+|actually\s+)?(?:\w+\s+){0,2}vaultbox"
-    r"|\bvaultbox\b[^.]{0,20}?\b(?:is|are|was|were|does|do)\s+(?:not|never)\b",
+    r"|\bvaultbox\b[^.,;]{0,20}?\b(?:is|are|was|were|does|do)\s+(?:not|never)\b",
     re.I,
 )
+# BEHAVIOR_SEC is a literal heading. A spec that renames the section, suffixes
+# the heading, or drops it returns no claims and fails A4 -- the same heading
+# dependency A1 and A3 carry on `## Decision Log`, recorded here for the same
+# reason. The defense is the same too: the prompt never asks for a rename, the
+# fixture heading is what the trial is editing, and all six surviving preflight
+# transcripts patch B-4 in place by literal old->new replacement without
+# touching a heading.
 
 
 def behavior_claims(text):
