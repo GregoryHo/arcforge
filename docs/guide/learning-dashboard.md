@@ -189,10 +189,9 @@ The CLI works the **same queue** the dashboard does. It is the scriptable way
 into the same review loop, not a second one: it reads through the same event
 log, offers only the transitions the same legality matrix allows, prints the
 same behavior-change warning before activation, and writes to the same audit
-log. The one difference is who supplies the acknowledgement that gates
-activation: the dashboard asks you for it, while on the CLI typing
-`learn activate <id>` is itself that decision — the warning and the target path
-print to stderr, and the command carries its own acknowledgement. So a scripted
+log. On the CLI, the acknowledgement that gates activation is the typed command
+itself: `learn activate <id>` prints the behavior-change warning and the target
+path to stderr, and carries its own acknowledgement. So a scripted
 `learn activate --json` activates with no further prompt; the command you typed
 was the gate.
 
