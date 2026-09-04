@@ -16,7 +16,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   declined and why.
 - ~~**gate-session-capture-depth**~~ — graduated into 6.1.0 (D-010).
 - ~~**gate-diary-enricher**~~ — graduated into 6.1.0 (D-009).
-- **stale-draft floor loses an overlapping opt-in** — `learningEnabledSince`
+- **stale-draft-floor-overlapping-opt-in** — `learningEnabledSince`
   (scripts/lib/learning.js) derives the floor only from scopes that are
   enabled *now*, and `setLearningEnabled` keeps one `updated_at` per scope, so
   disabling the scope that opted in first advances the floor even though
