@@ -1,6 +1,6 @@
 # uploads — spec
 
-> Status: shipped v0.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v0.4.0 · extended by 0.5.0 (next) · [ROADMAP](../ROADMAP.md)
 
 ## Purpose
 
@@ -11,8 +11,7 @@ Pileup exists to serve that one sentence.
 
 - **In scope:** the upload path, storage, share-link addressing and expiry,
   per-account quota accounting.
-- **Out of scope:** thumbnails and any other content-derived artifact; folders;
-  collaborative editing.
+- **Out of scope:** folders; collaborative editing.
 
 ## Behavior
 
