@@ -1085,6 +1085,26 @@ describe('check-product', () => {
       ]);
     });
 
+    it('does not count a Spec cell missing its opening bracket as a link', () => {
+      // The same hole one character higher up: a closing bracket with no
+      // opening one is not a link construct, so CommonMark renders the cell as
+      // literal text. Read bracket-blind, both halves of C4 resolved off a
+      // table that links nothing.
+      const rows = [row({ specCell: 'alpha](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
+    it('does not count a bare destination as a link', () => {
+      const rows = [row({ specCell: '](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
     it('still reads a link whose text is code-styled', () => {
       // The false-positive direction: only the span is dropped, so a link
       // labelled in code — a plausible authoring form — is still a link.

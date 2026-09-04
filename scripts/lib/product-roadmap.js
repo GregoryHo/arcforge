@@ -45,8 +45,21 @@ const ROW_COLUMNS = 6;
 // `## Decision Log` never ended `## Roadmap`, so a pipe-shaped line inside the
 // log parsed as a roadmap row. See `section`.
 const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
-// A link into `specs/`, which is what a `Spec` cell must carry.
-const SPEC_LINK_RE = /\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
+// A link into `specs/`, which is what a `Spec` cell must carry — the *whole*
+// link construct, because a closing bracket alone is not one. Read from `](`
+// onward, `alpha](specs/alpha.md)` counted as a link although CommonMark renders
+// it as literal text, and C4 must not record a spec as linked from a row a reader
+// cannot navigate from — the same reason `stripCodeSpans` runs before this match.
+// Both halves of C4 rode on it: the row escaped "links no spec", the spec got a
+// phantom governing row, and its `Status:` header was judged against that row.
+// The link text is `*` rather than `+` because the code-span strip runs first, so
+// a link labelled in code arrives here as `[](specs/alpha.md)`. The trade is
+// fail-closed: CommonMark allows balanced brackets in link text, so
+// `[see [alpha]](specs/alpha.md)` is a link this pattern reports. Every plausible
+// authoring form — plain text, code-styled text, several links joined by `·` —
+// matches. (The image form `![...](specs/x.md)` still counts, though it embeds
+// rather than links — not a Spec cell anyone writes, so it buys no rule.)
+const SPEC_LINK_RE = /\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 
 /** The lines between `## Roadmap` and the next `##` heading. */
 function roadmapSection(roadmap) {
