@@ -344,7 +344,7 @@ A3 只問 entry 內文有沒有 `csv`，不問那筆 decision 記的是採納還
 Decision Log 內追加一個 `### D-005`、`Status: Rejected`、
 `Decision: CSV export was not picked up and remains unsupported`，而 roadmap 的
 version 表格已有 CSV 推進列，在出貨中的 Version-2 grader 下即可拿到 A1–A6 全
-PASS、exit 0（已實測）。不收緊的理由有兩個，都可獨立查核。其一，這筆否認換不到
+PASS、exit 0（已實測）。不收緊的理由如下，都可獨立查核。其一，這筆否認換不到
 任何東西：assertion 那句「recording the CSV export being picked up」是由六條的
 連言承擔，不是 A3 一條；A3 在連言裡的職責是破折號之後那句——log 是被追加而非被
 繞過。與 `supersede-not-overwrite` 的 A3 是該關係的唯一證人不同，這裡 A1、
@@ -356,10 +356,28 @@ A2、A4、A5 各自獨立見證同一件事——要走到那個全 PASS，trial
 非本池的臂）寫的都是**格式**決策（`### D-005 — CSV is RFC 4180, rows only`），
 無一出現採納動詞，因此要求肯定動詞會三筆全 FAIL；其 `Status` 分別為 `Proposed`
 （trial-1）與 `Accepted`（trial-2、3），改鎖 `Status: Accepted` 則會 FAIL 一筆。
-兩者都是 treatment 臂的 false negative，而本節既有的取捨是：treatment 臂的 false
-negative 會壓低量測到的 delta，比不合理的 false positive 更貴。三筆共有的
-`- Version: 0.4.0` 也分不開兩者——上面那個實測的全 PASS 同樣帶著它。grader 未動，
-`## Version` 維持 2，未重評任何 trial，未動用 trial 額度。
+上述兩種判準都是 treatment 臂的 false negative，而本節既有的取捨是：treatment 臂的
+false negative 會壓低量測到的 delta，比不合理的 false positive 更貴。三筆共有的
+`- Version: 0.4.0` 也分不開兩者——上面那個實測的全 PASS 同樣帶著它。
+
+其三，還有一個比上述兩者都窄的候選，而且正是上面那個實測案例自己招來的：不是要求
+肯定動詞，而是**排除** `Status:` 記著否決的 entry（`Rejected`、`Declined`）。它確實
+關得掉上面那個案例，而且與前兩者不同，對三筆留存 trial 毫無代價（`Proposed`、
+`Accepted`、`Accepted` 都通過），並不是 treatment 臂的 false negative——因此不能用
+「太貴」打發，得說清楚為什麼仍然不收。不收的理由是：黑名單關掉的是**寫法**，不是
+漏洞。A3 根本不讀 `Status` 欄：同一筆只把 `Status:` 改成 `Accepted`、`Decision:` 維持
+`CSV export was not picked up and remains unsupported`，同樣拿到
+`A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`、exit 0（與上面那個案例在同一份
+trial 樹上實測，只變動 D-005 那兩行），任何寫在 `Decision:`／`Why:` 散文裡的否決都
+照樣穿過。token 清單也只能
+用猜的：`Rejected` 與 `Declined` 在 `product/` 與 `skills/core/speccing/` 底下都不
+存在，C3 對被翻轉 entry 的封閉 status 詞彙（`product/AGENTS.md:194-196`）是
+`Accepted` / `Proposed` / `Superseded-by: D-NNN` / `partially superseded by D-NNN`，
+根本沒有否定側可擋，fixture 四筆也全是 `Status: Accepted`——上面那個實測案例是自己
+造了一個 `Rejected`，黑名單才有東西可比對。而「這筆否認換不到任何東西」那條理由對
+它同樣成立。
+
+grader 未動，`## Version` 維持 2，未重評任何 trial，未動用 trial 額度。
 
 歷次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
