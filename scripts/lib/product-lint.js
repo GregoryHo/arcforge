@@ -201,19 +201,23 @@ function checkRoadmapTags(rows, errors) {
  * a header the spec does not have. The preamble therefore ends at the shared
  * `SECTION_END_RE`, the same boundary that ends a section, at the bound
  * `DECISION_ANY_RE` in `product-decisions.js` also takes and for the same reason
- * — every boundary a heading *ends* fails open when it is read at column 1. The one column-1 *boundary* read
- * left is the heading that *opens* a section, which fails closed — and C6 rejects
- * the empty slice that read yields for `ROADMAP.md`'s two sections, though not for
- * a spec's `## Decisions`, which has no such backstop and is then checked for
- * nothing (`product/AGENTS.md` states that exception). The one *form* still read at
- * column 1 is `DECISION_HEADING_RE`'s canonical shape, and `DECISION_ANY_RE` probes
- * the band above it, so an indented heading is reported rather than dropped. The two
- * `Status:` forms carry no such probe and take the bound themselves instead
- * (`SPEC_STATUS_HEADER_RE` here, `product-decisions.js`'s `STATUS_FIELD_RE` for an
- * entry): read at column 1, a stale header left beside its replacement one space in
- * was invisible, and the count that exists to reject a visibly two-state spec passed
- * it. Four spaces is an indented code block, so an illustrative `##` in the preamble
- * still does not cut it short.
+ * — every boundary a heading *ends* fails open when it is read at column 1. The
+ * one column-1 *boundary* read left is the heading that *opens* a section, which
+ * fails closed — and C6 rejects the empty slice that read yields for `ROADMAP.md`'s
+ * two sections, though not for a spec's `## Decisions`, which has no such backstop
+ * and is then checked for nothing (`product/AGENTS.md` states that exception).
+ *
+ * A *form* stays anchored at column 1 where a wider probe covers the band above it
+ * and reports what it catches there instead of dropping it: `DECISION_HEADING_RE`
+ * with `DECISION_ANY_RE`, and `product-decisions.js`'s `RELATION_FIELD_RE` with
+ * `RELATION_ANY_RE`, which widens past the band to the bullet character, the casing
+ * and the spacing around the colon as well. The two `Status:` forms carry no such
+ * probe and take the bound themselves instead (`SPEC_STATUS_HEADER_RE` here,
+ * `product-decisions.js`'s `STATUS_FIELD_RE` for an entry), so an indented one is
+ * counted where it renders rather than reported: read at column 1, a stale header
+ * left beside its replacement one space in was invisible, and the count that exists
+ * to reject a visibly two-state spec passed it. Four spaces is an indented code
+ * block, so an illustrative `##` in the preamble still does not cut it short.
  *
  * Every header in that scope is collected, not the first one: read first-wins, a
  * stale `> Status:` left beside the line meant to replace it decided the verdict
