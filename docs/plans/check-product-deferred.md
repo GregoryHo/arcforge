@@ -487,7 +487,7 @@ the comment closed would be read against a fence that never opened. Partial appl
 would have been worse than none — a comment-aware `unfencedEntries()` beside a
 fence-only `section()` leaves both heading holes wide open.
 
-Two directions stay open, and both were scoped deliberately:
+Three directions stay open, and all three were scoped deliberately:
 
 - **Raw HTML at large is not exempt, and must not become so.** The discriminator is
   *does the block render its contents*, not *is it HTML*. CommonMark's HTML blocks 1 and
@@ -501,3 +501,21 @@ Two directions stay open, and both were scoped deliberately:
   than its opening columns — the same shape as §5's code-span strip, and priced the
   same way. No line under `product/` writes one, and `product/AGENTS.md` states the
   scope so nobody hides product state that way by accident.
+- **A comment a block container carries is not exempt either.** `COMMENT_OPEN_RE` is
+  `/^ {0,3}<!--/`, measured from column 1 rather than from inside a container, so a
+  `> <!--` in a blockquote — and a `- <!--` in a list item — opens a comment for the
+  renderer and none for the linter. Confirmed the same way the block form was, against
+  GitHub's `/markdown`: the preamble `# alpha` / `> <!--` / `> Status: shipped
+  (v1.0.0)` / `> -->` comes back as the `<h1>` and an *empty* `<blockquote>`, no header
+  anywhere on the page, while `specStatusHeaders()` returns that header and C4 passes
+  the spec. Two rules leak, and only those two. C4, because a spec's header is itself a
+  blockquote line: one container deep, the hidden line is byte-identical to the one the
+  rule reads — which is also how a second, invisible header gets reported. And C5,
+  whose citation scan reads a spec's `## Decisions` body as text rather than as shaped
+  lines, so a hidden `D-999` is reported against a line on nobody's screen. Every probe
+  that matches a *shape* reads the container form as absent, which is what it looks
+  like: `> |` is no roadmap row and `> ### D-NNN` is no entry, at either indent bound.
+  Closing this direction means resolving a container prefix before every column bound —
+  becoming the CommonMark parser `hiddenTracker()`'s docblock says it is not — so it is
+  a decision about how much of the grammar the linter owns, not a review fix. No line
+  under `product/` writes one, and `product/AGENTS.md` states the scope.

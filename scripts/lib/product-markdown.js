@@ -78,9 +78,14 @@ const SECTION_END_RE = /^ {0,3}##\s+/;
  * long as the opening run, and carrying nothing but whitespace after it.
  *
  * Those are the three constraints this tracker applies to a fence. It is not a
- * CommonMark parser: the indent bound is measured from column 1 rather than from a
- * list container, so a fence nested inside a list item is read at its absolute
- * indent. Nothing in `product/` nests one that deep.
+ * CommonMark parser: every bound here is measured from column 1 rather than from
+ * inside a block container, so a delimiter counts only as a line's first content. A
+ * fence nested inside a list item is therefore read at its absolute indent, and a
+ * container prefix ahead of either kind of delimiter — a `>`, a list marker, or their
+ * nestings — is never stripped, so the delimiter opens nothing here while the
+ * container still hides its contents from the reader. Nothing in `product/` writes
+ * either; `docs/plans/check-product-deferred.md` §9 records which rules the second
+ * one leaks through.
  *
  * Each was needed, and they leak in opposite directions. Read marker-only, a
  * ` ```not-a-close ` line ended the block early and the illustrative table row

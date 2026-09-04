@@ -276,6 +276,19 @@ screen while C1, C4 and C7 read its row. An unterminated `<!--` hides the rest o
 scope the way an unclosed fence does, which for the log means C6's floor reports it as
 empty.
 
+Both ends are read from column 1 rather than from inside a block container, so
+`check:product` sees a comment only where its opener is the line's first content: any
+container prefix ahead of it — a `>`, a list marker, or their nestings — hides the
+block from the reader and opens nothing here. Two rules then read what nobody can see.
+A spec's `> Status:` header is itself a blockquote line, so a preamble whose three
+lines read `> <!--`, `> Status: …`, `> -->` renders as an empty blockquote carrying no
+header while C4 reads the hidden line and passes the spec; and a `D-NNN` hidden the
+same way inside a spec's `## Decisions` is still scanned as text, so C5 reports a
+citation off a line on nobody's screen. A probe that matches a *shape* leaks nothing,
+because the prefix defeats it too — a `> |` row and a `> ### D-NNN` heading match
+nothing at all, so they read as absent, which is what they look like. Write a comment
+at the margin; never wrap one in a container.
+
 Three edges are worth knowing before hiding anything this way. The first is where
 invisible and absent part company: the roadmap's rows run from the header to the first
 blank line, and GFM ends a table at an HTML block, so a `<!--` opening inside that run
