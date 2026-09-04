@@ -43,3 +43,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   every output it returns is a capped tail (about 5 ms per MB on real transcripts);
   bound the read, and correct the hooks spec's B-7 cost enumeration, which already
   omits this parse and the diary subprocess · issue: [#172](https://github.com/GregoryHo/arcforge/issues/172).
+- **stale-probe-window-vs-rendered-paths** — the draft renders every modified
+  path above its enrichment markers while the stale-draft probe reads only the
+  first 2 KB, so thirty long paths push the marker past the window and a stale
+  draft reads as enriched; bound the rendered block so the markers sit inside
+  the probe window by construction · issue: [#177](https://github.com/GregoryHo/arcforge/issues/177).
