@@ -2112,6 +2112,20 @@ describe('check-product', () => {
       expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
     });
 
+    it('still ends the roadmap table where a comment in the row run ends it', () => {
+      // The one place invisible and absent part company, and the qualification
+      // `product/AGENTS.md` carries because of it. The rows run from the header
+      // to the first blank line, and GFM ends a table at an HTML block, so a
+      // `<!--` opening inside that run really does move the table's end — C6's
+      // framing clause reports the line the way it reports any other non-row
+      // line there, where an absent row reports nothing at all. Below the blank
+      // line that closes the table it is invisible like any other comment.
+      const inRun = of('C6', run({ roadmap: { rows: [row(), '<!-- a note -->'] } }));
+      expect(inRun).toHaveLength(1);
+      expect(inRun[0]).toMatch(/rows do not end above "<!-- a note -->"/);
+      expect(run({ roadmap: { note: ['', '<!-- a note -->'] } })).toEqual([]);
+    });
+
     it('opens no comment on a `<!--` inside a fenced block', () => {
       // The same coupling from the other side: inside a fence the opener is the
       // literal text the block renders, so a fenced illustration of a comment

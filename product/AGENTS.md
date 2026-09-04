@@ -261,8 +261,9 @@ HTML comments are the third exemption, and the bluntest of the three. A fence an
 indented block still show their contents as literal text; a `<!-- ... -->` block shows
 nothing at all, so nothing inside one is product state. A commented `### D-NNN` is not
 an entry, a commented roadmap row is not a row, a commented `> Status:` header is not a
-header, and a commented `##` heading opens no section and closes none — each is read
-exactly as if it were absent, which is the whole rule.
+header, and a commented `##` heading opens no section and closes none — each is read as
+if it were absent. That is the rule, with the one qualification the first edge below
+carries.
 
 A comment **opens** on a line beginning `<!--`, at three leading spaces at most, the
 same bound the lines above take; at four it is an indented code block and opens
@@ -275,11 +276,17 @@ screen while C1, C4 and C7 read its row. An unterminated `<!--` hides the rest o
 scope the way an unclosed fence does, which for the log means C6's floor reports it as
 empty.
 
-Two edges are worth knowing before hiding anything this way. The exemption is the
-comment's alone, not raw HTML's: `<details>` renders its contents, and the folded index
-at the bottom of the log is read as live product state — fold an entry, don't comment
-it. And it is the block form's alone: an inline `<!-- note -->` sitting after text on a
-line leaves that line rendering, so the line is read whole, comment and all.
+Three edges are worth knowing before hiding anything this way. The first is where
+invisible and absent part company: the roadmap's rows run from the header to the first
+blank line, and GFM ends a table at an HTML block, so a `<!--` opening inside that run
+really does move the table's end — C6's framing clause reports the line the way it
+reports any other non-row line there, where an absent row reports nothing. Put the
+comment below the blank line that closes the table, where the section's note already
+sits. The second: the exemption is the comment's alone, not raw HTML's — `<details>`
+renders its contents, and the folded index at the bottom of the log is read as live
+product state, so fold an entry, don't comment it. The third: it is the block form's
+alone — an inline `<!-- note -->` sitting after text on a line leaves that line
+rendering, so the line is read whole, comment and all.
 
 All three exemptions apply inside a scope. The Decision Log is the `## Decision
 Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
@@ -291,9 +298,9 @@ The scope's own boundaries honour the fence and comment exemptions: a `##` line 
 a fenced block or a comment opens no section and closes none, so a worked example may
 show a whole `## Decision Log` — the way the few-shots here do — without standing in
 for the log or cutting it short at the entry above it, and a commented-out
-`## Appendix` ends nothing. Indentation is not an exemption at this boundary either,
-at either end, but the two ends are read at different bounds
-because they fail in opposite directions. The heading that **opens** the scope is
+`## Appendix` ends nothing. Indentation is not an exemption at this boundary either, at
+either end, but the two ends are read at different bounds because they fail in opposite
+directions. The heading that **opens** the scope is
 read at column 1, and an indented `## Decision Log` therefore leaves the log empty
 and C6 rejects it, the same way a renamed one does — fail-closed. The heading that
 **closes** it is read at one to three spaces, the same bound a `### D-NNN` heading
