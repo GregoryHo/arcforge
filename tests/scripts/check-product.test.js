@@ -330,6 +330,35 @@ describe('check-product', () => {
       expect(of('C2', run({ roadmap: { decisions } }))).toEqual([]);
     });
 
+    it('does not open the fold at a tag that merely starts with `details`', () => {
+      // An HTML tag name ends at whitespace, `/`, `>` or the line's end. Read at
+      // `\b` it ended at any non-word character too, so `<details-open>` — a
+      // different tag, opening no collapsible block — switched off the ascending
+      // clause for every entry below it while the log rendered in written order.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '<details-open>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toContainEqual(
+        expect.stringMatching(/out of order: D-002 follows D-003/),
+      );
+    });
+
+    it('still opens the fold at a `<details>` carrying attributes', () => {
+      // The other side of that bound, pinned because every other fold fixture
+      // opens with a bare `<details>`: narrowing the tag name must not narrow the
+      // tag, and `<details open>` is the form a fold left expanded is written in.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        '<details open>\n',
+        decision({ id: 'D-003' }),
+        decision({ id: 'D-002' }),
+      ];
+      expect(of('C2', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('does not read a decision heading inside a fenced code block', () => {
       // The illustration would otherwise enter the log as D-009 and open a
       // D-002…D-008 gap, so an example entry could never be shown in the log.

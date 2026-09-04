@@ -136,7 +136,14 @@ const RELATION_ANY_RE = /^ {0,3}[-*+]\s+(?:supersedes|refines|extends)\s*:/i;
 // HTML block opens at three leading spaces at most, and at four the line is an
 // indented code block rather than HTML. See `parseDecisions` for both directions
 // this leaked in when it was read at `\s*`.
-const FOLD_OPEN_RE = /^ {0,3}<details\b/i;
+//
+// The opener also has to end where an HTML tag name ends — at whitespace, `/`,
+// `>` or the line's end. Read at `\b`, it ended at any non-word character, so
+// `<details-open>` opened the fold: a hyphen is a word boundary, but the tag it
+// names is not `details` and opens no collapsible block, leaving the entries
+// below it exempt from C2's ascending clause while the log renders in the order
+// it is written.
+const FOLD_OPEN_RE = /^ {0,3}<details(?=[\s/>]|$)/i;
 const FOLD_CLOSE_RE = /^ {0,3}<\/details>/i;
 // The closed vocabulary a decision's `Status:` clauses are drawn from. A live
 // clause says the decision still governs; a flip clause says how much of it died.
