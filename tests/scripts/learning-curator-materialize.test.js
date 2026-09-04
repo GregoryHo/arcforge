@@ -119,6 +119,17 @@ function callMaterialize(candidateOverrides = {}, opts = {}) {
   });
 }
 
+// Helper: put a hand-written body where a materialization manifest belongs.
+// The engine only ever writes `JSON.stringify` of an object there, so a manifest
+// that parses to something else is externally corrupted state — which the
+// scanners still have to survive rather than throw out of.
+function writeRawManifest(arcforgeRoot, candidateId, dirName, body) {
+  const dir = path.join(arcforgeRoot, 'learning', 'drafts', candidateId, dirName);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'materialization.json'), body, 'utf8');
+  return dir;
+}
+
 // Helper: the materialization directories written for a candidate
 function materializationDirs(arcforgeRoot, candidateId) {
   const base = path.join(arcforgeRoot, 'learning', 'drafts', candidateId);
@@ -772,6 +783,35 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(materializationDirs(arcforgeRoot, approved.candidate_id)).toHaveLength(1);
     expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
   });
+
+  // The reuse scan's own comment — `continue; // Corrupted manifest — skip` —
+  // covers only what `JSON.parse` throws on. A manifest holding the literal
+  // `null` parses fine and reached the field access below the catch, throwing a
+  // raw TypeError out of `materialize()` past its `makeFailure`/`logFailure`
+  // path: an approved candidate could no longer be materialized at all.
+  it('skips a manifest that parsed to a non-object and materializes afresh', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const candidateId = `cand_test_${crypto.randomBytes(4).toString('hex')}`;
+
+    const first = callMaterialize({ candidate_id: candidateId });
+    expect(first.ok).toBe(true);
+    writeRawManifest(arcforgeRoot, candidateId, 'mat_0000_null', 'null');
+    // Deleting the one real draft is what sends the scan looking: with it intact
+    // the reuse branch could return before reaching the corrupt manifest.
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const second = callMaterialize({
+      candidate_id: candidateId,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    // Skipped, not merely survived: a third directory means a fresh draft was
+    // written past the corrupt manifest.
+    expect(materializationDirs(arcforgeRoot, candidateId)).toHaveLength(3);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -872,6 +912,43 @@ describe('findUsableMaterialization', () => {
 
     expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
       second.record.materialization_id,
+    );
+  });
+
+  // The twin of the reuse scan's regression, in the scanner that backs
+  // `learn inspect`, `learn drafts` and the dashboard's activate path — so the
+  // throw reached read commands, not only `materialize()`.
+  it('throws no TypeError when a `null` manifest sorts beside intact ones', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, second } = twoManifests(arcforgeRoot);
+    writeRawManifest(arcforgeRoot, candidate.candidate_id, 'mat_zzzz_null', 'null');
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  // The half `null` alone does not reach. This function ends
+  // `return newestIntact || newest`, so with no intact manifest left a manifest
+  // that parsed to a bare string was handed back AS the record — a pre-existing
+  // hazard, not something the queue unification introduced.
+  it('never hands back a manifest that is not an object', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const approved = makeCandidateRecord({});
+    const only = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(only.ok).toBe(true);
+    // No intact manifest survives, so the `newest` fallback is what returns.
+    fs.rmSync(only.draftPaths[0]);
+    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0000_string', '"str"');
+
+    expect(findUsable(arcforgeRoot, approved.candidate_id).materialization_id).toBe(
+      only.record.materialization_id,
     );
   });
 

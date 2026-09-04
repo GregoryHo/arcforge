@@ -857,6 +857,10 @@ function findUsableMaterialization(arcforgeRoot, candidateId) {
     } catch {
       continue; // Corrupted manifest — skip
     }
+    // `JSON.parse` throws on bad syntax, but `null`, a bare string and an array
+    // all parse cleanly and describe no manifest. Reject them here so the skip
+    // above holds for every corruption shape, not only the unparseable one.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
     if (!newest || record.created_at > newest.created_at) newest = record;
     if (!draftArtifactsIntact(record)) continue;
     if (!newestIntact || record.created_at > newestIntact.created_at) newestIntact = record;

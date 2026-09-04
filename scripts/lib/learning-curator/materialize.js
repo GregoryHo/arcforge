@@ -402,6 +402,10 @@ function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, p
     } catch {
       continue; // Corrupted manifest — skip
     }
+    // `JSON.parse` throws on bad syntax, but `null`, a bare string and an array
+    // all parse cleanly and describe no manifest. Reject them here so the skip
+    // above holds for every corruption shape, not only the unparseable one.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
     if (record.source_candidate?.candidate_record_hash !== candidateHash) continue;
     if (record.render_policy_version !== policyVersion) continue;
     if (!draftArtifactsIntact(record)) continue;
