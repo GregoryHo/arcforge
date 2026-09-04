@@ -215,8 +215,9 @@ scored A2. What A2 does *not* police is the size of the bump — the skill tells
 trial to add the row recording which version and why now, never that the
 successor is `0.4.0`, so pinning an expected id would fail a trial that
 legitimately picks `1.0.0` or `0.3.1`. Nor does it police that `← we are here`
-lands on the new row: marker placement is A6's floor, and widening A2 into it
-would change what this scenario measures.
+lands on the new row — the marker is A6's floor, and that floor counts markers
+rather than reading which row carries one; the carve-out and the case it leaves
+open are below, under A6.
 
 Validated offline against eight synthetic roadmaps, run through the grader with
 the pre-fix set-difference predicate and the numeric one that replaced it:
@@ -314,6 +315,42 @@ added `## Roadmap` heading, all still PASS; a roadmap rewritten as prose with
 no table at all emits six labels and
 `A2:FAIL:no roadmap row beyond 0.3.0 carries the CSV export milestone` rather
 than raising, which is what `version_table()` returning `""` buys.
+
+**A6 counts markers; it does not read which row carries one.** The measured
+case: a trial that appends `| 0.4.0 | — | CSV export | **next** | ... |` to the
+version table, appends `### D-005` naming CSV to the Decision Log, strikes the
+`csv-export` wish, adds a numbered CSV behavior item and ships the branch — but
+leaves `← we are here` on the fixture's shipped `0.3.0` row — scores
+`A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on the shipped
+grader. That is a real false positive rather than an unreachable one: the skill
+teaches the placement (`skills/core/speccing/SKILL.md:66` gives the new row the
+marker once every row above it has shipped, `:127` settles it on ship), and all
+three fixture rows have shipped, so the marker belongs on the row the trial
+added.
+
+It stays a count anyway, for three reasons. The skill's own red flag is
+count-shaped — "Leaving zero or two `← we are here` markers behind"
+(`skills/core/speccing/SKILL.md:161`) — and A6 is the pre-registered floor for
+exactly that. Placement is a judgment this project has deliberately declined to
+mechanize anywhere else: `product/AGENTS.md:93-95` says the production check
+"counts markers; *which* row deserves one is a judgment it does not make",
+`product/ROADMAP.md:136-139` records the resulting false green as a named C1
+residual and leaves placement "a reading task", and even the backlog's future
+`arcforge product check` (`product/BACKLOG.md:110`) asks only for "exactly one".
+And unlike the A2 and A3 narrowings above — which live inside assertions that
+failed in every baseline trial, and can only shrink a match set — a placement
+predicate would move a published number that can no longer be re-derived:
+`Grader: code` passes a trial only when all six assertions score, so it would
+drop any treatment trial that left the marker below a pass, and
+`evals/skill-eval-coverage.md:239` publishes that arm as pass 100% over a pool
+whose run directory is gone and whose results tree is gitignored.
+
+The three retained single-condition trials all wrote `**in progress ← we are
+here**` on the row they added
+(`evals/results/eval-speccing-spec-before-code/20260902-164317/transcripts/`),
+so the predicate would have cost nothing on them — but they are k=3
+single-condition trials, not this scenario's arms (see **What is not claimed**
+below), so they bound nothing about the k=10 pool that would need re-scoring.
 
 **k.** `## Trials` below is the per-run default `defaultK` reads when no `--k`
 is passed, and it is the corpus's 5. The pre-registered design for this scenario
