@@ -198,16 +198,16 @@ describe('learning subsystem MVP-1', () => {
     // be captured before the write rather than re-derived after it — otherwise
     // an idempotent re-enable silently retires every draft that failed
     // enrichment between the old mtime and the repeated command.
-    function writeUnstampedEnabledConfig() {
+    function writeUnstampedConfig(enabled = true) {
       const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
-      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled }));
       fs.utimesSync(configPath, new Date(EARLY), new Date(EARLY));
       return configPath;
     }
 
     it('preserves the mtime fallback when an unstamped enabled scope is enabled again', () => {
-      writeUnstampedEnabledConfig();
+      writeUnstampedConfig();
       const config = setLearningEnabled({
         scope: 'project',
         enabled: true,
@@ -221,10 +221,30 @@ describe('learning subsystem MVP-1', () => {
     });
 
     it('still stamps the transition when an unstamped scope is actually toggled', () => {
-      writeUnstampedEnabledConfig();
+      writeUnstampedConfig();
       setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: LATE });
       setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
+    // The preservation keys on "the state did not change", not on "the state is
+    // on", so a no-op DISABLE materializes the mtime as well. That is inert, and
+    // this pins WHY rather than just the field: `learningEnabledSince` skips a
+    // scope whose `enabled` is not true, so nothing ever reads the stamp a
+    // disabled config carries. If the floor is ever widened to disabled scopes,
+    // this case fails and names the coupling instead of letting a materialized
+    // mtime quietly become a floor.
+    it('materializes the mtime on a no-op disable, where the floor ignores it', () => {
+      writeUnstampedConfig(false);
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: false,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBeNull();
     });
   });
 
