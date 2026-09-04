@@ -26,6 +26,10 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   the unattended loop all spawn `claude` directly. A runner seam would let them
   target whichever CLI is hosting the session, and is the prerequisite for those
   three subsystems reaching any second harness · needs: D-013.
+- **website-install-symmetry** — the website's Platforms cards and Install recipe are
+  Claude-Code-shaped: give the Claude Code card its two-command form and add a
+  Codex CLI skills-only block to the install section, so the site carries both
+  install paths the README already documents.
 
 ## Learning
 
