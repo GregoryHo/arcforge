@@ -345,12 +345,19 @@ drop any treatment trial that left the marker below a pass, and
 `evals/skill-eval-coverage.md:239` publishes that arm as pass 100% over a pool
 whose run directory is gone and whose results tree is gitignored.
 
-The three retained single-condition trials all wrote `**in progress ← we are
-here**` on the row they added
-(`evals/results/eval-speccing-spec-before-code/20260902-164317/transcripts/`),
-so the predicate would have cost nothing on them — but they are k=3
-single-condition trials, not this scenario's arms (see **What is not claimed**
-below), so they bound nothing about the k=10 pool that would need re-scoring.
+The predicate would have cost nothing on any surviving transcript, and there are
+six of those, not three. The three in
+`evals/results/eval-speccing-spec-before-code/20260902-164317/transcripts/` —
+the same three that wrote a decision entry, above — each wrote `**in progress ←
+we are here**` on the row they added. The three in
+`20260902-170634/transcripts/` write no `← we are here` line at all and add no
+version row, so A1–A5 all fail and there is no pass for a placement read to take
+away; what carries their A6 is the fixture's own marker — the count-shaped floor
+scoring green on a trial that moved nothing, which is this carve-out's whole
+subject (the untouched fixture grades `A1:FAIL` through `A5:FAIL` with
+`A6:PASS`). But all six are k=3 single-condition trials, not this scenario's
+arms (see **What is not claimed** below), so they bound nothing about the k=10
+pool that would need re-scoring.
 
 **k.** `## Trials` below is the per-run default `defaultK` reads when no `--k`
 is passed, and it is the corpus's 5. The pre-registered design for this scenario
