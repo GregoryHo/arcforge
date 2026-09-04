@@ -54,3 +54,9 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   `safety_ack`, and shows neither the behavior-change warning nor the active
   target path it would be acknowledging, so the CLI is the only surface that can
   activate today · issue: [#173](https://github.com/GregoryHo/arcforge/issues/173).
+- **cli-draft-path-redaction** — `learn drafts` and `learn inspect` print
+  `draft_paths` verbatim while the dashboard's detail wire redacts the same
+  path; draft files are named for the candidate, so a keyword-shaped name reaches
+  the terminal through the path. B-9 says commands print the absolute path of
+  anything they write, so this is a product call between the two promises, not
+  a review fix.
