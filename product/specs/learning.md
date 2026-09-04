@@ -79,17 +79,17 @@ was recorded about them.
   prints — and refuses `--global`: a candidate that would apply to every
   project on the machine is reviewed where the reviewer can see what it
   changes. Scope is the one thing the CLI decides alone, and so the one refusal
-  class that leaves no audit entry: neither `--global` nor an id belonging to
-  another project is a gate the engine models, so there is no refusal of its own
-  to dispatch and render — dispatching would *accept* the action and move
-  another project's candidate. An id that names no candidate at all is not a
-  scope question, and is not refused that way: that refusal the engine does
-  model, so a transition naming one is dispatched, refused and audited like
-  every other. Its reach is what the engine can actually build — the instinct
-  artifact. That narrowing is the curator's own refusal, which the CLI renders
-  rather than re-decides, so it too is audited; every single-step command
-  renders that refusal rather than pre-empting it. `accept`, the one compound
-  command, is the exception that proves the rule: it would approve before
+  class that leaves no audit entry: neither `--global` nor an id this project
+  does not own — another project's, a global one, or one naming no project at
+  all — is a gate the engine models, so there is no refusal of its own to
+  dispatch and render; dispatching would *accept* the action and move a
+  candidate this project may not touch. An id that names no candidate anywhere
+  is not a scope question: that refusal the engine does model, so a transition
+  naming one is dispatched, refused and audited like every other. Its reach is
+  what the engine can actually build — the instinct artifact. That narrowing is
+  the curator's own refusal, which the CLI renders rather than re-decides, so it
+  too is audited; every single-step command renders that refusal rather than
+  pre-empting it. `accept`, the one compound command, is the exception that proves the rule: it would approve before
   meeting the refusal, and the queue is append-only, so it decides for itself
   the two things that no re-run clears — the artifact type, and whether the
   candidate's name is one the draft writer can use as a filename — and refuses
