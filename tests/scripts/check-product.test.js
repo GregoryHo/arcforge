@@ -1175,6 +1175,37 @@ describe('check-product', () => {
       ]);
     });
 
+    it('does not count a Spec cell written as an image as a link', () => {
+      // The bracket is unescaped and a reader sees it, but the `!` makes the
+      // construct an image: it embeds specs/alpha.md rather than navigating to
+      // it. Read image-blind, both halves of C4 resolved off a cell that links
+      // nowhere, and the spec got a governing row it could not be reached from.
+      const rows = [row({ specCell: '![alpha](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
+    it('still reads a link behind an escaped exclamation mark', () => {
+      // The false-positive direction of the image rule, and the reason its
+      // lookbehind reads the backslash run rather than the single character: an
+      // escaped `!` renders as a literal one, so what follows it is a real link.
+      const rows = [row({ specCell: '\\![alpha](specs/alpha.md)' })];
+      const errors = validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] });
+      expect(of('C4', errors)).toEqual([]);
+    });
+
+    it('does not count an image behind a literal backslash as a link', () => {
+      // Parity again, one construct over: two backslashes are a literal one, so
+      // the `!` is unescaped and still opens an image.
+      const rows = [row({ specCell: '\\\\![alpha](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
     it('does not count a bare destination as a link', () => {
       const rows = [row({ specCell: '](specs/alpha.md)' })];
       expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([

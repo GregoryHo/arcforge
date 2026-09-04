@@ -162,7 +162,9 @@ that spec — the point of the rule is that no version is ever built without one
 `Spec` cell links by carrying a whole inline link, `[text](specs/<slug>.md)`: a
 destination with no opening bracket, an opening bracket escaped as `\[`, or a link
 wrapped whole in a code span renders as literal text and links nothing, so the row is
-reported as linking no spec. A link whose *label* is code-styled is still a link.
+reported as linking no spec. An image, `![text](specs/<slug>.md)`, renders as written
+but embeds the spec rather than navigating to it, and is reported the same way. A link
+whose *label* is code-styled is still a link.
 Where more than one row links a spec, its **governing row** is the highest-version
 one:
 

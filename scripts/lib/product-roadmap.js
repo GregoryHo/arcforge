@@ -59,15 +59,22 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // cannot navigate from — the same reason `stripCodeSpans` runs before this match.
 // Both halves of C4 rode on it: the row escaped "links no spec", the spec got a
 // phantom governing row, and its `Status:` header was judged against that row.
-// The opening bracket also has to be one a reader sees: `\[alpha](specs/alpha.md)`
-// carries one, but CommonMark reads the backslash as escaping it, so the cell renders
-// as literal text while a bare `\[` match simply started one character later and C4
-// recorded the spec as linked all the same. The prefix is `(?<!\\)(?:\\\\)*` rather than
-// a plain `(?<!\\)` because backslashes pair off: `\\[alpha](...)` is a literal backslash
-// followed by a real link, which renders and must keep matching, so the parity of the
-// whole run before the bracket decides rather than the single character before it. It
-// is the lookbehind `rowCells` reads unescaped pipes with, extended to that run: a
-// cell's delimiters are never doubled, so there the plain form is enough.
+// The opening bracket also has to be one a reader sees, and one that opens a link
+// rather than an embed. `\[alpha](specs/alpha.md)` carries a bracket, but CommonMark
+// reads the backslash as escaping it, so the cell renders as literal text while a bare
+// `\[` match simply started one character later and C4 recorded the spec as linked all
+// the same. `![alpha](specs/alpha.md)` carries an unescaped one, but the `!` makes the
+// construct an image: it embeds `specs/alpha.md` instead of navigating to it, so the
+// cell is not the inline link `product/AGENTS.md` requires and the row navigates
+// nowhere — the same phantom governing row, reached from the other side of the bracket.
+// One lookbehind disqualifies both characters, and it reads the run before them rather
+// than the single character, because backslashes pair off: `\\[alpha](...)` is a
+// literal backslash followed by a real link, which renders and must keep matching. The
+// parity read covers the `!` too, which is why the prefix is nested rather than a plain
+// `(?<![\\!])` — that form would reject `\![alpha](specs/alpha.md)`, an escaped `!`
+// rendering as a literal one in front of a genuine link. The inner half is the
+// lookbehind `rowCells` reads unescaped pipes with, extended to that run: a cell's
+// delimiters are never doubled, so there the plain form is enough.
 // The link text is `*` rather than `+` because the code-span strip runs first, so
 // a link labelled in code arrives here as `[](specs/alpha.md)`. The trade is
 // fail-closed, in the two forms CommonMark allows inside link text that a
@@ -75,21 +82,25 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // an escaped one, `[a\]b](...)`. Both are links this pattern reports as linking no
 // spec — the miss is the report, not a silent pass. Every plausible
 // authoring form — plain text, code-styled text, several links joined by `·` —
-// matches. (The image form `![...](specs/x.md)` still counts, though it embeds
-// rather than links — not a Spec cell anyone writes, so it buys no rule.)
+// matches.
 // One sibling stays open, and in the opposite direction to that trade: an escaped
 // *closing* bracket, `[a\](specs/alpha.md)`, renders as literal text and still matches
 // here — a non-link read as a link, where the two forms above are real links missed.
 // Every way of shutting it prices a real link as fail-closed in exchange, so it is
 // recorded in `docs/plans/check-product-deferred.md` §8 rather than half-fixed.
-// A third miss is owed to the strip rather than to this pattern: `stripCodeSpans` is
-// escape-blind, so a cell writing an escaped backtick has a span cut out of it that
-// CommonMark never opened, and the text either side is joined — which can leave a
-// stray backslash against a real link's opening bracket for the prefix above to read
-// as escaping it. Fail-closed like the two named forms, and no `Spec` cell anyone
-// writes carries an escaped backtick; the fix belongs to `stripCodeSpans`, so it is
-// recorded in that file's §5 with the rest of the strip's cost.
-const SPEC_LINK_RE = /(?<!\\)(?:\\\\)*\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
+// A third miss is owed to the strip rather than to this pattern. `stripCodeSpans` drops
+// a span whole, contents included, so whatever sat in front of the span ends up against
+// whatever followed it — and if that is a real link's opening bracket, the prefix above
+// reads a character the renderer never put there. Both of the characters it disqualifies
+// arrive that way. The `!` needs nothing but the drop: `` !`x`[alpha](specs/alpha.md) ``
+// renders as a literal `!`, a code span and a real link, and reaches this pattern as the
+// image form. The backslash needs the strip's escape-blindness as well, since `` \` ``
+// opens no span in CommonMark but one here, so a cell writing an escaped backtick is
+// joined around a span that never existed. Both are fail-closed like the two named forms, and
+// no `Spec` cell anyone writes puts a code span between a `!` or an escaped backtick and
+// a link; the fix belongs to `stripCodeSpans`, so it is recorded in that file's §5 with
+// the rest of the strip's cost.
+const SPEC_LINK_RE = /(?<!(?<!\\)(?:\\\\)*[\\!])\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 
 /** The lines between `## Roadmap` and the next `##` heading. */
 function roadmapSection(roadmap) {

@@ -230,21 +230,36 @@ as a link", "still reads a link whose text is code-styled"): the pattern anchors
 to it.
 
 What the strip does cost is a *neighbour*, and §8's tightening made the cost real.
-A run of backticks opens a span here wherever it appears, while CommonMark's `` \` ``
-opens none — so a cell writing an escaped backtick has a span cut out of it that no
-renderer ever opened, and the text either side is joined. `` A\`x`[alpha](specs/alpha.md) ``
-reaches `SPEC_LINK_RE` as `A\[alpha](specs/alpha.md)`, where the stray backslash now
-sits against a real link's opening bracket and the unescaped-bracket prefix reads it as
-escaping that bracket. C4 reports a row a reader can navigate from as linking no spec.
-Confirmed against the shipped reader rather than reasoned: the pre-tightening pattern
-matched that cell, the current one does not.
+A span is dropped whole, so whatever preceded it lands against whatever followed it, and
+`SPEC_LINK_RE` disqualifies a link's opening bracket on a character CommonMark never put
+against it. Both characters its prefix rejects arrive that way.
+
+The backslash needs the escape-blindness as well. A run of backticks opens a span here
+wherever it appears, while CommonMark's `` \` `` opens none — so a cell writing an
+escaped backtick has a span cut out of it that no renderer ever opened, and the text
+either side is joined. `` A\`x`[alpha](specs/alpha.md) `` reaches `SPEC_LINK_RE` as
+`A\[alpha](specs/alpha.md)`, where the stray backslash now sits against a real link's
+opening bracket and the unescaped-bracket prefix reads it as escaping that bracket.
+
+The `!` needs nothing but the drop, and arrived with round 14's image-form fix.
+`` !`x`[alpha](specs/alpha.md) `` is a literal `!`, an ordinary code span and a real
+link — every part of it rendering as written — and it reaches `SPEC_LINK_RE` as
+`![alpha](specs/alpha.md)`, the image form that fix rejects.
+
+Both make C4 report a row a reader can navigate from as linking no spec. Confirmed
+against the shipped reader rather than reasoned, in both cases: the pattern before each
+tightening matched the cell, the one after does not.
 
 It is recorded rather than fixed on three grounds. It fails **closed** and loudly —
 a wrong "links no spec" is a message someone reads, not the phantom governing row §8's
-direction produces. No authoring form yields it: an escaped backtick in a `Spec` cell
-has no reason to be written. And the fix is not in `SPEC_LINK_RE` at all — teaching the
-strip about escapes is a change to what `stripCodeSpans()` means, owed to whoever writes
-a rule that needs it, which is the same conclusion this section reached in round 9.
+direction produces. No authoring form yields either: a `Spec` cell has no reason to
+carry an escaped backtick, or a code span wedged between a `!` and a link. And the fix
+is not in `SPEC_LINK_RE` at all — the pattern is right about the text it is handed, and
+what would have to change is the handing: the strip would have to leave the join it
+makes readable, by keeping a span's contents rather than dropping them, and read an
+escape while it is at it. That is a change to what `stripCodeSpans()` means, owed to
+whoever writes a rule that needs it, which is the same conclusion this section reached
+in round 9.
 
 The tightening this section warned about has, so far, only half arrived. The rule it
 anticipated was one requiring **non-empty link text** — to reject `[](specs/alpha.md)`,
@@ -261,10 +276,10 @@ Whoever tightens `SPEC_LINK_RE`'s link text owns one of them:
   which makes the emptying intended rather than incidental — and leaves the
   escape-blindness above untouched, since it is a separate read.
 
-No code was written for this in round 9, and none when §8 exposed the neighbour: the
-emptying is still correct under today's rules, the neighbour is fail-closed and
-unwritable, and changing what `stripCodeSpans()` means with no rule asking for it trades
-a latent coupling for a live one.
+No code was written for this in round 9, none when §8 exposed the neighbour, and none
+when round 14 widened it: the emptying is still correct under today's rules, both
+neighbours are fail-closed and unwritable, and changing what `stripCodeSpans()` means
+with no rule asking for it trades a latent coupling for a live one.
 
 ## 6. The roadmap table's framing is not asserted — **TAKEN in round 13**
 

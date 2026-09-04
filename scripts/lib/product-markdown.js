@@ -201,10 +201,15 @@ function unfencedEntries(lines) {
  * so a doubled span is not closed by a single backtick inside it. Unbalanced
  * backticks open no span in CommonMark either, and are left alone.
  *
- * What it does not read is an escape: `` \` `` opens no span in CommonMark but one
- * here, so a cell writing one is joined around a span that never existed, and the
- * join can hand `SPEC_LINK_RE` a backslash sitting against a real link's opening
- * bracket. Fail-closed, and no `Spec` cell anyone writes carries an escaped backtick;
+ * The join is what the neighbours pay for. Dropping a span whole leaves whatever
+ * preceded it against whatever followed, so a character the renderer kept apart from a
+ * link's opening bracket can arrive against it, and `SPEC_LINK_RE` disqualifies the
+ * bracket on a neighbour that was never adjacent. `` !`x`[alpha](specs/alpha.md) `` is
+ * the plain form — a literal `!`, a span, a real link — and reaches it as the image
+ * form. The other needs an escape as well, which is the one thing this function does
+ * not read: `` \` `` opens no span in CommonMark but one here, so a cell writing one is
+ * joined around a span that never existed and can strand a backslash the same way.
+ * Both fail closed, and no `Spec` cell anyone writes puts a span in either position;
  * the cost and the two ways of paying it are in
  * `docs/plans/check-product-deferred.md` §5, and belong to whoever needs the strip to
  * mean something different.
