@@ -186,10 +186,14 @@ every rule that reads the parsed state. The same proof applied: the suite requir
 rather than through a re-export, per the no-barrel rule in
 `.claude/rules/coding-standards.md`.
 
-**Round 19 bound it a third time**, and the third cut exhausts the formats. Round 18's
-row-run clause and the review prose around it left `product-lint.js` at **703** — three
-lines over, and still nothing counts lines in CI, so all six gate commands passed
-green over a file that breached the standard. The cut follows round 13's axis exactly:
+**Round 19 bound it a third time**, and the third cut exhausts the formats. The rule
+that forced it is round 18's fold-tag fix — `FOLD_OPEN_RE` ending where an HTML tag
+name ends, so `<details-open>` no longer opens the fold. `FOLD_OPEN_RE` lives here, and
+the fix put `product-lint.js` at **703** from 696, three lines over. Round 18's other
+rule, C6's row-run clause, landed wholly in `product-roadmap.js` and left this file
+untouched — worth naming, because the crossing looks like the larger rule's and is not.
+Nothing counts lines in CI, so all six gate commands passed green over a file that
+breached the standard. The cut follows round 13's axis exactly:
 `scripts/lib/product-decisions.js` takes the Decision Log's reader — `parseDecisions`,
 `checkDecisionNumbering`, `checkStatusPresence`, `statusClauses`,
 `checkSupersededStatus`, `checkFlipsAreClaimed`, `checkRelations` and the log's
