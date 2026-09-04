@@ -122,11 +122,12 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 28 synthetic roadmaps. Each row's `old` and `new` are
-the graders on either side of the correction that added the row, and the
-`graders` column names which pair — the corrections have different
-predecessors. Version 5 re-ran all fourteen under its own pair and only the
-three negated rows moved: under `V4→V5` the three reversed rows read
+Validated offline against 34 synthetic roadmaps, listed below as 36 rows: two
+roadmaps are listed twice, under the later grader pair that moves them further.
+Each row's `old` and `new` are the graders on either side of the correction that
+added the row, and the `graders` column names which pair — the corrections have
+different predecessors. Version 5 re-ran all fourteen under its own pair and
+only the three negated rows moved: under `V4→V5` the three reversed rows read
 `A3 FAIL | A3 FAIL`, already rejected by Version 4. Version 6 re-ran all
 eighteen under its own pair and only the three overwrite-plus-stash rows moved;
 the fourteen older rows are unchanged. Version 6's anchor was then corrected
@@ -143,8 +144,12 @@ rows live in the A4 table further down rather than here. Version 7's roadmap-sid
 scoping was corrected once more on the same terms (`V7 pre/post (log scope)`);
 the eight rows it adds are three placements measured against an *original* id,
 two indent variants of the log's closing bound, and three rows that correction
-moves further than Version 7 moved them. The older rows it re-checked are named
-in its note rather than re-listed here, and none of them moves.
+moves further than Version 7 moved them. Two of those eight are roadmaps this
+table already carried under `V6→V7` — `D-005`'s own entry in an appendix at
+column 1, and the log renamed `## Decisions` — re-listed because the correction
+moves them again, and that re-listing is the whole of the gap between 36 rows
+and 34 roadmaps. The older rows it re-checked that do *not* move are named in its
+note rather than re-listed here.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -360,9 +365,10 @@ at 4/4 — including a correct move whose log heading is indented two spaces —
 so does every older row re-checked in that matrix: the Version-6 decoys (the
 recorded pair copied to an appendix, the `... (historical)` retitle, and a second
 `### D-005` inside the log), both renumbering shapes, `### D-008` parked in an
-appendix, and A3's spelling, direction, polarity and numbering rows. All six surviving transcripts were re-read again: none writes an indented
-heading, and none writes an `## Appendix` or `## Archive` section at all, so none
-uses a removed path. No trials were spent.
+appendix, and A3's spelling, direction, polarity and numbering rows. All six
+surviving transcripts were re-read again: none writes an indented heading, and
+none writes an `## Appendix` or `## Archive` section at all, so none uses a
+removed path. No trials were spent.
 
 Three concessions, stated rather than hidden. The four-space `## Appendix` stays
 4/4 and is the one pass path left — correct by contract, because four spaces is
@@ -371,10 +377,28 @@ genuinely are inside the log under the engine's own reading. The `## Decision
 Log` heading dependency now costs A2 as well as A1 and A3; the defense is the one
 already given for those two — the prompt never asks for a rename, the fixture
 heading is what the trial is editing, and none of the six renames it — and no
-full pass is at stake, since a renamed log already failed A1 and A3. And the
-duplicate scan is not fence-aware, so a fenced `### D-005` example written into
-`ROADMAP.md` would register as a duplicate: pre-existing, nothing in this grader
-is fence-aware, unpressured by the prompt, recorded rather than fixed here.
+full pass is at stake, since a renamed log already failed A1 and A3. And nothing
+in this grader is fence-aware, which now costs on two scans rather than one. The
+duplicate scan never was: a fenced `### D-005` example written into `ROADMAP.md`
+registers as a duplicate, pre-existing and untouched here. The closing bound
+never was either, and this correction widened it — a fenced block whose content
+line reads `  ## Example section` now ends the log where it sits, so a correct
+move written below it goes 4/4 → `A2, A3 FAIL`; before this, only a fenced `##`
+at column 1 did that, and that one reads `A2, A3 FAIL` on both sides of the
+pair. Both measured. On the bound itself, that is where the grader stops
+matching the contract it copied: `section()` in
+`scripts/lib/product-markdown.js` reads `SECTION_END_RE` at the same ` {0,3}`
+indent but runs every line through `hiddenTracker` first, so a `##` inside a
+fence closes nothing there. The grader
+took the indent half and not the fence half, deliberately — porting that state
+machine is a bigger instrument than four assertions need, and the divergence can
+only ever fail a trial, never pass one. It is conceded here where the opening
+bound's false negative one paragraph up is refused, and the asymmetry is
+plausibility rather than cost: a correct roadmap whose `## Decision Log` heading
+is indented is a shape a real file has, while a fenced markdown example inside
+`ROADMAP.md` whose content line is an indented `##` is not. Nothing in the
+prompt asks for one, and none of the six surviving transcripts writes a fence
+into `ROADMAP.md` at all.
 
 **Version 7, continued — A3's "appended" read numerically.** `new_ids` was a set
 difference against the seven ids the fixture wrote, so any three-digit id
