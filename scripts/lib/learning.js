@@ -132,11 +132,15 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
  * The source is `updated_at`, which `setLearningEnabled` writes and nothing
  * else in the engine touches. It stamps a state CHANGE, not a write, so
  * re-running `learn enable` on an already-enabled scope leaves the floor where
- * the real opt-in put it. A config without it (hand-written, or older than the
- * field) falls back to the file's mtime; one that cannot be stat'd returns 0,
- * so an unreadable timestamp warns about everything rather than going quiet on
- * a real failure. When both scopes are enabled the EARLIEST wins — that is the
- * moment enrichment first became authorized.
+ * the real opt-in put it. A config without it (hand-written) falls back to the
+ * file's mtime, and a write that changes nothing persists that mtime as the
+ * field, so the fallback is computed once rather than re-derived on every read
+ * — a write moves the mtime, so re-deriving would drag the floor forward with
+ * it. (A write that DOES change the state stamps the transition, as always.) A
+ * config that cannot be stat'd returns 0, so an unreadable timestamp warns
+ * about everything rather than going quiet on a real failure. When both scopes
+ * are enabled the EARLIEST wins — that is the moment enrichment first became
+ * authorized.
  *
  * Accepted cost: a disable moves the floor forward, so drafts left stale
  * before it stop being reported. That includes the overlapping case — global
@@ -175,6 +179,21 @@ function scopeEnabledAt(config, configPath) {
 }
 
 /**
+ * The stamp an unchanged scope must keep, or null when there is none to keep.
+ *
+ * A parseable `updated_at` is kept VERBATIM rather than re-serialized, so a
+ * hand-written stamp survives a no-op command unaltered. Otherwise the
+ * effective floor — the file mtime that `scopeEnabledAt` falls back to — is
+ * materialized into the field it stands in for, which is what keeps
+ * `learningEnabledSince` reading the same instant after the write as before it.
+ */
+function preservedStamp(config, configPath) {
+  if (!Number.isNaN(Date.parse(config.updated_at ?? ''))) return config.updated_at;
+  const at = scopeEnabledAt(config, configPath);
+  return at > 0 ? new Date(at).toISOString() : null;
+}
+
+/**
  * Kill-switch for SessionStart injection of activated instincts (ICL-4).
  *
  * DEFAULT ON: injection happens unless `inject_activated_instincts` is set to
@@ -200,15 +219,19 @@ function setLearningEnabled({
 } = {}) {
   assertScope(scope);
   const next = enabled === true;
+  const configPath = getLearningConfigPath({ scope, projectRoot, homeDir });
   const previous = readScopeConfig({ scope, projectRoot, homeDir });
   // `updated_at` stamps the TRANSITION, not the write. `learningEnabledSince`
   // reads it as "when the opt-in took effect", so a command that changes
   // nothing must not move it — advancing the floor there would silently retire
-  // stale-draft warnings for drafts written since the actual opt-in.
-  const keepStamp =
-    previous.enabled === next && !Number.isNaN(Date.parse(previous.updated_at ?? ''));
-  const config = { scope, enabled: next, updated_at: keepStamp ? previous.updated_at : now };
-  writeJsonFile(getLearningConfigPath({ scope, projectRoot, homeDir }), config);
+  // stale-draft warnings for drafts written since the actual opt-in. A config
+  // that never carried the field is read as its file mtime, so an unchanged
+  // state persists THAT rather than `now`; the write itself moves the mtime,
+  // which is exactly why the fallback has to be captured here instead of
+  // re-derived on the next read.
+  const preserved = previous.enabled === next ? preservedStamp(previous, configPath) : null;
+  const config = { scope, enabled: next, updated_at: preserved ?? now };
+  writeJsonFile(configPath, config);
   return config;
 }
 
