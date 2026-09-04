@@ -1038,6 +1038,28 @@ describe('L7-12: path policy — reject path traversal in name', () => {
     expect(result.failure.reason).toBe('path_policy_rejected');
   });
 
+  // Layer 5 caps `name` at 120 UTF-16 code units, which a three-byte character
+  // spends 360 bytes on — past what a byte-limited filesystem gives a path
+  // component. Refusing here rather than at the write keeps the failure in the
+  // permanent class the policy owns, instead of the transient `write_failed`
+  // class `accept`'s preflight is entitled to skip.
+  it('rejects a name that is schema-valid but too many bytes for a filename', () => {
+    const result = callMaterialize({ name: '界'.repeat(120) });
+    expect(result.ok).toBe(false);
+    expect(result.failure.reason).toBe('path_policy_rejected');
+  });
+
+  // The bound is on the stem, in bytes, and it is 248 because `atomicWriteFile`
+  // writes `<stem>.md.tmp` first. ASCII so that bytes and characters agree and
+  // the boundary is unambiguous.
+  it('accepts a name at the byte limit and refuses the one byte past it', () => {
+    expect(callMaterialize({ name: 'a'.repeat(248) }).ok).toBe(true);
+
+    const overlong = callMaterialize({ name: 'a'.repeat(249) });
+    expect(overlong.ok).toBe(false);
+    expect(overlong.failure.reason).toBe('path_policy_rejected');
+  });
+
   // `isMaterializableName` is exported so a front end that must refuse before it
   // dispatches — the CLI's `accept` — asks Layer 7 instead of keeping a second
   // copy of this rule. That front end never reaches the branch below, so a drift
@@ -1053,6 +1075,9 @@ describe('L7-12: path policy — reject path traversal in name', () => {
       '',
       '   ',
       'null\u0000byte',
+      '界'.repeat(120),
+      'a'.repeat(248),
+      'a'.repeat(249),
     ];
 
     for (const name of names) {

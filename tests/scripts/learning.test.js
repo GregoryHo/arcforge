@@ -1493,6 +1493,26 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(materializationDirs()).toEqual([]);
     });
 
+    // The name policy is a byte budget as well as a shape rule, because the
+    // draft writer's temporary file has to fit in a path component. Layer 5's
+    // 120-character cap admits 360 bytes of CJK, so a schema-valid name can be
+    // one the draft writer could never write — and without the length clause
+    // `accept` approved first and met `ENAMETOOLONG` afterwards, stranding the
+    // candidate in `approved`, which the matrix gives no exit from.
+    it('refuses a name too long in bytes before it approves anything', () => {
+      seed(makeRecord({ name: '界'.repeat(120) }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/name is not one the draft writer can use/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+    });
+
     it('warns on stderr before activating, so the safety ack it sends is true', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);
