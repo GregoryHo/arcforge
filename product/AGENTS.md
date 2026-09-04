@@ -313,19 +313,19 @@ show a whole `## Decision Log` — the way the few-shots here do — without sta
 for the log or cutting it short at the entry above it, and a commented-out
 `## Appendix` ends nothing. Indentation is not an exemption at this boundary either, at
 either end, but the two ends are read at different bounds because they fail in opposite
-directions. The heading that **opens** the scope is
-read at column 1, and an indented `## Decision Log` therefore leaves the log empty
-and C6 rejects it, the same way a renamed one does — fail-closed. The heading that
-**closes** it is read at one to three spaces, the same bound a `### D-NNN` heading
-and a spec's preamble boundary take, because a heading a reader can see has to end
-the section: read at column 1, an indented `## Appendix` left the log running into
-it, and the appendix's decision-shaped headings became entries that C2 numbered and
-a spec's citation resolved — the fail-open direction the paragraph above forbids.
-Four spaces or more is an indented code block at either end, and closes nothing. The
-`## Decisions` section a spec's citations live in (C5) is scoped the same way, but
-without that backstop: no rule asserts a spec's headings, so a spec whose section is
-renamed, dropped, or swallowed by an unclosed fence or an unterminated comment cites
-nothing and is checked for nothing. Keep the heading as the template writes it.
+directions. The heading that **opens** the scope is read at column 1, and an indented
+`## Decision Log` therefore leaves the log empty and C6 rejects it, the same way a
+renamed one does — fail-closed. The heading that **closes** it is read at one to three
+spaces, the same bound a `### D-NNN` heading and a spec's preamble boundary take,
+because a heading a reader can see has to end the section: read at column 1, an
+indented `## Appendix` left the log running into it, and the appendix's
+decision-shaped headings became entries that C2 numbered and a spec's citation
+resolved — the fail-open direction the paragraph above forbids. Four spaces or more is
+an indented code block at either end, and closes nothing. The `## Decisions` section a
+spec's citations live in (C5) is scoped the same way, but without that backstop: no
+rule asserts a spec's headings, so a spec whose section is renamed, dropped, or
+swallowed by an unclosed fence or an unterminated comment cites nothing and is checked
+for nothing. Keep the heading as the template writes it.
 
 The exemptions are not the log's alone. Every section `check:product` reads is parsed
 the same way, so a fenced block is an illustration wherever it sits and a comment is
