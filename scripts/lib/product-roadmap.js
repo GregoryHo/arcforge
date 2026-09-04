@@ -54,8 +54,9 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // phantom governing row, and its `Status:` header was judged against that row.
 // The link text is `*` rather than `+` because the code-span strip runs first, so
 // a link labelled in code arrives here as `[](specs/alpha.md)`. The trade is
-// fail-closed: CommonMark allows balanced brackets in link text, so
-// `[see [alpha]](specs/alpha.md)` is a link this pattern reports. Every plausible
+// fail-closed, in the two forms CommonMark allows inside link text that a
+// bracket-blind class cannot cross: balanced brackets, `[see [alpha]](...)`, and
+// an escaped one, `[a\]b](...)`. Both are links this pattern reports. Every plausible
 // authoring form — plain text, code-styled text, several links joined by `·` —
 // matches. (The image form `![...](specs/x.md)` still counts, though it embeds
 // rather than links — not a Spec cell anyone writes, so it buys no rule.)
