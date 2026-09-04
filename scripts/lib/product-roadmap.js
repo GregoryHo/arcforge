@@ -59,6 +59,15 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // cannot navigate from — the same reason `stripCodeSpans` runs before this match.
 // Both halves of C4 rode on it: the row escaped "links no spec", the spec got a
 // phantom governing row, and its `Status:` header was judged against that row.
+// The opening bracket also has to be one a reader sees: `\[alpha](specs/alpha.md)`
+// carries one, but CommonMark reads the backslash as escaping it, so the cell renders
+// as literal text while a bare `\[` match simply started one character later and C4
+// recorded the spec as linked all the same. The prefix is `(?<!\\)(?:\\\\)*` rather than
+// a plain `(?<!\\)` because backslashes pair off: `\\[alpha](...)` is a literal backslash
+// followed by a real link, which renders and must keep matching, so the parity of the
+// whole run before the bracket decides rather than the single character before it. It
+// is the lookbehind `rowCells` reads unescaped pipes with, extended to that run: a
+// cell's delimiters are never doubled, so there the plain form is enough.
 // The link text is `*` rather than `+` because the code-span strip runs first, so
 // a link labelled in code arrives here as `[](specs/alpha.md)`. The trade is
 // fail-closed, in the two forms CommonMark allows inside link text that a
@@ -67,7 +76,12 @@ const ROADMAP_HEADING_RE = /^##\s+Roadmap\s*$/;
 // authoring form — plain text, code-styled text, several links joined by `·` —
 // matches. (The image form `![...](specs/x.md)` still counts, though it embeds
 // rather than links — not a Spec cell anyone writes, so it buys no rule.)
-const SPEC_LINK_RE = /\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
+// One sibling stays open, and in the opposite direction to that trade: an escaped
+// *closing* bracket, `[a\](specs/alpha.md)`, renders as literal text and still matches
+// here — a non-link read as a link, where the two forms above are real links missed.
+// Every way of shutting it prices a real link as fail-closed in exchange, so it is
+// recorded in `docs/plans/check-product-deferred.md` §8 rather than half-fixed.
+const SPEC_LINK_RE = /(?<!\\)(?:\\\\)*\[[^\]]*\]\(specs\/([A-Za-z0-9._-]+)\.md\)/g;
 
 /** The lines between `## Roadmap` and the next `##` heading. */
 function roadmapSection(roadmap) {

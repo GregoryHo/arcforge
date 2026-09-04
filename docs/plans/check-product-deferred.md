@@ -388,3 +388,33 @@ the fail-open outcome. `product/AGENTS.md` states the exception once, and the tw
 docblocks that make the C6 claim qualify it against that statement rather than
 restating it. Whoever adds a rule over a spec's headings is the one who gets to delete
 the qualification.
+
+## 8. An escaped closing bracket is still read as a link
+
+`SPEC_LINK_RE` now requires an opening bracket a reader sees — `\[alpha](specs/alpha.md)`
+is an escaped bracket, renders as literal text, and is reported as linking no spec. The
+sibling one character to the right is not closed: `[a\](specs/alpha.md)` escapes the
+*closing* bracket, so CommonMark renders the cell as literal text too, but the pattern's
+`[^\]]*` link-text class stops at that backslash-escaped `]` and matches all the same.
+C4 records the spec as linked and grants it a governing row off a cell that navigates
+nowhere — the same fail-open the opening-bracket fix removed, in the direction the fix
+does not reach.
+
+It stays open because every closure tested buys it with a *real* link priced as
+fail-closed, which is the worse trade for a gate the whole repo has to pass:
+
+- excluding `\` from the link text (`[^\]\\]*`) rejects `[a\b](specs/alpha.md)` — an
+  escaped non-bracket inside link text, which CommonMark renders as a link;
+- a `(?<!\\)` before the closing bracket rejects `[a\\](specs/alpha.md)` — a literal
+  backslash ending the link text, also a real link, and the same parity problem the
+  opening-bracket prefix had to solve, now needing its own run-length read;
+- the escape-aware class `(?:[^\]\\]|\\.)*?` matches this one, but silently flips
+  `[a\]b](specs/alpha.md)` from missed to matched — and that miss is a trade the
+  `SPEC_LINK_RE` docblock already prices as deliberate, one of the two fail-closed
+  forms it names. Reversing a documented trade as a side effect of closing a different
+  hole is exactly the kind of change this file exists to slow down.
+
+So the choice is not "fix or don't" but "how wide is a `Spec` cell allowed to be" —
+whether the linter reads link text as CommonMark does, or keeps the bracket-blind class
+and its two named misses. That is a maintainer decision about the format, not a review
+fix, and whoever takes it owns the docblock's fail-closed paragraph along with it.

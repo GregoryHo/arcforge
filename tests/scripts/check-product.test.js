@@ -1126,6 +1126,38 @@ describe('check-product', () => {
       ]);
     });
 
+    it('does not count a Spec cell whose opening bracket is escaped as a link', () => {
+      // The same hole one character further left: the bracket is there, but
+      // CommonMark reads the backslash as escaping it, so the cell renders as
+      // literal text. Read escape-blind, the match simply started one character
+      // later and both halves of C4 resolved off a table that links nothing.
+      const rows = [row({ specCell: '\\[alpha](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
+    it('still reads a link behind a literal backslash', () => {
+      // The false-positive direction of the same fix: backslashes pair off, so
+      // `\\[alpha](...)` is a literal backslash followed by a real link, which
+      // renders. An escape rule blind to parity would reject it.
+      const rows = [row({ specCell: '\\\\[alpha](specs/alpha.md)' })];
+      const errors = validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] });
+      expect(of('C4', errors)).toEqual([]);
+    });
+
+    it('does not count an odd run of backslashes before the bracket as a link', () => {
+      // Parity, not the single character before the bracket: three backslashes
+      // leave the bracket escaped just as one does, so the cell still renders as
+      // literal text.
+      const rows = [row({ specCell: '\\\\\\[alpha](specs/alpha.md)' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([
+        'C4 roadmap row 1.0.0: links no spec, so nothing says what it builds',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+      ]);
+    });
+
     it('does not count a bare destination as a link', () => {
       const rows = [row({ specCell: '](specs/alpha.md)' })];
       expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }))).toEqual([

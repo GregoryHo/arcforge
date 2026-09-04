@@ -160,9 +160,9 @@ a row links must exist, and every spec must be linked from at least one row. A p
 row is not exempt: a patch changes an area that already has a spec, and the row links
 that spec — the point of the rule is that no version is ever built without one. The
 `Spec` cell links by carrying a whole inline link, `[text](specs/<slug>.md)`: a
-destination with no opening bracket, or a link wrapped whole in a code span, renders
-as literal text and links nothing, so the row is reported as linking no spec. A link
-whose *label* is code-styled is still a link.
+destination with no opening bracket, an opening bracket escaped as `\[`, or a link
+wrapped whole in a code span renders as literal text and links nothing, so the row is
+reported as linking no spec. A link whose *label* is code-styled is still a link.
 Where more than one row links a spec, its **governing row** is the highest-version
 one:
 
