@@ -539,7 +539,11 @@ Confirmed against GitHub's `/markdown` endpoint, the evidentiary bar §9 records
 comment-block fix, rather than argued from the spec: `<details></details>` comes back as
 an empty closed element with both `<h3>`s outside it, and a line ending `</details>`
 closes the element before the `<h3>` under it. The linter's verdict disagreed with the
-render in both.
+render in both. The synthetic suite is the whole of the evidence on the other side:
+no line under `product/` opens a fold — `ROADMAP.md`'s eight entries are all unfolded —
+so both delimiters run against every live line and correctly match none of them. A green
+`check:product` is that much and no more: it is not coverage of the folded branch, and
+citing it as such would cite a rule no document exercises.
 
 Taken rather than deferred, for the reason §9's fix was: parity with a rule this file
 already implements. `hiddenTracker()` closes a comment on any line that *contains*
@@ -557,7 +561,7 @@ rather than exempted. The **closer** reads the whole line, because a missed clos
 both: at four columns the line is an indented code block, and `(?![ \t])` is what holds
 that bound on the line's start now that `.*` precedes the tag.
 
-Two things stay deliberately unwidened:
+Three things stay deliberately unwidened:
 
 - **An inline `text <details>` opens no fold.** The renderer opens the element; the
   anchored opener does not see it, so the entries below stay checked. That is the
@@ -569,3 +573,14 @@ Two things stay deliberately unwidened:
   fold. The strip is escape-blind and joins its neighbours, so `` <`x`/details> `` closes
   a fold the reader watched stay open. That fails closed too, nothing under `product/`
   writes either shape, and the price is already written up in §5.
+- **A nested fold is one boolean, so an inner closer ends the outer element.**
+  `inFold` records *whether* a fold is open, not how many are, so the first
+  `</details>` clears it and every entry between an inner element's close and the outer
+  one is read as live. Probe-confirmed on the current code: an outer fold holding
+  `D-050`, then an inner `<details>`…`</details>`, then `D-004` and `D-003`, returns
+  `inFold: false` for the last two, so C2's ascending clause reports `D-003 follows
+  D-004` on entries the render keeps folded. The anchored closer behaved identically, so
+  this round changed nothing here — and it is the fail-closed direction, reporting a
+  folded entry rather than exempting a live one. Tracking the element's actual lifetime
+  is the widening; nothing under `product/` nests a fold, and `product/AGENTS.md` puts
+  a single index at the bottom of the log.

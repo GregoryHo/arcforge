@@ -247,21 +247,21 @@ no block and hides nothing below it.
 
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
 relation bullet, an entry's `- Status:` line, a spec's `> Status:` header, a roadmap
-row and the `<details>` / `</details>` delimiters of the folded index all sit in
-column 1; indented four spaces or more, none is read, so an illustration can be shown
-as an indented block rather than a fenced one — including an illustration of the fold
-move itself, which at that depth opens no fold and closes none. The two fold
-delimiters keep that depth but not the same position on the line: `<details>` has to be
-the line's first content, while `</details>` ends the fold wherever on a rendering line
-it lands — its own opener's line included, so `<details></details>` opens and closes in
-place, and a line ending `that is all </details>` closes the fold above it. That is the
-shape the comment rule already takes for `-->`, and it is why an illustration of the
-closing tag needs a fence, four spaces, or a code span. One to three spaces is
-not an exemption — the line still renders as the heading, the field or the row a
-reader would trust, so it is read or reported like any other near-miss. The roadmap
-row is why this matters beyond the log: an indented six-cell row read as product
-state can become a spec's governing row and force its `Status:` header to a version
-that exists only in the illustration.
+row and the `<details>` opener of the folded index all sit in column 1; indented four
+spaces or more, none is read, so an illustration can be shown as an indented block
+rather than a fenced one — including an illustration of the fold move itself, which at
+that depth opens no fold and closes none. Both fold delimiters take that four-space
+bound, but not the same position on the line: `<details>` has to be the line's first
+content, while `</details>` ends the fold wherever on a rendering line it lands — its
+own opener's line included, so `<details></details>` opens and closes in place, and a
+line ending `that is all </details>` closes the fold above it. That is the shape the
+comment rule already takes for `-->`, and it is why an illustration of the closing tag
+needs a fence, four spaces, or a code span. One to three spaces is not an exemption —
+the line still renders as the heading, the field or the row a reader would trust, so
+it is read or reported like any other near-miss. The roadmap row is why this matters
+beyond the log: an indented six-cell row read as product state can become a spec's
+governing row and force its `Status:` header to a version that exists only in the
+illustration.
 
 HTML comments are the third exemption, and the bluntest of the three. A fence and an
 indented block still show their contents as literal text; a `<!-- ... -->` block shows
