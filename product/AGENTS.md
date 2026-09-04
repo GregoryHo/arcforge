@@ -115,7 +115,12 @@ paragraph of literal pipes; below the delimiter it renders an empty table with
 the rows as a paragraph beneath it. Either way the rows are not in a table, which
 is the only thing this rule is about.
 
-"Opens on" is literal: the table is the first thing in the section, so a pipe line
+"Opens on" is literal at both ends of the frame. The header row either opens the
+section or carries a blank line directly above it, and anything else sitting
+directly above it is reported (C6) — a blockquote or a list item there takes the
+pipe lines into itself, so GitHub renders no table at all and every row reaches a
+reader as literal text; a plain paragraph directly above still renders one, and is
+reported the same way. And the table is the section's first table, so a pipe line
 above the header is reported even when the table below it would render. That is
 deliberate rather than incidental — a data row written above the frame renders as a
 paragraph while the checks would still read it as product state, which is the whole

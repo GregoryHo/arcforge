@@ -98,6 +98,22 @@ function rowCells(line) {
  * this rule exists to close. Prose belongs above the heading, and the section's
  * note below the table, where the corpus puts it.
  *
+ * "First" is read against the *section*, not against the pipe lines: the header
+ * either opens `## Roadmap` or carries a blank line directly above it, and
+ * anything else sitting there is reported. Read pipe-only this end of the frame
+ * was open, and the input it costs the most on is a blockquote or a list item
+ * directly above the header — the pipe lines continue that block's paragraph
+ * lazily, so GitHub renders no table at all and every row reaches a reader as
+ * literal text inside it while C1, C4, C6 and C7 go on reading them as product
+ * state. Confirmed against GitHub's own renderer, along with the two directions
+ * this rule is deliberately blunt in: a plain *paragraph* directly above the
+ * header splits, so the table below it renders and is reported all the same,
+ * and a closing fence directly above the header is reported the same way. Blank
+ * is measured after `trim()` — a whitespace-only line is blank to CommonMark and
+ * the table under it renders, so strict equality would report a corpus GitHub
+ * draws. `index === 0` is the other half of the test rather than the whole of
+ * it: the corpus's own slice opens on the blank line under `## Roadmap`.
+ *
  * "First two pipe lines" is not the whole frame, and reading it as the whole
  * frame was a hole: GFM ends a table at the first blank line or block-level
  * structure, so the header, the delimiter and every row are one table only while
@@ -115,10 +131,19 @@ function rowCells(line) {
  * `D-id` are — dropping them would take the `← we are here` marker with them
  * and trade this rule's error for C1's.
  */
-function checkRoadmapFraming(table, errors) {
+function checkRoadmapFraming(table, lines, errors) {
   // An empty `## Roadmap` is the row floor's to report, not this rule's.
   if (table.length === 0) return;
-  // Adjacency first: a break anywhere in the run means the lines below it are
+  // The head of the frame: the table opens the section, or a blank line sits
+  // between it and whatever comes before.
+  const head = table[0].index;
+  if (head > 0 && lines[head - 1].trim() !== '') {
+    errors.push(
+      `C6 the roadmap table does not open the section: "${lines[head - 1].trim()}" sits directly above "${table[0].line}", so a blockquote or a list item there takes the whole table into itself and GFM renders none`,
+    );
+    return;
+  }
+  // Adjacency next: a break anywhere in the run means the lines below it are
   // not in the table at all, so judging the frame's shape past one would be
   // reporting on a table the reader never sees.
   const broken = table.find((entry, i) => i > 0 && entry.index !== table[i - 1].index + 1);
@@ -174,14 +199,16 @@ function checkRoadmapFraming(table, errors) {
 function parseRoadmapRows(roadmap, errors) {
   const table = [];
   // `index` is the line's position in the section slice, which is what C6's
-  // adjacency clause reads; a fenced line is dropped rather than renumbered, so
+  // head and adjacency clauses read against; a fenced line is dropped rather
+  // than renumbered, so
   // a fenced block between two pipe lines shows up as the break it is.
-  for (const { line: raw, index } of unfencedEntries(roadmapSection(roadmap))) {
+  const lines = roadmapSection(roadmap);
+  for (const { line: raw, index } of unfencedEntries(lines)) {
     if (!/^ {0,3}\|/.test(raw)) continue;
     const line = raw.trim();
     table.push({ line, cells: rowCells(line), index });
   }
-  checkRoadmapFraming(table, errors);
+  checkRoadmapFraming(table, lines, errors);
 
   const rows = [];
   for (const { line, cells } of table) {

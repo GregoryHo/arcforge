@@ -1388,6 +1388,63 @@ describe('check-product', () => {
         expect(errors[0]).toMatch(/opens on "\| Legend \| Meaning \|"/);
       });
 
+      // The head of the frame, the other end of the run. Each input below was
+      // rendered through GitHub's own GFM endpoint: a blockquote or a list item
+      // directly above the header takes the pipe lines into its own paragraph,
+      // so no `<table>` is emitted at all and every row sits inside that block
+      // as literal text — while C1, C4, C6 and C7 read those rows as product
+      // state. Both linted green before this clause.
+      it('rejects a blockquote directly above the header', () => {
+        const header = ['> a note', ...TABLE_HEADER];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/"> a note" sits directly above "\| Version \| Tag \|/);
+      });
+
+      it('rejects a list item directly above the header', () => {
+        const header = ['- an item', ...TABLE_HEADER];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/"- an item" sits directly above "\| Version \| Tag \|/);
+      });
+
+      it('rejects a paragraph directly above the header, though the table renders', () => {
+        // The stricter-than-rendering direction, and the one a later reader is
+        // likeliest to challenge: GitHub splits the paragraph and draws the
+        // table under it. Reported anyway — the frame no longer opens the
+        // section, and telling a paragraph that splits from a blockquote that
+        // swallows is a renderer's job, not this rule's.
+        const header = ['some prose', ...TABLE_HEADER];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/"some prose" sits directly above "\| Version \| Tag \|/);
+      });
+
+      it('accepts prose held off the table by a blank line', () => {
+        // The green guard the literal reading of "the table is the first thing
+        // in the section" would have broken: a blank line closes the paragraph,
+        // the table renders, and the corpus's own slice opens on a blank line.
+        const header = ['some prose', '', ...TABLE_HEADER];
+        expect(validateProduct({ roadmap: roadmap({ header }), specs: [spec()] })).toEqual([]);
+      });
+
+      it('accepts a table that opens the section on its first line', () => {
+        // The `index === 0` half of the head test, which the builder's blank
+        // line under `## Roadmap` puts out of reach. Verified to render.
+        const md = [
+          '# Roadmap — fixture',
+          '',
+          '## Roadmap',
+          ...TABLE_HEADER,
+          row(),
+          '',
+          '## Decision Log',
+          '',
+          decision(),
+        ].join('\n');
+        expect(validateProduct({ roadmap: md, specs: [spec()] })).toEqual([]);
+      });
+
       it('rejects a header with no delimiter row beneath it', () => {
         const header = [TABLE_HEADER[0]];
         const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
