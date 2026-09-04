@@ -359,9 +359,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   alone promises all-or-nothing; closing the two-step path means either
   rejecting such names at Layer-5 ingestion or normalizing the name at
   materialization, and reject-vs-normalize is a product decision this PR does
-  not make. The same two-step path also prints the offending name verbatim —
-  it is Layer 8's own `module_failure.detail`, which every single-step command
-  renders deliberately, so `accept` alone is held to not echoing it.
+  not make. The same two-step path still names the offending name — it is
+  Layer 8's own `module_failure.detail`, which every single-step command
+  renders deliberately — but the CLI now renders it through the same redactor
+  `sanitizeDashboardCard` applies to a card's `name`, so B-9's allowlisted-view
+  promise holds on the refusal path too. `accept` remains held to not echoing
+  the name at all.
 - Residual, second clause: the artifact-type narrowing strands a candidate at
   the same `approved` dead end, and there the CLI recommends the move that
   does it — `accept`'s type refusal names `learn approve` as the recovery, and
