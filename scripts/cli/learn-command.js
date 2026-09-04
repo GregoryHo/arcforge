@@ -269,8 +269,13 @@ function runDrafts({ scope }) {
  * `invalid_lifecycle_status` is already carried by `expected_current_status`;
  * `unsafe_content` cannot fire on a queued record, because `appendCandidate` is
  * the single ingestion gate and it redacts the body before storing it, with an
- * idempotent redactor; and a lock timeout or a write error is transient, which
- * is the class re-running already answers.
+ * idempotent redactor; and a lock timeout or a full disk is transient, which is
+ * the class re-running already answers. The one write error that is not
+ * transient and is a property of the record — a name too long to be a filename
+ * on the target filesystem — is screened by the name check below, which is why
+ * that check measures length as well as shape; an unwritable draft root is a
+ * fault in the environment rather than in the candidate, and no preflight on
+ * the record could screen it.
  *
  * The guard is on the command, not on the dispatch count: `accept` refuses from
  * every status, including the ones where it would have dispatched materialize

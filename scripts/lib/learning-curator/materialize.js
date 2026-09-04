@@ -42,16 +42,59 @@ function isMaterializableType(artifactType) {
 }
 
 /**
+ * The longest draft filename stem L7-12 will accept, in bytes.
+ *
+ * `NAME_MAX` is 255 *bytes* per path component on byte-limited filesystems —
+ * ext4 and friends, which is where CI runs and where a large share of users
+ * are. The binding write is not the `.md` draft: `atomicWriteFile` puts the
+ * content in `<stem>.md.tmp` and renames it into place, so the temporary name,
+ * 7 bytes longer than the stem, is the one that has to fit. 255 - 7 = 248.
+ *
+ * A fixed byte bound rather than a probe of the target filesystem, because
+ * `accept`'s preflight and the write it protects can only be one rule if both
+ * compute the same answer — and a probe would make that answer depend on where
+ * the draft root happens to live. macOS/APFS counts characters rather than
+ * bytes, so this is stricter than that platform needs: a 120-character CJK name
+ * is 360 bytes and is now refused there too, deliberately.
+ */
+const MAX_DRAFT_NAME_BYTES = 248;
+
+/**
  * The name policy of L7-12, in words a reviewer can act on.
  *
  * Exported for the same reason the type list is: the front end that has to
  * explain a refusal reads this rather than keeping a second description of a
  * rule it does not own. "Blank" covers both halves of what `sanitizeFilename`
- * rejects at the top — an empty string and a whitespace-only one.
+ * rejects at the top — an empty string and a whitespace-only one. The length is
+ * in bytes because the filesystem limit is, so a non-ASCII name reaches it well
+ * short of that many characters.
  */
 const NAME_POLICY_SUMMARY =
-  'a draft filename may not be blank, and may not contain a path separator, ".." or a control ' +
-  'character';
+  'a draft filename may not be blank, may not contain a path separator, ".." or a control ' +
+  `character, and may not exceed ${MAX_DRAFT_NAME_BYTES} bytes once encoded`;
+
+/**
+ * The whole name policy of L7-12, as the one check that enforces it.
+ *
+ * `sanitizeFilename` owns the shape rules and is shared with the rest of the
+ * engine; the length is Layer 7's own, because it is derived from the file this
+ * module writes. Both call sites below go through here so that neither the
+ * predicate nor the enforcing branch can grow a clause the other lacks.
+ *
+ * @param {string} name
+ * @returns {string} The validated name, unchanged.
+ * @throws {Error} If the name cannot be a draft filename.
+ */
+function checkDraftName(name) {
+  const safeName = sanitizeFilename(name);
+  const bytes = Buffer.byteLength(safeName, 'utf8');
+  if (bytes > MAX_DRAFT_NAME_BYTES) {
+    throw new Error(
+      `Invalid filename: ${bytes} bytes exceeds the ${MAX_DRAFT_NAME_BYTES}-byte limit`,
+    );
+  }
+  return safeName;
+}
 
 /**
  * Whether L7-12 would accept this name as a draft filename.
@@ -59,16 +102,16 @@ const NAME_POLICY_SUMMARY =
  * Exported so a front end that must refuse BEFORE it dispatches — the CLI's
  * `accept`, which approves first and would strand the candidate on a refusal it
  * could never clear — asks this module instead of keeping a second copy of the
- * policy. `materialize()` below still calls `sanitizeFilename` directly, so the
- * enforced branch and this predicate share one implementation of the rule and
- * differ only in what they do with the answer.
+ * policy. `materialize()` below calls `checkDraftName` too, so the enforced
+ * branch and this predicate share one implementation of the rule and differ
+ * only in what they do with the answer.
  *
  * @param {string} name
  * @returns {boolean}
  */
 function isMaterializableName(name) {
   try {
-    sanitizeFilename(name);
+    checkDraftName(name);
     return true;
   } catch {
     return false;
@@ -467,10 +510,10 @@ function materialize({
     );
   }
 
-  // L7-12: Validate name with sanitizeFilename
+  // L7-12: Validate name against the draft-filename policy
   let safeName;
   try {
-    safeName = sanitizeFilename(candidate.name);
+    safeName = checkDraftName(candidate.name);
   } catch (err) {
     return fail('path_policy_rejected', `Invalid candidate name: ${err.message}`);
   }
