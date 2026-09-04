@@ -148,8 +148,8 @@ export being *picked up*: a `### D-005` entry reading `Status: Rejected` /
 `Decision: CSV export was not picked up and remains unsupported`, appended to
 the Decision Log of a roadmap whose version table already carries the CSV row,
 scores `A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on the
-shipped Version-2 grader. It is left open deliberately, for two reasons, both
-measured rather than argued.
+shipped Version-2 grader. It is left open deliberately, and the reasons below
+are measured rather than argued.
 
 The denial buys nothing, because the assertion's phrase — "recording the CSV
 export being picked up" — is carried by the conjunction rather than by A3
@@ -161,10 +161,11 @@ names CSV (A2), the wish struck from the backlog (A4), the shipped branch in
 `src/exporter.js` (A5), with a numbered CSV behavior item (A1) beside them.
 Unlike `eval-speccing-supersede-not-overwrite`'s A3, which is the only witness
 to the relation it names, this one is never load-bearing alone: the roadmap the
-case needs is self-contradictory, recording the CSV milestone as shipped and
-the decision as refused, and every ledger edit A1–A4 exist to detect has been
-made before A3 is reached. The baseline arm, which writes none of them, cannot
-reach the case at all.
+case needs is self-contradictory, carrying an advancing CSV milestone row while
+its own decision refuses the export — A2 pins that row's version and its CSV
+token, not its status cell, so an `in progress` row reaches the same full pass —
+and every ledger edit A1–A4 exist to detect has been made before A3 is reached.
+The baseline arm, which writes none of them, cannot reach the case at all.
 
 And the affirmative test has no anchor in the language trials actually write.
 The three retained single-condition trials that wrote a decision entry
@@ -174,11 +175,37 @@ not this scenario's arms — see **What is not claimed** below) all wrote a
 export emits one header row plus one line per row …`. None of the three names a
 pickup, an adoption or a promotion, so a predicate demanding an affirmative
 choice fails all three; their `Status:` fields read `Proposed` (trial-1) and
-`Accepted` (trials 2 and 3), so keying on `Status: Accepted` fails one. Both
-are treatment-arm false negatives on the behavior this scenario measures, the
-error this file has already ranked as the costlier one. The one field all three
-do share — `- Version: 0.4.0` — does not separate the cases either: the
+`Accepted` (trials 2 and 3), so keying on `Status: Accepted` fails one. Both of
+those are treatment-arm false negatives on the behavior this scenario measures,
+the error this file has already ranked as the costlier one. The one field all
+three do share — `- Version: 0.4.0` — does not separate the cases either: the
 measured full pass above carries it too.
+
+A third candidate is narrower than both, and it is this file's own headline
+witness that invites it: not a predicate demanding an affirmative token, but one
+*rejecting* an entry whose `Status:` records a refusal — `Rejected`, `Declined`.
+It closes the measured case above, and unlike the two predicates just rebutted
+it costs nothing on the three retained trials — `Proposed`, `Accepted` and
+`Accepted` all survive a refusal blocklist — so it is not a treatment-arm false
+negative, and the reader who checks the paragraph's example is owed the reason
+it is declined anyway rather than left to find the cheaper fix unaddressed.
+
+It is declined because a blocklist closes a *spelling*, not the hole. A3 reads
+no status field at all, so the same entry rewritten `Status: Accepted` over the
+same `Decision: CSV export was not picked up and remains unsupported` scores
+`A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0 — measured on the same
+trial tree as the case above, with only D-005's two lines varied — and every
+refusal a trial could phrase in `Decision:` or `Why:` prose walks through
+untouched. The token list would also be guesswork: neither `Rejected` nor
+`Declined` appears anywhere under `product/` or `skills/core/speccing/`, C3's
+closed status vocabulary for a flipped entry (`product/AGENTS.md:194-196`) is
+`Accepted` / `Proposed` / `Superseded-by: D-NNN` / `partially superseded by
+D-NNN` and has no negative side to block, and the fixture's four entries all
+read `Status: Accepted` — the measured case had to invent `Rejected` for a
+blocklist to have anything to match. And the reason above that the denial buys
+nothing applies to it unchanged: the pickup is carried by the rest of the
+conjunction, so an entry that gets past A3 has already been contradicted by the
+ledger edits A1, A2, A4 and A5 read.
 
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
 version the fixture shipped, because that is what the assertion's own second
