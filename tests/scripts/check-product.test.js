@@ -1434,10 +1434,19 @@ describe('check-product', () => {
         // table under it. Reported anyway — the frame no longer opens the
         // section, and telling a paragraph that splits from a blockquote that
         // swallows is a renderer's job, not this rule's.
+        //
+        // This is the case that pins the message's *whole* text rather than its
+        // prefix. The blockquote clause is an example of what the rule protects
+        // against, not a diagnosis of this input: read as a diagnosis it sends a
+        // reader hunting for a rendering failure that is not there, which is what
+        // it said before. The tail carries the rule and the over-strictness.
         const header = ['some prose', ...TABLE_HEADER];
         const errors = of('C6', validateProduct({ roadmap: roadmap({ header }), specs: [spec()] }));
         expect(errors).toHaveLength(1);
         expect(errors[0]).toMatch(/"some prose" sits directly above "\| Version \| Tag \|/);
+        expect(errors[0]).toMatch(
+          /so the header neither opens "## Roadmap" nor carries a blank line above it — a blockquote or a list item there takes the whole table into itself and GFM renders none, and anything else there is reported the same way$/,
+        );
       });
 
       it('accepts prose held off the table by a blank line', () => {

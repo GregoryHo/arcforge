@@ -152,7 +152,7 @@ function checkRoadmapFraming(table, lines, errors) {
   const head = table[0].index;
   if (head > 0 && lines[head - 1].trim() !== '') {
     errors.push(
-      `C6 the roadmap table does not open the section: "${lines[head - 1].trim()}" sits directly above "${table[0].line}", so a blockquote or a list item there takes the whole table into itself and GFM renders none`,
+      `C6 the roadmap table does not open the section: "${lines[head - 1].trim()}" sits directly above "${table[0].line}", so the header neither opens "## Roadmap" nor carries a blank line above it — a blockquote or a list item there takes the whole table into itself and GFM renders none, and anything else there is reported the same way`,
     );
     return;
   }
