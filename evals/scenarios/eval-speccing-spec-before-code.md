@@ -124,8 +124,8 @@ Unlike A3's, this difference set is not a singleton and cannot be enumerated —
 every version below `0.3.0` that is not one of the three shipped rows moves
 PASS → FAIL. Neither column above is the shipped verdict: the eight roadmaps
 name no format in the added row, and the row tie below narrows several of them
-further — a bare `0.4.0` row scores A2:FAIL today. The second table is what the
-grader returns now.
+further — a bare `0.4.0` row scores A2:FAIL today. The `+table anchor` column
+of the fourteen-case table below is what the grader returns now.
 
 A2 also requires the advancing row's own line to name CSV. The numeric compare
 is blind to *which* work the row records and the assertion's second clause is
@@ -149,28 +149,66 @@ cell passes, so the risk is small — but it is a real false negative, recorded
 here beside the bump-size and marker-placement carve-outs rather than left for
 a future reader to meet in a failed run.
 
-Validated offline against ten synthetic roadmaps, run through the grader
-carrying the numeric predicate alone and the shipped one with the row tie:
+A2 finally requires the row to be a row *of the version table*, not any
+pipe-prefixed line in the file. `row_re` scanned the whole of ROADMAP.md, so a
+trial that appended the bare line `| 0.4.0 | CSV |` after the Decision Log —
+two cells, no table around it, no milestone recorded anywhere — scored
+`A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on the shipped
+grader carrying both narrowings above. `version_table()` narrows the scan to
+the contiguous run of pipe-lines beginning at the `| Version |` header. It
+anchors on that header rather than on a `## Roadmap` heading because the
+fixture has no such heading — its table sits directly under the H1, and a
+heading anchor would match nothing and fail every trial. It imposes no cell
+count either: a legitimate row written with five cells (Spec omitted) or seven
+(a column added) still passes, and a false negative on the treatment arm costs
+more than an implausible false positive, because it depresses the measured
+delta.
 
-| case | numeric | +row tie |
-|---|---|---|
-| `0.4.0` row naming CSV in Milestone | PASS | PASS |
-| `1.0.0` row naming CSV | PASS | PASS |
-| `0.3.1` row naming CSV | PASS | PASS |
-| `0.10.0` row naming CSV | PASS | PASS |
-| `0.4.0` row naming CSV only in What & why | PASS | PASS |
-| `0.4.0` row about unrelated work (`run diff`) | PASS | **FAIL** |
-| `0.4.0` row reading `spreadsheet export`, no CSV token | PASS | **FAIL** |
-| `0.0.1` row naming CSV | FAIL | FAIL |
-| unrelated `0.4.0` row plus a CSV `0.5.0` row | PASS | PASS |
-| no new row | FAIL | FAIL |
+Its costs, three of them, accepted rather than hidden — all measured on the
+shipped grader. A trial that renames the `Version` header cell scores A2:FAIL,
+because nothing anchors the scan. A trial that leaves the fixture table intact
+and writes its row into a *new* second `| Version |` table scores A2:FAIL,
+because the first header wins. And a trial that separates its row from the
+table by a blank line scores A2:FAIL — that one is the same contiguity rule
+that closes the stray line above the Decision Log, seen from the other side,
+and it reads as correct rather than as a cost, since a pipe-line cut off from
+the table by a blank line renders as a separate table.
+
+Validated offline against fourteen synthetic roadmaps, run through the grader
+carrying the numeric predicate alone, then with the row tie, then with the
+table anchor as shipped:
+
+| case | numeric | +row tie | +table anchor |
+|---|---|---|---|
+| `0.4.0` row naming CSV in Milestone | PASS | PASS | PASS |
+| `1.0.0` row naming CSV | PASS | PASS | PASS |
+| `0.3.1` row naming CSV | PASS | PASS | PASS |
+| `0.10.0` row naming CSV | PASS | PASS | PASS |
+| `0.4.0` row naming CSV only in What & why | PASS | PASS | PASS |
+| `0.4.0` row about unrelated work (`run diff`) | PASS | **FAIL** | FAIL |
+| `0.4.0` row reading `spreadsheet export`, no CSV token | PASS | **FAIL** | FAIL |
+| `0.0.1` row naming CSV | FAIL | FAIL | FAIL |
+| unrelated `0.4.0` row plus a CSV `0.5.0` row | PASS | PASS | PASS |
+| no new row | FAIL | FAIL | FAIL |
+| two-cell `0.4.0` / `CSV` pipe-line after the Decision Log | PASS | PASS | **FAIL** |
+| the same two-cell line above the Decision Log | PASS | PASS | **FAIL** |
+| three-cell `0.4.0` / `CSV export` / `shipped` pipe-line | PASS | PASS | **FAIL** |
+| `Version` / `Change` mini-table inside a decision body | PASS | PASS | **FAIL** |
+
+The anchor changes no verdict among the ten cases the earlier narrowings were
+validated against, and closes the four below them. Separately measured and not
+tabulated: a legitimate row with five or seven cells, and one written under an
+added `## Roadmap` heading, all still PASS; a roadmap rewritten as prose with
+no table at all emits six labels and
+`A2:FAIL:no roadmap row beyond 0.3.0 carries the CSV export milestone` rather
+than raising, which is what `version_table()` returning `""` buys.
 
 **k.** `## Trials` below is the per-run default `defaultK` reads when no `--k`
 is passed, and it is the corpus's 5. The pre-registered design for this scenario
 is k=10 per arm, and every recorded A/B run of it was launched with `--k 10`.
 Preflight is unaffected either way — it runs at its own fixed k=3.
 
-**Why `## Version` stays 2, for all three narrowings.** The published pool is the
+**Why `## Version` stays 2, for every narrowing below.** The published pool is the
 k=10 A/B of 2026-09-03T00:37Z, the run whose preflight record is
 `evals/preflight/afb5f3da7d729aca-default.json` (an earlier k=10 run under this
 same scenario text was voided and discarded whole;
@@ -183,9 +221,12 @@ any transcript:
   under the old predicates, and a strictly narrower predicate cannot lift a
   failure. The baseline arm scores 0.33 / 0% under either reading.
 - *Treatment, bounded.* All ten treatment trials scored 1.00, so A2 and A3 both
-  passed under the old predicates. All three narrowings touch only those two
-  assertions — the row tie lives *inside* A2, so the set a re-scored trial can
-  lose is still {A2, A3}. Were the pool re-scored under the shipped predicates
+  passed under the old predicates. The narrowings touch only those two
+  assertions — the row tie and the table anchor both live *inside* A2, so the
+  set a re-scored trial can lose is still {A2, A3}. Each is narrowing by
+  construction, not just on the cases tabulated above: the anchor feeds
+  `row_re` a substring of the text it used to scan, so its match set can only
+  shrink. Were the pool re-scored under the shipped predicates
   — it cannot be, see below — a treatment trial would score 1.00, or 0.83
   having lost one of the two, or 0.67 having lost both. The delta would land
   between **+0.33** and the +0.67 that was measured, and with a zero-variance
@@ -307,12 +348,33 @@ emit("A1", a1, "no spec under product/specs/ carries a numbered behavior item ab
 # this one the word. Comparing tuples rather than strings keeps `0.10.0` above
 # `0.3.0`; `any` (not `max`) keeps the predicate defined, emitting A2:FAIL
 # rather than raising, when a trial leaves no version rows at all.
+
+# The version table, not the whole file. `row_re` alone matches any
+# pipe-prefixed line anywhere in ROADMAP.md, so a bare `| 0.4.0 | CSV |` written
+# after the Decision Log — not a row of any table — scored A2 while no roadmap
+# row recorded the work. Narrow to the contiguous run of pipe-lines that starts
+# at the `| Version |` header: that is the fixture's table and the one a trial
+# appends to. No cell count is imposed, so a row written with five or seven
+# cells still counts; anchoring on the header rather than a `## Roadmap`
+# heading matters because the fixture has none — the table sits directly under
+# the H1. Returns "" when no header line is found, so `any` over no matches is
+# False and A2 emits its FAIL reason rather than raising.
+def version_table(text):
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*\|\s*Version\s*\|", line, re.I):
+            j = i
+            while j < len(lines) and lines[j].lstrip().startswith("|"):
+                j += 1
+            return "\n".join(lines[i:j])
+    return ""
+
 LATEST_SHIPPED = (0, 3, 0)
 row_re = re.compile(r"^\|\s*`?v?(\d+\.\d+\.\d+)`?\s*\|.*$", re.M)
 a2 = any(
     tuple(int(n) for n in m.group(1).split(".")) > LATEST_SHIPPED
     and "csv" in m.group(0).lower()
-    for m in row_re.finditer(road)
+    for m in row_re.finditer(version_table(road))
 )
 emit("A2", a2, "no roadmap row beyond 0.3.0 carries the CSV export milestone")
 

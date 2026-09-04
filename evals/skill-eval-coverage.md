@@ -307,15 +307,32 @@ decision 與 behavior item 寫在別處、程式也確實出貨，在只有數�
 已接受的 false negative，記在該 scenario 的 Design Notes。其餘八例判定不變。未重評
 任何 trial，未動用 trial 額度。
 
-三次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
+review round 2 的第四處收緊把 A2 的「列」綁到 version 表格本身。前三處收緊都跑在
+整份 ROADMAP.md 的文字上：`row_re` 會吃下檔案裡任何以 `|` 開頭的行，因此只要在
+`## Decision Log` 之後補一行 `| 0.4.0 | CSV |`（兩格、不屬於任何表格、roadmap 上
+CSV 沒有任何里程碑），在出貨中的 grader 下即可拿到 A1–A6 全 PASS、exit 0（已實測）。
+收緊後改由 `version_table()` 把掃描範圍縮到「自 `| Version |` 表頭起算、連續的
+pipe 行」——錨在表頭而非 `## Roadmap` 標題，因為 fixture 根本沒有那個標題（表格直接
+接在 H1 底下，錨在標題會一列都對不到、把每筆 trial 都判 FAIL）；也不設格數下限，
+五格（省略 Spec）或七格（多一欄）的正常列仍算數，因為 treatment 臂的 false negative
+會壓低量測到的 delta，比不合理的 false positive 更貴。以十四份合成 roadmap 實測：
+原本那十份判定全不變，新增四例全部由 PASS 轉 FAIL（Decision Log 之後的兩格行、同一
+行改寫在 log 之前、三格的 `| 0.4.0 | CSV export | shipped |`、寫在 decision 內文裡
+的 `| Version | Change |` 迷你表）。已接受的 false negative 有三個，都已實測並記在
+該 scenario 的 Design Notes：改掉 `Version` 表頭名稱者 FAIL、把新列另起一張
+`| Version |` 表格者 FAIL（第一個表頭優先）、新列與表格之間空一行者 FAIL（這第三個
+與「擋掉 log 之前那行」是同一條連續性規則的兩面，且空行隔開本來就會 render 成另一
+張表）。未重評任何 trial，未動用 trial 額度。
+
+歷次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
 
 - **baseline 臂已定。** 10 筆全為 0.33、A1–A4 全滅；A2 與 A3 都在 A1–A4 之內，
   因此在舊判準下已是 10/10 全滅，而收緊只會讓過的變不過，不可能把不過的拉成過。
   兩種讀法下 baseline 臂都是 0.33 / 0%。
-- **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。三處
-  收緊只動到這兩條（列綁定落在 A2 之內，可掉的 assertion 仍是 {A2, A3}），其餘
-  assertion 不受影響，因此若以出貨判準重評這個池——實際上重評不了，見下——
+- **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。各處
+  收緊只動到這兩條（列綁定與表格錨定都落在 A2 之內，可掉的 assertion 仍是
+  {A2, A3}），其餘 assertion 不受影響，因此若以出貨判準重評這個池——實際上重評不了，見下——
   一筆 treatment trial 只會是 1.00、掉一項的 0.83、或兩項都掉的 0.67。差值因而落在
   **+0.33** 與已量測的 +0.67 之間；baseline 臂變異數為 0、treatment 值全部落在
   [0.67, 1.00]，該區間內的任何信賴區間都碰不到 0。
