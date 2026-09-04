@@ -304,8 +304,8 @@ directory is gone. The transcripts that do survive under
 anywhere in the tree. Their directory names match the two k=3 preflights'
 start times, but that is adjacency, not something the filename guarantees.
 
-**Fixture hygiene.** No maintenance guide beside the four files, no instruction
-anywhere that the ledger moves with the code, and no earlier commit
+**Fixture hygiene.** No maintenance guide beside the fixture's files, no
+instruction anywhere that the ledger moves with the code, and no earlier commit
 demonstrating it. The Version-1 pool showed the baseline knows the sequence
 without being told, so the fixture stays clean and the pressure lives in the
 prompt.
