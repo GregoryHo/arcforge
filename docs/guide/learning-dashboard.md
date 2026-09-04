@@ -187,13 +187,12 @@ one path where nothing checks the transition and nothing records it.
 
 The CLI works the **same queue** the dashboard does. It is the scriptable way
 into the same review loop, not a second one: it reads through the same event
-log, offers only the transitions the same legality matrix allows, prints the
-same behavior-change warning before activation, and writes to the same audit
-log. On the CLI, the acknowledgement that gates activation is the typed command
-itself: `learn activate <id>` prints the behavior-change warning and the target
-path to stderr, and carries its own acknowledgement. So a scripted
-`learn activate --json` activates with no further prompt; the command you typed
-was the gate.
+log, offers only the transitions the same legality matrix allows, and writes to
+the same audit log. On the CLI, the acknowledgement that gates activation is the
+typed command itself: `learn activate <id>` prints the behavior-change warning
+and the target path to stderr, and carries its own acknowledgement. So a
+scripted `learn activate --json` activates with no further prompt; the command
+you typed was the gate.
 
 ```bash
 arcforge learn inbox --project
