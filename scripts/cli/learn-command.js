@@ -24,6 +24,7 @@ const { output } = require('./shared');
 const { runLearnWorkflowCommand } = require('./learn-workflow-command');
 const {
   readProjectCards,
+  isUnknownCandidateId,
   findProjectCandidate,
   findProjectCard,
   materializationFor,
@@ -80,6 +81,41 @@ function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
   });
   if (!result.accepted) throw new Error(refusalMessage(result, verb, card));
   return result;
+}
+
+/**
+ * The candidate a transition names, with the miss the engine owns audited.
+ *
+ * A miss splits two ways and only one is the engine's to answer. An id naming
+ * no candidate anywhere is exactly the `candidate_not_found` that
+ * `handleDashboardAction` models, so it is dispatched and the refusal lands in
+ * `actions.jsonl` beside the dashboard's, identical apart from
+ * `actor.actor_type` (B-5). The result is discarded rather than rendered — it is
+ * always that one rejection, and `missingCandidateError` says which miss this
+ * was, which the bare reason cannot.
+ *
+ * An id naming another project's candidate, or a global one, is refused here
+ * and recorded nowhere: the engine models no scope gate, and dispatching one
+ * comes back `accepted: true` having moved another project's candidate. Same
+ * class as the `--global` refusal in `requireProjectCandidateScope` — a scope
+ * decision only the front end makes. B-5 says so; a jest case pins it.
+ *
+ * Reads never come through here: they dispatch no action to record.
+ */
+function findTransitionCandidate(verb, candidateId) {
+  try {
+    return findProjectCandidate(candidateId);
+  } catch (error) {
+    if (isUnknownCandidateId(candidateId)) {
+      const { handleDashboardAction } = require('../lib/learning-dashboard');
+      handleDashboardAction({
+        action: ACTION_FOR_VERB[verb],
+        candidate_id: candidateId,
+        actor: CLI_ACTOR,
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -246,8 +282,10 @@ function runDrafts({ scope }) {
 function runAccept({ scope }, candidateId) {
   // The record as well as the card: the name policy is enforced against the
   // stored `name`, and the card's is redacted and truncated. See
-  // `findProjectCandidate`.
-  const { record, card } = findProjectCandidate(candidateId);
+  // `findProjectCandidate`. An unknown id records `approve` — the move accept
+  // would have dispatched first. B-5's "nothing recorded" covers accept's two
+  // prerequisites, which only a candidate that exists has.
+  const { record, card } = findTransitionCandidate('approve', candidateId);
   if (!isMaterializableType(card.artifact_type)) throw new Error(acceptRefusalMessage(card));
   if (!isMaterializableName(record.name)) throw new Error(acceptNameRefusalMessage(card));
   if (card.lifecycle_status === 'materialized') {
@@ -287,7 +325,7 @@ function runAccept({ scope }, candidateId) {
 }
 
 function runTransition({ scope }, verb, candidateId) {
-  const card = findProjectCard(candidateId);
+  const { card } = findTransitionCandidate(verb, candidateId);
   const safetyAck = verb === 'activate' ? acknowledgeActivation(card) : undefined;
   const result = dispatchAction({ verb, card, expectedStatus: card.lifecycle_status, safetyAck });
   return {

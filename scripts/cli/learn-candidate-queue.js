@@ -89,6 +89,24 @@ function missingCandidateError(candidateId) {
 }
 
 /**
+ * Whether the id names no candidate anywhere in the machine-wide queue.
+ *
+ * The split the dispatch layer audits on. An id that names nothing is the
+ * engine's own `candidate_not_found`; an id that names another project's
+ * candidate, or a global one, is a scope refusal only this front end makes.
+ * `learn-command.js` says what each one does with that.
+ *
+ * A second queue pass, deliberately: it runs only after `findProjectCandidate`
+ * has already thrown, on a path that ends in a non-zero exit, and keeping the
+ * question here rather than smuggling a flag out on the Error keeps
+ * `missingCandidateError` responsible for prose alone.
+ */
+function isUnknownCandidateId(candidateId) {
+  const { readCurrentCandidates } = require('../lib/learning-curator/queue-writer');
+  return readCurrentCandidates()[candidateId] === undefined;
+}
+
+/**
  * One candidate, as both the queue record and the card the CLI prints.
  *
  * Almost every surface wants only the card — the sanitized wire model is what
@@ -206,6 +224,7 @@ function activeTargetFor(card) {
 
 module.exports = {
   readProjectCards,
+  isUnknownCandidateId,
   findProjectCandidate,
   findProjectCard,
   materializationFor,

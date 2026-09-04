@@ -666,6 +666,7 @@ describe('learn candidate commands over the canonical queue', () => {
           scope: { kind: 'project', project: 'some-other-project', project_id: 'proj_other' },
         }),
       );
+      const queueBefore = queueBytes();
 
       const result = runCli(['activate', OTHER_PROJECT_CANDIDATE_ID, '--project', '--json']);
 
@@ -674,6 +675,62 @@ describe('learn candidate commands over the canonical queue', () => {
         /belongs to the project "some-other-project", not to "arcforge"/,
       );
       expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
+      // The scope half of the same split, pinned against a "fix" that would
+      // route it through the engine: `handleDashboardAction` models no scope
+      // gate, so dispatching this id returns `accepted: true` and moves another
+      // project's candidate. The refusal is the front end's own, it records
+      // nothing, and the record it protects is untouched (B-5).
+      expect(auditEntries()).toEqual([]);
+      expect(queueBytes()).toBe(queueBefore);
+    });
+
+    // The other half: an id that names no candidate anywhere is exactly the
+    // `candidate_not_found` the shared handler models and audits, so the CLI
+    // dispatches it rather than refusing silently. Before this, a mistyped id
+    // was the one transition refusal the dashboard logged and the CLI did not.
+    it('audits an unknown candidate id like the dashboard does, with the CLI actor', () => {
+      seed(makeRecord());
+      const queueBefore = queueBytes();
+
+      const result = runCli(['approve', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/candidate not found/);
+      expect(auditEntries()).toHaveLength(1);
+      expect(auditEntries()[0]).toMatchObject({
+        accepted: false,
+        action: 'approve',
+        candidate_id: 'cand_no_such_candidate_0000',
+        reason: 'candidate_not_found',
+        actor: { layer: 6, actor_type: 'cli', reviewer: 'local_user' },
+      });
+      // Audited, not applied: the refusal appends no queue event.
+      expect(queueBytes()).toBe(queueBefore);
+    });
+
+    // `accept` records the move it would have dispatched first. Its own two
+    // prerequisites still refuse before anything is applied or recorded — that
+    // carve-out is about a candidate that exists, which this id does not name.
+    it('audits an unknown id under accept as the approve it would have dispatched', () => {
+      const result = runCli(['accept', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(auditEntries()).toEqual([
+        expect.objectContaining({
+          accepted: false,
+          action: 'approve',
+          reason: 'candidate_not_found',
+          actor: expect.objectContaining({ actor_type: 'cli' }),
+        }),
+      ]);
+    });
+
+    // Reads dispatch no action, so a miss on one is not an action to record.
+    it('leaves the audit log alone when a read command misses', () => {
+      const result = runCli(['inspect', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(auditEntries()).toEqual([]);
     });
 
     it('groups the inbox by status and artifact type with the next command for each', () => {
