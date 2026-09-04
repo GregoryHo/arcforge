@@ -1,12 +1,13 @@
 # Deferred from the `check:product` review rounds
 
 Process record from the review of the product-method alignment PR — the round that
-built `scripts/check-product.js` and its falsifiability suite. Seven things came out
-of it that were deliberately **not** landed — five widenings and carry-forwards the
-rounds argued down, plus two standing constraints on the linter's own code, two of
-which have since been taken — and each would otherwise have survived only in a review
-thread. They are written down here so the next person hardening the linter starts
-from the constraints rather than rediscovering them.
+built `scripts/check-product.js` and its falsifiability suite. Each section below is
+something the rounds deliberately did **not** land — a widening argued down, a
+carry-forward, or a standing constraint on the linter's own code — or, where one is
+marked **TAKEN**, something later landed along with the part of it that stayed
+deferred. Each would otherwise have survived only in a review thread. They are
+written down here so the next person hardening the linter starts from the constraints
+rather than rediscovering them.
 
 Nothing here is a promise. `product/ROADMAP.md`'s D-006 is the entry that records
 what `check:product` actually asserts, and its `Residual:` points at this file.
@@ -455,3 +456,48 @@ So the choice is not "fix or don't" but "how wide is a `Spec` cell allowed to be
 whether the linter reads link text as CommonMark does, or keeps the bracket-blind class
 and its two named misses. That is a maintainer decision about the format, not a review
 fix, and whoever takes it owns the docblock's fail-closed paragraph along with it.
+
+## 9. What the HTML-comment exemption does not cover — the block form was **TAKEN** in the round that reported it
+
+`fenceTracker()` read fences only, so `unfencedEntries()` kept every line of an HTML
+comment and `section()` matched headings inside one. CommonMark's HTML block type 2
+opens on a line beginning `<!--` and closes only on a line containing `-->` — blank
+lines do **not** close it — so a comment could hold a blank line and a well-formed
+six-column table, and that table satisfied C6's framing clause while C1, C4 and C7 read
+its row. Confirmed against GitHub's own `/markdown` endpoint rather than argued from the
+spec: the commented corpus comes back as the `<h2>` and no `<table>`, the identical
+uncommented corpus as a full six-column `<table>`. The row the linter read was on
+nobody's screen. The same held for a whole Decision Log, a spec's `> Status:` header, a
+`## Roadmap` heading that won `section()`'s first match and displaced the real section
+below it, and a `## Appendix` that truncated the log.
+
+What made this a fix rather than a deferral is parity with the exemption this file
+already implements. A `D-002` that is absent, and the same entry inside a fence, both
+report `C2 ... gap: expected D-002, found D-003` and `C5 ... cites D-002, which is not
+in the Decision Log`. The same entry inside a comment reported nothing — so it counted
+toward gap-free numbering and resolved a spec's citation. Identical invisibility,
+opposite verdicts: an inconsistency in the abstraction `product-markdown.js` exists to
+provide, not a new promise. D-006 already says the roadmap's rows sit "under a table GFM
+renders", so no `D-id` was added and the rule count stays seven.
+
+`fenceTracker()` became `hiddenTracker()` and holds **one** `open` slot for either kind.
+That is load-bearing rather than tidy: two predicates OR-ed together would both see every
+line, so a fence delimiter inside a comment would flip fence state and every line after
+the comment closed would be read against a fence that never opened. Partial application
+would have been worse than none — a comment-aware `unfencedEntries()` beside a
+fence-only `section()` leaves both heading holes wide open.
+
+Two directions stay open, and both were scoped deliberately:
+
+- **Raw HTML at large is not exempt, and must not become so.** The discriminator is
+  *does the block render its contents*, not *is it HTML*. CommonMark's HTML blocks 1 and
+  3-7 pass their contents through to the reader, and `<details>` is the one this corpus
+  depends on: `product-decisions.js` reads the folded index's entries as live product
+  state (`FOLD_OPEN_RE`). A rule hiding every raw-HTML block would delete the fold, and
+  with it C2's ascending-order exception.
+- **The inline form is not exempt.** A `<!-- note -->` sitting after text on a line
+  leaves that line rendering, so the line is read whole and the comment's own contents
+  are read with it. Closing that direction means reading a line's inline spans rather
+  than its opening columns — the same shape as §5's code-span strip, and priced the
+  same way. No line under `product/` writes one, and `product/AGENTS.md` states the
+  scope so nobody hides product state that way by accident.

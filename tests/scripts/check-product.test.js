@@ -48,6 +48,20 @@ function decision({ id = 'D-001', title = 'a choice', status = 'Accepted', extra
 }
 
 /**
+ * `lines` wrapped in a block HTML comment, carrying the blank lines that make the
+ * wrapper worth testing. CommonMark keeps `<!-- ... -->` open across a blank line,
+ * so what comes back renders as nothing at all while still giving a roadmap table
+ * the blank line above its header that C6's framing clause asks for — the shape
+ * that let a table nobody can see satisfy four rules.
+ *
+ * Returns lines, the form `intro`, `note`, `header` and `preamble` take; a fixture
+ * putting one in `decisions` or `rows` joins it, the way the fenced fixtures do.
+ */
+function comment(lines) {
+  return ['<!--', '', ...lines, '', '-->'];
+}
+
+/**
  * `intro` and `appendix` sit outside the `## Decision Log` section — before it
  * and after it — so a fixture can put decision-shaped prose where the log is not.
  * `note` sits *inside* the `## Roadmap` section, below the table, so a fixture
@@ -1962,6 +1976,152 @@ describe('check-product', () => {
       // illustration rather than product state.
       const note = ['', '   ```markdown', LIVE_ROW, '   ```'];
       expect(run({ roadmap: { note } })).toEqual([]);
+    });
+  });
+
+  describe('where an HTML comment starts and ends', () => {
+    // The other half of the invisibility exemption. A fence renders its contents
+    // as literal text; a comment renders nothing at all, and every rule below
+    // read one as product state anyway — a table, a log, a spec header and two
+    // section boundaries, all of them off lines GitHub's own renderer drops.
+    const HIDDEN_ROW = row({ version: '9.9.9', status: 'building', here: false, specs: [] });
+
+    it('reads a commented decision the way it reads an absent one, and a fenced one', () => {
+      // The invariant the whole exemption is, stated once. D-002 is missing,
+      // then shown in a fence, then hidden in a comment, while a spec cites it
+      // throughout: all three are invisible, so all three owe the same verdict.
+      // The third returned no errors at all — the commented entry closed C2's
+      // gap and resolved C5's citation off a heading nobody can see.
+      const forms = {
+        absent: [],
+        fenced: [['```markdown', decision({ id: 'D-002' }), '```', ''].join('\n')],
+        commented: [comment(decision({ id: 'D-002' }).split('\n')).join('\n')],
+      };
+      const verdicts = Object.fromEntries(
+        Object.entries(forms).map(([name, hidden]) => [
+          name,
+          run({
+            roadmap: {
+              decisions: [decision({ id: 'D-001' }), ...hidden, decision({ id: 'D-003' })],
+            },
+            specs: [spec({ cites: ['D-002'] })],
+          }),
+        ]),
+      );
+      expect(verdicts.absent).toEqual([
+        'C2 Decision Log has a gap: expected D-002, found D-003',
+        'C5 specs/alpha.md: cites D-002, which is not in the Decision Log',
+      ]);
+      expect(verdicts.fenced).toEqual(verdicts.absent);
+      expect(verdicts.commented).toEqual(verdicts.absent);
+    });
+
+    it('does not read a roadmap table that sits inside a comment', () => {
+      // The reported input. The blank line the comment carries above the header
+      // satisfies C6's framing clause, so a table on nobody's screen passed the
+      // rule that exists to assert the table renders — and C1, C4 and C7 read
+      // its row as the corpus's product state.
+      // The wrapper is spelled out across the two knobs rather than through
+      // `comment()`, because the frame and the rows are separate knobs and the
+      // comment has to hold both.
+      const errors = run({
+        roadmap: { header: ['<!--', '', ...TABLE_HEADER], rows: [row(), '', '-->'] },
+      });
+      expect(errors).toEqual([
+        'C1 expected exactly 1 roadmap row carrying "← we are here", found 0',
+        'C4 specs/alpha.md: no roadmap row links it, so it has no governing row',
+        'C6 sanity floor: the roadmap table has no rows',
+      ]);
+    });
+
+    it('does not let a commented Decision Log satisfy the sanity floor', () => {
+      const decisions = [comment(decision({ id: 'D-001' }).split('\n')).join('\n')];
+      expect(of('C6', run({ roadmap: { decisions } }))).toEqual([
+        'C6 sanity floor: the Decision Log has no entries',
+      ]);
+    });
+
+    it("does not read a spec's `> Status:` header from inside a comment", () => {
+      // C4's counterpart to the table case: `specStatusHeaders` scans the whole
+      // preamble, so a commented header counted as the one header a spec owes —
+      // and a spec that says nothing about its version passed the rule that
+      // exists to make it agree with its row.
+      const specs = [spec({ preamble: ['<!--', ''], intro: ['-->', ''] })];
+      expect(of('C4', run({ specs }))).toEqual([
+        'C4 specs/alpha.md: missing the "> Status:" header line',
+      ]);
+    });
+
+    it('does not let a commented `## Roadmap` stand in for the section below it', () => {
+      // `section()` takes the first match, so a commented illustration of the
+      // section displaced the real one under it — the same hijack the fence
+      // exemption already blocks, through a wrapper that shows even less.
+      const intro = [...comment(['## Roadmap', '', ...TABLE_HEADER, HIDDEN_ROW]), ''];
+      expect(run({ roadmap: { intro } })).toEqual([]);
+    });
+
+    it('does not let a commented `## Appendix` truncate the Decision Log', () => {
+      // The closing boundary, where reading a hidden line fails open the way an
+      // indented `## Appendix` did: the log ended at a heading nobody sees, and
+      // D-002 left the checked history with the citation resolving it.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        comment(['## Appendix']).join('\n'),
+        decision({ id: 'D-002' }),
+      ];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
+    });
+
+    it('closes a one-line comment on the line it opens', () => {
+      // CommonMark ends the block on the first line *containing* `-->`, the
+      // opening line included. Read as an opener alone, this line would leave a
+      // comment open that nothing closes, and D-002 would go unread.
+      const decisions = [decision({ id: 'D-001' }), '<!-- a note -->', decision({ id: 'D-002' })];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
+    });
+
+    it('opens no comment on a `<!--` indented four spaces', () => {
+      // The bound is ` {0,3}`, the one every structural probe here takes: at
+      // four spaces the line is an indented code block, where `<!--` is literal
+      // text. Read at `\\s*`, an illustration of the wrapper would swallow the
+      // rest of the log.
+      const decisions = [decision({ id: 'D-001' }), '    <!--', decision({ id: 'D-002' })];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
+    });
+
+    it('swallows the rest of its scope when a comment is never closed', () => {
+      // Failure stays closed, matching the unclosed-fence posture: GFM really
+      // does hide everything below an unterminated `<!--`, so the log is empty
+      // and C6's floor is what reports it.
+      const decisions = ['<!--', decision({ id: 'D-001' })];
+      expect(of('C6', run({ roadmap: { decisions } }))).toEqual([
+        'C6 sanity floor: the Decision Log has no entries',
+      ]);
+    });
+
+    it('does not let a fence delimiter inside a comment open a block', () => {
+      // Why the tracker keeps one `open` slot instead of OR-ing two predicates.
+      // Two trackers both see every line, so this ` ``` ` would flip fence state
+      // and the lines after `-->` would be read against a fence that never
+      // opened — taking D-002 with them.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        comment(['```']).join('\n'),
+        decision({ id: 'D-002' }),
+      ];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
+    });
+
+    it('opens no comment on a `<!--` inside a fenced block', () => {
+      // The same coupling from the other side: inside a fence the opener is the
+      // literal text the block renders, so a fenced illustration of a comment
+      // must not open one that runs past the fence's own close.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        ['```markdown', '<!--', '```', ''].join('\n'),
+        decision({ id: 'D-002' }),
+      ];
+      expect(run({ roadmap: { decisions }, specs: [spec({ cites: ['D-002'] })] })).toEqual([]);
     });
   });
 });

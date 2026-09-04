@@ -257,17 +257,42 @@ row is why this matters beyond the log: an indented six-cell row read as product
 state can become a spec's governing row and force its `Status:` header to a version
 that exists only in the illustration.
 
-Both exemptions apply inside a scope. The Decision Log is the `## Decision
+HTML comments are the third exemption, and the bluntest of the three. A fence and an
+indented block still show their contents as literal text; a `<!-- ... -->` block shows
+nothing at all, so nothing inside one is product state. A commented `### D-NNN` is not
+an entry, a commented roadmap row is not a row, a commented `> Status:` header is not a
+header, and a commented `##` heading opens no section and closes none — each is read
+exactly as if it were absent, which is the whole rule.
+
+A comment **opens** on a line beginning `<!--`, at three leading spaces at most, the
+same bound the lines above take; at four it is an indented code block and opens
+nothing. It **closes** on the first line that *contains* `-->`, wherever on that line
+it lands and including the opening line itself, so a one-line `<!-- note -->` opens and
+closes in place. Blank lines do not close it, and that is why this exemption had to be
+written: a well-formed six-column table wrapped in a comment still carried the blank
+line above its header that C6's framing asks for, and passed as a table on nobody's
+screen while C1, C4 and C7 read its row. An unterminated `<!--` hides the rest of its
+scope the way an unclosed fence does, which for the log means C6's floor reports it as
+empty.
+
+Two edges are worth knowing before hiding anything this way. The exemption is the
+comment's alone, not raw HTML's: `<details>` renders its contents, and the folded index
+at the bottom of the log is read as live product state — fold an entry, don't comment
+it. And it is the block form's alone: an inline `<!-- note -->` sitting after text on a
+line leaves that line rendering, so the line is read whole, comment and all.
+
+All three exemptions apply inside a scope. The Decision Log is the `## Decision
 Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
 `### D-NNN` heading in an intro, an appendix, or any other section of the file is
 prose or illustration, not an entry, and is not checked as one. Rename or drop the
 section and the log reads as empty, which C6's sanity floor rejects.
 
-The scope's own boundaries honour the fence exemption: a `##` line inside a fenced
-block opens no section and closes none, so a worked example may show a whole
-`## Decision Log` — the way the few-shots here do — without standing in for the log
-or cutting it short at the entry above it. Indentation is not an exemption at this
-boundary either, at either end, but the two ends are read at different bounds
+The scope's own boundaries honour the fence and comment exemptions: a `##` line inside
+a fenced block or a comment opens no section and closes none, so a worked example may
+show a whole `## Decision Log` — the way the few-shots here do — without standing in
+for the log or cutting it short at the entry above it, and a commented-out
+`## Appendix` ends nothing. Indentation is not an exemption at this boundary either,
+at either end, but the two ends are read at different bounds
 because they fail in opposite directions. The heading that **opens** the scope is
 read at column 1, and an indented `## Decision Log` therefore leaves the log empty
 and C6 rejects it, the same way a renamed one does — fail-closed. The heading that
@@ -279,19 +304,20 @@ a spec's citation resolved — the fail-open direction the paragraph above forbi
 Four spaces or more is an indented code block at either end, and closes nothing. The
 `## Decisions` section a spec's citations live in (C5) is scoped the same way, but
 without that backstop: no rule asserts a spec's headings, so a spec whose section is
-renamed, dropped, or swallowed by an unclosed fence cites nothing and is checked for
-nothing. Keep the heading as the template writes it.
+renamed, dropped, or swallowed by an unclosed fence or an unterminated comment cites
+nothing and is checked for nothing. Keep the heading as the template writes it.
 
-The fence exemption is not the log's alone. Every section `check:product` reads is
-parsed the same way, so a fenced block is an illustration wherever it sits: a `|` row
-inside one in `## Roadmap` is not a roadmap row — it adds no second `← we are here`,
-and it does not stand in for a table that is not there (C1, C4, C6, C7) — and a
-`D-NNN` inside one in a spec's `## Decisions` is an example citation, not one C5
-resolves.
+The exemptions are not the log's alone. Every section `check:product` reads is parsed
+the same way, so a fenced block is an illustration wherever it sits and a comment is
+invisible wherever it sits: a `|` row inside either in `## Roadmap` is not a roadmap
+row — it adds no second `← we are here`, and it does not stand in for a table that is
+not there (C1, C4, C6, C7) — and a `D-NNN` inside either in a spec's `## Decisions` is
+an example citation or none at all, not one C5 resolves.
 
 A spec's `Status:` header has a scope of its own: it is read in the preamble above
-the spec's first `##` heading, and it honours the fence exemption there, so a fenced
-copy of the template is an illustration. Keep the header where the template puts it,
+the spec's first `##` heading, and it honours the exemptions there, so a fenced copy of
+the template is an illustration and a commented one is nothing at all — both leave the
+header C4 reports as missing. Keep the header where the template puts it,
 directly under the H1 — a `> Status:` line below the first `##` is prose, and C4
 reports the header as missing.
 
