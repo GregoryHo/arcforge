@@ -107,7 +107,11 @@ asserted by test (B-3).
 
 - **D-002** — the skill set targets Claude Code as its only harness for 6.0.0;
   self-containment (markdown + a bare CLI on PATH) is what keeps a second
-  harness cheap later. See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
+  harness cheap later.
+- **D-014** — the spec-driven method ships to users as a skill at 6.1.0, which
+  is why the shipped set gains `speccing` (B-1).
+
+See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 
 The area's structural choices — black-box skills, prose-only composition, the
 single shipping bucket, no name prefix — predate this log; their rationale is
