@@ -324,6 +324,21 @@ pipe 行」——錨在表頭而非 `## Roadmap` 標題，因為 fixture 根本�
 與「擋掉 log 之前那行」是同一條連續性規則的兩面，且空行隔開本來就會 render 成另一
 張表）。未重評任何 trial，未動用 trial 額度。
 
+第五處收緊把 A3 的 decision entry 綁到 `## Decision Log` 本身。A3 的 block loop
+與前四處一樣跑在整份 ROADMAP.md 的文字上：在檔尾另起一個 `## Appendix`、底下寫一個
+提到 CSV 的 `### D-005` 區塊——或把同一個區塊寫在 `## Decision Log` 標題之前——在
+出貨中的 grader 下即可拿到 A1–A6 全 PASS、exit 0（已實測），而 log 本身一字未增，
+該 assertion 要查的 append-only 歷史是被繞過而非被追加。收緊後改由 `decision_log()`
+把掃描範圍縮到「自 `## Decision Log` 標題起算、到下一個 `#` 或 `##` 標題為止」的
+區段——與 `version_table()` 同一形狀、同一理由；`###` 是三級標題，不會提前關閉區段。
+以五份合成 roadmap 實測（放置位置的案例；id 的判準案例是上面那六份）：追加在 log
+內的那份仍 PASS，另四份全部由 PASS 轉 FAIL（寫在 `## Appendix` 底下、寫在 log 標題
+之前、寫在檔尾另一個 `## Decision Log` 底下、log 標題被改名為 `## Decisions`）。
+已接受的 false negative 有兩個，都已實測並記在該 scenario 的 Design Notes：改掉標題
+名稱者 FAIL、把新項另起第二個 `## Decision Log` 者 FAIL（第一個標題優先，且 fixture
+的 log 一路到檔尾，要碰到這個案例得刻意在 D-004 內文後面另寫一個重複標題）。上面
+那六份 id 案例在錨定之下判定全不變。未重評任何 trial，未動用 trial 額度。
+
 歷次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
 
@@ -331,8 +346,8 @@ pipe 行」——錨在表頭而非 `## Roadmap` 標題，因為 fixture 根本�
   因此在舊判準下已是 10/10 全滅，而收緊只會讓過的變不過，不可能把不過的拉成過。
   兩種讀法下 baseline 臂都是 0.33 / 0%。
 - **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。各處
-  收緊只動到這兩條（列綁定與表格錨定都落在 A2 之內，可掉的 assertion 仍是
-  {A2, A3}），其餘 assertion 不受影響，因此若以出貨判準重評這個池——實際上重評不了，見下——
+  收緊只動到這兩條（列綁定與表格錨定落在 A2 之內、log 錨定落在 A3 之內，可掉的
+  assertion 仍是 {A2, A3}），其餘 assertion 不受影響，因此若以出貨判準重評這個池——實際上重評不了，見下——
   一筆 treatment trial 只會是 1.00、掉一項的 0.83、或兩項都掉的 0.67。差值因而落在
   **+0.33** 與已量測的 +0.67 之間；baseline 臂變異數為 0、treatment 值全部落在
   [0.67, 1.00]，該區間內的任何信賴區間都碰不到 0。
