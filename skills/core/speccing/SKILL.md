@@ -60,9 +60,9 @@ Promotion is three edits — two, absent a wish — made **before** any code:
    or this version's behaviors added to the area's existing living spec, never a
    second file. An existing spec's header follows its highest linking row from
    this edit on, not from the build — the compound form in
-   `references/conventions.md` once a lower row has shipped. The new row takes
-   `← we are here` only when every row above it has shipped; a `building` row,
-   or an earlier `next` row, keeps it.
+   `references/conventions.md` once a lower row has shipped, plain `draft` while
+   none has. The new row takes `← we are here` only when every row above it has
+   shipped; a `building` row, or an earlier `next` row, keeps it.
 
 The spec goes first because it is what the build gets reviewed against. Written
 afterwards it describes whatever got built — a summary, not a contract, and it
