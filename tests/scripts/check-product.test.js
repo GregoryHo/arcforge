@@ -1458,6 +1458,32 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/not a zero-padded D-NNN id/);
     });
 
+    it.each([
+      ['_D-009_', 'underscore emphasis'],
+      ['__D-009__', 'underscore bold'],
+    ])('reads %s, which %s renders as a citation', (written) => {
+      // `_` is a word character, so `\b` never fires between it and the `D`.
+      // Read at a word boundary the scan skipped the token whole and the spec
+      // cited a decision the log does not carry with no violation.
+      const specs = [
+        spec({
+          cites: ['D-001'],
+          extra: [`- ${written} — cites a decision the log does not carry.`],
+        }),
+      ];
+      const errors = of('C5', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/cites D-009/);
+    });
+
+    it('does not read the emphasis delimiter as a suffix on the id', () => {
+      // The other direction of the same boundary: `_` closes the emphasis, so a
+      // recorded decision emphasised this way is the citation it renders as
+      // rather than the malformed `D-001_` a trailing `\w*` would report.
+      const specs = [spec({ cites: ['D-001'], extra: ['- _D-001_ — pins another choice here.'] })];
+      expect(of('C5', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
     it('still reads the citations below a fenced `##` line', () => {
       // A spec's `## Decisions` is sliced by the same fence-aware `section`:
       // read fence-blind, the section ends inside this example and the citation

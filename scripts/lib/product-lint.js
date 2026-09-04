@@ -82,7 +82,12 @@
  *         and exists in the log — that section is sliced the same fence-aware
  *         way, so an example `##` heading cannot carry citations out of reach,
  *         and the citation scan skips its fenced lines, so a `D-NNN` inside a
- *         worked example is an illustration rather than a citation;
+ *         worked example is an illustration rather than a citation. The token
+ *         itself is bounded by the identifier alphabet rather than by a word
+ *         boundary, because Markdown's emphasis delimiter is a word character:
+ *         read at `\b`, `_D-999_` matched nothing at all, so a spec could cite
+ *         a decision the log does not carry, in a line every reader sees as a
+ *         citation, with no violation;
  *   - C6  sanity floor — at least one roadmap row, one decision, one spec, and
  *         the roadmap's rows sitting under a table that renders: a six-column
  *         header opening on `Version`, and a delimiter row of the same width
@@ -134,10 +139,17 @@ const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 // renders as the header a reader trusts and the count below has to see it. At four
 // the line is an indented code block, and an illustration again.
 const SPEC_STATUS_HEADER_RE = /^ {0,3}>\s*Status:\s*(.+?)\s*$/;
-// Matches a citation-shaped token and its trailing word characters, so a
+// Matches a citation-shaped token and its trailing identifier characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
-// leading `\d` keeps ordinary prose (`D-Bus`) out of the scan.
-const CITATION_RE = /\bD-(\d+)(\w*)/g;
+// leading `\d` keeps ordinary prose (`D-Bus`) out of the scan. The alphabet is
+// letters and digits on both sides rather than `\w`, so `_` is the emphasis
+// delimiter it renders as and never a character of the id: `\b` counts `_` as a
+// word character, so it never fired between the `_` and the `D` of `_D-999_`
+// and the scan skipped the citation whole. The residual runs the other way and
+// is the smaller one: an underscore-suffixed id (`D-001_beta`) now reads as a
+// clean `D-001` where it used to be reported malformed — a shape nothing
+// writes, where emphasising a citation is an ordinary way to write one.
+const CITATION_RE = /(?<![0-9A-Za-z])D-(\d+)([0-9A-Za-z]*)/g;
 
 /**
  * The three numbers a roadmap `Version` cell orders by — callers hand it a cell
