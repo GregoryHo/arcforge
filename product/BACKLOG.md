@@ -49,3 +49,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   first 2 KB, so thirty long paths push the marker past the window and a stale
   draft reads as enriched; bound the rendered block so the markers sit inside
   the probe window by construction · issue: [#177](https://github.com/GregoryHo/arcforge/issues/177).
+- **dashboard-activation-ack** — the learning dashboard's Activate and Deactivate
+  buttons are refused by their own gate: the page posts the action with no
+  `safety_ack`, and shows neither the behavior-change warning nor the active
+  target path it would be acknowledging, so the CLI is the only surface that can
+  activate today · issue: [#173](https://github.com/GregoryHo/arcforge/issues/173).
