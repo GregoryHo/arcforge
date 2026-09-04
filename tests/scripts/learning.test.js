@@ -193,6 +193,39 @@ describe('learning subsystem MVP-1', () => {
       fs.writeFileSync(configPath, JSON.stringify(config));
       expect(learningEnabledSince({ projectRoot, homeDir })).toBe(fs.statSync(configPath).mtimeMs);
     });
+
+    // Writing an unstamped config MOVES its mtime, so the fallback above has to
+    // be captured before the write rather than re-derived after it — otherwise
+    // an idempotent re-enable silently retires every draft that failed
+    // enrichment between the old mtime and the repeated command.
+    function writeUnstampedEnabledConfig() {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+      fs.utimesSync(configPath, new Date(EARLY), new Date(EARLY));
+      return configPath;
+    }
+
+    it('preserves the mtime fallback when an unstamped enabled scope is enabled again', () => {
+      writeUnstampedEnabledConfig();
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: true,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      // The CLI prints this returned config, so it carries the preserved stamp.
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    it('still stamps the transition when an unstamped scope is actually toggled', () => {
+      writeUnstampedEnabledConfig();
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: LATE });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
   });
 
   describe('inject_activated_instincts kill-switch (ICL-4)', () => {
