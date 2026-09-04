@@ -121,7 +121,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   with the roadmap's rows sitting under a table GFM renders — a six-column header
   opening on `Version`, a delimiter row of the same width, and the rows themselves,
   all on consecutive lines, since a blank line or a fenced block between any two of
-  them ends the table there — so an unframed row cannot stand in for the table (C6);
+  them ends the table there, and that header either opening the section or carrying
+  a blank line directly above it, with anything else directly above it reported: a
+  blockquote or a list item there takes the whole table into its own paragraph and
+  GFM renders none, while a plain paragraph splits and the table under it renders
+  and is reported all the same — so an unframed row cannot stand in for the table
+  (C6);
   and a `Tag` cell matching its
   row's Status —
   `vX.Y.Z` when shipped, `—` otherwise (C7).
