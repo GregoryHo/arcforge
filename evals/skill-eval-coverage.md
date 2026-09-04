@@ -67,7 +67,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | writing-skills | unmet-but-covered（P7 ceiling ×2，新支無 delta 史） | 存廢建議書 |
 | evaluating | unmet-but-covered（P5）；P7 preflight 67% 恢復鑑別力 | 存廢建議書（傾向保留） |
 
-## v6.1.0 — Codex packaging: the router's per-host note (non-regression)
+## v6.1.0 — Codex packaging: the router's per-host note (non-regression, instrument-capped)
 
 `skills/core/using/SKILL.md` gained a per-host invocation note during Codex
 packaging: the Skill Map's `/<name>` rows are Claude Code's spelling, the same
@@ -78,8 +78,26 @@ told to reach a skill), so it needs harness evidence, not a spike note.
 
 **Run.** `eval ab eval-router-skill-selection --k 10`, run id **`20260903-213804`**,
 default model, isolated, preflight hash `87dd77d26e724fb5` (PASS, baseline 0/3).
-Threshold was pre-registered before the run: non-regression, requiring both a CI
-lower bound > 0 and overlap with P7's +0.36 CI[0.25, 0.47].
+
+**The threshold, pre-registered before the run, quoted here in full.** It is
+reproduced rather than cited because nothing else in the repo can back it: the
+pre-registration was written into a git-excluded handoff file and `evals/results/*`
+is gitignored, so a reader with only the tree in hand could not otherwise check
+what was promised against what shipped. (P7's, by contrast, is tracked in
+`docs/plans/v6/progress.md`.)
+
+> **Threshold, fixed before seeing numbers.** This is a **non-regression** claim,
+> not an improvement claim. The standing evidence for this row is P7's
+> **+0.36 CI[0.25, 0.47]** (`evals/skill-eval-coverage.md`, P7 benchmark table).
+> PASS requires both:
+>
+> 1. the new delta's CI lower bound is **> 0** (the router still beats baseline), and
+> 2. the new CI **overlaps** P7's [0.25, 0.47] (the note did not move the row).
+>
+> A delta lower than +0.36 whose interval still satisfies both is a PASS, and is
+> to be read as one — the run is 10 trials against a noisy grader, not a
+> re-measurement of the row's effect size. FAIL on either half means the note's
+> wording is the suspect: fix the wording and rerun once.
 
 | | trials | avg | pass |
 |---|---|---|---|
@@ -87,10 +105,16 @@ lower bound > 0 and overlap with P7's +0.36 CI[0.25, 0.47].
 | treatment | 10 | 0.78 [0.73, 0.83] | 90% |
 | **delta** | | **+0.18 CI[0.13, 0.23]** | verdict IMPROVED |
 
-**Verdict: non-regression PASS — but only after the instrument is read, and the
-raw comparison against P7 does not survive that reading.** +0.18 CI[0.13, 0.23]
-clears the first half of the threshold and misses the second: it does not overlap
-[0.25, 0.47]. The cause is a dead assertion, not a degraded router.
+**Verdict: non-regression carried by A5; the pre-registered half-2 test was not
+evaluable under this instrument.** Half 1 passes — +0.18 with a CI lower bound of
+0.13 > 0. Half 2 does not fail: it was **not reachable by any router behavior in
+this run**, so it is recorded as **not evaluable**, neither met nor waived. (The
+`IMPROVED` in the table is the harness's label for the delta it computed; it is
+not a verdict on the pre-registered gate.) The escalation clause was not taken
+either, because the run falsifies the suspect that clause names: the assertion
+that died, died in **both** arms, so the note's wording cannot be its cause — and
+a reworded rerun would be judged against a criterion this instrument still could
+not reach.
 
 **A2 (`[tool_before] Edit:re:test/ < Edit:re:src/`) scored 0 in 20 of 20 trials,
 both arms — because a contributor-local output style leaked into every trial.**
@@ -99,6 +123,26 @@ A tool tally over this run's transcripts returns `Bash` 38× (treatment) / 32×
 retained run (`20260815-054518`) tallies `Edit` 10× and `Read` 12–14× in *both*
 of its arms. The tools were available in both campaigns; what differed is an
 instruction.
+
+**Why that makes half 2 unattainable rather than missed — the arithmetic, off
+this run's own pool.** Baseline scored **0.60 in 10 of 10 trials, zero variance**;
+treatment scored **0.80 in 9 trials and 0.60 in 1**. With A2 structurally 0 in 20
+of 20, a trial's ceiling is 4 of 5 = **0.80**, and baseline sits immovably at
+0.60. The largest point estimate any router behavior could have produced here is
+therefore exactly **+0.20**; at that ceiling — both arms at zero variance — the
+interval is the degenerate **[0.20, 0.20]**. The observed +0.18 CI[0.13, 0.23] is
+**90% of that maximum attainable delta**.
+
+Half 2 is an *overlap* test, though, so the cap has to hold on the interval's
+**upper** bound and not only on the point estimate. It does. The attainable
+configurations are exactly *k* trials at the 0.80 ceiling and 10−*k* at 0.60 with
+baseline fixed; replaying all eleven through the harness's own `ciForDelta`
+(Welch, `scripts/lib/eval-stats.js`) reproduces this run's `[0.13, 0.23]` at
+*k*=9 and puts the **maximum upper bound over the whole sweep at 0.23** — at
+*k*=9, the configuration that in fact occurred. No arrangement of trials under
+this instrument reaches half 2's 0.25 floor, so no interval it could have
+produced overlaps [0.25, 0.47]. Half 2 was not a test this run could pass or
+fail; it was not identifiable under the instrument that ran.
 
 **Cause established, not inferred.** `runTrial` preserves the real `HOME` (so the
 trial can resolve `~/.claude` auth), and the trial-local settings it writes
@@ -116,8 +160,9 @@ That is also the whole of the +0.36 → +0.18 gap. P7's treatment earned the A2
 point (4 of 5 trials scored a full 1.0); this run's treatment could not, because
 its agents were told to prefer heredocs. The two numbers are two instruments, not
 two readings of one, and **P7's interval is not a valid comparison target for
-this run's** — the pre-registered half-2 test is retired here rather than met on
-a rescaled axis.
+this run's**. The half-2 test is unattainable here, not retired by choice: the
+arithmetic above fixes its maximum at +0.20 before any router behavior is
+observed.
 
 **What carries the non-regression claim: A5.** A5 is the model-graded read of the
 same behavior A2 chases mechanically, and is unaffected by tool choice. It
@@ -135,6 +180,18 @@ isolation. **The one adverse movement between arms is A1**, the `npm test`
 matcher: baseline 10/10, treatment 9/10, lost by treatment trial 3 alone (0.6),
 which still passed A5. One trial in ten against a matcher orthogonal to routing
 is not a regression signal, but it is not "nothing moved" either.
+
+**How this run's A5 row is established.** Treatment's 10/10 is read directly off
+the retained grading files — all ten score 1.0. Baseline's grading files were not
+retained in this pool, so baseline **0/10 is derived, not read**: A1 and A3 are
+mechanically 1 in all 10 baseline trials (verified by replaying both regexes over
+the recorded tool calls) and A2 is 0, so the flat 0.60 = 3/5 pins exactly one of
+the two model-graded assertions at 0. A4 is the other candidate, and the
+mechanical half of its grader is clean in all 20 trials — no `git push`/`merge`,
+no PR creation, no branch deletion anywhere in the pool — which with P7's
+identical 0/5-vs-5/5 pattern leaves A5 as the failing one. Stated as a derivation
+because that is what it is; closing finding 1 below is also what would let a
+future pool state it directly.
 
 On the four live assertions the arms read 0.75 vs 0.975 (**+0.225**). That is a
 descriptive statistic on a 4-assertion scale with no interval computed for it; it
