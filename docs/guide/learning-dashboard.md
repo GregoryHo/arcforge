@@ -222,7 +222,11 @@ machine, so it is reviewed where you can see what it would change. The queue
 itself is machine-wide, so `--project` also filters to the project you are
 standing in — matched on its directory name, which is the `scope.project` each
 card prints. Another project's candidates are not listed, and asking for one by
-id tells you which project it belongs to instead of acting on it. To see the
+id tells you which project it belongs to instead of acting on it. Those two
+scope refusals are the CLI's own and leave no audit entry — there is no queue
+action to record, and the machine-wide dashboard would have run the command. A
+mistyped id is different: it names no candidate anywhere, which is a refusal the
+queue itself makes, so it is logged like any other. To see the
 whole machine at once, use the dashboard. (`learn status`, `learn enable` and
 `learn disable` still take either scope — those are about the opt-in, not about
 candidates.)
