@@ -183,7 +183,7 @@ removes. (The heading spelling `### D-005 — Upload storage backend (superseded
 by D-008)` is trial 7's, recorded while the pool existed; no surviving
 transcript annotates a heading.) The unmet-but-covered verdict is carried from
 Version 2's retained pool and Version 3's preflight, not re-measured — both
-scored under earlier graders, and nothing has been scored under Version 6. The
+scored under earlier graders, and nothing has been scored under Version 7. The
 forward regex on its own is still not direction-proof — `Superseded: D-005` on
 an appended entry matches it — but the pair is, because a reversed record needs
 D-005 to claim it supersedes the new entry, which A3 now rejects.
@@ -438,10 +438,12 @@ The spec's `Status:` header was corrected after the fact. Four shipped rows and
 an unshipped `0.5.0` all link `specs/uploads.md`, so the header the method owes
 is the compound `shipped v0.4.0 · extended by 0.5.0 (next)`; the fixture wrote
 the collapsed `shipped v0.4.0`, i.e. the starting state broke the header rule
-the skill it grades teaches. No assertion reads that line — A4 greps the spec
-for "vaultbox", A1–A3 read `ROADMAP.md` — so no recorded score moves and no
-verdict is re-opened; every pool named above predates the correction, and the
-`## Version` stays at 6 because nothing has been scored under it to keep apart.
+the skill it grades teaches. No assertion reads that line — A4 reads the
+spec's `## Behavior` section, A1–A3 read `ROADMAP.md` — so no recorded score
+moves and no verdict is re-opened; every pool named above predates the
+correction, and that correction did not move the `## Version`, because nothing
+had been scored under 6 to keep apart. (The three Version-7 corrections below
+did move it, for the reason each records.)
 The body moved with it by one line: `## Scope` listed thumbnails as out of
 scope, which the `extended by 0.5.0` header — 0.5.0 being the thumbnails row —
 would have contradicted outright, so the exclusion is gone. What is left thin is
