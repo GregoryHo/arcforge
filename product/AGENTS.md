@@ -476,9 +476,10 @@ does not add ceremony.
 ### Ship a version
 Run the `releasing` skill — it owns the mechanics and the ordering. Product-side, one
 commit flips all four things at once: the roadmap row to `shipped`, the `Tag` column
-to `vX.Y.Z`, every spec header the row governs, and the `← we are here` marker onto
-whatever is next — or left on the row that just shipped, when nothing has been
-promoted after it. `npm run check:product` is green before the flip and green after —
+to `vX.Y.Z`, every spec header the row governs, and the `← we are here` marker, which
+sits on the earliest row that has not shipped and on the last row when every row has
+— so it stays put when this version shipped ahead of an earlier unshipped row.
+`npm run check:product` is green before the flip and green after —
 what it catches is a *half-done* flip, which is the failure mode that actually
 happens. Three of the four edits are gated: the row's Status, its `Tag` cell, and
 every spec header the row governs all have to agree. The fourth is not — C1 counts

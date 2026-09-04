@@ -120,10 +120,10 @@ On the merge that releases a version: flip its roadmap row to shipped, fill the
 tag cell, reset each affected spec's status header from the **highest row that
 links it**, following that row's own status — `shipped v<its version>` once it
 has shipped, the compound form in `references/conventions.md` while it has not —
-and move the `← we are here` marker onto the next row, or leave it on the row
-that just shipped when nothing has been promoted after it yet. Exactly one row
-carries the marker, before and after; shipping never invents the row it would
-move to.
+and settle the `← we are here` marker — it sits on the earliest row that has not
+shipped, and on the last row when every row has, so it stays put when this
+version shipped ahead of an earlier unshipped row. Exactly one row carries the
+marker, before and after; shipping never invents the row it would move to.
 
 ## Handing off
 
