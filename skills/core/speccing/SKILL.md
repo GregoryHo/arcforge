@@ -58,11 +58,14 @@ Promotion is three edits — two, absent a wish — made **before** any code:
 2. Append a decision recording *which version, and why now*.
 3. Add the roadmap row and its spec — written from the template for a new area,
    or this version's behaviors added to the area's existing living spec, never a
-   second file. An existing spec's header follows its highest linking row from
-   this edit on, not from the build — the compound form in
-   `references/conventions.md` once a lower row has shipped, plain `draft` while
-   none has. The new row takes `← we are here` only when every row above it has
-   shipped; a `building` row, or an earlier `next` row, keeps it.
+   second file. Either way the spec's **Decisions** section carries that
+   decision's id and the one-line reason it is cited — the first entry on a new
+   spec, an addition on an existing one, never a swap. An existing spec's header
+   follows its highest linking row from this edit on, not from the build — the
+   compound form in `references/conventions.md` once a lower row has shipped,
+   plain `draft` while none has. The new row takes `← we are here` only when
+   every row above it has shipped; a `building` row, or an earlier `next` row,
+   keeps it.
 
 The spec goes first because it is what the build gets reviewed against. Written
 afterwards it describes whatever got built — a summary, not a contract, and it
