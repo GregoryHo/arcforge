@@ -122,7 +122,7 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 27 synthetic roadmaps. Each row's `old` and `new` are
+Validated offline against 28 synthetic roadmaps. Each row's `old` and `new` are
 the graders on either side of the correction that added the row, and the
 `graders` column names which pair — the corrections have different
 predecessors. Version 5 re-ran all fourteen under its own pair and only the
@@ -134,8 +134,9 @@ once more before any trial was scored under it (`V6 pre/post`), and re-running
 all twenty-one under that pair moves three rows: the two that correction added,
 and the drop case's mirror, whose A1 the pre-fix anchor passed by finding
 D-005's text under an id the fixture never wrote. Version 7 re-ran all
-twenty-one older rows under its own pair and none moved; the six it adds are
-placement cases, which no earlier version had a reason to write.
+twenty-one older rows under its own pair and none moved; the seven it adds are
+six placement cases and one numbering case, which no earlier version had a
+reason to write.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -166,6 +167,7 @@ placement cases, which no earlier version had a reason to write.
 | D-005's own entry lifted out of the log into an appendix | V6→V7 | 4/4 | **A1, A3 FAIL** |
 | the log renamed `## Decisions` | V6→V7 | 4/4 | **A1, A3 FAIL** |
 | no `## Decision Log` heading at all | V6→V7 | 4/4 | **A1, A3 FAIL** |
+| appended entry numbered `D-000`, otherwise a correct move | V6→V7 | 4/4 | **A3 FAIL** |
 
 No trials were spent, and the recorded pool cannot be re-scored: its k=10 run
 directory is gone, so none of those 8 transcripts can be re-read. The six
@@ -300,6 +302,31 @@ paths, the recorded pool cannot be re-scored (its k=10 run directory is gone),
 and all six surviving transcripts were re-read: none writes a new `##`-level
 section into `ROADMAP.md`, so none uses a removed path.
 
+**Version 7, continued — A3's "appended" read numerically.** `new_ids` was a set
+difference against the seven ids the fixture wrote, so any three-digit id
+outside 001–007 counted as appended — including `D-000`. A trial that flips
+D-005 to `Superseded by D-000` and appends an otherwise-valid `### D-000`
+scored A1–A4 all PASS: a full pass for a log made non-monotonic, against a skill
+whose rule is to append under the *next free* id. `D-000` is the entire
+reachable surface, which is why the guard can be this small: `heading_re`
+captures `D-(\d{3})`, so `D-0`, `D-005a` and `D-0000` never register as entries
+at all, and 001–007 are recorded. The predicate now requires the id to advance
+past the log's last recorded one, mirroring the `LAST_FIXTURE_ID` guard
+`eval-speccing-spec-before-code`'s A3 took two commits earlier — which states in
+its own prose that next-free-id hygiene is *this* scenario's claim, so the
+branch was shipping one scenario delegating the rule to another that handed it a
+full pass.
+
+The residual is the reviewer's stronger reading, refused deliberately: the guard
+buys "beyond D-007", not "the next free id". Pinning an exact id would fail
+correct work — the skill's step 4 can legitimately record a second decision
+ahead of the superseding one, so an entry at D-009, or D-020, is not wrong and
+still passes A3. Gap-freeness is not what this assertion measures. No trials
+were spent: the tightening can only remove passes, `grep -rn "D-000"` over
+`evals/results/eval-speccing-supersede-not-overwrite/` and `evals/preflight/`
+returns nothing, and the Version-6 note already records that all six surviving
+transcripts append after D-007.
+
 **Residual, stated rather than resolved.** Nothing has been scored under the
 Version-7 grader. Versions 4–7 only remove pass paths, so the untested direction
 is a *lower* baseline pass rate — the instrument becoming more discriminative,
@@ -323,9 +350,11 @@ here because it spends real trial quota.
   headings is not enough: dropping D-005, renumbering D-006/D-007 down, and
   appending the new entry as D-007 leaves seven ids each used once.
 - A3 — the supersede move itself: an entry appended to the `## Decision Log`
-  saying it supersedes D-005, and a line on D-005's entry in that same log
-  naming that entry as the one that superseded it. An entry parked outside the
-  log is not an append: the log is the artifact the method makes append-only. The
+  under an id beyond D-007, saying it supersedes D-005, and a line on D-005's
+  entry in that same log naming that entry as the one that superseded it. An
+  entry parked outside the log is not an append: the log is the artifact the
+  method makes append-only. Nor is an entry numbered below the log — an id that
+  undercuts what is already recorded is not the next free one. The
   reverse claim is not a spelling of the move: an appended entry saying it is
   superseded *by* D-005, or a D-005 annotation saying D-005 supersedes the new
   entry, is the same edit performed backwards, with D-005 still governing. Nor
@@ -391,7 +420,7 @@ git commit -q -m "pileup: product state at 0.4.0"
 ## Assertions
 - [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in its entry in the `## Decision Log` of `product/ROADMAP.md` byte for byte — the recorded text was not rewritten, deleted, or moved out of the log.
 - [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with — no entry was dropped, merged, or renumbered to close a gap.
-- [ ] A3: A new entry was appended to the `## Decision Log` saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
+- [ ] A3: A new entry was appended to the `## Decision Log`, with an id beyond D-007, saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
 - [ ] A4: `product/specs/uploads.md` names Vaultbox as the storage backend — the spec stopped promising a backend the product no longer uses.
 
 ## Grader
@@ -569,7 +598,16 @@ def affirmative(line):
     return not NEGATED.search(line)
 
 
-new_ids = [i for i in dict.fromkeys(ids) if i not in ORIGINAL_TITLES]
+# "an appended entry" read numerically, not as "not one of the seven ids the
+# fixture wrote". The two readings differ on exactly one id, `D-000` -- an entry
+# that undercuts the whole log while satisfying the set difference -- and a
+# superseding entry has to advance past the log's last recorded id. `int()` is
+# total here: heading_re captures `(\d{3})`, so every key is three digits.
+LAST_FIXTURE_ID = max(int(i) for i in ORIGINAL_TITLES)
+new_ids = [
+    i for i in dict.fromkeys(ids)
+    if i not in ORIGINAL_TITLES and int(i) > LAST_FIXTURE_ID
+]
 supersedes = [
     i for i in new_ids
     if any(SUPERSEDES.search(l) and affirmative(l) for l in blocks.get(i, []))
@@ -595,7 +633,7 @@ a3 = any(
     any(points_back(l, int(i)) for l in blocks.get("005", []))
     for i in supersedes
 )
-emit("A3", a3, "no appended entry supersedes D-005, or D-005 never points at one")
+emit("A3", a3, "no appended entry beyond D-007 supersedes D-005, or D-005 never points at one")
 
 # A4 — spec floor: the spec names the backend actually in use
 a4 = "vaultbox" in spec_text.lower()
