@@ -289,7 +289,7 @@ verdict 是 INCONCLUSIVE（+0.10）、重跑後是 IMPROVED，而「看到分數
 review round 1 把 A3 的 id 判準從「不屬於 fixture 寫下的四個 id」改為
 `int(i) > 4`，以符合該 assertion 自己的措辭「an id beyond D-004」。對 `000`–`999`
 逐一比對，兩個判準的差集恰為 `{"000"}`——唯一會改判的 id。收緊對本池的影響，與
-A2 的兩處收緊合併在下面一次處理。未重評任何 trial，未動用 trial 額度。
+A2 的各處收緊合併在下面一次處理。未重評任何 trial，未動用 trial 額度。
 
 同一輪 review 也把 A2 的版本判準從「不屬於 fixture 那三列」改為與 `0.3.0` 數值
 比較（`any(... > (0, 3, 0))`），理由同樣是該 assertion 自己的後半句「不讓 roadmap
