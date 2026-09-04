@@ -262,8 +262,8 @@ indented block still show their contents as literal text; a `<!-- ... -->` block
 nothing at all, so nothing inside one is product state. A commented `### D-NNN` is not
 an entry, a commented roadmap row is not a row, a commented `> Status:` header is not a
 header, and a commented `##` heading opens no section and closes none — each is read as
-if it were absent. That is the rule, with the one qualification the first edge below
-carries.
+if it were absent. That is the rule; what bounds it is below — which comments
+`check:product` sees at all, and the edges where invisible and absent part company.
 
 A comment **opens** on a line beginning `<!--`, at three leading spaces at most, the
 same bound the lines above take; at four it is an indented code block and opens
