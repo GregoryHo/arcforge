@@ -289,6 +289,25 @@ Log, and no already-superseded entry to imitate. Both pools showed the ceiling
 does not come from the fixture — the baseline knows the move without being told
 — so the fixture stays clean and the pressure lives in the prompt.
 
+The spec's `Status:` header was corrected after the fact. Four shipped rows and
+an unshipped `0.5.0` all link `specs/uploads.md`, so the header the method owes
+is the compound `shipped v0.4.0 · extended by 0.5.0 (next)`; the fixture wrote
+the collapsed `shipped v0.4.0`, i.e. the starting state broke the header rule
+the skill it grades teaches. No assertion reads that line — A4 greps the spec
+for "vaultbox", A1–A3 read `ROADMAP.md` — so no recorded score moves and no
+verdict is re-opened; every pool named above predates the correction, and the
+`## Version` stays at 6 because nothing has been scored under it to keep apart.
+The body moved with it by one line: `## Scope` listed thumbnails as out of
+scope, which the `extended by 0.5.0` header — 0.5.0 being the thumbnails row —
+would have contradicted outright, so the exclusion is gone. What is left thin is
+deliberate. `0.5.0` has no `B-` items and no promoting decision, and the second
+one is not cheap: the grader's `ORIGINAL_TITLES` and A1's recorded-id window are
+the fixture's seven entries exactly, so adding a `D-008` to the fixture would
+land on the id the trials append under and force a rubric edit — the version
+bump this correction is careful not to need. A `next` row whose behaviors are
+still unwritten is the state the skill's step 3 exists to correct, which is a
+fair thing for a fixture to show.
+
 **Redesign budget spent (1 of 1) at Version 2.** No further redesign is
 attempted; chasing a new trap after seeing the numbers is what the
 pre-registration exists to prevent.
