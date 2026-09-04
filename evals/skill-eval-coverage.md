@@ -289,7 +289,7 @@ verdict 是 INCONCLUSIVE（+0.10）、重跑後是 IMPROVED，而「看到分數
 review round 1 把 A3 的 id 判準從「不屬於 fixture 寫下的四個 id」改為
 `int(i) > 4`，以符合該 assertion 自己的措辭「an id beyond D-004」。對 `000`–`999`
 逐一比對，兩個判準的差集恰為 `{"000"}`——唯一會改判的 id。收緊對本池的影響，與
-A2 的收緊合併在下一段一次處理。未重評任何 trial，未動用 trial 額度。
+A2 的兩處收緊合併在下面一次處理。未重評任何 trial，未動用 trial 額度。
 
 同一輪 review 也把 A2 的版本判準從「不屬於 fixture 那三列」改為與 `0.3.0` 數值
 比較（`any(... > (0, 3, 0))`），理由同樣是該 assertion 自己的後半句「不讓 roadmap
@@ -297,14 +297,25 @@ A2 的收緊合併在下一段一次處理。未重評任何 trial，未動用 t
 實測，A1–A6 全 PASS、exit 0）。與 A3 不同，這裡的差集不是單一元素而是無界的
 （所有低於 `0.3.0` 且非既有三列的版本）。
 
-兩次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
+同一輪 review 的第三處收緊把 A2 的推進列綁到 CSV 這件事本身。數值比較看不出那一
+列記的是哪件事，只加一列 `| 0.4.0 | — | run diff | next | ... |`、把 CSV 的
+decision 與 behavior item 寫在別處、程式也確實出貨，在只有數值比較的 grader 下即
+可拿到 A1–A6 全 PASS、exit 0（已實測），而那份 roadmap 上 CSV 根本沒有里程碑——
+這正是該 assertion 後半句要擋的情況。收緊後改以整列比對，Milestone 與 What & why
+兩格都算；以十份合成 roadmap 實測，上述 `run diff` 列由 PASS 轉 FAIL，其餘九例判
+定不變。代價是一列寫成 `spreadsheet export`、整列不含 `csv` 字樣者也會 FAIL，此為
+已接受的 false negative，記在該 scenario 的 Design Notes。未重評任何 trial，未動用
+trial 額度。
+
+三次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
 
 - **baseline 臂已定。** 10 筆全為 0.33、A1–A4 全滅；A2 與 A3 都在 A1–A4 之內，
   因此在舊判準下已是 10/10 全滅，而收緊只會讓過的變不過，不可能把不過的拉成過。
   兩種讀法下 baseline 臂都是 0.33 / 0%。
-- **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。兩處
-  收緊不影響其餘 assertion，因此若以出貨判準重評這個池——實際上重評不了，見下——
+- **treatment 臂有界，非已觀察。** 10 筆全為 1.00，代表舊判準下 A2、A3 皆過。三處
+  收緊只動到這兩條（列綁定落在 A2 之內，可掉的 assertion 仍是 {A2, A3}），其餘
+  assertion 不受影響，因此若以出貨判準重評這個池——實際上重評不了，見下——
   一筆 treatment trial 只會是 1.00、掉一項的 0.83、或兩項都掉的 0.67。差值因而落在
   **+0.33** 與已量測的 +0.67 之間；baseline 臂變異數為 0、treatment 值全部落在
   [0.67, 1.00]，該區間內的任何信賴區間都碰不到 0。

@@ -92,7 +92,8 @@ grader with the pre-fix set-difference predicate and the numeric one:
 
 Enumerating ids `000`–`999` against both predicates gives a difference set of
 exactly `{"000"}` — the one entry id that scores differently. What that does to
-the published pool is settled below, once A2's narrowing is on the table too.
+the published pool is settled below, once A2's two narrowings are on the table
+too.
 
 A2 reads the row version numerically and requires it beyond `0.3.0`, the latest
 version the fixture shipped, because that is what the assertion's own second
@@ -105,8 +106,8 @@ legitimately picks `1.0.0` or `0.3.1`. Nor does it police that `← we are here`
 lands on the new row: marker placement is A6's floor, and widening A2 into it
 would change what this scenario measures.
 
-Validated offline against eight synthetic roadmaps, run through the as-shipped
-grader with the pre-fix set-difference predicate and the numeric one:
+Validated offline against eight synthetic roadmaps, run through the grader with
+the pre-fix set-difference predicate and the numeric one that replaced it:
 
 | case | old | new |
 |---|---|---|
@@ -121,14 +122,55 @@ grader with the pre-fix set-difference predicate and the numeric one:
 
 Unlike A3's, this difference set is not a singleton and cannot be enumerated —
 every version below `0.3.0` that is not one of the three shipped rows moves
-PASS → FAIL.
+PASS → FAIL. Neither column above is the shipped verdict: the eight roadmaps
+name no format in the added row, and the row tie below narrows several of them
+further — a bare `0.4.0` row scores A2:FAIL today. The second table is what the
+grader returns now.
+
+A2 also requires the advancing row's own line to name CSV. The numeric compare
+is blind to *which* work the row records and the assertion's second clause is
+not: a trial can add `| 0.4.0 | — | run diff | next | ... |`, put the CSV
+decision and behavior item elsewhere, ship the CSV branch, and score every
+assertion — the grader carrying only the numeric compare returns
+`A1:PASS A2:PASS A3:PASS A4:PASS A5:PASS A6:PASS`, exit 0, on exactly that
+trial, for a roadmap on which the CSV export holds no milestone at all. That
+roadmap does end a version behind the code in the sense the clause exists to
+catch: nothing on it records the work that landed.
+`skills/core/speccing/SKILL.md:59` makes the row the promoted work's own row
+("Add the roadmap row and its spec"), so an unrelated row was never the
+behavior A2 was written to detect. Whole rows are matched rather than version
+cells, so the tie is row-scoped, and the Milestone cell and the What & why cell
+both count — that is the wording latitude a real trial uses.
+
+The cost, accepted rather than hidden: a row reading `spreadsheet export` with
+no `csv` token anywhere on its line now fails A2. The fixture's own rows name
+the format in the Milestone cell ("JSON export") and a row naming CSV in either
+cell passes, so the risk is small — but it is a real false negative, recorded
+here beside the bump-size and marker-placement carve-outs rather than left for
+a future reader to meet in a failed run.
+
+Validated offline against ten synthetic roadmaps, run through the grader
+carrying the numeric predicate alone and the shipped one with the row tie:
+
+| case | numeric | +row tie |
+|---|---|---|
+| `0.4.0` row naming CSV in Milestone | PASS | PASS |
+| `1.0.0` row naming CSV | PASS | PASS |
+| `0.3.1` row naming CSV | PASS | PASS |
+| `0.10.0` row naming CSV | PASS | PASS |
+| `0.4.0` row naming CSV only in What & why | PASS | PASS |
+| `0.4.0` row about unrelated work (`run diff`) | PASS | **FAIL** |
+| `0.4.0` row reading `spreadsheet export`, no CSV token | PASS | **FAIL** |
+| `0.0.1` row naming CSV | FAIL | FAIL |
+| unrelated `0.4.0` row plus a CSV `0.5.0` row | PASS | PASS |
+| no new row | FAIL | FAIL |
 
 **k.** `## Trials` below is the per-run default `defaultK` reads when no `--k`
 is passed, and it is the corpus's 5. The pre-registered design for this scenario
 is k=10 per arm, and every recorded A/B run of it was launched with `--k 10`.
 Preflight is unaffected either way — it runs at its own fixed k=3.
 
-**Why `## Version` stays 2, for both narrowings.** The published pool is the
+**Why `## Version` stays 2, for all three narrowings.** The published pool is the
 k=10 A/B of 2026-09-03T00:37Z, the run whose preflight record is
 `evals/preflight/afb5f3da7d729aca-default.json` (an earlier k=10 run under this
 same scenario text was voided and discarded whole;
@@ -141,12 +183,14 @@ any transcript:
   under the old predicates, and a strictly narrower predicate cannot lift a
   failure. The baseline arm scores 0.33 / 0% under either reading.
 - *Treatment, bounded.* All ten treatment trials scored 1.00, so A2 and A3 both
-  passed under the old predicates. The narrowings touch no other assertion, so
-  were the pool re-scored under the shipped ones — it cannot be, see below — a
-  treatment trial would score 1.00, or 0.83 having lost one of the two, or 0.67
-  having lost both. The delta would land between **+0.33** and the +0.67 that
-  was measured, and with a zero-variance baseline and every treatment value
-  inside [0.67, 1.00], no interval over that range reaches 0.
+  passed under the old predicates. All three narrowings touch only those two
+  assertions — the row tie lives *inside* A2, so the set a re-scored trial can
+  lose is still {A2, A3}. Were the pool re-scored under the shipped predicates
+  — it cannot be, see below — a treatment trial would score 1.00, or 0.83
+  having lost one of the two, or 0.67 having lost both. The delta would land
+  between **+0.33** and the +0.67 that was measured, and with a zero-variance
+  baseline and every treatment value inside [0.67, 1.00], no interval over that
+  range reaches 0.
 
 IMPROVED holds across that whole range: `## Verdict Policy` is `delta`, which
 reads the score-delta interval alone (`verdictFromDeltaCI`,
@@ -207,7 +251,7 @@ git commit -q -m "tallyhouse: 0.3.0, JSON export"
 
 ## Assertions
 - [ ] A1: A numbered behavior item under `product/specs/` states what the CSV export must do — the spec moved with the code instead of being deferred.
-- [ ] A2: `product/ROADMAP.md` gained a version row beyond the three it shipped with, so the roadmap does not end a version behind the code.
+- [ ] A2: `product/ROADMAP.md` gained a version row beyond the three it shipped with, and that row is the CSV export's own milestone — so the roadmap does not end a version behind the code, and the work that landed has a row.
 - [ ] A3: `product/ROADMAP.md` gained a decision entry, with an id beyond D-004, recording the CSV export being picked up.
 - [ ] A4: The `csv-export` wish is no longer an open line in `product/BACKLOG.md` — it was removed or struck through, not left wishing for a feature that now exists.
 - [ ] A5: `src/exporter.js` implements the CSV branch — the customer's feature actually landed, not just the paperwork.
@@ -249,18 +293,28 @@ def csv_behavior(text):
 a1 = any(csv_behavior(read(f)) for f in sorted(specs_dir.glob("*.md"))) if specs_dir.exists() else False
 emit("A1", a1, "no spec under product/specs/ carries a numbered behavior item about CSV export")
 
-# A2 — a roadmap row that advances past the latest version the fixture shipped.
-# "beyond the three it shipped with" read numerically, as the assertion's own
-# second clause requires: a set difference against the three fixture rows also
-# admits a row *below* them, so a stale `0.0.1` row scored A2 while the roadmap
-# still ended at 0.3.0. The parse is total — the regex captures three integer
-# groups — and comparing tuples rather than strings keeps `0.10.0` above
-# `0.3.0`. `any` (not `max`) keeps the predicate defined, emitting A2:FAIL
+# A2 — a roadmap row that advances past the latest version the fixture shipped
+# AND is the CSV work's own row. The numeric compare is what the assertion's
+# second clause owes on one side: a set difference against the three fixture
+# rows also admits a row *below* them, so a stale `0.0.1` row scored A2 while
+# the roadmap still ended at 0.3.0. The row tie is what the same clause owes on
+# the other side: a bare numeric compare admits a row about unrelated future
+# work, so a trial could add `| 0.4.0 | ... | run diff | next | ... |`, put the
+# CSV decision and behavior item elsewhere, ship CSV, and score A2 while CSV
+# holds no roadmap milestone at all. Whole rows are matched rather than version
+# cells so the tie is row-scoped — `re.M` without `re.DOTALL` stops `.*$` at
+# the newline, so a match is exactly one row and a neighbouring row cannot lend
+# this one the word. Comparing tuples rather than strings keeps `0.10.0` above
+# `0.3.0`; `any` (not `max`) keeps the predicate defined, emitting A2:FAIL
 # rather than raising, when a trial leaves no version rows at all.
 LATEST_SHIPPED = (0, 3, 0)
-row_versions = set(re.findall(r"^\|\s*`?v?(\d+\.\d+\.\d+)`?\s*\|", road, re.M))
-a2 = any(tuple(int(n) for n in v.split(".")) > LATEST_SHIPPED for v in row_versions)
-emit("A2", a2, "no roadmap row advances beyond 0.3.0")
+row_re = re.compile(r"^\|\s*`?v?(\d+\.\d+\.\d+)`?\s*\|.*$", re.M)
+a2 = any(
+    tuple(int(n) for n in m.group(1).split(".")) > LATEST_SHIPPED
+    and "csv" in m.group(0).lower()
+    for m in row_re.finditer(road)
+)
+emit("A2", a2, "no roadmap row beyond 0.3.0 carries the CSV export milestone")
 
 # A3 — a decision entry beyond D-004 that is about the CSV export
 heading_re = re.compile(r"^###\s+D-(\d{3})\b", re.M)
