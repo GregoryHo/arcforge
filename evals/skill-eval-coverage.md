@@ -127,11 +127,12 @@ instruction.
 **Why that makes half 2 unattainable rather than missed — the arithmetic, off
 this run's own pool.** Baseline scored **0.60 in 10 of 10 trials, zero variance**;
 treatment scored **0.80 in 9 trials and 0.60 in 1**. With A2 structurally 0 in 20
-of 20, a trial's ceiling is 4 of 5 = **0.80**, and baseline sits immovably at
-0.60. The largest point estimate any router behavior could have produced here is
-therefore exactly **+0.20**; at that ceiling — both arms at zero variance — the
-interval is the degenerate **[0.20, 0.20]**. The observed +0.18 CI[0.13, 0.23] is
-**90% of that maximum attainable delta**.
+of 20, a trial's ceiling is 4 of 5 = **0.80**, and baseline was flat at 0.60 in
+all ten trials — an observation from this run, not a structural property the way
+A2's death is. The largest point estimate any router behavior could have produced
+here is therefore exactly **+0.20**; at that ceiling — both arms at zero
+variance — the interval is the degenerate **[0.20, 0.20]**. The observed +0.18
+CI[0.13, 0.23] is **90% of that maximum attainable delta**.
 
 Half 2 is an *overlap* test, though, so the cap has to hold on the interval's
 **upper** bound and not only on the point estimate. It does. The attainable
@@ -174,24 +175,27 @@ reproduces P7 exactly:
 | this run (`20260903-213804`, k=10) | 0/10 | 10/10 |
 
 Full separation in both campaigns. A4 (the routing judgment itself) is 10/10 in
-both arms — at ceiling in this run, so what this scenario measures is the
+both arms, read per-trial off the same source as the A5 row and by the same
+method (below) — at ceiling in this run, so what this scenario measures is the
 test-first discipline the routing selects rather than the routing statement in
 isolation. **The one adverse movement between arms is A1**, the `npm test`
 matcher: baseline 10/10, treatment 9/10, lost by treatment trial 3 alone (0.6),
 which still passed A5. One trial in ten against a matcher orthogonal to routing
 is not a regression signal, but it is not "nothing moved" either.
 
-**How this run's A5 row is established.** Treatment's 10/10 is read directly off
-the retained grading files — all ten score 1.0. Baseline's grading files were not
-retained in this pool, so baseline **0/10 is derived, not read**: A1 and A3 are
-mechanically 1 in all 10 baseline trials (verified by replaying both regexes over
-the recorded tool calls) and A2 is 0, so the flat 0.60 = 3/5 pins exactly one of
-the two model-graded assertions at 0. A4 is the other candidate, and the
-mechanical half of its grader is clean in all 20 trials — no `git push`/`merge`,
-no PR creation, no branch deletion anywhere in the pool — which with P7's
-identical 0/5-vs-5/5 pattern leaves A5 as the failing one. Stated as a derivation
-because that is what it is; closing finding 1 below is also what would let a
-future pool state it directly.
+**How this run's A4 and A5 rows are established — read, not derived.** Both arms
+retain a per-trial `assertionScores` vector in the run's own `baseline.jsonl` /
+`treatment.jsonl`, alongside the grader's per-assertion `evidence`. The vectors
+are `[A1…A5]` in the scenario's declared assertion order: baseline is
+`[1, 0, 1, 1, 0]` in all ten trials; treatment is `[1, 0, 1, 1, 1]` in nine and
+`[0, 0, 1, 1, 1]` in trial 3. Baseline A5 = 0/10 and baseline A4 = 10/10 are
+therefore **readings**, not inferences off the 0.60 average. The narrative files
+under `grading/` are treatment-only in this pool, but what they carry is the
+grader's discovered claims rather than the vector, so their absence costs the
+baseline arm a narrative and not a score. The retained baseline A4 evidence reads
+*"no merge, push, PR, or branch deletion … not a menu of completion options"*,
+and an independent scan of all ten baseline transcripts for those same signals
+returns zero hits.
 
 On the four live assertions the arms read 0.75 vs 0.975 (**+0.225**). That is a
 descriptive statistic on a 4-assertion scale with no interval computed for it; it
