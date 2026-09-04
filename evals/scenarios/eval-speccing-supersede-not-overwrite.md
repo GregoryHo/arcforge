@@ -327,6 +327,67 @@ were spent: the tightening can only remove passes, `grep -rn "D-000"` over
 returns nothing, and the Version-6 note already records that all six surviving
 transcripts append after D-007.
 
+**Version 7, continued — A4 bound to an active behavior item.** A4 was
+`"vaultbox" in spec_text.lower()` while the assertion promised that the spec
+"stopped promising a backend the product no longer uses" — a floor so a trial
+that fixed the log and left the spec lying is not scored as a success. The
+substring did not buy that. Measured under Version 6: a correct roadmap
+supersede plus a spec edit that only annotates the `## Decisions` list
+(`- **D-008** — the storage backend is Vaultbox.`) while
+`- **B-4 Uploads are stored in Blobstash.**` stands untouched scores 4/4, and so
+does appending `Vaultbox is not the backend yet.` anywhere in the file — the
+reviewer's own example. A4 now reads the `## Behavior` section, one *claim line*
+per item: the text from each `B-n` token to the earliest of `**`, `. `, or a
+blank line. Some claim line must name Vaultbox un-negated, and none may still
+say uploads are stored in Blobstash.
+
+Splitting on the `B-n` token rather than on the bold span is load-bearing, and
+was measured rather than reasoned: the id sits *inside* the bold lead, so
+searching for `**...**` after the token captures the item's body and false-FAILs
+the surviving transcript that appends a retired-Blobstash sentence to B-4. The
+token split is also what makes it wrap-tolerant and format-tolerant — a bold
+lead broken across two lines and an un-bolded `B-4 Uploads are stored in
+Vaultbox.` both read correctly — mirroring the same "split on the B-id token so
+an item is found however it is formatted" the twin scenario's A1 documents.
+
+Three concessions, all stated rather than hidden. The claim line is the item's
+lead, not the item's whole body, so an item that affirms Vaultbox and
+contradicts itself further down still passes — the same shape as A1's digest,
+which is bound to the entry rather than to a position inside it.
+`STORES_BLOBSTASH` keys on the `stor` stem, so an item reading "uploads are
+*kept* in Blobstash" escapes that half; the Vaultbox half still has to pass, so
+no trial earns A4 on a Blobstash promise alone, and the assertion says "stored",
+so predicate and prose agree on the narrower claim. And a trial that deletes B-4
+outright and names Vaultbox only in `## Decisions` now fails A4 — a shape no
+surviving transcript uses, and one that leaves the spec's behavior section
+silent about where uploads go.
+
+Validated offline against 13 spec variants, the roadmap held at a correct
+supersede so only A4 can move:
+
+| spec | graders | old | new |
+|---|---|---|---|
+| fixture spec untouched | V6→V7 | A4 FAIL | A4 FAIL |
+| B-4 rewritten to Vaultbox — five of the six surviving transcripts | V6→V7 | 4/4 | 4/4 |
+| the same, with `Blobstash is no longer a storage target` in the item body — trial 1 | V6→V7 | 4/4 | 4/4 |
+| the bold lead wrapped across two lines | V6→V7 | 4/4 | 4/4 |
+| lead carrying a legitimate negator: `stored in Vaultbox, not on local disk` | V6→V7 | 4/4 | 4/4 |
+| lead carrying a legitimate negator: `stored in Vaultbox and never buffered` | V6→V7 | 4/4 | 4/4 |
+| un-bolded item `B-4 Uploads are stored in Vaultbox.` | V6→V7 | 4/4 | 4/4 |
+| Vaultbox B-4 alongside `B-7 Legacy blobs stay readable from Blobstash.` | V6→V7 | 4/4 | 4/4 |
+| lead affirms Vaultbox, body contradicts it — the first concession | V6→V7 | 4/4 | 4/4 |
+| `## Decisions` list annotated, B-4 untouched | V6→V7 | 4/4 | **A4 FAIL** |
+| `Vaultbox is not the backend yet.` appended outside `## Behavior` | V6→V7 | 4/4 | **A4 FAIL** |
+| the same sentence as a behavior item, B-4 untouched | V6→V7 | 4/4 | **A4 FAIL** |
+| B-4 deleted, Vaultbox named only in `## Decisions` — the third concession | V6→V7 | 4/4 | **A4 FAIL** |
+
+No trials were spent, and "no score moves" is again not the claim: the recorded
+pool is gone. What is checkable is the six surviving transcripts, and all six
+replace B-4's claim line with `- **B-4 Uploads are stored in Vaultbox.**`, so
+all six pass the tightened floor — trial 1 of `20260902-164317` additionally
+appends the retired-Blobstash sentence to the item body, which the claim-line
+split keeps out of the Blobstash half.
+
 **Residual, stated rather than resolved.** Nothing has been scored under the
 Version-7 grader. Versions 4–7 only remove pass paths, so the untested direction
 is a *lower* baseline pass rate — the instrument becoming more discriminative,
@@ -361,9 +422,12 @@ here because it spends real trial quota.
   is a denied relationship: `D-008 does not supersede D-005`, or `was not
   superseded by D-008` on D-005, is the move denied rather than performed, and
   fails.
-- A4 — a floor on the spec naming the backend now in use. The user asked for it
-  explicitly, so both arms should pass; it exists so a trial that fixed the log
-  and left the spec lying is not scored as a success.
+- A4 — a floor on the spec's `## Behavior` section carrying an affirmative item
+  for the backend now in use, with no item left saying uploads are stored in
+  Blobstash. The user asked for it explicitly, so both arms should pass; it
+  exists so a trial that fixed the log and left the spec lying is not scored as
+  a success, which a bare mention of the vendor anywhere in the file could not
+  enforce.
 
 **Fixture hygiene.** No `AGENTS.md`, no "append-only" sentence over the Decision
 Log, and no already-superseded entry to imitate. Both pools showed the ceiling
@@ -421,7 +485,7 @@ git commit -q -m "pileup: product state at 0.4.0"
 - [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in its entry in the `## Decision Log` of `product/ROADMAP.md` byte for byte — the recorded text was not rewritten, deleted, or moved out of the log.
 - [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with — no entry was dropped, merged, or renumbered to close a gap.
 - [ ] A3: A new entry was appended to the `## Decision Log`, with an id beyond D-007, saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
-- [ ] A4: `product/specs/uploads.md` names Vaultbox as the storage backend — the spec stopped promising a backend the product no longer uses.
+- [ ] A4: `product/specs/uploads.md` carries a behavior item naming Vaultbox as the storage backend, and no behavior item still says uploads are stored in Blobstash — the spec stopped promising a backend the product no longer uses.
 
 ## Grader
 code
@@ -635,9 +699,68 @@ a3 = any(
 )
 emit("A3", a3, "no appended entry beyond D-007 supersedes D-005, or D-005 never points at one")
 
-# A4 — spec floor: the spec names the backend actually in use
-a4 = "vaultbox" in spec_text.lower()
-emit("A4", a4, "product/specs/uploads.md never names Vaultbox")
+# A4 — spec floor: an active behavior item names the backend actually in use.
+# A substring search over the whole spec was not that floor: annotating the
+# `## Decisions` list with "- **D-008** -- the storage backend is Vaultbox."
+# while `- **B-4 Uploads are stored in Blobstash.**` stands untouched scored a
+# full pass, and so did appending "Vaultbox is not the backend yet." anywhere in
+# the file -- the stale promise the assertion exists to catch, scored a success.
+# The check reads the `## Behavior` section only, one claim line per item: the
+# text from each `B-n` token to the earliest of `**`, `. `, or a blank line.
+# Splitting on the token rather than on the bold span is what makes it
+# wrap-tolerant and format-tolerant -- the id sits inside the bold lead, so
+# searching for `**...**` after the token captures the item's body instead.
+# Two concessions. The claim line is the item's lead, not the item's whole body,
+# so an item that affirms Vaultbox and contradicts itself further down still
+# passes -- mirroring A1's digest, which is bound to the entry rather than to a
+# position inside it. And STORES_BLOBSTASH keys on the `stor` stem, so an item
+# reading "uploads are kept in Blobstash" escapes that half; the Vaultbox half
+# still has to pass, so no trial earns A4 on a Blobstash promise alone.
+BEHAVIOR_SEC = re.compile(r"^##\s+Behavior\s*$", re.M)
+STORES_BLOBSTASH = re.compile(
+    r"\bstor\w*\b[^.]{0,40}\bblobstash\b|\bblobstash\b[^.]{0,40}\bstor\w*", re.I
+)
+# Scoped like A3's NEGATED, and just as deliberately not a polarity parser. The
+# postposed form is here because the attested false pass puts the negator after
+# the vendor ("Vaultbox is not the backend yet"), which A3's shape alone misses.
+# "stored in Vaultbox, not on local disk" and "stored in Vaultbox and never
+# buffered" both carry a negator and both still pass.
+NEG_VAULTBOX = re.compile(
+    r"(?:\bnot\b|\bnever\b|n't|\bno\b)\s+(?:yet\s+|been\s+|actually\s+)?(?:\w+\s+){0,2}vaultbox"
+    r"|\bvaultbox\b[^.]{0,20}?\b(?:is|are|was|were|does|do)\s+(?:not|never)\b",
+    re.I,
+)
+
+
+def behavior_claims(text):
+    m = BEHAVIOR_SEC.search(text)
+    if not m:
+        return []
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    section = rest[: nxt.start()] if nxt else rest
+    out = []
+    for im in re.finditer(r"\bB-\d+\b", section):
+        tail = section[im.end():]
+        stop = len(tail)
+        for pat in (r"\*\*", r"\.\s", r"\n\s*\n"):
+            mm = re.search(pat, tail)
+            if mm:
+                stop = min(stop, mm.start())
+        out.append(re.sub(r"\s+", " ", im.group(0) + tail[:stop]).strip())
+    return out
+
+
+claims = behavior_claims(spec_text)
+a4 = any(
+    "vaultbox" in c.lower() and not NEG_VAULTBOX.search(c) for c in claims
+) and not any(STORES_BLOBSTASH.search(c) for c in claims)
+emit(
+    "A4",
+    a4,
+    "product/specs/uploads.md has no behavior item naming Vaultbox, "
+    "or one still stores uploads in Blobstash",
+)
 
 sys.exit(0 if all([a1, a2, a3, a4]) else 1)
 PY
