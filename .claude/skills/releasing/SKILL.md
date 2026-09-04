@@ -170,8 +170,9 @@ places at once, and nothing in the version bump touches any of them. `product/AG
 3. Set the `Status:` header of every spec the row governs to `shipped vX.Y.Z`. A spec
    carrying the compound form — `shipped v6.0.0 · extended by 6.1.0 (building)` —
    collapses to `shipped v6.1.0`.
-4. Move `← we are here` onto whatever is next. If nothing is next yet it stays on the
-   row that just shipped: exactly one row carries it, always.
+4. Settle `← we are here`: it sits on the earliest row that has not shipped, and on
+   the last row when every row has — so it stays put when this version shipped ahead
+   of an earlier unshipped row. Exactly one row carries it, always.
 
 Then check the flip:
 
