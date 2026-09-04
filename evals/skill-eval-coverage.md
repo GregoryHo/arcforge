@@ -302,10 +302,10 @@ A2 的兩處收緊合併在下面一次處理。未重評任何 trial，未動�
 decision 與 behavior item 寫在別處、程式也確實出貨，在只有數值比較的 grader 下即
 可拿到 A1–A6 全 PASS、exit 0（已實測），而那份 roadmap 上 CSV 根本沒有里程碑——
 這正是該 assertion 後半句要擋的情況。收緊後改以整列比對，Milestone 與 What & why
-兩格都算；以十份合成 roadmap 實測，上述 `run diff` 列由 PASS 轉 FAIL，其餘九例判
-定不變。代價是一列寫成 `spreadsheet export`、整列不含 `csv` 字樣者也會 FAIL，此為
-已接受的 false negative，記在該 scenario 的 Design Notes。未重評任何 trial，未動用
-trial 額度。
+兩格都算；以十份合成 roadmap 實測，恰有兩例由 PASS 轉 FAIL——一是上述的 `run diff`
+列，二是代價：一列寫成 `spreadsheet export`、整列不含 `csv` 字樣者也會 FAIL，此為
+已接受的 false negative，記在該 scenario 的 Design Notes。其餘八例判定不變。未重評
+任何 trial，未動用 trial 額度。
 
 三次收緊之後 `## Version` 仍維持 2，依據是**本池的逐條紀錄**（即本節開頭那兩行），
 不是任何 transcript：
