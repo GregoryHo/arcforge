@@ -510,8 +510,9 @@ and didn't passes green. Re-read that one yourself.
 ```
 
 Placeholders stand in for whatever the real choices are — the **shape** is what
-matters: the original entry keeps its `Decision:` and `Why:` text and has its one
-`Status:` line replaced by `Superseded-by:`, never joined by a second one; the new
-entry carries `Supersedes:` and the reason for the change. Had only part of D-007
-died, the new entry would read `Supersedes: D-007 (clause 2)` and D-007's status would
-become `Accepted · partially superseded by D-011`.
+matters: the original entry keeps its `Decision:` and `Why:` text and has the value of
+its one `Status:` line replaced — `Accepted` becomes `Superseded-by: D-011`, never a
+second `Status:` line beside it; the new entry carries `Supersedes:` and the reason for
+the change. Had only part of D-007 died, the new entry would read
+`Supersedes: D-007 (clause 2)` and D-007's status would become
+`Accepted · partially superseded by D-011`.
