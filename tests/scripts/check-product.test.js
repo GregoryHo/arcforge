@@ -1445,7 +1445,7 @@ describe('check-product', () => {
         expect(errors).toHaveLength(1);
         expect(errors[0]).toMatch(/"some prose" sits directly above "\| Version \| Tag \|/);
         expect(errors[0]).toMatch(
-          /so the header neither opens "## Roadmap" nor carries a blank line above it — a blockquote or a list item there takes the whole table into itself and GFM renders none, and anything else there is reported the same way$/,
+          /so the header neither opens "## Roadmap" nor carries a blank line above it — a blockquote or a list item there takes the whole table into itself and GFM renders none, and anything else there is reported the same way, whether or not the table under it renders$/,
         );
       });
 
