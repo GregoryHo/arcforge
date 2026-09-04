@@ -54,11 +54,12 @@
  *         rejected `·`-separated and accepted newline-separated — and a missing
  *         one is reported too, because an entry with no `Status:` records
  *         nothing about whether it still governs and no later flip has a line to
- *         replace. Both existing exemptions already cover the counting and need
- *         no new code: an illustration inside a fence or an indented code block
- *         never becomes an entry at all, so it is never counted, and
- *         `product-decisions.js`'s `STATUS_FIELD_RE` is anchored at column 1, so
- *         a line only counts where the entry form puts it. `Refines:` and
+ *         replace. The fence exemption already covers the counting and needs no
+ *         new code: an illustration inside a fence or an indented code block
+ *         never becomes an entry at all, so it is never counted. Indentation
+ *         short of that is no exemption either — `product-decisions.js`'s
+ *         `STATUS_FIELD_RE` reads the ` {0,3}` band a bullet still renders in, so
+ *         a flip one space in is counted rather than hidden. `Refines:` and
  *         `Extends:` require no flip;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions — every row links at
@@ -72,7 +73,8 @@
  *         line further down is neither mistaken for the header nor allowed to
  *         displace it, and that preamble carries exactly one such header — read
  *         first-wins, a stale header left beside its replacement decided the
- *         verdict by typing order. Each version occupies exactly one row, which is what
+ *         verdict by typing order, and read at column 1 a stale header one space
+ *         in was not seen at all. Each version occupies exactly one row, which is what
  *         makes "the highest-version one" name a row at all: two rows for one
  *         version leave the governing row decided by table order, and the same
  *         pair then accepts two contradictory headers;
@@ -126,8 +128,12 @@ const NO_TAG = '—';
 // silently, where C6 catches the same read on `ROADMAP.md`.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 // The spec header line, matched per line rather than against the whole file, so
-// the scope in `specStatusHeaders` is what decides which line is the header.
-const SPEC_STATUS_HEADER_RE = /^>\s*Status:\s*(.+?)\s*$/;
+// the scope in `specStatusHeaders` is what decides which line is the header. Read at
+// the ` {0,3}` bound the rest of the linter reads structure at: CommonMark opens a
+// block quote at up to three leading spaces, so a `> Status:` line in that band still
+// renders as the header a reader trusts and the count below has to see it. At four
+// the line is an indented code block, and an illustration again.
+const SPEC_STATUS_HEADER_RE = /^ {0,3}>\s*Status:\s*(.+?)\s*$/;
 // Matches a citation-shaped token and its trailing word characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
 // leading `\d` keeps ordinary prose (`D-Bus`) out of the scan.
@@ -199,11 +205,15 @@ function checkRoadmapTags(rows, errors) {
  * left is the heading that *opens* a section, which fails closed — and C6 rejects
  * the empty slice that read yields for `ROADMAP.md`'s two sections, though not for
  * a spec's `## Decisions`, which has no such backstop and is then checked for
- * nothing (`product/AGENTS.md` states that exception). The field and entry forms
- * (`product-decisions.js`'s `STATUS_FIELD_RE` and `DECISION_HEADING_RE`'s
- * canonical form, `SPEC_STATUS_HEADER_RE`) are anchored there for a different reason, which is
- * that column 1 is where the form puts them. Four spaces is an indented code
- * block, so an illustrative `##` in the preamble still does not cut it short.
+ * nothing (`product/AGENTS.md` states that exception). The one *form* still read at
+ * column 1 is `DECISION_HEADING_RE`'s canonical shape, and `DECISION_ANY_RE` probes
+ * the band above it, so an indented heading is reported rather than dropped. The two
+ * `Status:` forms carry no such probe and take the bound themselves instead
+ * (`SPEC_STATUS_HEADER_RE` here, `product-decisions.js`'s `STATUS_FIELD_RE` for an
+ * entry): read at column 1, a stale header left beside its replacement one space in
+ * was invisible, and the count that exists to reject a visibly two-state spec passed
+ * it. Four spaces is an indented code block, so an illustrative `##` in the preamble
+ * still does not cut it short.
  *
  * Every header in that scope is collected, not the first one: read first-wins, a
  * stale `> Status:` left beside the line meant to replace it decided the verdict

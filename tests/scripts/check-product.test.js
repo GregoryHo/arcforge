@@ -602,6 +602,23 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/a second "- Status:" line/);
     });
 
+    it('rejects a second `- Status:` line indented one to three spaces', () => {
+      // A bullet one space in still renders, so the entry a reader sees carries two
+      // states. Read at column 1 the appended line was invisible and C3 passed it —
+      // the same fail-open the count exists to close, hidden by a stray indent.
+      const decisions = [decision({ id: 'D-001', extra: [' - Status: Proposed'] })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
+    it('does not read a four-space-indented `- Status:` line as a second one', () => {
+      // The other side of that bound: four spaces is an indented code block, where
+      // the bullet is literal text, so an illustration of the field stays one.
+      const decisions = [decision({ id: 'D-001', extra: ['    - Status: Proposed'] })];
+      expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
     it('rejects an entry with no status line at all', () => {
       // The other half of the same count. Rejecting two while accepting zero
       // reads the rule in one direction only, and zero is the case that leaves
@@ -1241,6 +1258,40 @@ describe('check-product', () => {
       const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('rejects a stale second header indented one to three spaces', () => {
+      // CommonMark opens a block quote at up to three leading spaces, so both lines
+      // render and the spec shows two states. Read at column 1 the indented one was
+      // not seen at all and C4 passed the spec on the header above it.
+      const specs = [spec({ intro: ['', '  > Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('rejects the same indented pair with the stale header first', () => {
+      // Both orders are the same defect, the way the column-1 pair above is.
+      const specs = [spec({ preamble: ['  > Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('reads a sole header indented one to three spaces instead of calling it missing', () => {
+      // The accept side of the bound: the line renders as the header, so it is the
+      // header — read and compared against the governing row rather than reported
+      // absent while the spec visibly carries one.
+      const header = '  > Status: shipped v1.0.0 · [ROADMAP](../ROADMAP.md)';
+      const specs = [spec({ status: null, preamble: [header, ''] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
+    });
+
+    it('does not count a four-space-indented Status line as a second header', () => {
+      // The other side of that bound: four spaces is an indented code block, so an
+      // unfenced illustration of the header stays an illustration.
+      const specs = [spec({ intro: ['', '    > Status: draft', ''] })];
+      expect(of('C4', validateProduct({ roadmap: roadmap(), specs }))).toEqual([]);
     });
 
     it('does not count a fenced illustration of the header as a second header', () => {

@@ -29,7 +29,12 @@ const { section, unfenced } = require('./product-markdown');
 const DECISION_HEADING_RE = /^###\s+D-(\d{3})\s+—\s+\S/;
 const DECISION_ANY_RE = /^ {0,3}###\s+D-/;
 const DECISION_INDENT_RE = /^ {1,3}###/;
-const STATUS_FIELD_RE = /^-\s+Status:\s*(.+?)\s*$/;
+// The entry's status field. Read at the same ` {0,3}` bound as the heading probe
+// above and as `SPEC_STATUS_HEADER_RE`, the header's counterpart in a spec: a bullet
+// one to three spaces in still renders as a bullet a reader trusts, so a flip
+// appended beside the line it replaces is counted wherever it renders rather than
+// hidden by a stray indent. At four the line is an indented code block again.
+const STATUS_FIELD_RE = /^ {0,3}-\s+Status:\s*(.+?)\s*$/;
 const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 // Candidate-shaped: any markdown bullet whose field label is one of the three

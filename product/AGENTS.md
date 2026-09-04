@@ -197,12 +197,13 @@ entry carry two clause-scoped flips from different decisions, or a partial flip
 alongside the later total one that finished it off — and what rejects the
 self-contradicting `Accepted · Superseded-by: D-MMM`.
 
-An entry carries exactly one `- Status:` line, at column 1, and C3 counts them from
-both sides: a second one is reported as malformed, and so is a missing one — an entry
-with no `Status:` records nothing about whether it still governs, and leaves a later
-reversal no line to flip. The flip in step 2 of *Change a decision* **replaces** the
-existing line rather than being appended below it — two `Status:` lines are the same
-contradiction spelled with a newline instead of a `·`.
+An entry carries exactly one `- Status:` line, written in column 1 and counted
+wherever it still renders as a bullet — one to three spaces in is no hiding place —
+and C3 counts them from both sides: a second one is reported as malformed, and so is
+a missing one — an entry with no `Status:` records nothing about whether it still
+governs, and leaves a later reversal no line to flip. The flip in step 2 of *Change a
+decision* **replaces** the existing line rather than being appended below it — two
+`Status:` lines are the same contradiction spelled with a newline instead of a `·`.
 
 The two forms are exclusive *per pair*, though: one decision either replaces another
 whole or reverses one of its clauses, never both, so `Superseded-by: D-MMM · partially
@@ -243,15 +244,16 @@ opens with three backticks and then quotes a `code span` is not a fence, so it o
 no block and hides nothing below it.
 
 Indentation is the second exemption, and a narrower one. A `### D-NNN` heading, a
-relation bullet, a roadmap row and the `<details>` / `</details>` delimiters of the
-folded index all sit in column 1; indented four spaces or more, none is read, so an
-illustration can be shown as an indented block rather than a fenced one — including
-an illustration of the fold move itself, which at that depth opens no fold and
-closes none. One to three spaces is not an exemption — the line still renders as the
-heading, the field or the row a reader would trust, so it is read or reported like any
-other near-miss. The roadmap row is why this matters beyond the log: an indented
-six-cell row read as product state can become a spec's governing row and force its
-`Status:` header to a version that exists only in the illustration.
+relation bullet, an entry's `- Status:` line, a spec's `> Status:` header, a roadmap
+row and the `<details>` / `</details>` delimiters of the folded index all sit in
+column 1; indented four spaces or more, none is read, so an illustration can be shown
+as an indented block rather than a fenced one — including an illustration of the fold
+move itself, which at that depth opens no fold and closes none. One to three spaces is
+not an exemption — the line still renders as the heading, the field or the row a
+reader would trust, so it is read or reported like any other near-miss. The roadmap
+row is why this matters beyond the log: an indented six-cell row read as product
+state can become a spec's governing row and force its `Status:` header to a version
+that exists only in the illustration.
 
 Both exemptions apply inside a scope. The Decision Log is the `## Decision
 Log` section of `ROADMAP.md`, and `check:product` reads entries only there — a
@@ -292,10 +294,12 @@ directly under the H1 — a `> Status:` line below the first `##` is prose, and 
 reports the header as missing.
 
 A spec carries exactly one such header, and C4 counts them the way C3 counts an
-entry's `Status:` lines. A second `> Status:` line in the preamble is reported rather
-than losing silently to the one above it — two headers are the same contradiction the
-log's two `- Status:` lines are, spelled in a different scope, and read first-wins the
-verdict over one visibly two-state spec was decided by which line was typed first.
+entry's `Status:` lines, at the same indent bound: a `> Status:` line one to three
+spaces in still renders as a blockquote, so it counts. A second one in the preamble
+is reported rather than losing silently to the one above it — two headers are the
+same contradiction the log's two `- Status:` lines are, spelled in a different scope,
+and read first-wins the verdict over one visibly two-state spec was decided by which
+line was typed first.
 The header flips in *Build a milestone* and *Ship a version* **replace** that one
 line; neither adds a second below it.
 
