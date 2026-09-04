@@ -28,9 +28,16 @@ const ROW_STATUSES = new Set(['next', 'building', 'shipped']);
 // whether the lines around it render as one at all. A single dash is legal
 // (`|-|-|` renders), so the run is `-+`: read as `-{2,}` the framing rule below
 // would reject a table every renderer draws.
+//
+// Unlike the header cell below, this one is matched at any position and stays
+// that way: a dash row carries no version, no `← we are here` marker and no
+// spec link, so a second one further down the table hides nothing from C1, C4,
+// C6 or C7 — it renders as an empty row and is dropped as one.
 const DELIMITER_CELL_RE = /^:?-+:?$/;
-// The `Version` header cell, which is what marks a pipe line as the table's
-// header rather than one of its rows.
+// The `Version` header cell — what the *first* pipe line of the table has to
+// read to be the header. It is a check on `table[0]`, not a way of recognizing a
+// header wherever one appears: the table has exactly one, and a later row that
+// happens to carry the same cell is a row (see `parseRoadmapRows`).
 const HEADER_FIRST_CELL = 'Version';
 // The width every line of the table carries: the six columns `product/AGENTS.md`
 // defines a roadmap row as.
@@ -235,6 +242,10 @@ function checkRoadmapFraming(table, lines, errors) {
  * an off-arity delimiter is reported rather than dropped by an all-dash test
  * that never looked at how many cells it had.
  *
+ * The two skips under it are not symmetric, and deliberately: the delimiter is
+ * recognized by shape anywhere, the header only at `table[0]`. See their
+ * constants above and the comment at the header skip.
+ *
  * The scan is indent-bounded the way the log's heading and relation probes are:
  * a row indented four spaces or more is an indented code block, so it is an
  * illustration rather than product state. Read indent-blind, such a row still
@@ -260,13 +271,25 @@ function parseRoadmapRows(roadmap, errors) {
   checkRoadmapFraming(table, lines, errors);
 
   const rows = [];
-  for (const { line, cells } of table) {
+  for (const [position, { line, cells }] of table.entries()) {
     if (cells.length !== ROW_COLUMNS) {
       errors.push(`C4 roadmap row "${line}": expected 6 columns, found ${cells.length}`);
       continue;
     }
     if (cells.every((c) => DELIMITER_CELL_RE.test(c))) continue;
-    if (cells[0] === HEADER_FIRST_CELL) continue;
+    // The header is skipped by *position*, not by cell content. Skipped on
+    // content alone, a second row whose `Version` cell reads `Version` was
+    // dropped here silently while every clause of the framing rule above passed
+    // it: it opens with a pipe, sits adjacent to the row before it, and is not
+    // `table[0]`, which is the only entry the frame reads as a header. The row
+    // rendered — a second `← we are here` marker, a `Tag` against no version, a
+    // link to a spec that does not exist — and C1, C4, C6 and C7 never saw it.
+    // Position is what `checkRoadmapFraming` already means by "the header", so
+    // reading it the same way here is what closes the gap; the content test
+    // stays alongside it so that when the frame is broken and `table[0]` is not
+    // the header, the real header below is read as the malformed row it then is
+    // rather than silently skipped on top of an already-reported frame.
+    if (position === 0 && cells[0] === HEADER_FIRST_CELL) continue;
     const version = cells[0].replace(/`/g, '').trim();
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
       errors.push(`C4 roadmap row "${cells[0]}": Version must be a semver X.Y.Z`);

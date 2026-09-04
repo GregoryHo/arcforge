@@ -1280,6 +1280,31 @@ describe('check-product', () => {
       const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
       expect(errors[0]).toMatch(/expected 6 columns, found 5/);
     });
+
+    it('reads a second row whose Version cell says "Version" as a row', () => {
+      // The frame's clauses all pass on this row — it opens with a pipe, it is
+      // adjacent to the row above it, and it is not `table[0]`, which is the
+      // only entry the frame reads as the header. Skipped on cell content it
+      // was then dropped before any rule ran, so a second `← we are here`
+      // marker, a `Tag` against no version and a link to a spec that does not
+      // exist all rendered in the table unread. Skipped by position, the row is
+      // read and its `Version` cell fails the semver check.
+      const rows = [
+        row(),
+        '| Version | `v9.9.9` | milestone | **shipped ← we are here** | why | [ghost](specs/ghost.md) |',
+      ];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+      expect(errors).toContainEqual(
+        expect.stringMatching(/roadmap row "Version": Version must be a semver/),
+      );
+    });
+
+    it('still skips the header, whose Version cell says the same thing', () => {
+      // The other side of the position skip: the one entry that legitimately
+      // carries `Version` is `table[0]`, and reading it as a row would report
+      // the header of every well-formed roadmap.
+      expect(of('C4', run())).toEqual([]);
+    });
   });
 
   describe('C5 — a spec only cites decisions that exist', () => {
