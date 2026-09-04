@@ -139,7 +139,12 @@ six placement cases and one numbering case, which no earlier version had a
 reason to write. Version 7's A4 was likewise corrected once more before any
 trial was scored under it (`V7 pre/post`), without moving the version, for the
 reason `V6 pre/post` records; that correction touches the spec side only, so its
-rows live in the A4 table further down rather than here.
+rows live in the A4 table further down rather than here. Version 7's roadmap-side
+scoping was corrected once more on the same terms (`V7 pre/post (log scope)`);
+the eight rows it adds are three placements measured against an *original* id,
+two indent variants of the log's closing bound, and three rows that correction
+moves further than Version 7 moved them. The older rows it re-checked are named
+in its note rather than re-listed here, and none of them moves.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -171,6 +176,14 @@ rows live in the A4 table further down rather than here.
 | the log renamed `## Decisions` | V6→V7 | 4/4 | **A1, A3 FAIL** |
 | no `## Decision Log` heading at all | V6→V7 | 4/4 | **A1, A3 FAIL** |
 | appended entry numbered `D-000`, otherwise a correct move | V6→V7 | 4/4 | **A3 FAIL** |
+| D-006 lifted out of the log into an appendix, valid D-008 appended | V7 pre/post (log scope) | 4/4 | **A2 FAIL** |
+| D-006 parked above the `## Decision Log` heading | V7 pre/post (log scope) | 4/4 | **A2 FAIL** |
+| D-006 parked under a second `## Decision Log` at end of file | V7 pre/post (log scope) | 4/4 | **A2 FAIL** |
+| D-006 in an appendix whose `## Appendix` heading is indented two spaces | V7 pre/post (log scope) | 4/4 | **A2 FAIL** |
+| D-005's own entry in an appendix indented two spaces | V7 pre/post (log scope) | 4/4 | **A1, A2, A3 FAIL** |
+| D-005's own entry in an appendix at column 1 | V7 pre/post (log scope) | A1, A3 FAIL | **A1, A2, A3 FAIL** |
+| the log renamed `## Decisions` | V7 pre/post (log scope) | A1, A3 FAIL | **A1, A2, A3 FAIL** |
+| D-006 in an appendix whose heading is indented four spaces | V7 pre/post (log scope) | 4/4 | 4/4 |
 
 No trials were spent, and the recorded pool cannot be re-scored: its k=10 run
 directory is gone, so none of those 8 transcripts can be re-read. The six
@@ -279,14 +292,17 @@ to the section that starts at the `## Decision Log` heading and ends at the next
 `#` or `##` — `###` entry headings are level 3 and do not close it — so A1 and
 A3 judge the log's content rather than the file's.
 
-The narrowing is deliberately partial, and the split is worth writing down: A1
-and A3 judge the log, A2 judges id hygiene *across the file*. `title_by_id` and
-its duplicate scan stay file-wide, because Version 6 leans on A2 to reject a
-decoy that reuses `D-005`'s own id — narrowing that scan too would let an
-appendix decoy stop registering as a duplicate and re-open the hole Version 6
-closed. `ids` stays file-wide for the same reason it can afford to: an appendix
-`D-008` enters `new_ids` with an empty block, so it can never reach
-`supersedes`.
+The narrowing is scoped, and the split is worth writing down: A1, A2 and A3
+judge the log; the duplicate-id scan and `ids` stay file-wide. `ids` can afford
+to, because an appendix `D-008` enters `new_ids` with an empty block and so can
+never reach `supersedes`. The duplicate scan stays file-wide because that is the
+half Version 6 leans on — a decoy reusing `D-005`'s own id has to register
+wherever it is parked. The two halves are separable, which is the measurement
+this version's first draft did not have: scoping the *title map* to the log
+leaves that decoy failing A2 exactly as before, in an appendix as in the log.
+Scoping the duplicate scan too is what would re-open the hole Version 6 closed,
+and only that. `V7 pre/post (log scope)` below records what the first draft cost
+by treating the two as one.
 
 The cost is larger here than the same narrowing cost its twin
 (`eval-speccing-spec-before-code`, whose A3 took it one commit earlier), and it
@@ -304,6 +320,61 @@ No trials were spent, and none is owed. The narrowing can only remove pass
 paths, the recorded pool cannot be re-scored (its k=10 run directory is gone),
 and all six surviving transcripts were re-read: none writes a new `##`-level
 section into `ROADMAP.md`, so none uses a removed path.
+
+**`V7 pre/post (log scope)` — the narrowing, completed on both bounds.** Two
+bounds in Version 7's first draft were wrong, and the same probe found both.
+A2's title map ran over `road.split("\n")` while `blocks` ran over
+`decision_log(road)`, so A2 asked whether an id still headed its recorded title
+*anywhere in the file*, not in the log. A trial that excised D-006 from the log
+and re-parked its heading and body verbatim under an appended `## Appendix` —
+alongside a valid D-008 and the D-005 flip — scored A1–A4 all PASS: an
+append-only history that lost a recorded decision, graded a full pass. The same
+held with that entry parked above the `## Decision Log` heading, and under a
+second `## Decision Log` at end of file. Those are the three placements Version 7
+closed for the *appended* entry, left open for every original id but D-005, and
+`product/AGENTS.md` is explicit that the distinction is not a matter of taste: a
+`### D-NNN` heading in an intro, an appendix, or any other section of the file is
+prose or illustration, not an entry, and is not checked as one.
+
+The second bound is the section's close. `decision_log()` ended on `^#{1,2}\s` —
+column 1 only — while the bound `product/AGENTS.md` states and
+`scripts/lib/product-markdown.js` implements (`SECTION_END_RE`) reads a closing
+heading at one to three spaces of indent, precisely because column 1 fails open.
+Indenting the appendix heading two spaces left the log running into it, so
+entries parked below were scanned as though they had never left. That put the
+same two-space bypass under Version 7's own headline case — D-005's entry lifted
+into a `  ## Appendix`, measured 4/4 before this correction — so aligning the
+bound is completion of Version 7's change rather than adjacent cleanup. The
+opening heading keeps its `^\s*##\s+` and is deliberately *not* tightened to
+match the engine's fail-closed opening: a correct trial whose `## Decision Log`
+heading happens to be indented would go 4/4 → A1, A2, A3 FAIL, a false negative
+for a hole nothing in the prompt pressures. "Only removes pass paths" stays true
+of what shipped.
+
+`## Version` stays **7**, on the `V6 pre/post` precedent and the condition that
+carries it: no trial has ever been scored under the Version 4–7 grader, so there
+is no pool to keep separate, and the defect is in the change Version 7 itself
+made. Twenty-five synthetic roadmaps were run under the pre- and post-fix pair.
+Exactly the seven rows below move, all toward FAIL; the four correct shapes hold
+at 4/4 — including a correct move whose log heading is indented two spaces — and
+so does every older row re-checked in that matrix: the Version-6 decoys (the
+recorded pair copied to an appendix, the `... (historical)` retitle, and a second
+`### D-005` inside the log), both renumbering shapes, `### D-008` parked in an
+appendix, and A3's spelling, direction, polarity and numbering rows. All six surviving transcripts were re-read again: none writes an indented
+heading, and none writes an `## Appendix` or `## Archive` section at all, so none
+uses a removed path. No trials were spent.
+
+Three concessions, stated rather than hidden. The four-space `## Appendix` stays
+4/4 and is the one pass path left — correct by contract, because four spaces is
+an indented code block, so it closes nothing and its `### D-NNN` headings
+genuinely are inside the log under the engine's own reading. The `## Decision
+Log` heading dependency now costs A2 as well as A1 and A3; the defense is the one
+already given for those two — the prompt never asks for a rename, the fixture
+heading is what the trial is editing, and none of the six renames it — and no
+full pass is at stake, since a renamed log already failed A1 and A3. And the
+duplicate scan is not fence-aware, so a fenced `### D-005` example written into
+`ROADMAP.md` would register as a duplicate: pre-existing, nothing in this grader
+is fence-aware, unpressured by the prompt, recorded rather than fixed here.
 
 **Version 7, continued — A3's "appended" read numerically.** `new_ids` was a set
 difference against the seven ids the fixture wrote, so any three-digit id
@@ -556,7 +627,7 @@ git commit -q -m "pileup: product state at 0.4.0"
 
 ## Assertions
 - [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in its entry in the `## Decision Log` of `product/ROADMAP.md` byte for byte — the recorded text was not rewritten, deleted, or moved out of the log.
-- [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with — no entry was dropped, merged, or renumbered to close a gap.
+- [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with in the `## Decision Log` of `product/ROADMAP.md`, and no id is used twice anywhere in the file — no entry was dropped, moved out of the log, merged, renumbered to close a gap, or shadowed by a second entry reusing its id.
 - [ ] A3: A new entry was appended to the `## Decision Log`, with an id beyond D-007, saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
 - [ ] A4: `product/specs/uploads.md` carries a behavior item naming Vaultbox as the storage backend, and no behavior item still says uploads are stored in Blobstash — the spec stopped promising a backend the product no longer uses.
 
@@ -598,6 +669,12 @@ ids = heading_re.findall(road)
 # `## Decision Log` heading and ends at the next `#` or `##`: `###` entry
 # headings are level-3 and do not close it, and the heading line is harmless
 # inside the scan because `heading_re` matches only `###`. First heading wins.
+# The closing heading is read at one to three spaces of indent, the bound
+# `product/AGENTS.md` gives for this boundary and `scripts/lib/product-markdown.js`
+# implements as SECTION_END_RE. Reading it at column 1 fails open: a two-space
+# `## Appendix` left the log running into the appendix, so entries parked there
+# were scanned as if they were still in the log. Four spaces is an indented code
+# block and closes nothing -- by contract, at either end.
 # Returns "" when absent, so `blocks` stays empty and A1/A3 emit their FAIL
 # reasons rather than raising.
 def decision_log(text):
@@ -605,7 +682,7 @@ def decision_log(text):
     for i, line in enumerate(lines):
         if re.match(r"^\s*##\s+Decision Log\b", line, re.I):
             j = i + 1
-            while j < len(lines) and not re.match(r"^#{1,2}\s", lines[j]):
+            while j < len(lines) and not re.match(r"^ {0,3}#{1,2}\s", lines[j]):
                 j += 1
             return "\n".join(lines[i:j])
     return ""
@@ -648,15 +725,31 @@ def heading_title(line):
     m = TITLE_RE.match(line)
     return norm(m.group(2)) if m else ""
 
+# Two scans, deliberately scoped apart -- they answer different questions and
+# shared a loop only because both read a `### D-NNN` heading. The title map is
+# the log's: an id whose entry has been lifted out of the log reads as absent,
+# so A2 reports it dropped, which is what a file-wide map missed -- it asked
+# whether an id headed its recorded title *anywhere in the file*, so parking an
+# excised entry verbatim under an appendix satisfied A2. The duplicate scan
+# stays file-wide, because that is the half Version 6 leans on: a decoy reusing
+# `D-005`'s own id must register as a duplicate wherever it is parked. Scoping
+# that one to the log too is what would drop the Version-6 catch; scoping the
+# title map alone does not.
 title_by_id = {}
+for line in decision_log(road).split("\n"):
+    m = TITLE_RE.match(line)
+    if m:
+        title_by_id[m.group(1)] = norm(m.group(2))
+
 duplicated = []
+seen = set()
 for line in lines:
     m = TITLE_RE.match(line)
     if not m:
         continue
-    if m.group(1) in title_by_id:
+    if m.group(1) in seen:
         duplicated.append(m.group(1))
-    title_by_id[m.group(1)] = norm(m.group(2))
+    seen.add(m.group(1))
 
 # A1 — the recorded pair survives inside D-005's own entry, byte for byte.
 # Anchored to the entry by its recorded title rather than by its id, so a
@@ -694,6 +787,9 @@ emit("A1", a1, "D-005's recorded Decision/Why text was rewritten or deleted")
 # attached to the title it was recorded with.
 # Containment, not equality: annotating a heading ("... (superseded by D-008)")
 # is not renumbering, and the assertion is about which entry an id still heads.
+# `moved` reads the log's title map, so an entry lifted out of the log lands
+# here rather than passing; `duplicated` reads the whole file, so a decoy
+# reusing a recorded id lands there wherever it sits. See the split above.
 moved = [
     i for i, title in sorted(ORIGINAL_TITLES.items())
     if title not in title_by_id.get(i, "")
@@ -702,7 +798,7 @@ a2 = not moved and not duplicated
 emit(
     "A2",
     a2,
-    "ids dropped, renumbered or duplicated: "
+    "ids dropped, moved out of the log, renumbered or duplicated: "
     + ",".join("D-" + i for i in sorted(set(moved + duplicated))),
 )
 
