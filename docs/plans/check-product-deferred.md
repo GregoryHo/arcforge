@@ -289,6 +289,37 @@ four mutation-checked cases in `tests/scripts/check-product.test.js` pin each in
 The prose above keeps the shorthand it was written with; this paragraph is what it
 means.
 
+**Round 18 — the run has a tail, and the pipe scan was reading it as one.** The
+adjacency clause above measures the run's *breaks*; nothing measured its *end*. The
+collector is `if (!/^ {0,3}\|/.test(raw)) continue;`, so a line appended under the
+last row without outer pipes was skipped — and GFM asks no outer pipe of a row.
+Verified two ways rather than argued: driving `validateProduct` against a canonical
+table plus a row written `2.0.0 | v9.9.9 | m | **frobnicated ← we are here** | why |
+[ghost](specs/ghost.md)` yields zero errors, and the same input through GitHub's own
+`/markdown` endpoint comes back as a `<table>` with two `<tbody>` rows. A second
+`← we are here`, a `Status` outside the vocabulary, a `Tag` against the wrong version
+and a link to a spec that does not exist all sat in the rendered table unread by C1,
+C4, C6 and C7. A line with no pipe at all is the same hole — the endpoint renders it
+as a one-cell row.
+
+"Explicitly reject" beat "parse the optional outer pipes": `product/AGENTS.md` already
+defines a roadmap row as six `|`-delimited cells, so reading a row the corpus does not
+write that way would widen the format, while rejecting it makes the engine match the
+doc. It landed the way rounds 13 and 15 did — a clause of C6, no new `D-id`, the rule
+count still seven. The clause measures the run positionally, from the header down to
+the first blank line, and reports any line in it the pipe scan did not collect. It
+runs **last**: ahead of the adjacency check it would steal
+`'rejects a fenced block between the header and its delimiter'`, whose fence lines
+`unfencedEntries()` drops and which is the adjacency clause's to report.
+
+Blunt in one direction, and priced: a fence or a four-space-indented line directly
+under the last row *does* end the table for a reader — confirmed against the same
+endpoint, alongside the blockquote, ATX heading and list item that end it too — and is
+reported all the same, because what the rule asks for is the blank line the corpus
+already writes above its note. The adjacency message widened in the same change: a
+pipe-less row *between* two canonical rows was already reported there, and the message
+named only causes that end the table, which is the one thing that input does not do.
+
 The silent sibling of this family was fixed rather than deferred, and is not part of
 the rule above: `parseRoadmapRows` trimmed before testing for a leading `|`, with no
 indent bound, so a four-space-indented six-cell row — an indented code block, i.e. an

@@ -125,8 +125,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   a blank line directly above it, with anything else directly above it reported: a
   blockquote or a list item there takes the whole table into its own paragraph and
   GFM renders none, while a plain paragraph splits and the table under it renders
-  and is reported all the same — so an unframed row cannot stand in for the table
-  (C6);
+  and is reported all the same — and every line from that header down to the first
+  blank line written as a `|`-delimited six-column row, since GFM asks no outer pipe
+  of a row and renders any line in that run as one — so neither an unframed row can
+  stand in for the table nor a rendered row escape the rules that read it (C6);
   and a `Tag` cell matching its
   row's Status —
   `vX.Y.Z` when shipped, `—` otherwise (C7).

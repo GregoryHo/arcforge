@@ -1573,6 +1573,99 @@ describe('check-product', () => {
         const header = [TABLE_HEADER[0], '|-|-|-|-|-|-|'];
         expect(validateProduct({ roadmap: roadmap({ header }), specs: [spec()] })).toEqual([]);
       });
+
+      // The tail of the run, the last end of the frame left open. GFM asks no
+      // outer pipe of a row, so a line the pipe scan skips still renders as one
+      // — both inputs below were rendered through GitHub's own GFM endpoint and
+      // came back as a second `<tbody>` row. Each linted green before this
+      // clause, carrying violations of four rules none of them could see.
+      it('rejects a row written without its outer pipes, which GFM still renders', () => {
+        const rows = [
+          row(),
+          '2.0.0 | `v9.9.9` | m | **frobnicated ← we are here** | why | [ghost](specs/ghost.md) |',
+        ];
+        const errors = validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] });
+        expect(of('C6', errors)).toHaveLength(1);
+        expect(of('C6', errors)[0]).toMatch(/rows do not end above "2\.0\.0 \| `v9\.9\.9`/);
+        // Rejected, not parsed: the row carries a second `← we are here`, a
+        // Status outside the vocabulary, a `v9.9.9` Tag on a 2.0.0 row and a
+        // link to a spec that does not exist. None of them is reported, because
+        // the fix holds the format rather than widening it to read the row —
+        // `product/AGENTS.md` defines a roadmap row as six `|`-delimited cells.
+        expect(of('C1', errors)).toEqual([]);
+        expect(of('C4', errors)).toEqual([]);
+        expect(of('C7', errors)).toEqual([]);
+      });
+
+      it('rejects a pipe-free line under the last row, which GFM renders as a row', () => {
+        const rows = [row(), 'Un-scheduled ideas live in the Backlog'];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/rows do not end above "Un-scheduled ideas live in the Backlog"/);
+      });
+
+      it('rejects a fence directly under the last row, though the table ends there', () => {
+        // The blunt direction, and the one a later reader is likeliest to
+        // challenge: GitHub closes the `<table>` at the fence and draws the
+        // block below it, so nothing here renders as a row. Reported anyway —
+        // the rule is that the run ends at a blank line, and telling the
+        // terminators apart from the lines that go on rendering rows is a
+        // renderer's job, not this rule's. Pinned whole for that reason: read
+        // as a diagnosis of this input the outer-pipe clause is wrong, so the
+        // message has to carry the rule and its over-strictness, the way the
+        // head clause's does.
+        const rows = [row(), '```markdown', 'an illustration', '```'];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+        expect(errors).toEqual([
+          'C6 the roadmap table\'s rows do not end above "```markdown": they run from the header ' +
+            'to the first blank line, and every line in that run must be written as a ' +
+            '"|"-delimited 6-column row — GFM asks no outer pipe of a row, so a line like ' +
+            '"1.0.0 | `v1.0.0` | … |" renders inside the table while every rule here reads only ' +
+            'lines opening with "|" — and anything else in the run is reported the same way, ' +
+            'whether or not it renders as a row. Put a blank line above it',
+        ]);
+      });
+
+      it('rejects a four-space-indented row under the last row, though the table ends there', () => {
+        // The other blunt input, and the one that reads as a contradiction of
+        // the ` {0,3}` bound the row scan applies: at four spaces GitHub closes
+        // the `<table>` and draws an indented code block. Reported anyway —
+        // inside the run the rule is positional, and the indent exemption is
+        // about what counts as a row, not about where the run ends. Pinned
+        // because four doc surfaces state it and an indent bound added to this
+        // clause later would otherwise make all four silently false.
+        const rows = [row(), `    ${row({ version: '2.0.0', status: 'building', here: false })}`];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/rows do not end above "\| 2\.0\.0 \|/);
+      });
+
+      it('accepts the note the corpus holds off the table with a blank line', () => {
+        // The green guard: `product/ROADMAP.md` writes a blank line above its
+        // `> Un-scheduled ideas…` note, which ends the run. Without this the
+        // clause would fire on the live corpus.
+        const note = ['', '> a note'];
+        expect(validateProduct({ roadmap: roadmap({ note }), specs: [spec()] })).toEqual([]);
+      });
+
+      it('accepts a fenced illustration held off the table by a blank line', () => {
+        const note = ['', '```markdown', 'an illustration', '```'];
+        expect(validateProduct({ roadmap: roadmap({ note }), specs: [spec()] })).toEqual([]);
+      });
+
+      it('reports a pipe-less row between two rows through the adjacency clause', () => {
+        // The negative control on the clause order: inside the run the pipe
+        // lines stop being consecutive, so adjacency reports it first and this
+        // clause never runs. Its enumeration names this cause now — a line that
+        // renders as a row without being written as one — because it read as a
+        // break that ends the table, which is the one thing this input does not
+        // do.
+        const rows = [row(), 'a pipe-less row', row({ version: '1.1.0', here: false })];
+        const errors = of('C6', validateProduct({ roadmap: roadmap({ rows }), specs: [spec()] }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/breaks above "\| 1\.1\.0 \|/);
+        expect(errors[0]).toMatch(/a line that renders as a row without being written as one/);
+      });
     });
   });
 

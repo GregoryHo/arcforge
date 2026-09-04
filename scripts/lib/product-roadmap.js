@@ -141,6 +141,30 @@ function rowCells(line) {
  * read those rows as product state — the same defect as a missing delimiter,
  * reached one line later.
  *
+ * The frame is not the whole story at the tail either, and reading it as one was
+ * the same hole reached from the other end. A table runs from its header to the
+ * first blank line, and until then *every* line in that run is a row — GFM asks
+ * no outer pipe of one. `2.0.0 | \`v9.9.9\` | m | **frobnicated ← we are here** |
+ * why | [ghost](specs/ghost.md)` appended under the last row renders as a full
+ * six-cell row, and a pipe-free prose line renders as a one-cell row; neither
+ * opens with `|`, so the scan above never collected either and a second
+ * `← we are here` marker, a `Status` outside the vocabulary, a `Tag` against the
+ * wrong version and a link to a spec that does not exist all sat in the rendered
+ * table unread by C1, C4, C6 and C7. So the run is measured positionally rather
+ * than off the pipe lines: every line from the header down to the first blank
+ * line has to be written as one, and one the scan did not collect is reported.
+ * Reported rather than parsed — `product/AGENTS.md` defines a roadmap row as six
+ * `|`-delimited cells, and reading a row the corpus does not write that way
+ * would widen the format instead of holding it.
+ *
+ * Blunt in the same direction the head clause is, and priced the same way: a
+ * fenced block or a four-space-indented row directly under the last row *does*
+ * end the table for a reader — both confirmed against GitHub's own renderer,
+ * along with the blockquote, ATX heading and list item that end it too — and is
+ * reported all the same. What the rule asks for is the blank line the corpus
+ * already writes above the section's note, and telling the terminators apart
+ * from the lines that keep rendering rows is a renderer's job, not this rule's.
+ *
  * Reported and the rows kept, the way a duplicate `Version` and a duplicate
  * `D-id` are — dropping them would take the `← we are here` marker with them
  * and trade this rule's error for C1's.
@@ -163,7 +187,7 @@ function checkRoadmapFraming(table, lines, errors) {
   const broken = table.find((entry, i) => i > 0 && entry.index !== table[i - 1].index + 1);
   if (broken) {
     errors.push(
-      `C6 the roadmap table breaks above "${broken.line}": a blank line, a paragraph or a fenced block sits between it and the pipe line before it, so GFM ends the table there and what follows renders as a paragraph of pipes`,
+      `C6 the roadmap table breaks above "${broken.line}": a line no rule here reads as a row — a blank line, a paragraph, a fenced block, or a line that renders as a row without being written as one — sits between it and the pipe line before it, so either GFM ends the table there and what follows renders as a paragraph of pipes, or the table goes on carrying a row every rule here reads past`,
     );
     return;
   }
@@ -184,6 +208,17 @@ function checkRoadmapFraming(table, lines, errors) {
     errors.push(
       `C6 the roadmap table's delimiter row carries ${delimiter.cells.length} column(s) against a ${header.cells.length}-column header, so GFM renders no table`,
     );
+  }
+  // The tail of the run, last because the clauses above name the shape of a
+  // frame this one only measures the extent of. One push and out: a fenced
+  // block under the last row would otherwise report every line of it.
+  const collected = new Set(table.map((entry) => entry.index));
+  for (let i = head; i < lines.length && lines[i].trim() !== ''; i++) {
+    if (collected.has(i)) continue;
+    errors.push(
+      `C6 the roadmap table's rows do not end above "${lines[i].trim()}": they run from the header to the first blank line, and every line in that run must be written as a "|"-delimited ${ROW_COLUMNS}-column row — GFM asks no outer pipe of a row, so a line like "1.0.0 | \`v1.0.0\` | … |" renders inside the table while every rule here reads only lines opening with "|" — and anything else in the run is reported the same way, whether or not it renders as a row. Put a blank line above it`,
+    );
+    return;
   }
 }
 

@@ -127,6 +127,19 @@ paragraph while the checks would still read it as product state, which is the wh
 defect this rule exists to close. Prose above the table belongs above `## Roadmap`,
 and the section's note goes below it, where the corpus already puts it.
 
+The run has a tail as well as a head, and it is measured rather than inferred from
+the pipes: the rows run from the header down to the first blank line, and every line
+in that run must be written as a `|`-delimited six-column row (C6). GFM asks no outer
+pipe of a row, so `2.0.0 | v9.9.9 | … |` renders inside the table exactly as a
+framed row does, and a pipe-free prose line renders as a one-cell row — while the
+checks read only lines opening with `|`, so a marker, a `Tag` or a spec link sitting
+on one of them would pass unseen. Such a line is reported rather than read: six
+`|`-delimited cells is what a row is, and the fix holds that rather than widening it.
+Anything else in the run is reported the same way, whether or not it renders as a row
+— a fence or a four-space-indented line there does end the table for a reader and is
+reported all the same. So the section's note carries a blank line above it, which is
+what ends the run.
+
 ## The three mechanical rules
 
 These three are pinned in exactly this form because `npm run check:product` reads
