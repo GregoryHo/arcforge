@@ -930,8 +930,8 @@ describe('findUsableMaterialization', () => {
 
   // The half `null` alone does not reach. This function ends
   // `return newestIntact || newest`, so with no intact manifest left a manifest
-  // that parsed to a bare string was handed back AS the record — a pre-existing
-  // hazard, not something the queue unification introduced.
+  // that parsed to a bare string or an array was handed back AS the record — a
+  // pre-existing hazard, not something the queue unification introduced.
   it('never hands back a manifest that is not an object', () => {
     const arcforgeRoot = path.join(tmpDir, '.arcforge');
     const approved = makeCandidateRecord({});
@@ -945,11 +945,31 @@ describe('findUsableMaterialization', () => {
     expect(only.ok).toBe(true);
     // No intact manifest survives, so the `newest` fallback is what returns.
     fs.rmSync(only.draftPaths[0]);
-    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0000_string', '"str"');
+    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0000_array', '[]');
+    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0001_string', '"str"');
 
     expect(findUsable(arcforgeRoot, approved.candidate_id).materialization_id).toBe(
       only.record.materialization_id,
     );
+  });
+
+  // The array half, pinned where directory order cannot decide the outcome.
+  // Beside a real manifest a corrupt one only wins when `readdirSync` yields it
+  // first: read second, `undefined > <iso>` is false and `newest` keeps the real
+  // record whatever the guard does. A candidate whose only manifest is an array
+  // has no competitor — the guard returns null, and without `Array.isArray` the
+  // array is `newest` and comes back as the record.
+  //
+  // There is no counterpart in `findExistingMaterialization`: an array clearing
+  // the guard there is dropped on the very next line
+  // (`[].source_candidate?.candidate_record_hash !== candidateHash`), so its
+  // array clause guards a path nothing observes. Only this function can return
+  // the bad record, because only this one ends `newestIntact || newest`.
+  it('returns null when the only manifest is an array', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    writeRawManifest(arcforgeRoot, 'cand_only_array', 'mat_0000_array', '[]');
+
+    expect(findUsable(arcforgeRoot, 'cand_only_array')).toBeNull();
   });
 
   it('returns null when the candidate has no manifest at all', () => {
