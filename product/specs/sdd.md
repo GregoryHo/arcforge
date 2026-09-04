@@ -80,8 +80,8 @@ want it.
   check over them belongs to the project that adopts the method, not to arcforge.
 - **B-9 A spec cites the decisions in force, and says why each governs.** The
   link from a spec to the log is maintained in both directions: a decision
-  recorded mid-build is filed into the affected spec's **Decisions** section with
-  the one-line reason it is cited, and a supersession swaps the retired id there
+  recorded at promotion or mid-build is filed into the affected spec's
+  **Decisions** section with the one-line reason it is cited, and a supersession swaps the retired id there
   for the one now governing. The clause-scoped form is the exception — the old
   entry still governs its other clauses, so the spec gains the new id and keeps
   the old citation. A spec left pinned to a retired id goes on promising the
