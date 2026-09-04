@@ -175,10 +175,9 @@ reproduces P7 exactly:
 | this run (`20260903-213804`, k=10) | 0/10 | 10/10 |
 
 Full separation in both campaigns. A4 (the routing judgment itself) is 10/10 in
-both arms, read per-trial off the same source as the A5 row and by the same
-method (below) — at ceiling in this run, so what this scenario measures is the
-test-first discipline the routing selects rather than the routing statement in
-isolation. **The one adverse movement between arms is A1**, the `npm test`
+both arms, read off the same per-arm vector as the A5 row (below) — at ceiling in
+this run, so what this scenario measures is the test-first discipline the routing
+selects rather than the routing statement in isolation. **The one adverse movement between arms is A1**, the `npm test`
 matcher: baseline 10/10, treatment 9/10, lost by treatment trial 3 alone (0.6),
 which still passed A5. One trial in ten against a matcher orthogonal to routing
 is not a regression signal, but it is not "nothing moved" either.
