@@ -103,7 +103,8 @@ Sessions stored in `~/.arcforge/sessions/{project}/{date}/` as JSON:
   "filesModified": [
     "src/foo.ts",
     "tests/foo.test.ts"
-  ]
+  ],
+  "compactions": []
 }
 ```
 
@@ -111,11 +112,14 @@ Every field above is continuity: the learning opt-in never gates any of them.
 The diary threshold does gate the two the transcript supplies — `toolsUsed` and
 `filesModified` are refreshed only on a Stop or compaction that hits the
 threshold, and below it a Stop clears `filesModified` and leaves `toolsUsed` as
-an earlier parse wrote it. One field is missing from the block above because it
-is not continuity: `userMessageContent` — the last 10 user messages, each
-truncated — is written on that same threshold hit and only when learning is
-enabled in some scope, and is removed again, at any threshold, the first time a
-Stop or a compaction stamps the record with learning off.
+an earlier parse wrote it. `compactions` is seeded empty here; the PreCompact
+hook appends to it and documents the populated shape. Other hooks stamp their
+own fields into the same record and document those themselves.
+One field is deliberately absent because it is not continuity:
+`userMessageContent` — the last 10 user messages, each truncated — is written
+on that same threshold hit and only when learning is enabled in some scope, and
+is removed again, at any threshold, the first time a Stop or a compaction
+stamps the record with learning off.
 
 ## Output Examples
 
