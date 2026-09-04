@@ -41,6 +41,21 @@ function namePolicySummary() {
   return require('../lib/learning-curator/materialize').NAME_POLICY_SUMMARY;
 }
 
+// The one value this module renders that never passed through
+// `sanitizeDashboardCard`: an engine module's own `module_failure.detail`. It is
+// diagnostic prose built from whatever the candidate carries, and the candidate's
+// raw `name` is what several of those details embed — `materialize.js` puts it in
+// `path_policy_rejected`'s message, `activate.js` builds `target_path_rejected`'s
+// path from it, and an fs error carries a path that contains it. A card renders
+// `name` through `redactObservationText`, so a secret-bearing name that `learn
+// review` shows as `[REDACTED]` would otherwise reach stdout intact the moment a
+// transition refuses. Same redactor, same reason — no truncation, because the
+// card's length cap is a display bound and clipping an engine error mangles it.
+// Lazily required like every other `../lib` import across the candidate front end.
+function redactEngineDetail(detail) {
+  return require('../lib/sanitize-observation').redactObservationText(detail);
+}
+
 // `reject` is the CLI's long-standing name for the matrix's `dismiss`.
 const ACTION_FOR_VERB = {
   approve: 'approve',
@@ -327,7 +342,7 @@ function refusalMessage(result, verb, card) {
     );
   }
   const detail = result.module_failure?.detail;
-  return detail ? `${base} — ${detail}` : base;
+  return detail ? `${base} — ${redactEngineDetail(detail)}` : base;
 }
 
 /**
