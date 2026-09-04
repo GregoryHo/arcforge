@@ -52,9 +52,10 @@ the log's status column — which is the only fast way to read it.
   consolidates onto the platform already deployed to.
 ```
 
-Two edits in the log. D-007 keeps its text and gains one line; D-011 carries the
-new choice and the reason it changed. Nothing was deleted, and the pair reads as
-a story.
+Two edits in the log. D-007 keeps its `Decision:` and `Why:` text and has one
+line replaced — `Status: Accepted` becomes `Status: Superseded-by: D-011`, never
+a second `Status:` line beside the old one; D-011 carries the new choice and the
+reason it changed. No decision text was deleted, and the pair reads as a story.
 
 The spec that cited D-007 moves with them — its **Decisions** section swaps the
 retired id for the one now in force:
