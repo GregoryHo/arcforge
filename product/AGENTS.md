@@ -419,9 +419,10 @@ no estimate, no commitment. Low friction is the point.
    keeps it.
 4. Write the spec **before building** — `specs/<slug>.md` from the template for a
    new area, or this version's behaviors added to the area's existing living spec,
-   never a second file for one area. An existing spec's header takes the compound
-   form of rule 2 the moment the new row links it: `shipped vX.Y.Z · extended by
-   <this version> (next)`.
+   never a second file for one area. An existing spec's header follows rule 2 from
+   the moment the new row links it: the compound form `shipped vX.Y.Z · extended
+   by <this version> (next)` once a lower row has shipped, and plain `draft` while
+   none has.
 
 ### Record a decision
 Append to the Decision Log with the next free `D-NNN` (zero-padded, monotonic,

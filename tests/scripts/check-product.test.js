@@ -1101,6 +1101,33 @@ describe('check-product', () => {
       expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
     });
 
+    it('keeps a draft header when a next row is promoted over a building one', () => {
+      // The `next` → `draft` branch is not single-row-only. Two unshipped rows
+      // link one spec, the governing row is still `next`, and no shipped row
+      // means there is no compound form to write — its left half would have no
+      // version to name.
+      const rows = [
+        row({ version: '1.0.0', status: 'building' }),
+        row({ version: '1.1.0', status: 'next', here: false }),
+      ];
+      const specs = [spec({ status: 'draft' })];
+      expect(of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }))).toEqual([]);
+    });
+
+    it('rejects a compound header invented over two unshipped rows', () => {
+      // The mutant of the case above, and the header a reader takes from any
+      // "an existing spec goes compound on promotion" reading: it announces a
+      // shipped 1.0.0 that has not shipped.
+      const rows = [
+        row({ version: '1.0.0', status: 'building' }),
+        row({ version: '1.1.0', status: 'next', here: false }),
+      ];
+      const specs = [spec({ status: 'shipped v1.0.0 · extended by 1.1.0 (next)' })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap({ rows }), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/makes it "draft"/);
+    });
+
     it('requires the compound form while a later row extends a shipped spec', () => {
       const rows = [
         row({ version: '1.0.0', here: false }),
