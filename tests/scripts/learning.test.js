@@ -1130,6 +1130,25 @@ describe('learn candidate commands over the canonical queue', () => {
       });
     }
 
+    it('refuses when --global is named alongside --project, in either order', () => {
+      seed(makeRecord({ body: BODY_CANARY }));
+
+      // Naming both selectors is still naming `--global`, so the refusal holds
+      // rather than the command quietly resolving to project scope.
+      for (const args of [
+        ['review', '--global', '--project', '--json'],
+        ['approve', CANDIDATE_ID, '--project', '--global', '--json'],
+      ]) {
+        const result = runCli(args);
+
+        expect(result.status).not.toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual({
+          error: expect.stringContaining('arcforge learn dashboard'),
+        });
+        expect(`${result.stdout}${result.stderr}`).not.toContain(BODY_CANARY);
+      }
+    });
+
     it('still requires an explicit scope', () => {
       const result = runCli(['review']);
 

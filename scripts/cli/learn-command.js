@@ -54,7 +54,9 @@ const {
 const CLI_ACTOR = { layer: 6, actor_type: 'cli', reviewer: 'local_user' };
 
 function requireProjectCandidateScope(args) {
-  if (args.flags.project) return 'project';
+  // `--global` is read first so the refusal is unconditional: a command naming
+  // both selectors is still a command that named `--global`, and the docs
+  // promise that fails closed rather than quietly resolving to project scope.
   if (args.flags.global) {
     throw new Error(
       'only project candidate commands are supported — a global-scoped candidate applies to ' +
@@ -62,6 +64,7 @@ function requireProjectCandidateScope(args) {
         'arcforge learn dashboard',
     );
   }
+  if (args.flags.project) return 'project';
   throw new Error('learn command requires --project or --global');
 }
 
