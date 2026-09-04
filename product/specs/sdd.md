@@ -81,12 +81,12 @@ want it.
 - **B-9 A spec cites the decisions in force, and says why each governs.** The
   link from a spec to the log is maintained in both directions: a decision
   recorded at promotion or mid-build is filed into the affected spec's
-  **Decisions** section with the one-line reason it is cited, and a supersession swaps the retired id there
-  for the one now governing. The clause-scoped form is the exception — the old
-  entry still governs its other clauses, so the spec gains the new id and keeps
-  the old citation. A spec left pinned to a retired id goes on promising the
-  choice that was reversed, which is the failure B-3 forbids in the other
-  direction.
+  **Decisions** section with the one-line reason it is cited, and a supersession
+  swaps the retired id there for the one now governing. The clause-scoped form
+  is the exception — the old entry still governs its other clauses, so the spec
+  gains the new id and keeps the old citation. A spec left pinned to a retired
+  id goes on promising the choice that was reversed, which is the failure B-3
+  forbids in the other direction.
 
 ## Data / domain model
 
