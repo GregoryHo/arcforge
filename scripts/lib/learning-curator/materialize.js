@@ -510,7 +510,18 @@ function materialize({
     );
   }
 
-  // L7-12: Validate name against the draft-filename policy
+  // L7-12: Validate name against the draft-filename policy.
+  //
+  // This runs BEFORE the L7-11 idempotence branch below, so it screens the
+  // re-materialization of an existing record as well as a fresh write. That
+  // ordering predates the byte bound, and the bound gives it one retroactive
+  // consequence worth naming: a legacy candidate whose name is over 248 bytes
+  // — only reachable if it materialized on a character-counting filesystem
+  // such as APFS — is refused here on `deactivated → materialize`, where it
+  // used to get its existing record back. It is not a dead end. The matrix
+  // leaves `deactivated → activate` legal and `activate` resolves its path
+  // from `candidate_id` rather than from `name`, so the draft that is already
+  // on disk is still reachable by the one command that reads it.
   let safeName;
   try {
     safeName = checkDraftName(candidate.name);
