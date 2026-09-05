@@ -206,9 +206,10 @@ a missing one — an entry with no `Status:` records nothing about whether it st
 governs, and leaves a later reversal no line to flip. A line with nothing after the
 colon is counted as a line and reported for what it is: it counts toward the second
 one, and when it is the only one it gets its own message naming the line rather than
-the missing-line message, because the line is there and the value is not. The flip in step 2 of *Change a
-decision* **replaces** the existing line rather than being appended below it — two
-`Status:` lines are the same contradiction spelled with a newline instead of a `·`.
+the missing-line message, because the line is there and the value is not. The flip
+in step 2 of *Change a decision* **replaces** the existing line rather than being
+appended below it — two `Status:` lines are the same contradiction spelled with a
+newline instead of a `·`.
 
 The two forms are exclusive *per pair*, though: one decision either replaces another
 whole or reverses one of its clauses, never both, so `Superseded-by: D-MMM · partially
