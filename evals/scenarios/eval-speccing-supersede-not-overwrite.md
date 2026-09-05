@@ -667,7 +667,16 @@ trial quota.
   Blobstash. The user asked for it explicitly, so both arms should pass; it
   exists so a trial that fixed the log and left the spec lying is not scored as
   a success, which a bare mention of the vendor anywhere in the file could not
-  enforce.
+  enforce. Not asserted: the spec-side citation swap
+  `skills/core/speccing/SKILL.md` §5 and `product/specs/sdd.md` B-9 require —
+  the spec's `## Decisions` list trading the retired id for the superseding
+  one — so a trial that appends and links D-008 and rewrites B-4 to Vaultbox
+  while leaving that list pinned to D-005 still scores 4/4. It stays
+  unasserted because all six surviving transcripts make that swap without the
+  prompt naming the `## Decisions` list, so a fifth assertion separates
+  nothing in the observed pool and this scenario has no A/B at stake; and
+  because it would restate the denominator on every measured row of both A4
+  tables and owe a validation matrix of its own.
 
 **Fixture hygiene.** No `AGENTS.md`, no "append-only" sentence over the Decision
 Log, and no already-superseded entry to imitate. Both pools showed the ceiling
