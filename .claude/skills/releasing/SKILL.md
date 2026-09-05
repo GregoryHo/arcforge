@@ -1,6 +1,6 @@
 ---
 name: releasing
-description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → 8-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
+description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → product-state flip → 8-file version bump (incl. website) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
 ---
 
 # releasing
@@ -15,14 +15,14 @@ Never start the release workflow on a broken branch.
 
 1. `npm run lint` — exit code 0 (warnings acceptable, errors are not)
 2. `npm test` — all **5** runners green (`test:scripts`, `test:hooks`, `test:node`, `test:skills`, `test:observer-daemon`)
-3. The **5 static checks**, which are CI-gated but deliberately *not* part of `npm test` — run each and require exit 0:
+3. The **6 static checks**, which are CI-gated but deliberately *not* part of `npm test` — run each and require exit 0:
 
    ```bash
    npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-     && npm run check:hooks && npm run check:eval-targets
+     && npm run check:hooks && npm run check:eval-targets && npm run check:product
    ```
 
-   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 5 and must be green after it. The other four must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward.
+   `check:versions` will still be red at this point if you have not bumped yet — that is expected before step 6 and must be green after it. The other five must be green *now*: a red `check:docs` before the bump means the shipped prose already disagrees with the code, and the release would carry that lie forward. `check:product` green here means the product state is coherent going in; step 5 flips it and you run the check again to catch a half-done flip.
 4. `git status` clean of unrelated work-in-progress. Untracked lock files or editor droppings that belong in `.gitignore` must be addressed separately, never folded into the release commit
 5. `git log main..HEAD --oneline` — verify the commits listed match the intended release scope
 6. `node scripts/check-unmerged-branches.js` — every local branch with commits off `main` must be dispositioned: a MERGED PR, an OPEN PR, or already landed on `origin/main`. A branch reported `NO-PR` is unmerged work about to miss this release — land it (open + merge a PR) or delete it, then re-run. The script catches squash-merged branches that `git branch --no-merged main` cannot see. Releaser-only; it cannot be a CI gate (a fresh runner has no local branches), and it degrades to list-only if `gh` is absent.
@@ -159,7 +159,46 @@ Include only sections that have entries. Order: Fixed → Changed → Added → 
 
 **Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. The `release.yml` workflow extracts this exact `## [X.Y.Z]` section verbatim into the GitHub Release body when the tag is pushed (it slices from the version header to the next `## [` header), so this is the text users read on the GitHub release page — treat it as a user-facing artifact. The release job **fails** if no matching CHANGELOG section exists, which enforces the "no bump without CHANGELOG entry" rule below.
 
-### 5. Bump the version in **all 8 canonical locations**
+### 5. Flip the product state
+
+`product/` records what the product is and why. A release makes it stale in four
+places at once, and nothing in the version bump touches any of them. `product/AGENTS.md`
+(*Ship a version*) is the authority; the mechanics are:
+
+1. Flip the release's roadmap row in `product/ROADMAP.md` to `Status: shipped`.
+2. Fill that row's `Tag` column with `vX.Y.Z`.
+3. Set the `Status:` header of every spec the row governs to `shipped vX.Y.Z`. A spec
+   carrying the compound form — `shipped v6.0.0 · extended by 6.1.0 (building)` —
+   collapses to `shipped v6.1.0`.
+4. Move `← we are here` onto whatever is next. If nothing is next yet it stays on the
+   row that just shipped: exactly one row carries it, always.
+
+Then check the flip:
+
+```bash
+npm run check:product
+```
+
+It was green before this step and it must be green after — a `building` row with
+`building` spec headers agrees just as well as a `shipped` row with `shipped` headers.
+What it catches is a **half-done flip**: the row moved but a spec header didn't, or
+the `Tag` cell was left empty (or still reads `—`). That is the failure that actually
+happens, because the four edits live in four different files and only the first one
+feels like "the release". Edit 4 is the one it cannot judge for you — C1 counts
+markers, it does not know which row deserves one, so a marker that should have moved
+and didn't passes green. Re-read that one yourself.
+
+Commit this on its own, ahead of the release commit:
+
+```bash
+git add product/
+git commit -m "docs(product): flip vX.Y.Z to shipped"
+```
+
+Keeping it separate is deliberate — the release commit in step 7 stays exactly the 9
+version files, so reverting a bad bump does not drag the product history back with it.
+
+### 6. Bump the version in **all 8 canonical locations**
 
 | File | Where in the file |
 |---|---|
@@ -194,14 +233,14 @@ For an authoritative pass/fail that compares every location against the canonica
 
 For releases that change **shipped surface area** (new skill, removed CLI flag, new marketing claim), also audit the website **content** — `website/page/hero.jsx` and `sections.jsx` carry the project framing. Patch releases usually just need the version label bumped; minor/major releases often need copy adjustments too. Confirm with the user before rewriting hero copy or feature lists.
 
-### 6. Commit, push, open PR
+### 7. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
-- Stage exactly the 9 release files (8 version locations + `CHANGELOG.md`). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
+- Stage exactly the 9 release files (8 version locations + `CHANGELOG.md`) — the product-state flip from step 5 is already its own commit on this branch, so do not fold it in. Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 5 runners green, 5 static checks green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
+- `gh pr create` with a test-plan checklist in the body: 5 runners green, 6 static checks green, lint green, secret scan clean, canonical 8-location grep returned exactly 8 hits
 
-### 7. After PR merges to main — tag it
+### 8. After PR merges to main — tag it
 
 Arcforge has tagged every release since `v1.0.0`. Skipping a tag breaks the `git log vPREV..HEAD` workflow that the *next* release relies on to scope its CHANGELOG.
 
@@ -217,11 +256,12 @@ If the user is merging via GitHub UI (squash or merge), run the tag commands aga
 
 These are the steps that get skipped when a contributor is in a hurry. The skill's job is to surface them even when the user doesn't ask:
 
-- **Ingest before bump.** Once the version flips, the "why" narrative is harder to reconstruct for the vault. That's why it's step 1, not step 5.
+- **Ingest before bump.** Once the version flips, the "why" narrative is harder to reconstruct for the vault. That's why it's step 1, not step 6.
 - **Website version labels + babel rebuild.** `website/page/hero.jsx` and `sections.jsx` both carry the version, and the committed `.js` siblings must be regenerated via `npm run build:website` to match — easy to miss because the website looks like a "doc only" surface but `.jsx` ≠ `.js` in a single commit is a real defect.
 - **README badge URL.** The shields.io badge is image-cached; stale numbers visually persist even after every other file is correct. Worth an extra explicit mention.
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
+- **The product-state flip.** The roadmap row, its `Tag` cell, the spec headers, and the `← we are here` marker are four edits in four files, and a version bump touches none of them. `npm run check:product` proves the first three; where the marker ended up is on you.
 - **The post-merge tag.** Merging the PR does not auto-tag. This is the single most commonly skipped step.
 
 ## Anti-Patterns (from real arcforge release incidents)

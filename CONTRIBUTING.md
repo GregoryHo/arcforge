@@ -5,6 +5,7 @@ Welcome! arcforge is a skill-based agent toolkit for Claude Code. Contributions 
 ## Table of Contents
 
 - [Philosophy & Principles](#philosophy--principles)
+- [How we work](#how-we-work)
 - [Quick Start](#quick-start)
 - [Plugin Development](#plugin-development)
 - [Contributing Skills](#contributing-skills)
@@ -39,6 +40,24 @@ See [`CLAUDE.md`](CLAUDE.md) for the command reference and `.claude/rules/` for 
 
 ---
 
+## How we work
+
+arcforge is maintained **spec-driven**. `product/` holds the product's living state — one spec per feature area, a semver roadmap, an append-only Decision Log, and a backlog of un-scheduled wishes — and `product/AGENTS.md` is the guide to keeping it current. Engineering conventions stay in `.claude/rules/`; `product/` answers *what the toolkit does, for whom, and in what order*.
+
+Three consequences for a PR:
+
+- **A behavior change ships with its spec change in the same PR.** The spec describes the *current* product, not the original plan. A merged PR whose spec still describes the old behavior is incomplete, not tidy-later.
+- **A choice becomes a `D-NNN`** in the ROADMAP Decision Log, cited from the spec it pins. Recorded decisions are never edited or renumbered — reverse one by appending a superseding entry and flipping one line on the old one.
+- **`npm run check:product` gates the mechanical half** — one `← we are here` marker, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row, and a `Tag` cell that agrees with its row's status. It cannot tell whether what you wrote is *true*; that is what review is for.
+
+Two project-local agents make this cheaper: `pm` is scoped to write `product/**` and nothing else, `qa` runs the gates and holds no editing tools. See `.claude/agents/README.md`.
+
+Add one line to your pre-PR check, alongside the runners and the static checks:
+
+- [ ] relevant `product/specs/*.md` updated in this PR (+ `D-NNN` recorded when a choice was made)
+
+---
+
 ## Quick Start
 
 ```bash
@@ -59,9 +78,9 @@ git checkout -b feat/my-contribution   # or fix/..., docs/...
 # 5. Run all 5 test runners
 npm test
 
-# 6. Run the 5 static checks — CI gates on these and npm test does not cover them
+# 6. Run the 6 static checks — CI gates on these and npm test does not cover them
 npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-  && npm run check:hooks && npm run check:eval-targets
+  && npm run check:hooks && npm run check:eval-targets && npm run check:product
 npm run lint
 
 # 7. Submit PR
@@ -289,7 +308,7 @@ arcforge uses five separate test runners. **All must pass before submitting a PR
 | Bash | `npm run test:observer-daemon` | `tests/observer-daemon/` | Observer daemon behavior |
 | **All** | **`npm test`** | All above | **Run this before every PR** |
 
-Five static checks run in CI and are **not** part of `npm test`:
+Six static checks run in CI and are **not** part of `npm test`:
 
 | Command | Guards |
 |---|---|
@@ -298,6 +317,7 @@ Five static checks run in CI and are **not** part of `npm test`:
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
 | `npm run check:hooks` | `hooks/hooks.json` schema |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
+| `npm run check:product` | `product/` roadmap, Decision Log, and spec headers stay consistent |
 
 ---
 
@@ -367,7 +387,7 @@ Use the escape hatch sparingly. If you find yourself adding many suppressions, t
 - Read existing skills, hooks, and tests before writing new ones
 - Follow existing patterns and conventions
 - Run `npm test` before submitting (all 5 runners must pass)
-- Run the 5 static checks so CI doesn't catch what you could have
+- Run the 6 static checks so CI doesn't catch what you could have
 - Include tests for new functionality
 - Keep skills inside the 250-line cap; use `references/` for overflow
 - Use `execFileSync` over `exec` (prevents shell injection)
