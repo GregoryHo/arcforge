@@ -459,9 +459,14 @@ rationale intact. A pivot is two small edits, not a rewrite.
 ### Build a milestone (`building`)
 Implementing a spec is ordinary disciplined development — this system bookends it, it
 does not add ceremony.
-1. Flip the row to `Status: building` **and** the spec header to `building vX.Y.Z`
-   (or the compound form, per mechanical rule 2). One edit, both halves; C4 in
-   `npm run check:product` proves you did both (the `Tag` stays `—` either way).
+1. Flip the row to `Status: building`, then re-read the spec header off the
+   **highest row linking that spec**, per mechanical rule 2. When the row that
+   just started is that highest row, the header becomes `building vX.Y.Z` — or
+   the compound form. When a later row is, the header does not move: promotion,
+   or that later row's own ship, already wrote what it says. C4 in
+   `npm run check:product` reads the header against the governing row either
+   way, so the no-op passes and a half-done flip does not (the `Tag` stays `—`
+   throughout).
 2. Branch from `main`. Build the spec's **Behavior** items test-first — a failing
    test per `B-id` → make it pass → refactor. Keep the 5 runners and the 6 static
    checks green.
