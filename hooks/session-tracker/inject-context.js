@@ -36,11 +36,14 @@ const {
 const { parseConfidenceFrontmatter } = require('../../scripts/lib/confidence');
 const { getArcforgeHome } = require('../../scripts/lib/utils');
 const { listActivatedCandidateIds } = require('../../scripts/lib/learning-curator/activate');
-const { isInjectActivatedInstinctsEnabled } = require('../../scripts/lib/learning');
+const {
+  isInjectActivatedInstinctsEnabled,
+  learningEnabledSince,
+} = require('../../scripts/lib/learning');
 
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
-const { draftIsStale } = require('../../scripts/lib/diary-capture');
+const { draftIsStale, learningCaptureEnabled } = require('../../scripts/lib/diary-capture');
 
 // Max activated instincts injected into SessionStart context (ICL-4).
 const MAX_INJECTED_INSTINCTS = 5;
@@ -147,10 +150,45 @@ function loadInstinctFiles(dir) {
 // single owner shared by this healthcheck and the curator batch-assembler.
 
 /**
+ * Whether a draft was written before enrichment was ever authorized.
+ *
+ * The floor is the EARLIER of creation and last-write time, so hand-editing or
+ * touching a pre-opt-in stub does not lift it above the floor — mtime alone
+ * would, and every later session would then report a by-design stub as an
+ * enricher failure. A copy that preserves NEITHER stamp still does, because the
+ * learning config's `updated_at` is embedded and survives the same copy while
+ * file stamps do not; ordinary restore tooling keeps mtime and so stays below
+ * the floor.
+ *
+ * Fails open — an unreadable timestamp lets the stub probe decide.
+ */
+function draftPredatesOptIn(filePath, enabledSince) {
+  try {
+    const { mtimeMs, birthtimeMs } = fs.statSync(filePath);
+    // birthtime is 0 on filesystems that don't record it; fall back to mtime
+    // there rather than collapsing the floor to 0 and going quiet forever.
+    const writtenAt = birthtimeMs > 0 ? Math.min(mtimeMs, birthtimeMs) : mtimeMs;
+    return writtenAt < enabledSince;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns { count, message } when stale drafts exist, else null.
  * Surfaces silent enrichment failures so they don't accumulate forever.
+ *
+ * Only drafts written since the learning opt-in count. Drafts from a
+ * learning-off period keep their stubs by design (D-009), so counting them
+ * would turn the first session after opting in into a report of the entire
+ * backlog — and the message's diagnosis ("the enricher may be failing") would
+ * be wrong about every one of them.
+ *
+ * @param {string} project
+ * @param {number} [enabledSince] - Epoch ms the opt-in took effect; 0 (the
+ *   default) applies no floor and counts every stale draft.
  */
-function loadStaleDraftWarning(project) {
+function loadStaleDraftWarning(project, enabledSince = 0) {
   try {
     const dir = getProjectDiariesDir(project);
     if (!fs.existsSync(dir)) return null;
@@ -161,7 +199,9 @@ function loadStaleDraftWarning(project) {
       const dateDirPath = path.join(dir, dateEntry.name);
       for (const file of fs.readdirSync(dateDirPath)) {
         if (!file.startsWith('diary-') || !file.endsWith('-draft.md')) continue;
-        if (draftIsStale(path.join(dateDirPath, file))) stale++;
+        const draftPath = path.join(dateDirPath, file);
+        if (draftPredatesOptIn(draftPath, enabledSince)) continue;
+        if (draftIsStale(draftPath)) stale++;
       }
     }
 
@@ -178,8 +218,15 @@ function loadStaleDraftWarning(project) {
 
 /**
  * Load and consume pending actions for context injection.
+ *
+ * @param {string} project
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose learning opt-in
+ *   decides whether a queued `reflect-ready` may still be delivered. Omitted or
+ *   blank means no consent, so the nudge is suppressed — the safe direction for
+ *   an invitation.
  */
-function loadPendingActions(project) {
+function loadPendingActions(project, { projectRoot } = {}) {
   try {
     // Relay-isolation: a session arcforge spawned itself (e.g. the detached
     // diary enricher, or a loop's headless task session) must NOT consume the
@@ -194,9 +241,24 @@ function loadPendingActions(project) {
     const lines = [];
     const summaryParts = [];
 
+    // The reflection nudge is gated at BOTH ends of its life: at queue time in
+    // end.js (D-009), so it never accumulates while learning is off, and here at
+    // delivery, so an opt-out between the queuing Stop and this SessionStart
+    // retracts a nudge already in the queue instead of spending it. Both ends
+    // ask the one consent predicate — end.js's queue gate reads it through the
+    // same helper — so the fail-closed-on-a-missing-projectRoot rule is stated
+    // once, in diary-capture.js, rather than restated here.
+    //
+    // The action stays in `actions` either way, so the consume loop below still
+    // clears it — a suppressed nudge is dropped, never deferred to fire later
+    // with a stale count. `reflect-ready` also stays in DEDICATED_TYPES, so a
+    // suppressed nudge cannot fall through to the raw `Pending: <type>` line and
+    // deliver the same invitation with its payload attached.
+    const learningOn = learningCaptureEnabled({ projectRoot });
+
     const DEDICATED_TYPES = ['diary-ready', 'reflect-ready'];
     const diaryActions = actions.filter((a) => a.type === 'diary-ready');
-    const reflectActions = actions.filter((a) => a.type === 'reflect-ready');
+    const reflectActions = learningOn ? actions.filter((a) => a.type === 'reflect-ready') : [];
     const otherActions = actions.filter((a) => !DEDICATED_TYPES.includes(a.type));
 
     if (diaryActions.length > 0) {
@@ -310,8 +372,14 @@ function main() {
     userParts.push(`${instinctCount} active instinct${instinctCount === 1 ? '' : 's'}`);
   }
 
+  // One projectRoot serves both the pending-action delivery gate and the
+  // stale-draft floor below.
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
   // Pending action notifications
-  const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project);
+  const { text: pendingContext, summary: pendingSummary } = loadPendingActions(project, {
+    projectRoot,
+  });
   if (pendingContext) {
     contextParts.push(pendingContext);
   }
@@ -319,8 +387,14 @@ function main() {
     userParts.push(pendingSummary);
   }
 
-  // Stale-draft healthcheck (re-evaluated every session start, not consumed)
-  const staleWarning = loadStaleDraftWarning(project);
+  // Stale-draft healthcheck (re-evaluated every session start, not consumed).
+  // Only meaningful once enrichment can run: with learning off, drafts keep
+  // their TO BE ENRICHED stubs by design (D-009), so the warning would be a
+  // permanent complaint about intended behavior. The opt-in TIMESTAMP, not just
+  // the flag, is what bounds it — otherwise the whole learning-off backlog
+  // surfaces at once on the first session after opting in.
+  const enabledSince = learningEnabledSince({ projectRoot });
+  const staleWarning = enabledSince === null ? null : loadStaleDraftWarning(project, enabledSince);
   if (staleWarning) {
     contextParts.push(staleWarning.message);
     userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);

@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.1.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -56,12 +56,53 @@ down, never block the user, and never observe them uninvited.
   observation registrations check for an enabled configuration and exit before
   doing any work when learning is off — the default — so with learning off
   nothing is observed and no pattern is ever mined. Session bookkeeping sits
-  outside that gate and runs either way: every session leaves a durable record
-  on disk, and a session that passes the activity threshold additionally writes
-  a diary draft, stores in that record the recent user messages the draft is
-  built from, and hands the draft to a background enrichment run. There is no
-  per-hook switch: the single opt-in covers the learning loop, disabling
-  learning stops it, and uninstalling the plugin removes everything.
+  outside that gate and runs either way, but *depth* is split by what the field
+  is: metadata about the session is continuity, the user's own words and
+  anything handed to a model are not.
+
+  | Recorded on a threshold hit | Learning off | Learning on |
+  |---|---|---|
+  | Session record: duration, message and tool counts, compactions | yes | yes |
+  | Tool names used, files modified (paths) | yes | yes |
+  | Diary draft (renders row 1 and the paths from row 2) | yes | yes |
+  | Verbatim recent user messages, in the session record | **no** | yes |
+  | Background enrichment run over a session summary | **no** | yes |
+  | Reflection nudge ("N diaries ready for reflection") | **no** | yes |
+
+  The last row is why the nudge and the diary-ready notice split: diary-ready
+  points at a continuity artifact that exists and can be read now, while
+  reflection is the learning loop itself, which [learning](learning.md) B-1
+  keeps off. Left ungated it would re-queue at every threshold hit, forever,
+  over diaries the user never authorized anything to be made of. The nudge is
+  gated at both ends — queue and delivery — so an opt-out between them retracts
+  a nudge already queued instead of spending it on the next session start.
+
+  So with learning off the draft is written but never filled in: its unfilled
+  sections are the contract, not a failed enrichment, and the hooks do not
+  report them as one. What the draft does fill in is the counts and the paths
+  of the files the session touched, plus a tool-usage aggregate — the only
+  place tool names appear — whenever an observations log already exists for the
+  project; since observation is itself gated, with learning off that aggregate
+  can only be residue of a period when learning was on, and nothing new is
+  observed to build it. The stale-draft healthcheck counts only drafts written
+  since the opt-in took effect, so turning learning on reports what the enricher
+  has since failed to fill in, rather than the backlog of stubs from before it
+  was ever asked to. The floor is the earlier of the draft's creation and
+  last-write times, so hand-editing or touching a pre-opt-in stub does not lift
+  it above the floor. Two things still do, and are reported: a copy that
+  preserves neither stamp — a sync re-download or a naive unzip, where ordinary
+  restore tooling keeps the modification time and so stays below the floor — and
+  a filesystem that records no creation time, which leaves the floor resting on
+  last-write alone. The floor cuts the other way twice, and both are silences
+  rather than false alarms: a draft first written before the opt-in and
+  rewritten in place afterwards keeps its original creation time, so a genuine
+  post-opt-in enrichment failure over it is never reported; and disabling the
+  scope that carries the earliest opt-in — global on, then project on, then
+  global off — advances the floor to the surviving scope's stamp even though
+  authorization never lapsed, because a scope's config records its latest
+  transition and not the enable it replaced. There is no per-hook switch: the
+  single opt-in covers the learning loop in either scope, disabling learning
+  stops it, and uninstalling the plugin removes everything.
 
 ### Performance
 - **B-7 The synchronous path stays small.** Observation writes and
@@ -89,11 +130,20 @@ unconditionally and B-6 bounds. Its path and its safe read/write belong to
 `hooks/session-tracker/start.js` opens the record, `hooks/session-tracker/end.js`
 closes it with the counts and, above the diary threshold, with the summary
 `scripts/lib/transcript.js` parses out of the harness transcript (with no parsed
-transcript — below the threshold, or above it with none to read — `filesModified`
-is cleared while `userMessageContent` and `toolsUsed` are neither written nor
-cleared, so a record an earlier parse filled keeps that turn's prose and tool list
-until a later parse refreshes them), and
-`hooks/pre-compact/main.js` appends each compaction. The diary is
+transcript — below the threshold, or above it with none to read — a Stop clears
+`filesModified` while `toolsUsed` is neither written nor cleared, so a record an
+earlier parse filled keeps that turn's tool list until a later parse refreshes it;
+`userMessageContent` follows a different lifetime, because the opt-in governs how
+long it may stay and not only whether it is written — every Stop, and every
+compaction that stamps the record, removes it whenever learning is off, so prose
+captured under the opt-in does not outlive it), and
+`hooks/pre-compact/main.js` appends each compaction and, above that same
+threshold, stamps the compaction's own counts and parsed summary *before* the
+draft is generated — the draft is rendered from the record, so a compaction that
+reaches the threshold before any Stop has closed it would otherwise report the
+previous turn's numbers and none of the paths it touched. A compaction stamps
+only what it can read: with no parsed transcript it leaves the record's paths as
+an earlier Stop wrote them rather than clearing them. The diary is
 not a hooks format but learning's ([learning](learning.md)); what this area owns is its
 trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`
 coordinates for both Stop and PreCompact. Everything else a hook handles — tool
@@ -105,3 +155,8 @@ of its own (B-5).
 The warn-only and fail-open stances predate this log; their rationale is
 inline above (B-2, B-3). The error-handling tier that
 implements fail-open is pinned in `.claude/rules/coding-standards.md`.
+
+- **D-010** — session capture depth: counts always, verbatim user prose only
+  under the opt-in (B-6).
+- **D-009** — the enrichment run that B-6 gates is also unprivileged
+  ([learning](learning.md) B-9).

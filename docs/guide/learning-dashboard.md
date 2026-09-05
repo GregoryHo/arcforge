@@ -228,10 +228,23 @@ the dashboard.
 ## What is stored, and where
 
 All state stays on your own machine — arcforge has no telemetry and no server of
-its own to report to. The one thing that leaves is diary enrichment: it runs
-`claude` locally over a parsed summary of the session, so that summary reaches
-the model exactly the way anything you type in a session does. State sits in two
-places, split by scope:
+its own to report to. The one thing that leaves is diary enrichment, and it only
+happens once you have turned learning on: it runs `claude` locally over a parsed
+summary of the session, so that summary reaches the model exactly the way
+anything you type in a session does. That run used to skip every permission
+check; it no longer does. It gets two tools, `Read` and `Write`, and the diary
+directory is added to the places it is allowed to work in. It is not sealed off,
+though: it still starts in your project directory, and edits inside those places
+are approved automatically, because a background run has nobody to ask. What it
+no longer has is a blanket pass over your whole machine.
+
+Turn learning off and the enrichment stops: diary drafts are still written from
+your session record — the counts and the files you touched — but their
+`TO BE ENRICHED` sections stay unfilled, which is what an un-enriched draft is
+supposed to look like. The same opt-in decides whether your recent message text
+is stored in the session record at all.
+
+State sits in two places, split by scope:
 
 - **Home-global** — under `~/.arcforge/`: diaries in `diaries/<project>/<date>/`,
   raw observations in `observations/<project>/`, activated global instincts in

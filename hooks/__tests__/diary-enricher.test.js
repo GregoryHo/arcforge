@@ -36,6 +36,19 @@ describe('spawnDiaryEnricher invocation', () => {
     );
   });
 
+  it('never re-introduces --dangerously-skip-permissions (D-009)', () => {
+    // Scan the spawn(...) argv only — the prose above the function explains the
+    // flag's removal and would otherwise match.
+    const spawnIdx = source.indexOf('spawn(');
+    assert.ok(spawnIdx !== -1, 'expected spawn(...) call');
+    const argv = source.slice(spawnIdx, spawnIdx + 1500);
+    assert.ok(
+      !argv.includes('--dangerously-skip-permissions'),
+      'the enricher must not bypass every permission check — it runs --tools Read,Write ' +
+        'with the draft directory added via --add-dir and --permission-mode acceptEdits.',
+    );
+  });
+
   it('does not silently discard enricher stderr', () => {
     // Find the spawn(...) call body
     const spawnIdx = source.indexOf('spawn(');

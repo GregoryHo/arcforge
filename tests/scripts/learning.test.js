@@ -14,7 +14,9 @@ const {
   getLearningConfigPath,
   inspectCandidate,
   isLearningEnabled,
+  isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
+  learningEnabledSince,
   listLearningInbox,
   loadCandidates,
   materializeCandidate,
@@ -92,6 +94,158 @@ describe('learning subsystem MVP-1', () => {
     });
 
     expect(isLearningEnabled({ scope: 'project', projectRoot, homeDir })).toBe(false);
+  });
+
+  describe('isLearningEnabledAnyScope', () => {
+    it('is false when neither scope is enabled', () => {
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(false);
+    });
+
+    it('is true when only the project scope is enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+
+    it('is true when only the global scope is enabled', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+
+    it('is true when both scopes are enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledAnyScope({ projectRoot, homeDir })).toBe(true);
+    });
+  });
+
+  // The stale-draft healthcheck needs "since when", not just "is it on":
+  // drafts from a learning-off period are by-design stubs (D-009).
+  describe('learningEnabledSince', () => {
+    const EARLY = '2026-01-01T00:00:00.000Z';
+    const LATE = '2026-06-01T00:00:00.000Z';
+
+    it('is null when neither scope is enabled', () => {
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBeNull();
+    });
+
+    it("returns the enabled scope's updated_at", () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
+    it('returns the EARLIEST scope — when enrichment first became authorized', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    // `learn enable --project` is a copy-paste step in four user-facing
+    // surfaces, so re-running it on an already-enabled scope is routine. It
+    // stamps no transition and must not move the floor.
+    it('does not move when an already-enabled scope is enabled again', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: true,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      // The CLI prints this returned config, so it carries the same stamp.
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    // The documented accepted cost: a real consent toggle DOES move the floor.
+    it('moves when a scope is disabled and re-enabled', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
+    // Accepted cost, pinned: disabling the scope that carries the earliest
+    // opt-in advances the floor even though any-scope authorization never
+    // lapsed. A scope's `updated_at` records its latest transition, so the
+    // disable overwrites the enable it replaced (D-009 Residual).
+    it('advances to the surviving scope when the earliest-enabled scope is disabled', () => {
+      const MIDDLE = '2026-03-01T00:00:00.000Z';
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: MIDDLE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+      setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(MIDDLE));
+    });
+
+    it('ignores a disabled scope, however recently it was written', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: EARLY });
+      setLearningEnabled({ scope: 'global', enabled: false, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    it.each([
+      ['missing', { scope: 'project', enabled: true }],
+      ['unparseable', { scope: 'project', enabled: true, updated_at: 'garbage' }],
+      ['not a string', { scope: 'project', enabled: true, updated_at: {} }],
+    ])('falls back to the config mtime when updated_at is %s', (_label, config) => {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify(config));
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(fs.statSync(configPath).mtimeMs);
+    });
+
+    // Writing an unstamped config MOVES its mtime, so the fallback above has to
+    // be captured before the write rather than re-derived after it — otherwise
+    // an idempotent re-enable silently retires every draft that failed
+    // enrichment between the old mtime and the repeated command.
+    function writeUnstampedConfig(enabled = true) {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot, homeDir });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled }));
+      fs.utimesSync(configPath, new Date(EARLY), new Date(EARLY));
+      return configPath;
+    }
+
+    it('preserves the mtime fallback when an unstamped enabled scope is enabled again', () => {
+      writeUnstampedConfig();
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: true,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      // The CLI prints this returned config, so it carries the preserved stamp.
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(EARLY));
+    });
+
+    it('still stamps the transition when an unstamped scope is actually toggled', () => {
+      writeUnstampedConfig();
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: LATE });
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: LATE });
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBe(Date.parse(LATE));
+    });
+
+    // The preservation keys on "the state did not change", not on "the state is
+    // on", so a no-op DISABLE materializes the mtime as well. That is inert, and
+    // this pins WHY rather than just the field: `learningEnabledSince` skips a
+    // scope whose `enabled` is not true, so nothing ever reads the stamp a
+    // disabled config carries. If the floor is ever widened to disabled scopes,
+    // this case fails and names the coupling instead of letting a materialized
+    // mtime quietly become a floor.
+    it('materializes the mtime on a no-op disable, where the floor ignores it', () => {
+      writeUnstampedConfig(false);
+      const config = setLearningEnabled({
+        scope: 'project',
+        enabled: false,
+        projectRoot,
+        homeDir,
+        now: LATE,
+      });
+      expect(config.updated_at).toBe(EARLY);
+      expect(learningEnabledSince({ projectRoot, homeDir })).toBeNull();
+    });
   });
 
   describe('inject_activated_instincts kill-switch (ICL-4)', () => {

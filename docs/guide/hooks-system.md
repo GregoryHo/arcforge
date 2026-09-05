@@ -67,18 +67,28 @@ one, as a JSON file under `~/.arcforge/sessions/`. That record is what the
 learning loop reads later, and what a diary is built from.
 
 Once a session passes the diary threshold — ten of your messages, or fifty tool
-calls — `session-end` also fills that record in with your ten most recent
-messages (truncated), writes a diary draft under `~/.arcforge/diaries/`, and
-starts a short background run to flesh the draft out.
+calls — `session-end` also writes a diary draft under `~/.arcforge/diaries/`.
+The draft is built from the session record above — the counts and the files the
+session touched — and its interpretive sections are left as `TO BE ENRICHED`
+stubs.
+
+Three further things happen at that same threshold, and **only if you have
+turned learning on**: your ten most recent messages (truncated) are stored in
+the session record, a short background run is started to fill the draft's stubs
+in, and — once a few drafts have accumulated — a note appears at your next
+session start offering to reflect over them. With learning off, none of the
+three does, so a draft you open will still have its stubs. That is the intended
+state, not a failure: nothing warns you about it and nothing keeps offering to
+process it.
 
 `pre-compact` runs just before compaction and captures what is about to be
 dropped, so the part of a long session worth keeping survives the boundary.
 
-The two `observe` registrations record tool calls for pattern detection — **but
-only if you have turned learning on**. With learning disabled, the default, each
-checks one file, finds no configuration, and exits before doing any work. That
-opt-in is what gates the learning capture; the session record and diary above
-are continuity, and they run either way. To see where learning stands:
+The two `observe` registrations record tool calls for pattern detection — again
+only with learning on. With learning disabled, the default, each checks one
+file, finds no configuration, and exits before doing any work. The session
+record, its counts, and the diary draft are continuity, and they run either
+way. To see where learning stands:
 
 ```bash
 arcforge learn status

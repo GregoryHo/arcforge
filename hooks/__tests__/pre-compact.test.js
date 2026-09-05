@@ -40,7 +40,7 @@ describe('pre-compact: updateSessionFile', () => {
       '2025-01-15T10:30:00Z',
       'session-123',
     );
-    assert.strictEqual(result, true);
+    assert.ok(result, 'the stamped record is returned');
 
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
     assert.strictEqual(updated.compactions.length, 1);
@@ -57,7 +57,7 @@ describe('pre-compact: updateSessionFile', () => {
       '2025-01-15T10:30:00Z',
       'nonexistent',
     );
-    assert.strictEqual(result, false);
+    assert.strictEqual(result, null, 'no record to update reports null');
   });
 
   it('should append multiple compaction markers', () => {
@@ -73,6 +73,78 @@ describe('pre-compact: updateSessionFile', () => {
 
     const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
     assert.strictEqual(updated.compactions.length, 2);
+  });
+
+  // -------------------------------------------------------------------
+  // D-010 retention: stamping the compaction marker rewrites the whole
+  // record, so the same opt-in that governs capture governs what survives
+  // here. Without the prune, a compaction re-serializes prose captured
+  // before the user opted out.
+  // -------------------------------------------------------------------
+
+  /** A session record carrying prose an earlier, opted-in Stop wrote. */
+  function seedRecordWithProse(sessionId) {
+    const sessionDir = path.join(testDir, '.arcforge', 'sessions', 'test-project', '2025-01-15');
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({
+        toolCalls: 10,
+        compactions: [],
+        userMessageContent: ['carried prose'],
+        toolsUsed: ['Edit'],
+      }),
+    );
+    return sessionFile;
+  }
+
+  /** A project root whose project-scope learning config is written as `enabled`. */
+  function projectRootWithLearning(enabled) {
+    const projectRoot = path.join(testDir, `proj-${enabled ? 'on' : 'off'}`);
+    const configPath = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled }));
+    return projectRoot;
+  }
+
+  it('prunes carried user prose when the opt-in is off', () => {
+    const { updateSessionFile } = require('../pre-compact/main');
+    const sessionFile = seedRecordWithProse('session-prune-off');
+
+    const result = updateSessionFile(
+      'test-project',
+      '2025-01-15',
+      '2025-01-15T10:30:00Z',
+      'session-prune-off',
+      { projectRoot: projectRootWithLearning(false) },
+    );
+    assert.ok(result, 'the stamped record is returned');
+
+    const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    assert.strictEqual(
+      updated.userMessageContent,
+      undefined,
+      'a compaction must not re-serialize prose captured before the opt-out',
+    );
+    assert.deepStrictEqual(updated.toolsUsed, ['Edit'], 'tool names are continuity, kept');
+    assert.strictEqual(updated.compactions.length, 1, 'the compaction marker still lands');
+  });
+
+  it('keeps carried user prose while the opt-in is on', () => {
+    const { updateSessionFile } = require('../pre-compact/main');
+    const sessionFile = seedRecordWithProse('session-prune-on');
+
+    updateSessionFile('test-project', '2025-01-15', '2025-01-15T10:30:00Z', 'session-prune-on', {
+      projectRoot: projectRootWithLearning(true),
+    });
+
+    const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    assert.deepStrictEqual(
+      updated.userMessageContent,
+      ['carried prose'],
+      'with learning on the record keeps what an earlier parse wrote',
+    );
   });
 });
 
@@ -108,6 +180,13 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
     return path.join(tmpDir, `arcforge-${name}-session-${sessionId}`);
   }
 
+  /** Turn the project-scope learning opt-in on for a project dir. */
+  function enableLearning(projectDir) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
   function pendingActions(project) {
     const file = path.join(homeDir, '.arcforge', 'sessions', project, 'pending-actions.json');
     if (!fs.existsSync(file)) return [];
@@ -138,6 +217,8 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
 
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-proj-'));
     const project = path.basename(projectDir);
+    // Enrichment is opt-in (D-009): this case asserts the spawn, so opt in.
+    enableLearning(projectDir);
 
     const env = {
       ...process.env,
@@ -176,6 +257,59 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
       // Enricher stub fired with the relay-isolation env (poll: detached spawn).
       assert.ok(await waitFor(marker, 5000), 'enricher stub invoked');
       assert.strictEqual(fs.readFileSync(marker, 'utf-8'), 'enricher', 'ARCFORGE_SPAWNED=enricher');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('learning off: draft + diary-ready still happen, but the enricher never spawns', async () => {
+    const marker = path.join(binDir, 'spawned.marker');
+    fs.writeFileSync(
+      path.join(binDir, 'claude'),
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}"\n`,
+      { mode: 0o755 },
+    );
+
+    fs.writeFileSync(counterPath('user-count'), '15');
+    fs.writeFileSync(counterPath('tool-count'), '0');
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-proj-'));
+    const project = path.basename(projectDir);
+    // No learning config anywhere — the default.
+
+    const env = {
+      ...process.env,
+      HOME: homeDir,
+      TMPDIR: tmpDir,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      CLAUDE_PROJECT_DIR: projectDir,
+    };
+    delete env.CLAUDE_SESSION_ID;
+
+    const res = spawnSync('node', [PRE_COMPACT], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'PreCompact',
+        cwd: projectDir,
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      // Continuity is unchanged by the opt-in.
+      assert.strictEqual(
+        pendingActions(project).filter((a) => a.type === 'diary-ready').length,
+        1,
+        'diary-ready still queued',
+      );
+      assert.ok(
+        fs.existsSync(path.join(homeDir, '.arcforge', 'diaries', project)),
+        'draft still generated',
+      );
+      // Enrichment is not.
+      assert.strictEqual(await waitFor(marker, 1000), false, 'enricher must NOT spawn');
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
     }
@@ -223,6 +357,302 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
       );
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+  // D-010 retention, end-to-end: updateSessionFile fails closed on a missing
+  // projectRoot, so a main() that never threaded it through would delete prose
+  // even for an opted-in user — and every direct-call test would still pass.
+  // This case spawns the real hook to pin the wiring.
+  it('main(): a compaction with learning ON keeps the prose an earlier Stop wrote', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-keep-proj-'));
+    const project = path.basename(projectDir);
+    enableLearning(projectDir);
+
+    const date = new Date().toISOString().split('T')[0];
+    const sessionDir = path.join(homeDir, '.arcforge', 'sessions', project, date);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `session-${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({ compactions: [], userMessageContent: ['carried prose'] }),
+    );
+
+    // Below the diary threshold, so this compaction only stamps the record.
+    fs.writeFileSync(counterPath('user-count'), '1');
+    fs.writeFileSync(counterPath('tool-count'), '1');
+
+    const env = {
+      ...process.env,
+      HOME: homeDir,
+      TMPDIR: tmpDir,
+      CLAUDE_PROJECT_DIR: projectDir,
+    };
+    delete env.CLAUDE_SESSION_ID;
+
+    const res = spawnSync('node', [PRE_COMPACT], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'PreCompact',
+        cwd: projectDir,
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      const updated = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+      assert.strictEqual(updated.compactions.length, 1, 'the compaction marker landed');
+      assert.deepStrictEqual(
+        updated.userMessageContent,
+        ['carried prose'],
+        'main() must pass the project root through — an opted-in record keeps its prose',
+      );
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // Draft freshness. The draft is rendered from the session record by a
+  // subprocess, so a compaction that reaches the threshold before any Stop has
+  // closed the record must stamp the CURRENT counts and paths BEFORE the draft
+  // is generated. Stamping afterwards produced a draft reporting 0 messages and
+  // 0 tool calls for the very compaction the hook logged as 12 msgs / 55 tools.
+  // -------------------------------------------------------------------
+
+  const TODAY = new Date().toISOString().split('T')[0];
+
+  /** A record holding an earlier turn's counts and no touched paths. */
+  function seedStaleRecord(project) {
+    const sessionDir = path.join(homeDir, '.arcforge', 'sessions', project, TODAY);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionFile = path.join(sessionDir, `session-${sessionId}.json`);
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({
+        project,
+        date: TODAY,
+        sessionId: `session-${sessionId}`,
+        started: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        userMessages: 0,
+        toolCalls: 0,
+        filesModified: [],
+        compactions: [],
+      }),
+    );
+    return sessionFile;
+  }
+
+  /** A harness transcript carrying user prose plus Edit/Write tool uses. */
+  function writeTranscript() {
+    const transcriptPath = path.join(homeDir, 'transcript.jsonl');
+    const entry = (o) => JSON.stringify(o);
+    fs.writeFileSync(
+      transcriptPath,
+      `${[
+        entry({
+          type: 'user',
+          message: { role: 'user', content: [{ type: 'text', text: 'ship the fix' }] },
+        }),
+        entry({
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'tool_use', name: 'Edit', input: { file_path: '/repo/src/alpha.js' } },
+            ],
+          },
+        }),
+        entry({
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'tool_use', name: 'Write', input: { file_path: '/repo/src/beta.js' } },
+            ],
+          },
+        }),
+      ].join('\n')}\n`,
+    );
+    return transcriptPath;
+  }
+
+  /**
+   * Spawn the real hook on an above-threshold PreCompact carrying a transcript.
+   * With `promptFile`, the stub enricher writes the prompt it was handed there.
+   */
+  function compactAboveThreshold(projectDir, promptFile) {
+    const sink = promptFile ? `"${promptFile}"` : '/dev/null';
+    fs.writeFileSync(path.join(binDir, 'claude'), `#!/bin/sh\ncat > ${sink}\nexit 0\n`, {
+      mode: 0o755,
+    });
+    fs.writeFileSync(counterPath('user-count'), '12');
+    fs.writeFileSync(counterPath('tool-count'), '55');
+
+    const env = {
+      ...process.env,
+      HOME: homeDir,
+      TMPDIR: tmpDir,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      CLAUDE_PROJECT_DIR: projectDir,
+    };
+    delete env.CLAUDE_SESSION_ID;
+
+    return spawnSync('node', [PRE_COMPACT], {
+      input: JSON.stringify({
+        session_id: sessionId,
+        hook_event_name: 'PreCompact',
+        transcript_path: writeTranscript(),
+        cwd: projectDir,
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+  }
+
+  function readDraft(project) {
+    return fs.readFileSync(
+      path.join(
+        homeDir,
+        '.arcforge',
+        'diaries',
+        project,
+        TODAY,
+        `diary-session-${sessionId}-draft.md`,
+      ),
+      'utf-8',
+    );
+  }
+
+  function readRecord(project) {
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(homeDir, '.arcforge', 'sessions', project, TODAY, `session-${sessionId}.json`),
+        'utf-8',
+      ),
+    );
+  }
+
+  it('above threshold: the draft renders this compaction, not the stale record', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-fresh-proj-'));
+    const project = path.basename(projectDir);
+    seedStaleRecord(project);
+
+    const res = compactAboveThreshold(projectDir);
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      const draft = readDraft(project);
+      assert.match(draft, /\*\*User messages\*\*: 12/, 'draft reports the live message count');
+      assert.match(draft, /\*\*Tool calls\*\*: 55/, 'draft reports the live tool count');
+      assert.match(
+        draft,
+        /\*\*Files modified\*\*: .*alpha\.js.*beta\.js/,
+        'draft lists the paths this compaction touched',
+      );
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('above threshold: the record is stamped with the same counts and paths', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-stamp-proj-'));
+    const project = path.basename(projectDir);
+    seedStaleRecord(project);
+
+    const res = compactAboveThreshold(projectDir);
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      const record = readRecord(project);
+      assert.strictEqual(record.userMessages, 12, 'record carries the live message count');
+      assert.strictEqual(record.toolCalls, 55, 'record carries the live tool count');
+      assert.deepStrictEqual(
+        record.filesModified,
+        ['/repo/src/alpha.js', '/repo/src/beta.js'],
+        'record carries the transcript-derived paths',
+      );
+      assert.deepStrictEqual(record.toolsUsed, ['Edit', 'Write'], 'tool names are continuity');
+      assert.strictEqual(record.compactions.length, 1, 'the compaction marker still lands');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  // The stamp is a new WRITE path for prose — PreCompact previously only ever
+  // pruned it — so the gate is pinned in both directions (D-010 / B-6).
+  it('learning off: the stamp writes counts and paths but never the user prose', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-gate-off-proj-'));
+    const project = path.basename(projectDir);
+    seedStaleRecord(project);
+    // No learning config anywhere — the default.
+
+    const res = compactAboveThreshold(projectDir);
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      const record = readRecord(project);
+      assert.strictEqual(
+        record.userMessageContent,
+        undefined,
+        'a compaction must not write verbatim prose while the opt-in is off',
+      );
+      assert.strictEqual(record.userMessages, 12, 'the count is continuity and lands either way');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('learning on: the stamp includes the verbatim user prose', () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-gate-on-proj-'));
+    const project = path.basename(projectDir);
+    enableLearning(projectDir);
+    seedStaleRecord(project);
+
+    const res = compactAboveThreshold(projectDir);
+
+    try {
+      assert.strictEqual(res.status, 0, res.stderr);
+      assert.deepStrictEqual(
+        readRecord(project).userMessageContent,
+        ['ship the fix'],
+        'with the opt-in on the compaction records what the transcript parsed',
+      );
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  // The enricher's prompt is the other half of the draft: it fills the prose
+  // sections. A compaction used to hand it {} while Stop handed it the parsed
+  // summary, so those sections were enriched from nothing even once the metrics
+  // above were correct.
+  it('hands the enricher the same populated summary Stop does — and only under the opt-in', async () => {
+    const onDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-summary-on-'));
+    const offDir = fs.mkdtempSync(path.join(os.tmpdir(), 'precompact-summary-off-'));
+    const onPrompt = path.join(binDir, 'prompt-on.txt');
+    const offPrompt = path.join(binDir, 'prompt-off.txt');
+
+    try {
+      enableLearning(onDir);
+      seedStaleRecord(path.basename(onDir));
+      assert.strictEqual(compactAboveThreshold(onDir, onPrompt).status, 0);
+
+      // Detached spawn — poll, as the sibling enricher cases do.
+      assert.ok(await waitFor(onPrompt, 5000), 'enricher stub invoked');
+      const prompt = fs.readFileSync(onPrompt, 'utf-8');
+      assert.match(prompt, /alpha\.js/, 'the summary carries the touched paths');
+      assert.match(prompt, /"Edit"/, 'and the tool names');
+      assert.match(prompt, /ship the fix/, 'and, under the opt-in, the user prose');
+      assert.match(prompt, /12 messages, 55 tool calls/, 'and a populated stats line');
+
+      // Learning off: no summary reaches a model at all, because no enricher runs.
+      seedStaleRecord(path.basename(offDir));
+      assert.strictEqual(compactAboveThreshold(offDir, offPrompt).status, 0);
+      assert.strictEqual(await waitFor(offPrompt, 1000), false, 'enricher must NOT spawn');
+    } finally {
+      fs.rmSync(onDir, { recursive: true, force: true });
+      fs.rmSync(offDir, { recursive: true, force: true });
     }
   });
 });
