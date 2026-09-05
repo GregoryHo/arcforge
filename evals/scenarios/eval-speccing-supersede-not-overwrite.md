@@ -122,8 +122,8 @@ back-pointer must name the new entry as the one that superseded it — passive
 `Status: Superseded by D-008`, a heading annotation, or `Status: Superseded —
 see D-008` — not as an entry D-005 supersedes.
 
-Validated offline against 34 synthetic roadmaps, listed below as 36 rows: two
-roadmaps are listed twice, under the later grader pair that moves them further.
+Validated offline against the synthetic roadmaps listed below; two of them are
+listed twice, under the later grader pair that moves them further.
 Each row's `old` and `new` are the graders on either side of the correction that
 added the row, and the `graders` column names which pair — the corrections have
 different predecessors. Version 5 re-ran all fourteen under its own pair and
@@ -147,9 +147,13 @@ two indent variants of the log's closing bound, and three rows that correction
 moves further than Version 7 moved them. Two of those eight are roadmaps this
 table already carried under `V6→V7` — `D-005`'s own entry in an appendix at
 column 1, and the log renamed `## Decisions` — re-listed because the correction
-moves them again, and that re-listing is the whole of the gap between 36 rows
-and 34 roadmaps. The older rows it re-checked that do *not* move are named in its
-note rather than re-listed here.
+moves them again, and that re-listing is the whole of the gap between the table's
+rows and the roadmaps behind them. The older rows it re-checked that do *not*
+move are named in its note rather than re-listed here. The log's *opening* bound
+was corrected on the same terms once more (`V7 pre/post (log open)`); the seven
+rows it adds are two spellings of the faux-heading exploit it closes, four
+indented-heading shapes it reclassifies, and the one shape it moves toward PASS.
+No older row can move under it, for the mechanical reason its note gives.
 
 | case | graders | old | new |
 |---|---|---|---|
@@ -189,6 +193,13 @@ note rather than re-listed here.
 | D-005's own entry in an appendix at column 1 | V7 pre/post (log scope) | A1, A3 FAIL | **A1, A2, A3 FAIL** |
 | the log renamed `## Decisions` | V7 pre/post (log scope) | A1, A3 FAIL | **A1, A2, A3 FAIL** |
 | D-006 in an appendix whose heading is indented four spaces | V7 pre/post (log scope) | 4/4 | 4/4 |
+| log heading renamed, faux `## Decision Log` planted four spaces in above the entries | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| the same, faux `## Decision Log` planted two spaces in | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| correct move, log heading indented one space | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| correct move, log heading indented two spaces | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| correct move, log heading indented three spaces | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| correct move, log heading indented four spaces | V7 pre/post (log open) | 4/4 | **A1, A2, A3 FAIL** |
+| correct move, real column-1 heading kept, indented `## Decision Log` illustration above it | V7 pre/post (log open) | A1, A2, A3 FAIL | **4/4** |
 
 No trials were spent, and the recorded pool cannot be re-scored: its k=10 run
 directory is gone, so none of those 8 transcripts can be re-read. The six
@@ -349,19 +360,21 @@ Indenting the appendix heading two spaces left the log running into it, so
 entries parked below were scanned as though they had never left. That put the
 same two-space bypass under Version 7's own headline case — D-005's entry lifted
 into a `  ## Appendix`, measured 4/4 before this correction — so aligning the
-bound is completion of Version 7's change rather than adjacent cleanup. The
-opening heading keeps its `^\s*##\s+` and is deliberately *not* tightened to
-match the engine's fail-closed opening: a correct trial whose `## Decision Log`
-heading happens to be indented would go 4/4 → A1, A2, A3 FAIL, a false negative
-for a hole nothing in the prompt pressures. "Only removes pass paths" stays true
-of what shipped.
+bound is completion of Version 7's change rather than adjacent cleanup. This
+correction moved the closing bound only. The opening heading kept its
+`^\s*##\s+`, on the argument that tightening it to the engine's column 1 would
+cost a correct trial whose `## Decision Log` heading happens to be indented — an
+argument `V7 pre/post (log open)` below retracts, because the engine's own
+reading leaves such a file no log at all, so there was no correct trial to cost.
+"Only removes pass paths" is true of this pair.
 
 `## Version` stays **7**, on the `V6 pre/post` precedent and the condition that
 carries it: no trial has ever been scored under the Version 4–7 grader, so there
 is no pool to keep separate, and the defect is in the change Version 7 itself
 made. Twenty-five synthetic roadmaps were run under the pre- and post-fix pair.
-Exactly the seven rows below move, all toward FAIL; the four correct shapes hold
-at 4/4 — including a correct move whose log heading is indented two spaces — and
+Exactly the seven rows below move, all toward FAIL; the four shapes this
+correction counted correct hold at 4/4 — including a move whose log heading is
+indented two spaces, which `V7 pre/post (log open)` below reclassifies — and
 so does every older row re-checked in that matrix: the Version-6 decoys (the
 recorded pair copied to an appendix, the `... (historical)` retitle, and a second
 `### D-005` inside the log), both renumbering shapes, `### D-008` parked in an
@@ -370,41 +383,96 @@ surviving transcripts were re-read again: none writes an indented heading, and
 none writes an `## Appendix` or `## Archive` section at all, so none uses a
 removed path. No trials were spent.
 
-Three concessions, stated rather than hidden. The four-space `## Appendix` stays
-4/4 and is the one pass path left — correct by contract, because four spaces is
-an indented code block, so it closes nothing and its `### D-NNN` headings
-genuinely are inside the log under the engine's own reading. The `## Decision
-Log` heading dependency now costs A2 as well as A1 and A3; the defense is the one
-already given for those two — the prompt never asks for a rename, the fixture
-heading is what the trial is editing, and none of the six renames it — and no
-full pass is at stake, since a renamed log already failed A1 and A3. And nothing
-in this grader is fence-aware, which now costs on two scans rather than one. The
-duplicate scan never was: a fenced `### D-005` example written into `ROADMAP.md`
-registers as a duplicate, pre-existing and untouched here. The closing bound
-never was either, and this correction widened it — a fenced block whose content
-line reads `  ## Example section` now ends the log where it sits, so a correct
-move written below it goes 4/4 → `A2, A3 FAIL`; before this, only a fenced `##`
-at column 1 did that, and that one reads `A2, A3 FAIL` on both sides of the
-pair. Both measured. On the bound itself, that is where the grader stops
-matching the contract it copied: `section()` in
-`scripts/lib/product-markdown.js` reads `SECTION_END_RE` at the same ` {0,3}`
-indent but runs every line through `hiddenTracker` first, so a `##` inside a
-fence closes nothing there. The grader
-took the indent half and not the fence half, deliberately — porting that state
-machine is a bigger instrument than four assertions need, and the divergence can
-only ever fail a trial, never pass one. It is conceded here where the opening
-bound's false negative one paragraph up is refused, and the asymmetry is
-plausibility rather than cost: a correct roadmap whose `## Decision Log` heading
-is indented is a shape a real file has, while a fenced markdown example inside
-`ROADMAP.md` whose content line is an indented `##` is not. Nothing in the
-prompt asks for one, and none of the six surviving transcripts writes a fence
-into `ROADMAP.md` at all. A fourth, found after the fact and recorded rather
-than closed: `^\s*` opens the log at any indent — the same four-space reading
-that closes nothing opens nothing either — so a trial that renames the real
-heading and plants a four-space `## Decision Log` above the entries scores 4/4
-on a file whose log the engine does not see and C6 rejects. The shape needs two
-edits nothing in the prompt pressures and no transcript writes, and tightening
-the opening to column 1 is the narrowing this section already declines.
+The concessions, stated rather than hidden. The four-space `## Appendix` stays
+4/4 — correct by contract, because four spaces is an indented code block, so it
+closes nothing and its `### D-NNN` headings genuinely are inside the log under
+the engine's own reading. The `## Decision Log` heading dependency now costs A2
+as well as A1 and A3; the defense is the one already given for those two — the
+prompt never asks for a rename, the fixture heading is what the trial is
+editing, and none of the six renames it — and no full pass is at stake, since a
+renamed log already failed A1 and A3. And nothing in this grader is
+fence-aware, which now costs on two scans rather than one. The duplicate scan
+never was: a fenced `### D-005` example written into `ROADMAP.md` registers as
+a duplicate, pre-existing and untouched here. The closing bound never was
+either, and this correction widened it — a fenced block whose content line
+reads `  ## Example section` now ends the log where it sits, so a correct move
+written below it goes 4/4 → `A2, A3 FAIL`; before this, only a fenced `##` at
+column 1 did that, and that one reads `A2, A3 FAIL` on both sides of the pair.
+Both measured. On the bound itself, that is where the grader stops matching the
+contract it copied: `section()` in `scripts/lib/product-markdown.js` reads
+`SECTION_END_RE` at the same ` {0,3}` indent but runs every line through
+`hiddenTracker` first, so a `##` inside a fence closes nothing there. The
+grader took the indent half and not the fence half, deliberately — porting that
+state machine is a bigger instrument than four assertions need, and the
+divergence can only ever fail a trial, never pass one. Nothing in the prompt
+asks for a fence, and none of the six surviving transcripts writes one into
+`ROADMAP.md` at all. And the log's opening heading stays looser than the
+engine's in one dimension after `V7 pre/post (log open)` below closes the
+other. `Decision Log\b` under `re.I` opens on `## Decision Log (historical)`
+and on `## decision log`, where `DECISION_LOG_HEADING_RE` in
+`scripts/lib/product-decisions.js` is `/^##\s+Decision Log\s*$/` —
+case-sensitive and anchored at end of line — so either spelling leaves the
+engine the empty log C6 rejects while the grader reads a full one. The suffixed
+heading measures 4/4 after that correction, and is named here rather than
+closed: the spelling tolerance is what the heading dependency's defense two
+sentences up rests on, and narrowing it is a pre-registration decision about
+which spellings count as the fixture's heading, not a bound the grader copied
+wrong.
+
+**`V7 pre/post (log open)` — the opening bound, corrected.** A pass path found
+after `V7 pre/post (log scope)` shipped, and first recorded as a fourth
+concession rather than closed, is closed here instead. `decision_log()` opened
+on `^\s*##\s+Decision Log\b`, which reads the
+heading at any indent, so a trial that renames the real heading and plants an
+indented `## Decision Log` above the entries scored 4/4 on a file whose log the
+engine never sees: `DECISION_LOG_HEADING_RE` is anchored at column 1,
+`section()` returns an empty slice, and C6 rejects the corpus.
+`product/AGENTS.md` states that bound and states why the two ends of a section
+take different ones — the heading that *opens* a scope is read at column 1
+because reading it wider fails open, the heading that *closes* one is read at
+` {0,3}` because reading it narrower fails open. The grader had copied the
+closing half of that asymmetry and not the opening half. It now carries both:
+`^##\s+Decision Log\b` opens, and `^ {0,3}#{1,2}\s` still closes.
+
+Column 1 rather than ` {0,3}`, and the difference is not cosmetic: the exploit
+is a family, not a spelling. Under ` {0,3}` the four-space faux heading fails
+and the two-space one still scores 4/4 — both rows are in the table above —
+because ` {0,3}` is precisely the bound at which an indented heading is still a
+heading. Only column 1 closes the family, and only column 1 is the bound the
+engine opens at; the closing bound's ` {0,3}` is the other half of the same
+contract, not a bound to generalize from.
+
+The false negative this narrowing was declined over does not exist. A trial
+whose `## Decision Log` heading is indented one, two or three spaces was
+counted a correct shape by the log-scope matrix and held at 4/4 there; under
+the engine that same file has no log, C6 rejects it, and the assertions — each
+of which names "the `## Decision Log` of `product/ROADMAP.md`" — have nothing
+to judge. Those rows now read `A1, A2, A3 FAIL`, which is the grader agreeing
+with the contract rather than a correct answer it loses. The fixture writes
+that heading at column 1, so producing the shape at all takes an edit to the
+heading that the prompt never pressures and no transcript makes.
+
+"Only removes pass paths" does not survive this correction unqualified, and the
+exception is the single shape that moves the other way. A roadmap that keeps
+its real column-1 heading and carries an indented `## Decision Log` above it —
+a code-block illustration, not a rename — read `A1, A2, A3 FAIL` before and
+reads 4/4 now: the old opening matched the illustration first and the real
+heading below it then closed that slice immediately, so an intact log graded as
+an empty one. The engine reads the real heading there, the corrected grader now
+reads it too, and the trial is correct. Every other row moves toward FAIL.
+
+`## Version` stays **7**, on the ground `V6 pre/post` and `V7 pre/post (log
+scope)` stand on: no trial has ever been scored under the Version 4–7 grader,
+so there is no pool to keep separate. Seven synthetic roadmaps were run under
+the pre- and post-fix pair and all seven are listed above. No older row can
+move, and the reason is mechanical rather than a re-run: the change is confined
+to which lines open the log, the opening reads a `## Decision Log` heading line
+and nothing else, and every other row in the table leaves that line where the
+fixture wrote it — at column 1, where both graders match it. The six surviving
+transcripts were re-read against this bound specifically: all six leave the
+heading at column 1, and the one that touches it at all
+(`20260902-170634/trial-1.txt`) reuses it as a replace anchor. No trials were
+spent.
 
 **Version 7, continued — A3's "appended" read numerically.** `new_ids` was a set
 difference against the seven ids the fixture wrote, so any three-digit id
@@ -699,18 +767,26 @@ ids = heading_re.findall(road)
 # `## Decision Log` heading and ends at the next `#` or `##`: `###` entry
 # headings are level-3 and do not close it, and the heading line is harmless
 # inside the scan because `heading_re` matches only `###`. First heading wins.
-# The closing heading is read at one to three spaces of indent, the bound
-# `product/AGENTS.md` gives for this boundary and `scripts/lib/product-markdown.js`
-# implements as SECTION_END_RE. Reading it at column 1 fails open: a two-space
-# `## Appendix` left the log running into the appendix, so entries parked there
-# were scanned as if they were still in the log. Four spaces is an indented code
-# block and closes nothing -- by contract, at either end.
+# The two ends take different indent bounds, because they fail in opposite
+# directions -- the asymmetry `product/AGENTS.md` states and
+# `scripts/lib/product-markdown.js` implements. The heading that *closes* the log
+# is read at one to three spaces (SECTION_END_RE): read at column 1 it fails
+# open, and a two-space `## Appendix` left the log running into the appendix, so
+# entries parked there were scanned as if they were still in the log. The heading
+# that *opens* it is read at column 1 (DECISION_LOG_HEADING_RE in
+# scripts/lib/product-decisions.js): read wider it fails open, and a planted
+# `## Decision Log` two or four spaces in, above a renamed real heading, graded a
+# full pass on a file whose log the engine does not see and C6 rejects. Four
+# spaces is an indented code block at either end: it opens nothing and closes
+# nothing. The opening stays looser than the engine's in spelling, not in indent
+# -- `\b` under re.I where the engine anchors `Decision Log\s*$` case-sensitively
+# -- which the Design Notes name as a residual.
 # Returns "" when absent, so `blocks` stays empty and A1/A3 emit their FAIL
 # reasons rather than raising.
 def decision_log(text):
     lines = text.split("\n")
     for i, line in enumerate(lines):
-        if re.match(r"^\s*##\s+Decision Log\b", line, re.I):
+        if re.match(r"^##\s+Decision Log\b", line, re.I):
             j = i + 1
             while j < len(lines) and not re.match(r"^ {0,3}#{1,2}\s", lines[j]):
                 j += 1
