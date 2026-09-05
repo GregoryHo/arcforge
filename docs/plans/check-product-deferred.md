@@ -203,12 +203,21 @@ vocabulary, the two flip patterns and `DECISION_LOG_HEADING_RE`) — so the seco
 `ROADMAP.md`'s two formats has one owner, and the rules about the log's own shape
 (C2's numbering invariants, C3's relation and status coherence) travel with it.
 `product-lint.js` came out at **400** and keeps C1, C4's row↔spec pairing, C5, C6's
-sanity floor, C7 and `validateProduct`. `product-decisions.js` is 343 lines,
-`product-roadmap.js` 312 and `product-markdown.js` 208. Same proof, same import rule:
-the suite requires only `validateProduct`, so a green run across the move showed no
-behaviour changed, and `scripts/check-product.js` now imports `parseDecisions` from the
-new module directly — `product-lint.js` stopped re-exporting it rather than keeping a
-barrel.
+sanity floor, C7 and `validateProduct`. `product-decisions.js` landed at 343,
+`product-roadmap.js` at 312 and `product-markdown.js` at 208. Same proof, same import
+rule: the suite requires only `validateProduct`, so a green run across the move showed
+no behaviour changed, and `scripts/check-product.js` now imports `parseDecisions` from
+the new module directly — `product-lint.js` stopped re-exporting it rather than
+keeping a barrel.
+
+Those four are landing counts, and the rounds since have moved them: `product-lint.js`
+is now **432** lines and `product-decisions.js` **412**, both back over the 400-line
+**soft** limit, with `product-roadmap.js` at 345 and `product-markdown.js` at 301. No
+fourth cut is implied — the soft limit is an extraction prompt rather than a gate, the
+hard limit is uncrossed, and `.claude/rules/coding-standards.md` says most of
+`scripts/lib/` already sits above 400. It is recorded because the growth is the
+constraint below in miniature: what adds the lines is rule prose — a regex rationale, a
+docblock — and nothing reports the crossing either way.
 
 The standing constraint, stated once so the fourth crossing does not need re-deriving:
 **nothing mechanically counts lines**, so this ceiling is invisible to every gate and
