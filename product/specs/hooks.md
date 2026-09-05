@@ -31,6 +31,13 @@ down, never block the user, and never observe them uninvited.
   registrations (`inject-context`, `session-start`, `session-end`), observation
   for two (`observe-pre`, `observe-post`); `user-message-counter`,
   `secrets-guard`, `compact-suggester`, and `pre-compact` complete the set.
+- **B-1a The registry is named for its host, not by convention.** The nine
+  registrations live in `hooks/claude-code.json`, loaded because
+  `.claude-plugin/plugin.json` declares it. The conventional `hooks/hooks.json` <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
+  stays empty: it is the path a second harness auto-discovers plugin hooks at,
+  and these hooks are Claude Code's alone (see
+  [codex-harness](codex-harness.md)). `npm run check:hooks` gates both halves —
+  the declaration and the emptiness.
 
 ### Safety contract
 - **B-2 Fail-open, always.** A hook that throws — corrupt state file, full

@@ -181,8 +181,8 @@ Return JSON {markdown: "<the section, starting at the ## header>"}.`,
 const AXES = [
   {
     key: 'install-surface',
-    prompt: `Audit arcforge's install surface (READ-ONLY): the Installation section of README.md. arcforge targets Claude Code only — there is no second platform's install guide to cross-check.
-Flag, with the exact file: (1) hardcoded skill COUNTS that drift across releases (e.g. "15 skills") — should be invariants; (2) stale path references (skills live under skills/core/<name>/, and skills are invoked as /arcforge:<name> with no prefix); (3) install commands that look broken. Return JSON per schema (empty findings is a valid result).`,
+    prompt: `Audit arcforge's install surface (READ-ONLY): the Installation section of README.md. arcforge ships on TWO hosts from one tree, so there are two install paths to cross-check — Claude Code (\`/plugin marketplace add\` + \`/plugin install arcforge@arcforge-dev\`, backed by .claude-plugin/) and Codex CLI (\`codex plugin marketplace add\` + \`codex plugin add arcforge@arcforge-dev\`, backed by .codex-plugin/plugin.json + .agents/plugins/marketplace.json).
+Flag, with the exact file: (1) hardcoded skill COUNTS that drift across releases (e.g. "15 skills") — should be invariants; (2) stale path or name references — skills live under skills/core/<name>/, and the namespaced invocation form is HOST-SPECIFIC: \`/arcforge:<name>\` on Claude Code and \`arcforge:<name>\` (no leading slash) on Codex, which is what codex-cli actually renders — so do NOT flag a slashless Codex name in the Codex block as stale. What IS stale on either host is a surviving \`arc-\` name prefix (e.g. \`arc-tdd\`), which no longer resolves; (3) install commands that look broken, including a Codex command whose plugin/marketplace name disagrees with the manifests; (4) a Codex install block that omits the boundary — hooks, learning, eval and loop are Claude Code only, and the CLI-backed skills cannot reach the \`arcforge\` CLI on Codex. Return JSON per schema (empty findings is a valid result).`,
   },
   {
     key: 'stale-patterns',
@@ -191,9 +191,10 @@ Specifically: (1) the OLD version string "${prevVersion}" hardcoded anywhere out
   },
   {
     key: 'version-locations',
-    prompt: `Verify the 8 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
-package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
-For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ README.md website/page/\` and note the hit count. Return JSON per schema.`,
+    prompt: `Verify the 9 canonical version locations for arcforge (READ-ONLY) and report each one's CURRENT value so the bump can target them precisely:
+package.json (version), .claude-plugin/plugin.json (version), .claude-plugin/marketplace.json (plugins[0].version), .codex-plugin/plugin.json (version — Codex CLI's manifest), README.md (shields.io badge URL), website/page/hero.jsx (vX.Y.Z label), website/page/sections.jsx (footer vX.Y.Z), website/page/hero.js (built), website/page/sections.js (built).
+.agents/plugins/marketplace.json is NOT a version location — the Codex marketplace schema has no version field.
+For each, emit a finding with severity 'nit', file = "<path> — current: <value>", issue describing whether it equals ${prevVersion} (expected pre-bump) or is anomalous, and suggestion = the bump target ${version}. Also run \`grep -rn "${prevVersion}" package.json .claude-plugin/ .codex-plugin/ README.md website/page/\` and note the hit count. Return JSON per schema.`,
   },
 ];
 

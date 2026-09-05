@@ -264,7 +264,8 @@ function SessionLearning({theme:t}) {
 // ─── Platforms ───
 function Platforms({theme:t}) {
   const plats = [
-    {name:'Claude Code',tag:'THE TARGET',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
+    {name:'Claude Code',tag:'IN FULL',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
+    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 15 skills load from the same tree \u2014 8 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 15 before you install.'},
     {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
@@ -272,22 +273,22 @@ function Platforms({theme:t}) {
       <SectionHeader
         n="09"
         kicker="PLATFORM"
-        title={<>One harness, <em style={{color:t.brass,fontStyle:'italic'}}>done properly.</em></>}
-        sub="arcforge targets Claude Code and nothing else. No portability layer, no lowest-common-denominator features, no second packaging target to drift out of sync."
+        title={<>One tree, <em style={{color:t.brass,fontStyle:'italic'}}>two manifests.</em></>}
+        sub="One codebase, no portability layer, no per-host copy of anything. Claude Code gets the whole toolkit; Codex CLI installs the skills. What each host gets is stated up front, and version parity across both manifests is a CI gate, not a habit."
         theme={t}
       />
-      <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+      <div data-af-reveal className="af-grid-3col" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:24}}>
         {plats.map(p=>(
           <div key={p.name} style={{
             background:t.card,border:`${p.primary?1.5:1}px solid ${p.primary?t.ember:t.line}`,
-            padding:'28px 32px',position:'relative'
+            padding:'28px 32px',position:'relative',display:'flex',flexDirection:'column'
           }}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
               <h3 style={{fontFamily:'"Fraunces",serif',fontSize:28,margin:0,color:t.ink,fontWeight:400,letterSpacing:-.5}}>{p.name}</h3>
               <Stamp label={p.tag} color={p.primary?t.ember:t.brass} small/>
             </div>
             <div style={{color:t.mute,fontSize:13,lineHeight:1.55,marginBottom:18}}>{p.note}</div>
-            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`}}>{p.cmd}</div>
+            <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:12,color:p.primary?t.ember:t.dim,background:t.bg,padding:'10px 14px',border:`1px dashed ${t.line}`,marginTop:'auto'}}>{Array.isArray(p.cmd)?p.cmd.map(c=><div key={c}>{c}</div>):p.cmd}</div>
           </div>
         ))}
       </div>
@@ -350,7 +351,7 @@ function SkillsGrid({theme:t}) {
             </div>
           ))}
         </div>
-        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>The full catalog · invoke any of them as /arcforge:&lt;name&gt;</div>
+        <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:10,letterSpacing:2,color:t.dim,textTransform:'uppercase',borderTop:`1px dashed ${t.line}`,paddingTop:18}}>The full catalog · invoke any of them as /arcforge:&lt;name&gt; · arcforge:&lt;name&gt; on Codex</div>
         {groups.map(([name,color,items])=>(
           <div key={name}>
             <div style={{display:'flex',alignItems:'baseline',gap:16,marginBottom:18,paddingBottom:10,borderBottom:`1px dashed ${t.line}`}}>

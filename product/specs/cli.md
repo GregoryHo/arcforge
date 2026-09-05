@@ -25,12 +25,16 @@ underneath without breaking anything written against it.
 ## Behavior
 
 ### Invocation
-- **B-1 Bare command, no setup.** `arcforge <command>` resolves anywhere once
-  the plugin is installed — no path construction, no `node` prefix, no
-  environment variable, no config file before first use. The host puts the
-  plugin's `bin/` on PATH; that mechanism is the whole discovery story. A skill
-  or script that needs the engine MUST shell out to the bare command and treat
-  everything behind it as opaque.
+- **B-1 Bare command, no setup.** `arcforge <command>` resolves anywhere on a
+  host that puts a loaded plugin's `bin/` on PATH — no path construction, no
+  `node` prefix, no environment variable, no config file before first use. That
+  host mechanism is the whole discovery story, and it is the host's to provide:
+  Claude Code does, Codex CLI does not, so on Codex the bare command does not
+  resolve and the CLI-backed skills report `command not found`
+  ([codex-harness](codex-harness.md) B-3). A skill or script that needs the
+  engine MUST shell out to the bare command and treat everything behind it as
+  opaque — the answer to a host without the mechanism is a decision recorded
+  here, never a skill that builds its own path.
 - **B-2 One environment input.** The CLI reads `CLAUDE_PROJECT_DIR` for the
   project root (defaulting to the current directory) and derives everything
   else. It MUST NOT require being pointed at its own installation.
@@ -85,7 +89,11 @@ command offers one (B-6).
 
 - **D-002** — the bare-command discovery contract (B-1) leans on the host
   harness putting plugin `bin/` on PATH; 6.0.0 commits to Claude Code as that
-  host. See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
+  host.
+- **D-013** — 6.1.0 adds a second host that does *not* provide that mechanism,
+  and accepts the loud `command not found` rather than bending B-1.
+
+See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 
 The single-executable and single-manifest choices predate this log; rationale
 inline above, mechanical enforcement in `npm run check:docs` /

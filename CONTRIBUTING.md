@@ -257,7 +257,7 @@ Hooks extend Claude Code behavior through event-driven JavaScript modules. See [
 
 ```
 hooks/
-  hooks.json              # Hook registration
+  claude-code.json        # Hook registry (named by the plugin manifest)
   __tests__/              # Node --test suites
   <hook-name>/
     main.js               # Entry point
@@ -288,10 +288,10 @@ Import from `scripts/lib/utils.js` (canonical location) for common operations:
 
 - Must be Node.js (not bash) for cross-platform support
 - Silent catch — a hook must never crash the session
-- Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for path references in `hooks.json`
+- Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for path references in `claude-code.json`
 - Use `path.join()` for file paths; temp files go to `os.tmpdir()`
 - Tests: `npm run test:hooks` (runs `hooks/__tests__/` with Node `--test`)
-- The schema of `hooks.json` is checked by `npm run check:hooks`
+- The schema of `hooks/claude-code.json`, and the `hooks` value each plugin manifest declares, are checked by `npm run check:hooks`
 
 ---
 
@@ -315,7 +315,7 @@ Six static checks run in CI and are **not** part of `npm test`:
 | `npm run check:versions` | Version strings in sync across the locations in `scripts/check-version-sync.js` |
 | `npm run check:docs` | Docs don't promise paths, commands, or flags the engine lacks |
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
-| `npm run check:hooks` | `hooks/hooks.json` schema |
+| `npm run check:hooks` | `hooks/claude-code.json` schema + the manifests’ `hooks` declarations |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
 | `npm run check:product` | `product/` roadmap, Decision Log, and spec headers stay consistent |
 

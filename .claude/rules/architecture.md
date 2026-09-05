@@ -113,10 +113,30 @@ rules, or tests.
   instructions, and harness/eval isolation. For simple answers, read-only
   inspection, grading, or single-skill evals, do not force routing.
 
-## Single Platform
+## Packaging Targets
 
-arcforge targets Claude Code only. There is no platform-agnostic /
-platform-specific split to maintain, and no second packaging target.
+One codebase, two manifests, no source split. Claude Code installs over
+`.claude-plugin/`; Codex CLI installs over `.codex-plugin/plugin.json` +
+`.agents/plugins/marketplace.json`. That manifest pair, plus the hook registry's
+filename (below), is the *entire* difference — there is no platform-agnostic /
+platform-specific source tree, no per-target copy of a skill, and no build step
+that emits one target from the other.
+
+What each target gets is not symmetric, and that asymmetry is the contract:
+
+- **Skills port; nothing else does.** All 15 skills load on both hosts. Hooks,
+  learning, eval, and loop are Claude Code only — they depend on Claude Code's
+  hook protocol and on `claude` being spawnable, neither of which Codex offers.
+  Hooks go further than "do not run": the registry is named
+  `hooks/claude-code.json` precisely so Codex's hook auto-discovery cannot see
+  it, and `check:hooks` keeps it that way.
+- **The D9 bare-`arcforge` boundary is Claude Code's.** Codex does not put a
+  plugin's `bin/` on PATH (spike-verified), so on Codex the CLI-backed skills
+  report `command not found` rather than silently misbehaving. D1/D9 do not
+  bend for this: a skill still never builds a path to the engine.
+
+Details and rationale: `.claude/rules/plugin.md` (the manifest pair) and
+`product/specs/codex-harness.md` (why the boundary sits here).
 
 ## Directory Layout
 
@@ -132,7 +152,10 @@ docs/             # Guides, design docs, plans
 ## Recognizing Stale References
 
 External material (old wiki pages, blog posts, cached docs) may still mention
-an SDD pipeline, a DAG engine, `agents/` or `templates/` directories, `.codex*`
-packaging, an `ARCFORGE_ROOT` variable, or `arc-`-prefixed skill names. None of
-those exist in this project — treat such a reference as stale, not as something
-to restore.
+an SDD pipeline, a DAG engine, `agents/` or `templates/` directories, an
+`ARCFORGE_ROOT` variable, or `arc-`-prefixed skill names. None of those exist in
+this project — treat such a reference as stale, not as something to restore.
+
+`.codex-plugin/` and `.agents/` are the exception that used to be on that list:
+they are shipped files as of 6.1.0 (see *Packaging Targets* above), so material
+calling them stale is itself the stale reference.

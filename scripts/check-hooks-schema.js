@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * check-hooks-schema.js — static validation of hooks/hooks.json.
+ * check-hooks-schema.js — static validation of the hook registry and of the
+ * registration path the two plugin manifests point at.
  *
  * The hook registry is load-bearing and silently fails: a typo'd command, an
  * unknown event name, or an async guard leaves the session running with a hook
  * disabled and no error. The e2e suite spawns entry files directly, so it can
  * never catch a broken registration. This linter is the only guard on the
- * hooks.json wiring itself. Fits the scripts/check-*.js linter family.
+ * registration wiring itself. Fits the scripts/check-*.js linter family.
  *
- * Validates:
+ * Validates hooks/claude-code.json:
  *   - every event key is a known Claude Code hook event;
  *   - every matcher-group has a stable string `id`, a valid-regex `matcher`,
  *     and a non-empty `hooks` array;
@@ -20,13 +21,42 @@
  *     synchronous (non-async) matcher-group — the dispatcher — so the blocking
  *     path is a single sync process and the async observers cannot creep onto it.
  *
+ * And validates where each manifest points, which is a two-host contract:
+ *   - `.claude-plugin/plugin.json` must declare exactly
+ *     `"hooks": "./hooks/claude-code.json"`. Claude Code honours a manifest
+ *     `hooks` path, and that declaration is the ONLY thing loading arcforge's
+ *     hooks — the registry deliberately does not sit at the conventional name.
+ *   - `.codex-plugin/plugin.json` must declare no `hooks` key. arcforge's hooks
+ *     speak Claude Code's protocol and Codex must not run them. Silence here is
+ *     a statement of intent, not the guard: the guard is the registry's
+ *     filename plus the two absence checks below.
+ *   - Nothing may sit at `hooks.json` or `hooks/hooks.json`. Those are the paths
+ *     Codex auto-discovers plugin hooks at whether or not a manifest names them:
+ *     a plugin whose manifest was silent still fired every hook it declared at
+ *     `hooks/hooks.json`. Keeping both paths empty is what makes that leak
+ *     structurally impossible instead of merely unlikely, so re-introducing
+ *     either file is a finding even if nothing references it.
+ *
  * CLI tier: prints a report and exits 0 (valid) / 1 (invalid).
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const HOOKS_JSON = path.resolve(__dirname, '..', 'hooks', 'hooks.json');
+const repoRoot = path.resolve(__dirname, '..');
+const HOOKS_REGISTRY = path.join(repoRoot, 'hooks', 'claude-code.json');
+
+// Each shipped plugin manifest and the exact `hooks` value it must carry —
+// `null` meaning "must declare no hooks key at all". Both are shipped files, so
+// a missing one is a finding rather than a skipped check.
+const MANIFESTS = [
+  { file: '.claude-plugin/plugin.json', expectedHooks: './hooks/claude-code.json' },
+  { file: '.codex-plugin/plugin.json', expectedHooks: null },
+];
+
+// The paths Codex auto-discovers plugin hooks at. Both must stay empty; see the
+// header for why an unreferenced file at either one is still a leak.
+const CODEX_DISCOVERED_PATHS = ['hooks.json', 'hooks/hooks.json'];
 
 // Known Claude Code hook events (see .claude/rules/plugin.md).
 const ALLOWED_EVENTS = new Set([
@@ -51,17 +81,17 @@ const ALLOWED_EVENTS = new Set([
 const SINGLE_SYNC_EVENTS = ['PreToolUse', 'PostToolUse'];
 
 /**
- * Validate the parsed hooks.json object. Pure — returns a list of error strings
+ * Validate the parsed hook registry object. Pure — returns a list of error strings
  * (empty = valid). Never throws on a structurally-broken config.
  *
- * @param {object} config - Parsed hooks.json.
+ * @param {object} config - Parsed hooks/claude-code.json.
  * @returns {string[]} error messages
  */
 function validateHooksJson(config) {
   const errors = [];
 
   if (!config || typeof config !== 'object' || !config.hooks || typeof config.hooks !== 'object') {
-    return ['hooks.json must have a top-level "hooks" object'];
+    return ['hooks/claude-code.json must have a top-level "hooks" object'];
   }
 
   const seenIds = new Set();
@@ -128,16 +158,102 @@ function validateHooksJson(config) {
   return errors;
 }
 
+/**
+ * Assert each plugin manifest declares exactly the `hooks` value it owes: the
+ * Claude Code manifest points at the renamed registry, the Codex one stays
+ * silent. Pure over the read results — returns a list of error strings.
+ *
+ * @param {{file: string, expectedHooks: string|null, status: 'ok'|'missing'|'unreadable', manifest?: object, error?: string}[]} reads
+ * @returns {string[]} error messages
+ */
+function validateManifestHooks(reads) {
+  const errors = [];
+  for (const read of reads) {
+    if (read.status === 'missing') {
+      errors.push(`${read.file}: manifest missing — it is a shipped file`);
+      continue;
+    }
+    if (read.status === 'unreadable') {
+      errors.push(`${read.file}: cannot read/parse — ${read.error}`);
+      continue;
+    }
+    const declared = Object.hasOwn(read.manifest, 'hooks') ? read.manifest.hooks : undefined;
+    if (read.expectedHooks === null) {
+      if (declared !== undefined) {
+        errors.push(
+          `${read.file}: declares "hooks": ${JSON.stringify(declared)} — this manifest must stay silent about hooks (see this file's header)`,
+        );
+      }
+      continue;
+    }
+    if (declared !== read.expectedHooks) {
+      errors.push(
+        `${read.file}: "hooks" must be exactly ${JSON.stringify(read.expectedHooks)}, found ${JSON.stringify(declared)} — it is the only thing that loads the hook registry`,
+      );
+    }
+  }
+  return errors;
+}
+
+/**
+ * Resolve every Codex-discovered path that actually exists under a tree. This is
+ * the filesystem half of the leak guard — the half a typo silently disables, so
+ * it is a named export rather than an expression inlined into main().
+ *
+ * @param {string} root - repo root to resolve CODEX_DISCOVERED_PATHS against
+ * @returns {string[]} the repo-relative paths that exist
+ */
+function findCodexDiscoverablePaths(root) {
+  return CODEX_DISCOVERED_PATHS.filter((f) => fs.existsSync(path.join(root, f)));
+}
+
+/**
+ * Assert nothing sits at a path Codex auto-discovers plugin hooks at. Pure —
+ * takes the subset of CODEX_DISCOVERED_PATHS that exist on disk.
+ *
+ * @param {string[]} present - discovered-path repo-relative paths that exist
+ * @returns {string[]} error messages
+ */
+function validateNoCodexDiscoverablePaths(present) {
+  return present.map(
+    (file) =>
+      `${file}: exists — Codex auto-discovers plugin hooks here with or without a manifest key, so this file leaks arcforge's Claude Code hooks into Codex sessions (see this file's header)`,
+  );
+}
+
+/** Read one manifest into the shape validateManifestHooks consumes. */
+function readManifest({ file, expectedHooks }) {
+  const abs = path.join(repoRoot, file);
+  if (!fs.existsSync(abs)) {
+    return { file, expectedHooks, status: 'missing' };
+  }
+  try {
+    return {
+      file,
+      expectedHooks,
+      status: 'ok',
+      manifest: JSON.parse(fs.readFileSync(abs, 'utf8')),
+    };
+  } catch (err) {
+    return { file, expectedHooks, status: 'unreadable', error: err.message };
+  }
+}
+
 function main() {
   let config;
   try {
-    config = JSON.parse(fs.readFileSync(HOOKS_JSON, 'utf8'));
+    config = JSON.parse(fs.readFileSync(HOOKS_REGISTRY, 'utf8'));
   } catch (err) {
-    console.error(`hooks-schema linter — cannot read/parse hooks.json: ${err.message}`);
+    console.error(`hooks-schema linter — cannot read/parse hooks/claude-code.json: ${err.message}`);
     process.exit(1);
   }
 
-  const errors = validateHooksJson(config);
+  const present = findCodexDiscoverablePaths(repoRoot);
+  const errors = [
+    ...validateHooksJson(config),
+    ...validateManifestHooks(MANIFESTS.map(readManifest)),
+    ...validateNoCodexDiscoverablePaths(present),
+  ];
   const eventCount = Object.keys(config.hooks || {}).length;
   const groupCount = Object.values(config.hooks || {}).reduce(
     (n, g) => n + (Array.isArray(g) ? g.length : 0),
@@ -145,20 +261,33 @@ function main() {
   );
 
   console.log(
-    `hooks-schema linter — ${eventCount} events / ${groupCount} matcher-groups in hooks.json\n`,
+    `hooks-schema linter — ${eventCount} events / ${groupCount} matcher-groups in ` +
+      `hooks/claude-code.json, ${MANIFESTS.length} manifests checked for their "hooks" value, ` +
+      `${CODEX_DISCOVERED_PATHS.length} Codex-discovered paths checked for absence\n`,
   );
 
   if (errors.length === 0) {
-    console.log('hooks.json is valid.');
+    console.log(
+      'hooks/claude-code.json is valid, each manifest declares what it owes, and no ' +
+        'Codex-discovered hooks path exists.',
+    );
     process.exit(0);
   }
 
-  console.error(`hooks.json has ${errors.length} schema violation(s):`);
+  console.error(`hook registry has ${errors.length} violation(s):`);
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
 
-module.exports = { validateHooksJson, ALLOWED_EVENTS };
+module.exports = {
+  validateHooksJson,
+  validateManifestHooks,
+  findCodexDiscoverablePaths,
+  validateNoCodexDiscoverablePaths,
+  ALLOWED_EVENTS,
+  MANIFESTS,
+  CODEX_DISCOVERED_PATHS,
+};
 
 if (require.main === module) {
   main();

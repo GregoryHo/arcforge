@@ -5,8 +5,10 @@ arcforge repo itself (Codex, Claude Code, or anything else). It deliberately
 contains no rules of its own — it tells you where the binding ones live, so
 there is exactly one copy of each.
 
-**The product ships for Claude Code only; the *contributor* surface is
-harness-neutral.** Nothing here changes what arcforge targets.
+**The product ships on two hosts from one tree — Claude Code in full, Codex CLI
+as skills only — and the *contributor* surface is harness-neutral.** What each
+host loads is `.claude/rules/plugin.md` (the manifest pair) and
+`.claude/rules/architecture.md` (Packaging Targets); nothing here changes it.
 
 ## Read these before changing anything
 

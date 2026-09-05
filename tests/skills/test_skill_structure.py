@@ -416,6 +416,91 @@ def test_cross_references_found():
     )
 
 
+# --- Host parity: the two explicit-intent gates -------------------------------
+# `disable-model-invocation: true` is the Claude Code mechanism and means nothing
+# to Codex — verified twice against codex-cli 0.152.1: with the flag alone all
+# fifteen skills still appear in the `<skills_instructions>` list the model picks
+# from, and Codex's own bundled plugin validator rejects the key outright
+# ("frontmatter field `disable-model-invocation` must be false"). Codex spells the
+# same intent `policy.allow_implicit_invocation: false` in a skill-local
+# `agents/openai.yaml`. Two mechanisms, one meaning — so they are asserted as one
+# set, in both directions, or a skill silently becomes model-invokable on one host.
+
+
+CODEX_AGENT_MANIFEST = ("agents", "openai.yaml")
+
+
+def _codex_allows_implicit(skill_dir: Path) -> bool | None:
+    """False/True from the skill's Codex policy; None when it declares no manifest."""
+    manifest = skill_dir.joinpath(*CODEX_AGENT_MANIFEST)
+    if not manifest.is_file():
+        return None
+    payload = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict), f"{skill_dir.name}: agents/openai.yaml is not a mapping"
+    # Codex's validator requires a non-empty interface whenever the file exists,
+    # so a policy-only manifest would fail to load rather than gate anything.
+    interface = payload.get("interface")
+    assert isinstance(interface, dict), (
+        f"{skill_dir.name}: agents/openai.yaml must carry an `interface` object — "
+        f"Codex rejects the manifest without one"
+    )
+    for field in ("display_name", "short_description"):
+        value = interface.get(field)
+        assert isinstance(value, str) and value.strip(), (
+            f"{skill_dir.name}: agents/openai.yaml `interface.{field}` must be a non-empty string"
+        )
+    policy = payload.get("policy")
+    assert isinstance(policy, dict), (
+        f"{skill_dir.name}: agents/openai.yaml declares no `policy` block — the only "
+        f"reason arcforge ships this file is to set allow_implicit_invocation"
+    )
+    allowed = policy.get("allow_implicit_invocation")
+    assert isinstance(allowed, bool), (
+        f"{skill_dir.name}: `policy.allow_implicit_invocation` must be a boolean, "
+        f"got {allowed!r}"
+    )
+    return allowed
+
+
+@pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
+def test_user_invoked_skills_are_gated_on_every_host(skill_dir):
+    """A user-invoked skill gates on Codex too; a model-invoked one is never gated.
+
+    Checked per skill in both directions, so neither half can drift: adding the
+    frontmatter flag without the Codex manifest leaves the skill implicitly
+    selectable on Codex, and leaving the manifest behind after dropping the flag
+    hides a model-invoked skill from Codex for no stated reason.
+    """
+    user_invoked = _is_dmi(_load_frontmatter(_read(skill_dir)))
+    allows_implicit = _codex_allows_implicit(skill_dir)
+
+    if user_invoked:
+        assert allows_implicit is False, (
+            f"{skill_dir.name} is user-invoked (disable-model-invocation) but its Codex "
+            f"policy is {allows_implicit!r} — Codex ignores the frontmatter flag, so the "
+            f"skill stays implicitly selectable there. Add agents/openai.yaml with "
+            f"`policy.allow_implicit_invocation: false`"
+        )
+    else:
+        assert allows_implicit is not False, (
+            f"{skill_dir.name} is model-invoked but agents/openai.yaml sets "
+            f"`allow_implicit_invocation: false` — that hides it from Codex's skill list "
+            f"while Claude Code still fires it automatically. Drop the manifest or add "
+            f"the frontmatter flag"
+        )
+
+
+def test_codex_policy_set_matches_the_user_invoked_set():
+    """The two gate lists are the same set — a per-skill check cannot see a swap."""
+    user_invoked = {d.name for d in SKILL_DIRS if _is_dmi(_load_frontmatter(_read(d)))}
+    codex_gated = {d.name for d in SKILL_DIRS if _codex_allows_implicit(d) is False}
+    assert user_invoked == codex_gated, (
+        f"user-invoked skills {sorted(user_invoked)} != Codex-gated skills "
+        f"{sorted(codex_gated)} — the two mechanisms have drifted apart"
+    )
+    assert user_invoked, "no user-invoked skill found — the discovery or the flag broke"
+
+
 # --- Scan integrity ----------------------------------------------------------
 
 

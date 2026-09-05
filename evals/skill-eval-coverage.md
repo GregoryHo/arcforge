@@ -55,7 +55,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | finishing | +0.54 CI[0.46, 0.62] | P7 ab（P4 +0.58 同量級） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 分數面過 | P7 ab ×3 |
 | executing | +0.40 CI[0.03, 0.77] | P7 ab k=10 |
-| using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab |
+| using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
 | sessions | +0.29（吸收 compacting：non-reg 1.00） | P7 ab |
 | maintaining-obsidian | +0.28 CI[0.14, 0.42] | P7 ab |
@@ -66,6 +66,164 @@ p7-benchmark-evidence.md「協定修正案」）。
 | dispatching | unmet-but-covered（ceiling ×3） | 存廢建議書 |
 | writing-skills | unmet-but-covered（P7 ceiling ×2，新支無 delta 史） | 存廢建議書 |
 | evaluating | unmet-but-covered（P5）；P7 preflight 67% 恢復鑑別力 | 存廢建議書（傾向保留） |
+
+## v6.1.0 — Codex packaging: the router's per-host note (non-regression, instrument-capped)
+
+`skills/core/using/SKILL.md` gained a per-host invocation note during Codex
+packaging: the Skill Map's `/<name>` rows are Claude Code's spelling, the same
+skill is `arcforge:<name>` on Codex, and — added in this round — that mapping
+also covers the handoffs skills write to each other mid-workflow. That is a
+**behavioral** edit under `.claude/rules/skills.md` (it changes how the agent is
+told to reach a skill), so it needs harness evidence, not a spike note.
+
+**Run.** `eval ab eval-router-skill-selection --k 10`, run id **`20260903-213804`**,
+default model, isolated, preflight hash `87dd77d26e724fb5` (PASS, baseline 0/3).
+
+**The threshold, pre-registered before the run, quoted here in full.** It is
+reproduced rather than cited because nothing else in the repo can back it: the
+pre-registration was written into a git-excluded handoff file and `evals/results/*`
+is gitignored, so a reader with only the tree in hand could not otherwise check
+what was promised against what shipped. (P7's, by contrast, is tracked in
+`docs/plans/v6/progress.md`.)
+
+> **Threshold, fixed before seeing numbers.** This is a **non-regression** claim,
+> not an improvement claim. The standing evidence for this row is P7's
+> **+0.36 CI[0.25, 0.47]** (`evals/skill-eval-coverage.md`, P7 benchmark table).
+> PASS requires both:
+>
+> 1. the new delta's CI lower bound is **> 0** (the router still beats baseline), and
+> 2. the new CI **overlaps** P7's [0.25, 0.47] (the note did not move the row).
+>
+> A delta lower than +0.36 whose interval still satisfies both is a PASS, and is
+> to be read as one — the run is 10 trials against a noisy grader, not a
+> re-measurement of the row's effect size. FAIL on either half means the note's
+> wording is the suspect: fix the wording and rerun once.
+
+| | trials | avg | pass |
+|---|---|---|---|
+| baseline | 10 | 0.60 [0.6, 0.6] | 0% |
+| treatment | 10 | 0.78 [0.73, 0.83] | 90% |
+| **delta** | | **+0.18 CI[0.13, 0.23]** | verdict IMPROVED |
+
+**Verdict: non-regression carried by A5; the pre-registered half-2 test was not
+evaluable under this instrument.** Half 1 passes — +0.18 with a CI lower bound of
+0.13 > 0. Half 2 does not fail: it was **not reachable by any router behavior in
+this run**, so it is recorded as **not evaluable**, neither met nor waived. (The
+`IMPROVED` in the table is the harness's label for the delta it computed; it is
+not a verdict on the pre-registered gate.) The escalation clause was not taken
+either, because the run falsifies the suspect that clause names: the assertion
+that died, died in **both** arms, so the note's wording cannot be its cause — and
+a reworded rerun would be judged against a criterion this instrument still could
+not reach.
+
+**A2 (`[tool_before] Edit:re:test/ < Edit:re:src/`) scored 0 in 20 of 20 trials,
+both arms — because a contributor-local output style leaked into every trial.**
+A tool tally over this run's transcripts returns `Bash` 38× (treatment) / 32×
+(baseline) and **nothing else**: no `Edit`, `Write` or `Read` in either arm. P7's
+retained run (`20260815-054518`) tallies `Edit` 10× and `Read` 12–14× in *both*
+of its arms. The tools were available in both campaigns; what differed is an
+instruction.
+
+**Why that makes half 2 unattainable rather than missed — the arithmetic, off
+this run's own pool.** Baseline scored **0.60 in 10 of 10 trials, zero variance**;
+treatment scored **0.80 in 9 trials and 0.60 in 1**. With A2 structurally 0 in 20
+of 20, a trial's ceiling is 4 of 5 = **0.80**, and baseline was flat at 0.60 in
+all ten trials — an observation from this run, not a structural property the way
+A2's death is. The largest point estimate any router behavior could have produced
+here is therefore exactly **+0.20**; at that ceiling — both arms at zero
+variance — the interval is the degenerate **[0.20, 0.20]**. The observed +0.18
+CI[0.13, 0.23] is **90% of that maximum attainable delta**.
+
+Half 2 is an *overlap* test, though, so the cap has to hold on the interval's
+**upper** bound and not only on the point estimate. It does. The attainable
+configurations are exactly *k* trials at the 0.80 ceiling and 10−*k* at 0.60 with
+baseline fixed; replaying all eleven through the harness's own `ciForDelta`
+(Welch, `scripts/lib/eval-stats.js`) reproduces this run's `[0.13, 0.23]` at
+*k*=9 and puts the **maximum upper bound over the whole sweep at 0.23** — at
+*k*=9, the configuration that in fact occurred. No arrangement of trials under
+this instrument reaches half 2's 0.25 floor, so no interval it could have
+produced overlaps [0.25, 0.47]. Half 2 was not a test this run could pass or
+fail; it was not identifiable under the instrument that ran.
+
+**Cause established, not inferred.** `runTrial` preserves the real `HOME` (so the
+trial can resolve `~/.claude` auth), and the trial-local settings it writes
+disable plugins and exclude `CLAUDE.md`/`rules/` — but nothing excludes the
+user-global `outputStyle` in `~/.claude/settings.json`. A probe run reproducing
+the harness's isolation settings and prompted to quote its own tool-selection
+instructions returned, verbatim: *"Do your work through the Bash tool wherever it
+can accomplish the job: read files with cat, head, or sed -n … rather than using
+the dedicated Read, Edit, or Write tools"* — and stated that this is why it used
+`cat` rather than `Read`. The same probe showed a user-level SessionStart hook
+reaching the trial as well. So the operator's personal output style is a live
+input to every eval trial, in both arms, on any machine that sets one.
+
+That is also the whole of the +0.36 → +0.18 gap. P7's treatment earned the A2
+point (4 of 5 trials scored a full 1.0); this run's treatment could not, because
+its agents were told to prefer heredocs. The two numbers are two instruments, not
+two readings of one, and **P7's interval is not a valid comparison target for
+this run's**. The half-2 test is unattainable here, not retired by choice: the
+arithmetic above fixes its maximum at +0.20 before any router behavior is
+observed.
+
+**What carries the non-regression claim: A5.** A5 is the model-graded read of the
+same behavior A2 chases mechanically, and is unaffected by tool choice. It
+reproduces P7 exactly:
+
+| | A5 baseline | A5 treatment |
+|---|---|---|
+| P7 (`20260815-054518`, k=5) | 0/5 | 5/5 |
+| this run (`20260903-213804`, k=10) | 0/10 | 10/10 |
+
+Full separation in both campaigns. A4 (the routing judgment itself) is 10/10 in
+both arms, read off the same per-arm vector as the A5 row (below) — at ceiling in
+this run, so what this scenario measures is the test-first discipline the routing
+selects rather than the routing statement in isolation. **The one adverse movement between arms is A1**, the `npm test`
+matcher: baseline 10/10, treatment 9/10, lost by treatment trial 3 alone (0.6),
+which still passed A5. One trial in ten against a matcher orthogonal to routing
+is not a regression signal, but it is not "nothing moved" either.
+
+**How this run's A4 and A5 rows are established — read, not derived.** Both arms
+retain a per-trial `assertionScores` vector in the run's own `baseline.jsonl` /
+`treatment.jsonl`, alongside the grader's per-assertion `evidence`. The vectors
+are `[A1…A5]` in the scenario's declared assertion order: baseline is
+`[1, 0, 1, 1, 0]` in all ten trials; treatment is `[1, 0, 1, 1, 1]` in nine and
+`[0, 0, 1, 1, 1]` in trial 3. Baseline A5 = 0/10 and baseline A4 = 10/10 are
+therefore **readings**, not inferences off the 0.60 average. The narrative files
+under `grading/` are treatment-only in this pool, but what they carry is the
+grader's discovered claims rather than the vector, so their absence costs the
+baseline arm a narrative and not a score. The retained baseline A4 evidence reads
+*"no merge, push, PR, or branch deletion … not a menu of completion options"*,
+and an independent scan of all ten baseline transcripts for those same signals
+returns zero hits.
+
+On the four live assertions the arms read 0.75 vs 0.975 (**+0.225**). That is a
+descriptive statistic on a 4-assertion scale with no interval computed for it; it
+is **not comparable to P7's +0.36 CI[0.25, 0.47]**, computed on the 5-assertion
+scale, and is not offered as an overlap argument.
+
+**Findings for the maintainer, neither fixed here.**
+1. **The isolation gap is the important one.** `buildIsolationSettings()` covers
+   plugins and `CLAUDE.md`, not `outputStyle` or user-level hooks, while `HOME`
+   stays real by design. Any contributor with a personal output style silently
+   changes what every trial does, in both arms — so tool-keyed assertions can die
+   and cross-campaign benchmark comparisons can read instrument change as
+   behavior change. This run is the existence proof.
+2. A2 is dead under that condition. Repairing it (matching file creation through
+   `Bash` heredocs, or leaning on A5, which read the ordering correctly in all 20
+   trials) changes the scenario hash, voids the preflight record and needs a
+   `## Version` bump — a scenario-design decision outside a packaging PR's scope.
+   Every `[tool_before]`/`[tool_called]` assertion keyed to `Edit`, `Write` or
+   `Read` across the corpus is exposed to the same cause. Until (1) is closed,
+   read this row's raw delta as instrument-capped.
+
+### Codex-side coverage: pre-registered as UNMEASURED
+
+Whether a Codex agent follows a `/<name>` handoff after reading that mapping is
+**not measured, and no number above speaks to it.** The harness spawns `claude`
+and has no Codex runner; that is the `harness-neutral-model-runner` Backlog wish,
+and `product/specs/codex-harness.md` B-6 carries the same statement as a
+residual. The evidence on record for the note is Claude-side non-regression
+only. This gap closes when a harness can reach that host, not before.
 
 以下為歷史量測紀錄（P5/P6 逐 campaign 原帳，保留不改；其中引用的部分 scenario
 名與路徑為當時現狀）。

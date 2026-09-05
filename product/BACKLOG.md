@@ -6,8 +6,30 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 
 ## Harness
 
-- **codex-harness** — wrap Codex as a second harness alongside Claude Code
-  (packaging + spike verification of skill discovery and invocation) · needs: D-002.
+- ~~**codex-harness**~~ — graduated into 6.1.0 (D-013).
+- **codex-cli-on-path** — give the seven CLI-backed skills a working engine call
+  on Codex, which does not put a plugin's `bin/` on `PATH`. Two mechanisms were
+  observed working in the spike, and they are not equally cheap: a **skill-relative
+  path** from Codex's skills-roots table up to the bundled `bin/arcforge` (proven,
+  but a skill naming its way to the engine is exactly what D1/D9 forbid, so it
+  needs a decision), or a **SessionStart hook** injecting the absolute path as
+  `additionalContext` (proven, but it needs a hook file Codex can discover — i.e.
+  the `hooks/hooks.json` that D-013 deliberately keeps empty, so taking this route <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
+  means re-opening that guard). Skill-relative is the cheaper candidate · needs:
+  D-013.
+- **codex-hooks-adapter** — decide whether the six hooks earn a Codex-native
+  implementation. The payload shape is closer than expected (snake_case keys,
+  `hookSpecificOutput.additionalContext` honoured, `${CLAUDE_PLUGIN_ROOT}` and an
+  unprefixed `PLUGIN_ROOT` both exported), so the blocker is ownership and trust,
+  not protocol translation · needs: D-013.
+- **harness-neutral-model-runner** — the learning enricher, the eval harness and
+  the unattended loop all spawn `claude` directly. A runner seam would let them
+  target whichever CLI is hosting the session, and is the prerequisite for those
+  three subsystems reaching any second harness · needs: D-013.
+- **website-install-symmetry** — the website's Platforms cards and Install recipe are
+  Claude-Code-shaped: give the Claude Code card its two-command form and add a
+  Codex CLI skills-only block to the install section, so the site carries both
+  install paths the README already documents.
 
 ## Learning
 
