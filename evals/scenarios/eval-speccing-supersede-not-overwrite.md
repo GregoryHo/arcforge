@@ -393,31 +393,40 @@ editing, and none of the six renames it — and no full pass is at stake, since 
 renamed log already failed A1 and A3. And nothing in this grader is
 fence-aware, which now costs on two scans rather than one. The duplicate scan
 never was: a fenced `### D-005` example written into `ROADMAP.md` registers as
-a duplicate, pre-existing and untouched here. The closing bound never was
-either, and this correction widened it — a fenced block whose content line
-reads `  ## Example section` now ends the log where it sits, so a correct move
-written below it goes 4/4 → `A2, A3 FAIL`; before this, only a fenced `##` at
-column 1 did that, and that one reads `A2, A3 FAIL` on both sides of the pair.
-Both measured. On the bound itself, that is where the grader stops matching the
-contract it copied: `section()` in `scripts/lib/product-markdown.js` reads
-`SECTION_END_RE` at the same ` {0,3}` indent but runs every line through
-`hiddenTracker` first, so a `##` inside a fence closes nothing there. The
-grader took the indent half and not the fence half, deliberately — porting that
-state machine is a bigger instrument than four assertions need, and the
-divergence can only ever fail a trial, never pass one. Nothing in the prompt
-asks for a fence, and none of the six surviving transcripts writes one into
-`ROADMAP.md` at all. And the log's opening heading stays looser than the
-engine's in one dimension after `V7 pre/post (log open)` below closes the
-other. `Decision Log\b` under `re.I` opens on `## Decision Log (historical)`
-and on `## decision log`, where `DECISION_LOG_HEADING_RE` in
-`scripts/lib/product-decisions.js` is `/^##\s+Decision Log\s*$/` —
-case-sensitive and anchored at end of line — so either spelling leaves the
-engine the empty log C6 rejects while the grader reads a full one. The suffixed
-heading measures 4/4 after that correction, and is named here rather than
-closed: the spelling tolerance is what the heading dependency's defense two
-sentences up rests on, and narrowing it is a pre-registration decision about
-which spellings count as the fixture's heading, not a bound the grader copied
-wrong.
+a duplicate, pre-existing and untouched here. Nor is it indent-aware in the
+other direction: it reads `### D-NNN` at column 1, so a decoy reusing
+`D-005`'s id one to three spaces in does not register — an otherwise-correct
+move plus a lone indented `### D-005` heading measures 4/4, where the
+identical line at column 1 measures `A2 FAIL`. That indent is not the closing
+bound generalized: the engine's candidate detector spans it (`DECISION_ANY_RE`
+in `scripts/lib/product-decisions.js`, wide because a duplicate detector fails
+closed where a section-opening bound fails open) and reports the line as
+`C2 indented Decision Log heading`, so the shape is a file the product linter
+refuses, and none of the six surviving transcripts writes an indented heading.
+The closing bound never was either, and this correction widened it — a fenced
+block whose content line reads `  ## Example section` now ends the log where
+it sits, so a correct move written below it goes 4/4 → `A2, A3 FAIL`; before
+this, only a fenced `##` at column 1 did that, and that one reads
+`A2, A3 FAIL` on both sides of the pair. Both measured. On the bound itself,
+that is where the grader stops matching the contract it copied: `section()` in
+`scripts/lib/product-markdown.js` reads `SECTION_END_RE` at the same ` {0,3}`
+indent but runs every line through `hiddenTracker` first, so a `##` inside a
+fence closes nothing there. The grader took the indent half and not the fence
+half, deliberately — porting that state machine is a bigger instrument than
+four assertions need, and the divergence can only ever fail a trial, never
+pass one. Nothing in the prompt asks for a fence, and none of the six
+surviving transcripts writes one into `ROADMAP.md` at all. And the log's
+opening heading stays looser than the engine's in one dimension after
+`V7 pre/post (log open)` below closes the other. `Decision Log\b` under `re.I`
+opens on `## Decision Log (historical)` and on `## decision log`, where
+`DECISION_LOG_HEADING_RE` in `scripts/lib/product-decisions.js` is
+`/^##\s+Decision Log\s*$/` — case-sensitive and anchored at end of line — so
+either spelling leaves the engine the empty log C6 rejects while the grader
+reads a full one. The suffixed heading measures 4/4 after that correction, and
+is named here rather than closed: the spelling tolerance is what the heading
+dependency's defense two sentences up rests on, and narrowing it is a
+pre-registration decision about which spellings count as the fixture's
+heading, not a bound the grader copied wrong.
 
 **`V7 pre/post (log open)` — the opening bound, corrected.** A pass path found
 after `V7 pre/post (log scope)` shipped, and first recorded as a fourth
